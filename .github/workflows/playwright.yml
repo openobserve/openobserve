@@ -8,8 +8,6 @@ on:
       - "**.md"
       - "**.yml"
       - "**.yaml"
-    # paths:
-    #   - "web/**"
   pull_request:
     branches:
       - "*"
@@ -17,8 +15,6 @@ on:
       - "**.md"
       - "**.yml"
       - "**.yaml"
-    # paths:
-    #   - "web/**"
 
 env:
   COLUMNS: 150
@@ -197,6 +193,8 @@ jobs:
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       # - name: Download artifacts
       #   uses: actions/download-artifact@v5
@@ -251,8 +249,7 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
-
-          npx playwright install
+          npx playwright install --with-deps chromium 
           # Get list of files to run using join function
           FILE_LIST="${{ join(matrix.run_files, ' ') }}"
           echo "DEBUG: FILE_LIST = $FILE_LIST"
@@ -307,13 +304,13 @@ jobs:
       # - name: Generate Coverage Report
       #   run: cd tests/ui-testing && npx nyc report
 
-      - name: Upload Playwright Report
+      - name: Upload blob report to GitHub Actions Artifacts
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
-        if: always() && hashFiles('playwright-report/**') != ''
         with:
-          name: playwright-report-${{ matrix.testfolder }}
-          path: playwright-report/
-          retention-days: 30
+          name: blob-report-${{ matrix.testfolder }}
+          path: tests/ui-testing/blob-report
+          retention-days: 1
 
       # - name: Check OpenObserve logs
       #   if: always()

@@ -23,7 +23,7 @@ use crate::{
         meta::{http::HttpResponse as MetaHttpResponse, telemetry},
         utils::auth::UserEmail,
     },
-    handler::http::models::billings::NewUserAttribution,
+    handler::http::{extractors::Headers, models::billings::NewUserAttribution},
 };
 
 /// HandleUserAttributionEvent
@@ -54,7 +54,7 @@ use crate::{
 )]
 #[post("/{org_id}/billings/new_user_attribution")]
 pub async fn handle_new_attribution_event(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     req_body: web::Json<NewUserAttribution>,
 ) -> impl Responder {
     let email = user_email.user_id.as_str();

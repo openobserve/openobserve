@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage q-my-xs" id="logPage">
+  <q-page class="logPage" id="logPage">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -45,22 +45,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection"
-            style="width: 100%"
+            class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection full-width"
             v-show="searchObj.meta.logsVisualizeToggle == 'logs'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              style="width: 100%"
-              class="full-height"
+              class="full-height full-width logs-splitter-smooth"
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <div class="relative-position full-height">
+                <div class="relative-position full-height" style="overflow: visible !important;">
                   <index-list
-                    v-if="searchObj.meta.showFields"
+                    v-show="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     class="full-height"
                     @setInterestingFieldInSQLQuery="
@@ -69,24 +67,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <q-btn
                     data-test="logs-search-field-list-collapse-btn"
-                    :icon="
-                      searchObj.meta.showFields
-                        ? 'chevron_left'
-                        : 'chevron_right'
-                    "
+                    icon="drag_indicator"
                     :title="
                       searchObj.meta.showFields
                         ? 'Collapse Fields'
                         : 'Open Fields'
                     "
+                    flat
                     dense
-                    size="20px"
-                    round
-                    class="q-mr-xs field-list-collapse-btn"
-                    color="primary"
-                    :style="{
-                      right: searchObj.meta.showFields ? '-20px' : '-24px',
-                    }"
+                    :class="[
+                      'splitter-section-collapse-btn',
+                      searchObj.meta.showFields
+                        ? 'splitter-section-collapse-btn--visible'
+                        : 'splitter-section-collapse-btn--hidden',
+                    ]"
                     @click="collapseFieldList"
                   ></q-btn>
                 </div>
@@ -250,13 +244,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-if="disableMoreErrorDetails">
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-error-message"
-                        :htmlContent="
-                          searchObj?.data?.errorMsg +
-                          '<h6 style=\'font-size: 14px; margin: 0;\'>' +
-                          searchObj?.data?.errorDetail +
-                          '</h6>'
-                        "
+                        :htmlContent="searchObj?.data?.errorMsg"
                       />
+                      <div class="error-display__message">
+                        {{ searchObj?.data?.errorDetail }}
+                      </div>
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-function-error-message"
                         :htmlContent="searchObj?.data?.functionError"
@@ -269,7 +261,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
-            :style="`height: calc(100vh - ${splitterModel}vh - 40px);`"
+            class="visualize-container"
+            :style="{ '--splitter-height': `${splitterModel}vh` }"
           >
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
@@ -290,31 +283,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div
         v-else-if="showSearchHistory && !store.state.zoConfig.usage_enabled"
-        style="height: 200px"
+        class="search-history-empty"
       >
-        <div style="height: 80vh" class="text-center q-pa-md flex flex-center">
+        <div class="search-history-empty__content text-center q-pa-md flex flex-center">
           <div>
             <div>
               <q-icon
                 name="history"
                 size="100px"
                 color="gray"
-                class="q-mb-md"
-                style="opacity: 0.1"
+                class="search-history-empty__icon"
               />
             </div>
-            <div class="text-h4" style="opacity: 0.8">
+            <div class="text-h4 search-history-empty__title">
               Search history is not enabled.
             </div>
             <div
-              style="opacity: 0.8"
-              class="q-mt-sm flex items-center justify-center"
+              class="search-history-empty__info q-mt-sm flex items-center justify-center"
             >
               <q-icon
                 name="info"
                 class="q-mr-xs"
                 size="20px"
-                style="opacity: 0.5"
               />
               <span class="text-h6 text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
@@ -1428,27 +1418,6 @@ export default defineComponent({
       return true;
     };
 
-    watch(
-      () => [
-        searchObj?.data?.tempFunctionContent,
-        searchObj?.meta?.logsVisualizeToggle,
-      ],
-      () => {
-        if (
-          searchObj.meta.logsVisualizeToggle == "visualize" &&
-          searchObj.data.transformType === "function" &&
-          searchObj.data.tempFunctionContent
-        ) {
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
-        } else {
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].vrlFunctionQuery = "";
-        }
-      },
-    );
     const closeSearchHistoryfn = () => {
       router.back();
       showSearchHistory.value = false;
@@ -2655,6 +2624,8 @@ export default defineComponent({
 .logPage {
   height: calc(100vh - $navbarHeight);
   min-height: calc(100vh - $navbarHeight) !important;
+  max-height: calc(100vh - $navbarHeight) !important;
+  overflow: hidden !important;
 
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
@@ -2671,23 +2642,24 @@ export default defineComponent({
     /* text-transform: capitalize; */
   }
 
-  .index-table :hover::-webkit-scrollbar,
-  #searchGridComponent:hover::-webkit-scrollbar {
-    height: 13px;
-    width: 13px;
-  }
+  // Removed - using global glassmorphic scrollbar from app.scss
+  // .index-table :hover::-webkit-scrollbar,
+  // #searchGridComponent:hover::-webkit-scrollbar {
+  //   height: 13px;
+  //   width: 13px;
+  // }
 
-  .index-table ::-webkit-scrollbar-track,
-  #searchGridComponent::-webkit-scrollbar-track {
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 10px;
-  }
+  // .index-table ::-webkit-scrollbar-track,
+  // #searchGridComponent::-webkit-scrollbar-track {
+  //   -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+  //   border-radius: 10px;
+  // }
 
-  .index-table ::-webkit-scrollbar-thumb,
-  #searchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 10px;
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  }
+  // .index-table ::-webkit-scrollbar-thumb,
+  // #searchGridComponent::-webkit-scrollbar-thumb {
+  //   border-radius: 10px;
+  //   -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+  // }
 
   .q-table__top {
     padding: 0px !important;
@@ -2703,26 +2675,99 @@ export default defineComponent({
 
   .logs-horizontal-splitter {
     border: 1px solid var(--q-color-grey-3);
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    height: 100% !important;
+    max-height: 100vh !important;
+
     .q-splitter__panel {
       z-index: auto !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      box-sizing: border-box !important;
     }
     .q-splitter__before {
-      overflow: visible !important;
+      overflow: visible !important; // Allow button to overflow
+
+      // IndexList container - full width, scrollbar inside
+      > .relative-position {
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important; // Allow button to overflow
+      }
+    }
+    .q-splitter__after {
+      padding: 0 !important;
+      margin: 0 !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+    }
+    .q-splitter__after {
+      padding: 0 !important;
+      margin: 0 !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
     }
   }
 
   .thirdlevel {
-    .field-list-collapse-btn {
-      z-index: 11;
-      position: absolute;
-      top: 5px;
-      font-size: 12px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    height: 100% !important;
+    overflow: visible !important; /* Changed from hidden to visible for button */
+  }
+
+  .logs-splitter-smooth {
+    .q-splitter__before,
+    .q-splitter__after {
+      transition: none !important;
+    }
+
+    .q-splitter__separator {
+      transition: none !important;
+      z-index: 1 !important; // Lower z-index so scrollbar overlaps it
+      // Separator IS draggable, but scrollbar will be on top where they overlap
+    }
+
+    // When hovering over the splitter area, slide out the collapsed button
+    &:hover .splitter-section-collapse-btn--hidden {
+      transform: translateY(-50%) translateX(10px) !important;
+    }
+  }
+
+  .logs-splitter-smooth {
+    .q-splitter__before,
+    .q-splitter__after {
+      transition: none !important;
+    }
+
+    .q-splitter__separator {
+      transition: none !important;
+      z-index: 1 !important; // Lower z-index so scrollbar overlaps it
+      // Separator IS draggable, but scrollbar will be on top where they overlap
+    }
+
+    // When hovering over the splitter area, slide out the collapsed button
+    &:hover .splitter-section-collapse-btn--hidden {
+      transform: translateY(-50%) translateX(10px) !important;
     }
   }
 
   .search-result-container {
     position: relative;
     width: 100%;
+    height: 100%;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
   }
 }
+</style>
+
+<style lang="scss">
+@import '@/styles/logs/logs-page.scss';
 </style>

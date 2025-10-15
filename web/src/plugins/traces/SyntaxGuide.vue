@@ -20,12 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     dense
     flat
-    class="q-ml-sm q-pa-xs syntax-guide-button"
+    class="q-ml-xs q-pa-xs syntax-guide-button"
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
-    :label="t('search.syntaxGuideLabel')"
     icon="help"
-    :aria-label="t('search.syntaxGuideLabel')"
   >
+    <q-tooltip>{{ t("search.syntaxGuideLabel") }}</q-tooltip>
     <q-menu
       data-test="syntax-guide-menu"
       class="syntax-guide-menu"
@@ -180,9 +179,13 @@ export default defineComponent({
 .syntax-guide-button {
   cursor: pointer;
   text-transform: capitalize;
-  padding: 5px 5px;
+  width: 32px;
+  height: 34px;
   font-weight: bold;
-  border: 1px solid rgba(89, 96, 178, 0.3);
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid #c4c4c4;
+  border-radius: 4px;
 }
 
 .normal-mode {

@@ -43,8 +43,11 @@ pub mod metrics;
 mod mmdb_downloader;
 #[cfg(feature = "enterprise")]
 pub(crate) mod pipeline;
+mod pipeline_error_cleanup;
 mod promql;
 mod promql_self_consume;
+#[cfg(feature = "enterprise")]
+mod query_optimization_recommendation;
 mod stats;
 
 pub use file_downloader::{download_from_node, queue_download};
@@ -277,6 +280,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { file_downloader::run().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { pipeline::run().await });
+    pipeline_error_cleanup::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());
@@ -322,6 +326,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { query_optimization_recommendation::run().await });
+
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");
 
@@ -334,6 +341,11 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
         return Ok(());
     }
+
+    // Clean up old JSON format enrichment tables before caching (one-time check at startup)
+    config::utils::enrichment_local_cache::cleanup_old_json_format()
+        .await
+        .expect("Failed to clean up old JSON format enrichment tables");
 
     db::schema::cache_enrichment_tables()
         .await

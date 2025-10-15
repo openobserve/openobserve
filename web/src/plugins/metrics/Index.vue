@@ -226,6 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :width="6"
                             @error="handleChartApiError"
                             @updated:data-zoom="onDataZoom"
+                            :allowAlertCreation="true"
                             @updated:vrl-function-field-list="
                               updateVrlFunctionFieldList
                             "
@@ -427,6 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :width="6"
                             @error="handleChartApiError"
                             @updated:data-zoom="onDataZoom"
+                            :allowAlertCreation="true"
                             @updated:vrl-function-field-list="
                               updateVrlFunctionFieldList
                             "

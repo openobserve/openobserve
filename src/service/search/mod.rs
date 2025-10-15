@@ -697,78 +697,6 @@ pub async fn search_partition(
         skip_get_file_list = true;
     }
 
-    #[cfg(feature = "enterprise")]
-    // check if we need to use streaming_output
-    let (streaming_id, streaming_interval_micros) = if req.streaming_output
-        && is_streaming_aggregate
-        && !skip_get_file_list
-    {
-        let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
-            // TODO: cache don't not support multiple stream names
-            Ok(v) => (v[0].clone(), v.join(",")),
-            Err(e) => {
-                return Err(Error::Message(e.to_string()));
-            }
-        };
-
-        // check cardinality for group by fields
-        let group_by_fields = get_group_by_fields(&sql).await?;
-        let cardinality_map = crate::service::search::cardinality::check_cardinality(
-            org_id,
-            stream_type,
-            &stream_name,
-            &group_by_fields,
-            query.end_time,
-        )
-        .await?;
-
-        let cardinality_value = cardinality_map.values().product::<f64>();
-        let cardinality_level = CardinalityLevel::from(cardinality_value);
-        let cache_interval = generate_aggregation_cache_interval(
-            query.start_time,
-            query.end_time,
-            cardinality_level,
-        );
-
-        log::info!(
-            "[trace_id {trace_id}] search_partition: using streaming_output, group by fields: {cardinality_map:?}, cardinality level: {cardinality_level:?}, interval: {cache_interval:?}"
-        );
-
-        let cache_interval_mins = cache_interval.get_duration_minutes();
-        if cache_interval_mins == 0 {
-            // this query can't use streaming_agg cache,
-            // so we set is_streaming_aggregate to false and return None
-            is_streaming_aggregate = false;
-            skip_get_file_list = true;
-            (None, 0)
-        } else {
-            let streaming_id = ider::uuid();
-            let hashed_query = get_aggregation_cache_key_from_request(req);
-            let cache_file_path = create_aggregation_cache_file_path(
-                org_id,
-                &stream_type.to_string(),
-                &stream_name,
-                hashed_query,
-                cache_interval_mins,
-            );
-            streaming_aggs_exec::init_cache(
-                &streaming_id,
-                query.start_time,
-                query.end_time,
-                &cache_file_path,
-            );
-            log::info!(
-                "[trace_id {trace_id}] [streaming_id: {streaming_id}] init streaming_agg cache: cache_file_path: {cache_file_path}"
-            );
-            (
-                Some(streaming_id),
-                cache_interval.get_interval_microseconds(),
-            )
-        }
-    } else {
-        (None, 0)
-    };
-
     let mut files = Vec::new();
 
     let mut step_factor = 1;
@@ -902,9 +830,6 @@ pub async fn search_partition(
         (records + f.records, original_size + f.original_size)
     });
 
-    #[cfg(feature = "enterprise")]
-    let streaming_aggs = is_streaming_aggregate && req.streaming_output && streaming_id.is_some();
-
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
@@ -925,11 +850,11 @@ pub async fn search_partition(
         streaming_id: None,
         // enterprise
         #[cfg(feature = "enterprise")]
-        streaming_output: streaming_aggs,
+        streaming_output: false,
         #[cfg(feature = "enterprise")]
-        streaming_aggs,
+        streaming_aggs: false,
         #[cfg(feature = "enterprise")]
-        streaming_id: streaming_id.clone(),
+        streaming_id: None,
         is_histogram_eligible,
     };
 
@@ -963,6 +888,23 @@ pub async fn search_partition(
     if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
         total_secs += 1;
     }
+
+    // If total secs is <= aggs_min_num_partition_secs (default 3 seconds), then disable
+    // partitioning even if streaming aggs is true. This optimization avoids partition overhead
+    // for fast queries.
+    #[cfg(feature = "enterprise")]
+    if is_streaming_aggregate && total_secs <= cfg.limit.aggs_min_num_partition_secs {
+        log::info!(
+            "[trace_id {trace_id}] Disabling streaming aggregation: total_secs ({}) <= aggs_min_num_partition_secs ({}), returning single partition",
+            total_secs,
+            cfg.limit.aggs_min_num_partition_secs
+        );
+        resp.partitions = vec![[req.start_time, req.end_time]];
+        resp.streaming_aggs = false;
+        resp.streaming_id = None;
+        return Ok(resp);
+    }
+
     let mut part_num = max(1, total_secs / cfg.limit.query_partition_by_secs);
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
@@ -1046,6 +988,86 @@ pub async fn search_partition(
 
     if cfg.common.align_partitions_for_index && use_inverted_index(&sql) {
         step *= step_factor;
+    }
+
+    #[cfg(feature = "enterprise")]
+    // check if we need to use streaming_output
+    let (streaming_id, streaming_interval_micros) = if req.streaming_output
+        && is_streaming_aggregate
+        && !skip_get_file_list
+    {
+        let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
+            // TODO: cache don't not support multiple stream names
+            Ok(v) => (v[0].clone(), v.join(",")),
+            Err(e) => {
+                return Err(Error::Message(e.to_string()));
+            }
+        };
+
+        // check cardinality for group by fields
+        let group_by_fields = get_group_by_fields(&sql).await?;
+        let cardinality_map = crate::service::search::cardinality::check_cardinality(
+            org_id,
+            stream_type,
+            &stream_name,
+            &group_by_fields,
+            query.end_time,
+        )
+        .await?;
+
+        let cardinality_value = cardinality_map.values().product::<f64>();
+        let cardinality_level = CardinalityLevel::from(cardinality_value);
+        let cache_interval = generate_aggregation_cache_interval(
+            query.start_time,
+            query.end_time,
+            cardinality_level,
+        );
+
+        log::info!(
+            "[trace_id {trace_id}] search_partition: using streaming_output, group by fields: {cardinality_map:?}, cardinality level: {cardinality_level:?}, interval: {cache_interval:?}"
+        );
+
+        let cache_interval_mins = cache_interval.get_duration_minutes();
+        if cache_interval_mins == 0 {
+            // this query can't use streaming_agg cache,
+            // so we set is_streaming_aggregate to false and return None
+            is_streaming_aggregate = false;
+            // skip_get_file_list = true;
+            (None, 0)
+        } else {
+            let streaming_id = ider::uuid();
+            let hashed_query = get_aggregation_cache_key_from_request(req);
+            let cache_file_path = create_aggregation_cache_file_path(
+                org_id,
+                &stream_type.to_string(),
+                &stream_name,
+                hashed_query,
+                cache_interval_mins,
+            );
+            streaming_aggs_exec::init_cache(
+                &streaming_id,
+                query.start_time,
+                query.end_time,
+                &cache_file_path,
+            );
+            log::info!(
+                "[trace_id {trace_id}] [streaming_id: {streaming_id}] init streaming_agg cache: cache_file_path: {cache_file_path}"
+            );
+            (
+                Some(streaming_id),
+                cache_interval.get_interval_microseconds(),
+            )
+        }
+    } else {
+        (None, 0)
+    };
+    #[cfg(feature = "enterprise")]
+    let streaming_aggs = is_streaming_aggregate && req.streaming_output && streaming_id.is_some();
+    #[cfg(feature = "enterprise")]
+    {
+        resp.streaming_output = streaming_aggs;
+        resp.streaming_aggs = streaming_aggs;
+        resp.streaming_id = streaming_id;
     }
 
     // Generate partitions

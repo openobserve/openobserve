@@ -16,7 +16,10 @@
 use std::{cmp::Ordering, io::Error};
 
 use actix_web::{
-    HttpRequest, HttpResponse, Responder, delete, get, http, http::StatusCode, post, put, web,
+    HttpRequest, HttpResponse, Responder, delete, get,
+    http::{self, StatusCode},
+    post, put,
+    web::{self, Query},
 };
 use chrono::{TimeZone, Utc};
 use config::{
@@ -36,9 +39,14 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             stream::{ListStream, StreamCreate, StreamDeleteFields},
         },
-        utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
+        utils::{
+            auth::UserEmail,
+            http::{get_stream_type_from_request, get_ts_from_request_with_key},
+        },
     },
-    handler::http::request::search::error_utils::map_error_to_http_response,
+    handler::http::{
+        extractors::Headers, request::search::error_utils::map_error_to_http_response,
+    },
     service::stream,
 };
 
@@ -363,8 +371,11 @@ async fn delete(
     )
 )]
 #[get("/{org_id}/streams")]
-async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+async fn list(
+    org_id: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
+    Query(query): Query<HashMap<String, String>>,
+) -> impl Responder {
     let stream_type = get_stream_type_from_request(&query);
 
     let fetch_schema = match query.get("fetchSchema") {
@@ -385,12 +396,11 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        let user_id = req.headers().get("user_id").unwrap();
         if let Some(s_type) = &stream_type {
             let stream_type_str = s_type.to_string();
             match crate::handler::http::auth::validator::list_objects_for_user(
                 &org_id,
-                user_id.to_str().unwrap(),
+                &_user_email.user_id,
                 "GET",
                 OFGA_MODELS
                     .get(stream_type_str.as_str())

@@ -46,6 +46,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotations } from "./useAnnotations";
 import useHttpStreamingSearch from "../useStreamingSearch";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import logsUtils from "@/composables/useLogs/logsUtils";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -72,8 +73,8 @@ export const usePanelDataLoader = (
   runId?: any,
   tabId?: any,
   tabName?: any,
-  searchResponse: any,
-  is_ui_histogram: any,
+  searchResponse?: any,
+  is_ui_histogram?: any,
   dashboardName?: any,
   folderName?: any,
 ) => {
@@ -163,7 +164,7 @@ export const usePanelDataLoader = (
       queries: [] as any,
     },
     annotations: [] as any,
-    resultMetaData: [] as any,
+    resultMetaData: [] as any, // 2D array: [queryIndex][partitionIndex]
     lastTriggeredAt: null as any,
     isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],
@@ -173,6 +174,9 @@ export const usePanelDataLoader = (
     loadingProgressPercentage: 0,
     isPartialData: false,
   });
+
+  // Initialize logs utils to reuse common SQL validations
+  const { checkTimestampAlias } = logsUtils();
 
   // observer for checking if panel is visible on the screen
   let observer: any = null;
@@ -493,9 +497,9 @@ export const usePanelDataLoader = (
       // histogram_interval from partition api response
       const histogramInterval = res?.data?.histogram_interval ?? undefined;
 
-      // Add empty objects to state.resultMetaData for the results of this query
+      // Add empty arrays to state.resultMetaData for the partition results of this query
       state.data.push([]);
-      state.resultMetaData.push({});
+      state?.resultMetaData?.push([]); // Now each query has an array of partition results
 
       const currentQueryIndex = state.data.length - 1;
 
@@ -610,13 +614,26 @@ export const usePanelDataLoader = (
             ];
           }
 
-          // update result metadata
-          state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
+          // update result metadata - add to partition results array
+          // Store each partition's result metadata
+          state.resultMetaData?.[currentQueryIndex]?.push(
+            searchRes?.data ?? {},
+          );
 
-          if (searchRes.data.is_partial == true) {
+          if (
+            searchRes.data.is_partial == true &&
+            searchRes.data.new_end_time &&
+            searchRes.data.new_start_time
+          ) {
             // set the new start time as the start time of query
-            state.resultMetaData[currentQueryIndex].new_end_time =
-              endISOTimestamp;
+            // Update the last partition result
+            const lastPartitionIndex = Math.max(
+              state?.resultMetaData?.[currentQueryIndex]?.length - 1,
+              0,
+            );
+            state.resultMetaData[currentQueryIndex][
+              lastPartitionIndex
+            ].new_end_time = endISOTimestamp;
 
             // need to break the loop, save the cache
             // this is async task, which will be executed in background(await is not required)
@@ -648,17 +665,28 @@ export const usePanelDataLoader = (
               // set that is_partial to true if it is not last partition which we need to call
               if (i != 0) {
                 // set that is_partial to true
-                state.resultMetaData[currentQueryIndex].is_partial = true;
+                // Update the last partition result
+                const lastPartitionIndex = Math.max(
+                  state?.resultMetaData?.[currentQueryIndex]?.length - 1,
+                  0,
+                );
+                state.resultMetaData[currentQueryIndex][
+                  lastPartitionIndex
+                ].is_partial = true;
                 // set function error
-                state.resultMetaData[currentQueryIndex].function_error =
+                state.resultMetaData[currentQueryIndex][
+                  lastPartitionIndex
+                ].function_error =
                   `Query duration is modified due to query range restriction of ${max_query_range} hours`;
                 // set the new start time and end time
-                state.resultMetaData[currentQueryIndex].new_end_time =
-                  endISOTimestamp;
+                state.resultMetaData[currentQueryIndex][
+                  lastPartitionIndex
+                ].new_end_time = endISOTimestamp;
 
                 // set the new start time as the start time of query
-                state.resultMetaData[currentQueryIndex].new_start_time =
-                  partition[0];
+                state.resultMetaData[currentQueryIndex][
+                  lastPartitionIndex
+                ].new_start_time = partition[0];
 
                 // need to break the loop, save the cache
                 // this is async task, which will be executed in background(await is not required)
@@ -699,14 +727,16 @@ export const usePanelDataLoader = (
     // is streaming aggs
     const streaming_aggs = searchRes?.content?.streaming_aggs ?? false;
 
+    // Initialize data array if not exists
+    if (!state.data[payload?.meta?.currentQueryIndex]) {
+      state.data[payload?.meta?.currentQueryIndex] = [];
+    }
+
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
-      // handle empty hits case
-      if (searchRes?.content?.results?.hits?.length > 0) {
-        state.data[payload?.meta?.currentQueryIndex] = [
-          ...(searchRes?.content?.results?.hits ?? {}),
-        ];
-      }
+      state.data[payload?.meta?.currentQueryIndex] = [
+        ...(searchRes?.content?.results?.hits ?? {}),
+      ];
     }
     // if order by is desc, append new partition response at end
     else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
@@ -722,9 +752,10 @@ export const usePanelDataLoader = (
       ];
     }
 
-    // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex] =
-      searchRes?.content?.results ?? {};
+    // Push metadata for each partition
+    state.resultMetaData[payload?.meta?.currentQueryIndex].push(
+      searchRes?.content?.results ?? {},
+    );
 
     // If we have data and loading is complete, set isPartialData to false
     if (
@@ -736,11 +767,19 @@ export const usePanelDataLoader = (
   };
 
   const handleStreamingHistogramMetadata = (payload: any, searchRes: any) => {
-    // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex] = {
+    // Use currentQueryIndex from payload meta
+    const currentQueryIndex = payload?.meta?.currentQueryIndex;
+
+    // Initialize metadata array if not exists
+    if (!state.resultMetaData[currentQueryIndex]) {
+      state.resultMetaData[currentQueryIndex] = [];
+    }
+
+    // Push metadata for each partition
+    state.resultMetaData[currentQueryIndex].push({
       ...(searchRes?.content ?? {}),
       ...(searchRes?.content?.results ?? {}),
-    };
+    });
   };
 
   const handleStreamingHistogramHits = (payload: any, searchRes: any) => {
@@ -750,10 +789,20 @@ export const usePanelDataLoader = (
       code: "",
     };
 
+    const lastPartitionIndex = Math.max(
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.length - 1,
+      0,
+    );
     // is streaming aggs
     const streaming_aggs =
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]
-        ?.streaming_aggs ?? false;
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
+      ]?.streaming_aggs ?? false;
+
+    // Initialize data array if not exists
+    if (!state.data[payload?.meta?.currentQueryIndex]) {
+      state.data[payload?.meta?.currentQueryIndex] = [];
+    }
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
@@ -766,8 +815,8 @@ export const usePanelDataLoader = (
     }
     // if order by is desc, append new partition response at end
     else if (
-      state?.resultMetaData?.[
-        payload?.meta?.currentQueryIndex
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
       ]?.order_by?.toLowerCase() === "asc"
     ) {
       // else append new partition response at start
@@ -782,9 +831,16 @@ export const usePanelDataLoader = (
       ];
     }
 
-    // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex].hits =
-      searchRes?.content?.results?.hits ?? {};
+    // update result metadata - update the first partition result
+    if (
+      state.resultMetaData[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
+      ]
+    ) {
+      state.resultMetaData[payload?.meta?.currentQueryIndex][
+        lastPartitionIndex
+      ].hits = searchRes?.content?.results?.hits ?? {};
+    }
   };
 
   // Limit, aggregation, vrl function, pagination, function error and query error
@@ -1248,81 +1304,106 @@ export const usePanelDataLoader = (
 
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
-        // Iterate through each query in the panel schema
-        const queryPromises = panelSchema.value.queries?.map(
-          async (it: any) => {
-            const { query: query1, metadata: metadata1 } = replaceQueryValue(
-              it.query,
-              startISOTimestamp,
-              endISOTimestamp,
-              panelSchema.value.queryType,
-            );
-
-            const { query: query2, metadata: metadata2 } =
-              await applyDynamicVariables(query1, panelSchema.value.queryType);
-
-            const query = query2;
-            const metadata = {
-              originalQuery: it.query,
-              query: query,
-              startTime: startISOTimestamp,
-              endTime: endISOTimestamp,
-              queryType: panelSchema.value.queryType,
-              variables: [...(metadata1 || []), ...(metadata2 || [])],
-            };
-            const { traceparent, traceId } = generateTraceContext();
-            addTraceId(traceId);
-            try {
-              const res = await callWithAbortController(
-                () =>
-                  queryService.metrics_query_range({
-                    org_identifier: store.state.selectedOrganization.identifier,
-                    query: query,
-                    start_time: startISOTimestamp,
-                    end_time: endISOTimestamp,
-                    step: panelSchema.value.config.step_value ?? "0",
-                    dashboard_id: dashboardId?.value,
-                    dashboard_name: dashboardName?.value,
-                    folder_id: folderId?.value,
-                    folder_name: folderName?.value,
-                    panel_id: panelSchema.value.id,
-                    panel_name: panelSchema.value.title,
-                    run_id: runId?.value,
-                    tab_id: tabId?.value,
-                    tab_name: tabName?.value,
-                  }),
-                abortController.signal,
+        try {
+          // Iterate through each query in the panel schema
+          const queryPromises = panelSchema.value.queries?.map(
+            async (it: any) => {
+              const { query: query1, metadata: metadata1 } = replaceQueryValue(
+                it.query,
+                startISOTimestamp,
+                endISOTimestamp,
+                panelSchema.value.queryType,
               );
 
-              state.errorDetail = {
-                message: "",
-                code: "",
+              const { query: query2, metadata: metadata2 } =
+                await applyDynamicVariables(
+                  query1,
+                  panelSchema.value.queryType,
+                );
+
+              const query = query2;
+              const metadata = {
+                originalQuery: it.query,
+                query: query,
+                startTime: startISOTimestamp,
+                endTime: endISOTimestamp,
+                queryType: panelSchema.value.queryType,
+                variables: [...(metadata1 || []), ...(metadata2 || [])],
               };
-              return { result: res.data.data, metadata: metadata };
-            } catch (error) {
-              processApiError(error, "promql");
-              return { result: null, metadata: metadata };
-            } finally {
-              removeTraceId(traceId);
+              const { traceparent, traceId } = generateTraceContext();
+              addTraceId(traceId);
+              try {
+                const res = await callWithAbortController(
+                  () =>
+                    queryService.metrics_query_range({
+                      org_identifier:
+                        store.state.selectedOrganization.identifier,
+                      query: query,
+                      start_time: startISOTimestamp,
+                      end_time: endISOTimestamp,
+                      step: panelSchema.value.config.step_value ?? "0",
+                      dashboard_id: dashboardId?.value,
+                      dashboard_name: dashboardName?.value,
+                      folder_id: folderId?.value,
+                      folder_name: folderName?.value,
+                      panel_id: panelSchema.value.id,
+                      panel_name: panelSchema.value.title,
+                      run_id: runId?.value,
+                      tab_id: tabId?.value,
+                      tab_name: tabName?.value,
+                    }),
+                  abortController.signal,
+                );
+
+                state.errorDetail = {
+                  message: "",
+                  code: "",
+                };
+                return { result: res.data.data, metadata: metadata };
+              } catch (error) {
+                processApiError(error, "promql");
+                return { result: null, metadata: metadata };
+              } finally {
+                removeTraceId(traceId);
+              }
+            },
+          );
+
+          // Start fetching annotations in parallel with queries
+          const annotationsPromise = (async () => {
+            try {
+              if (!shouldFetchAnnotations()) {
+                return [];
+              }
+              const annotationList = await refreshAnnotations(
+                startISOTimestamp,
+                endISOTimestamp,
+              );
+              return annotationList || [];
+            } catch (annotationError) {
+              console.error("Failed to fetch annotations:", annotationError);
+              return [];
             }
-          },
-        );
-        // get annotations
-        const annotationList = shouldFetchAnnotations()
-          ? await refreshAnnotations(startISOTimestamp, endISOTimestamp)
-          : [];
+          })();
 
-        // Wait for all query promises to resolve
-        const queryResults: any = await Promise.all(queryPromises);
-        state.loading = false;
-        state.data = queryResults.map((it: any) => it?.result);
-        state.metadata = {
-          queries: queryResults.map((it: any) => it?.metadata),
-        };
-        state.annotations = annotationList || [];
+          // Wait for all query promises to resolve
+          const queryResults: any = await Promise.all(queryPromises);
 
-        // this is async task, which will be executed in background(await is not required)
-        saveCurrentStateToCache();
+          state.loading = false;
+          state.data = queryResults.map((it: any) => it?.result);
+          state.metadata = {
+            queries: queryResults.map((it: any) => it?.metadata),
+          };
+
+          // Wait for annotations to complete and update state
+          // The watcher in PanelSchemaRenderer will trigger re-render when this updates
+          state.annotations = await annotationsPromise;
+
+          // this is async task, which will be executed in background(await is not required)
+          saveCurrentStateToCache();
+        } catch (error) {
+          state.loading = false;
+        }
       } else {
         // copy of current abortController
         // which is used to check whether the current query has been aborted
@@ -1385,6 +1466,17 @@ export const usePanelDataLoader = (
                     panelSchema.value.queryType,
                   );
                 const query = query2;
+
+                // Validate that timestamp column is not used as an alias for other fields
+                if (!checkTimestampAlias(query)) {
+                  state.errorDetail = {
+                    message: `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
+                    code: "400",
+                  };
+                  state.loading = false;
+                  // Skip this iteration and continue with next query/time shift
+                  continue;
+                }
                 const metadata: any = {
                   originalQuery: it.query,
                   query: query,
@@ -1420,6 +1512,26 @@ export const usePanelDataLoader = (
               }
 
               try {
+                // Start fetching annotations in parallel with search
+                const annotationsPromise = (async () => {
+                  try {
+                    if (!shouldFetchAnnotations()) {
+                      return [];
+                    }
+                    const annotationList = await refreshAnnotations(
+                      startISOTimestamp,
+                      endISOTimestamp,
+                    );
+                    return annotationList || [];
+                  } catch (annotationError) {
+                    console.error(
+                      "Failed to fetch annotations:",
+                      annotationError,
+                    );
+                    return [];
+                  }
+                })();
+
                 // get search queries
                 const searchQueries = timeShiftQueries.map(
                   (it: any) => it.searchRequestObj,
@@ -1479,7 +1591,9 @@ export const usePanelDataLoader = (
                   // if there is an function error and which not related to stream range, throw error
                   if (
                     searchRes.data.function_error &&
-                    searchRes.data.is_partial != true
+                    searchRes.data.is_partial != true &&
+                    searchRes.data.new_end_time &&
+                    searchRes.data.new_start_time
                   ) {
                     // abort on unmount
                     if (abortControllerRef) {
@@ -1505,7 +1619,7 @@ export const usePanelDataLoader = (
                   ) {
                     state.data.push([]);
                     state.metadata.queries.push({});
-                    state.resultMetaData.push({});
+                    state?.resultMetaData?.push([{}]); // Initialize as array with one element
 
                     if (
                       searchRes?.data?.hits &&
@@ -1518,11 +1632,13 @@ export const usePanelDataLoader = (
                       );
                     }
 
-                    // update result metadata
-                    state.resultMetaData[i] = {
-                      ...searchRes.data,
-                      hits: searchRes.data.hits[i],
-                    };
+                    // update result metadata - single partition per query
+                    state.resultMetaData[i] = [
+                      {
+                        ...searchRes.data,
+                        hits: searchRes.data.hits[i],
+                      },
+                    ];
 
                     // Update the metadata for the current query
                     Object.assign(
@@ -1531,21 +1647,15 @@ export const usePanelDataLoader = (
                     );
                   }
 
-                  // get annotations
-                  const annotationList = shouldFetchAnnotations()
-                    ? await refreshAnnotations(
-                        startISOTimestamp,
-                        endISOTimestamp,
-                      )
-                    : [];
-                  state.annotations = annotationList;
-
                   // need to break the loop, save the cache
                   // this is async task, which will be executed in background(await is not required)
                   saveCurrentStateToCache();
                 } finally {
                   removeTraceId(traceId);
                 }
+
+                // Wait for annotations to complete (started in parallel earlier)
+                state.annotations = await annotationsPromise;
               } catch (error) {
                 // Process API error for "sql"
                 processApiError(error, "sql");
@@ -1570,6 +1680,17 @@ export const usePanelDataLoader = (
 
               const query = query2;
 
+              // Validate that timestamp column is not used as an alias for other fields
+              if (!checkTimestampAlias(query)) {
+                state.errorDetail = {
+                  message: `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
+                  code: "400",
+                };
+                state.loading = false;
+                // Skip executing this query and move to next
+                continue;
+              }
+
               const metadata: any = {
                 originalQuery: it.query,
                 query: query,
@@ -1586,58 +1707,94 @@ export const usePanelDataLoader = (
                 return;
               }
               state.metadata.queries[panelQueryIndex] = metadata;
-              const annotations = shouldFetchAnnotations()
-                ? await refreshAnnotations(
-                    Number(startISOTimestamp),
-                    Number(endISOTimestamp),
-                  )
-                : [];
-              state.annotations = annotations;
+
+              let annotationsPromise: Promise<any> | null = null;
 
               if (searchResponse?.value?.hits?.length > 0) {
+                // Start fetching annotations in parallel
+                annotationsPromise = (async () => {
+                  try {
+                    if (!shouldFetchAnnotations()) {
+                      return [];
+                    }
+                    const annotationList = await refreshAnnotations(
+                      Number(startISOTimestamp),
+                      Number(endISOTimestamp),
+                    );
+                    return annotationList || [];
+                  } catch (annotationError) {
+                    return [];
+                  }
+                })();
+
                 // Add empty objects to state.resultMetaData for the results of this query
                 state.data.push([]);
-                state.resultMetaData.push({});
+                state?.resultMetaData?.push([{}]); // Initialize as array with one element
 
                 const currentQueryIndex = state.data.length - 1;
 
                 state.data[currentQueryIndex] = searchResponse.value.hits;
-                state.resultMetaData[currentQueryIndex] = searchResponse.value;
+                state.resultMetaData[currentQueryIndex] = [
+                  searchResponse.value,
+                ]; // Wrap in array
                 // set loading to false
                 state.loading = false;
+              } else {
+                // Start fetching annotations in parallel for ALL query types
+                annotationsPromise = (async () => {
+                  try {
+                    if (!shouldFetchAnnotations()) {
+                      return [];
+                    }
+                    const annotationList = await refreshAnnotations(
+                      Number(startISOTimestamp),
+                      Number(endISOTimestamp),
+                    );
+                    return annotationList || [];
+                  } catch (annotationError) {
+                    console.error(
+                      "Failed to fetch annotations:",
+                      annotationError,
+                    );
+                    return [];
+                  }
+                })();
 
-                return;
+                if (isStreamingEnabled(store.state)) {
+                  await getDataThroughStreaming(
+                    query,
+                    it,
+                    startISOTimestamp,
+                    endISOTimestamp,
+                    pageType,
+                    panelQueryIndex,
+                    abortControllerRef,
+                  );
+                } else if (isWebSocketEnabled(store.state)) {
+                  await getDataThroughWebSocket(
+                    query,
+                    it,
+                    startISOTimestamp,
+                    endISOTimestamp,
+                    pageType,
+                    panelQueryIndex,
+                  );
+                } else {
+                  await getDataThroughPartitions(
+                    query,
+                    metadata,
+                    it,
+                    startISOTimestamp,
+                    endISOTimestamp,
+                    pageType,
+                    abortControllerRef,
+                  );
+                }
               }
 
-              if (isStreamingEnabled(store.state)) {
-                await getDataThroughStreaming(
-                  query,
-                  it,
-                  startISOTimestamp,
-                  endISOTimestamp,
-                  pageType,
-                  panelQueryIndex,
-                  abortControllerRef,
-                );
-              } else if (isWebSocketEnabled(store.state)) {
-                await getDataThroughWebSocket(
-                  query,
-                  it,
-                  startISOTimestamp,
-                  endISOTimestamp,
-                  pageType,
-                  panelQueryIndex,
-                );
-              } else {
-                await getDataThroughPartitions(
-                  query,
-                  metadata,
-                  it,
-                  startISOTimestamp,
-                  endISOTimestamp,
-                  pageType,
-                  abortControllerRef,
-                );
+              // Wait for annotations if they were started
+              if (annotationsPromise) {
+                state.annotations = await annotationsPromise;
               }
 
               // this is async task, which will be executed in background(await is not required)

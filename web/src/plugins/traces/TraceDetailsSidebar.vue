@@ -827,19 +827,55 @@ export default defineComponent({
 <style scoped lang="scss">
 .span_details_tab-panels {
   table {
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     width: 100%;
-    /* Other styling properties */
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(0.625rem);
+    border-radius: 0.5rem;
+    border: 0.125rem solid rgba(255, 255, 255, 0.3);
+    overflow: hidden;
   }
 
   th,
   td {
-    border: 1px solid #f0f0f0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
     text-align: left;
-    padding: 4px 8px !important;
+    padding: 8px 12px !important;
     font-size: 13px;
-    /* Other styling properties */
   }
+
+  th:last-child,
+  td:last-child {
+    border-right: none;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  tbody tr:first-child td:first-child {
+    border-top-left-radius: 0.5rem;
+  }
+
+  tbody tr:first-child td:last-child {
+    border-top-right-radius: 0.5rem;
+  }
+
+  tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 0.5rem;
+  }
+
+  tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 0.5rem;
+  }
+}
+
+.span_details_tab-panels table.q-table {
+  background: rgba(240, 240, 245, 0.8);
+  backdrop-filter: blur(0.625rem);
+  border: 0.125rem solid rgba(100, 100, 120, 0.5);
 }
 .attr-text {
   font-size: 12px;
@@ -1038,5 +1074,39 @@ export default defineComponent({
 }
 .highlight {
   background-color: yellow; /* Adjust background color as desired */
+}
+</style>
+
+<style lang="scss">
+// Dark theme support for glassmorphic tables
+.body--dark {
+  .span_details_tab-panels {
+    table {
+      background: rgba(255, 255, 255, 0.05);
+      border: 0.125rem solid rgba(255, 255, 255, 0.3);
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-right: 1px solid rgba(255, 255, 255, 0.15);
+    }
+  }
+}
+
+// Light theme support for glassmorphic tables
+.body--light {
+  .span_details_tab-panels {
+    table {
+      background: rgba(240, 240, 245, 0.8);
+      border: 0.125rem solid rgba(100, 100, 120, 0.5);
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid rgba(100, 100, 120, 0.2);
+      border-right: 1px solid rgba(100, 100, 120, 0.3);
+    }
+  }
 }
 </style>

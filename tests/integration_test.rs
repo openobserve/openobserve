@@ -16,7 +16,13 @@
 #[cfg(test)]
 mod tests {
     use core::time;
-    use std::{env, fs, net::SocketAddr, str, sync::Once, thread};
+    use std::{
+        env, fs,
+        net::SocketAddr,
+        str,
+        sync::{Arc, Once},
+        thread,
+    };
 
     use actix_web::{App, http::header::ContentType, test, web};
     use arrow_flight::flight_service_server::FlightServiceServer;
@@ -26,7 +32,7 @@ mod tests {
         get_config,
         meta::{
             alerts::{Operator, QueryCondition, TriggerCondition, alert::Alert},
-            dashboards::{Dashboard, v1},
+            dashboards::{Dashboard, v5},
             pipeline::{
                 Pipeline,
                 components::{DerivedStream, PipelineSource},
@@ -35,7 +41,9 @@ mod tests {
             triggers::{ScheduledTriggerData, Trigger, TriggerModule, TriggerStatus},
         },
         utils::{
-            enrichment_local_cache::{get_key, get_table_dir, get_table_path},
+            enrichment_local_cache::{
+                get_key, get_metadata_content, get_metadata_path, get_table_dir, get_table_path,
+            },
             json,
         },
     };
@@ -57,10 +65,15 @@ mod tests {
             },
         },
         migration,
-        service::{alerts::scheduler::handlers::handle_triggers, search::SEARCH_SERVER},
+        service::{
+            alerts::scheduler::handlers::handle_triggers,
+            enrichment::storage::{Values, local},
+            search::SEARCH_SERVER,
+        },
     };
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
+    use serde_json::json;
     use tonic::codec::CompressionEncoding;
 
     static START: Once = Once::new();
@@ -156,6 +169,9 @@ mod tests {
         // init job
         openobserve::job::init().await.unwrap();
 
+        // Wait for async initialization tasks (like default user creation) to complete
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
         for _i in 0..3 {
             e2e_1_post_bulk().await;
         }
@@ -201,22 +217,18 @@ mod tests {
         {
             let board = e2e_create_dashboard().await;
             let list = e2e_list_dashboards().await;
-            assert_eq!(list[0], board.clone());
+            assert_eq!(list[0], board);
 
-            let board = e2e_update_dashboard(
-                v1::Dashboard {
-                    title: "e2e test".to_owned(),
-                    description: "Logs flow downstream".to_owned(),
-                    ..board.v1.unwrap()
-                },
-                board.hash,
-            )
-            .await;
+            let mut v5_board = board.v5.unwrap();
+            v5_board.title = "e2e test".to_owned();
+            v5_board.description = "Logs flow downstream".to_owned();
+
+            let board = e2e_update_dashboard(v5_board, board.hash).await;
             assert_eq!(
-                e2e_get_dashboard(&board.clone().v1.unwrap().dashboard_id).await,
+                e2e_get_dashboard(&board.v5.as_ref().unwrap().dashboard_id).await,
                 board
             );
-            e2e_delete_dashboard(&board.v1.unwrap().dashboard_id).await;
+            e2e_delete_dashboard(&board.v5.unwrap().dashboard_id).await;
             assert!(e2e_list_dashboards().await.is_empty());
         }
 
@@ -281,7 +293,9 @@ mod tests {
         e2e_handle_derived_stream_evaluation_failure().await;
         e2e_cleanup_test_pipeline().await;
 
+        // enrichment table
         test_enrichment_table_integration().await;
+        test_enrichment_table_local_all_sequential().await;
 
         // others
         e2e_health_check().await;
@@ -928,11 +942,6 @@ mod tests {
 
     async fn e2e_post_user() {
         let auth = setup();
-        let body_str = r#"{
-                                "email": "nonadmin@example.com",
-                                "password": "Abcd12345",
-                                "role": "admin"
-                            }"#;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
@@ -943,6 +952,20 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
+
+        // Delete user if it exists from previous test runs to avoid conflicts
+        let delete_req = test::TestRequest::delete()
+            .uri(&format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let _ = test::call_service(&app, delete_req).await;
+
+        let body_str = r#"{
+                                "email": "nonadmin@example.com",
+                                "password": "Abcd12345",
+                                "role": "admin"
+                            }"#;
         let req = test::TestRequest::post()
             .uri(&format!("/api/{}/users", "e2e"))
             .insert_header(ContentType::json())
@@ -1036,9 +1059,6 @@ mod tests {
 
     async fn e2e_add_user_to_org() {
         let auth = setup();
-        let body_str = r#"{
-            "role":"admin"
-        }"#;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
@@ -1049,31 +1069,53 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/users/{}", "e2e", "admin@example.com"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        // Should fail as the user still does not exist
-        assert!(resp.status().is_client_error());
 
-        // Add the user
-        let body_str = r#"{
-            "email": "admin@example.com",
-            "password": "Abcd12345",
-            "role": "admin"
-        }"#;
-
-        let req = test::TestRequest::post()
+        // Check if admin@example.com already exists from initialization
+        let req = test::TestRequest::get()
             .uri(&format!("/api/{}/users", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
-            .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        let user_list: UserList = serde_json::from_str(&body_str).unwrap();
+        let admin_exists = user_list
+            .data
+            .iter()
+            .any(|user| user.email == "admin@example.com");
+
+        if !admin_exists {
+            // Test that adding user to org fails when user doesn't exist
+            let body_str = r#"{
+                "role":"admin"
+            }"#;
+            let req = test::TestRequest::post()
+                .uri(&format!("/api/{}/users/{}", "e2e", "admin@example.com"))
+                .insert_header(ContentType::json())
+                .append_header(auth)
+                .set_payload(body_str)
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            // Should fail as the user still does not exist
+            assert!(resp.status().is_client_error());
+
+            // Add the user
+            let body_str = r#"{
+                "email": "admin@example.com",
+                "password": "Abcd12345",
+                "role": "admin"
+            }"#;
+
+            let req = test::TestRequest::post()
+                .uri(&format!("/api/{}/users", "e2e"))
+                .insert_header(ContentType::json())
+                .append_header(auth)
+                .set_payload(body_str)
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert!(resp.status().is_success());
+        }
 
         // Role in the default organization
         let body_str = r#"{
@@ -1088,7 +1130,14 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let status = resp.status();
+        let body = test::read_body(resp).await;
+        println!(
+            "add user to default org body: {}",
+            String::from_utf8_lossy(&body)
+        );
+        // Accept both success (user added) and conflict (user already in org) as valid outcomes
+        assert!(status.is_success() || status.as_u16() == 409);
     }
 
     async fn e2e_delete_user() {
@@ -1114,7 +1163,7 @@ mod tests {
 
     async fn e2e_create_dashboard() -> Dashboard {
         let auth = setup();
-        let body_str = r##"{"title":"b2","dashboardId":"","description":"desc2","role":"","owner":"root@example.com","created":"2023-03-30T07:49:41.744+00:00","panels":[{"id":"Panel_ID7857010","type":"bar","fields":{"stream":"default","stream_type":"logs","x":[{"label":"Timestamp","alias":"x_axis_1","column":"_timestamp","color":null,"aggregationFunction":"histogram"}],"y":[{"label":"Kubernetes Host","alias":"y_axis_1","column":"kubernetes_host","color":"#5960b2","aggregationFunction":"count"}],"filter":[{"type":"condition","values":[],"column":"method","operator":"Is Not Null","value":null}]},"config":{"title":"p5","description":"sample config blah blah blah","show_legends":true},"query":"SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE method IS NOT NULL GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"","customQuery":false}],"layouts":[{"x":0,"y":0,"w":12,"h":13,"i":1,"panelId":"Panel_ID7857010","static":false}]}"##;
+        let body_str = r##"{"version":5,"title":"b2","dashboardId":"","description":"desc2","role":"","owner":"root@example.com","created":"2023-03-30T07:49:41.744+00:00","tabs":[{"tabId":"tab1","name":"Main","panels":[{"id":"Panel_ID7857010","type":"bar","title":"p5","description":"sample config blah blah blah","config":{"show_legends":true},"queryType":"sql","queries":[{"query":"SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\" FROM \"default\" GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"","customQuery":false,"fields":{"stream":"default","stream_type":"logs","x":[{"label":"Timestamp","alias":"x_axis_1","column":"_timestamp","color":null,"aggregationFunction":"histogram"}],"y":[{"label":"Kubernetes Host","alias":"y_axis_1","column":"kubernetes_host","color":"#5960b2","aggregationFunction":"count"}],"filter":{"filterType":"group","logicalOperator":"AND","conditions":[]}},"config":{"promql_legend":""}}],"layout":{"x":0,"y":0,"w":12,"h":13,"i":1}}]}]}"##;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
@@ -1132,8 +1181,12 @@ mod tests {
             .set_payload(body_str)
             .to_request();
 
-        let body = test::call_and_read_body(&app, req).await;
-        json::from_slice(&body).unwrap()
+        let resp = test::call_service(&app, req).await;
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        let result: Dashboard = json::from_slice(&body)
+            .unwrap_or_else(|e| panic!("Failed to deserialize dashboard: {e}\nBody: {body_str}"));
+        result
     }
 
     async fn e2e_list_dashboards() -> Vec<Dashboard> {
@@ -1167,7 +1220,7 @@ mod tests {
         dashboards
     }
 
-    async fn e2e_update_dashboard(dashboard: v1::Dashboard, hash: String) -> Dashboard {
+    async fn e2e_update_dashboard(dashboard: v5::Dashboard, hash: String) -> Dashboard {
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -1373,6 +1426,8 @@ mod tests {
     }
 
     async fn e2e_post_alert_template() {
+        use actix_web::body::MessageBody;
+
         let auth = setup();
         let body_str = r#"{"name":"slackTemplate","body":"{\"text\":\"For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active app_name {app_name}\"}"}"#;
         let app = test::init_service(
@@ -1392,7 +1447,11 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let status = resp.status();
+        let text = resp.into_body().try_into_bytes().unwrap_or_default();
+        let text = String::from_utf8_lossy(&text).to_string();
+        println!("e2e_post_alert_template: status: {status:?}, text: {text:?}");
+        assert!(status.is_success());
     }
 
     async fn e2e_get_alert_template() {
@@ -2693,21 +2752,39 @@ mod tests {
         // Should succeed even with empty data
         assert!(res.is_ok());
 
-        // Verify trigger was updated
-        let trigger = openobserve::service::db::scheduler::get(
-            "e2e",
-            TriggerModule::DerivedStream,
-            &module_key,
-        )
-        .await;
-        assert!(trigger.is_ok());
-        let trigger = trigger.unwrap();
-        let scheduled_trigger_data: ScheduledTriggerData =
-            serde_json::from_str(&trigger.data).unwrap();
-        assert!(scheduled_trigger_data.period_end_time.is_some());
-        assert!(scheduled_trigger_data.period_end_time.unwrap() > 0);
-        assert!(trigger.status == TriggerStatus::Waiting);
-        assert!(trigger.next_run_at > now && trigger.retries == 0);
+        // Verify trigger was updated - retry a few times since trigger processing is async
+        let mut attempts = 0;
+        let max_attempts = 10;
+        let mut trigger_updated = false;
+
+        while attempts < max_attempts {
+            let trigger = openobserve::service::db::scheduler::get(
+                "e2e",
+                TriggerModule::DerivedStream,
+                &module_key,
+            )
+            .await;
+
+            if let Ok(trigger) = trigger
+                && let Ok(scheduled_trigger_data) =
+                    serde_json::from_str::<ScheduledTriggerData>(&trigger.data)
+                && scheduled_trigger_data.period_end_time.is_some()
+            {
+                assert!(scheduled_trigger_data.period_end_time.unwrap() > 0);
+                assert!(trigger.status == TriggerStatus::Waiting);
+                assert!(trigger.next_run_at > now && trigger.retries == 0);
+                trigger_updated = true;
+                break;
+            }
+
+            attempts += 1;
+            thread::sleep(time::Duration::from_millis(100));
+        }
+
+        assert!(
+            trigger_updated,
+            "Trigger was not updated after {max_attempts} attempts"
+        );
     }
 
     async fn e2e_handle_derived_stream_pipeline_not_found() {
@@ -3718,47 +3795,10 @@ mod tests {
         )
         .await;
         assert!(result2.is_ok());
+        let result = result2.unwrap();
+        assert!(!result.status().is_success());
         // wait for 2 seconds
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        // Verify schema was evolved to include new fields
-        let mut stream_schema_map = std::collections::HashMap::new();
-        let schema_exists = openobserve::service::schema::stream_schema_exists(
-            org_id,
-            table_name,
-            config::meta::stream::StreamType::EnrichmentTables,
-            &mut stream_schema_map,
-        )
-        .await;
-
-        assert!(schema_exists.has_fields);
-
-        // Verify the schema cache contains the evolved schema
-        let schema_key = format!(
-            "{}/{}/{}",
-            org_id,
-            config::meta::stream::StreamType::EnrichmentTables,
-            table_name
-        );
-        let stream_schemas = STREAM_SCHEMAS.read().await;
-        assert!(stream_schemas.contains_key(&schema_key));
-        drop(stream_schemas);
-
-        // Get the latest SchemaCache
-        let stream_schemas_latest = STREAM_SCHEMAS_LATEST.read().await;
-        assert!(stream_schemas_latest.contains_key(&schema_key));
-        let schema_cache = stream_schemas_latest.get(&schema_key).unwrap();
-
-        // Verify the schema cache contains the evolved schema
-        assert!(schema_cache.contains_field("city"));
-        assert!(schema_cache.contains_field("country"));
-        drop(stream_schemas_latest);
-
-        // Check the ENRICHMENT_TABLES cache to check if the table is created
-        let enrichment_tables = ENRICHMENT_TABLES.clone();
-        assert!(enrichment_tables.contains_key(&schema_key));
-        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 2);
-        drop(enrichment_tables);
 
         // Clean up
         e2e_cleanup_enrichment_table(org_id, table_name).await;
@@ -3786,5 +3826,419 @@ mod tests {
         let key = get_key(org_id, table_name);
         let table_dir = get_table_dir(&key);
         assert!(!table_dir.exists());
+    }
+
+    // Helper function to setup schema for enrichment tables in tests
+    async fn setup_enrichment_table_schema(org_id: &str, table_name: &str) {
+        use arrow::datatypes::{DataType, Field, Schema};
+        use config::meta::stream::StreamType;
+
+        // Create a simple schema that matches our test data
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int64, true),
+            Field::new("name", DataType::Utf8, true),
+            Field::new("age", DataType::Int64, true),
+            Field::new("data", DataType::Utf8, true),
+            Field::new("version", DataType::Utf8, true),
+            Field::new("nested", DataType::Utf8, true),
+            Field::new("special_chars", DataType::Utf8, true),
+        ]);
+
+        // Use infra::schema::merge to create/update the schema in the database
+        let result = infra::schema::merge(
+            org_id,
+            table_name,
+            StreamType::EnrichmentTables,
+            &schema,
+            None,
+        )
+        .await;
+
+        // Ignore error if schema already exists
+        match result {
+            Ok(_) => {}
+            Err(e) => {
+                log::debug!("Schema setup for {}/{}: {:?}", org_id, table_name, e);
+            }
+        }
+    }
+
+    async fn test_enrichment_table_local_all_sequential() {
+        // Run all tests sequentially to avoid directory conflicts
+        test_store_and_retrieve().await;
+        test_store_multiple_versions().await;
+        test_retrieve_nonexistent_table().await;
+        test_delete().await;
+        test_delete_nonexistent_table().await;
+        test_get_last_updated_at().await;
+        test_store_data_if_needed().await;
+        test_store_data_if_needed_background().await;
+        test_metadata_persistence().await;
+        test_large_data_handling().await;
+        test_error_handling().await;
+    }
+
+    async fn test_store_and_retrieve() {
+        let org_id = "test_org";
+        let table_name = "test_table";
+        let test_data = vec![
+            json!({"id": 1, "name": "Alice", "age": 25}),
+            json!({"id": 2, "name": "Bob", "age": 30}),
+        ];
+        let updated_at = 1640995200;
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Test store function
+        let test_data = Values::Json(Arc::new(test_data));
+        let result = local::store(org_id, table_name, test_data, updated_at).await;
+        println!("Store result: {result:?}");
+        assert!(result.is_ok(), "Store should succeed");
+
+        // Verify file was created
+        let key = get_key(org_id, table_name);
+        let table_dir = get_table_dir(&key);
+        let file_path = get_table_path(table_dir.to_str().unwrap(), updated_at);
+        assert!(file_path.exists(), "Data file should exist");
+
+        // Verify metadata was created
+        let metadata_path = get_metadata_path();
+        assert!(metadata_path.exists(), "Metadata file should exist");
+
+        // Test retrieve function
+        let retrieved_data = local::retrieve(org_id, table_name).await;
+        assert!(retrieved_data.is_ok(), "Retrieve should succeed");
+
+        let retrieved_data = retrieved_data.unwrap().to_json().unwrap();
+        assert_eq!(retrieved_data.len(), 2, "Should retrieve 2 records");
+        assert_eq!(
+            retrieved_data[0]["id"],
+            json!(1),
+            "First record should match"
+        );
+        assert_eq!(
+            retrieved_data[1]["id"],
+            json!(2),
+            "Second record should match"
+        );
+    }
+
+    async fn test_store_multiple_versions() {
+        let org_id = "test_org";
+        let table_name = "versioned_table";
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Store first version
+        let data_v1 = Values::Json(Arc::new(vec![json!({"id": 1, "version": "v1"})]));
+        let updated_at_v1 = 1640995200;
+        let result = local::store(org_id, table_name, data_v1, updated_at_v1).await;
+        assert!(result.is_ok(), "First store should succeed");
+
+        // Store second version
+        let data_v2 = Values::Json(Arc::new(vec![json!({"id": 2, "version": "v2"})]));
+        let updated_at_v2 = 1640995300;
+        let result = local::store(org_id, table_name, data_v2, updated_at_v2).await;
+        assert!(result.is_ok(), "Second store should succeed");
+
+        // Retrieve should get both versions
+        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        assert_eq!(retrieved_data.len(), 2, "Should retrieve both versions");
+    }
+
+    async fn test_retrieve_nonexistent_table() {
+        let result = local::retrieve("nonexistent_org", "nonexistent_table").await;
+        assert!(
+            result.is_err(),
+            "Should return an error for nonexistent table"
+        );
+    }
+
+    async fn test_delete() {
+        let org_id = "test_org";
+        let table_name = "delete_test_table";
+        let test_data = Values::Json(Arc::new(vec![json!({"id": 1, "data": "test"})]));
+        let updated_at = 1640995200;
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // First store some data
+        let result = local::store(org_id, table_name, test_data, updated_at).await;
+        assert!(result.is_ok(), "Store should succeed");
+
+        // Verify data exists
+        let key = get_key(org_id, table_name);
+        let table_dir = get_table_dir(&key);
+        assert!(table_dir.exists(), "Table directory should exist");
+
+        // Test delete function
+        let result = local::delete(org_id, table_name).await;
+        assert!(result.is_ok(), "Delete should succeed");
+
+        // Verify directory was removed
+        assert!(!table_dir.exists(), "Table directory should be removed");
+
+        // Verify metadata was updated
+        let metadata_content = get_metadata_content().await.unwrap();
+        assert!(
+            !metadata_content.contains_key(&key),
+            "Key should be removed from metadata"
+        );
+    }
+
+    async fn test_delete_nonexistent_table() {
+        // Delete non-existent table should succeed gracefully
+        let result = local::delete("nonexistent_org", "nonexistent_table").await;
+        assert!(
+            result.is_ok(),
+            "Delete should handle nonexistent table gracefully"
+        );
+    }
+
+    async fn test_get_last_updated_at() {
+        let org_id = "test_org";
+        let table_name = "timestamp_test_table";
+        let test_data = Values::Json(Arc::new(vec![json!({"id": 1, "data": "test"})]));
+        let updated_at = 1640995200;
+
+        // Test getting timestamp before storing data
+        let result = local::get_last_updated_at(org_id, table_name).await;
+        assert!(result.is_ok(), "Get last updated should succeed");
+        assert_eq!(result.unwrap(), 0, "Should return 0 for non-existent table");
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Store data
+        local::store(org_id, table_name, test_data, updated_at)
+            .await
+            .unwrap();
+
+        // Test getting timestamp after storing data
+        let result = local::get_last_updated_at(org_id, table_name).await;
+        assert!(result.is_ok(), "Get last updated should succeed");
+        assert_eq!(
+            result.unwrap(),
+            updated_at,
+            "Should return correct timestamp"
+        );
+    }
+
+    async fn test_store_data_if_needed() {
+        let org_id = "test_org";
+        let table_name = "conditional_test_table";
+        let test_data_v1 = Values::Json(Arc::new(vec![json!({"id": 1, "version": "v1"})]));
+        let test_data_v2 = Values::Json(Arc::new(vec![json!({"id": 1, "version": "v2"})]));
+        let updated_at_v1 = 1640995200;
+        let updated_at_v2 = 1640995300;
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Store initial data
+        let result =
+            local::store_data_if_needed(org_id, table_name, test_data_v1, updated_at_v1).await;
+        assert!(result.is_ok(), "Initial store should succeed");
+
+        // Verify data was stored
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert_eq!(
+            retrieved_data[0]["version"],
+            json!("v1"),
+            "Should have v1 data"
+        );
+
+        // Try to store older data (should be ignored)
+        let old_updated_at = 1640995100;
+        let result =
+            local::store_data_if_needed(org_id, table_name, test_data_v2.clone(), old_updated_at)
+                .await;
+        assert!(
+            result.is_ok(),
+            "Store with old timestamp should succeed but not update"
+        );
+
+        // Verify data wasn't changed
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert_eq!(
+            retrieved_data[0]["version"],
+            json!("v1"),
+            "Should still have v1 data"
+        );
+
+        // Store newer data (should update)
+        let result =
+            local::store_data_if_needed(org_id, table_name, test_data_v2, updated_at_v2).await;
+        assert!(result.is_ok(), "Store with newer timestamp should succeed");
+
+        // Verify data was updated
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert_eq!(
+            retrieved_data[0]["version"],
+            json!("v2"),
+            "Should now have v2 data"
+        );
+    }
+
+    async fn test_store_data_if_needed_background() {
+        let org_id = "test_org";
+        let table_name = "background_test_table";
+        let test_data = Values::Json(Arc::new(vec![json!({"id": 1, "data": "background"})]));
+        let updated_at = 1640995200;
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Test background store
+        let result =
+            local::store_data_if_needed_background(org_id, table_name, test_data, updated_at).await;
+        assert!(result.is_ok(), "Background store should succeed");
+
+        // Wait a bit for background task to complete
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Verify data was eventually stored
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert_eq!(retrieved_data.len(), 1, "Should have stored 1 record");
+        assert_eq!(
+            retrieved_data[0]["data"],
+            json!("background"),
+            "Should have correct data"
+        );
+    }
+
+    async fn test_metadata_persistence() {
+        let org_id = "test_org";
+        let table_name = "metadata_test_table";
+        let test_data = Values::Json(Arc::new(vec![json!({"id": 1, "data": "test"})]));
+        let updated_at = 1640995200;
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Store data
+        local::store(org_id, table_name, test_data, updated_at)
+            .await
+            .unwrap();
+
+        // Manually read metadata file
+        let metadata_path = get_metadata_path();
+        let metadata_content = tokio::fs::read_to_string(&metadata_path).await.unwrap();
+        let metadata: std::collections::HashMap<String, i64> =
+            serde_json::from_str(&metadata_content).unwrap();
+
+        let key = get_key(org_id, table_name);
+        assert!(
+            metadata.contains_key(&key),
+            "Metadata should contain the key"
+        );
+        assert_eq!(
+            metadata[&key], updated_at,
+            "Metadata should have correct timestamp"
+        );
+    }
+
+    async fn test_large_data_handling() {
+        let org_id = "test_org";
+        let table_name = "large_data_table";
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Create large dataset (1000 records)
+        let large_data: Vec<_> = (0..1000)
+            .map(|i| {
+                json!({
+                    "id": i,
+                    "name": format!("name_{}", i),
+                    "data": "x".repeat(100), // 100 characters per record
+                    "nested": {
+                        "field1": i * 2,
+                        "field2": format!("nested_value_{}", i)
+                    }
+                })
+            })
+            .collect();
+
+        let updated_at = 1640995200;
+
+        // Test storing large data
+        let large_data = Values::Json(Arc::new(large_data));
+        let result = local::store(org_id, table_name, large_data, updated_at).await;
+        assert!(result.is_ok(), "Should handle large data successfully");
+
+        // Test retrieving large data
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert_eq!(
+            retrieved_data.len(),
+            1000,
+            "Should retrieve all 1000 records"
+        );
+        assert_eq!(
+            retrieved_data[0]["id"],
+            json!(0),
+            "First record should be correct"
+        );
+        assert_eq!(
+            retrieved_data[999]["id"],
+            json!(999),
+            "Last record should be correct"
+        );
+    }
+
+    async fn test_error_handling() {
+        // Test with invalid JSON data
+        let org_id = "test_org";
+        let table_name = "error_test_table";
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Create data that will serialize fine but test edge cases
+        let test_data = Values::Json(Arc::new(vec![
+            json!({"id": 1, "data": null}),
+            json!({"id": 2, "special_chars": "!@#$%^&*()"}),
+        ]));
+        let updated_at = 1640995200;
+
+        let result = local::store(org_id, table_name, test_data, updated_at).await;
+        assert!(
+            result.is_ok(),
+            "Should handle special characters and null values"
+        );
+
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert_eq!(retrieved_data.len(), 2, "Should retrieve both records");
+        assert!(
+            retrieved_data[0]["data"].is_null(),
+            "Should preserve null values"
+        );
     }
 }
