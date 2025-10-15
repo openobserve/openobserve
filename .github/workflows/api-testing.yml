@@ -25,14 +25,22 @@ env:
   WS_ZO_BASE_URL: ws://localhost:5080/
   ZO_SMTP_ENABLED: true
   ZO_CREATE_ORG_THROUGH_INGESTION: true
-  # Utf8View regression test environment variables
-  ZO_FEATURE_JOIN_MATCH_ONE_ENABLED: true
-  ZO_UTF8_VIEW_ENABLED: true
 
 jobs:
   api_integration_tests:
-    name: api_integration_tests
+    name: api_tests / utf8_view=${{ matrix.utf8_view_enabled }}
     runs-on: ubicloud-standard-8
+    strategy:
+      matrix:
+        include:
+          - utf8_view_enabled: "true"
+            test_name: "UTF8_VIEW_ENABLED"
+          - utf8_view_enabled: "false" 
+            test_name: "UTF8_VIEW_DISABLED"
+    env:
+      # Utf8View regression test environment variables
+      ZO_FEATURE_JOIN_MATCH_ONE_ENABLED: true
+      ZO_UTF8_VIEW_ENABLED: ${{ matrix.utf8_view_enabled }}
     steps:
       - name: Remove unused tools
         run: |

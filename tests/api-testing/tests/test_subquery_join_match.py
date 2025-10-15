@@ -4,7 +4,7 @@ REGRESSION TEST SUITE: Data Fusion Error with Subqueries and UTF-8 String Operat
 This test suite validates queries that previously caused data fusion errors when
 OpenObserve server is configured with:
 - ZO_FEATURE_JOIN_MATCH_ONE_ENABLED = true  
-- ZO_UTF8_VIEW_ENABLED = true
+- ZO_UTF8_VIEW_ENABLED = true OR false (bug occurs in both cases)
 
 The error manifests as:
 "Join Error caused by External error: task panicked with message 'Unsupported data type: Utf8View'"
@@ -21,6 +21,9 @@ Test Coverage:
 Expected Results:
 - FIXED environments: All queries should return valid data
 - BUGGY environments: Complex string queries should fail with Utf8View error
+
+Note: The bug can be reproduced with ZO_UTF8_VIEW_ENABLED set to either true OR false,
+as long as ZO_FEATURE_JOIN_MATCH_ONE_ENABLED = true.
 """
 
 import json
@@ -409,7 +412,8 @@ WHERE k8s_container_name IN (
 SERVER REQUIREMENTS:
 The OpenObserve server being tested must be configured with:
 ZO_FEATURE_JOIN_MATCH_ONE_ENABLED = true
-ZO_UTF8_VIEW_ENABLED = true
+ZO_UTF8_VIEW_ENABLED = true OR false (bug occurs in both cases)
 
-These settings trigger the Utf8View data type handling that causes the regression.
+The critical setting is ZO_FEATURE_JOIN_MATCH_ONE_ENABLED = true, which triggers
+the data fusion error regardless of the ZO_UTF8_VIEW_ENABLED setting.
 """
