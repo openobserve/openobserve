@@ -106,6 +106,7 @@ itertools.workspace = true
 jsonwebtoken = "9.3"
 log.workspace = true
 maxminddb = "0.26"
+md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.43", default-features = false, optional = true }
 once_cell.workspace = true

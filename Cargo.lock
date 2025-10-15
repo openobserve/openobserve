@@ -6731,6 +6731,7 @@ dependencies = [
  "lettre",
  "log",
  "maxminddb",
+ "md5",
  "memchr",
  "mimalloc",
  "mime",
