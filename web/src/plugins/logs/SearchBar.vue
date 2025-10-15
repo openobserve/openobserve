@@ -3825,7 +3825,7 @@ export default defineComponent({
       }
     };
     const visualizeIcon = computed(() => {
-      return searchObj.meta.logsVisualizeToggle === "visualize"
+      return searchObj.meta.logsVisualizeToggle === "visualize" || store.state.theme === "dark"
         ? getImageURL("images/common/visualize_icon_light.svg")
         : getImageURL("images/common/visualize_icon_dark.svg");
     });

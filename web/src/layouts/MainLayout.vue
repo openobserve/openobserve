@@ -633,6 +633,7 @@ import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
+import { Home, Search, BarChart3, GitBranch, Layout, FileText,AlertTriangle, TvMinimal, Database, Users, Code, FileBarChart, Settings } from 'lucide-vue-next';
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -777,62 +778,62 @@ export default defineComponent({
     var linksList = ref([
       {
         title: t("menu.home"),
-        icon: outlinedHome,
+        iconComponent: markRaw(Home),
         link: "/",
         exact: true,
         name: "home",
       },
       {
         title: t("menu.search"),
-        icon: outlinedSearch,
+        iconComponent: markRaw(Search),
         link: "/logs",
         name: "logs",
       },
       {
         title: t("menu.metrics"),
-        icon: outlinedBarChart,
+        iconComponent: markRaw(BarChart3),
         link: "/metrics",
         name: "metrics",
       },
       {
         title: t("menu.traces"),
-        icon: outlinedAccountTree,
+        iconComponent: markRaw(GitBranch),
         link: "/traces",
         name: "traces",
       },
       {
         title: t("menu.rum"),
-        icon: outlinedDevices,
+        iconComponent: markRaw(TvMinimal),
         link: "/rum",
         name: "rum",
       },
       {
         title: t("menu.dashboard"),
-        icon: outlinedDashboard,
+        iconComponent: markRaw(Layout),
         link: "/dashboards",
         name: "dashboards",
       },
       {
         title: t("menu.index"),
-        icon: outlinedWindow,
+        iconComponent: markRaw(Database),
         link: "/streams",
         name: "streams",
       },
       {
         title: t("menu.alerts"),
-        icon: outlinedReportProblem,
+        iconComponent: markRaw(AlertTriangle),
         link: "/alerts",
         name: "alertList",
       },
       {
         title: t("menu.ingestion"),
-        icon: outlinedFilterAlt,
+        iconComponent: markRaw(FileText),
         link: "/ingestion",
         name: "ingestion",
       },
       {
         title: t("menu.iam"),
-        icon: outlinedManageAccounts,
+        iconComponent: markRaw(Users),
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
@@ -1700,8 +1701,8 @@ export default defineComponent({
   &.leftNavList {
     .q-item {
       .q-icon {
-        height: 1.2rem;
-        width: 1.2rem;
+        height: 1rem;
+        width: 1rem;
         color: var(--o2-icon-color);
       }
 
