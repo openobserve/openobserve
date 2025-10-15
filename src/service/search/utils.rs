@@ -276,7 +276,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_is_cachable_function_error() {
+    fn test_is_permissable_function_error() {
         let error = vec![];
         assert_eq!(is_permissable_function_error(&error), true);
 
