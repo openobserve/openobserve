@@ -74,6 +74,30 @@ class UnflattenedPage {
     get allFieldsButton() {
         return this.page.locator('[data-test="logs-all-fields-btn"]');
     }
+
+    get configurationTab() {
+        return this.page.getByRole('tab', { name: 'Configuration' });
+    }
+
+    get streamSettingsUpdatedSnackbar() {
+        return this.page.getByText('Stream settings updated');
+    }
+
+    get logsSearchBarRefreshButton() {
+        return this.page.locator("[data-test='logs-search-bar-refresh-btn']");
+    }
+
+    get logDetailJsonContent() {
+        return this.page.locator('[data-test="log-detail-json-content"]');
+    }
+
+    get allLogDetailKeys() {
+        return this.page.locator('[data-test="log-detail-json-content"] [data-test^="log-expand-detail-key-"]');
+    }
+
+    get timestampDropdown() {
+        return this.page.getByText("arrow_drop_down_timestamp:");
+    }
 }
 export default UnflattenedPage;
 
