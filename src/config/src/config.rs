@@ -760,8 +760,6 @@ pub struct Common {
         help = "Disable timestamp field compression"
     )]
     pub timestamp_compression_disabled: bool,
-    #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
-    pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_INGESTER_NONE_COMPRESSION", default = false)]
     pub feature_ingester_none_compression: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
@@ -917,7 +915,7 @@ pub struct Common {
     // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
-    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = true)]
+    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]
     pub mmdb_disable_download: bool,
     #[env_config(name = "ZO_MMDB_UPDATE_DURATION_DAYS", default = 30)] // default 30 days
     pub mmdb_update_duration_days: u64,
@@ -1186,7 +1184,7 @@ pub struct Limit {
         help = "Maximum number of fields allowed in user-defined schema"
     )]
     pub user_defined_schema_max_fields: usize,
-    // MB, total data size in memory, default is 50% of system memory
+    // MB, total data size in memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     pub mem_table_max_size: usize,
     #[env_config(
