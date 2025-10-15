@@ -1132,7 +1132,6 @@ class="q-pr-sm q-pt-xs" />
       <div
         class="col tw-h-full"
         :class="{ 'expand-on-focus': isFocused }"
-        :style="backgroundColorStyle"
       >
         <q-splitter
           class="logs-search-splitter !tw-h-full"
@@ -1250,11 +1249,23 @@ class="q-pr-sm q-pt-xs" />
         </q-splitter>
       </div>
       <q-btn
+        v-if="!isAiAssistantVisible"
+        data-test="logs-query-editor-ai-assistant-btn"
+        icon="auto_awesome"
+        title="Show AI Assistant"
+        dense
+        size="10px"
+        color="primary"
+        @click="toggleAiAssistant"
+        class="ai-toggle-icon-btn"
+        style="position: absolute; top: 10px; right: 39px; z-index: 20"
+        aria-label="Show AI Assistant"
+      ></q-btn>
+      <q-btn
         data-test="logs-query-editor-full_screen-btn"
         :title="isFocused ? 'Collapse' : 'Expand'"
         dense
         size="10px"
-        round
         color="primary"
         @click="isFocused = !isFocused"
         class="tw-absolute tw-top-[3.3rem] tw-right-[1.2rem] tw-z-50"
@@ -1734,6 +1745,7 @@ import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { Bookmark, ChartLine, ChartNoAxesColumn, RefreshCcw, ScanSearch, Share, Menu, Maximize, Minimize } from "lucide-vue-next";
 import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
+import useAiChat from "@/composables/useAiChat";
 
 const defaultValue: any = () => {
   return {
@@ -1774,6 +1786,7 @@ export default defineComponent({
     "onAutoIntervalTrigger",
     "showSearchHistory",
     "extractPatterns",
+    "onAiAssistantToggle",
   ],
   methods: {
     searchData() {
@@ -1894,6 +1907,7 @@ export default defineComponent({
     const $q = useQuasar();
     const store = useStore();
     const { showErrorNotification } = useNotifications();
+    const { fetchAiChat } = useAiChat();
     const rowsPerPage = ref(10);
     const regionFilter = ref();
     const regionFilterRef = ref(null);
@@ -1948,6 +1962,148 @@ export default defineComponent({
     const saveFunctionLoader = ref(false);
 
     const isFocused = ref(false);
+    const isAiAssistantVisible = ref(false);
+    const aiAssistantQuery = ref("");
+    const aiAssistantMode = ref("sql");
+    const isAiLoading = ref(false);
+    const isAiFocused = ref(false);
+    const aiBarHeight = computed(() => {
+      if (!isAiAssistantVisible.value) return 56;
+      const newlineCount = (aiAssistantQuery.value.match(/\n/g) || []).length;
+      return 56 + (newlineCount * 10);
+    });
+    const aiBarRef = ref(null);
+
+    const toggleAiAssistant = () => {
+      isAiAssistantVisible.value = !isAiAssistantVisible.value;
+      // Emit event to parent to adjust splitter
+      emit("onAiAssistantToggle", isAiAssistantVisible.value);
+    };
+
+    const sendAiQuery = async () => {
+      if (!aiAssistantQuery.value.trim()) return;
+      
+      // Auto-switch editor modes based on AI mode selection
+      if (aiAssistantMode.value === 'sql') {
+        // Switch to SQL mode if not already
+        if (!searchObj.meta.sqlMode) {
+          searchObj.meta.sqlMode = true;
+        }
+      } else {
+        // Switch to VRL mode if not already
+        if (searchObj.meta.showTransformEditor === false) {
+          searchObj.meta.showTransformEditor = true;
+        }
+      }
+      
+      isAiLoading.value = true;
+      aiAbortController = new AbortController();
+      
+      try {
+        const prompt = aiAssistantMode.value === 'sql' 
+          ? `${aiAssistantQuery.value}. Return only SQL query. Make sure that you don't return in markdown.`
+          : `${aiAssistantQuery.value}. Return only VRL function. Make sure that you don't return in markdown.`;
+        
+        const messages = [{
+          role: 'user',
+          content: prompt
+        }];
+        
+        const response = await fetchAiChat(
+          messages,
+          "",
+          store.state.selectedOrganization.identifier,
+          aiAbortController.signal
+        );
+        
+        if (response.cancelled) return;
+        
+        if (!response.ok) {
+          throw new Error('AI request failed');
+        }
+        
+        // Handle streaming response with real-time updates
+        let aiResponse = '';
+        let hasStartedReplacing = false;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.substring(6));
+                if (data.content) {
+                  aiResponse += data.content;
+                  
+                  // Only start replacing once we have content
+                  if (!hasStartedReplacing && aiResponse.trim()) {
+                    hasStartedReplacing = true;
+                  }
+                  
+                  if (hasStartedReplacing) {
+                    // Update the editor in real-time
+                    if (aiAssistantMode.value === 'sql') {
+                      searchObj.data.query = aiResponse;
+                    } else {
+                      searchObj.data.tempFunctionContent = aiResponse;
+                    }
+                    
+                    // Add a small delay for typewriter effect
+                    await new Promise(resolve => setTimeout(resolve, 30));
+                  }
+                }
+              } catch (e) {
+                // Ignore JSON parse errors for non-JSON lines
+              }
+            }
+          }
+        }
+        
+        aiAssistantQuery.value = '';
+        
+      } catch (error) {
+        if (error.message !== 'Request cancelled') {
+          console.error('AI query failed:', error);
+          showErrorNotification('AI query failed. Please try again.');
+        }
+      } finally {
+        isAiLoading.value = false;
+        aiAbortController = null;
+      }
+    };
+
+    let aiAbortController = null;
+    
+    const stopAiQuery = () => {
+      isAiLoading.value = false;
+      if (aiAbortController) {
+        aiAbortController.abort();
+        aiAbortController = null;
+      }
+      console.log('AI query stopped');
+    };
+
+    const handleAiInputKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter') {
+        if (event.shiftKey) {
+          // Allow Shift+Enter for new line
+          return;
+        } else {
+          // Prevent default Enter and send query
+          event.preventDefault();
+          sendAiQuery();
+        }
+      }
+    };
+
+
 
     const confirmDialogVisible: boolean = ref(false);
     const confirmSavedViewDialogVisible: boolean = ref(false);
@@ -4347,6 +4503,17 @@ export default defineComponent({
       disable,
       cancelVisualizeQueries,
       isFocused,
+      isAiAssistantVisible,
+      aiAssistantQuery,
+      aiAssistantMode,
+      isAiLoading,
+      isAiFocused,
+      toggleAiAssistant,
+      sendAiQuery,
+      stopAiQuery,
+      handleAiInputKeydown,
+      aiBarHeight,
+      aiBarRef,
       backgroundColorStyle,
       editorWidthToggleFunction,
       fnParsedSQL,
@@ -4771,4 +4938,404 @@ export default defineComponent({
     background-color:#f67a7a;
     color: var(--o2-primary-btn-text);
   }
+
+  /* AI Assistant Horizontal Bar Styles */
+.ai-assistant-horizontal-bar {
+  width: 100%;
+  position: relative;
+  border: none;
+  border-bottom: none;
+  border-radius: 12px;
+  background: transparent;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+  animation: aiBarSlideDown 0.28s ease-out;
+  box-shadow: none;
+  margin: 0; /* align with surrounding layout */
+  padding: 0 12px 8px; /* horizontal spacing with a little bottom breathing room */
+  backdrop-filter: none;
+}
+
+.ai-assistant-horizontal-bar.dark-theme {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ai-assistant-horizontal-content {
+  width: 100%;
+}
+
+.ai-assistant-input-fullwidth {
+  width: 100%;
+  max-height: 112px;
+}
+
+.ai-assistant-input-fullwidth :deep(.q-field__control-container) {
+  max-height: 112px !important;
+  overflow-y: auto;
+}
+
+.ai-assistant-input-fullwidth :deep(.q-field__control) {
+  border-radius: 10px;
+  /* Make input more visible in light mode */
+  border: 1px solid rgba(102, 126, 234, 0.35);
+  /* Modern soft gradient for light mode */
+  background: linear-gradient(180deg, #f8faff 0%, #eef2ff 100%);
+  box-shadow: inset 0 0 0 1px rgba(102, 126, 234, 0.08);
+  padding: 8px 10px !important;
+  display: flex;               /* ensure vertical centering */
+  align-items: center;         /* center textarea content vertically */
+}
+
+/* Remove Quasar default bottom/underline for filled inputs */
+.ai-assistant-input-fullwidth :deep(.q-field__control:before),
+.ai-assistant-input-fullwidth :deep(.q-field__control:after) {
+  display: none !important;
+}
+
+.ai-assistant-input-fullwidth :deep(.q-field__control-container) {
+  padding: 0 !important;
+}
+
+.ai-assistant-input-fullwidth :deep(.q-field__native) {
+  padding: 4px 0 !important;   /* slight vertical padding for balanced caret */
+  margin: 0 !important;
+  min-height: 28px !important;
+  font-size: 14px !important;              /* increased for readability */
+  line-height: 1.65 !important;            /* adjust for visual balance */
+}
+
+/* Ensure textarea inside native gets the font size (higher specificity) */
+.ai-assistant-input-fullwidth :deep(.q-field__native textarea) {
+  font-size: 14px !important;
+  line-height: 1.65 !important;
+}
+
+.ai-assistant-input-fullwidth :deep(.q-field__native textarea::placeholder) {
+  font-size: 14px !important;
+}
+
+.ai-assistant-input-fullwidth :deep(.q-field__marginal) {
+  padding: 0 !important;
+}
+
+.ai-assistant-horizontal-bar.dark-theme .ai-assistant-input-fullwidth :deep(.q-field__control) {
+  border-color: rgba(102, 126, 234, 0.28);
+  background: linear-gradient(180deg, rgba(36, 42, 66, 0.9) 0%, rgba(30, 34, 55, 0.85) 100%);
+}
+
+.ai-horizontal-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 10px;
+}
+
+/* Disable hover visuals for all buttons inside AI controls */
+.ai-horizontal-controls :deep(.q-btn:hover),
+.ai-horizontal-controls :deep(.q-btn:focus),
+.ai-horizontal-controls :deep(.q-btn:active) {
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
+  outline: none !important;
+}
+.ai-horizontal-controls :deep(.q-btn::before),
+.ai-horizontal-controls :deep(.q-btn::after) {
+  display: none !important;
+}
+.ai-horizontal-controls :deep(.q-btn .q-focus-helper) {
+  display: none !important; /* remove rounded hover/focus helper */
+}
+
+/* Allow hover effects for non-active toggle buttons */
+.ai-mode-toggle-horizontal :deep(.q-btn:not(.q-btn--active):hover),
+.ai-mode-toggle-horizontal :deep(.q-btn:not(.q-btn--active):focus),
+.ai-mode-toggle-horizontal :deep(.q-btn:not(.q-btn--active):active) {
+  background: rgba(102, 126, 234, 0.12) !important;
+  transform: translateY(-1px) !important;
+  transition: all 0.2s ease !important;
+}
+.ai-mode-toggle-horizontal :deep(.q-btn .q-focus-helper) { display: none !important; }
+
+/* Vertical arrows stack without borders */
+.ai-arrows-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+  align-items: center;
+  line-height: 0; /* collapse inline spacing */
+  cursor: pointer; /* indicate group is interactive */
+}
+.ai-arrow-btn {
+  border: none !important;
+  background: transparent !important;
+  color: #64748b;
+}
+.ai-arrows-stack :deep(.q-btn .q-focus-helper) { display: none !important; }
+.ai-arrows-stack :deep(.q-btn) {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 16px !important;
+  height: 16px !important;
+  width: 22px !important;
+  min-width: 0 !important;
+}
+.ai-arrows-stack :deep(.q-btn .q-icon) {
+  font-size: 16px;
+  line-height: 16px;
+}
+.ai-arrows-stack :deep(.q-btn__content) {
+  padding: 0 !important;
+}
+/* Slight overlap to reduce perceived gap */
+.ai-arrow-btn + .ai-arrow-btn {
+  margin-top: -8px !important;
+}
+.ai-arrow-btn:hover {
+  color: inherit; /* individual button hover does nothing */
+}
+.ai-arrows-stack:hover .ai-arrow-btn {
+  color: #667eea; /* hover affects the whole stack uniformly */
+}
+.q-dark .ai-arrow-btn {
+  color: #cbd5e1;
+}
+.q-dark .ai-arrow-btn:hover {
+  color: inherit;
+}
+.q-dark .ai-arrows-stack:hover .ai-arrow-btn {
+  color: #aeb8ff;
+}
+
+/* Container hover should recolor both icons together */
+.ai-arrows-stack:hover .ai-arrow-btn {
+  color: #667eea;
+}
+
+/* Prepend icon styling */
+.ai-prepend-icon {
+  color: #667eea;
+  opacity: 0.9;
+  margin-right: 6px; /* space after icon */
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.ai-assistant-horizontal-bar.ai-input-focused .ai-prepend-icon {
+  transform: scale(1.05);
+  opacity: 1;
+}
+
+.ai-mode-toggle-horizontal {
+  border-radius: 999px; /* pill */
+  background-color: rgba(102, 126, 234, 0.08);
+  padding: 2px;
+}
+
+/* refine toggle buttons look */
+.ai-mode-toggle-horizontal :deep(.q-btn) {
+  border-radius: 999px !important;
+  padding: 2px 10px;
+  font-weight: 600;
+}
+
+/* Toggle micro-interactions */
+.ai-mode-toggle-horizontal :deep(.q-btn:hover) {
+  transform: translateY(-1px);
+}
+.ai-mode-toggle-horizontal :deep(.q-btn--active) {
+  filter: saturate(1.1);
+}
+
+/* Preserve active background on hover/focus for SQL/VRL toggle */
+.ai-mode-toggle-horizontal-light :deep(.q-btn--active),
+.ai-mode-toggle-horizontal-light :deep(.q-btn--active:hover),
+.ai-mode-toggle-horizontal-light :deep(.q-btn--active:focus) {
+  background: rgba(102, 126, 234, 0.18) !important;
+  color: #2b2f53 !important;
+  box-shadow: none !important;
+}
+
+.ai-mode-toggle-horizontal-dark :deep(.q-btn--active),
+.ai-mode-toggle-horizontal-dark :deep(.q-btn--active:hover),
+.ai-mode-toggle-horizontal-dark :deep(.q-btn--active:focus) {
+  background: rgba(102, 126, 234, 0.28) !important;
+  color: #e5e7eb !important;
+  box-shadow: none !important;
+}
+
+.ai-mode-toggle-horizontal-light{
+  border: 1px solid rgb(133, 130, 130);
+}
+
+.ai-mode-toggle-horizontal-dark{
+  border: 1px solid rgb(133, 130, 130);
+}
+
+/* Override to show primary color on active buttons */
+.ai-mode-toggle-horizontal :deep(.q-btn--active) {
+  background: var(--q-primary) !important;
+  color: white !important;
+}
+
+.ai-mode-toggle-horizontal :deep(.q-btn--active:hover) {
+  background: var(--q-primary) !important;
+  color: white !important;
+  opacity: 0.9 !important;
+  transform: translateY(-1px) scale(1.02) !important;
+  transition: all 0.2s ease !important;
+}
+
+.ai-assistant-horizontal-bar.dark-theme .ai-mode-toggle-horizontal {
+  background-color: rgba(102, 126, 234, 0.15);
+}
+
+/* Focus and interactive states - keep input highlight only, not container */
+.ai-assistant-horizontal-bar.ai-input-focused {
+  border-color: transparent;
+  box-shadow: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.query-editor-container.ai-focused .editor-column {
+  border-color: #dbdbdb !important; /* keep original top border color */
+  box-shadow: none; /* remove highlight glow */
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ai-assistant-horizontal-bar.ai-input-focused .ai-assistant-input-fullwidth :deep(.q-field__control) {
+  border-color: #667eea !important;
+  /* Add a clear shadow ring on focus */
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.18), 0 8px 20px rgba(17, 24, 39, 0.08);
+  /* keep existing background (light tint in light mode, gradient in dark) */
+}
+
+/* Subtle hover accent for better affordance */
+.ai-assistant-input-fullwidth:hover :deep(.q-field__control) {
+  border-color: #6d7df0;
+}
+
+/* Softer placeholder for modern look */
+.ai-assistant-input-fullwidth :deep(.q-field__native textarea::placeholder) {
+  color: #94a3b8 !important;
+}
+
+/* Buttons: send/stop/collapse */
+.ai-send-btn :deep(.q-btn__content),
+.ai-stop-btn :deep(.q-btn__content),
+.ai-collapse-btn :deep(.q-btn__content) {
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+.ai-send-btn:hover :deep(.q-btn__content),
+.ai-stop-btn:hover :deep(.q-btn__content),
+.ai-collapse-btn:hover :deep(.q-btn__content) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.ai-send-btn :deep(.q-btn) {
+  background: linear-gradient(90deg, #6c7cff 0%, #7a5cff 100%);
+  color: #fff !important;
+}
+
+.ai-stop-btn :deep(.q-btn) {
+  background: linear-gradient(90deg, #ff6b6b 0%, #ff4d4d 100%);
+  color: #fff !important;
+}
+
+.ai-collapse-btn :deep(.q-btn) {
+  background: transparent;
+}
+
+.ai-collapse-btn {
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.ai-collapse-btn:hover {
+  background-color: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+  transform: scale(1.05);
+}
+
+.ai-send-btn, .ai-stop-btn {
+  transition: all 0.2s ease;
+}
+
+/* Icon-only hide button styling */
+.ai-toggle-icon-btn {
+  color: #64748b;
+  background: rgba(241, 245, 255, 0.6);
+  border-radius: 8px;
+  width: 28px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, filter 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.ai-toggle-icon-btn:hover {
+  transform: translateY(-1px) scale(1.03);
+  background: rgba(230, 235, 255, 0.9);
+  color: #475569;
+}
+.q-dark .ai-toggle-icon-btn {
+  color: #cbd5e1;
+  background: rgba(39, 44, 70, 0.6);
+}
+.q-dark .ai-toggle-icon-btn:hover {
+  background: rgba(45, 51, 82, 0.9);
+  color: #e2e8f0;
+}
+
+.ai-send-btn:hover {
+  background-color: rgba(102, 126, 234, 0.1);
+  transform: scale(1.05);
+}
+
+.ai-stop-btn:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  transform: scale(1.05);
+}
+
+.editor-column {
+  position: relative;
+}
+
+/* Animations */
+@keyframes aiBarSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 80px;
+  }
+}
+
+@keyframes aiIconPulse {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* Enhanced container styles */
+.ai-enhanced-container {
+  position: relative;
+  border-radius: 0 0 8px 8px;
+}
+
+.editor-column {
+  position: relative;
+}
 </style>

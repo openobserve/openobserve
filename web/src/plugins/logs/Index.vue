@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @on-auto-interval-trigger="onAutoIntervalTrigger"
               @showSearchHistory="showSearchHistoryfn"
               @extractPatterns="extractPatternsForCurrentQuery"
+              @onAiAssistantToggle="handleAiAssistantToggle"
             />
           </div>
         </template>
@@ -709,11 +710,17 @@ export default defineComponent({
       schemaCache.value = null;
     };
 
-    const {
-      registerAiChatHandler,
-      removeAiChatHandler,
-      initializeDefaultContext,
-    } = useAiChat();
+    const handleAiAssistantToggle = (isVisible) => {
+      if (isVisible) {
+        // AI is opened, increase splitter by 10%
+        splitterModel.value = Math.min(splitterModel.value + 10, 90);
+      } else {
+        // AI is closed, decrease splitter by 10%
+        splitterModel.value = Math.max(splitterModel.value - 10, 5);
+      }
+    };
+
+    const { registerAiChatHandler, removeAiChatHandler, initializeDefaultContext } = useAiChat();
 
     onUnmounted(() => {
       // reset logsVisualizeToggle when user navigate to other page with keepAlive is false and navigate back to logs page
@@ -2500,6 +2507,7 @@ export default defineComponent({
       getHistogramData,
       extractPatternsForCurrentQuery,
       patternsState,
+      handleAiAssistantToggle,
     };
   },
   computed: {
