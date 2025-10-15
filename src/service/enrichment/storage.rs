@@ -13,18 +13,160 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use anyhow::{Result, anyhow};
+use arrow::array::{Array, Int64Array, RecordBatch};
+use arrow_schema::SchemaRef;
 use bytes::Bytes;
 use config::{
-    spawn_pausable_job,
+    PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, spawn_pausable_job,
     utils::{
         enrichment_local_cache::{
             get_key, get_metadata_content, get_metadata_path, get_table_dir, get_table_path,
         },
         json::Value,
+        record_batch_ext::{convert_json_to_record_batch, convert_vrl_to_record_batch},
     },
 };
+use rayon::prelude::*;
 use tokio::task::JoinHandle;
+
+#[derive(Debug, Clone)]
+pub enum Values {
+    Json(Arc<Vec<serde_json::Value>>),
+    Vrl(Arc<Vec<vrl::value::Value>>),
+    RecordBatch(Vec<RecordBatch>),
+}
+
+impl Values {
+    pub fn len(&self) -> usize {
+        match self {
+            Values::Json(data) => data.len(),
+            Values::Vrl(data) => data.len(),
+            Values::RecordBatch(batches) => batches.iter().map(|b| b.num_rows()).sum(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Values::Json(data) => data.is_empty(),
+            Values::Vrl(data) => data.is_empty(),
+            Values::RecordBatch(batches) => batches.iter().all(|b| b.num_rows() == 0),
+        }
+    }
+
+    pub fn last_updated_at(&self) -> i64 {
+        match self {
+            Values::RecordBatch(batches) => {
+                let mut max_ts = 0;
+                for batch in batches {
+                    if let Some(column) = batch.column_by_name(TIMESTAMP_COL_NAME)
+                        && let Some(array) = column.as_any().downcast_ref::<Int64Array>()
+                    {
+                        for v in array.values() {
+                            if *v > max_ts {
+                                max_ts = *v;
+                            }
+                        }
+                    }
+                }
+                max_ts
+            }
+            Values::Json(data) => data
+                .iter()
+                .map(|r| r.get(TIMESTAMP_COL_NAME).unwrap().as_i64().unwrap())
+                .max()
+                .unwrap(),
+            _ => unimplemented!("last_updated_at is not implement for vrl"),
+        }
+    }
+
+    /// Convert to JSON format if not already in that format
+    pub fn to_json(&self) -> Result<Arc<Vec<serde_json::Value>>> {
+        match self {
+            Values::Json(data) => Ok(Arc::clone(data)),
+            Values::Vrl(data) => {
+                let pool = rayon::ThreadPoolBuilder::new()
+                    .num_threads(config::get_config().limit.cpu_num)
+                    .build()?;
+                let json_data = pool.install(|| {
+                    data.par_iter()
+                        .map(crate::service::db::enrichment_table::convert_from_vrl)
+                        .collect()
+                });
+                Ok(Arc::new(json_data))
+            }
+            Values::RecordBatch(batches) => {
+                let mut records = Vec::new();
+                for batch in batches {
+                    let mut buf = Vec::new();
+                    let mut writer = arrow_json::ArrayWriter::new(&mut buf);
+                    writer
+                        .write(batch)
+                        .map_err(|e| anyhow!("Failed to write batch as JSON: {e}"))?;
+                    writer
+                        .finish()
+                        .map_err(|e| anyhow!("Failed to finish JSON writer: {e}"))?;
+
+                    let json_str = String::from_utf8(buf)
+                        .map_err(|e| anyhow!("Failed to convert JSON bytes to string: {e}"))?;
+                    let batch_data: Vec<Value> = serde_json::from_str(&json_str)
+                        .map_err(|e| anyhow!("Failed to parse JSON: {e}"))?;
+                    records.extend(batch_data);
+                }
+                Ok(Arc::new(records))
+            }
+        }
+    }
+
+    /// Convert to VRL format if not already in that format
+    pub fn to_vrl(&self) -> Result<Arc<Vec<vrl::value::Value>>> {
+        match self {
+            Values::Vrl(data) => Ok(Arc::clone(data)),
+            Values::Json(data) => {
+                let pool = rayon::ThreadPoolBuilder::new()
+                    .num_threads(config::get_config().limit.cpu_num)
+                    .build()?;
+                let vrl_data = pool.install(|| {
+                    data.par_iter()
+                        .map(crate::service::db::enrichment_table::convert_to_vrl)
+                        .collect()
+                });
+                Ok(Arc::new(vrl_data))
+            }
+            Values::RecordBatch(batches) => {
+                // Convert RecordBatch directly to VRL without intermediate JSON
+                let vrl_data =
+                    crate::service::db::enrichment_table::convert_recordbatch_to_vrl(batches)?;
+                Ok(Arc::new(vrl_data))
+            }
+        }
+    }
+
+    /// Convert to RecordBatch format if not already in that format
+    pub fn to_record_batch(&self, schema: &SchemaRef) -> Result<Vec<RecordBatch>> {
+        match self {
+            Values::RecordBatch(batches) => Ok(batches.clone()),
+            Values::Vrl(data) => {
+                let chunks: Vec<&[vrl::value::Value]> =
+                    data.as_ref().chunks(PARQUET_BATCH_SIZE).collect();
+
+                chunks
+                    .iter()
+                    .map(|chunk| convert_vrl_to_record_batch(schema, chunk))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| anyhow!("Failed to convert VRL to RecordBatch: {}", e))
+            }
+            Values::Json(data) => {
+                let data_refs: Vec<_> = data.iter().map(|row| Arc::new(row.clone())).collect();
+                convert_json_to_record_batch(schema, &data_refs)
+                    .map(|batch| vec![batch])
+                    .map_err(|e| anyhow!("Failed to convert JSON to RecordBatch: {}", e))
+            }
+        }
+    }
+}
 
 pub mod remote {
     use std::sync::Arc;
@@ -33,7 +175,8 @@ pub mod remote {
     use config::{
         meta::stream::{FileMeta, StreamType},
         utils::{
-            parquet::write_recordbatch_to_parquet, record_batch_ext::convert_json_to_record_batch,
+            json::estimate_json_bytes, parquet::write_recordbatch_to_parquet,
+            record_batch_ext::convert_json_to_record_batch,
         },
     };
 
@@ -104,13 +247,13 @@ pub mod remote {
             return Ok(());
         }
 
-        let buf = Bytes::from(serde_json::to_string(&data).unwrap());
+        let original_size = data.iter().map(estimate_json_bytes).sum::<usize>() as i64;
         let mut file_meta = FileMeta {
             min_ts,
             max_ts,
             records: data.len() as i64,
-            original_size: buf.len() as i64,
-            compressed_size: buf.len() as i64,
+            original_size,
+            compressed_size: original_size,
             ..Default::default()
         };
 
@@ -143,7 +286,7 @@ pub mod remote {
     pub async fn store(
         org_id: &str,
         table_name: &str,
-        data: &Vec<Value>,
+        data: &[Value],
         created_at: i64,
     ) -> Result<()> {
         if data.is_empty() {
@@ -153,13 +296,13 @@ pub mod remote {
             .await
             .map_err(|e| anyhow!("Failed to get schema from cache: {}", e))?;
 
-        let buf = Bytes::from(serde_json::to_string(&data).unwrap());
+        let original_size = data.iter().map(estimate_json_bytes).sum::<usize>() as i64;
         let mut file_meta = FileMeta {
             min_ts: created_at,
             max_ts: created_at,
             records: data.len() as i64,
-            original_size: buf.len() as i64,
-            compressed_size: buf.len() as i64,
+            original_size,
+            compressed_size: original_size,
             ..Default::default()
         };
 
@@ -226,12 +369,18 @@ pub mod remote {
 }
 
 pub mod local {
+    use config::{
+        meta::stream::{FileMeta, StreamType},
+        utils::parquet::write_recordbatch_to_parquet,
+    };
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
     use super::*;
 
     pub async fn store(
         org_id: &str,
         table_name: &str,
-        data: &[Value],
+        data: Values,
         updated_at: i64,
     ) -> Result<()> {
         let key = get_key(org_id, table_name);
@@ -244,10 +393,26 @@ pub mod local {
             tokio::fs::create_dir_all(parent).await?;
         }
 
-        // Serialize and write data
-        let json_data = serde_json::to_string_pretty(data)
-            .map_err(|e| anyhow!("Failed to serialize enrichment table data: {}", e))?;
-        tokio::fs::write(&file_path, json_data)
+        // Get schema from cache
+        let schema = infra::schema::get_cache(org_id, table_name, StreamType::EnrichmentTables)
+            .await
+            .map_err(|e| anyhow!("Failed to get schema from cache: {e}"))?
+            .schema()
+            .clone();
+
+        let data = data.to_record_batch(&schema)?;
+        let file_meta = FileMeta {
+            min_ts: updated_at,
+            max_ts: updated_at,
+            records: data.iter().map(|b| b.num_rows()).sum::<usize>() as i64,
+            ..Default::default()
+        };
+
+        let parquet_data =
+            write_recordbatch_to_parquet(schema.clone(), &data, &[], &file_meta).await?;
+
+        // Write parquet data to file
+        tokio::fs::write(&file_path, parquet_data)
             .await
             .map_err(|e| anyhow!("Failed to write enrichment table file: {}", e))?;
 
@@ -272,36 +437,47 @@ pub mod local {
         Ok(())
     }
 
-    pub async fn retrieve(org_id: &str, table_name: &str) -> Result<Vec<Value>> {
+    /// Retrieve enrichment table data as Values (optimized version)
+    /// This returns data in RecordBatch format directly from parquet files,
+    /// avoiding unnecessary conversions
+    pub async fn retrieve(org_id: &str, table_name: &str) -> Result<Values> {
         let key = get_key(org_id, table_name);
         let file_dir = get_table_dir(&key);
         let mut files = Vec::new();
         let mut entries = tokio::fs::read_dir(&file_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let file_path = entry.path();
-            if file_path.is_file() && file_path.extension().unwrap_or_default() == "json" {
+            if file_path.is_file() && file_path.extension().unwrap_or_default() == "parquet" {
                 files.push(file_path);
             }
         }
 
         if files.is_empty() {
-            return Ok(vec![]);
+            return Ok(Values::RecordBatch(vec![]));
         }
 
         // sort the files by created_at
         files.sort_by_key(|f| f.metadata().unwrap().created().unwrap());
 
-        // read the files in order
-        let mut records = Vec::new();
+        // read the files in order and keep as RecordBatch
+        let mut batches = Vec::new();
         for file in files {
-            let data = tokio::fs::read_to_string(&file)
+            let file_content = tokio::fs::read(&file)
                 .await
-                .map_err(|e| anyhow!("Failed to read enrichment table file: {}", e))?;
-            let table_data: Vec<Value> = serde_json::from_str(&data)
-                .map_err(|e| anyhow!("Failed to parse enrichment table JSON: {}", e))?;
-            records.extend(table_data);
+                .map_err(|e| anyhow!("Failed to read enrichment table file: {e}"))?;
+
+            // Parse parquet file
+            let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(file_content))
+                .map_err(|e| anyhow!("Failed to create parquet reader: {e}"))?
+                .build()
+                .map_err(|e| anyhow!("Failed to build parquet reader: {e}"))?;
+
+            for batch in reader {
+                let batch = batch.map_err(|e| anyhow!("Failed to read record batch: {e}"))?;
+                batches.push(batch);
+            }
         }
-        Ok(records)
+        Ok(Values::RecordBatch(batches))
     }
 
     pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
@@ -343,7 +519,7 @@ pub mod local {
     pub async fn store_data_if_needed(
         org_id: &str,
         table_name: &str,
-        data: &[Value],
+        data: Values,
         updated_at: i64,
     ) -> Result<()> {
         let key = get_key(org_id, table_name);
@@ -359,14 +535,13 @@ pub mod local {
     pub async fn store_data_if_needed_background(
         org_id: &str,
         table_name: &str,
-        data: &[Value],
+        data: Values,
         updated_at: i64,
     ) -> Result<()> {
         let org_id = org_id.to_string();
         let table_name = table_name.to_string();
-        let data = data.to_owned();
         tokio::task::spawn(async move {
-            store_data_if_needed(&org_id, &table_name, &data, updated_at).await
+            store_data_if_needed(&org_id, &table_name, data, updated_at).await
         });
         Ok(())
     }
@@ -390,22 +565,6 @@ pub mod database {
 
         log::debug!("Stored enrichment table {table_name} to database");
         Ok(())
-    }
-
-    pub async fn retrieve(org_id: &str, table_name: &str) -> Result<Vec<Value>> {
-        match crate::service::db::enrichment_table::get_enrichment_data_from_db(org_id, table_name)
-            .await
-        {
-            Ok(data) => Ok(data.0),
-            Err(e) => {
-                log::error!("Failed to retrieve enrichment table {table_name} from database: {e}");
-                Err(anyhow::anyhow!(
-                    "Failed to retrieve enrichment table {}: {}",
-                    table_name,
-                    e
-                ))
-            }
-        }
     }
 
     pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
@@ -439,13 +598,20 @@ pub mod database {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, sync::Arc};
 
+    use arrow::{
+        array::RecordBatch,
+        datatypes::{DataType, Field, Schema},
+    };
     use serde_json::json;
     use tokio;
 
     use super::*;
+    use crate::service::enrichment::storage::Values;
 
+    // current ignore because it need database to get schema
+    #[ignore]
     #[tokio::test]
     async fn test_all_sequential() {
         // Run all tests sequentially to avoid directory conflicts
@@ -472,7 +638,9 @@ mod tests {
         let updated_at = 1640995200;
 
         // Test store function
-        let result = local::store(org_id, table_name, &test_data, updated_at).await;
+        let test_data = Values::Json(Arc::new(test_data));
+        let result = local::store(org_id, table_name, test_data, updated_at).await;
+        println!("Store result: {:?}", result);
         assert!(result.is_ok(), "Store should succeed");
 
         // Verify file was created
@@ -489,7 +657,7 @@ mod tests {
         let retrieved_data = local::retrieve(org_id, table_name).await;
         assert!(retrieved_data.is_ok(), "Retrieve should succeed");
 
-        let retrieved_data = retrieved_data.unwrap();
+        let retrieved_data = retrieved_data.unwrap().to_json().unwrap();
         assert_eq!(retrieved_data.len(), 2, "Should retrieve 2 records");
         assert_eq!(
             retrieved_data[0]["id"],
@@ -508,15 +676,15 @@ mod tests {
         let table_name = "versioned_table";
 
         // Store first version
-        let data_v1 = vec![json!({"id": 1, "version": "v1"})];
+        let data_v1 = Values::Json(Arc::new(vec![json!({"id": 1, "version": "v1"})]));
         let updated_at_v1 = 1640995200;
-        let result = local::store(org_id, table_name, &data_v1, updated_at_v1).await;
+        let result = local::store(org_id, table_name, data_v1, updated_at_v1).await;
         assert!(result.is_ok(), "First store should succeed");
 
         // Store second version
-        let data_v2 = vec![json!({"id": 2, "version": "v2"})];
+        let data_v2 = Values::Json(Arc::new(vec![json!({"id": 2, "version": "v2"})]));
         let updated_at_v2 = 1640995300;
-        let result = local::store(org_id, table_name, &data_v2, updated_at_v2).await;
+        let result = local::store(org_id, table_name, data_v2, updated_at_v2).await;
         assert!(result.is_ok(), "Second store should succeed");
 
         // Retrieve should get both versions
@@ -535,11 +703,11 @@ mod tests {
     async fn test_delete() {
         let org_id = "test_org";
         let table_name = "delete_test_table";
-        let test_data = vec![json!({"id": 1, "data": "test"})];
+        let test_data = Values::Json(Arc::new(vec![json!({"id": 1, "data": "test"})]));
         let updated_at = 1640995200;
 
         // First store some data
-        let result = local::store(org_id, table_name, &test_data, updated_at).await;
+        let result = local::store(org_id, table_name, test_data, updated_at).await;
         assert!(result.is_ok(), "Store should succeed");
 
         // Verify data exists
@@ -574,7 +742,7 @@ mod tests {
     async fn test_get_last_updated_at() {
         let org_id = "test_org";
         let table_name = "timestamp_test_table";
-        let test_data = vec![json!({"id": 1, "data": "test"})];
+        let test_data = Values::Json(Arc::new(vec![json!({"id": 1, "data": "test"})]));
         let updated_at = 1640995200;
 
         // Test getting timestamp before storing data
@@ -583,7 +751,7 @@ mod tests {
         assert_eq!(result.unwrap(), 0, "Should return 0 for non-existent table");
 
         // Store data
-        local::store(org_id, table_name, &test_data, updated_at)
+        local::store(org_id, table_name, test_data, updated_at)
             .await
             .unwrap();
 
@@ -600,18 +768,22 @@ mod tests {
     async fn test_store_data_if_needed() {
         let org_id = "test_org";
         let table_name = "conditional_test_table";
-        let test_data_v1 = vec![json!({"id": 1, "version": "v1"})];
-        let test_data_v2 = vec![json!({"id": 1, "version": "v2"})];
+        let test_data_v1 = Values::Json(Arc::new(vec![json!({"id": 1, "version": "v1"})]));
+        let test_data_v2 = Values::Json(Arc::new(vec![json!({"id": 1, "version": "v2"})]));
         let updated_at_v1 = 1640995200;
         let updated_at_v2 = 1640995300;
 
         // Store initial data
         let result =
-            local::store_data_if_needed(org_id, table_name, &test_data_v1, updated_at_v1).await;
+            local::store_data_if_needed(org_id, table_name, test_data_v1, updated_at_v1).await;
         assert!(result.is_ok(), "Initial store should succeed");
 
         // Verify data was stored
-        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
         assert_eq!(
             retrieved_data[0]["version"],
             json!("v1"),
@@ -621,14 +793,19 @@ mod tests {
         // Try to store older data (should be ignored)
         let old_updated_at = 1640995100;
         let result =
-            local::store_data_if_needed(org_id, table_name, &test_data_v2, old_updated_at).await;
+            local::store_data_if_needed(org_id, table_name, test_data_v2.clone(), old_updated_at)
+                .await;
         assert!(
             result.is_ok(),
             "Store with old timestamp should succeed but not update"
         );
 
         // Verify data wasn't changed
-        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
         assert_eq!(
             retrieved_data[0]["version"],
             json!("v1"),
@@ -637,11 +814,15 @@ mod tests {
 
         // Store newer data (should update)
         let result =
-            local::store_data_if_needed(org_id, table_name, &test_data_v2, updated_at_v2).await;
+            local::store_data_if_needed(org_id, table_name, test_data_v2, updated_at_v2).await;
         assert!(result.is_ok(), "Store with newer timestamp should succeed");
 
         // Verify data was updated
-        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
         assert_eq!(
             retrieved_data[0]["version"],
             json!("v2"),
@@ -652,20 +833,23 @@ mod tests {
     async fn test_store_data_if_needed_background() {
         let org_id = "test_org";
         let table_name = "background_test_table";
-        let test_data = vec![json!({"id": 1, "data": "background"})];
+        let test_data = Values::Json(Arc::new(vec![json!({"id": 1, "data": "background"})]));
         let updated_at = 1640995200;
 
         // Test background store
         let result =
-            local::store_data_if_needed_background(org_id, table_name, &test_data, updated_at)
-                .await;
+            local::store_data_if_needed_background(org_id, table_name, test_data, updated_at).await;
         assert!(result.is_ok(), "Background store should succeed");
 
         // Wait a bit for background task to complete
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         // Verify data was eventually stored
-        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
         assert_eq!(retrieved_data.len(), 1, "Should have stored 1 record");
         assert_eq!(
             retrieved_data[0]["data"],
@@ -677,11 +861,11 @@ mod tests {
     async fn test_metadata_persistence() {
         let org_id = "test_org";
         let table_name = "metadata_test_table";
-        let test_data = vec![json!({"id": 1, "data": "test"})];
+        let test_data = Values::Json(Arc::new(vec![json!({"id": 1, "data": "test"})]));
         let updated_at = 1640995200;
 
         // Store data
-        local::store(org_id, table_name, &test_data, updated_at)
+        local::store(org_id, table_name, test_data, updated_at)
             .await
             .unwrap();
 
@@ -723,11 +907,16 @@ mod tests {
         let updated_at = 1640995200;
 
         // Test storing large data
-        let result = local::store(org_id, table_name, &large_data, updated_at).await;
+        let large_data = Values::Json(Arc::new(large_data));
+        let result = local::store(org_id, table_name, large_data, updated_at).await;
         assert!(result.is_ok(), "Should handle large data successfully");
 
         // Test retrieving large data
-        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
         assert_eq!(
             retrieved_data.len(),
             1000,
@@ -751,23 +940,143 @@ mod tests {
         let table_name = "error_test_table";
 
         // Create data that will serialize fine but test edge cases
-        let test_data = vec![
+        let test_data = Values::Json(Arc::new(vec![
             json!({"id": 1, "data": null}),
             json!({"id": 2, "special_chars": "!@#$%^&*()"}),
-        ];
+        ]));
         let updated_at = 1640995200;
 
-        let result = local::store(org_id, table_name, &test_data, updated_at).await;
+        let result = local::store(org_id, table_name, test_data, updated_at).await;
         assert!(
             result.is_ok(),
             "Should handle special characters and null values"
         );
 
-        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
         assert_eq!(retrieved_data.len(), 2, "Should retrieve both records");
         assert!(
             retrieved_data[0]["data"].is_null(),
             "Should preserve null values"
         );
+    }
+
+    #[test]
+    fn test_values_conversions() {
+        // Test JSON -> JSON (no conversion)
+        let json_data = Arc::new(vec![
+            serde_json::json!({"name": "Alice", "age": 30}),
+            serde_json::json!({"name": "Bob", "age": 25}),
+        ]);
+        let value_type = Values::Json(Arc::clone(&json_data));
+        let result = value_type.to_json().unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["name"], "Alice");
+
+        // Test JSON -> VRL
+        let vrl_data = value_type.to_vrl().unwrap();
+        assert_eq!(vrl_data.len(), 2);
+
+        // Test VRL -> VRL (no conversion)
+        let value_type_vrl = Values::Vrl(Arc::clone(&vrl_data));
+        let result_vrl = value_type_vrl.to_vrl().unwrap();
+        assert_eq!(result_vrl.len(), 2);
+
+        // Test VRL -> JSON
+        let json_from_vrl = value_type_vrl.to_json().unwrap();
+        assert_eq!(json_from_vrl.len(), 2);
+    }
+
+    #[test]
+    fn test_values_record_batch_conversion() {
+        use arrow::array::{Int64Array, StringArray};
+
+        // Create a simple RecordBatch
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Int64, false),
+        ]));
+
+        let name_array = StringArray::from(vec!["Alice", "Bob"]);
+        let age_array = Int64Array::from(vec![30, 25]);
+
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(name_array), Arc::new(age_array)],
+        )
+        .unwrap();
+
+        let value_type = Values::RecordBatch(vec![batch]);
+
+        // Test RecordBatch -> JSON
+        let json_data = value_type.to_json().unwrap();
+        assert_eq!(json_data.len(), 2);
+        assert_eq!(json_data[0]["name"], "Alice");
+        assert_eq!(json_data[0]["age"], 30);
+
+        // Test RecordBatch -> RecordBatch (no conversion)
+        let result_batch = value_type.to_record_batch(&schema).unwrap();
+        assert_eq!(result_batch.len(), 1);
+        assert_eq!(result_batch[0].num_rows(), 2);
+    }
+
+    #[test]
+    fn test_last_updated_at() {
+        use arrow::array::{Int64Array, StringArray};
+
+        // Create a schema with _timestamp column
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("_timestamp", DataType::Int64, false),
+        ]));
+
+        // Create first batch with timestamps
+        let name_array1 = StringArray::from(vec!["Alice", "Bob"]);
+        let timestamp_array1 = Int64Array::from(vec![1000, 2000]);
+
+        let batch1 = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(name_array1), Arc::new(timestamp_array1)],
+        )
+        .unwrap();
+
+        // Create second batch with timestamps
+        let name_array2 = StringArray::from(vec!["Charlie", "David"]);
+        let timestamp_array2 = Int64Array::from(vec![1500, 3000]);
+
+        let batch2 = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(name_array2), Arc::new(timestamp_array2)],
+        )
+        .unwrap();
+
+        // Test with multiple batches
+        let value_type = Values::RecordBatch(vec![batch1, batch2]);
+        let max_ts = value_type.last_updated_at();
+        assert_eq!(max_ts, 3000);
+
+        // Test with empty batches
+        let empty_value_type = Values::RecordBatch(vec![]);
+        let max_ts_empty = empty_value_type.last_updated_at();
+        assert_eq!(max_ts_empty, 0);
+
+        // Test with batch without _timestamp column
+        let schema_no_ts = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Int64, false),
+        ]));
+        let name_array3 = StringArray::from(vec!["Eve"]);
+        let age_array3 = Int64Array::from(vec![25]);
+        let batch3 = RecordBatch::try_new(
+            schema_no_ts,
+            vec![Arc::new(name_array3), Arc::new(age_array3)],
+        )
+        .unwrap();
+        let value_type_no_ts = Values::RecordBatch(vec![batch3]);
+        let max_ts_no_ts = value_type_no_ts.last_updated_at();
+        assert_eq!(max_ts_no_ts, 0);
     }
 }

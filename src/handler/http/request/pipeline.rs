@@ -15,16 +15,20 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
+use actix_web::{
+    HttpResponse, delete, get, http, post, put,
+    web::{self, Json, Query},
+};
 use ahash::HashMap;
 use config::{ider, meta::pipeline::Pipeline};
 
 #[cfg(feature = "enterprise")]
 use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::models::pipelines::{
-        PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::{
+        extractors::Headers,
+        models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
     },
     service::{db::pipeline::PipelineError, pipeline},
 };
@@ -66,18 +70,17 @@ impl From<PipelineError> for HttpResponse {
 #[post("/{org_id}/pipelines")]
 pub async fn save_pipeline(
     path: web::Path<String>,
-    pipeline: web::Json<Pipeline>,
-    req: HttpRequest,
+    Query(query): Query<HashMap<String, String>>,
+    Json(mut pipeline): Json<Pipeline>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let mut pipeline = pipeline.into_inner();
     pipeline.name = pipeline.name.trim().to_lowercase();
     pipeline.org = org_id;
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let overwrite = match query.get("overwrite") {
-        Some(v) => v.parse::<bool>().unwrap_or_default(),
-        None => false,
-    };
+
+    let overwrite = query
+        .get("overwrite")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
     if !overwrite {
         pipeline.id = ider::generate();
     }
@@ -114,7 +117,7 @@ pub async fn save_pipeline(
 #[get("/{org_id}/pipelines")]
 async fn list_pipelines(
     org_id: web::Path<String>,
-    _req: HttpRequest,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let mut _permitted = None;
@@ -123,10 +126,9 @@ async fn list_pipelines(
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        let user_id = _req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
-            user_id.to_str().unwrap(),
+            &user_email.user_id,
             "GET",
             OFGA_MODELS
                 .get("pipelines")
@@ -273,8 +275,7 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
     )
 )]
 #[put("/{org_id}/pipelines")]
-pub async fn update_pipeline(pipeline: web::Json<Pipeline>) -> Result<HttpResponse, Error> {
-    let pipeline = pipeline.into_inner();
+pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Result<HttpResponse, Error> {
     match pipeline::update_pipeline(pipeline).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK,
@@ -312,22 +313,26 @@ pub async fn update_pipeline(pipeline: web::Json<Pipeline>) -> Result<HttpRespon
 #[put("/{org_id}/pipelines/{pipeline_id}/enable")]
 pub async fn enable_pipeline(
     path: web::Path<(String, String)>,
-    req: HttpRequest,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, pipeline_id) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let enable = match query.get("value") {
-        Some(v) => v.parse::<bool>().unwrap_or_default(),
-        None => false,
-    };
-    let starts_from_now = match query.get("from_now") {
-        Some(v) => v.parse::<bool>().unwrap_or_default(),
-        None => false,
-    };
-    let resp_msg =
-        "Pipeline successfully ".to_string() + if enable { "enabled" } else { "disabled" };
+
+    let enable = query
+        .get("value")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+
+    let starts_from_now = query
+        .get("from_now")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+
     match pipeline::enable_pipeline(&org_id, &pipeline_id, enable, starts_from_now).await {
         Ok(()) => {
+            let resp_msg = format!(
+                "Pipeline successfully {}",
+                if enable { "enabled" } else { "disabled" }
+            );
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(http::StatusCode::OK, resp_msg)))
         }
         Err(e) => Ok(e.into()),
@@ -348,7 +353,7 @@ pub async fn enable_pipeline(
         ("org_id" = String, Path, description = "Organization name"),
         ("value" = bool, Query, description = "Enable or disable pipeline"),
     ),
-    request_body(content = Object, description = "Pipeline id list", content_type = "application/json"),
+    request_body(content = PipelineBulkEnableRequest, description = "Pipeline id list", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
@@ -361,32 +366,23 @@ pub async fn enable_pipeline(
 #[post("/{org_id}/pipelines/bulk/enable")]
 pub async fn enable_pipeline_bulk(
     path: web::Path<String>,
-    body: web::Bytes,
-    in_req: HttpRequest,
+    Query(query): Query<HashMap<String, String>>,
+    Json(req): Json<PipelineBulkEnableRequest>,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let enable = match query.get("value") {
-        Some(v) => v.parse::<bool>().unwrap_or_default(),
-        None => false,
-    };
-    let starts_from_now = match query.get("from_now") {
-        Some(v) => v.parse::<bool>().unwrap_or_default(),
-        None => false,
-    };
-    let req: PipelineBulkEnableRequest = match serde_json::from_slice(&body) {
-        Ok(v) => v,
-        Err(_) => return Ok(MetaHttpResponse::bad_request("invalid body")),
-    };
+    let enable = query
+        .get("value")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+    let starts_from_now = query
+        .get("from_now")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
 
     #[cfg(feature = "enterprise")]
     {
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+        let user_id = _user_email.user_id;
 
         for id in &req.ids {
             if let Some(res) =

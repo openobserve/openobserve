@@ -43,8 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex q-gutter-sm">
         <q-btn
           outline
-          padding="sm"
-          class="q-mr-sm"
+          padding="xs sm"
+          class="q-mr-sm tw-h-[36px]"
           no-caps
           label="Dashboard Tutorial"
           @click="showTutorial"
@@ -57,8 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           "
           outline
-          padding="sm"
-          class="q-mr-sm"
+          padding="xs"
+          class="q-mr-sm tw-h-[36px]"
           no-caps
           icon="info_outline"
           @click="showViewPanel = true"
@@ -73,23 +73,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="selectedDate"
           ref="dateTimePickerRef"
           :disable="disable"
+          class="tw-h-[36px]"
           @hide="setTimeForVariables"
         />
         <q-btn
-          class="q-ml-md text-bold"
           outline
-          padding="sm lg"
           color="red"
           no-caps
+          flat
+          class="o2-secondary-button tw-h-[36px] q-ml-md"
+          style="color: red !important;"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           :label="t('panel.discard')"
           @click="goBackToDashboardList"
           data-test="dashboard-panel-discard"
         />
         <q-btn
-          class="q-ml-md text-bold"
-          outline
-          padding="sm lg"
+          class="o2-secondary-button tw-h-[36px] q-ml-md"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           no-caps
+          flat
           :label="t('panel.save')"
           data-test="dashboard-panel-save"
           @click.stop="savePanelData.execute()"
@@ -100,21 +103,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-btn
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-            class="q-ml-md text-bold no-border"
             data-test="dashboard-cancel"
-            padding="sm lg"
-            color="negative"
             no-caps
+            dense
+            flat
+            class="o2-primary-button tw-h-[36px] q-ml-md"
+            :class="store.state.theme === 'dark' ? 'o2-negative-button-dark' : 'o2-negative-button-light'"
             :label="t('panel.cancel')"
             @click="cancelAddPanelQuery"
           />
           <q-btn
             v-else
-            class="q-ml-md text-bold no-border"
             data-test="dashboard-apply"
-            padding="sm lg"
-            color="secondary"
+            class="o2-primary-button tw-h-[36px] q-ml-md"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             no-caps
+            flat
+            dense
             :label="t('panel.apply')"
             @click="runQuery"
           />
@@ -239,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </span>
                   </div>
-                  <div class="tw-h-[calc(100vh-500px)]">
+                  <div class="tw-h-[calc(100vh-500px)] tw-min-h-[140px]">
                     <PanelSchemaRenderer
                       v-if="chartData"
                       @metadata-update="metaDataValue"
@@ -1762,4 +1767,6 @@ export default defineComponent({
   max-width: 500px;
   transition: width 0.2s ease;
 }
+
 </style>
+

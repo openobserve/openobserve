@@ -46,7 +46,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: ubicloud-standard-16
+      labels: repo-openobserve-standard-16
 
     steps:
       - name: Remove unused tools
@@ -99,10 +99,10 @@ jobs:
     name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary]
     runs-on:
-      labels: ubicloud-standard-8
-    container:
-      image: mcr.microsoft.com/playwright:v1.50.0-jammy
-      options: --user root
+      labels: repo-openobserve-standard-8
+    # container:
+    #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
+    #   options: --user root
     strategy:
       matrix:
         include:
@@ -195,7 +195,10 @@ jobs:
               ]
           - testfolder: "Reports"
             browser: "chrome"
-            run_files: ["reportsUpdated.spec.js", "reportsUpdated2.spec.js"]
+            run_files: [
+              "reportsUpdated.spec.js", 
+              "reportsUpdated2.spec.js"
+              ]
           - testfolder: "Streams"
             browser: "chrome"
             run_files:
@@ -220,7 +223,7 @@ jobs:
         run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
-        run: sleep 15
+        run: sleep 60
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
@@ -246,7 +249,7 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
-
+          npx playwright install --with-deps chromium 
           # Get list of files to run using join function
           FILE_LIST="${{ join(matrix.run_files, ' ') }}"
           echo "DEBUG: FILE_LIST = $FILE_LIST"
@@ -301,22 +304,72 @@ jobs:
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
 
-      - name: Upload Playwright Report
+      - name: Upload blob report to GitHub Actions Artifacts
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
-        if: always() && hashFiles('playwright-report/**') != ''
         with:
-          name: playwright-report-${{ matrix.testfolder }}
-          path: playwright-report/
-          retention-days: 30
+          name: blob-report-${{ matrix.testfolder }}
+          path: tests/ui-testing/blob-report
+          retention-days: 1
 
       - name: Check OpenObserve logs
         if: always()
         run: cat o2.log
 
+  merge_and_upload_reports:
+    name: Merge Reports and Upload to TestDino
+    needs: [ui_integration_tests]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install project dependencies
+        run: cd tests/ui-testing && npm ci
+
+      - name: Download blob reports from GitHub Actions Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: tests/ui-testing/all-blob-reports
+          pattern: blob-report-*
+          merge-multiple: true
+
+      - name: Merge Reports
+        run: |
+          cd tests/ui-testing
+
+          # Unset CI to use non-CI reporter config (html + json instead of blob)
+          unset CI
+          npx playwright merge-reports --config playwright.config.js ./all-blob-reports
+
+          echo "Contents of playwright-results:"
+          ls -la playwright-results/
+          echo "Contents of html-report:"
+          ls -la playwright-results/html-report/
+          echo "Checking report.json:"
+          ls -lh playwright-results/report.json
+
+      - name: Upload to TestDino
+        if: ${{ always() }}
+        run: |
+          cd tests/ui-testing
+          npx --yes tdpw upload playwright-results \
+            --json-report playwright-results/report.json \
+            --html-report playwright-results/html-report \
+            --upload-html \
+            --token="${{ secrets.TESTDINO_API_TOKEN }}"
+
   generate_coverage_report:
     name: Generate Coverage Report
     needs: [build_binary, ui_integration_tests]
-    runs-on: ubicloud-standard-8
+    runs-on: repo-openobserve-standard-8
     if: success() || failure()
 
     steps:

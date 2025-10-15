@@ -23,7 +23,11 @@ use promql_parser::parser;
 use {config::meta::stream::StreamType, o2_openfga::meta::mapping::OFGA_MODELS};
 
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
+    common::{
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::{auth::UserEmail, http::get_or_create_trace_id},
+    },
+    handler::http::extractors::Headers,
     service::{metrics, promql},
 };
 
@@ -121,9 +125,16 @@ pub async fn remote_write(
 pub async fn query_get(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestQuery>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query(&org_id.into_inner(), req.into_inner(), in_req).await
+    query(
+        &org_id.into_inner(),
+        req.into_inner(),
+        &user_email.user_id,
+        in_req,
+    )
+    .await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query")]
@@ -131,6 +142,7 @@ pub async fn query_post(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestQuery>,
     web::Form(form): web::Form<config::meta::promql::RequestQuery>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
@@ -138,12 +150,13 @@ pub async fn query_post(
     } else {
         req.into_inner()
     };
-    query(&org_id.into_inner(), req, in_req).await
+    query(&org_id.into_inner(), req, &user_email.user_id, in_req).await
 }
 
 async fn query(
     org_id: &str,
     req: config::meta::promql::RequestQuery,
+    user_email: &str,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let cfg = config::get_config();
@@ -156,9 +169,6 @@ async fn query(
         tracing::Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-
-    let user_id = in_req.headers().get("user_id").unwrap();
-    let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
         if crate::service::search::check_search_allowed().is_err() {
@@ -300,9 +310,17 @@ async fn query(
 pub async fn query_range_get(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestRangeQuery>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query_range(&org_id.into_inner(), req.into_inner(), in_req, false).await
+    query_range(
+        &org_id.into_inner(),
+        req.into_inner(),
+        &user_email.user_id,
+        in_req,
+        false,
+    )
+    .await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query_range")]
@@ -310,6 +328,7 @@ pub async fn query_range_post(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestRangeQuery>,
     web::Form(form): web::Form<config::meta::promql::RequestRangeQuery>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
@@ -317,7 +336,14 @@ pub async fn query_range_post(
     } else {
         req.into_inner()
     };
-    query_range(&org_id.into_inner(), req, in_req, false).await
+    query_range(
+        &org_id.into_inner(),
+        req,
+        &user_email.user_id,
+        in_req,
+        false,
+    )
+    .await
 }
 
 /// prometheus query exemplars
@@ -395,9 +421,17 @@ pub async fn query_range_post(
 pub async fn query_exemplars_get(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestRangeQuery>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query_range(&org_id.into_inner(), req.into_inner(), in_req, true).await
+    query_range(
+        &org_id.into_inner(),
+        req.into_inner(),
+        &user_email.user_id,
+        in_req,
+        true,
+    )
+    .await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query_exemplars")]
@@ -405,6 +439,7 @@ pub async fn query_exemplars_post(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestRangeQuery>,
     web::Form(form): web::Form<config::meta::promql::RequestRangeQuery>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
@@ -412,12 +447,13 @@ pub async fn query_exemplars_post(
     } else {
         req.into_inner()
     };
-    query_range(&org_id.into_inner(), req, in_req, true).await
+    query_range(&org_id.into_inner(), req, &user_email.user_id, in_req, true).await
 }
 
 async fn query_range(
     org_id: &str,
     req: config::meta::promql::RequestRangeQuery,
+    user_email: &str,
     in_req: HttpRequest,
     query_exemplars: bool,
 ) -> Result<HttpResponse, Error> {
@@ -431,9 +467,6 @@ async fn query_range(
         tracing::Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-
-    let user_id = in_req.headers().get("user_id").unwrap();
-    let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
         use crate::{
@@ -666,15 +699,17 @@ pub async fn metadata(
 pub async fn series_get(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestSeries>,
+    Headers(user_email): Headers<UserEmail>,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    series(&org_id, req.into_inner(), _in_req).await
+    series(&org_id, req.into_inner(), &user_email.user_id, _in_req).await
 }
 
 #[post("/{org_id}/prometheus/api/v1/series")]
 pub async fn series_post(
     org_id: web::Path<String>,
     req: web::Query<config::meta::promql::RequestSeries>,
+    Headers(user_email): Headers<UserEmail>,
     _in_req: HttpRequest,
     web::Form(form): web::Form<config::meta::promql::RequestSeries>,
 ) -> Result<HttpResponse, Error> {
@@ -683,12 +718,13 @@ pub async fn series_post(
     } else {
         req.into_inner()
     };
-    series(&org_id, req, _in_req).await
+    series(&org_id, req, &user_email.user_id, _in_req).await
 }
 
 async fn series(
     org_id: &str,
     req: config::meta::promql::RequestSeries,
+    _user_email: &str,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let config::meta::promql::RequestSeries {
@@ -731,15 +767,12 @@ async fn series(
             None => "".to_string(),
         };
 
-        let user_id = _in_req.headers().get("user_id").unwrap();
-        let user_email = user_id.to_str().unwrap();
-
-        if !is_root_user(user_email) {
-            let user: config::meta::user::User = get_cached_user_org(org_id, user_email).unwrap();
+        if !is_root_user(_user_email) {
+            let user: config::meta::user::User = get_cached_user_org(org_id, _user_email).unwrap();
             let stream_type_str = StreamType::Metrics.as_str();
             if user.is_external
                 && !crate::handler::http::auth::validator::check_permissions(
-                    user_email,
+                    _user_email,
                     AuthExtractor {
                         auth: "".to_string(),
                         method: "GET".to_string(),

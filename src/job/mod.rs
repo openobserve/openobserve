@@ -375,6 +375,11 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    // Clean up old JSON format enrichment tables before caching (one-time check at startup)
+    config::utils::enrichment_local_cache::cleanup_old_json_format()
+        .await
+        .expect("Failed to clean up old JSON format enrichment tables");
+
     db::schema::cache_enrichment_tables()
         .await
         .expect("EnrichmentTables cache failed");
