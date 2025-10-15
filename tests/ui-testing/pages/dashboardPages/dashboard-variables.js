@@ -128,7 +128,8 @@ export default class DashboardVariables {
     await saveBtn.click();
 
     // Wait for the save action to complete and DOM to stabilize
-    await this.page.waitForTimeout(3000);
+    // await this.page.waitForTimeout(3000);
+    await this.page.waitForLoadState("networkidle");
 
     // Use JavaScript evaluation to click the close button to avoid DOM instability issues
     await this.page.evaluate(() => {
