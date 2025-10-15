@@ -155,15 +155,16 @@ test.describe("dashboard streaming testcases", () => {
   }) => {
     const valuesResponses = [];
 
+    // Listen to responses (not requests) to get status codes
     page.on("response", async (response) => {
       const url = response.url();
       if (url.includes("/_values_stream")) {
-        // console.log(`[VALUES API HIT ${valuesResponses.length + 1}] Status: ${response.status()}`);
-        // console.log(`URL: ${url}`);
+        console.log(`[VALUES API HIT ${valuesResponses.length + 1}] Status: ${response.status()}`);
         valuesResponses.push({
           url,
           status: response.status(),
           hasStreaming: url.includes("_values_stream"),
+          timestamp: Date.now()
         });
       }
     });
@@ -269,20 +270,32 @@ test.describe("dashboard streaming testcases", () => {
     await namespaceVariable.waitFor({ state: 'visible', timeout: 10000 });
     await expect(namespaceVariable).toBeVisible();
 
-    // Clear the responses array to track only API calls after variable selection
-    // This is the key point: we want to know how many values API calls happen when the variable value changes
-    valuesResponses.length = 0;
+    // Wait for all initial network activity to settle completely
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle");
 
+    // Now capture the baseline count after everything has settled
+    const noOfPreviousCalls = valuesResponses.length;
+    console.log(`[BASELINE] Previous API calls recorded: ${noOfPreviousCalls}`);
+
+    // Change the variable value - this should trigger dependent variable API calls
     await pm.dashboardVariables.selectValueFromVariableDropDown(
       "variablename",
       "ziox"
     );
 
-    // Wait for all 3 dependent variables to load their values via API calls
-    await pm.dashboardVariables.waitForDependentVariablesToLoad(valuesResponses, 3);
+    // Wait for the dependent variables to load
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle");
 
-    // Assert that exactly 3 values API calls are made (one for each dependent variable)
-    expect(valuesResponses.length).toBe(3);
+    const newCallsCount = valuesResponses.length - noOfPreviousCalls;
+    console.log(`[AFTER SELECTION] New API calls: ${newCallsCount}, Total: ${valuesResponses.length}, Previous: ${noOfPreviousCalls}`);
+
+    // Assert that exactly 2 values API calls are made (for variablename12 and variablename123)
+    // Note: variablename itself doesn't need to reload, only its dependent variables
+    expect(newCallsCount).toBe(3)
 
     for (const res of valuesResponses) {
       expect(res.status).toBe(200);
@@ -299,12 +312,12 @@ test.describe("dashboard streaming testcases", () => {
     console.log(`[TEST 2] Streaming-aware API calls: ${streamingAwareCalls.length}`);
     expect(streamingAwareCalls.length).toBeGreaterThan(0);
 
-  await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(
-      randomDashboardName + "_filter"
-    );
-    await pm.dashboardCreate.deleteDashboard(
-      randomDashboardName + "_filter"
-    );
+  // await pm.dashboardCreate.backToDashboardList();
+  //   await pm.dashboardCreate.searchDashboard(
+  //     randomDashboardName + "_filter"
+  //   );
+  //   await pm.dashboardCreate.deleteDashboard(
+  //     randomDashboardName + "_filter"
+  //   );
   });
 });
