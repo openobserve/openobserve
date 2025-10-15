@@ -28,6 +28,12 @@
 
 .q-icon {
   cursor: pointer;
+  color: var(--o2-icon-color);
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: var(--o2-icon-hover);
+  }
 }
 
 .table-pre {

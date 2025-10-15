@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="parentRef" class="container tw-overflow-x-auto tw-relative table-container">
+  <div
+    ref="parentRef"
+    class="container tw-overflow-x-auto tw-relative table-container !tw-rounded-none tw-mt-[0.75rem] tw-mx-[1rem]"
+  >
     <table
       v-if="table"
       data-test="logs-search-result-logs-table"
@@ -33,10 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '100%',
       }"
     >
-      <thead
-        class="tw-sticky tw-top-0 tw-z-10"
-        style="max-height: 44px; height: 22px"
-      >
+      <thead class="tw-sticky tw-top-0 tw-z-10 tw-max-h-[44px] tw-h-[22px]">
         <vue-draggable
           v-model="columnOrder"
           v-for="headerGroup in table.getHeaderGroups()"
@@ -56,12 +56,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? tableRowSize + 'px'
                   : table.getTotalSize() + 'px',
             minWidth: '100%',
-            background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
+            background:
+              store.state.theme === 'dark'
+                ? 'var(--o2-hover-accent)'
+                : 'var(--o2-theme-background)',
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
           @end="() => handleDragEnd()"
-          class="tw-flex items-center"
+          class="tw-flex items-center tw-border tw-border-zinc-200"
         >
           <th
             v-for="header in headerGroup.headers"
@@ -142,8 +145,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :colspan="columnOrder.length"
             class="text-bold"
             :style="{
-              background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
-              opacity: 0.7,
+              background:
+                store.state.theme === 'dark'
+                  ? 'var(--o2-hover-accent)'
+                  : 'transparent',
             }"
           >
             <div
@@ -161,7 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.7"
           >
             <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs" name="warning" class="q-mr-xs" />
+              <q-icon size="xs" name="warning"
+class="q-mr-xs" />
               {{ errMsg }}
             </div>
           </td>
@@ -258,10 +264,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- Status color line for entire row -->
-            <div 
-              v-if="!(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
+            <div
+              v-if="
+                !(formattedRows[virtualRow.index]?.original as any)
+                  ?.isExpandedRow
+              "
               class="tw-absolute tw-left-0 tw-inset-y-0 tw-w-1 tw-z-10"
-              :style="{ backgroundColor: getRowStatusColor(tableRows[virtualRow.index]) }"
+              :style="{
+                backgroundColor: getRowStatusColor(tableRows[virtualRow.index]),
+              }"
             ></div>
             <td
               v-if="
@@ -347,11 +358,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <LogsHighLighting
-                  :data="cell.column.columnDef.id === 'source' ? cell.row.original : cell.renderValue()"
+                  :data="
+                    cell.column.columnDef.id === 'source'
+                      ? cell.row.original
+                      : cell.renderValue()
+                  "
                   :show-braces="cell.column.columnDef.id === 'source'"
                   :show-quotes="cell.column.columnDef.id === 'source'"
                   :query-string="highlightQuery"
-                  :simple-mode="!(cell.column.columnDef.id === 'source' || isFTSColumn(cell.column.columnDef.id, cell.renderValue(), selectedStreamFtsKeys))"
+                  :simple-mode="
+                    !(
+                      cell.column.columnDef.id === 'source' ||
+                      isFTSColumn(
+                        cell.column.columnDef.id,
+                        cell.renderValue(),
+                        selectedStreamFtsKeys,
+                      )
+                    )
+                  "
                 />
                 <O2AIContextAddBtn
                   v-if="
@@ -515,7 +539,6 @@ const getRowStatusColor = (rowData: any) => {
   const statusInfo = extractStatusFromLog(rowData);
   return statusInfo.color;
 };
-
 
 watch(
   () => props.columns,
@@ -910,5 +933,5 @@ defineExpose({
 });
 </script>
 <style scoped lang="scss">
-@import '@/styles/logs/tenstack-table.scss';
+@import "@/styles/logs/tenstack-table.scss";
 </style>

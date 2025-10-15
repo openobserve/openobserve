@@ -74,11 +74,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-no-field-found-text"
         class="text-center col-10 q-mx-none"
       >
-        <q-icon name="info" color="primary" size="xs" /> No field found in
+        <q-icon name="info"
+color="primary" size="xs" /> No field found in
         selected stream.
       </h3>
     </div>
-    <div v-else class="index-table">
+    <div v-else class="index-table scroll-section">
       <q-table
         data-test="log-search-index-list-fields-table"
         v-model="sortedStreamFields"
@@ -208,7 +209,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </span>
                 </div>
-                <div class="field_overlay" v-if="props.row.name !== store.state.zoConfig.timestamp_column">
+                <div
+                  class="field_overlay"
+                  v-if="
+                    props.row.name !== store.state.zoConfig.timestamp_column
+                  "
+                >
                   <q-btn
                     v-if="
                       props.row.isSchemaField &&
@@ -227,7 +233,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="
                       !searchObj.data.stream.selectedFields.includes(
                         props.row.name,
-                      ) && props.row.name !== store.state.zoConfig.timestamp_column
+                      ) &&
+                      props.row.name !== store.state.zoConfig.timestamp_column
                     "
                     :name="outlinedVisibility"
                     style="margin-right: 0.375rem"
@@ -528,7 +535,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
           <q-tr v-if="searchObj.loadingStream == true">
-            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
+            <q-td colspan="100%"
+class="text-bold" style="opacity: 0.7">
               <div class="text-subtitle2 text-weight-bold">
                 <q-spinner-hourglass size="20px" />
                 {{ t("confirmDialog.loading") }}
@@ -692,13 +700,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <!-- Page number buttons (3 at a time) -->
-              <template v-for="page in getPageNumbers(scope.pagination.page, scope.pagesNumber)" :key="page">
+              <template
+                v-for="page in getPageNumbers(
+                  scope.pagination.page,
+                  scope.pagesNumber,
+                )"
+                :key="page"
+              >
                 <q-btn
                   flat
                   :data-test="`logs-page-fields-list-pagination-page-${page}-button`"
                   :class="[
                     'pagination-page-btn',
-                    scope.pagination.page === page ? 'pagination-page-active' : ''
+                    scope.pagination.page === page
+                      ? 'pagination-page-active'
+                      : '',
                   ]"
                   @click="setPage(page)"
                   >{{ page }}</q-btn
@@ -850,7 +866,8 @@ export default defineComponent({
     const { onStreamChange, handleQueryData } = useSearchBar();
     const { validateFilterForMultiStream } = useSearchStream();
 
-    const {fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField} = logsUtils();
+    const { fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField } =
+      logsUtils();
 
     const {
       fetchQueryDataWithWebSocket,

@@ -335,11 +335,10 @@ body.body--light {
 
     &.q-router-link--active {
       background: linear-gradient(
-        135deg,
-        color-mix(in srgb, var(--o2-theme-elements) 80%, white) 100%,
-        var(--o2-theme-background) 100%
+        250deg,
+        color-mix(in srgb, var(--o2-theme-elements) 80%, #ffffff) 50%,
+        #4fd1c5 90%
       ) !important;
-      box-shadow: 0px 0px 2px var(--o2-theme-background) !important;
       color: var(--o2-theme-elements) !important;
 
       :deep(.q-icon) {
@@ -351,12 +350,12 @@ body.body--light {
       }
 
       &::before {
-        background: linear-gradient(
-          180deg,
-          var(--o2-theme-elements) 0%,
-          var(--o2-theme-background) 100%
-        ) !important;
-        box-shadow: 0 0 8px rgba(37, 99, 235, 0.5) !important;
+        // background: linear-gradient(
+        //   180deg,
+        //   var(--o2-theme-elements) 0%,
+        //   var(--o2-theme-background) 100%
+        // ) !important;
+        // box-shadow: 0 0 8px rgba(37, 99, 235, 0.5) !important;
       }
     }
   }

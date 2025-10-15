@@ -49,7 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <q-separator />
-      <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
+      <div v-for="(items, i) in refreshTimes"
+:key="'row_' + i" class="row">
         <div
           v-for="(item, j) in items"
           :key="'col_' + i + '_' + j"
@@ -254,5 +255,14 @@ export default defineComponent({
   min-height: 30px;
   line-height: 30px;
   padding: 0px 5px;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+
+  .q-focus-helper {
+    background-color: none !important;
+    opacity: 0 !important;
+  }
 }
 </style>

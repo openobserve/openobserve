@@ -52,11 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-splitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              class="full-height full-width logs-splitter-smooth"
+              class="full-height full-width logs-splitter-smooth scroll-section"
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <div class="relative-position full-height" style="overflow: visible !important;">
+                <div
+                  class="relative-position full-height"
+                  style="overflow: visible !important"
+                >
                   <index-list
                     v-show="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
@@ -94,7 +97,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     <h5 class="text-center">
-                      <q-icon name="warning" color="warning" size="10rem" /><br />
+                      <q-icon
+                        name="warning"
+                        color="warning"
+                        size="10rem"
+                      /><br />
                       <div
                         data-test="logs-search-filter-error-message"
                         v-html="searchObj.data.filterErrMsg"
@@ -103,7 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-else-if="
-                      searchObj.data.errorMsg !== '' && searchObj.loading == false
+                      searchObj.data.errorMsg !== '' &&
+                      searchObj.loading == false
                     "
                   >
                     <h5 class="text-center q-ma-none">
@@ -173,10 +181,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" /> Select a
-                      stream and press 'Run query' to continue. Additionally, you
-                      can apply additional filters and adjust the date range to
-                      enhance search.
+                      <q-icon name="info" /> Select a stream and press 'Run
+                      query' to continue. Additionally, you can apply additional
+                      filters and adjust the date range to enhance search.
                     </h6>
                   </div>
                   <div
@@ -285,7 +292,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="showSearchHistory && !store.state.zoConfig.usage_enabled"
         class="search-history-empty"
       >
-        <div class="search-history-empty__content text-center q-pa-md flex flex-center">
+        <div
+          class="search-history-empty__content text-center q-pa-md flex flex-center"
+        >
           <div>
             <div>
               <q-icon
@@ -300,11 +309,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="search-history-empty__info q-mt-sm flex items-center justify-center"
             >
-              <q-icon
-                name="info"
-                class="q-mr-xs"
-                size="20px"
-              />
+              <q-icon name="info" class="q-mr-xs"
+size="20px" />
               <span class="text-h6 text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
                 reporting.</span
@@ -373,7 +379,11 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep, debounce } from "lodash-es";
-import { buildSqlQuery, getFieldsFromQuery, isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
+import {
+  buildSqlQuery,
+  getFieldsFromQuery,
+  isSimpleSelectAllQuery,
+} from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
@@ -397,7 +407,6 @@ import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
-
 
 export default defineComponent({
   name: "PageSearch",
@@ -644,7 +653,11 @@ export default defineComponent({
       schemaCache.value = null;
     };
 
-    const { registerAiChatHandler, removeAiChatHandler, initializeDefaultContext } = useAiChat();
+    const {
+      registerAiChatHandler,
+      removeAiChatHandler,
+      initializeDefaultContext,
+    } = useAiChat();
 
     onUnmounted(() => {
       // reset logsVisualizeToggle when user navigate to other page with keepAlive is false and navigate back to logs page
@@ -1369,7 +1382,6 @@ export default defineComponent({
       return parsedSQL;
     };
 
-
     const handleQuickModeChange = () => {
       if (searchObj.meta.quickMode == true) {
         let field_list: string = "*";
@@ -1820,15 +1832,15 @@ export default defineComponent({
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
           let logsPageQuery = "";
-          
+
           // handle sql mode
-          if(!searchObj.meta.sqlMode){
+          if (!searchObj.meta.sqlMode) {
             const queryBuild = buildSearch();
             logsPageQuery = queryBuild?.query?.sql ?? "";
           } else {
             logsPageQuery = searchObj.data.query;
           }
-          
+
           // Check if query is SELECT * which is not supported for visualization
           if (
             store.state.zoConfig.quick_mode_enabled === true &&
@@ -2273,33 +2285,33 @@ export default defineComponent({
 
     /**
      * Setup the logs context provider for AI chat integration
-     * 
+     *
      * Example: When user opens logs page, this registers the context provider
      * that will extract current search state and comprehensive schema information for AI context
      * Follows the same schema extraction pattern as legacy AI context system
      */
     const setupContextProvider = () => {
       const provider = createLogsContextProvider(
-        searchObj, 
-        store, 
-        dashboardPanelData
+        searchObj,
+        store,
+        dashboardPanelData,
       );
-      
-      contextRegistry.register('logs', provider);
-      contextRegistry.setActive('logs');
+
+      contextRegistry.register("logs", provider);
+      contextRegistry.setActive("logs");
     };
 
     /**
      * Cleanup logs context provider when leaving logs page
-     * 
+     *
      * Example: When user navigates away from logs, this deactivates the logs provider
      * but keeps the default provider available for fallback
      */
     const cleanupContextProvider = () => {
       // Only unregister the logs provider, keep default provider
-      contextRegistry.unregister('logs');
+      contextRegistry.unregister("logs");
       // Reset to no active provider, so it falls back to default
-      contextRegistry.setActive('');
+      contextRegistry.setActive("");
     };
 
     // [END] Context Provider Setup
@@ -2813,5 +2825,5 @@ export default defineComponent({
 </style>
 
 <style lang="scss">
-@import '@/styles/logs/logs-page.scss';
+@import "@/styles/logs/logs-page.scss";
 </style>

@@ -236,23 +236,60 @@ $o2-dark-teal-900: #9BDDD6;
 // $o2-theme-elements: #0B2C43;
 
 // $o2-theme-background: #E9F4F4;
-$o2-theme-elements: #1664a6; // OCHIN
-$o2-active-button-text: #f4f4f4;
 
-$o2-theme-background: #fafbfd;
+
+
+
+///////////// AQUA BLUE THEME COLORS START //////////////
+// Primary Colors
+$color-primary: #3182ff;
+$color-primary-light: #61a5ff;
+$color-primary-light2: #9fc5f8;
+$color-primary-light3: #d3e6ff;
+
+$color-primary-dark: #0057cc;
+
+// Secondary & Accent
+$color-secondary: #4fd1c5;
+$color-accent: #ff6e31;
+
+// Neutral Colors
+$color-text: #1a202c;
+$color-text-subtle: #4a5568;
+$color-ui-dark: #e2e8f0;
+$color-ui-light: #f7fafc;
+$color-background: #ffffff;
+
+// Semantic Colors
+$color-success: #48bb78;
+$color-warning: #ecc94b;
+$color-error: #f56565;
+
+$color-icon-default: #4a5568;
+
+$color-scrollbar: #cbcbcb;
+
+
+///////////// AQUA BLUE THEME COLORS END //////////////
+$o2-primary-color: $color-primary;
+
+$o2-theme-elements: $color-primary; // OCHIN
+$o2-active-button-text: $color-ui-light;
+// Common Use Case Mappings
+$o2-theme-background: $color-ui-light;
 // $o2-theme-elements: #04c9b7;
-$o2-menu-background: #ffffff; 
-$o2-card-background: #ffffff; 
-$o2-hover-background: #d9e2ef;
-$o2-border-color: #E5E7EB;
-$o2-icon-color: #444444;
+$o2-menu-background: $color-ui-light; 
+$o2-card-background: $color-background; 
+$o2-hover-background: $color-primary-light3;
+$o2-border-color: $color-ui-dark;
+$o2-icon-color: $color-icon-default;
 $o2-scrollbar-track: transparent;
-$o2-scrollbar-thumb: #EFEFEF;
-$o2-scrollbar-thumb-hover: #DCDCDC;
-$o2-hover-bg: #FCFCFC;
+$o2-scrollbar-thumb: $color-scrollbar;
+$o2-scrollbar-thumb-hover: $color-primary-light2;
+$o2-hover-bg: $color-ui-dark;
 
 $o2-dark-theme-background: #0B162C;
-$o2-dark-theme-elements: #1664a6;
+$o2-dark-theme-elements: #1f70e9;
 $o2-dark-menu-background: #252529;  
 $o2-dark-card-background: #2c2c2e;
 $o2-dark-hover-background: #76838f;
@@ -286,8 +323,8 @@ $o2-dark-hover-bg: #F3F4F6;
   --o2-border-input: #{$o2-gray-500};       // Input field borders
   
   // Interactive Elements
-  --o2-primary-color: #{$o2-iris-1100};     // Primary actions/buttons
-  --o2-primary-foreground: #{$o2-gray-100}; // Text on primary color
+  --o2-primary-color: #{$o2-primary-color};     // Primary actions/buttons
+  --o2-primary-foreground: #{$o2-active-button-text}; // Text on primary color
   --o2-hover-accent: #{$o2-hover-background};       // Hover state accent
   --o2-destructive-foreground: #{$o2-gray-100}; // Text on destructive buttons
   --o2-focus-ring: #{$o2-iris-1200};        // Focus state indicator
@@ -308,6 +345,7 @@ $o2-dark-hover-bg: #F3F4F6;
 
   --o2-border-color: #{$o2-border-color};
   --o2-icon-color: #{$o2-icon-color};
+  --o2-icon-hover:#{$color-primary-dark};
 
   --o2-hover-bg: #{$o2-hover-bg};
 }

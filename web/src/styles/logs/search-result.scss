@@ -202,6 +202,11 @@
       transition: all 0.3s linear;
       margin: 0 1px;
       pointer-events: auto;
+      color: var(--o2-icon-color);
+
+      &:hover {
+        color: var(--o2-icon-hover);
+      }
     }
   }
 
@@ -230,6 +235,11 @@
 
     .q-icon {
       pointer-events: auto;
+      color: var(--o2-icon-color);
+
+      &:hover {
+        color: var(--o2-icon-hover);
+      }
     }
   }
 }

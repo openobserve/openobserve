@@ -5,6 +5,7 @@
 
 .toolbar-icon-in-toggle {
   font-size: 0.9rem; // ~14.4px
+  filter: opacity(0.75);
 }
 
 .function-selector {
@@ -23,6 +24,12 @@
     .q-btn__content {
       .q-icon {
         font-size: 1.125rem; // 18px
+        color: var(--o2-icon-color);
+        transition: color 0.2s ease;
+
+        &:hover {
+          color: var(--o2-icon-hover);
+        }
       }
     }
   }

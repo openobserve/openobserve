@@ -195,6 +195,19 @@ body {
 
   .q-icon {
     font-size: 1rem; // 16px
+    color: var(--o2-icon-color);  
+  }
+
+  .q-focus-helper {
+    background: none !important;
+  }
+
+  &:hover{
+    background-color: var(--o2-hover-accent);
+
+    .q-icon {
+      color: var(--o2-icon-hover);  
+    }
   }
 }
 
@@ -205,9 +218,35 @@ body {
     border-radius: 0.375rem; // 6px
   }
 
+  .q-focus-helper{
+    background: none !important;
+  }
+
+  .q-btn{
+    &:hover{
+      background-color: var(--o2-hover-accent) !important;
+    }
+  }
+
+  .q-icon{
+    color: var(--o2-icon-color);
+  }
+
   &:hover {
     background-color: transparent;
+
+    .q-icon{
+      color: var(--o2-icon-hover);
+    }
   }
+}
+
+.toolbar-icon-in-toggle {
+  font-size: 0.9rem; // ~14.4px
+}
+
+.q-icon{
+  color: var(--o2-icon-color);
 }
 
 /* ============================================================================
@@ -227,6 +266,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
   border-radius: 0.25rem; // 4px - subtle rounding
+  transition: background 0.2s ease all;
 }
 
 // Dark theme scrollbar
@@ -238,7 +278,7 @@ body {
   ::-webkit-scrollbar-thumb {
     // background: color-mix(in srgb, var(--o2-theme-elements) 30%, white);
     background: transparent;
-    transition: background 0.2s ease;
+    transition: background 0.3s ease all;
     cursor: pointer; // Hand pointer
   }
 
@@ -255,15 +295,27 @@ body {
 
 // Light theme scrollbar
 .theme-light {
-  ::-webkit-scrollbar-track {
+
+  .scroll-section {
+    ::-webkit-scrollbar-thumb {
+      // background: color-mix(in srgb, var(--o2-theme-elements) 30%, white);
+      background: transparent !important;
+      cursor: pointer; // Hand pointer
+      transition: background 0.2s ease all;
+    }
+  }
+  
+  .scroll-section:hover::-webkit-scrollbar-track {
     background: var(--o2-scrollbar-track); // Clean, minimal track
   }
 
-  ::-webkit-scrollbar-thumb {
-    // background: color-mix(in srgb, var(--o2-theme-elements) 30%, white);
-    background: var(--o2-scrollbar-thumb);
-    transition: background 0.2s ease;
-    cursor: pointer; // Hand pointer
+  .scroll-section:hover {
+    ::-webkit-scrollbar-thumb {
+      // background: color-mix(in srgb, var(--o2-theme-elements) 30%, white);
+      background: var(--o2-scrollbar-thumb) !important;
+      transition: background 0.2s ease all;
+      cursor: pointer; // Hand pointer
+    }
   }
 
   ::-webkit-scrollbar-thumb:hover {

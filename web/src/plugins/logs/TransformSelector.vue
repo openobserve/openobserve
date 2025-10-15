@@ -350,8 +350,32 @@ const getTransformLabelTooltip = computed(() => {
 </style>
 <style lang="scss">
 .save-transform-btn {
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
+
+  .q-focus-helper {
+    background: none !important;
+  }
+
   .q-btn__content {
     padding-left: 0 !important;
+  }
+}
+
+.saved-views-dropdown {
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
+
+  .q-focus-helper {
+    background: none !important;
+  }
+
+  .q-icon {
+    img {
+      opacity: 0.75;
+    }
   }
 }
 </style>
