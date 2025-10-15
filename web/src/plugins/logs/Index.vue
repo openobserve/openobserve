@@ -250,7 +250,7 @@ size="md" />
                       <div class="error-display__message">
                         {{ searchObj?.data?.errorDetail }}
                       </div>
-                      <div data-test="logs-search-error-message" v-else>
+                      <div data-test="logs-search-error-message" class=" q-pt-lg" v-else>
                         Error occurred while retrieving search events.
                         <q-btn
                           v-if="
@@ -259,6 +259,7 @@ size="md" />
                           "
                           @click="toggleErrorDetails"
                           size="sm"
+                          class="o2-secondary-button"
                           data-test="logs-page-result-error-details-btn"
                           >{{ t("search.histogramErrorBtnLabel") }}</q-btn
                         >

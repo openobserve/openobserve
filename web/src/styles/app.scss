@@ -6,9 +6,9 @@ html, body {
 }
 
 body {
-  background: #8e9eab;  /* fallback for old browsers */
-  background: -webkit-linear-gradient(to bottom right, rgba(89, 155, 174, 0.01), rgba(89, 155, 174, 0.4));  /* Chrome 10-25, Safari 5.1-6 */
-  background: linear-gradient(to bottom right, rgba(89, 155, 174, 0.01), rgba(89, 155, 174, 0.4)); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+  background: var(--o2-body-secondary-bg);  /* fallback for old browsers */
+  background: -webkit-linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));  /* Chrome 10-25, Safari 5.1-6 */
+  background: linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg)); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
   overflow: hidden;
 
   // background: -webkit-linear-gradient(
@@ -37,7 +37,7 @@ body {
 }
 
 .element-box-shadow {
-  box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--o2-box-shadow);
 }
 
 .q-splitter--vertical {
@@ -56,6 +56,22 @@ body {
 
 .el-border {
   border: 0.0625rem solid var(--o2-border-color);
+}
+
+.table-container thead {
+    // background: var(--o2-table-header-bg);
+    // opacity: 0.9;
+    tr {
+      background: var(--o2-table-header-bg) !important;
+    }
+}
+
+.o2-secondary-button {
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+}
+
+.index-table .q-table .q-tr:hover {
+    background: color-mix(in srgb, var(--o2-theme-color) 5%, white 90%) !important;
 }
 
 // .q-splitter--vertical {
@@ -750,16 +766,16 @@ body {
 .o2-primary-button-light{
   background-color: var(--o2-primary-btn-bg) !important;
   color: #ffffff !important;
-  border: 1px solid var(--o2-dark-primary-btn-bg) !important;
+  border: 1px solid var(--o2-primary-btn-bg) !important;
   &:hover{
     opacity: 0.9;
   }
 }
 //TODO o2: after getting the dark theme work on it
 .o2-primary-button-dark{
-  background-color: var(--o2-dark-primary-btn-bg) !important;
+  background-color: var(--o2-primary-btn-bg) !important;
   color: #ffffff !important;
-  border: 1px solid var(--o2-dark-primary-btn-bg) !important;
+  border: 1px solid var(--o2-primary-btn-bg) !important;
   &:hover{
     opacity: 0.9;
   }
