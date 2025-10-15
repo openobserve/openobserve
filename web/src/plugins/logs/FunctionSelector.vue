@@ -19,12 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="searchObj.meta.showTransformEditor"
     :icon="functionToggleIcon"
     title="Toggle Function Editor"
-    class="float-left tw-cursor-pointer o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+    class="float-left tw-cursor-pointer o2-toggle-button-xs tw-flex tw-items-center tw-justify-center element-box-shadow"
     size="xs"
     :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
   />
   <q-btn-group
-    class="no-outline q-pa-none no-border float-left function-selector"
+    class="no-outline q-pa-none no-border float-left function-selector element-box-shadow"
     :disable="!searchObj.meta.showTransformEditor"
   >
     <q-btn-dropdown

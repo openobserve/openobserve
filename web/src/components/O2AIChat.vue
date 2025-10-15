@@ -1319,30 +1319,14 @@ export default defineComponent({
   
   // Light mode gradient - more sophisticated
   &.light-mode {
-    background: linear-gradient(
-      135deg, 
-      rgba(255, 255, 255, 0.95) 0%, 
-      rgba(248, 250, 255, 0.98) 20%,
-      rgba(243, 247, 255, 1) 40%,
-      rgba(250, 252, 255, 0.99) 60%,
-      rgba(245, 248, 255, 1) 80%,
-      rgba(255, 255, 255, 0.96) 100%
-    );
+    background: rgba(255,255,255,0.7);
     background-size: 400% 400%;
     animation: subtleShift 20s ease-in-out infinite;
   }
   
   // Dark mode gradient - more sophisticated
   &.dark-mode {
-    background: linear-gradient(
-      135deg,
-      rgba(18, 18, 24, 0.95) 0%,
-      rgba(22, 22, 35, 0.98) 20%,
-      rgba(16, 16, 30, 1) 40%,
-      rgba(20, 20, 32, 0.99) 60%,
-      rgba(14, 14, 28, 1) 80%,
-      rgba(19, 19, 26, 0.96) 100%
-    );
+    background: rgba(0,0,0,0.7);
     background-size: 400% 400%;
     animation: subtleShift 25s ease-in-out infinite;
   }
@@ -1354,30 +1338,14 @@ export default defineComponent({
     
     // Light mode gradient - more sophisticated
     &.light-mode {
-      background: linear-gradient(
-        135deg, 
-        rgba(255, 255, 255, 0.95) 0%, 
-        rgba(248, 250, 255, 0.98) 20%,
-        rgba(243, 247, 255, 1) 40%,
-        rgba(250, 252, 255, 0.99) 60%,
-        rgba(245, 248, 255, 1) 80%,
-        rgba(255, 255, 255, 0.96) 100%
-      );
+      background: transparent;
       background-size: 400% 400%;
       animation: subtleShift 20s ease-in-out infinite;
     }
     
     // Dark mode gradient - more sophisticated
     &.dark-mode {
-      background: linear-gradient(
-        135deg,
-        rgba(18, 18, 24, 0.95) 0%,
-        rgba(22, 22, 35, 0.98) 20%,
-        rgba(16, 16, 30, 1) 40%,
-        rgba(20, 20, 32, 0.99) 60%,
-        rgba(14, 14, 28, 1) 80%,
-        rgba(19, 19, 26, 0.96) 100%
-      );
+      background: transparent;
       background-size: 400% 400%;
       animation: subtleShift 25s ease-in-out infinite;
     }
