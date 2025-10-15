@@ -132,10 +132,10 @@ pub enum StreamType {
 }
 
 impl StreamType {
-    pub fn is_basic_type(&self) -> bool {
+    pub fn support_index(&self) -> bool {
         matches!(
             *self,
-            StreamType::Logs | StreamType::Metrics | StreamType::Traces
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Metadata
         )
     }
 
