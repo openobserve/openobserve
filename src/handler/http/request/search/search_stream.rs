@@ -63,7 +63,7 @@ use crate::{
         },
     },
     service::{
-        search::{streaming::process_search_stream_request, utils::is_cachable_function_error},
+        search::{streaming::process_search_stream_request, utils::is_permissable_function_error},
         setup_tracing_with_trace_id,
     },
 };
@@ -437,9 +437,10 @@ pub async fn search_http2_stream(
                     ref mut results, ..
                 } = v
                     && search_type == Some(SearchEventType::UI)
-                    && is_cachable_function_error(&results.function_error)
+                    && is_permissable_function_error(&results.function_error)
                 {
                     results.function_error.clear();
+                    results.is_partial = false;
                 }
 
                 if is_ui_histogram

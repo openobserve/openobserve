@@ -63,7 +63,7 @@ use crate::{
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
         search::{
             self as SearchService, datafusion::plan::projections::get_result_schema,
-            sql::visitor::pickup_where::pickup_where, utils::is_cachable_function_error,
+            sql::visitor::pickup_where::pickup_where, utils::is_permissable_function_error,
         },
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
@@ -420,9 +420,10 @@ pub async fn search(
 
             // Check if function error is only query limit default error and only `ui`
             if req.search_type == Some(SearchEventType::UI)
-                && is_cachable_function_error(&res.function_error)
+                && is_permissable_function_error(&res.function_error)
             {
                 res.function_error.clear();
+                res.is_partial = false;
             }
 
             Ok(HttpResponse::Ok().json(res))
