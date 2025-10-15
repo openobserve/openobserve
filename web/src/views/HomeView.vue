@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-px-md" style="overflow-y: auto;" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
-    <div v-if="!no_data_ingest && !isLoadingSummary" class="q-pt-md" style="display: flex; flex-direction: column; gap: 16px;">
+  <q-page style="overflow-y: auto;" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
+    <div v-if="!no_data_ingest && !isLoadingSummary" class="card-container tw-w-full tw-h-full" style="display: flex; flex-direction: column; ">
         <!-- 1st section -->
          <div>
           <TrialPeriod></TrialPeriod>
@@ -1320,9 +1320,9 @@ export default defineComponent({
 .dashboards-tile-content,
 .chart-container,
 .streams-container {
-  &:hover {
+  // &:hover {
     box-shadow: 0 4px 12px var(--hover-shadow);
-  }
+  // }
 }
 
 /* Focus visible states for keyboard navigation */
