@@ -345,9 +345,9 @@ body.body--light {
     }
 
     &.q-router-link--active {
-      background: linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(168, 85, 247, 0.25) 100%) !important;
-      border: 1px solid rgba(59, 130, 246, 0.5) !important;
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+      background: linear-gradient(135deg, rgba(89, 155, 174, 0.04) 0%, rgba(89, 155, 174, 0.08) 100%) !important;
+      border: 1px solid rgba(89, 155, 174, 0.6) !important;
+      box-shadow: 0 4px 12px rgba(89, 155, 174, 0.09) !important;
       color: #2563eb !important;
 
       :deep(.q-icon) {

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="row">
       <div class="float-right col q-mb-xs flex">
-        <div class="button-group logs-visualize-toggle q-ml-xs">
+        <div class="button-group logs-visualize-toggle element-box-shadow">
           <div class="row">
             <div>
               <q-btn
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- moved to dropdown if ai chat is enabled -->
         <div
-          class="toolbar-toggle-container"
+          class="toolbar-toggle-container element-box-shadow"
           v-if="!store.state.isAiChatEnabled"
         >
           <q-toggle
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.showHistogramLabel") }}
           </q-tooltip>
         </div>
-        <div class="toolbar-toggle-container">
+        <div class="toolbar-toggle-container element-box-shadow">
           <q-toggle
             data-test="logs-search-bar-sql-mode-toggle-btn"
             v-model="searchObj.meta.sqlMode"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           dense
           icon="restart_alt"
-          class="toolbar-reset-btn"
+          class="toolbar-reset-btn element-box-shadow"
           @click="resetFilters"
         >
           <q-tooltip>
@@ -154,10 +154,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!store.state.isAiChatEnabled"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
-          class="syntax-guide-in-toolbar"
+          class="syntax-guide-in-toolbar element-box-shadow"
         >
         </syntax-guide>
-        <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
+        <q-btn-group class="q-ml-xs q-pa-none element-box-shadow el-border">
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
             v-model="savedViewDropdownModel"
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="fnSavedView"
             @show="loadSavedView"
             split
-            class="no-outline saved-views-dropdown no-border"
+            class="saved-views-dropdown"
           >
             <q-list
               :style="
@@ -429,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- this is the button group responsible for showing all the utilities when ai chat is enabled -->
         <q-btn
           v-if="store.state.isAiChatEnabled"
-          class="group-menu-btn"
+          class="group-menu-btn  element-box-shadow"
           no-caps
           menu-anchor="bottom left"
           menu-self="top left"
@@ -564,7 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-menu>
         </q-btn>
         <!-- moved to dropdown if ai chat is enabled -->
-        <div class="toolbar-toggle-container" v-if="!store.state.isAiChatEnabled">
+        <div class="toolbar-toggle-container element-box-shadow" v-if="!store.state.isAiChatEnabled">
           <q-toggle
             data-test="logs-search-bar-quick-mode-toggle-btn"
             v-model="searchObj.meta.quickMode"
@@ -595,7 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-toggle
             data-test="logs-search-bar-wrap-table-content-toggle-btn"
             v-model="searchObj.meta.toggleSourceWrap"
-            class="o2-toggle-button-xs"
+            class="o2-toggle-button-xs element-box-shadow"
             size="xs"
             flat
             :class="
@@ -630,8 +630,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           data-test="logs-search-bar-share-link-btn"
-          class="q-mr-xs download-logs-btn q-px-sm"
-          size="sm"
+          class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
+          size="xs"
           icon="share"
           @click="shareLink.execute()"
           :loading="shareLink.isLoading.value"
@@ -643,7 +643,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-btn
           data-test="logs-search-bar-more-options-btn"
-          class="q-mr-xs download-logs-btn q-px-sm"
+          class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
           icon="menu"
         >
           <q-menu>
@@ -850,6 +850,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
             :disable="disable"
+            class=" element-box-shadow"
           />
         </div>
         <div class="search-time float-left q-mr-xs">
@@ -865,7 +866,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @trigger="$emit('onAutoIntervalTrigger')"
             />
             <q-btn-group
-              class="no-outline q-pa-none no-border q-mr-xs"
+              class="no-outline q-pa-none no-border q-mr-xs element-box-shadow"
               v-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -916,7 +917,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button tw-w-[90px]"
+                class="q-pa-none search-button cancel-search-button tw-w-[90px] element-box-shadow"
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -926,7 +927,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.runQuery')"
-                class="q-pa-none o2-primary-button tw-h-[30px]"
+                class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
                 no-caps
                 :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                 @click="handleRunQueryFn"
@@ -948,7 +949,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button tw-w-[90px]"
+                class="q-pa-none search-button cancel-search-button tw-w-[90px] element-box-shadow"
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -959,7 +960,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.runQuery')"
-                class="q-pa-none o2-primary-button tw-h-[30px]"
+                class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
                 style="font-size: 11px;"
                 no-caps
                 :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"

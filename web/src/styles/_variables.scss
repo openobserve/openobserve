@@ -228,6 +228,16 @@ $o2-dark-teal-700: #42B1A4;
 $o2-dark-teal-800: #60C0B5;
 $o2-dark-teal-900: #9BDDD6;
 
+  // --o2-primary: #3f7994;
+  // --o2-secondary: #59b97a;
+  // --o2-accent: #7474e1;
+  // --o2-error: #e66b5a;
+  // --o2-bg-light: #f7f9fb;
+  // --o2-bg-dark: #0d1117;
+
+$theme-color: #3F7994;
+$dark-theme-color: #3F7994;
+
 // Semantic Colors - Light Mode
 :root {
   // Backgrounds
@@ -256,6 +266,21 @@ $o2-dark-teal-900: #9BDDD6;
   --o2-hover-accent: #{$o2-iris-400};       // Hover state accent
   --o2-destructive-foreground: #{$o2-gray-100}; // Text on destructive buttons
   --o2-focus-ring: #{$o2-iris-1200};        // Focus state indicator
+  --hover-shadow: rgba(0, 0, 0, 0.3);
+
+  --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
+  --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
+  --o2-scrollbar-thumb-bg: color-mix(in srgb, #{$primary} 20%, white);
+  --o2-scrollbar-thumb-hover-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
+  --o2-scrollbar-thumb-active-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
+
+  --o2-theme-color: #{$theme-color};
+
+  --o2-primary-btn-bg: color-mix(in srgb, var(--o2-theme-color) 100%, white);
+  --o2-primary-btn-text: #{$o2-gray-100};
+
+  --o2-toggle-track-bg: color-mix(in srgb, var(--o2-theme-color) 90%, white);
+  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-theme-color) 30%, white);
 }
 
 // Semantic Colors - Dark Mode
@@ -286,4 +311,19 @@ $o2-dark-teal-900: #9BDDD6;
   --o2-hover-accent: #{$o2-dark-iris-1000};   // Hover accents
   --o2-destructive-foreground: #{$o2-dark-gray-100}; // Destructive text
   --o2-focus-ring: #{$o2-dark-iris-600};      // Focus indicators
+  --hover-shadow: rgba(0, 0, 0, 0.6);
+
+  --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
+  --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
+  --o2-scrollbar-thumb-bg: color-mix(in srgb, #{$primary} 20%, white);
+  --o2-scrollbar-thumb-hover-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
+  --o2-scrollbar-thumb-active-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
+
+  --o2-theme-color: #{$dark-theme-color};
+
+  --o2-primary-btn-bg: color-mix(in srgb, var(--o2-dark-theme-color) 90%, white);
+  --o2-primary-btn-text: #{$o2-gray-1400};
+
+  --o2-toggle-track-bg: color-mix(in srgb, var(--o2-dark-theme-color) 90%, white);
+  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-dark-theme-color) 30%, white);
 }

@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <search-bar
             data-test="logs-search-bar"
             ref="searchBarRef"
+            class="card-container"
             :fieldValues="fieldValues"
             @searchdata="searchData"
             @onChangeInterval="onChangeInterval"
@@ -56,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <div class="relative-position full-height" style="overflow: visible !important;">
+                <div class="relative-position full-height card-container">
                   <index-list
                     v-show="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
@@ -119,13 +120,9 @@ size="10rem" /><br />
                       Result not found.
                       <q-btn
                         v-if="
-                          searchObj.data.errorMsg != '' ||
-                          searchObj?.data?.functionError != ''
+                          searchObj.data.errorCode == 0 &&
+                          searchObj.data.errorMsg == ''
                         "
-                        @click="toggleErrorDetails"
-                        size="sm"
-                        data-test="logs-page-result-error-details-btn-result-not-found"
-                        >{{ t("search.functionErrorBtnLabel") }}</q-btn
                       >
                     </div>
                     <div data-test="logs-search-error-message" v-else>
@@ -253,12 +250,135 @@ size="md" />
                       <div class="error-display__message">
                         {{ searchObj?.data?.errorDetail }}
                       </div>
-                      <SanitizedHtmlRenderer
-                        data-test="logs-search-detail-function-error-message"
-                        :htmlContent="searchObj?.data?.functionError"
-                      />
-                    </span>
-                  </h5>
+                      <div data-test="logs-search-error-message" v-else>
+                        Error occurred while retrieving search events.
+                        <q-btn
+                          v-if="
+                            searchObj.data.errorMsg != '' ||
+                            searchObj?.data?.functionError != ''
+                          "
+                          @click="toggleErrorDetails"
+                          size="sm"
+                          data-test="logs-page-result-error-details-btn"
+                          >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                        >
+                      </div>
+                      <div
+                        data-test="logs-search-error-20003"
+                        v-if="parseInt(searchObj.data.errorCode) == 20003"
+                      >
+                        <q-btn
+                          no-caps
+                          unelevated
+                          size="sm"
+                          bg-secondary
+                          class="no-border bg-secondary text-white"
+                          :to="
+                            '/streams?dialog=' +
+                            searchObj.data.stream.selectedStream.label
+                          "
+                          >Click here</q-btn
+                        >
+                        to configure a full text search field to the stream.
+                      </div>
+                      <q-item-label>{{
+                        searchObj.data.additionalErrorMsg
+                      }}</q-item-label>
+                    </h5>
+                  </div>
+                  <div
+                    v-else-if="
+                      searchObj.data.stream.selectedStream.length == 0 &&
+                      searchObj.loading == false
+                    "
+                    class="row tw-justify-center"
+                  >
+                    <h6
+                      data-test="logs-search-no-stream-selected-text"
+                      class="text-center col-10 q-mx-none"
+                    >
+                      <q-icon name="info" color="primary" size="md" /> Select a
+                      stream and press 'Run query' to continue. Additionally, you
+                      can apply additional filters and adjust the date range to
+                      enhance search.
+                    </h6>
+                  </div>
+                  <div
+                    v-else-if="
+                      searchObj.data.queryResults.hasOwnProperty('hits') &&
+                      searchObj.data.queryResults.hits.length == 0 &&
+                      searchObj.loading == false &&
+                      searchObj.meta.searchApplied == true
+                    "
+                    class="row tw-justify-center"
+                  >
+                    <h6
+                      data-test="logs-search-error-message"
+                      class="text-center q-ma-none col-10"
+                    >
+                      <q-icon name="info" color="primary" size="md" />
+                      {{ t("search.noRecordFound") }}
+                      <q-btn
+                        v-if="
+                          searchObj.data.errorMsg != '' ||
+                          searchObj?.data?.functionError != ''
+                        "
+                        @click="toggleErrorDetails"
+                        size="sm"
+                        data-test="logs-page-result-error-details-btn-norecord"
+                        >{{ t("search.functionErrorBtnLabel") }}</q-btn
+                      ><br />
+                    </h6>
+                  </div>
+                  <div
+                    v-else-if="
+                      searchObj.data.queryResults.hasOwnProperty('hits') &&
+                      searchObj.data.queryResults.hits.length == 0 &&
+                      searchObj.loading == false &&
+                      searchObj.meta.searchApplied == false
+                    "
+                    class="row tw-justify-center"
+                  >
+                    <h6
+                      data-test="logs-search-error-message"
+                      class="text-center q-ma-none col-10"
+                    >
+                      <q-icon name="info" color="primary" size="md" />
+                      {{ t("search.applySearch") }}
+                    </h6>
+                  </div>
+                  <div
+                    v-else
+                    data-test="logs-search-search-result"
+                    class="full-height card-container"
+                  >
+                    <search-result
+                      ref="searchResultRef"
+                      :expandedLogs="expandedLogs"
+                      @update:datetime="setHistogramDate"
+                      @update:scroll="getMoreData"
+                      @update:recordsPerPage="getMoreDataRecordsPerPage"
+                      @expandlog="toggleExpandLog"
+                      @send-to-ai-chat="sendToAiChat"
+                    />
+                  </div>
+                  <div class="text-center col-10 q-ma-none">
+                    <h5>
+                      <span v-if="disableMoreErrorDetails">
+                        <SanitizedHtmlRenderer
+                          data-test="logs-search-detail-error-message"
+                          :htmlContent="searchObj?.data?.errorMsg"
+                        />
+                        <div class="error-display__message">
+                          {{ searchObj?.data?.errorDetail }}
+                        </div>
+                        <SanitizedHtmlRenderer
+                          data-test="logs-search-detail-function-error-message"
+                          :htmlContent="searchObj?.data?.functionError"
+                        />
+                      </span>
+                    </h5>
+                  </div>
                 </div>
               </template>
             </q-splitter>
@@ -2573,6 +2693,7 @@ export default defineComponent({
   max-height: calc(100vh - $navbarHeight) !important;
   overflow: hidden !important;
 
+
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
   .q-field__input,
@@ -2583,29 +2704,6 @@ export default defineComponent({
   .q-splitter__after {
     overflow: hidden;
   }
-
-  .q-item__label span {
-    /* text-transform: capitalize; */
-  }
-
-  // Removed - using global glassmorphic scrollbar from app.scss
-  // .index-table :hover::-webkit-scrollbar,
-  // #searchGridComponent:hover::-webkit-scrollbar {
-  //   height: 13px;
-  //   width: 13px;
-  // }
-
-  // .index-table ::-webkit-scrollbar-track,
-  // #searchGridComponent::-webkit-scrollbar-track {
-  //   -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-  //   border-radius: 10px;
-  // }
-
-  // .index-table ::-webkit-scrollbar-thumb,
-  // #searchGridComponent::-webkit-scrollbar-thumb {
-  //   border-radius: 10px;
-  //   -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  // }
 
   .q-table__top {
     padding: 0px !important;
@@ -2702,15 +2800,15 @@ export default defineComponent({
     }
   }
 
-  .search-result-container {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-sizing: border-box !important;
-    overflow: hidden !important;
-  }
+  // .search-result-container {
+  //   position: relative;
+  //   width: 100%;
+  //   height: 100%;
+  //   padding: 0 !important;
+  //   margin: 0 !important;
+  //   box-sizing: border-box !important;
+  //   overflow: hidden !important;
+  // }
 }
 </style>
 

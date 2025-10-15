@@ -19,10 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     view="hHh Lpr lff"
     :class="[store.state.printMode === true ? 'printMode' : '']"
   >
-    <q-header
-      :class="[store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white']"
-    >
-      <q-toolbar class="o2-bg-color">
+    <q-header>
+      <q-toolbar>
         <div
           class="flex relative-position q-mr-sm"
           v-if="
@@ -293,7 +291,6 @@ class="padding-none" />
           <div class="row items-center no-wrap">
             <q-icon
               name="help_outline"
-              size="25px"
               class="header-icon"
             ></q-icon>
             <q-tooltip anchor="top middle" self="bottom middle">
@@ -357,7 +354,6 @@ class="padding-none" />
           <div class="row items-center no-wrap">
             <q-icon
               :name="outlinedSettings"
-              size="25px"
               class="header-icon"
             ></q-icon>
           </div>
@@ -376,7 +372,6 @@ class="padding-none" />
           <div class="row items-center no-wrap">
             <q-icon
               :name="user.picture ? user.picture : 'person'"
-              size="25px"
               class="header-icon"
             ></q-icon>
             <q-tooltip anchor="top middle" self="bottom middle">
@@ -502,8 +497,6 @@ class="padding-none" />
       show-if-above
       :width="80"
       :breakpoint="500"
-      bordered
-      class="o2-bg-color"
       role="navigation"
       aria-label="Main navigation"
     >
@@ -640,6 +633,7 @@ import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
+import { Home, Search, BarChart3, GitBranch, Layout, FileText,AlertTriangle, TvMinimal, Database, Users, Code, FileBarChart, Settings } from 'lucide-vue-next';
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -784,26 +778,26 @@ export default defineComponent({
     var linksList = ref([
       {
         title: t("menu.home"),
-        icon: outlinedHome,
+        iconComponent: markRaw(Home),
         link: "/",
         exact: true,
         name: "home",
       },
       {
         title: t("menu.search"),
-        icon: outlinedSearch,
+        iconComponent: markRaw(Search),
         link: "/logs",
         name: "logs",
       },
       {
         title: t("menu.metrics"),
-        icon: outlinedBarChart,
+        iconComponent: markRaw(BarChart3),
         link: "/metrics",
         name: "metrics",
       },
       {
         title: t("menu.traces"),
-        icon: outlinedAccountTree,
+        iconComponent: markRaw(GitBranch),
         link: "/traces",
         name: "traces",
       },
@@ -815,37 +809,37 @@ export default defineComponent({
       },
       {
         title: t("menu.rum"),
-        icon: outlinedDevices,
+        iconComponent: markRaw(TvMinimal),
         link: "/rum",
         name: "rum",
       },
       {
         title: t("menu.dashboard"),
-        icon: outlinedDashboard,
+        iconComponent: markRaw(Layout),
         link: "/dashboards",
         name: "dashboards",
       },
       {
         title: t("menu.index"),
-        icon: outlinedWindow,
+        iconComponent: markRaw(Database),
         link: "/streams",
         name: "streams",
       },
       {
         title: t("menu.alerts"),
-        icon: outlinedReportProblem,
+        iconComponent: markRaw(AlertTriangle),
         link: "/alerts",
         name: "alertList",
       },
       {
         title: t("menu.ingestion"),
-        icon: outlinedFilterAlt,
+        iconComponent: markRaw(FileText),
         link: "/ingestion",
         name: "ingestion",
       },
       {
         title: t("menu.iam"),
-        icon: outlinedManageAccounts,
+        iconComponent: markRaw(Users),
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
@@ -1557,16 +1551,17 @@ export default defineComponent({
 
 // Phase 3: Enhanced drawer with glassmorphism
 .q-drawer {
-  background: linear-gradient(180deg, #0f172a 0%, #020617 100%) !important;
-  backdrop-filter: blur(12px);
-  border-right: 1px solid rgba(71, 85, 105, 0.5) !important;
-  transition: background-color 500ms ease-in-out,
-              border-color 500ms ease-in-out;
+  background: transparent;
+  // background: linear-gradient(180deg, #0f172a 0%, #020617 100%) !important;
+  // backdrop-filter: blur(12px);
+  // border-right: 1px solid rgba(71, 85, 105, 0.5) !important;
+  // transition: background-color 500ms ease-in-out,
+              // border-color 500ms ease-in-out;
 
   // Light mode
   body.body--light & {
-    background: rgba(255, 255, 255, 0.8) !important;
-    border-right: 1px solid rgba(226, 232, 240, 0.5) !important;
+    // background: rgba(255, 255, 255, 0.8) !important;
+    // border-right: 1px solid rgba(226, 232, 240, 0.5) !important;
   }
 }
 
@@ -1588,7 +1583,6 @@ export default defineComponent({
 
 .q-header {
   color: unset;
-  @extend .border-bottom;
 
   .beta-text {
     font-size: 11px;
@@ -1626,11 +1620,13 @@ export default defineComponent({
 
 .q-item {
   min-height: 30px;
-  padding: 8px 8px;
+  padding: 3px 8px;
 }
 
 .o2-bg-color {
-  background-color: rgba(89, 96, 178, 0.08);
+  // background-color: rgba(89, 96, 178, 0.08);
+  background: transparent;
+
 }
 
 .q-list {
@@ -1646,8 +1642,8 @@ export default defineComponent({
       border-radius: 5px;
 
       .q-icon {
-        height: 1.5rem;
-        width: 1.5rem;
+        height: 1rem;
+        width: 1rem;
       }
 
       &.q-router-link--active {
@@ -1747,8 +1743,8 @@ export default defineComponent({
   &.leftNavList {
     .q-item {
       .q-icon {
-        height: 1.5rem;
-        width: 1.5rem;
+        height: 1rem;
+        width: 1rem;
       }
 
       &.q-router-link--active {
@@ -1858,9 +1854,11 @@ body.ai-chat-open {
 }
 .dark-mode-chat-container {
   border-left: 1.5px solid #232323ff;
+  box-shadow: -0.0rem 0.1rem 0.3rem var(--hover-shadow)
 }
 .light-mode-chat-container {
   border-left: 1.5px solid #f7f7f7;
+  box-shadow: -0.0rem 0.1rem 0.3rem var(--hover-shadow)
 }
 
 .ai-btn-active {
