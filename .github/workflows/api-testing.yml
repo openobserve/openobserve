@@ -28,8 +28,19 @@ env:
 
 jobs:
   api_integration_tests:
-    name: api_integration_tests
+    name: api_tests / utf8_view=${{ matrix.utf8_view_enabled }}
     runs-on: ubicloud-standard-8
+    strategy:
+      matrix:
+        include:
+          - utf8_view_enabled: "true"
+            test_name: "UTF8_VIEW_ENABLED"
+          - utf8_view_enabled: "false" 
+            test_name: "UTF8_VIEW_DISABLED"
+    env:
+      # Utf8View regression test environment variables
+      ZO_FEATURE_JOIN_MATCH_ONE_ENABLED: true
+      ZO_UTF8_VIEW_ENABLED: ${{ matrix.utf8_view_enabled }}
     steps:
       - name: Remove unused tools
         run: |
@@ -116,15 +127,7 @@ jobs:
         run: rye sync
         working-directory: tests/api-testing/
 
-      - name: Run regression tests with both UTF8_VIEW settings
+      - name: Run tests
         if: steps.check_changes.outputs.has_changes == 'true'
-        run: |
-          echo "=== Testing with ZO_UTF8_VIEW_ENABLED=false ==="
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false rye run pytest tests/test_subquery_join_match.py --force-sugar -v
-          
-          echo "=== Testing with ZO_UTF8_VIEW_ENABLED=true ==="
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true rye run pytest tests/test_subquery_join_match.py --force-sugar -v
-          
-          echo "=== Running all other API tests ==="
-          rye run pytest --ignore=tests/test_subquery_join_match.py --force-sugar
+        run: rye run pytest --force-sugar
         working-directory: tests/api-testing/
