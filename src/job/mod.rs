@@ -305,6 +305,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move {
             o2_enterprise::enterprise::re_patterns::get_pattern_manager().await
         });
+
+        if LOCAL_NODE.is_alert_manager() {
+            tokio::task::spawn(async move { query_optimization_recommendation::run().await });
+        }
     }
 
     // additional for cloud
@@ -325,9 +329,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
             cloud::start();
         }
     }
-
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { query_optimization_recommendation::run().await });
 
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");
