@@ -563,6 +563,9 @@ export default defineComponent({
         searchObj.data.histogram.xData.length > 0
         // && plotChart.value?.reDraw
       ) {
+        searchObj.data.histogram.chartParams["itemStyle"] = {
+          color: store.state.theme == "dark" ? "#3B82F6" : "#3F7994",
+        };
         //format data in form of echarts options
         plotChart.value = convertLogData(
           searchObj.data.histogram.xData,
