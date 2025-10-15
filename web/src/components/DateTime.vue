@@ -1158,7 +1158,7 @@ export default defineComponent({
   padding: 0px 5px;
   font-size: 12px;
   min-width: auto;
-  border: 0.0625rem solid rgba(0, 0, 0, 0.12);
+  border: 0.0625rem solid var(--o2-border-color);
 
   .q-icon.on-right {
     transition: transform 0.25s ease;
