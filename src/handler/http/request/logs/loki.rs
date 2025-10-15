@@ -15,7 +15,7 @@
 
 use std::io::{Error, Read};
 
-use actix_web::{HttpRequest, HttpResponse, post, web};
+use actix_web::{HttpRequest, HttpResponse, http::header, post, web};
 use flate2::read::GzDecoder;
 use prost::Message;
 use proto::loki_rpc;
@@ -58,6 +58,13 @@ pub async fn loki_push(
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
+    // log start processing time
+    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
+        config::utils::time::now_micros()
+    } else {
+        0
+    };
+
     let thread_id = **thread_id;
     let org_id = org_id.into_inner();
 
@@ -106,13 +113,22 @@ pub async fn loki_push(
         }
     };
 
-    match logs::loki::handle_request(thread_id, &org_id, request, user_email).await {
-        Ok(_) => Ok(HttpResponse::NoContent().finish()),
+    let mut resp = match logs::loki::handle_request(thread_id, &org_id, request, user_email).await {
+        Ok(_) => HttpResponse::NoContent().finish(),
         Err(e) => {
             log::error!("[Loki] Processing error for org '{org_id}': {e:?}");
-            Ok(e.into())
+            e.into()
         }
+    };
+
+    if process_time > 0 {
+        resp.headers_mut().insert(
+            header::HeaderName::from_static("o2_process_time"),
+            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
+        );
     }
+
+    Ok(resp)
 }
 
 fn parse_json_request(
