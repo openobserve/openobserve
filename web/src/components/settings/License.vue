@@ -384,7 +384,7 @@ export default defineComponent({
     const redirectToGetLicense = () => {
       const baseUrl = window.location.origin;
       const installationId = licenseData.value.installation_id || '';
-      const licenseUrl = `http://localhost:3002/user/request-license?base_url=${encodeURIComponent(baseUrl)}&license_id=${encodeURIComponent(installationId)}`;
+      const licenseUrl = `${store.state.zoConfig.license_server_url}/user/request-license?base_url=${encodeURIComponent(baseUrl)}&license_id=${encodeURIComponent(installationId)}`;
       window.open(licenseUrl, '_blank');
     };
 
