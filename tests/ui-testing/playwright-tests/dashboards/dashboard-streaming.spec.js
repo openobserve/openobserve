@@ -159,7 +159,6 @@ test.describe("dashboard streaming testcases", () => {
     page.on("response", async (response) => {
       const url = response.url();
       if (url.includes("/_values_stream")) {
-        console.log(`[VALUES API HIT ${valuesResponses.length + 1}] Status: ${response.status()}`);
         valuesResponses.push({
           url,
           status: response.status(),
@@ -272,13 +271,10 @@ test.describe("dashboard streaming testcases", () => {
 
     // Wait for all initial network activity to settle completely
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
 
     // Now capture the baseline count after everything has settled
     const noOfPreviousCalls = valuesResponses.length;
-    console.log(`[BASELINE] Previous API calls recorded: ${noOfPreviousCalls}`);
-
     // Change the variable value - this should trigger dependent variable API calls
     await pm.dashboardVariables.selectValueFromVariableDropDown(
       "variablename",
@@ -302,22 +298,21 @@ test.describe("dashboard streaming testcases", () => {
     }
 
     // Verify that streaming parameters are present in API calls
-    const streamingAwareCalls = valuesResponses.filter(
+    const streamingAwareCalls = valuesResponses.filter( 
       (res) =>
         res.url.includes("_values_stream") ||
         res.url.includes("use_streaming") ||
         res.url.includes("streaming") ||
         res.url.includes("sql=")
     );
-    console.log(`[TEST 2] Streaming-aware API calls: ${streamingAwareCalls.length}`);
     expect(streamingAwareCalls.length).toBeGreaterThan(0);
 
-  // await pm.dashboardCreate.backToDashboardList();
-  //   await pm.dashboardCreate.searchDashboard(
-  //     randomDashboardName + "_filter"
-  //   );
-  //   await pm.dashboardCreate.deleteDashboard(
-  //     randomDashboardName + "_filter"
-  //   );
+  await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(
+      randomDashboardName + "_filter"
+    );
+    await pm.dashboardCreate.deleteDashboard(
+      randomDashboardName + "_filter"
+    );
   });
 });
