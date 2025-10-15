@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { test as base } from '@playwright/test';
 import fs from 'fs';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class AlertTemplatesPage {
     constructor(page) {
@@ -188,12 +189,15 @@ export class AlertTemplatesPage {
         await this.page.waitForTimeout(2000); // Wait for search to complete
         
         // Wait for either search results or no data message
-        await Promise.race([
-            this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
-            this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
-        ]).catch(() => {
-            console.log('Neither table nor no data message found after search, continuing...');
-        });
+        try {
+            await Promise.race([
+                this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
+                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+            ]);
+        } catch (error) {
+            testLogger.error('Neither table nor no data message found after template search', { templateName, error: error.message });
+            throw new Error(`Failed to search for template "${templateName}": Neither table nor "No data available" message appeared`);
+        }
 
         // Verify template exists before deletion
         await this.page.getByRole('cell', { name: templateName }).waitFor({ timeout: 2000 });
@@ -249,16 +253,19 @@ export class AlertTemplatesPage {
             await this.page.waitForTimeout(2000); // Wait for search to complete
             
             // Wait for either search results or no data message
-            await Promise.race([
-                this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
-                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
-            ]).catch(() => {
-                console.log('Neither table nor no data message found after search, continuing...');
-            });
+            try {
+                await Promise.race([
+                    this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
+                    this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+                ]);
+            } catch (error) {
+                testLogger.error('Neither table nor no data message found after template search', { templateName, error: error.message });
+                throw new Error(`Failed to search for template "${templateName}": Neither table nor "No data available" message appeared`);
+            }
 
             // Try to find the template
             await this.page.getByRole('cell', { name: templateName }).waitFor({ timeout: 2000 });
-            console.log('Successfully verified template exists:', templateName);
+            testLogger.info('Successfully verified template exists', { templateName });
         } catch (error) {
             throw new Error(`Template ${templateName} not found in the list`);
         }

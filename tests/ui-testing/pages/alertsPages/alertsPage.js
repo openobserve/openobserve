@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import fs from 'fs';
 import { CommonActions } from '../commonActions';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class AlertsPage {
     constructor(page) {
@@ -123,12 +124,15 @@ export class AlertsPage {
     async navigateToFolder(folderName) {
         await this.page.getByText(folderName).first().click();
         // Wait for the folder content to load by checking for either the table or no data message
-        await Promise.race([
-            this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
-            this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
-        ]).catch(() => {
-            console.log('Neither table nor no data message found, continuing...');
-        });
+        try {
+            await Promise.race([
+                this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
+                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+            ]);
+        } catch (error) {
+            testLogger.error('Neither table nor no data message found after clicking folder', { folderName, error: error.message });
+            throw new Error(`Failed to load folder content for "${folderName}": Neither table nor "No data available" message appeared`);
+        }
     }
 
     async verifyNoDataAvailable() {
@@ -353,12 +357,15 @@ export class AlertsPage {
         await this.page.waitForTimeout(2000); // Wait for search to complete
         
         // Wait for either search results or no data message
-        await Promise.race([
-            this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
-            this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
-        ]).catch(() => {
-            console.log('Neither table nor no data message found, continuing...');
-        });
+        try {
+            await Promise.race([
+                this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
+                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+            ]);
+        } catch (error) {
+            testLogger.error('Neither table nor no data message found after search', { alertName, error: error.message });
+            throw new Error(`Failed to search for alert "${alertName}": Neither table nor "No data available" message appeared`);
+        }
     }
 
     /**
