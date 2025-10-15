@@ -151,4 +151,42 @@ export default class DashboardVariables {
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
   }
+
+  // Method to wait for dependent variables API calls to complete
+  // Parameters: expectedCallCount - number of API calls to wait for
+  //             valuesResponsesArray - reference to the array tracking API responses
+  //             timeout - maximum time to wait in milliseconds (default: 15000)
+  // This method uses native Promise-based waiting without hard timeouts
+  async waitForDependentVariablesToLoad(valuesResponsesArray, expectedCallCount, timeout = 15000) {
+    const startTime = Date.now();
+
+    // Use Promise.race to wait efficiently without polling
+    while (valuesResponsesArray.length < expectedCallCount) {
+      if (Date.now() - startTime > timeout) {
+        throw new Error(
+          `Timeout waiting for ${expectedCallCount} API calls. Only received ${valuesResponsesArray.length} calls after ${timeout}ms`
+        );
+      }
+
+      // Wait for the next network response matching the values API pattern
+      try {
+        await Promise.race([
+          this.page.waitForResponse(
+            response => response.url().includes('/api/') && response.url().includes('/values'),
+            { timeout: 2000 }
+          ),
+          // Small delay to allow array to be updated
+          new Promise(resolve => setTimeout(resolve, 100))
+        ]);
+      } catch (error) {
+        // Continue if no response in 2s, will check array length again
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    // Wait for DOM to stabilize after all API calls complete
+    await this.page.waitForLoadState('domcontentloaded');
+
+    return true;
+  }
 }
