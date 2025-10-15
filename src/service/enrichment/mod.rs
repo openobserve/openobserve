@@ -249,7 +249,7 @@ pub async fn get_enrichment_table_json(
     storage::local::store_data_if_needed_background(org_id, table_name, &records, last_updated_at)
         .await?;
 
-    log::debug!(
+    log::info!(
         "get_enrichment_table_json: fetched from {org_id}/{table_name}, number of records: {}",
         records.len()
     );
