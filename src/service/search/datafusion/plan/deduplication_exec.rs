@@ -20,8 +20,8 @@ use std::{
 };
 
 use arrow::array::{
-    BooleanArray, Float64Array, Int64Array, RecordBatch, StringArray, TimestampMicrosecondArray,
-    UInt64Array,
+    BooleanArray, Float64Array, Int64Array, LargeStringArray, RecordBatch, StringArray,
+    StringViewArray, TimestampMicrosecondArray, UInt64Array,
 };
 use arrow_schema::{DataType, SortOptions, TimeUnit};
 use config::TIMESTAMP_COL_NAME;
@@ -37,6 +37,7 @@ use datafusion::{
         DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
         expressions::Column,
+        metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet},
     },
 };
 use futures::{Stream, StreamExt};
@@ -46,8 +47,9 @@ use itertools::Itertools;
 pub struct DeduplicationExec {
     input: Arc<dyn ExecutionPlan>,
     deduplication_columns: Vec<Column>,
-    max_rows: usize,
+    max_rows: usize, // current unused
     cache: PlanProperties,
+    metrics: ExecutionPlanMetricsSet,
 }
 
 impl DeduplicationExec {
@@ -63,6 +65,7 @@ impl DeduplicationExec {
             deduplication_columns,
             max_rows,
             cache,
+            metrics: ExecutionPlanMetricsSet::new(),
         }
     }
 
@@ -83,8 +86,12 @@ impl DisplayAs for DeduplicationExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "DeduplicationExec: columns: {:?}",
+            "DeduplicationExec: columns: [{}]",
             self.deduplication_columns
+                .iter()
+                .map(|c| format!("{c}"))
+                .collect::<Vec<_>>()
+                .join(", ")
         )
     }
 }
@@ -118,6 +125,10 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
+    fn supports_limit_pushdown(&self) -> bool {
+        true
+    }
+
     fn execute(
         &self,
         partition: usize,
@@ -131,14 +142,17 @@ impl ExecutionPlan for DeduplicationExec {
 
         let input_stream = self.input.execute(partition, context)?;
 
+        let metrics = BaselineMetrics::new(&self.metrics, partition);
+
         Ok(Box::pin(DeduplicationStream::new(
             input_stream,
             self.deduplication_columns.clone(),
+            metrics,
         )))
     }
 
-    fn statistics(&self) -> Result<Statistics> {
-        self.input.partition_statistics(None)
+    fn partition_statistics(&self, partition: Option<usize>) -> Result<Statistics> {
+        self.input.partition_statistics(partition)
     }
 
     // if don't have this, the optimizer will not merge the SortExec
@@ -166,6 +180,10 @@ impl ExecutionPlan for DeduplicationExec {
     fn required_input_distribution(&self) -> Vec<Distribution> {
         vec![Distribution::SinglePartition; self.children().len()]
     }
+
+    fn metrics(&self) -> Option<MetricsSet> {
+        Some(self.metrics.clone_inner())
+    }
 }
 
 // TODO: rewrite this part use arrow kernel
@@ -175,15 +193,21 @@ struct DeduplicationStream {
     last_value: Option<Vec<Value>>,
     #[allow(unused)]
     batch_size: usize,
+    metrics: BaselineMetrics,
 }
 
 impl DeduplicationStream {
-    pub fn new(stream: SendableRecordBatchStream, deduplication_columns: Vec<Column>) -> Self {
+    pub fn new(
+        stream: SendableRecordBatchStream,
+        deduplication_columns: Vec<Column>,
+        metrics: BaselineMetrics,
+    ) -> Self {
         Self {
             stream,
             deduplication_columns,
             last_value: None,
             batch_size: 0,
+            metrics,
         }
     }
 }
@@ -195,8 +219,9 @@ impl Stream for DeduplicationStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        match self.stream.poll_next_unpin(cx) {
+        let poll = match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => {
+                let timer = std::time::Instant::now();
                 // deduplication the batch based on the deduplication_columns
                 let deduplication_arrays =
                     generate_deduplication_arrays(&self.deduplication_columns, &batch);
@@ -225,12 +250,16 @@ impl Stream for DeduplicationStream {
 
                 let new_batch = RecordBatch::try_new(self.schema(), new_columns)?;
 
+                self.metrics.elapsed_compute().add_duration(timer.elapsed());
+
                 Poll::Ready(Some(Ok(new_batch)))
             }
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
-        }
+        };
+
+        self.metrics.record_poll(poll)
     }
 }
 
@@ -240,6 +269,7 @@ impl RecordBatchStream for DeduplicationStream {
         Arc::clone(&self.stream.schema())
     }
 }
+
 #[derive(Debug, Clone)]
 struct DeduplicationArrays {
     pub arrays: Vec<Array>,
@@ -257,6 +287,8 @@ impl DeduplicationArrays {
 #[derive(Debug, Clone)]
 enum Array {
     String(StringArray),
+    StringView(StringViewArray),
+    LargeString(LargeStringArray),
     Int64(Int64Array),
     UInt64(UInt64Array),
     Boolean(BooleanArray),
@@ -268,6 +300,8 @@ impl Array {
     pub fn get_value(&self, i: usize) -> Value {
         match &self {
             Array::String(array) => Value::String(array.value(i).to_string()),
+            Array::StringView(array) => Value::String(array.value(i).to_string()),
+            Array::LargeString(array) => Value::String(array.value(i).to_string()),
             Array::Int64(array) => Value::Int64(array.value(i)),
             Array::UInt64(array) => Value::UInt64(array.value(i)),
             Array::Boolean(array) => Value::Boolean(array.value(i)),
@@ -299,6 +333,20 @@ fn generate_deduplication_arrays(
                     array
                         .as_any()
                         .downcast_ref::<StringArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                DataType::Utf8View => Array::StringView(
+                    array
+                        .as_any()
+                        .downcast_ref::<StringViewArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                DataType::LargeUtf8 => Array::LargeString(
+                    array
+                        .as_any()
+                        .downcast_ref::<LargeStringArray>()
                         .unwrap()
                         .clone(),
                 ),
