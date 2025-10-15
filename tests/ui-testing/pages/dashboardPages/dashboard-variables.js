@@ -60,44 +60,43 @@ export default class DashboardVariables {
 
     // Add Filter Configuration if provided
     if (filterConfig) {
-      await this.page.waitForTimeout(2000);
 
-      await this.page.locator('[data-test="dashboard-add-filter-btn"]').click();
-      await this.page.waitForTimeout(2000);
-      await this.page
-        .locator('[data-test="dashboard-query-values-filter-name-selector"]')
-        .click();
-      await this.page
-        .locator('[data-test="dashboard-query-values-filter-name-selector"]')
-        .fill(filterConfig.filterName);
-
-      await this.page
-        .getByRole("option", { name: filterConfig.filterName })
-        .click();
-
-      await this.page
-        .locator(
-          '[data-test="dashboard-query-values-filter-operator-selector"]'
-        )
-        .click();
-      await this.page
-        .getByRole("option", { name: filterConfig.operator, exact: true })
-        .locator("div")
-        .nth(2)
-        .click();
-      await this.page.locator('[data-test="common-auto-complete"]').click();
-      await this.page
-        .locator('[data-test="common-auto-complete"]')
-        .fill(filterConfig.value);
-      await this.page.waitForTimeout(2000);
+      const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
+      await addFilterBtn.waitFor({ state: "visible", timeout: 10000 });
+      await addFilterBtn.click();
+      
+      // Wait for and interact with Filter Name selector
+      const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]');
+      await filterNameSelector.waitFor({ state: "visible", timeout: 10000 });
+      await filterNameSelector.click();
+      await filterNameSelector.fill(filterConfig.filterName);
+      
+      // Wait for and select the filter name option
+      const filterNameOption = this.page.getByRole("option", { name: filterConfig.filterName });
+      await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
+      await filterNameOption.click();
+      
+      // Wait for and interact with Operator selector
+      const operatorSelector = this.page.locator('[data-test="dashboard-query-values-filter-operator-selector"]');
+      await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
+      await operatorSelector.click();
+      
+      // Wait for and select the operator option
+      const operatorOption = this.page.getByRole("option", { name: filterConfig.operator, exact: true }).locator("div").nth(2);
+      await operatorOption.waitFor({ state: "visible", timeout: 10000 });
+      await operatorOption.click();
+      
+      // Wait for and interact with value input
+      const autoComplete = this.page.locator('[data-test="common-auto-complete"]');
+      await autoComplete.waitFor({ state: "visible", timeout: 10000 });
+      await autoComplete.click();
+      await autoComplete.fill(filterConfig.value);
+      
       // await this.page
       //   .locator('[data-test="common-auto-complete-option"]')
       //   .getByText(filterConfig.value, { exact: true })
       //   .click();
     }
-
-    await this.page.waitForTimeout(2000);
-
     // Custom Value Search if want to search custom value from variable dropdown
     if (customValueSearch) {
       await this.page
