@@ -41,21 +41,21 @@ body {
 }
 
 .q-splitter--vertical {
-  .q-splitter__separator {
+  > .q-splitter__separator {
     width: 0.5rem; // 10px
     background: transparent;
   }
 }
 
 .q-splitter--horizontal {
-  .q-splitter__separator {
+  > .q-splitter__separator {
     height: 0.5rem; // 10px
     background: transparent;
   }
 }
 
 .el-border {
-  border: 0.0625rem solid rgba(0, 0, 0, 0.12);
+  border: 0.0625rem solid var(--o2-border-color);
 }
 
 // .q-splitter--vertical {
