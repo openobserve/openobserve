@@ -403,6 +403,7 @@ pub async fn search(
                 && is_permissable_function_error(&res.function_error)
             {
                 res.function_error.clear();
+                res.is_partial = false;
             }
 
             Ok(HttpResponse::Ok().json(res))

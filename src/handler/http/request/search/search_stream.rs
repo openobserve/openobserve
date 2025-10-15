@@ -441,6 +441,7 @@ pub async fn search_http2_stream(
                     && is_permissable_function_error(&results.function_error)
                 {
                     results.function_error.clear();
+                    results.is_partial = false;
                 }
 
                 if is_ui_histogram
