@@ -2,7 +2,7 @@ import { toZonedTime, format } from "date-fns-tz";
 export const convertLogData = (
   x: any,
   y: any,
-  params: { title: any; unparsed_x_data: any; timezone: string }
+  params: { title: any; unparsed_x_data: any; timezone: string, itemStyle: any }
 ) => {
   const options: any = {
     title: {
@@ -100,7 +100,7 @@ export const convertLogData = (
         ]),
         type: "bar",
         emphasis: { focus: "series" },
-        itemStyle: {
+        itemStyle: params.itemStyle ? params.itemStyle : {
           color: "#7A80C2",
         },
       },
