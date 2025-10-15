@@ -76,7 +76,7 @@ def validate_query_response():
     """Shared fixture for query response validation with error handling."""
     def _validate(response, expected_fields, test_name, validation_func=None):
         """
-        Validate query response with smart error detection.
+        Validate query response - show results for both success and error cases.
         
         Args:
             response: HTTP response object
@@ -86,7 +86,8 @@ def validate_query_response():
         """
         if is_utf8view_error(response):
             logging.warning(f"❌ {test_name}: Utf8View error detected (bug exists)")
-            pytest.skip(f"Environment has Utf8View bug - {test_name} validates error condition")
+            # Assert failure to show the error in test results instead of skipping
+            assert False, f"{test_name} failed with Utf8View error: {response.content.decode()}"
         
         # Validate successful response
         hits = validate_successful_response(response, expected_fields, test_name)
