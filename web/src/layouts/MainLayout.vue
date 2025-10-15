@@ -824,7 +824,7 @@ export default defineComponent({
       },
       {
         title: t("menu.iam"),
-        iconComponent: markRaw(ShieldUser),
+        iconComponent: markRaw(Users),
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
@@ -1636,7 +1636,7 @@ export default defineComponent({
       border-radius: 5px;
 
       .q-icon {
-        height: 1.3rem;
+        height: 1rem;
         width: 1rem;
       }
 
