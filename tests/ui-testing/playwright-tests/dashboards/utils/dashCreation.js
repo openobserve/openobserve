@@ -47,7 +47,7 @@ export async function deleteDashboard(page, dashboardName) {
   // const dashboardRow = page.locator(`//tr[.//td[text()="${dashboardName}"]]`);
   // await expect(dashboardRow).toBeVisible(); // Ensure the row is visible
   const dashboardRow = page
-    .locator('//tr[.//td[text()="' + dashboardName + '"]]')
+    .locator('//tr[.//div[@title="' + dashboardName + '"]]')
     .nth(0);
 
   const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
@@ -59,5 +59,5 @@ export async function deleteDashboard(page, dashboardName) {
   await confirmButton.click();
 
   // Ensure the dashboard is removed
-  await expect(page.getByText("Dashboard deleted successfully")).toBeVisible();
+  await expect(page.getByText("Dashboard deleted successfully").first()).toBeVisible();
 }
