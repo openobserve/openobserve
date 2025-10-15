@@ -5,84 +5,122 @@ html, body {
   padding: 0 !important;
 }
 
+body {
+  background: #8e9eab;  /* fallback for old browsers */
+  background: -webkit-linear-gradient(to bottom right, rgba(89, 155, 174, 0.01), rgba(89, 155, 174, 0.4));  /* Chrome 10-25, Safari 5.1-6 */
+  background: linear-gradient(to bottom right, rgba(89, 155, 174, 0.01), rgba(89, 155, 174, 0.4)); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+  overflow: hidden;
+
+  // background: -webkit-linear-gradient(
+  //   to bottom right,
+  //   rgba(63, 121, 148, 0.05),
+  //   rgba(89, 185, 122, 0.4)
+  // );
+
+  // /* Modern browsers (W3C, IE10+, Edge, Firefox, Chrome, Safari) */
+  // background: linear-gradient(
+  //   to bottom right,
+  //   rgba(63, 121, 148, 0.05),
+  //   rgba(89, 185, 122, 0.4)
+  // );
+}
+  
+.card-container {
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 0.5rem;
+  box-shadow: 0 0.25rem 075rem var(--hover-shadow);
+}
+
+.q-page {
+  box-shadow: 0.063rem 0.625rem 0.313rem var(--hover-shadow);
+  border-radius: 0.375rem;
+}
+
+.element-box-shadow {
+  box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
+}
+
+.q-splitter--vertical {
+  .q-splitter__separator {
+    width: 0.5rem; // 10px
+    background: transparent;
+  }
+}
+
+.q-splitter--horizontal {
+  .q-splitter__separator {
+    height: 0.5rem; // 10px
+    background: transparent;
+  }
+}
+
+.el-border {
+  border: 0.0625rem solid rgba(0, 0, 0, 0.12);
+}
+
+// .q-splitter--vertical {
+//   width: 0.625rem; // 10px
+//   height: 100%;
+// }
+
+// .q-splitter--horizontal {
+//   width: 0.625rem; // 10px
+//   height: 100%;
+// }
+
 /* ============================================================================
    MODERN LEAN SCROLLBAR STYLES
    Thin, minimal design with primary color scheme
    ============================================================================ */
 
+/* Base scrollbar style */
 ::-webkit-scrollbar {
-  width: 0.5rem; // 8px - thinner for modern look
-  height: 0.5rem; // 8px
+  width: 0.4rem;   // thinner for modern look
+  height: 0.4rem;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent; // Clean, minimal track
-  border-radius: 0.25rem; // 4px - subtle rounding
+  background: var(--o2-scrollbar-track-bg, transparent);
+  border-radius: 0.25rem;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(87, 95, 197, 0.4); // Light primary color
-  border-radius: 0.25rem; // 4px - subtle rounding
-  transition: background 0.2s ease;
-  cursor: pointer; // Hand pointer
+  border-radius: 0.25rem;
+  background: transparent; // hidden by default
+  transition: background 0.3s ease;
+  cursor: pointer;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(87, 95, 197, 0.6); // Slightly darker on hover
-  cursor: pointer; // Hand pointer
+/* When user hovers over the entire scrollable area */
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--o2-scrollbar-thumb-bg, transparent);
 }
 
-::-webkit-scrollbar-thumb:active {
-  background: rgba(87, 95, 197, 0.8); // More visible when dragging
-  cursor: grabbing; // Grabbing hand when dragging
+*:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--o2-scrollbar-thumb-hover-bg, rgba(0, 0, 0, 0.1));
+  cursor: pointer;
 }
 
-// Dark theme scrollbar
-.theme-dark {
-  ::-webkit-scrollbar-track {
-    background: transparent; // Clean, minimal track
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: rgba(161, 175, 255, 0.4); // Light dark-mode primary color
-    transition: background 0.2s ease;
-    cursor: pointer; // Hand pointer
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(161, 175, 255, 0.6);
-    cursor: pointer; // Hand pointer
-  }
-
-  ::-webkit-scrollbar-thumb:active {
-    background: rgba(161, 175, 255, 0.8);
-    cursor: grabbing; // Grabbing hand when dragging
-  }
+*:hover::-webkit-scrollbar-thumb:active {
+  background: var(--o2-scrollbar-thumb-active-bg, rgba(0, 0, 0, 0.15));
+  cursor: grabbing;
 }
 
-// Light theme scrollbar
-.theme-light {
-  ::-webkit-scrollbar-track {
-    background: transparent; // Clean, minimal track
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: rgba(87, 95, 197, 0.4); // Light primary color
-    transition: background 0.2s ease;
-    cursor: pointer; // Hand pointer
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(87, 95, 197, 0.6);
-    cursor: pointer; // Hand pointer
-  }
-
-  ::-webkit-scrollbar-thumb:active {
-    background: rgba(87, 95, 197, 0.8);
-    cursor: grabbing; // Grabbing hand when dragging
-  }
+*:hover::-webkit-scrollbar-track {
+  background: var(--o2-scrollbar-track-hover-bg, rgba(0, 0, 0, 0.02));
 }
 
+/* Firefox support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+/* When hovered */
+*:hover {
+  scrollbar-color: var(--o2-scrollbar-thumb-bg, transparent)
+                   var(--o2-scrollbar-track-hover-bg, rgba(0, 0, 0, 0.02));
+}
 
 .q-w-sm {
   width: 360px;
@@ -710,22 +748,20 @@ html, body {
 }
 
 .o2-primary-button-light{
-  background-color: #575FC5 !important;
+  background-color: var(--o2-primary-btn-bg) !important;
   color: #ffffff !important;
-  border: 1px solid #575FC5 !important;
+  border: 1px solid var(--o2-dark-primary-btn-bg) !important;
   &:hover{
-    background-color: #6B76E3 !important;
-    border: 1px solid #6B76E3 !important;
+    opacity: 0.9;
   }
 }
 //TODO o2: after getting the dark theme work on it
 .o2-primary-button-dark{
-  background-color: #575FC5 !important;
+  background-color: var(--o2-dark-primary-btn-bg) !important;
   color: #ffffff !important;
-  border: 1px solid #575FC5 !important;
+  border: 1px solid var(--o2-dark-primary-btn-bg) !important;
   &:hover{
-    background-color: #6B76E3 !important;
-    border: 1px solid #6B76E3 !important;
+    opacity: 0.9;
   }
 }
 
@@ -779,28 +815,26 @@ html, body {
 
 .o2-toggle-button-sm-light{
   .q-toggle__track{
-    background-color: #acbbf3;
-    border: 1px solid #D3D5DB !important;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff !important;
     .q-toggle__track{
-      background-color: #575FC5;
+      background-color: var(--o2-toggle-track-bg);
     }
-    }
+  }
 }
 
 .o2-toggle-button-sm-dark{
   .q-toggle__track{
-    background-color: #2f415e;
-    border: 1px solid #6F737A !important;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff !important;
     .q-toggle__track{
-      background-color: #6B76E3;
+      background-color: var(--o2-toggle-track-bg);
     }
     } 
 }
@@ -849,28 +883,26 @@ html, body {
 
 .o2-toggle-button-lg-light{
   .q-toggle__track{
-    background-color: #acbbf3;
-    border: 1px solid #D3D5DB !important;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff;
     .q-toggle__track{
-      background-color: #575FC5;
+      background-color: var(--o2-toggle-track-bg);
     }
     }
 }
 
 .o2-toggle-button-lg-dark{
   .q-toggle__track{
-    background-color: #2f415e;
-    border: 1px solid #6F737A !important;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff;
     .q-toggle__track{
-      background-color: #6B76E3;
+      background-color: var(--o2-toggle-track-bg);
     }
     }
 }
@@ -903,15 +935,15 @@ html, body {
   }
   
   .q-toggle__track{
-    height: 20px;
+    height: 17px;
     padding-bottom: 16px;
     border-radius: 16px;
-    width: 32px;
+    width: 30px;
     background-color: #EBECF0;
     opacity: 100%;
   }
   .q-toggle__thumb:after{
-    top: 0.5px;
+    top: 0.04em;
     left: -0.5px;
     height: 14px;
     width: 14px;
@@ -958,29 +990,26 @@ html, body {
 
 .o2-toggle-button-xs-light{
   .q-toggle__track{
-    background-color: #acbbf3;
-    border: 1px solid #D3D5DB !important;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff;
     .q-toggle__track{
-      background-color: #575FC5;
+      background-color: var(--o2-toggle-track-bg);
     }
-    }
+  }
 }
 
 .o2-toggle-button-xs-dark{
   .q-toggle__track{
-    background-color: #2f415e;
-    border: 1px solid #9CA3AF !important;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff;
     .q-toggle__track{
-      background-color: #6B76E3;
-      border: 1px solid #818CF8 !important;
+      background-color: var(--o2-toggle-track-bg);
     }
     }
 }
@@ -1081,9 +1110,6 @@ html, body {
     top: 5% !important;
     transform: translateY(-50%) !important;
 
-    &:hover {
-      transform: translateY(-50%) translateX(-2px) !important;
-    }
   }
 
   &--hidden {
