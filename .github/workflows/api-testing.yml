@@ -98,6 +98,14 @@ jobs:
           working-directory: "tests/api-testing/"
           version: "0.27.0"
 
+      - name: Start OpenObserve
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: target/debug/openobserve &
+
+      - name: Wait for start
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: sleep 15
+
       - name: Pin cpython
         if: steps.check_changes.outputs.has_changes == 'true'
         run: rye pin cpython@3.11.6
@@ -108,55 +116,15 @@ jobs:
         run: rye sync
         working-directory: tests/api-testing/
 
-      - name: Run regression tests with ZO_UTF8_VIEW_ENABLED=false
+      - name: Run regression tests with both UTF8_VIEW settings
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           echo "=== Testing with ZO_UTF8_VIEW_ENABLED=false ==="
-          echo "Starting OpenObserve with ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false"
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false target/debug/openobserve > o2_utf8_false.log 2>&1 &
-          SERVER_PID=$!
-          echo "OpenObserve PID: $SERVER_PID"
-          sleep 15
+          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false rye run pytest tests/test_subquery_join_match.py --force-sugar -v
           
-          # Run regression tests
-          rye run pytest tests/test_subquery_join_match.py --force-sugar -v
-          
-          # Kill the server
-          kill $SERVER_PID || true
-          sleep 5
-        working-directory: tests/api-testing/
-
-      - name: Run regression tests with ZO_UTF8_VIEW_ENABLED=true  
-        if: steps.check_changes.outputs.has_changes == 'true'
-        run: |
           echo "=== Testing with ZO_UTF8_VIEW_ENABLED=true ==="
-          echo "Starting OpenObserve with ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true"
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true target/debug/openobserve > o2_utf8_true.log 2>&1 &
-          SERVER_PID=$!
-          echo "OpenObserve PID: $SERVER_PID"
-          sleep 15
+          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true rye run pytest tests/test_subquery_join_match.py --force-sugar -v
           
-          # Run regression tests  
-          rye run pytest tests/test_subquery_join_match.py --force-sugar -v
-          
-          # Kill the server
-          kill $SERVER_PID || true
-          sleep 5
-        working-directory: tests/api-testing/
-
-      - name: Run other API tests
-        if: steps.check_changes.outputs.has_changes == 'true'
-        run: |
           echo "=== Running all other API tests ==="
-          echo "Starting OpenObserve with default settings"
-          target/debug/openobserve > o2_default.log 2>&1 &
-          SERVER_PID=$!
-          echo "OpenObserve PID: $SERVER_PID"
-          sleep 15
-          
-          # Run all other tests
           rye run pytest --ignore=tests/test_subquery_join_match.py --force-sugar
-          
-          # Kill the server
-          kill $SERVER_PID || true
         working-directory: tests/api-testing/
