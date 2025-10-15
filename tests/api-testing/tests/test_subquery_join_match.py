@@ -36,6 +36,7 @@ def query_timeframe():
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
+    logging.debug(f"Query timeframe: {one_hour_ago} to {end_time}")
     return one_hour_ago, end_time
 
 
@@ -47,6 +48,9 @@ def execute_search_query(create_session, base_url):
         url = base_url
         org_id = "default"
         
+        # Log the query being executed for debugging
+        logging.debug(f"Executing SQL query: {sql_query.strip()}")
+        
         json_data = {
             "query": {
                 "sql": sql_query,
@@ -57,9 +61,40 @@ def execute_search_query(create_session, base_url):
             },
         }
         
-        return session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+        response = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+        logging.debug(f"Query response status: {response.status_code}")
+        return response
     
     return _execute
+
+
+@pytest.fixture
+def validate_query_response():
+    """Shared fixture for query response validation with error handling."""
+    def _validate(response, expected_fields, test_name, validation_func=None):
+        """
+        Validate query response with smart error detection.
+        
+        Args:
+            response: HTTP response object
+            expected_fields: List of required fields in successful response
+            test_name: Name of test for logging
+            validation_func: Optional additional validation function for hits
+        """
+        if is_utf8view_error(response):
+            logging.warning(f"❌ {test_name}: Utf8View error detected (bug exists)")
+            pytest.skip(f"Environment has Utf8View bug - {test_name} validates error condition")
+        
+        # Validate successful response
+        hits = validate_successful_response(response, expected_fields, test_name)
+        
+        # Apply additional validation if provided
+        if validation_func and hits:
+            validation_func(hits, test_name)
+            
+        return hits
+    
+    return _validate
 
 
 def validate_successful_response(response, expected_fields, test_name):
@@ -96,12 +131,18 @@ def is_utf8view_error(response):
     try:
         error_data = response.json()
         error_detail = error_data.get("error_detail", "")
-        return "Unsupported data type: Utf8View" in error_detail
-    except:
+        is_utf8_error = "Unsupported data type: Utf8View" in error_detail
+        
+        if is_utf8_error:
+            logging.debug(f"Utf8View error detected: {error_detail}")
+        
+        return is_utf8_error
+    except (json.JSONDecodeError, KeyError) as e:
+        logging.debug(f"Error parsing response JSON: {e}")
         return False
 
 
-def test_subquery_with_substr_function(execute_search_query, query_timeframe):
+def test_subquery_with_substr_function(execute_search_query, query_timeframe, validate_query_response):
     """
     Test subquery with substr function - main regression test.
     
@@ -127,23 +168,21 @@ def test_subquery_with_substr_function(execute_search_query, query_timeframe):
     
     response = execute_search_query(sql_query, start_time, end_time)
     
-    if is_utf8view_error(response):
-        logging.warning("❌ Subquery with substr: Utf8View error detected (bug exists)")
-        pytest.skip("Environment has Utf8View bug - test validates error condition")
-    else:
-        # Environment is fixed - validate successful results
-        hits = validate_successful_response(
-            response, 
-            ["_timestamp", "kubernetes_container_name"], 
-            "Subquery with substr"
-        )
-        
-        # Additional validation for prometheus containers
+    def validate_prometheus_containers(hits, test_name):
+        """Validate that all containers start with 'p' (prometheus)."""
         for i, hit in enumerate(hits):
             container_name = hit["kubernetes_container_name"]
             assert container_name.startswith('p'), (
                 f"Hit {i}: container '{container_name}' should start with 'p'"
             )
+        logging.info(f"{test_name}: Validated {len(hits)} prometheus containers")
+    
+    validate_query_response(
+        response,
+        ["_timestamp", "kubernetes_container_name"],
+        "Subquery with substr",
+        validate_prometheus_containers
+    )
 
 
 def test_subquery_with_length_function(execute_search_query, query_timeframe):
