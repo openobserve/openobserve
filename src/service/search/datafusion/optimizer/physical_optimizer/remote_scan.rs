@@ -26,6 +26,8 @@ use datafusion::{
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
         ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        coalesce_partitions::CoalescePartitionsExec,
+        joins::{HashJoinExec, PartitionMode},
         repartition::RepartitionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
@@ -287,17 +289,24 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                 return Ok(Transformed::yes(new_node));
             }
         } else if node.name() == "HashJoinExec" {
+            // Check if this is a CollectLeft join that requires left child to have 1 partition
+            let hash_join = node
+                .as_any()
+                .downcast_ref::<HashJoinExec>()
+                .expect("Expected HashJoinExec");
+            let partition_mode = *hash_join.partition_mode();
+
             let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
-            for child in node.children() {
+            for (idx, child) in node.children().iter().enumerate() {
                 let mut visitor = TableNameVisitor::new();
                 child.visit(&mut visitor)?;
                 if !visitor.has_remote_scan {
                     let table_name = visitor.table_name.clone().unwrap();
                     let remote_scan = Arc::new(RemoteScanExec::new(
-                        child.clone(),
+                        Arc::clone(child),
                         self.remote_scan_nodes.get_remote_node(&table_name),
                     )?);
-                    // add repartition for better performance(imporve parallelism)
+                    // add repartition for better performance(improve parallelism)
                     let output_partitioning = Partitioning::RoundRobinBatch(
                         child.output_partitioning().partition_count(),
                     );
@@ -305,7 +314,27 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         Arc::new(RepartitionExec::try_new(remote_scan, output_partitioning)?);
                     new_children.push(repartition);
                 } else {
-                    new_children.push(child.clone());
+                    // For CollectLeft mode, ensure left child outputs exactly 1 partition
+                    // CollectLeft is used by DataFusion for INTERSECT/EXCEPT operations where
+                    // the left side needs to be collected for correctness (semi/anti joins).
+                    //
+                    // Performance note: CoalescePartitionsExec reduces parallelism but is necessary
+                    // for correctness. The impact is mitigated because:
+                    // 1. This happens AFTER deduplication/aggregation (reduced data volume)
+                    // 2. INTERSECT/EXCEPT typically work on small deduplicated sets
+                    // 3. CoalescePartitionsExec uses streaming execution (no full buffering)
+                    if partition_mode == PartitionMode::CollectLeft && idx == 0 {
+                        let partition_count = child.output_partitioning().partition_count();
+                        if partition_count != 1 {
+                            // Add CoalescePartitionsExec to force single partition
+                            let coalesce = Arc::new(CoalescePartitionsExec::new(Arc::clone(child)));
+                            new_children.push(coalesce);
+                        } else {
+                            new_children.push(Arc::clone(child));
+                        }
+                    } else {
+                        new_children.push(Arc::clone(child));
+                    }
                 }
             }
             let new_node = node.with_new_children(new_children)?;
