@@ -288,7 +288,6 @@ async fn run_datafusion(
     let org_id = req.org_id.clone();
 
     let context = tracing::Span::current().context();
-    let search_event_type = req.search_event_type.clone();
     let mut rewrite = RemoteScanRewriter::new(
         req,
         nodes,
@@ -399,7 +398,6 @@ async fn run_datafusion(
                 data.iter().fold(0, |acc, batch| acc + batch.num_rows()),
                 &mut visit.partial_err,
                 &sql,
-                search_event_type,
             );
             (data, visit.scan_stats, visit.partial_err)
         })

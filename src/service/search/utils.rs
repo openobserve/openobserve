@@ -17,7 +17,7 @@ use std::{future::Future, pin::Pin, sync::Arc};
 
 use config::meta::{
     inverted_index::UNKNOWN_NAME,
-    search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats, SearchEventType},
+    search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats},
 };
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use sqlparser::ast::{BinaryOperator, Expr};
@@ -233,21 +233,7 @@ pub async fn collect_scan_stats(
     scan_stats
 }
 
-pub fn check_query_default_limit_exceeded(
-    num_rows: usize,
-    partial_err: &mut String,
-    sql: &Sql,
-    search_event_type: Option<String>,
-) {
-    if search_event_type.is_none()
-        || search_event_type
-            .as_ref()
-            .and_then(|s| SearchEventType::try_from(s.as_ref()).ok())
-            != Some(SearchEventType::Dashboards)
-    {
-        return;
-    }
-
+pub fn check_query_default_limit_exceeded(num_rows: usize, partial_err: &mut String, sql: &Sql) {
     if is_default_query_limit_exceeded(num_rows, sql) {
         let capped_err = CAPPED_RESULTS_MSG.to_string();
         if !partial_err.is_empty() {
@@ -268,8 +254,7 @@ pub fn is_default_query_limit_exceeded(num_rows: usize, sql: &Sql) -> bool {
     }
 }
 
-#[allow(dead_code)]
-pub fn is_cachable_function_error(function_error: &[String]) -> bool {
+pub fn is_permissable_function_error(function_error: &[String]) -> bool {
     if function_error.is_empty() {
         return true;
     }
@@ -293,37 +278,37 @@ mod tests {
     #[test]
     fn test_is_cachable_function_error() {
         let error = vec![];
-        assert_eq!(is_cachable_function_error(&error), true);
+        assert_eq!(is_permissable_function_error(&error), true);
 
         let error = vec!["".to_string()];
-        assert_eq!(is_cachable_function_error(&error), true);
+        assert_eq!(is_permissable_function_error(&error), true);
 
         let error = vec![
             CAPPED_RESULTS_MSG.to_string(),
             PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
         ];
-        assert_eq!(is_cachable_function_error(&error), true); // only this is cachable
+        assert_eq!(is_permissable_function_error(&error), true); // only this is cachable
 
         let error = vec![
             CAPPED_RESULTS_MSG.to_string(),
             PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
             "parquet not found".to_string(),
         ];
-        assert_eq!(is_cachable_function_error(&error), false);
+        assert_eq!(is_permissable_function_error(&error), false);
 
         let error = vec![
             "parquet not found".to_string(),
             PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
         ];
-        assert_eq!(is_cachable_function_error(&error), false);
+        assert_eq!(is_permissable_function_error(&error), false);
 
         let error = vec!["parquet not found".to_string()];
-        assert_eq!(is_cachable_function_error(&error), false);
+        assert_eq!(is_permissable_function_error(&error), false);
 
         let error = vec![
             "parquet not found".to_string(),
             CAPPED_RESULTS_MSG.to_string(),
         ];
-        assert_eq!(is_cachable_function_error(&error), false);
+        assert_eq!(is_permissable_function_error(&error), false);
     }
 }
