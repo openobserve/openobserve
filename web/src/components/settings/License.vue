@@ -193,7 +193,7 @@
                     <span class="text-h6">{{ ingestionUsagePercent }}%</span>
                   </q-circular-progress>
                   <div class="text-caption text-weight-bold">
-                    {{ isIngestionUnlimited ? 'Limit: Unlimited' : `Limit: ${licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '200 GB / day'}` }}
+                    {{ isIngestionUnlimited ? 'Limit: Unlimited' : `Limit: ${licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '100 GB / day'}` }}
                   </div>
                   <div v-if="isIngestionUnlimited" class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
                     * Usage shows 0% for unlimited plans
@@ -212,7 +212,7 @@
                     </tr>
                     <tr>
                       <td class="text-weight-bold">Value</td>
-                      <td>{{ licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '200 GB / day' }}</td>
+                      <td>{{ licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '100 GB / day' }}</td>
                     </tr>
                     <tr>
                       <td class="text-weight-bold">Limit Exceeded</td>
