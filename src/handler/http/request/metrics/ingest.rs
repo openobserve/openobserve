@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, http, post, web};
+use actix_web::{HttpRequest, HttpResponse, http, http::header, post, web};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -46,15 +46,31 @@ use crate::{
 )]
 #[post("/{org_id}/ingest/metrics/_json")]
 pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
+    // log start processing time
+    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
+        config::utils::time::now_micros()
+    } else {
+        0
+    };
+
     let org_id = org_id.into_inner();
-    Ok(match metrics::json::ingest(&org_id, body).await {
+    let mut resp = match metrics::json::ingest(&org_id, body).await {
         Ok(v) => HttpResponse::Ok().json(v),
         Err(e) => {
             log::error!("Error processing request {org_id}/metrics/_json: {e}");
             HttpResponse::BadRequest()
                 .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
         }
-    })
+    };
+
+    if process_time > 0 {
+        resp.headers_mut().insert(
+            header::HeaderName::from_static("o2_process_time"),
+            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
+        );
+    }
+
+    Ok(resp)
 }
 
 /// MetricsIngest
@@ -79,16 +95,32 @@ pub async fn otlp_metrics_write(
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
+    // log start processing time
+    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
+        config::utils::time::now_micros()
+    } else {
+        0
+    };
+
     let org_id = org_id.into_inner();
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
-    if content_type.eq(CONTENT_TYPE_PROTO) {
-        metrics::otlp::otlp_proto(&org_id, body).await
+    let mut resp = if content_type.eq(CONTENT_TYPE_PROTO) {
+        metrics::otlp::otlp_proto(&org_id, body).await?
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        metrics::otlp::otlp_json(&org_id, body).await
+        metrics::otlp::otlp_json(&org_id, body).await?
     } else {
-        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+        HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
             "Bad Request",
-        )))
+        ))
+    };
+
+    if process_time > 0 {
+        resp.headers_mut().insert(
+            header::HeaderName::from_static("o2_process_time"),
+            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
+        );
     }
+
+    Ok(resp)
 }
