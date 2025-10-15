@@ -281,6 +281,8 @@ $dark-theme-color: #3F7994;
 
   --o2-toggle-track-bg: color-mix(in srgb, var(--o2-theme-color) 90%, white);
   --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-theme-color) 30%, white);
+
+  --o2-card-bg: rgba(255, 255, 255, 0.8);
 }
 
 // Semantic Colors - Dark Mode
@@ -326,4 +328,6 @@ $dark-theme-color: #3F7994;
 
   --o2-toggle-track-bg: color-mix(in srgb, var(--o2-dark-theme-color) 90%, white);
   --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-dark-theme-color) 30%, white);
+
+  --o2-card-bg: rgba(0, 0, 0, 0.8);
 }
