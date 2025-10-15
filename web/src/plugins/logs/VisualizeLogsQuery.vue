@@ -699,19 +699,19 @@ export default defineComponent({
 
     const addToDashboard = () => {
       if (
-        resultMetaData?.[0]?.[0]?.converted_histogram_query &&
+        resultMetaData.value?.[0]?.[0]?.converted_histogram_query &&
         is_ui_histogram.value === true
       ) {
         dashboardPanelData.data.queries[0].query =
-          resultMetaData?.[0]?.[0]?.converted_histogram_query;
+          resultMetaData.value?.[0]?.[0]?.converted_histogram_query;
       } else if (
         // Backward compatibility - check if it's old format
-        resultMetaData?.[0]?.converted_histogram_query &&
+        resultMetaData.value?.[0]?.converted_histogram_query &&
         is_ui_histogram.value === true &&
-        !Array.isArray(resultMetaData[0])
+        !Array.isArray(resultMetaData.value?.[0])
       ) {
         dashboardPanelData.data.queries[0].query =
-          resultMetaData?.[0]?.converted_histogram_query;
+          resultMetaData.value?.[0]?.converted_histogram_query;
       }
 
       const errors: any = [];
@@ -913,8 +913,7 @@ export default defineComponent({
     };
 
     const onResultMetadataUpdate = (resultMetaDataParams: any) => {
-      resultMetaData.value =
-        resultMetaDataParams?.[0] ?? resultMetaDataParams ?? [];
+      resultMetaData.value = resultMetaDataParams ?? null;
 
       maxQueryRangeWarning.value = processQueryMetadataErrors(
         resultMetaData,
