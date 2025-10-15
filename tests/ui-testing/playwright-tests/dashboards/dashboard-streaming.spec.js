@@ -264,22 +264,21 @@ test.describe("dashboard streaming testcases", () => {
 
 
     await pm.dashboardPanelActions.savePanel();
-    await page.waitForLoadState("networkidle");
 
-    // Wait to ensure all previous network activity has completed
-    await page.waitForTimeout(1000);
+    //wait for variable to be visible.
+    const namespaceVariable = page.getByLabel("variablename", { exact: true });
+    await namespaceVariable.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(namespaceVariable).toBeVisible();
 
     // Clear the responses array to track only API calls after variable selection
     // This is the key point: we want to know how many values API calls happen when the variable value changes
     valuesResponses.length = 0;
-    // console.log(`\n[TRACKING START] Cleared counter. Now tracking values API calls triggered by variable dropdown selection...`);
 
     await pm.dashboardVariables.selectValueFromVariableDropDown(
       "variablename",
       "ziox"
     );
 
-    // Wait for all 3 _values_stream API calls (one for each dependent variable)
     // Using a polling approach to wait until we receive exactly 3 API calls
     await page.waitForFunction(
       (expectedCount) => {
@@ -288,19 +287,10 @@ test.describe("dashboard streaming testcases", () => {
         return true;
       },
       3,
-      { timeout: 500 }
+      { timeout: 50 }
     ).catch(() => {});
 
-    // Wait with a reasonable timeout for all API calls to complete
-    await page.waitForTimeout(3000);
-
-    // Wait for any remaining network activity to settle
-    await page.waitForLoadState("networkidle");
-    // console.log(`[TRACKING END] Values API calls triggered AFTER variable value change: ${valuesResponses.length}\n`);
-
-    // console.log(`\n========================================`);
-    // console.log(`[TEST 2] TOTAL VALUES API CALLS: ${valuesResponses.length}`);
-    // console.log(`========================================\n`);
+    // await page.waitForTimeout(3000);
 
     // Assert that exactly 3 values API calls are made (one for each dependent variable)
     expect(valuesResponses.length).toBe(3);
