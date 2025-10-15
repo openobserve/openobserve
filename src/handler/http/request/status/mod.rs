@@ -147,6 +147,8 @@ struct ConfigResponse<'a> {
     ingest_flatten_level: u32,
     #[cfg(feature = "enterprise")]
     license_expiry: i64,
+    #[cfg(feature = "enterprise")]
+    license_server_url: String,
     log_page_default_field_list: String,
 }
 
@@ -302,6 +304,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
 
     #[cfg(feature = "enterprise")]
     let expiry_time = o2_enterprise::enterprise::license::get_expiry_time().await;
+    #[cfg(feature = "enterprise")]
+    let license_server_url = o2cfg.common.license_server_url.to_string();
 
     let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
@@ -374,6 +378,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         #[cfg(feature = "enterprise")]
         license_expiry: expiry_time,
         log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
+        #[cfg(feature = "enterprise")]
+        license_server_url,
     }))
 }
 
