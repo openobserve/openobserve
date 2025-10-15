@@ -4318,7 +4318,7 @@ export default defineComponent({
 }
 
 .dark-theme .toolbar-toggle-container {
-  border: 0.0625rem solid rgb(196, 196, 196);
+  border: 0.0625rem solid var(--o2-border-color);
 }
 
 .toolbar-icon {
@@ -4353,7 +4353,7 @@ export default defineComponent({
 .toolbar-reset-btn {
   padding: 0.25rem 0.375rem; // 4px 6px
   margin-left: 0.25rem; // 8px
-  border: 0.0625rem solid rgba(0, 0, 0, 0.12); // 1px
+  border: 0.0625rem solid var(--o2-border-color); // 1px
   border-radius: 0.375rem; // 6px
   transition: all 0.2s ease;
   min-height: 1.875rem; // 30px
@@ -4367,12 +4367,12 @@ export default defineComponent({
   }
 
   &.theme-dark {
-    border-color: rgb(196, 196, 196) !important;
+    border-color: var(--o2-border-color) !important;
   }
 }
 
 .q-dark .toolbar-reset-btn, .dark-theme .toolbar-reset-btn {
-  border-color: rgb(196,196,196);
+  border-color: var(--o2-border-color);
 }
 
 .group-menu-btn {
@@ -4395,6 +4395,6 @@ export default defineComponent({
 }
 
 .dark-theme .group-menu-btn, .q-dark .group-menu-btn {
-  border: 0.0625rem solid rgb(196, 196, 196) !important;
+  border: 0.0625rem solid var(--o2-border-color) !important;
 }
 </style>
