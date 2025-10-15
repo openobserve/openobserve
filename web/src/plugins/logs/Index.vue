@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @handleRunQueryFn="handleRunQueryFn"
             @on-auto-interval-trigger="onAutoIntervalTrigger"
             @showSearchHistory="showSearchHistoryfn"
+            @onAiAssistantToggle="handleAiAssistantToggle"
           />
         </template>
         <template v-slot:after>
@@ -643,6 +644,16 @@ export default defineComponent({
 
     const clearSchemaCache = () => {
       schemaCache.value = null;
+    };
+
+    const handleAiAssistantToggle = (isVisible) => {
+      if (isVisible) {
+        // AI is opened, increase splitter by 10%
+        splitterModel.value = Math.min(splitterModel.value + 10, 90);
+      } else {
+        // AI is closed, decrease splitter by 10%
+        splitterModel.value = Math.max(splitterModel.value - 10, 5);
+      }
     };
 
     const { registerAiChatHandler, removeAiChatHandler, initializeDefaultContext } = useAiChat();
@@ -2383,6 +2394,7 @@ export default defineComponent({
       searchResponseForVisualization,
       shouldUseHistogramQuery,
       clearSchemaCache,
+      handleAiAssistantToggle,
     };
   },
   computed: {
