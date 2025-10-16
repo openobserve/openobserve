@@ -1,27 +1,14 @@
 <template>
   <q-page data-test="iam-page" class="q-pa-none" style="min-height: inherit">
-    <q-btn
-      data-test="iam-tabs-collapse-btn"
-      :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
-      :title="showSidebar ? 'Collapse Tabs' : 'Open Tabs'"
-      dense
-      size="12px"
-      round
-      class="q-mr-xs field-list-collapse-btn tw-absolute tw-top-0 tw-z-10"
-      color="primary"
-      :style="{
-        left: showSidebar ? splitterModel - 14 + 'px' : '-8px',
-      }"
-      @click="collapseSidebar"
-    />
     <q-splitter
       v-model="splitterModel"
       unit="px"
       :limits="[0, 300]"
-      class="tw-overflow-hidden"
+      class="tw-overflow-hidden logs-splitter-smooth"
     >
       <template v-slot:before>
-        <div v-if="showSidebar" class="iam-tabs spitter-container" style="height: calc(100vh - 42px)">
+        <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+           <div v-if="showSidebar" class="iam-tabs spitter-container card-container o2-container-navbarheight">
           <route-tabs
             ref="iamRouteTabsRef"
             dataTest="iam-tabs"
@@ -29,11 +16,29 @@
             :activeTab="activeTab"
             @update:activeTab="updateActiveTab"
           />
+          </div>
+          <q-btn
+              data-test="iam-tabs-collapse-btn"
+              icon="drag_indicator"
+              :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+              dense
+              flat
+              :class="[
+                'splitter-section-collapse-btn',
+                showSidebar
+                  ? 'splitter-section-collapse-btn--visible'
+                  : 'splitter-section-collapse-btn--hidden',
+              ]"
+              
+              @click="collapseSidebar"
+            />
         </div>
       </template>
       <template v-slot:after>
-        <div style="height: calc(100vh - 42px); overflow-y: auto">
-          <RouterView />
+        <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+          <div class="card-container o2-container-navbarheight">
+            <RouterView />
+          </div>
         </div>
       </template>
     </q-splitter>
@@ -61,7 +66,7 @@ const iamRouteTabsRef: any = ref(null);
 
 const { isMetaOrg } = useIsMetaOrg();
 
-const splitterModel = ref(180);
+const splitterModel = ref(220);
 const lastSplitterPosition = ref(splitterModel.value);
 const showSidebar = ref(true);
 
