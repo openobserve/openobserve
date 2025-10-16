@@ -27,13 +27,13 @@ body {
   
 .card-container {
   background-color: var(--o2-card-bg);
-  border-radius: 0.5rem;
-  box-shadow: 0rem 0.1rem 0.3rem var(--hover-shadow)
+  border-radius: 0.375rem;
+  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
 }
 
 .q-page {
-  box-shadow: 0.063rem 0.625rem 0.313rem var(--hover-shadow);
   border-radius: 0.375rem;
+  margin-left: 0.4rem;
 }
 
 .element-box-shadow {
@@ -41,16 +41,14 @@ body {
 }
 
 .q-splitter--vertical {
-  > .q-splitter__separator {
-    width: 0.5rem; // 10px
-    background: transparent;
+  .q-splitter__separator {
+    width: 0; // 10px
   }
 }
 
 .q-splitter--horizontal {
-  > .q-splitter__separator {
-    height: 0.5rem; // 10px
-    background: transparent;
+  .q-splitter__separator {
+    height: 0; // 10px
   }
 }
 
@@ -76,6 +74,12 @@ body {
 
 .index-table .q-table .q-tr:hover {
     background: color-mix(in srgb, var(--o2-theme-color) 5%, white 90%) !important;
+}
+
+
+.q-table__card{
+  box-shadow: none;
+  background-color: transparent;
 }
 
 .q-tabs {
