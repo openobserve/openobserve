@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column index-menu">
+  <div class="column index-menu tw-p-[0.25rem]">
     <q-select
       data-test="log-search-index-list-select-stream"
       v-model="searchObj.data.stream.selectedStream"
