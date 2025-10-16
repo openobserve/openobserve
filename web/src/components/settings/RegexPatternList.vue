@@ -1,5 +1,5 @@
 <template>
-    <div class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
+    <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     :class="store.state.theme === 'dark' ? 'dark-theme-list' : 'light-theme-list'"
     >
     <div v-if="!showImportRegexPatternDialog" class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
@@ -54,7 +54,9 @@
           :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
         >
         <template #no-data>
-          <NoRegexPatterns v-if="!listLoading && filterQuery == ''" @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
+          <div v-if="!listLoading && filterQuery == ''" class="full-width column flex-center q-mt-xs full-height" style="font-size: 1.5rem">
+          <NoRegexPatterns  @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
+          </div>
           <div v-else-if="!listLoading && filterQuery != ''" class="full-width column flex-center q-mt-xs" style="font-size: 1.5rem">
             <NoData />
           </div>
@@ -156,7 +158,7 @@
         <q-dialog v-model="showAddRegexPatternDialog.show" position="right" full-height maximized>
           <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="closeAddRegexPatternDialog" />
         </q-dialog>
-      </div>
+      </q-page>
   </template>
 
 <script lang="ts">
