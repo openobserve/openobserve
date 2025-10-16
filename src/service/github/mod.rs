@@ -23,9 +23,11 @@
 //! use crate::service::github::GitHubDataService;
 //!
 //! let service = GitHubDataService::new();
-//! let data = service.fetch_json::<Vec<Pattern>>(
-//!     "https://raw.githubusercontent.com/bee-san/pyWhat/main/pywhat/Data/regex.json"
-//! ).await?;
+//! let data = service
+//!     .fetch_json::<Vec<Pattern>>(
+//!         "https://raw.githubusercontent.com/bee-san/pyWhat/main/pywhat/Data/regex.json",
+//!     )
+//!     .await?;
 //! ```
 
 pub mod adapters;

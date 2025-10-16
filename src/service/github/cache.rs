@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
+
 use tokio::sync::RwLock;
 
 use super::types::{CachedData, GitHubError};
@@ -117,12 +117,14 @@ pub struct CacheStats {
 
 /// Generate a cache key from URL
 pub fn generate_cache_key(url: &str) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+    };
 
     let mut hasher = DefaultHasher::new();
     url.hash(&mut hasher);
     let hash = hasher.finish();
 
-    format!("github:data:{:x}", hash)
+    format!("github:data:{hash:x}")
 }

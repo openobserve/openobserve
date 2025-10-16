@@ -45,7 +45,8 @@ pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
                 attempt += 1;
                 if attempt >= MAX_ATTEMPTS {
                     return Err(anyhow::anyhow!(
-                        "Failed to create pattern with unique name after {} attempts", MAX_ATTEMPTS
+                        "Failed to create pattern with unique name after {} attempts",
+                        MAX_ATTEMPTS
                     ));
                 }
 
@@ -87,7 +88,10 @@ pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
     {
         let config = o2_enterprise::enterprise::common::config::get_config();
         if config.super_cluster.enabled {
-            match o2_enterprise::enterprise::super_cluster::queue::patterns_put(pattern_entry.clone()).await
+            match o2_enterprise::enterprise::super_cluster::queue::patterns_put(
+                pattern_entry.clone(),
+            )
+            .await
             {
                 Ok(_) => {
                     log::info!(

@@ -185,10 +185,8 @@ pub async fn save(
                     "Pattern created successfully".to_string()
                 };
 
-                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK,
-                    message,
-                )))
+                Ok(HttpResponse::Ok()
+                    .json(MetaHttpResponse::message(http::StatusCode::OK, message)))
             }
             Err(e) => Ok(MetaHttpResponse::bad_request(e)),
         }
@@ -512,7 +510,7 @@ pub async fn get_built_in_patterns(
     _org_id: web::Path<String>,
     query: web::Query<BuiltInPatternsQuery>,
 ) -> Result<HttpResponse, Error> {
-    use crate::service::github::{adapters::PyWhatAdapter, GitHubDataService};
+    use crate::service::github::{GitHubDataService, adapters::PyWhatAdapter};
 
     // Create GitHub service
     let github_service = GitHubDataService::new();

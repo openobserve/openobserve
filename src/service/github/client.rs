@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use bytes::Bytes;
-use serde::de::DeserializeOwned;
 use std::time::Duration;
 
-use super::cache::{generate_cache_key, CacheManager};
-use super::types::{CachedData, GitHubError, GitHubServiceConfig};
+use bytes::Bytes;
+use serde::de::DeserializeOwned;
+
+use super::{
+    cache::{CacheManager, generate_cache_key},
+    types::{CachedData, GitHubError, GitHubServiceConfig},
+};
 
 /// Generic GitHub Data Service
 ///
@@ -69,11 +72,9 @@ impl GitHubDataService {
         let cache_key = generate_cache_key(url);
 
         // Check cache first unless force refresh
-        if !force_refresh {
-            if let Some(cached_data) = self.cache.get(&cache_key).await {
-                log::info!("Returning cached data for URL: {}", url);
-                return Ok(cached_data);
-            }
+        if !force_refresh && let Some(cached_data) = self.cache.get(&cache_key).await {
+            log::info!("Returning cached data for URL: {}", url);
+            return Ok(cached_data);
         }
 
         // Fetch from GitHub
@@ -97,10 +98,7 @@ impl GitHubDataService {
     ///
     /// # Returns
     /// Parsed JSON data of type T
-    pub async fn fetch_json<T: DeserializeOwned>(
-        &self,
-        url: &str,
-    ) -> Result<T, GitHubError> {
+    pub async fn fetch_json<T: DeserializeOwned>(&self, url: &str) -> Result<T, GitHubError> {
         let data = self.fetch_with_cache(url, false).await?;
         let parsed = serde_json::from_slice(&data)?;
         Ok(parsed)
