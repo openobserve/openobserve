@@ -236,10 +236,16 @@ $o2-dark-teal-900: #9BDDD6;
   // --o2-bg-dark: #0d1117;
 
 $theme-color: #3F7994;
-$dark-theme-color: #3F7994;
+$dark-theme-color: #0E131D;
+
+$theme-mode: white;
+$dark-theme-mode: $dark-theme-color;
 
 $body-primary-bg: rgba(89, 155, 174, 0.01);
 $body-secondary-bg: rgba(89, 155, 174, 0.4);
+
+$dark-body-primary-bg: rgba(14, 19, 29, 0.01);
+$dark-body-secondary-bg: rgba(14, 19, 29, 0.4);
 
 $menu-gradient-start: rgba(89, 155, 174, 0.04);
 $menu-gradient-end: rgba(89, 155, 174, 0.08);
@@ -247,6 +253,7 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
 
 // Semantic Colors - Light Mode
 :root {
+  --o2-theme-mode: #{$theme-mode};
   // Backgrounds
   --o2-primary-background: #{$o2-gray-100};  // White background
   --o2-secondary-background: #{$o2-iris-200}; // Light iris background
@@ -307,10 +314,12 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
   --o2-table-header-bg: color-mix(in srgb, #{$theme-color} 20%, white);
 
   --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, white);
+  --o2-tab-text-color: #{$o2-gray-1400};
 }
 
 // Semantic Colors - Dark Mode
 .body--dark {
+  --o2-theme-mode: #{$dark-theme-mode};
   // Backgrounds
   --o2-primary-background: #{$o2-dark-gray-1400};  // Dark mode background
   --o2-secondary-background: #{$o2-dark-gray-1300}; // Secondary background
@@ -347,28 +356,29 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
 
   --o2-theme-color: #{$dark-theme-color};
 
-  --o2-body-primary-bg: #{$body-primary-bg};
-  --o2-body-secondary-bg: #{$body-secondary-bg};
+  --o2-body-primary-bg: #{$dark-body-primary-bg};
+  --o2-body-secondary-bg: #{$dark-body-secondary-bg};
 
-  --o2-primary-btn-bg: color-mix(in srgb, var(--o2-theme-color) 90%, white);
-  --o2-primary-btn-text: #{$o2-gray-1400};
+  --o2-primary-btn-bg: #{$theme-color};
+  --o2-primary-btn-text: #{$o2-gray-100};
 
   --o2-toggle-track-bg: color-mix(in srgb, var(--o2-theme-color) 90%, white);
-  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-theme-color) 30%, white);
+  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-theme-color) 1%, #{$dark-theme-color});
 
   --o2-card-bg: rgba(0, 0, 0, 0.8);
 
-  --o2-header-menu-bg: rgba(255, 255, 255, 0.8);
+  --o2-header-menu-bg: rgba(0, 0, 0, 1);
 
   --o2-border-color: rgba(255, 255, 255, 0.40);
   --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
 
   --o2-menu-gradient-start: #{$menu-gradient-start};
   --o2-menu-gradient-end: #{$menu-gradient-end};
-  --o2-menu-border-color: #{$menu-border-color};
-  --o2-menu-color: #{$theme-color};
+  --o2-menu-border-color: #{$dark-theme-color};
+  --o2-menu-color: #{$o2-gray-100};
 
-  --o2-table-header-bg: color-mix(in srgb, #{$theme-color} 5%, white);
+  --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 5%, #{$dark-theme-color});
 
-  --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 5%, white 90%);
+  --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, #{$dark-theme-color});
+  --o2-tab-text-color: #{$o2-gray-100};
 }

@@ -133,20 +133,6 @@ body {
   height: 2.25rem !important;
 }
 
-
-
-
-
-
-
-.o2-secondary-button {
-  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
-
-  &:hover {
-    opacity: 0.8;
-  }
-}
-
 .q-tabs {
   &--vertical {
     .q-tab {
@@ -157,7 +143,7 @@ body {
       margin: 0.5rem;
 
       &:hover{
-        background-color: var(--o2-tab-bg);
+        background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
       }
 
       &__content.tab_content {
@@ -169,7 +155,7 @@ body {
         }
       }
       &--active {
-        color: black;
+        color: var(--o2-tab-text-color);
         background-color: var(--o2-tab-bg);
       }
     }
@@ -446,7 +432,7 @@ body {
 .q-table {
   border-radius: 0.375rem;
   tbody .q-tr:hover {
-    background: color-mix(in srgb, var(--o2-theme-color) 5%, white 90%) !important;
+    background: color-mix(in srgb, var(--o2-theme-color) 5%, var(--o2-theme-mode) 90%) !important;
   }
 }
 
@@ -812,6 +798,13 @@ body {
   border-radius: 4px !important;
   padding: 0px 12px !important;
   min-width: 90px !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
+  }
 }
 
 
@@ -824,22 +817,32 @@ body {
   padding: 0px 12px !important;
   min-width: 90px !important;
   height: 28px !important;
-}
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
 
-.o2-secondary-button-light{
-  color: #19191E !important;
-  border: 1px solid #D3D5DB !important;
-  background-color: #F7F8FA;
-}
-.o2-secondary-button-dark{
-  color: #DFE1E5 !important;
-  border: 1px solid #6F737A !important;
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
+  }
 }
 
 
+// .o2-primary-button{
+//   font-size: 13px ;
+//   font-weight: 500 !important;
+//   line-height: 16px !important;
+//   padding: 0px 12px !important;
+//   border-radius: 0.375rem !important;
+//   min-width: 90px !important;
+//   background-color: var(--o2-primary-btn-bg);
+//   color: var(--o2-primary-btn-text);
 
-.o2-primary-button{
-  font-size: 13px ;
+//   &:hover {
+//     opacity: 0.8;
+//   }
+// }
+.o2-primary-button {
+  font-size: 13px;
   font-weight: 500 !important;
   line-height: 16px !important;
   padding: 0px 12px !important;
@@ -847,11 +850,17 @@ body {
   min-width: 90px !important;
   background-color: var(--o2-primary-btn-bg);
   color: var(--o2-primary-btn-text);
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+
+  /* subtle default glow */
+  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
 
   &:hover {
-    opacity: 0.8;
+    opacity: 0.9;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
   }
 }
+
 .o2-primary-button-small{
   height: 28px !important;
   font-size: 13px !important;
@@ -862,9 +871,14 @@ body {
   min-width: 90px !important;
   background-color: var(--o2-primary-btn-bg);
   color: var(--o2-primary-btn-text);
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+
+  /* subtle default glow */
+  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
 
   &:hover {
     opacity: 0.8;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
   }
 }
 
@@ -872,18 +886,24 @@ body {
   background-color: #ec1414 !important;
   color: #ffffff !important;
   border: 1px solid #ec1414 !important;
+  // box-shadow: 0 0 8px color-mix(in srgb, #ec1414, transparent 60%);
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
   &:hover{
     background-color: #f13939 !important;
     border: 1px solid #f13939 !important;
+      
   }
 }
 .o2-negative-button-dark{
   background-color: #ec1414 !important;
   color: #ffffff !important;
   border: 1px solid #ec1414 !important;
+  // box-shadow: 0 0 8px color-mix(in srgb, #ec1414, transparent 60%);
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
   &:hover{
     background-color: #f13939 !important;
     border: 1px solid #f13939 !important;
+    box-shadow: 0 0 14px color-mix(in srgb, #f13939, transparent 30%);
   }
 }
 
