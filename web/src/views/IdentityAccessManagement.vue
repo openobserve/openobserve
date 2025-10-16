@@ -1,20 +1,42 @@
 <template>
   <q-page data-test="iam-page" class="q-pa-none" style="min-height: inherit">
-    <div class="flex no-wrap" style="height: calc(100vh - 42px) !important">
-      <div style="width: 180px" class="iam-tabs spitter-container">
-        <route-tabs
-          ref="iamRouteTabsRef"
-          dataTest="iam-tabs"
-          :tabs="tabs"
-          :activeTab="activeTab"
-          @update:activeTab="updateActiveTab"
-        />
-      </div>
-      <q-separator vertical />
-      <div style="width: calc(100% - 160px); overflow-y: auto">
-        <RouterView />
-      </div>
-    </div>
+    <q-btn
+      data-test="iam-tabs-collapse-btn"
+      :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
+      :title="showSidebar ? 'Collapse Tabs' : 'Open Tabs'"
+      dense
+      size="12px"
+      round
+      class="q-mr-xs field-list-collapse-btn tw-absolute tw-top-0 tw-z-10"
+      color="primary"
+      :style="{
+        left: showSidebar ? splitterModel - 14 + 'px' : '-8px',
+      }"
+      @click="collapseSidebar"
+    />
+    <q-splitter
+      v-model="splitterModel"
+      unit="px"
+      :limits="[0, 300]"
+      class="tw-overflow-hidden"
+    >
+      <template v-slot:before>
+        <div v-if="showSidebar" class="iam-tabs spitter-container" style="height: calc(100vh - 42px)">
+          <route-tabs
+            ref="iamRouteTabsRef"
+            dataTest="iam-tabs"
+            :tabs="tabs"
+            :activeTab="activeTab"
+            @update:activeTab="updateActiveTab"
+          />
+        </div>
+      </template>
+      <template v-slot:after>
+        <div style="height: calc(100vh - 42px); overflow-y: auto">
+          <RouterView />
+        </div>
+      </template>
+    </q-splitter>
   </q-page>
 </template>
 
@@ -38,6 +60,16 @@ const activeTab = ref("users");
 const iamRouteTabsRef: any = ref(null);
 
 const { isMetaOrg } = useIsMetaOrg();
+
+const splitterModel = ref(180);
+const lastSplitterPosition = ref(splitterModel.value);
+const showSidebar = ref(true);
+
+const collapseSidebar = () => {
+  if (showSidebar.value) lastSplitterPosition.value = splitterModel.value;
+  showSidebar.value = !showSidebar.value;
+  splitterModel.value = showSidebar.value ? lastSplitterPosition.value : 0;
+};
 
 const tabs = ref([
   {
@@ -206,4 +238,8 @@ const updateActiveTab = (tab: string) => {
 };
 </script>
 
-<style scoped></style>
+<style scoped lang="scss">
+:deep(.q-splitter__before) {
+  overflow: visible;
+}
+</style>
