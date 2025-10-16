@@ -1,5 +1,5 @@
 <template>
-  <div class="q-px-md q-pt-md q-pb-md">
+  <div class="q-px-md q-pt-md q-pb-md tw-mt-2">
     <div class="text-body1 text-bold">
       {{ t("settings.logDetails") }}
     </div>
