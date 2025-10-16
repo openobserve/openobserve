@@ -59,6 +59,78 @@ body {
   border-radius: 0.375rem;
 }
 
+/** 
+=====================================================================
+    input related heights defined here
+=====================================================================
+**/
+
+.el-input-min-height {
+  min-height: 2.25rem !important;
+}
+
+.el-input-height {
+  height: 2.25rem !important;
+}
+
+.el-input-max-height {
+  height: 2.25rem !important;
+}
+
+
+/** 
+=====================================================================
+    select (dropdown) related heights defined here
+=====================================================================
+**/
+
+.el-select-min-height {
+  min-height: 2.25rem !important;
+}
+
+.el-select-height {
+  height: 2.25rem !important;
+}
+
+.el-select-max-height {
+  height: 2.25rem !important;
+}
+
+
+/** 
+=====================================================================
+    side dropdown related widths defined here
+=====================================================================
+**/
+.el-side-dropdown-width{
+  width: 30vw !important; 
+}
+
+
+
+/** 
+=====================================================================
+    input file related heights defined here
+=====================================================================
+**/
+.el-input-file-min-height {
+  min-height: 2.25rem !important;
+}
+
+.el-input-file-height {
+  height: 2.25rem !important;
+}
+
+.el-input-file-max-height {
+  height: 2.25rem !important;
+}
+
+
+
+
+
+
+
 .o2-secondary-button {
   background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
 
@@ -1181,19 +1253,20 @@ body {
 
 .q-input {
   min-height: 2.25rem;
+  @extend .el-input-min-height;
   font-size: 0.813rem;
   .q-field__control {
     @extend .el-border;
     @extend .el-border-radius;
-    min-height: 2.25rem;
-    max-height: 2.25rem;
+    @extend .el-input-min-height;
+    @extend .el-input-max-height;
     background-color: transparent;
     line-height: 1.5rem;
     padding: 0rem 0.75rem !important;
   }
   .q-field__control-container{
       .q-field__native{
-      height: 2.25rem  !important;
+       @extend .el-input-height;
     }
   }
   &:hover .q-field__control {
@@ -1208,13 +1281,13 @@ body {
    ============================================================================ */
 
 .q-select {
-  min-height: 2.25rem;
+  @extend .el-input-min-height;
   font-size: 0.813rem;
   .q-field__control {
     @extend .el-border;
     @extend .el-border-radius;
-    min-height: 2.25rem;
-    max-height: 2.25rem;
+    @extend .el-input-min-height;
+    @extend .el-input-max-height;
     background-color: transparent;
     line-height: 1.5rem;
     padding: 0rem 0.75rem !important;
@@ -1244,7 +1317,7 @@ body {
  */
 
  .o2-side-dialog {
-  width: 30vw !important; 
+  @extend .el-side-dropdown-width;
  }
 
 
@@ -1259,5 +1332,24 @@ body {
 }
 
 
+/* ============================================================================
+   resuable file input in the app
+   ============================================================================
+ */
+
+.o2-file-input {
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    @extend .el-input-file-min-height;
+    @extend .el-input-file-max-height;
+    background-color: transparent;
+    line-height: 1.5rem;
+    padding: 0rem 0.75rem !important;
+  }
+  &:hover .q-field__control {
+    border-color: var(--border-color-hover) !important;
+  }
+}
 
 
