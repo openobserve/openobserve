@@ -394,6 +394,13 @@ body {
 //   --q-dark-page: #181a1b;
 // }
 
+body.desktop .q-focus-helper:before,
+body.desktop .q-focusable:focus > .q-focus-helper, 
+body.desktop .q-manual-focusable--focused > .q-focus-helper, 
+body.desktop .q-hoverable:hover > .q-focus-helper{
+  background: transparent !important;
+}
+
 .q-layout__section--marginal {
   background: transparent;
 }
