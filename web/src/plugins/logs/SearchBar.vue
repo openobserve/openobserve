@@ -763,6 +763,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item>
               <q-separator />
               <q-item
+                v-if="searchObj.meta.sqlMode"
+                data-test="logs-search-bar-explain-query-menu-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                :disable="!searchObj.data.query || searchObj.data.query.trim() === ''"
+                @click="openExplainDialog"
+              >
+                <q-item-section v-close-popup>
+                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                    <q-icon name="lightbulb" size="20px" />
+                    {{ t("search.explainQuery") }}</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+              <q-separator v-if="searchObj.meta.sqlMode" />
+              <q-item
                 v-if="config.isEnterprise == 'true'"
                 data-test="search-scheduler-create-new-btn"
                 class="q-pa-sm saved-view-item"

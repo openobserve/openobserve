@@ -188,7 +188,14 @@
     "errorRunningAnalyze": "Error running analyze",
     "noLogicalPlan": "No logical plan available",
     "noLogicalPlanAnalyze": "EXPLAIN ANALYZE only shows physical execution plan with metrics",
-    "noPhysicalPlan": "No physical plan available"
+    "noPhysicalPlan": "No physical plan available",
+    "executionSummary": "Execution Summary",
+    "logicalPlan": "Logical Plan",
+    "physicalPlan": "Physical Plan",
+    "totalTime": "Total Time",
+    "totalRows": "Total Rows",
+    "peakMemory": "Peak Memory",
+    "operatorCount": "Operators"
   },
   "menu": {
     "home": "Home",
