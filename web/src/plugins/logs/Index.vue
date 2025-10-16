@@ -2666,7 +2666,6 @@ export default defineComponent({
   max-height: calc(100vh - $navbarHeight) !important;
   overflow: hidden !important;
 
-
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
   .q-field__input,
