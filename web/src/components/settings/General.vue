@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div :class="store.state.theme == 'dark' ? 'dark-settings-theme' : 'light-settings-theme'">
-    <div class="q-px-md q-py-md">
+    <div class="q-px-md q-py-md tw-mt-2">
       <div class="general-page-title">
         {{ t("settings.generalPageTitle") }}
       </div>

@@ -16,11 +16,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="management-page">
+  <q-page class="management-page spitter-container">
     <div class="head q-table__title q-mx-md q-py-sm">
       {{ t("settings.header") }}
     </div>
     <q-separator class="separator" />
+    <q-btn
+      data-test="logs-search-field-list-collapse-btn-management"
+      :icon="showManagementTabs ? 'chevron_left' : 'chevron_right'"
+      :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
+      dense
+      size="12px"
+      round
+      class="q-mr-xs field-list-collapse-btn tw-absolute tw-top-0 tw-z-[10000]"
+      color="primary"
+      :style="{
+        left: showManagementTabs ? splitterModel - 14 + 'px' : '-8px',
+        top: '57px',
+      }"
+      @click="controlManagementTabs"
+    />
       <q-splitter
       class="management_splitter"
       v-model="splitterModel"
@@ -28,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       unit="px"
       style="min-height: calc(100vh - 104px); overflow: hidden;"
     >
-      <template style="background-color: red;" v-slot:before>
+      <template v-slot:before>
         
         <div class="absolute-position full-height" >
           <q-tabs
@@ -183,25 +198,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:after>
-        <div
-      style="position: absolute;  top: -5px; left: -16px; z-index: 1200; "
-    >
-      <!-- Place the content you want in the middle here -->
-      <q-btn
-        data-test="logs-search-field-list-collapse-btn-management"
-        :icon="showManagementTabs ? 'chevron_left' : 'chevron_right'"
-        :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
-        dense
-        size="20px"
-        round
-        class="field-list-collapse-btn-management "
-        :style="{
-                      right: showManagementTabs ? '0px' : '-4px',
-                    }"
-        color="primary"
-        @click="controlManagementTabs"
-      ></q-btn>
-    </div>
         <router-view title=""> </router-view>
       </template>
     </q-splitter>
@@ -336,43 +332,5 @@ export default defineComponent({
       z-index: auto;
     }
   }
-
 }
-
-
-.q-tabs {
-
-
-  &--vertical {
-    margin: 1.5rem 1rem 0 1rem;
-    .q-tab {
-      justify-content: flex-start;
-      padding: 0 0.6rem 0 0.6rem;
-      border-radius: 0.5rem;
-      margin-bottom: 0.5rem;
-      text-transform: capitalize;
-
-      &__content.tab_content {
-        .q-tab {
-          &__icon + &__label {
-            padding-left: 0.875rem;
-            font-weight: 600;
-          }
-        }
-      }
-      &--active {
-        color: black;
-        background-color: $accent;
-      }
-    }
-  }
-}
-    .field-list-collapse-btn-management {
-      z-index: 90;
-      position: relative;
-      
-      top: 5px;
-      font-size: 12px !important;
-    }
-
 </style>
