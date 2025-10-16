@@ -113,12 +113,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <div
-      class="row"
-      v-if="searchObj.meta.showQuery"
-      style="border-top: 1px solid #dbdbdb"
-    >
-      <div class="col">
+    <div v-if="searchObj.meta.showQuery" class="row">
+      <div
+        class="col tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mx-[0.25rem] tw-mb-[0.25rem] tw-rounded-[0.325rem]"
+      >
         <code-query-editor
           ref="queryEditorRef"
           editor-id="traces-query-editor"
