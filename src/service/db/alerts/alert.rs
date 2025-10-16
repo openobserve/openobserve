@@ -103,7 +103,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                     Ok(job) => {
                         trigger.data = job.data;
                         trigger.start_time = job.start_time;
-                        match db::scheduler::update_trigger(trigger).await {
+                        match db::scheduler::update_trigger(trigger, false, "").await {
                             Ok(_) => Ok(alert),
                             Err(e) => {
                                 log::error!(
@@ -203,9 +203,11 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     {
         trigger.data = job.data;
         trigger.start_time = job.start_time;
-        let _ = db::scheduler::update_trigger(trigger).await.map_err(|e| {
-            log::error!("Failed to update trigger for alert {schedule_key}: {e}");
-        });
+        let _ = db::scheduler::update_trigger(trigger, false, "")
+            .await
+            .map_err(|e| {
+                log::error!("Failed to update trigger for alert {schedule_key}: {e}");
+            });
     } else {
         let _ = db::scheduler::push(trigger).await.map_err(|e| {
             log::error!("Failed to save trigger for alert {schedule_key}: {e}");

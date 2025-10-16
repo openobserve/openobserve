@@ -89,7 +89,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         ..Default::default()
     };
     if scheduler_exists {
-        db::scheduler::update_trigger(trigger)
+        db::scheduler::update_trigger(trigger, false, "")
             .await
             .inspect_err(|e| log::error!("Failed to update trigger: {e}"))?;
     } else {

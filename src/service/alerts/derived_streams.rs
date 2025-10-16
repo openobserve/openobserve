@@ -153,7 +153,7 @@ pub async fn save(
     {
         Ok(mut existing_trigger) => {
             existing_trigger.next_run_at = next_run_at;
-            db::scheduler::update_trigger(existing_trigger)
+            db::scheduler::update_trigger(existing_trigger, false, "")
                 .await
                 .map_err(|_| anyhow::anyhow!("Trigger already exists, but failed to update"))
         }

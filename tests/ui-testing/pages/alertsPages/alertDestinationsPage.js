@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { CommonActions } from '../commonActions';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class AlertDestinationsPage {
     constructor(page) {
@@ -79,7 +80,7 @@ export class AlertDestinationsPage {
             try {
                 await this.page.getByRole('cell', { name: destinationName }).waitFor({ timeout: 2000 });
                 destinationFound = true;
-                console.log('Found destination:', destinationName);
+                testLogger.info('Found destination', { destinationName });
             } catch (error) {
                 // Check if there's a next page button and if it's enabled
                 const nextPageButton = this.page.getByRole('button').filter({ hasText: 'chevron_right' }).first();
@@ -111,9 +112,9 @@ export class AlertDestinationsPage {
         if (!destinationFound) {
             // Destination not found, create new one
             await this.createDestination(destinationName, url, templateName);
-            console.log('Created new destination:', destinationName);
+            testLogger.info('Created new destination', { destinationName });
         } else {
-            console.log('Found existing destination:', destinationName);
+            testLogger.info('Found existing destination', { destinationName });
         }
         
         return destinationName;

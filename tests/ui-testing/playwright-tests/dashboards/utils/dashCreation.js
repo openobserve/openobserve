@@ -41,14 +41,27 @@ export async function deleteDashboard(page, dashboardName) {
   testLogger.info('Deleting dashboard', { dashboardName });
 
   // Wait for page to be fully loaded
-  await page.waitForLoadState('networkidle');
-  await page.waitForTimeout(5000);
+// ✅ Wait for either the Dashboard API or Folder API (whichever comes first)
+  await Promise.race([
+    page.waitForResponse(
+      (response) => {
+        const url = response.url();
+        return (
+          ( /\/api\/.*\/dashboards/.test(url) ||
+            /\/api\/.*\/folders/.test(url) ) &&
+          response.status() === 200
+        );
+      },
+      { timeout: 20000 }
+    ),
+    page.waitForSelector('[data-test="dashboard-table"]', { timeout: 20000 }),
+  ]);
 
   // const dashboardRow = page.locator(`//tr[.//td[text()="${dashboardName}"]]`);
   // await expect(dashboardRow).toBeVisible(); // Ensure the row is visible
   const dashboardRow = page
-    .locator('//tr[.//div[@title="' + dashboardName + '"]]')
-    .nth(0);
+  .locator('//tr[.//div[@title="' + dashboardName + '"]]')
+  .nth(0);
 
   const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
   await deleteButton.click();
@@ -59,5 +72,5 @@ export async function deleteDashboard(page, dashboardName) {
   await confirmButton.click();
 
   // Ensure the dashboard is removed
-  await expect(page.getByText("Dashboard deleted successfully").first()).toBeVisible();
+  await expect(page.getByText("Dashboard deleted successfully")).toBeVisible();
 }

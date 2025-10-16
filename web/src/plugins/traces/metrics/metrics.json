@@ -78,7 +78,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "WITH base_traces AS ( SELECT min(_timestamp) AS _time, max(duration) AS max_duration, count(distinct(trace_id)) as rate, SUM(CASE WHEN span_status='ERROR' then 1 else 0 end) as error FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY trace_id ) SELECT histogram(_time) AS time_bucket, max(max_duration) AS max_trace_duration, sum(rate) AS max_rate, max(error) AS error_rate FROM base_traces GROUP BY time_bucket [HAVING] ORDER BY time_bucket ASC",
+              "query": "WITH base_traces AS ( SELECT min(_timestamp) AS _time, max(duration) AS max_duration, count(distinct(trace_id)) as rate, SUM(CASE WHEN span_status='ERROR' then 1 else 0 end) as error FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY trace_id ) SELECT histogram(_time) AS time_bucket, max(max_duration) AS max_trace_duration, sum(rate) AS max_rate, max(error) AS error_rate FROM base_traces GROUP BY time_bucket ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -202,7 +202,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "WITH base_traces AS ( SELECT min(_timestamp) AS _time, max(duration) AS max_duration, count(distinct(trace_id)) as rate, SUM(CASE WHEN span_status='ERROR' then 1 else 0 end) as error FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY trace_id ) SELECT histogram(_time) AS time_bucket, max(max_duration) AS max_trace_duration, sum(rate) AS max_rate, max(error) AS error_rate FROM base_traces GROUP BY time_bucket [HAVING] ORDER BY time_bucket ASC",
+              "query": "WITH base_traces AS ( SELECT min(_timestamp) AS _time, max(duration) AS max_duration, count(distinct(trace_id)) as rate, SUM(CASE WHEN span_status='ERROR' then 1 else 0 end) as error FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY trace_id ) SELECT histogram(_time) AS time_bucket, max(max_duration) AS max_trace_duration, sum(rate) AS max_rate, max(error) AS error_rate FROM base_traces GROUP BY time_bucket ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -327,7 +327,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "WITH base_traces AS ( SELECT min(_timestamp) AS _time, max(duration) AS max_duration, count(distinct(trace_id)) as rate, SUM(CASE WHEN span_status='ERROR' then 1 else 0 end) as error FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY trace_id ) SELECT histogram(_time) AS time_bucket, max(max_duration) AS max_trace_duration, sum(rate) AS max_rate, max(error) AS error_rate FROM base_traces GROUP BY time_bucket [HAVING] ORDER BY time_bucket ASC",
+              "query": "WITH base_traces AS ( SELECT min(_timestamp) AS _time, max(duration) AS max_duration, count(distinct(trace_id)) as rate, SUM(CASE WHEN span_status='ERROR' then 1 else 0 end) as error FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY trace_id ) SELECT histogram(_time) AS time_bucket, max(max_duration) AS max_trace_duration, sum(rate) AS max_rate, max(error) AS error_rate FROM base_traces GROUP BY time_bucket ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {

@@ -222,8 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openDrilldown(index)"
             style="cursor: pointer; display: flex; align-items: center"
           >
-            <q-icon class="q-mr-xs q-mt-xs"
-size="16px" name="link" />
+            <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
             <span>{{ drilldown.name }}</span>
           </div>
         </div>
@@ -1309,7 +1308,7 @@ export default defineComponent({
 
     // get interval from resultMetaData if it exists
     const interval = computed(
-      () => resultMetaData?.value?.[0]?.histogram_interval,
+      () => resultMetaData?.value?.[0]?.[0]?.histogram_interval,
     );
 
     // get interval in micro seconds
