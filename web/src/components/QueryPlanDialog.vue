@@ -169,8 +169,9 @@ export default defineComponent({
       }
 
       // Parse hits to extract logical and physical plans
+      // Check both plan_type (EXPLAIN) and phase (EXPLAIN ANALYZE)
       responseData.hits.forEach((hit: any) => {
-        const planType = hit.plan_type || hit._source?.plan_type;
+        const planType = hit.plan_type || hit.phase || hit._source?.plan_type || hit._source?.phase;
         const planContent = hit.plan || hit._source?.plan || "";
 
         if (planType === "logical_plan") {
