@@ -19,8 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row q-py-xs">
       <div class="float-right col flex items-center">
         <div
-          style="border: 1px solid #c4c4c4; border-radius: 5px"
-          class="q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center"
+          class="q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center tw-border-solid tw-border tw-border-[var(--o2-border-color)] tw-rounded-[0.4rem]"
         >
           <q-toggle
             data-test="traces-search-bar-show-metrics-toggle-btn"
