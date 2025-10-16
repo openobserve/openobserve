@@ -543,6 +543,11 @@ body {
       border-bottom: 1px solid var(--o2-border-color) !important;
     }
   }
+  tr{
+    td{
+      border-bottom: 1px solid var(--o2-border-color) !important;
+    }
+  }
 }
 
 .o2-quasar-table{
