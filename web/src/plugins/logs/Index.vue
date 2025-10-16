@@ -427,7 +427,7 @@ size="md" />
                     >
                       <h6
                         data-test="logs-search-no-stream-selected-text"
-                        class="text-center col-10 q-mx-none"
+                        class="text-center col-10 q-mx-none !tw-mt-none"
                       >
                         <q-icon name="info" color="primary"
 size="md" /> Select
