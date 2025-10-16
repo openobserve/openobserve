@@ -1109,6 +1109,12 @@ pub struct Common {
     pub metrics_cache_enabled: bool,
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
+    #[env_config(
+        name = "ZO_REGEX_PATTERNS_SOURCE_URL",
+        default = "https://raw.githubusercontent.com/bee-san/pyWhat/main/pywhat/Data/regex.json",
+        help = "URL for built-in regex patterns JSON source. Can be customized to use different pattern libraries."
+    )]
+    pub regex_patterns_source_url: String,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
     #[env_config(name = "ZO_ES_VERSION", default = "")]

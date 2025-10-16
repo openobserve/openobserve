@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             flat
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            @click="importJson"
+            @click="handleImportClick"
             data-test="regex-pattern-import-json-btn"
           />
         </div>
@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
       <div class="flex" style="width: 100%">
         <q-splitter
+          v-if="activeTab !== 'import_built_in_patterns'"
           class="logs-search-splitter"
           no-scroll
           v-model="splitterModel"
@@ -165,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-form>
             </div>
           </template>
-  
+
           <template #after>
             <div
               data-test="regex-pattern-import-output-editor"
@@ -297,6 +298,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </q-splitter>
+
+        <!-- Built-in Patterns Tab (full width, no splitter) -->
+        <div
+          v-if="activeTab === 'import_built_in_patterns'"
+          class="editor-container-built-in"
+        >
+          <built-in-patterns-tab
+            ref="builtInPatternsTabRef"
+            @import-patterns="handleBuiltInPatternsImport"
+            data-test="built-in-patterns-tab"
+          />
+        </div>
       </div>
     </div>
   </template>
@@ -339,18 +352,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
       const jsonStr: any = ref("");
       const q = useQuasar();
-  
+
       const regexPatternErrorsToDisplay = ref<any[]>([]);
-  
+
       const queryEditorPlaceholderFlag = ref(true);
       const jsonFiles = ref(null);
       const url = ref("");
       const jsonArrayOfObj = ref<any[]>([{}]);
-      const activeTab = ref("import_json_file");
+      const activeTab = ref("import_built_in_patterns");
       const splitterModel = ref(60);
       const userSelectedRegexPatternName = ref([]);
       const userSelectedRegexPattern = ref([]);
       const regexPatternCreators = ref<any[]>([]);
+      const builtInPatternsTabRef = ref<any>(null);
   
       // Create a Set for O(1) lookups
       const existingPatternNames = ref(new Set());
@@ -452,6 +466,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
       const tabs = reactive([
         {
+          label: "Built-in Patterns",
+          value: "import_built_in_patterns",
+        },
+        {
           label: "File Upload / JSON",
           value: "import_json_file",
         },
@@ -495,44 +513,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         const totalCount = jsonArrayOfObj.value.length;
         for (let index = 0; index < jsonArrayOfObj.value.length; index++) {
           const jsonObj = jsonArrayOfObj.value[index];
-          const success = await processJsonObject(jsonObj, index + 1);
-          if (!success) {
+          const result = await processJsonObject(jsonObj, index + 1);
+          if (!result) {
             hasErrors = true;
           } else {
             successCount++;
           }
         }
-  
-        // Only redirect and show success message if ALL regex patterns were imported successfully
-        if (successCount === totalCount) {
+
+        // Show success message if patterns were imported
+        if (successCount > 0) {
+          const message = `Successfully imported ${successCount} pattern(s)`;
+
           q.notify({
-            message: `Successfully imported regex-pattern(s)`,
+            message: message,
             color: "positive",
             position: "bottom",
-            timeout: 2000,
+            timeout: 3000,
           });
-          emit("update:list");
 
-          router.push({
-            name: "regexPatterns",
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          });
-          emit("cancel:hideform");
+          if (successCount > 0) {
+            emit("update:list");
+            router.push({
+              name: "regexPatterns",
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            });
+            emit("cancel:hideform");
+          }
         }
       };
   
       const processJsonObject = async (jsonObj: any, index: number) => {
         try {
-          const isValidRegexPattern = await validateRegexPatternInputs(
+          const validationResult = await validateRegexPatternInputs(
             jsonObj,
             index,
           );
-          if (!isValidRegexPattern) {
-            return false;
+          if (!validationResult) {
+            return false;  // Validation error
           }
-  
+
           if (regexPatternErrorsToDisplay.value.length === 0) {
             const hasCreatedRegexPattern = await createRegexPattern(jsonObj, index);
             return hasCreatedRegexPattern;
@@ -557,15 +579,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }]);
           return false;
         }
-        // Check if name already exists - O(1) lookup
-        if(existingPatternNames.value.has(jsonObj.name.trim())) {
-          regexPatternErrorsToDisplay.value.push([{
-            field: 'regex_pattern_name',
-            message: `Regex pattern - ${index}: with this name already exists`
-          }]);
-
-          return false;
-        }
+        // Note: Backend will handle duplicate names by appending a suffix like "(2)", "(3)", etc.
+        // This allows importing patterns with same names while keeping database unique constraint
         if(!jsonObj.pattern || !jsonObj.pattern.trim() || typeof jsonObj.pattern !== 'string'){
           regexPatternErrorsToDisplay.value.push([{
             field: 'regex_pattern',
@@ -587,10 +602,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 pattern: jsonObj.pattern,
                 description: jsonObj.description,
             }
-            await regexPatternsService.create(store.state.selectedOrganization.identifier, payload);
+            const response = await regexPatternsService.create(store.state.selectedOrganization.identifier, payload);
+
+            // Check if backend returned a message about duplicate name
+            const backendMessage = response?.data?.message || '';
+            const isDuplicate = backendMessage.includes('already exists');
+
+            const message = isDuplicate
+                ? `Regex pattern - ${index}: ${backendMessage}`
+                : `Regex pattern - ${index}: "${jsonObj.name}" created successfully \nNote: please remove the created regex pattern object ${jsonObj.name} from the json file`;
+
             regexPatternCreators.value.push({
                 success: true,
-                message: `Regex pattern - ${index}: "${jsonObj.name}" created successfully \nNote: please remove the created regex pattern object ${jsonObj.name} from the json file`,
+                message: message,
             });
             return true;
         } catch (error: any) {
@@ -615,7 +639,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const onSubmit = (e: any) => {
         e.preventDefault();
       };
-  
+
+      const handleBuiltInPatternsImport = async (patternsToImport: any[]) => {
+        // Set the patterns to the existing import flow
+        jsonArrayOfObj.value = patternsToImport;
+        jsonStr.value = JSON.stringify(patternsToImport, null, 2);
+
+        // Call the existing import function
+        await importJson();
+      };
+
+      const handleImportClick = async () => {
+        if (activeTab.value === 'import_built_in_patterns') {
+          // For built-in patterns tab, trigger import from the child component
+          if (builtInPatternsTabRef.value) {
+            builtInPatternsTabRef.value.importSelectedPatterns();
+          }
+        } else {
+          // For other tabs (file/url), use the existing import function
+          await importJson();
+        }
+      };
+
       return {
         store,
         t,
@@ -643,6 +688,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         processJsonObject,
         validateRegexPatternInputs,
         createRegexPattern,
+        handleBuiltInPatternsImport,
+        handleImportClick,
+        builtInPatternsTabRef,
       };
     },
     components: {
@@ -650,6 +698,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       () => import("@/components/CodeQueryEditor.vue"),
     ),
       AppTabs,
+      BuiltInPatternsTab: defineAsyncComponent(
+      () => import("@/components/settings/BuiltInPatternsTab.vue"),
+    ),
     },
   });
   </script>
@@ -668,6 +719,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   }
   .editor-container {
     height: calc(70vh - 20px) !important;
+  }
+  .editor-container-built-in {
+    width: 100%;
+    height: calc(100vh - 220px); /* Account for header, tabs, and padding */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
   .editor-container-url {
     .monaco-editor {
