@@ -16,28 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="management-page spitter-container">
-    <div class="head q-table__title q-mx-md q-py-sm">
+  <q-page class="">
+    <div class="head q-table__title tw-mx-2 tw-mb-2 tw-px-2 q-py-sm o2-management-header">
       {{ t("settings.header") }}
     </div>
-    <q-separator class="separator" />
-    <q-btn
-      data-test="logs-search-field-list-collapse-btn-management"
-      :icon="showManagementTabs ? 'chevron_left' : 'chevron_right'"
-      :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
-      dense
-      size="12px"
-      round
-      class="q-mr-xs field-list-collapse-btn tw-absolute tw-top-0 tw-z-[10000]"
-      color="primary"
-      :style="{
-        left: showManagementTabs ? splitterModel - 14 + 'px' : '-8px',
-        top: '57px',
-      }"
-      @click="controlManagementTabs"
-    />
       <q-splitter
-      class="management_splitter"
+      class="logs-splitter-smooth tw-overflow-hidden"
       v-model="splitterModel"
       :limits="[0, 400]"
       unit="px"
@@ -45,160 +29,181 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:before>
         
-        <div class="absolute-position full-height" >
-          <q-tabs
-          class="management-tabs"
-          v-if="showManagementTabs"
-          v-model="settingsTab"
-          indicator-color="transparent"
-          inline-label
-          vertical
-        >
-          <q-route-tab
-            default
-            name="queryManagement"
-            :to="`/settings/query_management?org_identifier=${store.state.selectedOrganization?.identifier}`"
-            icon="query_stats"
-            :label="t('settings.queryManagement')"
-            content-class="tab_content"
-            v-if="isMetaOrg"
-          />
-          <q-route-tab
-            v-if="config.isEnterprise == 'true' && isMetaOrg"
-            data-test="nodes-tab"
-            name="nodes"
-            :to="{
-              name: 'nodes',
-              query: {
-                org_identifier: store.state.selectedOrganization?.identifier,
-              },
-            }"
-            icon="hub"
-            :label="t('settings.nodes')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="general"
-            :to="`/settings/general?org_identifier=${store.state.selectedOrganization?.identifier}`"
-            :icon="outlinedSettings"
-            :label="t('settings.generalLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="organization"
-            :to="`/settings/organization?org_identifier=${store.state.selectedOrganization?.identifier}`"
-            icon="business"
-            :label="t('settings.orgLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            v-if="config.isEnterprise == 'true' && isMetaOrg"
-            data-test="domain-management-tab"
-            name="domain_management"
-            :to="{
-              name: 'domainManagement',
-              query: {
-                org_identifier: store.state.selectedOrganization?.identifier,
-              },
-            }"
-            icon="domain"
-            :label="t('settings.ssoDomainRestrictions')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            data-test="alert-destinations-tab"
-            name="alert_destinations"
-            :to="{
-              name: 'alertDestinations',
-              query: {
-                org_identifier: store.state.selectedOrganization?.identifier,
-              },
-            }"
-            icon="location_on"
-            :label="t('alert_destinations.header')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            v-if="config.isEnterprise == 'true'"
-            data-test="pipeline-destinations-tab"
-            name="pipeline_destinations"
-            :to="{
-              name: 'pipelineDestinations',
-              query: {
-                org_identifier: store.state.selectedOrganization?.identifier,
-              },
-            }"
-            icon="person_pin_circle"
-            :label="t('pipeline_destinations.header')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            data-test="alert-templates-tab"
-            name="templates"
-            :to="{
-              name: 'alertTemplates',
-              query: {
-                org_identifier: store.state.selectedOrganization?.identifier,
-              },
-            }"
-            icon="description"
-            :label="t('alert_templates.header')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            v-if="config.isEnterprise == 'true'"
-            data-test="management-cipher-key-tab"
-            name="cipher-keys"
-            :to="{
-              name: 'cipherKeys',
-              query: {
-                org_identifier: store.state.selectedOrganization?.identifier,
-              },
-            }"
-            icon="key"
-            :label="t('settings.cipherKeys')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            v-if="config.isCloud == 'true' && isMetaOrg"
-            data-test="organization-management-tab"
-            name="organization_management"
-            :to="{
-              name: 'orgnizationManagement',
-              query: {
-                org_identifier: store.state.selectedOrganization?.identifier,
-              },
-            }"
-            icon="lan"
-            :label="t('settings.organizationManagement')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            v-if="config.isEnterprise == 'true'"
-            data-test="regex-patterns-tab"
-            name="regex_patterns"
-            :to="{
-              name: 'regexPatterns',
-              query: {
-                org_identifier: store.state.selectedOrganization?.identifier,
-              },
-            }"
-            content-class="tab_content"
-          >
-          <div class="tw-flex tw-items-center tw-w-full">
-            <img :src="regexIcon" alt="regex" style="width: 24px; height: 24px;" />
-            <span class="tw-text-sm tw-font-medium tw-ml-2"
-            :class="store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns'   ? 'tw-text-white' : 'tw-text-black'"
-            >{{ t('regex_patterns.title') }}</span>
+        <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+          <div v-if="showManagementTabs" class="o2-container-navbarheight card-container">
+            <q-tabs
+              class="management-tabs"
+              v-model="settingsTab"
+              indicator-color="transparent"
+              inline-label
+              vertical
+            >
+            <q-route-tab
+              default
+              name="queryManagement"
+              :to="`/settings/query_management?org_identifier=${store.state.selectedOrganization?.identifier}`"
+              icon="query_stats"
+              :label="t('settings.queryManagement')"
+              content-class="tab_content"
+              v-if="isMetaOrg"
+            />
+            <q-route-tab
+              v-if="config.isEnterprise == 'true' && isMetaOrg"
+              data-test="nodes-tab"
+              name="nodes"
+              :to="{
+                name: 'nodes',
+                query: {
+                  org_identifier: store.state.selectedOrganization?.identifier,
+                },
+              }"
+              icon="hub"
+              :label="t('settings.nodes')"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="general"
+              :to="`/settings/general?org_identifier=${store.state.selectedOrganization?.identifier}`"
+              :icon="outlinedSettings"
+              :label="t('settings.generalLabel')"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="organization"
+              :to="`/settings/organization?org_identifier=${store.state.selectedOrganization?.identifier}`"
+              icon="business"
+              :label="t('settings.orgLabel')"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              v-if="config.isEnterprise == 'true' && isMetaOrg"
+              data-test="domain-management-tab"
+              name="domain_management"
+              :to="{
+                name: 'domainManagement',
+                query: {
+                  org_identifier: store.state.selectedOrganization?.identifier,
+                },
+              }"
+              icon="domain"
+              :label="t('settings.ssoDomainRestrictions')"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              data-test="alert-destinations-tab"
+              name="alert_destinations"
+              :to="{
+                name: 'alertDestinations',
+                query: {
+                  org_identifier: store.state.selectedOrganization?.identifier,
+                },
+              }"
+              icon="location_on"
+              :label="t('alert_destinations.header')"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              v-if="config.isEnterprise == 'true'"
+              data-test="pipeline-destinations-tab"
+              name="pipeline_destinations"
+              :to="{
+                name: 'pipelineDestinations',
+                query: {
+                  org_identifier: store.state.selectedOrganization?.identifier,
+                },
+              }"
+              icon="person_pin_circle"
+              :label="t('pipeline_destinations.header')"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              data-test="alert-templates-tab"
+              name="templates"
+              :to="{
+                name: 'alertTemplates',
+                query: {
+                  org_identifier: store.state.selectedOrganization?.identifier,
+                },
+              }"
+              icon="description"
+              :label="t('alert_templates.header')"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              v-if="config.isEnterprise == 'true'"
+              data-test="management-cipher-key-tab"
+              name="cipher-keys"
+              :to="{
+                name: 'cipherKeys',
+                query: {
+                  org_identifier: store.state.selectedOrganization?.identifier,
+                },
+              }"
+              icon="key"
+              :label="t('settings.cipherKeys')"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              v-if="config.isCloud == 'true' && isMetaOrg"
+              data-test="organization-management-tab"
+              name="organization_management"
+              :to="{
+                name: 'orgnizationManagement',
+                query: {
+                  org_identifier: store.state.selectedOrganization?.identifier,
+                },
+              }"
+              icon="lan"
+              :label="t('settings.organizationManagement')"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              v-if="config.isEnterprise == 'true'"
+              data-test="regex-patterns-tab"
+              name="regex_patterns"
+              :to="{
+                name: 'regexPatterns',
+                query: {
+                  org_identifier: store.state.selectedOrganization?.identifier,
+                },
+              }"
+              content-class="tab_content"
+            >
+            <div class="tw-flex tw-items-center tw-w-full">
+              <img :src="regexIcon" alt="regex" style="width: 24px; height: 24px;" />
+              <span class="tw-text-sm tw-font-medium tw-ml-2"
+              :class="store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns'   ? 'tw-text-white' : 'tw-text-black'"
+              >{{ t('regex_patterns.title') }}</span>
+            </div>
+          </q-route-tab>
+            </q-tabs>
           </div>
-        </q-route-tab>
-        </q-tabs>
-
+              <q-btn
+            data-test="logs-search-field-list-collapse-btn-management"
+            icon="drag_indicator"
+            :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
+            dense
+            flat
+            :class="[
+                'splitter-section-collapse-btn',
+                showManagementTabs
+                  ? 'splitter-section-collapse-btn--visible'
+                  : 'splitter-section-collapse-btn--hidden',
+              ]"
+            color="primary"
+            @click="controlManagementTabs"
+          />
         </div>
       </template>
 
       <template v-slot:after>
-        <router-view title=""> </router-view>
+        <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+            <div
+              class="o2-container-navbarheight card-container"
+            >
+             <router-view title=""> </router-view>
+          </div>
+          </div>
       </template>
     </q-splitter>
 
@@ -233,7 +238,7 @@ export default defineComponent({
     const router: any = useRouter();
     const settingsTab = ref("general");
     const { isMetaOrg } = useIsMetaOrg();
-    const splitterModel = ref(220);
+    const splitterModel = ref(250);
     const storePreviousStoreModel  = ref(250);
 
     const handleSettingsRouting = () => {
@@ -320,17 +325,4 @@ export default defineComponent({
 });
 </script>
 <style lang="scss">
-.management-page{
-  .management_splitter {
-    .q-splitter__before {
-      overflow: visible !important ;
-    }
-    .q-splitter__after {
-      overflow: visible !important ;
-    }
-    .q-splitter__panel{
-      z-index: auto;
-    }
-  }
-}
 </style>
