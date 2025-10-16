@@ -601,8 +601,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ai::prompt::get_prompt)
         .service(ai::prompt::update_prompt)
         .service(ai::prompt::rollback_prompt)
-        .service(re_pattern::get_built_in_patterns)  // Must be before ::get to match /built-in before /{id}
-        .service(re_pattern::test) 
+        .service(re_pattern::get_built_in_patterns)
+        .service(re_pattern::test)
         .service(re_pattern::list)
         .service(re_pattern::save)
         .service(re_pattern::update)
