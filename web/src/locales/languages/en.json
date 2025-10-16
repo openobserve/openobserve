@@ -187,6 +187,7 @@
     "errorFetchingPlan": "Error fetching query plan",
     "errorRunningAnalyze": "Error running analyze",
     "noLogicalPlan": "No logical plan available",
+    "noLogicalPlanAnalyze": "EXPLAIN ANALYZE only shows physical execution plan with metrics",
     "noPhysicalPlan": "No physical plan available"
   },
   "menu": {

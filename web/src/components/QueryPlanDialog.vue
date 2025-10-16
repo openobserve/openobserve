@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="plan-scroll-area">
                   <pre v-if="logicalPlan" class="plan-text">{{ logicalPlan }}</pre>
                   <div v-else class="q-pa-md text-grey-6">
-                    {{ t("search.noLogicalPlan") }}
+                    {{ showAnalyzeResults ? t("search.noLogicalPlanAnalyze") : t("search.noLogicalPlan") }}
                   </div>
                 </div>
               </q-tab-panel>
@@ -157,9 +157,9 @@ export default defineComponent({
       set: (val) => emit("update:modelValue", val),
     });
 
-    const parsePlans = (responseData: any) => {
-      // DataFusion returns plans in hits array with plan_type field
-      // Response format: { hits: [{ plan_type: "logical_plan", plan: "..." }, { plan_type: "physical_plan", plan: "..." }] }
+    const parsePlans = (responseData: any, isAnalyze: boolean = false) => {
+      // EXPLAIN returns: { hits: [{ plan_type: "logical_plan", plan: "..." }, { plan_type: "physical_plan", plan: "..." }] }
+      // EXPLAIN ANALYZE returns: { hits: [{ phase: 0, plan: "..." }, { phase: 1, plan: "..." }] }
 
       logicalPlan.value = "";
       physicalPlan.value = "";
@@ -168,32 +168,46 @@ export default defineComponent({
         return;
       }
 
-      // Parse hits to extract logical and physical plans
-      // Check both plan_type (EXPLAIN) and phase (EXPLAIN ANALYZE)
-      responseData.hits.forEach((hit: any) => {
-        const planType = hit.plan_type || hit.phase || hit._source?.plan_type || hit._source?.phase;
-        const planContent = hit.plan || hit._source?.plan || "";
+      if (isAnalyze) {
+        // For EXPLAIN ANALYZE: phase is numeric, combine all phases into physical plan
+        const allPlans = responseData.hits
+          .sort((a: any, b: any) => (a.phase || 0) - (b.phase || 0))
+          .map((hit: any) => hit.plan || "")
+          .filter((plan: string) => plan.trim() !== "")
+          .join("\n\n");
 
-        if (planType === "logical_plan") {
-          logicalPlan.value = formatQueryPlan(planContent);
-        } else if (planType === "physical_plan") {
-          physicalPlan.value = formatQueryPlan(planContent);
+        if (allPlans) {
+          physicalPlan.value = formatQueryPlan(allPlans);
+          // For analyze, we show the execution plan in physical tab
+          logicalPlan.value = ""; // No logical plan in EXPLAIN ANALYZE
         }
-      });
+      } else {
+        // For EXPLAIN: plan_type is string
+        responseData.hits.forEach((hit: any) => {
+          const planType = hit.plan_type || hit._source?.plan_type;
+          const planContent = hit.plan || hit._source?.plan || "";
 
-      // Fallback: if no plan_type, try to parse from combined text
-      if (!logicalPlan.value && !physicalPlan.value && responseData.hits.length > 0) {
-        const combined = responseData.hits.map((h: any) => h.plan || JSON.stringify(h)).join("\n");
+          if (planType === "logical_plan") {
+            logicalPlan.value = formatQueryPlan(planContent);
+          } else if (planType === "physical_plan") {
+            physicalPlan.value = formatQueryPlan(planContent);
+          }
+        });
 
-        // Try to split by plan_type markers
-        const logicalMatch = combined.match(/logical_plan[:\s]+(.+?)(?=physical_plan|$)/is);
-        const physicalMatch = combined.match(/physical_plan[:\s]+(.+?)$/is);
+        // Fallback: if no plan_type, try to parse from combined text
+        if (!logicalPlan.value && !physicalPlan.value && responseData.hits.length > 0) {
+          const combined = responseData.hits.map((h: any) => h.plan || JSON.stringify(h)).join("\n");
 
-        if (logicalMatch) {
-          logicalPlan.value = formatQueryPlan(logicalMatch[1].trim());
-        }
-        if (physicalMatch) {
-          physicalPlan.value = formatQueryPlan(physicalMatch[1].trim());
+          // Try to split by plan_type markers
+          const logicalMatch = combined.match(/logical_plan[:\s]+(.+?)(?=physical_plan|$)/is);
+          const physicalMatch = combined.match(/physical_plan[:\s]+(.+?)$/is);
+
+          if (logicalMatch) {
+            logicalPlan.value = formatQueryPlan(logicalMatch[1].trim());
+          }
+          if (physicalMatch) {
+            physicalPlan.value = formatQueryPlan(physicalMatch[1].trim());
+          }
         }
       }
     };
@@ -292,7 +306,7 @@ export default defineComponent({
 
         // Parse the response to extract logical and physical plans
         if (response.data) {
-          parsePlans(response.data);
+          parsePlans(response.data, false);
 
           // Check if we got at least one plan
           if (!logicalPlan.value && !physicalPlan.value) {
@@ -348,7 +362,7 @@ export default defineComponent({
 
         // Parse the response to extract logical and physical plans with metrics
         if (response.data) {
-          parsePlans(response.data);
+          parsePlans(response.data, true);
 
           // Extract metrics from the physical plan (which has execution stats)
           if (physicalPlan.value) {
@@ -357,7 +371,7 @@ export default defineComponent({
           }
 
           // Check if we got at least one plan
-          if (!logicalPlan.value && !physicalPlan.value) {
+          if (!physicalPlan.value) {
             error.value = t("search.noAnalyzePlanFound");
           }
         } else {
