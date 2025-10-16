@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="add-user-dialog column full-height ">
+  <q-card class="o2-side-dialog column full-height ">
     <q-card-section class="q-py-md tw-w-full">
       <div class="row items-center no-wrap q-py-sm">
         <div class="col">
@@ -604,8 +604,3 @@ export default defineComponent({
   },
 });
 </script>
-<style scoped lang="scss">
-.add-user-dialog {
-  width: 30vw;
-}
-</style>
