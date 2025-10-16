@@ -273,7 +273,7 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
   --o2-hover-accent: color-mix(in srgb, #{$theme-color} 30%, white);       // Hover state accent
   --o2-destructive-foreground: #{$o2-gray-100}; // Text on destructive buttons
   --o2-focus-ring: #{$o2-iris-1200};        // Focus state indicator
-  --hover-shadow: rgba(0, 0, 0, 0.3);
+  --o2-hover-shadow: #dddddd;
 
   --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
   --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
@@ -295,7 +295,7 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
   --o2-card-bg: rgba(255, 255, 255, 0.8);
 
   --o2-border-color: rgba(0, 0, 0, 0.12);
-  --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12)
+  --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
 
   --o2-menu-gradient-start: #{$menu-gradient-start};
   --o2-menu-gradient-end: #{$menu-gradient-end};
@@ -335,7 +335,7 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
   --o2-hover-accent: color-mix(in srgb, #{$theme-color} 50%, black);   // Hover accents
   --o2-destructive-foreground: #{$o2-dark-gray-100}; // Destructive text
   --o2-focus-ring: #{$o2-dark-iris-600};      // Focus indicators
-  --hover-shadow: rgba(0, 0, 0, 0.6);
+  --o2-hover-shadow: rgba(0, 0, 0, 0.6);
 
   --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
   --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
