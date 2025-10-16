@@ -151,7 +151,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <add-user
         v-if="config.isCloud == 'false'"
-        style="width: 35vw"
         v-model="selectedUser"
         :isUpdated="isUpdated"
         :userRole="currentUserRole"

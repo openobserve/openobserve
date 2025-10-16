@@ -58,13 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="existingUser && !beingUpdated"
             v-model="formData.email"
             :label="t('user.email') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-md showLabelOnTop"
+            class="showLabelOnTop"
             stack-label
-            outlined
-            filled
+            hide-bottom-space
             dense
+            borderless
             :rules="[
               (val: any, rules: any) =>
                 rules.email(val) || 'Please enter a valid email address',
@@ -399,7 +397,7 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18n();
     const { track } = useReo();
-    const $q = useQuasar();
+    const q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(true);
     const beingUpdated: any = ref(false);
@@ -446,7 +444,7 @@ export default defineComponent({
 
     return {
       t,
-      $q,
+      q,
       store,
       router,
       formData,
@@ -511,7 +509,7 @@ export default defineComponent({
       this.$router.push("/logout");
     },
     onSubmit() {
-      const dismiss = this.$q.notify({
+      const dismiss = this.q.notify({
         spinner: true,
         message: "Please wait...",
         timeout: 2000,
@@ -544,7 +542,7 @@ export default defineComponent({
             }
           })
           .catch((err: any) => {
-            this.$q.notify({
+            this.q.notify({
               color: "negative",
               message: err.response.data.message,
               timeout: 2000,
@@ -578,7 +576,7 @@ export default defineComponent({
             })
             .catch((err: any) => {
               if (err.response.data.code === 422) {
-                // this.$q.notify({
+                // this.q.notify({
                 //   color: "positive",
                 //   type: 'positive',
                 //   message: "User added successfully.",
@@ -586,7 +584,7 @@ export default defineComponent({
                 dismiss();
                 this.existingUser = false;
               } else {
-                this.$q.notify({
+                this.q.notify({
                   color: "negative",
                   message: err.response.data.message,
                   timeout: 2000,
@@ -607,7 +605,7 @@ export default defineComponent({
               this.$emit("updated", res.data, this.formData, "created");
             })
             .catch((err: any) => {
-              this.$q.notify({
+              this.q.notify({
                 color: "negative",
                 message: err.response.data.message,
                 timeout: 2000,

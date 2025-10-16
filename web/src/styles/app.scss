@@ -685,7 +685,7 @@ body {
     
     height: 36px;
     display: flex;
-    align-items: end;
+    align-items: center;
     font-size: 13px;
     padding: 0px 6px !important;
     font-weight: 500;
@@ -1138,4 +1138,33 @@ body {
 .q-splitter--vertical > .q-splitter__separator > div {
   left:0px;
   right: 0px;
+}
+
+
+
+/* ============================================================================
+   Input Section
+   Reusable Input Section across all pages with consistent borders and radius
+   ============================================================================ */
+
+.q-input {
+  min-height: 2.25rem;
+  font-size: 0.813rem;
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    min-height: 2.25rem;
+    max-height: 2.25rem;
+    background-color: transparent;
+    line-height: 1.5rem;
+    padding: 0rem 0.75rem !important;
+  }
+  .q-field__control-container{
+      .q-field__native{
+      height: 2.25rem  !important;
+    }
+  }
+  &:hover .q-field__control {
+    border-color: var(--border-color-hover) !important;
+  }
 }
