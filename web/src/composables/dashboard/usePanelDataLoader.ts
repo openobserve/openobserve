@@ -154,7 +154,7 @@ export const usePanelDataLoader = (
       queries: [] as any,
     },
     annotations: [] as any,
-    resultMetaData: [] as any,
+    resultMetaData: [] as any, // 2D array: [queryIndex][partitionIndex]
     lastTriggeredAt: null as any,
     isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],
@@ -392,14 +392,16 @@ export const usePanelDataLoader = (
     // is streaming aggs
     const streaming_aggs = searchRes?.content?.streaming_aggs ?? false;
 
+    // Initialize data array if not exists
+    if (!state.data[payload?.meta?.currentQueryIndex]) {
+      state.data[payload?.meta?.currentQueryIndex] = [];
+    }
+
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
-      // handle empty hits case
-      if (searchRes?.content?.results?.hits?.length > 0) {
-        state.data[payload?.meta?.currentQueryIndex] = [
-          ...(searchRes?.content?.results?.hits ?? {}),
-        ];
-      }
+      state.data[payload?.meta?.currentQueryIndex] = [
+        ...(searchRes?.content?.results?.hits ?? {}),
+      ];
     }
     // if order by is desc, append new partition response at end
     else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
@@ -415,9 +417,10 @@ export const usePanelDataLoader = (
       ];
     }
 
-    // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex] =
-      searchRes?.content?.results ?? {};
+    // Push metadata for each partition
+    state.resultMetaData[payload?.meta?.currentQueryIndex].push(
+      searchRes?.content?.results ?? {},
+    );
 
     // If we have data and loading is complete, set isPartialData to false
     if (
@@ -429,11 +432,19 @@ export const usePanelDataLoader = (
   };
 
   const handleStreamingHistogramMetadata = (payload: any, searchRes: any) => {
-    // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex] = {
+    // Use currentQueryIndex from payload meta
+    const currentQueryIndex = payload?.meta?.currentQueryIndex;
+
+    // Initialize metadata array if not exists
+    if (!state.resultMetaData[currentQueryIndex]) {
+      state.resultMetaData[currentQueryIndex] = [];
+    }
+
+    // Push metadata for each partition
+    state.resultMetaData[currentQueryIndex].push({
       ...(searchRes?.content ?? {}),
       ...(searchRes?.content?.results ?? {}),
-    };
+    });
   };
 
   const handleStreamingHistogramHits = (payload: any, searchRes: any) => {
@@ -443,10 +454,20 @@ export const usePanelDataLoader = (
       code: "",
     };
 
+    const lastPartitionIndex = Math.max(
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.length - 1,
+      0,
+    );
     // is streaming aggs
     const streaming_aggs =
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]
-        ?.streaming_aggs ?? false;
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
+      ]?.streaming_aggs ?? false;
+
+    // Initialize data array if not exists
+    if (!state.data[payload?.meta?.currentQueryIndex]) {
+      state.data[payload?.meta?.currentQueryIndex] = [];
+    }
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
@@ -459,8 +480,8 @@ export const usePanelDataLoader = (
     }
     // if order by is desc, append new partition response at end
     else if (
-      state?.resultMetaData?.[
-        payload?.meta?.currentQueryIndex
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
       ]?.order_by?.toLowerCase() === "asc"
     ) {
       // else append new partition response at start
@@ -475,9 +496,16 @@ export const usePanelDataLoader = (
       ];
     }
 
-    // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex].hits =
-      searchRes?.content?.results?.hits ?? {};
+    // update result metadata - update the first partition result
+    if (
+      state.resultMetaData[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
+      ]
+    ) {
+      state.resultMetaData[payload?.meta?.currentQueryIndex][
+        lastPartitionIndex
+      ].hits = searchRes?.content?.results?.hits ?? {};
+    }
   };
 
   // Limit, aggregation, vrl function, pagination, function error and query error
@@ -1300,7 +1328,7 @@ export const usePanelDataLoader = (
 
                 // Add empty objects to state.resultMetaData for the results of this query
                 state.data.push([]);
-                state.resultMetaData.push({});
+                state?.resultMetaData?.push([{}]); // Initialize as array with one element
 
                 const currentQueryIndex = state.data.length - 1;
 
