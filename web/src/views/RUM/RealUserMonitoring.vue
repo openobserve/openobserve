@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div :style="{ height: 'calc(100vh - 57px)', overflow: 'hidden' }">
+  <div :style="{ height: 'calc(100vh - 41px)', overflow: 'hidden' }">
     <template v-if="isLoading.length">
       <div
         class="q-pb-lg flex items-center justify-center text-center"
@@ -34,15 +34,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <AppTabs
-        :show="showTabs"
-        :tabs="tabs"
-        v-model:active-tab="activeTab"
-        @update:active-tab="changeTab"
-      />
+      <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
+        <AppTabs
+          :show="showTabs"
+          :tabs="tabs"
+          class="card-container"
+          v-model:active-tab="activeTab"
+          @update:active-tab="changeTab"
+        />
+      </div>
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
-          <keep-alive>
+          <keep-alive class="tw-h-full">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -51,11 +54,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </keep-alive>
         </template>
         <template v-else>
-          <component
-            :is="Component"
-            :isRumEnabled="isRumEnabled"
-            :isSessionReplayEnabled="isSessionReplayEnabled"
-          />
+          <div class="tw-h-full">
+            <component
+              :is="Component"
+              :isRumEnabled="isRumEnabled"
+              :isSessionReplayEnabled="isSessionReplayEnabled"
+            />
+          </div>
         </template>
       </router-view>
     </template>
@@ -74,14 +79,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-btn
           class="o2-primary-button tw-h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-primary-button-dark'
+              : 'o2-primary-button-light'
+          "
           flat
           no-caps
           :title="t('rum.getStartedTitle')"
           @click="getStarted"
         >
           {{ t("rum.getStartedLabel") }}
-          <q-icon name="arrow_forward" size="20px" class="q-ml-xs" />
+          <q-icon name="arrow_forward" size="20px"
+class="q-ml-xs" />
         </q-btn>
       </div>
     </template>
@@ -190,7 +200,7 @@ onActivated(async () => {
 
 watch(
   () => routeName.value,
-  () => updateTabOnRouteChange()
+  () => updateTabOnRouteChange(),
 );
 
 const updateTabOnRouteChange = () => {
@@ -264,7 +274,7 @@ const changeTab = (tab: string) => {
       name: "ErrorTracking",
       query: getQueryParams(
         performanceState.data.datetime,
-        errorTrackingState.data.editorValue
+        errorTrackingState.data.editorValue,
       ),
     });
     return;
@@ -275,7 +285,7 @@ const changeTab = (tab: string) => {
       name: "Sessions",
       query: getQueryParams(
         performanceState.data.datetime,
-        sessionState.data.editorValue
+        sessionState.data.editorValue,
       ),
     });
     return;
