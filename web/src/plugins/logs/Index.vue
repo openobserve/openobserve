@@ -2854,90 +2854,12 @@ export default defineComponent({
     padding-top: 0px !important;
   }
 
-  .logs-horizontal-splitter {
-    border: 1px solid var(--q-color-grey-3);
-    padding: 0 !important;
-    margin: 0 !important;
-    box-sizing: border-box !important;
-    height: 100% !important;
-    max-height: 100vh !important;
-
-    .q-splitter__panel {
-      z-index: auto !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      box-sizing: border-box !important;
-    }
-    .q-splitter__before {
-      overflow: visible !important; // Allow button to overflow
-
-      // IndexList container - full width, scrollbar inside
-      .relative-position {
-        width: 100% !important;
-        margin: 0 !important;
-        overflow: visible !important; // Allow button to overflow
-      }
-    }
-    .q-splitter__after {
-      padding: 0 !important;
-      margin: 0 !important;
-      box-sizing: border-box !important;
-      overflow: hidden !important;
-    }
-    .q-splitter__after {
-      padding: 0 !important;
-      margin: 0 !important;
-      box-sizing: border-box !important;
-      overflow: hidden !important;
-    }
-  }
-
   .thirdlevel {
     padding: 0 !important;
     margin: 0 !important;
     box-sizing: border-box !important;
     height: 100% !important;
     overflow: visible !important; /* Changed from hidden to visible for button */
-  }
-
-  .logs-splitter-smooth {
-    .q-splitter__before,
-    .q-splitter__after {
-      transition: none !important;
-    }
-
-    .q-splitter__separator {
-      transition: none !important;
-      z-index: 1 !important; // Lower z-index so scrollbar overlaps it
-      // Separator IS draggable, but scrollbar will be on top where they overlap
-    }
-
-    .splitter-section-collapse-btn--visible {
-      transform: translateY(50%) translateX(-10px) !important;
-    }
-
-    // When hovering over the splitter area, slide out the collapsed button
-    &:hover .splitter-section-collapse-btn--hidden {
-      transform: translateY(50%) translateX(10px) !important;
-    }
-  }
-
-  .logs-splitter-smooth {
-    .q-splitter__before,
-    .q-splitter__after {
-      transition: none !important;
-    }
-
-    .q-splitter__separator {
-      transition: none !important;
-      z-index: 1 !important; // Lower z-index so scrollbar overlaps it
-      // Separator IS draggable, but scrollbar will be on top where they overlap
-    }
-
-    // When hovering over the splitter area, slide out the collapsed button
-    &:hover .splitter-section-collapse-btn--hidden {
-      transform: translateY(-50%) translateX(10px) !important;
-    }
   }
 
   // .search-result-container {
