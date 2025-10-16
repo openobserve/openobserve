@@ -203,29 +203,29 @@ export default defineComponent({
   }
 }
 .functions-tabs {
-  .q-tabs_bkcss {
-    &--vertical {
-      margin: 20px 16px 0 16px;
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        text-transform: capitalize;
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          background-color: $accent;
-          color: black;
-        }
-      }
-    }
-  }
+  // .q-tabs_bkcss {
+  //   &--vertical {
+  //     margin: 20px 16px 0 16px;
+  //     .q-tab {
+  //       justify-content: flex-start;
+  //       padding: 0 1rem 0 1.25rem;
+  //       border-radius: 0.5rem;
+  //       margin-bottom: 0.5rem;
+  //       text-transform: capitalize;
+  //       &__content.tab_content {
+  //         .q-tab {
+  //           &__icon + &__label {
+  //             padding-left: 0.875rem;
+  //             font-weight: 600;
+  //           }
+  //         }
+  //       }
+  //       &--active {
+  //         background-color: $accent;
+  //         color: black;
+  //       }
+  //     }
+  //   }
+  // }
 }
 </style>
