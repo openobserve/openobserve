@@ -443,7 +443,7 @@ body {
 
 .o2-quasar-table{
   th,td {
-    padding: 0px 16px !important;
+    padding: 0px 5px !important;
     height: 36px !important;
   };
 
@@ -641,6 +641,7 @@ body {
     border-bottom: none;
     width: auto;
     white-space: normal;
+    line-height: 1.5rem;
   }
   .o2-tab.active{
     background-color: var(--o2-primary-btn-bg);
