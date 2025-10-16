@@ -62,7 +62,10 @@ use crate::{
             build_search_request_per_field, error_utils::map_error_to_http_response,
         },
     },
-    service::{search::streaming::process_search_stream_request, setup_tracing_with_trace_id},
+    service::{
+        search::{streaming::process_search_stream_request, utils::is_permissable_function_error},
+        setup_tracing_with_trace_id,
+    },
 };
 /// Search HTTP2 streaming endpoint
 
@@ -416,6 +419,7 @@ pub async fn search_http2_stream(
     });
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
+    let search_type = req.search_type;
 
     // Spawn the search task in a separate task
     actix_web::rt::spawn(process_search_stream_request(
@@ -438,6 +442,17 @@ pub async fn search_http2_stream(
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
             Ok(mut v) => {
+                // Check if function error is only - query limit default error and only `ui`
+                if let StreamResponses::SearchResponse {
+                    ref mut results, ..
+                } = v
+                    && search_type == Some(SearchEventType::UI)
+                    && is_permissable_function_error(&results.function_error)
+                {
+                    results.function_error.clear();
+                    results.is_partial = false;
+                }
+
                 if is_ui_histogram
                     && let StreamResponses::SearchResponse {
                         ref mut results, ..

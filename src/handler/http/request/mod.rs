@@ -33,6 +33,7 @@ pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod license;
 pub mod logs;
+pub mod mcp;
 pub mod metrics;
 pub mod organization;
 pub mod pipeline;

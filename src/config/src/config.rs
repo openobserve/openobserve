@@ -1276,6 +1276,13 @@ pub struct Limit {
     pub query_partition_by_secs: usize,
     #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
     pub query_group_base_speed: usize,
+    // Default Config: Run Query Recommendation Analysis for last one hour for every hour
+    #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)]
+    pub query_recommendation_duration: i64,
+    #[env_config(name = "ZO_QUERY_RECOMMENDATION_INTERVAL", default = 3600000000)]
+    pub query_recommendation_analysis_interval: i64,
+    #[env_config(name = "ZO_QUERY_RECOMMENDATION_TOP_K", default = 128)]
+    pub query_recommendation_top_k: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
     #[env_config(name = "ZO_INGEST_ALLOWED_IN_FUTURE", default = 24)] // in hours - in future

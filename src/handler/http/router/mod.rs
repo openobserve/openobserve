@@ -606,7 +606,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(domain_management::get_domain_management_config)
         .service(domain_management::set_domain_management_config)
         .service(license::get_license_info)
-        .service(license::store_license);
+        .service(license::store_license)
+        .service(mcp::handle_mcp_post)
+        .service(mcp::handle_mcp_get);
 
     #[cfg(feature = "cloud")]
     let service = service
@@ -624,6 +626,11 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(cloud::marketing::handle_new_attribution_event)
         .service(organization::org::all_organizations)
         .service(organization::org::extend_trial_period);
+
+    #[cfg(not(feature = "enterprise"))]
+    let service = service
+        .service(mcp::handle_mcp_post)
+        .service(mcp::handle_mcp_get);
 
     svc.service(service);
 }
