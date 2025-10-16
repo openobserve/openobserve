@@ -48,16 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="metric-value">{{ metrics.peakMemory }}</div>
           </div>
         </div>
-
-        <div class="metric-item">
-          <div class="metric-icon">
-            <q-icon name="account_tree" size="24px" color="primary" />
-          </div>
-          <div class="metric-content">
-            <div class="metric-label">{{ t("search.operatorCount") }}</div>
-            <div class="metric-value">{{ metrics.operatorCount }}</div>
-          </div>
-        </div>
       </div>
     </q-card-section>
   </q-card>

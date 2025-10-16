@@ -31,7 +31,6 @@ export interface SummaryMetrics {
   totalTime: string;
   totalRows: string;
   peakMemory: string;
-  operatorCount: number;
 }
 
 /**
@@ -254,17 +253,6 @@ function calculateNodeMetrics(node: OperatorNode): {
 }
 
 /**
- * Count total number of operators in tree
- */
-function countOperators(node: OperatorNode): number {
-  let count = node.name !== 'Root' ? 1 : 0;
-  for (const child of node.children) {
-    count += countOperators(child);
-  }
-  return count;
-}
-
-/**
  * Calculate summary metrics from query plan text
  */
 export function calculateSummaryMetrics(planText: string): SummaryMetrics {
@@ -275,7 +263,6 @@ export function calculateSummaryMetrics(planText: string): SummaryMetrics {
     totalTime: formatTime(metrics.maxTime),
     totalRows: metrics.totalRows.toLocaleString(),
     peakMemory: formatMemory(metrics.maxMemory),
-    operatorCount: countOperators(tree),
   };
 }
 

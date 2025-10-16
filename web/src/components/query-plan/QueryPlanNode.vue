@@ -18,6 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="plan-node">
     <!-- Node content -->
     <div class="node-line">
+      <!-- Parent prefix indentation -->
+      <span v-if="parentPrefix" class="tree-indent">{{ parentPrefix }}</span>
+
       <!-- Tree connector -->
       <span class="tree-connector">{{ connector }}</span>
 
@@ -53,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Additional details (collapsed by default if projection is long) -->
     <div v-if="expanded && nodeDetails" class="node-details">
-      <span class="tree-indent">{{ childPrefix }}</span>
+      <span class="tree-indent">{{ childPrefix }}  </span>
       <CollapsibleProjection
         v-if="hasProjection"
         :fields-text="nodeDetails"
@@ -172,13 +175,22 @@ export default defineComponent({
   .node-line {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 0;
     padding: 2px 0;
+    white-space: pre;
+
+    .tree-indent {
+      color: rgba(0, 0, 0, 0.3);
+      font-weight: bold;
+      user-select: none;
+      white-space: pre;
+    }
 
     .tree-connector {
       color: rgba(0, 0, 0, 0.3);
       font-weight: bold;
       user-select: none;
+      padding-right: 4px;
     }
 
     .expand-icon {
@@ -203,6 +215,7 @@ export default defineComponent({
     .operator-name {
       font-weight: 600;
       color: rgba(0, 0, 0, 0.87);
+      padding-left: 4px;
     }
 
     .metrics-inline {
@@ -231,11 +244,13 @@ export default defineComponent({
     padding-bottom: 2px;
     color: rgba(0, 0, 0, 0.7);
     font-size: 12px;
+    white-space: pre-wrap;
 
     .tree-indent {
       color: rgba(0, 0, 0, 0.3);
       font-weight: bold;
       user-select: none;
+      white-space: pre;
     }
   }
 
@@ -247,6 +262,10 @@ export default defineComponent({
 .body--dark {
   .plan-node {
     .node-line {
+      .tree-indent {
+        color: rgba(255, 255, 255, 0.3);
+      }
+
       .tree-connector {
         color: rgba(255, 255, 255, 0.3);
       }

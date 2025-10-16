@@ -194,8 +194,7 @@
     "physicalPlan": "Physical Plan",
     "totalTime": "Total Time",
     "totalRows": "Total Rows",
-    "peakMemory": "Peak Memory",
-    "operatorCount": "Operators"
+    "peakMemory": "Peak Memory"
   },
   "menu": {
     "home": "Home",
