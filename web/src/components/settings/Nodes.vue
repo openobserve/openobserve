@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="min-height: 90vh; overflow: hidden"
     >
       <template style="background-color: red" v-slot:before>
-        <div class="full-height  q-pt-sm">
+        <div class="full-height  q-pt-sm tw-mt-4">
           <div class="sticky-header q-px-sm">
             <span class="q-ma-none q-pa-sm" style="font-size: 18px;">
               {{t("nodes.filter_header")}} <q-icon name="filter_list" />
