@@ -129,7 +129,7 @@ export default defineComponent({
     const activeTab: any = ref("streamPipelines");
     const templates = ref([]);
     const functionAssociatedStreams = ref([]);
-    const splitterModel = ref(250);
+    const splitterModel = ref(220);
 
     const lastSplitterPosition = ref(splitterModel.value);
 

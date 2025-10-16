@@ -17,10 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 57px);">
-    <div class="card-container">
+  <q-page class="q-pa-none card-container" style="min-height: inherit; height: calc(100vh - 44px);">
+    <div>
       <div class="tw-flex tw-flex-row tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
-    :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
     >
       <div
           class="q-table__title full-width tw-font-[600]"
@@ -35,10 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               class="q-ml-auto no-border o2-search-input tw-h-[36px]"
               :placeholder="t('user.search')"
-              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
           <div class="col-6" v-if="config.isCloud == 'true'">
@@ -51,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               class="q-ml-sm o2-primary-button tw-h-[36px]"
               flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               no-caps
               :label="t(`user.add`)"
               @click="addRoutePush({})"
@@ -69,7 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :filter="filterQuery"
       :style="hasVisibleRows ? 'height: calc(100vh - 114px); overflow-y: auto;' : ''"
       class="o2-quasar-table o2-quasar-table-header-sticky"
-      :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
     >
       <template #no-data>
         <NoData></NoData>
