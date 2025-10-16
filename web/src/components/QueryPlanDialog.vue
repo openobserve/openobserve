@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div v-else class="plan-container">
           <!-- Show metrics summary if analyze was run -->
-          <div v-if="showAnalyzeResults && analyzeMetrics" class="metrics-summary q-mb-md">
+          <div v-if="showAnalyzeResults && analyzeMetrics.length > 0" class="metrics-summary q-mb-md">
             <q-card flat bordered>
               <q-card-section>
                 <div class="text-subtitle1 q-mb-sm">{{ t("search.executionMetrics") }}</div>
@@ -73,11 +73,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-card>
           </div>
 
-          <!-- Query plan display -->
+          <!-- Query plan tabs -->
           <q-card flat bordered class="plan-card">
-            <q-card-section class="q-pa-none">
-              <pre class="plan-text">{{ formattedPlan }}</pre>
-            </q-card-section>
+            <q-tabs
+              v-model="activeTab"
+              dense
+              class="text-grey"
+              active-color="primary"
+              indicator-color="primary"
+              align="left"
+            >
+              <q-tab name="logical" label="Logical Plan" />
+              <q-tab name="physical" label="Physical Plan" />
+            </q-tabs>
+
+            <q-separator />
+
+            <q-tab-panels v-model="activeTab" animated>
+              <q-tab-panel name="logical" class="q-pa-none">
+                <div class="plan-scroll-area">
+                  <pre v-if="logicalPlan" class="plan-text">{{ logicalPlan }}</pre>
+                  <div v-else class="q-pa-md text-grey-6">
+                    {{ t("search.noLogicalPlan") }}
+                  </div>
+                </div>
+              </q-tab-panel>
+
+              <q-tab-panel name="physical" class="q-pa-none">
+                <div class="plan-scroll-area">
+                  <pre v-if="physicalPlan" class="plan-text">{{ physicalPlan }}</pre>
+                  <div v-else class="q-pa-md text-grey-6">
+                    {{ t("search.noPhysicalPlan") }}
+                  </div>
+                </div>
+              </q-tab-panel>
+            </q-tab-panels>
           </q-card>
         </div>
       </q-card-section>
@@ -115,7 +145,9 @@ export default defineComponent({
 
     const loading = ref(false);
     const error = ref("");
-    const rawPlan = ref("");
+    const logicalPlan = ref("");
+    const physicalPlan = ref("");
+    const activeTab = ref("logical");
     const isAnalyzing = ref(false);
     const showAnalyzeResults = ref(false);
     const analyzeMetrics = ref<Array<{ label: string; value: string }>>([]);
@@ -125,52 +157,52 @@ export default defineComponent({
       set: (val) => emit("update:modelValue", val),
     });
 
-    const formattedPlan = computed(() => {
-      if (!rawPlan.value) return "";
-      return formatQueryPlan(rawPlan.value);
-    });
+    const parsePlans = (responseData: any) => {
+      // DataFusion returns plans in hits array with plan_type field
+      // Response format: { hits: [{ plan_type: "logical_plan", plan: "..." }, { plan_type: "physical_plan", plan: "..." }] }
 
-    const formatQueryPlan = (plan: string): string => {
-      // DataFusion plans already contain \n characters
-      // We'll enhance the formatting by:
-      // 1. Preserving existing indentation
-      // 2. Adding extra spacing between major plan sections
-      // 3. Highlighting key operators
+      logicalPlan.value = "";
+      physicalPlan.value = "";
 
-      let formatted = plan;
+      if (!responseData || !responseData.hits) {
+        return;
+      }
 
-      // Add extra line breaks before major plan sections
-      const majorSections = [
-        "logical_plan",
-        "physical_plan",
-        "Physical Plan",
-        "Logical Plan",
-      ];
+      // Parse hits to extract logical and physical plans
+      responseData.hits.forEach((hit: any) => {
+        const planType = hit.plan_type || hit._source?.plan_type;
+        const planContent = hit.plan || hit._source?.plan || "";
 
-      majorSections.forEach((section) => {
-        formatted = formatted.replace(
-          new RegExp(`(${section})`, "gi"),
-          `\n$1`
-        );
+        if (planType === "logical_plan") {
+          logicalPlan.value = formatQueryPlan(planContent);
+        } else if (planType === "physical_plan") {
+          physicalPlan.value = formatQueryPlan(planContent);
+        }
       });
 
-      // Add spacing around operators (lines that start with indent + uppercase)
-      formatted = formatted
-        .split("\n")
-        .map((line) => {
-          // Check if line contains a major operator
-          if (
-            /^\s*(TableScan|Filter|Projection|Aggregate|Sort|Limit|Join|Union|SubqueryAlias|EmptyRelation|CrossJoin|Repartition)/i.test(
-              line
-            )
-          ) {
-            return line;
-          }
-          return line;
-        })
-        .join("\n");
+      // Fallback: if no plan_type, try to parse from combined text
+      if (!logicalPlan.value && !physicalPlan.value && responseData.hits.length > 0) {
+        const combined = responseData.hits.map((h: any) => h.plan || JSON.stringify(h)).join("\n");
 
-      return formatted;
+        // Try to split by plan_type markers
+        const logicalMatch = combined.match(/logical_plan[:\s]+(.+?)(?=physical_plan|$)/is);
+        const physicalMatch = combined.match(/physical_plan[:\s]+(.+?)$/is);
+
+        if (logicalMatch) {
+          logicalPlan.value = formatQueryPlan(logicalMatch[1].trim());
+        }
+        if (physicalMatch) {
+          physicalPlan.value = formatQueryPlan(physicalMatch[1].trim());
+        }
+      }
+    };
+
+    const formatQueryPlan = (plan: string): string => {
+      if (!plan) return "";
+
+      // DataFusion plans already contain \n characters
+      // Just clean up and preserve the formatting
+      return plan.trim();
     };
 
     const extractAnalyzeMetrics = (plan: string) => {
@@ -221,7 +253,8 @@ export default defineComponent({
     const fetchExplainPlan = async () => {
       loading.value = true;
       error.value = "";
-      rawPlan.value = "";
+      logicalPlan.value = "";
+      physicalPlan.value = "";
       showAnalyzeResults.value = false;
       analyzeMetrics.value = [];
 
@@ -256,20 +289,12 @@ export default defineComponent({
           "ui"
         );
 
-        // The plan is typically returned as a string in the response
+        // Parse the response to extract logical and physical plans
         if (response.data) {
-          // Check if there's a plan field directly in the response
-          if (response.data.plan) {
-            rawPlan.value = response.data.plan;
-          } else if (response.data.hits && response.data.hits.length > 0) {
-            // Sometimes the plan is in the first hit
-            const firstHit = response.data.hits[0];
-            const planText = firstHit.plan ||
-                            firstHit._source?.plan ||
-                            firstHit.query_plan ||
-                            JSON.stringify(firstHit, null, 2);
-            rawPlan.value = planText;
-          } else {
+          parsePlans(response.data);
+
+          // Check if we got at least one plan
+          if (!logicalPlan.value && !physicalPlan.value) {
             error.value = t("search.noPlanFound");
           }
         } else {
@@ -320,24 +345,18 @@ export default defineComponent({
           "ui"
         );
 
-        // The plan is typically returned as a string in the response
+        // Parse the response to extract logical and physical plans with metrics
         if (response.data) {
-          let planText = "";
-          if (response.data.plan) {
-            planText = response.data.plan;
-          } else if (response.data.hits && response.data.hits.length > 0) {
-            const firstHit = response.data.hits[0];
-            planText = firstHit.plan ||
-                      firstHit._source?.plan ||
-                      firstHit.query_plan ||
-                      JSON.stringify(firstHit, null, 2);
+          parsePlans(response.data);
+
+          // Extract metrics from the physical plan (which has execution stats)
+          if (physicalPlan.value) {
+            analyzeMetrics.value = extractAnalyzeMetrics(physicalPlan.value);
+            showAnalyzeResults.value = true;
           }
 
-          if (planText) {
-            rawPlan.value = planText;
-            showAnalyzeResults.value = true;
-            analyzeMetrics.value = extractAnalyzeMetrics(planText);
-          } else {
+          // Check if we got at least one plan
+          if (!logicalPlan.value && !physicalPlan.value) {
             error.value = t("search.noAnalyzePlanFound");
           }
         } else {
@@ -371,7 +390,9 @@ export default defineComponent({
       showDialog,
       loading,
       error,
-      formattedPlan,
+      logicalPlan,
+      physicalPlan,
+      activeTab,
       isAnalyzing,
       showAnalyzeResults,
       analyzeMetrics,
@@ -426,11 +447,22 @@ export default defineComponent({
   .plan-card {
     flex: 1;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 
-    .q-card-section {
-      max-height: 500px;
-      overflow-y: auto;
+    .q-tabs {
+      flex-shrink: 0;
     }
+
+    .q-tab-panels {
+      flex: 1;
+      overflow: hidden;
+    }
+  }
+
+  .plan-scroll-area {
+    max-height: 500px;
+    overflow-y: auto;
   }
 
   .plan-text {

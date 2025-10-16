@@ -185,7 +185,9 @@
     "noPlanFound": "No query plan found",
     "noAnalyzePlanFound": "No analyze plan found",
     "errorFetchingPlan": "Error fetching query plan",
-    "errorRunningAnalyze": "Error running analyze"
+    "errorRunningAnalyze": "Error running analyze",
+    "noLogicalPlan": "No logical plan available",
+    "noPhysicalPlan": "No physical plan available"
   },
   "menu": {
     "home": "Home",
