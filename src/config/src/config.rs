@@ -851,6 +851,12 @@ pub struct Common {
         help = "Skip WAL for query"
     )]
     pub feature_query_skip_wal: bool,
+    #[env_config(
+        name = "ZO_FEATURE_TANTIVY_FOOTER_CACHE_FORCE_SLOW_PATH",
+        default = false,
+        help = "Force slow path for tantivy footer cache reads (for testing purposes)"
+    )]
+    pub feature_tantivy_footer_cache_force_slow_path: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]

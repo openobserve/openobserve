@@ -802,13 +802,14 @@ pub async fn tantivy_search(
 }
 
 pub async fn get_tantivy_directory(
-    _trace_id: &str,
+    trace_id: &str,
     file_account: &str,
     file_name: &str,
     file_size: i64,
     footer_cache_offset: Option<i64>,
     footer_cache_size: Option<i32>,
 ) -> anyhow::Result<(PuffinDirReader, Option<bytes::Bytes>)> {
+    let cfg = get_config();
     let file_account = file_account.to_string();
     let source = object_store::ObjectMeta {
         location: file_name.into(),
@@ -818,16 +819,34 @@ pub async fn get_tantivy_directory(
         version: None,
     };
 
-    // Use optimized path if footer metadata is available
-    if let (Some(offset), Some(size)) = (footer_cache_offset, footer_cache_size) {
-        let (reader, footer_cache_bytes) =
-            PuffinDirReader::from_path_optimized(file_account, source, offset, size).await?;
-        Ok((reader, Some(footer_cache_bytes)))
+    // Check if we should force slow path for testing
+    let force_slow_path = cfg.common.feature_tantivy_footer_cache_force_slow_path;
+
+    // Use optimized path if footer metadata is available and not forcing slow path
+    if !force_slow_path {
+        if let (Some(offset), Some(size)) = (footer_cache_offset, footer_cache_size) {
+            log::debug!(
+                "[trace_id {trace_id}] Using optimized fast path for tantivy footer cache: {}",
+                file_name
+            );
+            let (reader, footer_cache_bytes) =
+                PuffinDirReader::from_path_optimized(file_account, source, offset, size).await?;
+            return Ok((reader, Some(footer_cache_bytes)));
+        }
     } else {
-        // Fallback to old approach for backward compatibility
-        let reader = PuffinDirReader::from_path(file_account, source).await?;
-        Ok((reader, None))
+        log::debug!(
+            "[trace_id {trace_id}] Forcing slow path for tantivy footer cache (testing mode): {}",
+            file_name
+        );
     }
+
+    // Fallback to old approach for backward compatibility or when forced
+    log::debug!(
+        "[trace_id {trace_id}] Using slow path for tantivy footer cache: {}",
+        file_name
+    );
+    let reader = PuffinDirReader::from_path(file_account, source).await?;
+    Ok((reader, None))
 }
 
 async fn search_tantivy_index(
