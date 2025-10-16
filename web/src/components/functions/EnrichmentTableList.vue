@@ -19,9 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
     <div v-if="!showAddJSTransformDialog">
-      <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-h-[71px] tw-border-b-[1px]" 
-      :class="store.state.theme === 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
-      >
+      <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-h-[71px] tw-border-b-[1px]">
         <div class="q-table__title tw-font-[600]">
             {{ t("function.enrichmentTables") }}
           </div>
@@ -32,19 +30,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               class="q-ml-auto no-border o2-search-input tw-w-[220px]"
               :placeholder="t('function.searchEnrichmentTable')"
-              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
 
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
           </div>
           <q-btn
-            class="q-ml-md o2-primary-button tw-h-[36px]"
+            class="q-ml-sm o2-primary-button tw-h-[36px]"
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             :label="t(`function.addEnrichmentTable`)"
             @click="showAddUpdateFn({})"
           />
@@ -61,7 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'width: 100%; height: calc(100vh - 114px)' 
             : 'width: 100%'"
         class="o2-quasar-table o2-quasar-table-header-sticky "
-        :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
       >
         <template #no-data>
           <NoData />
