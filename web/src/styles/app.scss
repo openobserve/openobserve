@@ -35,9 +35,9 @@ body {
   border-radius: 0.375rem;
 }
 
-.element-box-shadow {
-  box-shadow: var(--o2-box-shadow);
-}
+// .element-box-shadow {
+//   box-shadow: var(--o2-box-shadow);
+// }
 
 .q-splitter--vertical {
   .q-splitter__separator {
@@ -59,26 +59,12 @@ body {
   border-radius: 0.375rem;
 }
 
-.table-container thead {
-    // background: var(--o2-table-header-bg);
-    // opacity: 0.9;
-    tr {
-      background: var(--o2-table-header-bg) !important;
-    }
-}
-
 .o2-secondary-button {
   background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
-}
 
-.index-table .q-table .q-tr:hover {
-    background: color-mix(in srgb, var(--o2-theme-color) 5%, white 90%) !important;
-}
-
-
-.q-table__card{
-  box-shadow: none;
-  background-color: transparent;
+  &:hover {
+    opacity: 0.8;
+  }
 }
 
 .q-tabs {
@@ -111,11 +97,12 @@ body {
 }
 
 .spitter-container {
-  height: 100vh;
   width: 100%;
+  height: 100%;
   background-color: var(--o2-card-bg);
   border-radius: 0.375rem;
-  overflow: hidden;
+  overflow: auto;
+  flex: 10000 1 0%;
 }
 
 // .q-splitter--vertical {
@@ -304,6 +291,12 @@ body {
   outline-style: none;
 }
 
+.o2-container-navbarheight {
+  height: calc(100vh - 42px);
+  overflow: auto;
+  // padding: 0.625rem; // 10px
+}
+
 .o2-page-title {
   font-size: 24px;
   font-weight: 900;
@@ -362,6 +355,25 @@ body {
 //add if we want to apply dark theme to the table , we need to add a class dark-o2-quasar-table to the table
 //add if we want to apply light theme to the table , we need to add a class light-o2-quasar-table to the table
 //if there are actions in the table , we need to add a class actions-column to the last column
+.table-container thead, .o2-quasar-table thead {
+    // background: var(--o2-table-header-bg);
+    // opacity: 0.9;
+    tr {
+      background: var(--o2-table-header-bg) !important;
+    }
+}
+
+.q-table {
+  border-radius: 0.375rem;
+  tbody .q-tr:hover {
+    background: color-mix(in srgb, var(--o2-theme-color) 5%, white 90%) !important;
+  }
+}
+
+.q-table__card{
+  box-shadow: none;
+  background-color: transparent;
+}
 
 .o2-quasar-table{
   th,td {
@@ -377,6 +389,7 @@ body {
     right: 0;
     z-index: 1;
     box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
+    border-radius: 0 0.375rem 0 0;
   }
 }
 //here we have dark theme styling for the table
@@ -751,6 +764,12 @@ body {
   padding: 0px 12px !important;
   border-radius: 0.375rem !important;
   min-width: 90px !important;
+  background-color: var(--o2-primary-btn-bg);
+  color: var(--o2-primary-btn-text);
+
+  &:hover {
+    opacity: 0.8;
+  }
 }
 .o2-primary-button-small{
   height: 28px !important;
@@ -760,26 +779,13 @@ body {
   padding: 0px 12px !important;
   border-radius: 4px !important;
   min-width: 90px !important;
-}
+  background-color: var(--o2-primary-btn-bg);
+  color: var(--o2-primary-btn-text);
 
-.o2-primary-button-light{
-  background-color: var(--o2-primary-btn-bg) !important;
-  color: #ffffff !important;
-  border: 1px solid var(--o2-primary-btn-bg) !important;
-  &:hover{
-    opacity: 0.9;
+  &:hover {
+    opacity: 0.8;
   }
 }
-//TODO o2: after getting the dark theme work on it
-.o2-primary-button-dark{
-  background-color: var(--o2-primary-btn-bg) !important;
-  color: #ffffff !important;
-  border: 1px solid var(--o2-primary-btn-bg) !important;
-  &:hover{
-    opacity: 0.9;
-  }
-}
-
 
 .o2-negative-button-light{
   background-color: #ec1414 !important;
@@ -1091,6 +1097,28 @@ body {
    SPLITTER SECTION COLLAPSE BUTTON
    Reusable collapse button for splitter sections across all pages
    ============================================================================ */
+
+.q-splitter {
+  .q-splitter__before,
+  .q-splitter__after {
+    transition: none !important;
+  }
+
+  .q-splitter__separator {
+    transition: none !important;
+    z-index: 1 !important; // Lower z-index so scrollbar overlaps it
+    // Separator IS draggable, but scrollbar will be on top where they overlap
+  }
+
+  .splitter-section-collapse-btn--visible {
+    transform: translateY(50%) translateX(-10px) !important;
+  }
+
+  // When hovering over the splitter area, slide out the collapsed button
+  &:hover .splitter-section-collapse-btn--hidden {
+    transform: translateY(50%) translateX(10px) !important;
+  }
+}
 
 .splitter-section-collapse-btn {
   z-index: 1001 !important;
