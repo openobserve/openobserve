@@ -1484,8 +1484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Query Plan Dialog -->
     <QueryPlanDialog
       v-model="showExplainDialog"
-      :sqlQuery="searchObj.data.query"
-      :orgIdentifier="store.state.selectedOrganization.identifier"
+      :searchObj="searchObj"
     />
   </div>
 </template>

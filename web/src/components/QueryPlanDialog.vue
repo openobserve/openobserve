@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="showDialog" @hide="onClose" maximized>
-    <q-card class="query-plan-dialog">
+  <q-dialog v-model="showDialog" @hide="onClose">
+    <q-card class="query-plan-dialog" style="width: 900px; max-width: 90vw; max-height: 85vh">
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">{{ t("search.queryPlan") }}</div>
         <q-space />
@@ -91,6 +91,8 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import searchService from "@/services/search";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import { generateTraceContext } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "QueryPlanDialog",
@@ -99,12 +101,8 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    sqlQuery: {
-      type: String,
-      required: true,
-    },
-    orgIdentifier: {
-      type: String,
+    searchObj: {
+      type: Object,
       required: true,
     },
   },
@@ -113,6 +111,7 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
+    const { buildSearch } = useSearchStream();
 
     const loading = ref(false);
     const error = ref("");
@@ -227,42 +226,58 @@ export default defineComponent({
       analyzeMetrics.value = [];
 
       try {
-        const explainQuery = `EXPLAIN ${props.sqlQuery}`;
-        const queryPayload = {
+        // Build the complete query using buildSearch()
+        const queryReq = buildSearch();
+
+        if (!queryReq || !queryReq.query || !queryReq.query.sql) {
+          error.value = t("search.errorFetchingPlan");
+          loading.value = false;
+          return;
+        }
+
+        // Wrap the SQL with EXPLAIN
+        const explainSQL = `EXPLAIN ${queryReq.query.sql}`;
+        const explainQueryPayload = {
+          ...queryReq,
           query: {
-            sql: explainQuery,
-            sql_mode: "full",
-            from: 0,
-            size: 0,
+            ...queryReq.query,
+            sql: explainSQL,
           },
         };
 
+        const traceparent = generateTraceContext()?.traceparent;
         const response = await searchService.search(
           {
-            org_identifier: props.orgIdentifier,
-            query: queryPayload,
+            org_identifier: store.state.selectedOrganization.identifier,
+            query: explainQueryPayload,
             page_type: "logs",
+            traceparent,
           },
           "ui"
         );
 
-        if (response.data && response.data.hits && response.data.hits.length > 0) {
-          // The plan should be in the first hit
-          const firstHit = response.data.hits[0];
-
-          // Try different possible field names where the plan might be stored
-          const planText = firstHit.plan ||
-                          firstHit._source?.plan ||
-                          firstHit.query_plan ||
-                          JSON.stringify(firstHit, null, 2);
-
-          rawPlan.value = planText;
+        // The plan is typically returned as a string in the response
+        if (response.data) {
+          // Check if there's a plan field directly in the response
+          if (response.data.plan) {
+            rawPlan.value = response.data.plan;
+          } else if (response.data.hits && response.data.hits.length > 0) {
+            // Sometimes the plan is in the first hit
+            const firstHit = response.data.hits[0];
+            const planText = firstHit.plan ||
+                            firstHit._source?.plan ||
+                            firstHit.query_plan ||
+                            JSON.stringify(firstHit, null, 2);
+            rawPlan.value = planText;
+          } else {
+            error.value = t("search.noPlanFound");
+          }
         } else {
           error.value = t("search.noPlanFound");
         }
       } catch (err: any) {
         console.error("Error fetching explain plan:", err);
-        error.value = err.message || t("search.errorFetchingPlan");
+        error.value = err.response?.data?.message || err.message || t("search.errorFetchingPlan");
       } finally {
         loading.value = false;
       }
@@ -274,41 +289,63 @@ export default defineComponent({
       isAnalyzing.value = true;
 
       try {
-        const analyzeQuery = `EXPLAIN ANALYZE ${props.sqlQuery}`;
-        const queryPayload = {
+        // Build the complete query using buildSearch()
+        const queryReq = buildSearch();
+
+        if (!queryReq || !queryReq.query || !queryReq.query.sql) {
+          error.value = t("search.errorRunningAnalyze");
+          loading.value = false;
+          isAnalyzing.value = false;
+          return;
+        }
+
+        // Wrap the SQL with EXPLAIN ANALYZE
+        const analyzeSQL = `EXPLAIN ANALYZE ${queryReq.query.sql}`;
+        const analyzeQueryPayload = {
+          ...queryReq,
           query: {
-            sql: analyzeQuery,
-            sql_mode: "full",
-            from: 0,
-            size: 0,
+            ...queryReq.query,
+            sql: analyzeSQL,
           },
         };
 
+        const traceparent = generateTraceContext()?.traceparent;
         const response = await searchService.search(
           {
-            org_identifier: props.orgIdentifier,
-            query: queryPayload,
+            org_identifier: store.state.selectedOrganization.identifier,
+            query: analyzeQueryPayload,
             page_type: "logs",
+            traceparent,
           },
           "ui"
         );
 
-        if (response.data && response.data.hits && response.data.hits.length > 0) {
-          const firstHit = response.data.hits[0];
-          const planText = firstHit.plan ||
-                          firstHit._source?.plan ||
-                          firstHit.query_plan ||
-                          JSON.stringify(firstHit, null, 2);
+        // The plan is typically returned as a string in the response
+        if (response.data) {
+          let planText = "";
+          if (response.data.plan) {
+            planText = response.data.plan;
+          } else if (response.data.hits && response.data.hits.length > 0) {
+            const firstHit = response.data.hits[0];
+            planText = firstHit.plan ||
+                      firstHit._source?.plan ||
+                      firstHit.query_plan ||
+                      JSON.stringify(firstHit, null, 2);
+          }
 
-          rawPlan.value = planText;
-          showAnalyzeResults.value = true;
-          analyzeMetrics.value = extractAnalyzeMetrics(planText);
+          if (planText) {
+            rawPlan.value = planText;
+            showAnalyzeResults.value = true;
+            analyzeMetrics.value = extractAnalyzeMetrics(planText);
+          } else {
+            error.value = t("search.noAnalyzePlanFound");
+          }
         } else {
           error.value = t("search.noAnalyzePlanFound");
         }
       } catch (err: any) {
         console.error("Error running analyze:", err);
-        error.value = err.message || t("search.errorRunningAnalyze");
+        error.value = err.response?.data?.message || err.message || t("search.errorRunningAnalyze");
       } finally {
         loading.value = false;
         isAnalyzing.value = false;
@@ -322,7 +359,7 @@ export default defineComponent({
     watch(
       () => props.modelValue,
       (newVal) => {
-        if (newVal && props.sqlQuery) {
+        if (newVal && props.searchObj) {
           fetchExplainPlan();
         }
       }
@@ -347,17 +384,17 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .query-plan-dialog {
-  height: 100vh;
   display: flex;
   flex-direction: column;
 
   .query-plan-content {
-    flex: 1;
+    max-height: calc(85vh - 120px);
     overflow-y: auto;
   }
 
   .plan-container {
-    height: 100%;
+    display: flex;
+    flex-direction: column;
   }
 
   .metrics-summary {
@@ -387,11 +424,11 @@ export default defineComponent({
   }
 
   .plan-card {
-    height: calc(100% - 150px);
+    flex: 1;
     overflow: hidden;
 
     .q-card-section {
-      height: 100%;
+      max-height: 500px;
       overflow-y: auto;
     }
   }
