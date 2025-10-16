@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.custom_role"
             :label="t('user.customRole')"
             :options="filterdOption"
-            class="q-pb-lg showLabelOnTop"
+            class="showLabelOnTop"
             multiple
             emit-value
             map-options
@@ -165,13 +165,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-toggle
               v-model="formData.change_password"
               :label="t('user.changePassword')"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-pt-md q-pb-sm showLabelOnTop"
               stack-label
               outlined
               filled
-              dense
+              class="o2-toggle-button-lg tw-mr-3 -tw-ml-4"
+              size="lg"
+              :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
               data-test="user-change-password-field"
             />
 
