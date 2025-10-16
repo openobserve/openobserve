@@ -17,6 +17,8 @@ use config::meta::{search::Response, sql::OrderBy};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+pub const CAPPED_RESULTS_MSG: &str = "Warn: results are capped to meet default limit";
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
 pub struct CachedQueryResponse {
     pub cached_response: Response,

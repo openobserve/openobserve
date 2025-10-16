@@ -24,6 +24,8 @@ use config::{
     utils::json,
 };
 use datafusion::arrow::datatypes::Schema;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -44,6 +46,18 @@ pub struct Stream {
     pub pattern_associations: Vec<PatternAssociation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_derived: Option<bool>,
+}
+
+#[cfg(feature = "enterprise")]
+impl From<Stream> for enterprise::recommendations::meta::Stream {
+    fn from(value: Stream) -> Self {
+        Self {
+            name: value.name,
+            stream_type: value.stream_type,
+            stats: value.stats,
+            settings: value.settings,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

@@ -640,7 +640,7 @@ mod tests {
         // Test store function
         let test_data = Values::Json(Arc::new(test_data));
         let result = local::store(org_id, table_name, test_data, updated_at).await;
-        println!("Store result: {:?}", result);
+        println!("Store result: {result:?}");
         assert!(result.is_ok(), "Store should succeed");
 
         // Verify file was created

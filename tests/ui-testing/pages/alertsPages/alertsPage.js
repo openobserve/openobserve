@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import fs from 'fs';
 import { CommonActions } from '../commonActions';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class AlertsPage {
     constructor(page) {
@@ -123,12 +124,15 @@ export class AlertsPage {
     async navigateToFolder(folderName) {
         await this.page.getByText(folderName).first().click();
         // Wait for the folder content to load by checking for either the table or no data message
-        await Promise.race([
-            this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
-            this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
-        ]).catch(() => {
-            console.log('Neither table nor no data message found, continuing...');
-        });
+        try {
+            await Promise.race([
+                this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
+                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+            ]);
+        } catch (error) {
+            testLogger.error('Neither table nor no data message found after clicking folder', { folderName, error: error.message });
+            throw new Error(`Failed to load folder content for "${folderName}": Neither table nor "No data available" message appeared`);
+        }
     }
 
     async verifyNoDataAvailable() {
@@ -192,7 +196,7 @@ export class AlertsPage {
 
         await this.page.locator(this.alertSubmitButton).click();
         await expect(this.page.getByText(this.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
-        console.log('Successfully created alert:', randomAlertName);
+        testLogger.info('Successfully created alert', { alertName: randomAlertName });
 
         return randomAlertName;
     }
@@ -218,7 +222,7 @@ export class AlertsPage {
 
         await this.page.locator(this.alertSubmitButton).click();
         await expect(this.page.getByText(this.alertUpdatedMessage)).toBeVisible();
-        console.log('Successfully updated alert:', alertName);
+        testLogger.info('Successfully updated alert', { alertName });
     }
 
     /** @param {string} alertName @param {string} streamType @param {string} streamName */
@@ -232,17 +236,17 @@ export class AlertsPage {
         await this.page.getByText(streamName, { exact: true }).click();
         await this.page.locator(this.cloneSubmitButton).click();
         await expect(this.page.getByText(this.alertClonedMessage)).toBeVisible();
-        console.log('Successfully cloned alert:', alertName);
+        testLogger.info('Successfully cloned alert', { alertName });
     }
 
     async ensureFolderExists(folderName, description = '') {
         try {
             await this.page.getByText(folderName).waitFor({ timeout: 2000 });
-            console.log('Folder exists:', folderName);
+            testLogger.info('Folder exists', { folderName });
             return true;
         } catch (error) {
             await this.createFolder(folderName, description);
-            console.log('Created folder:', folderName);
+            testLogger.info('Created folder', { folderName });
             return false;
         }
     }
@@ -272,7 +276,7 @@ export class AlertsPage {
         await expect(this.page.getByText(this.alertsMovedMessage)).toBeVisible();
         await expect(this.page.getByText(this.noDataAvailableText)).toBeVisible();
         
-        console.log('Successfully moved alerts to folder:', targetFolderName);
+        testLogger.info('Successfully moved alerts to folder', { targetFolderName });
     }
 
     async deleteFolder(folderName) {
@@ -286,8 +290,10 @@ export class AlertsPage {
         await dotButton.waitFor({ state: 'visible', timeout: 3000 });
 
         // 3. Optional: Verify Playwright thinks it's visible and enabled
-        console.log('Button visible:', await dotButton.isVisible());
-        console.log('Button enabled:', await dotButton.isEnabled());
+        testLogger.info('Button state', {
+            visible: await dotButton.isVisible(),
+            enabled: await dotButton.isEnabled()
+        });
 
         // 4. Force click the button
         await dotButton.click({ force: true });
@@ -301,7 +307,7 @@ export class AlertsPage {
         await this.page.locator(this.confirmButton).click();
         await expect(this.page.getByText(this.folderDeletedMessage)).toBeVisible();
 
-        console.log('Successfully deleted folder:', folderName);
+        testLogger.info('Successfully deleted folder', { folderName });
     }
 
     /**
@@ -353,12 +359,15 @@ export class AlertsPage {
         await this.page.waitForTimeout(2000); // Wait for search to complete
         
         // Wait for either search results or no data message
-        await Promise.race([
-            this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
-            this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
-        ]).catch(() => {
-            console.log('Neither table nor no data message found, continuing...');
-        });
+        try {
+            await Promise.race([
+                this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
+                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+            ]);
+        } catch (error) {
+            testLogger.error('Neither table nor no data message found after search', { alertName, error: error.message });
+            throw new Error(`Failed to search for alert "${alertName}": Neither table nor "No data available" message appeared`);
+        }
     }
 
     /**
@@ -448,7 +457,7 @@ export class AlertsPage {
             await expect(closeButton).toBeVisible({ timeout: 15000 });
             await closeButton.click({ timeout: 10000 });
         } catch (error) {
-            console.warn('Primary close button failed, trying alternative:', error.message);
+            testLogger.warn('Primary close button failed, trying alternative', { error: error.message });
             await this.page.waitForLoadState('networkidle');
             // Try alternative close methods
             const altCloseButton = this.page.locator('.q-dialog').getByText('arrow_back_ios_new');
@@ -461,7 +470,7 @@ export class AlertsPage {
         await this.page.locator(this.alertSubmitButton).click();
         await expect(this.page.getByText(this.alertSuccessMessage)).toBeVisible();
         await expect(this.page.getByRole('cell', { name: '15 Mins' })).toBeVisible();
-        console.log('Successfully created scheduled alert:', randomAlertName);
+        testLogger.info('Successfully created scheduled alert', { alertName: randomAlertName });
 
         return randomAlertName;
     }
@@ -525,17 +534,17 @@ export class AlertsPage {
                 await this.page.waitForTimeout(3000);
                 attempts++;
                 
-                console.log(`Successfully deleted alert instance ${attempts} of ${alertName}`);
+                testLogger.info('Successfully deleted alert instance', { attempts, alertName });
             } catch (error) {
-                console.log('No more instances found or error occurred:', error.message);
+                testLogger.info('No more instances found or error occurred', { error: error.message });
                 alertExists = false;
             }
         }
         
         if (attempts > 0) {
-            console.log(`Successfully deleted all ${attempts} instances of alert: ${alertName}`);
+            testLogger.info('Successfully deleted all instances of alert', { attempts, alertName });
         } else {
-            console.log(`No instances of alert found to delete: ${alertName}`);
+            testLogger.info('No instances of alert found to delete', { alertName });
         }
     }
 
@@ -543,10 +552,10 @@ export class AlertsPage {
         try {
             if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
-                console.log('Successfully deleted file:', filePath);
+                testLogger.info('Successfully deleted file', { filePath });
             }
         } catch (error) {
-            console.error('Error deleting file:', error);
+            testLogger.error('Error deleting file', { filePath, error: error.message });
         }
     }
 
@@ -606,6 +615,6 @@ export class AlertsPage {
         const initial = parseInt(initialCount);
         const updated = parseInt(newCount);
         expect(updated).toBeGreaterThan(initial);
-        console.log(`Alert count verification successful: Count increased from ${initial} to ${updated}`);
+        testLogger.info('Alert count verification successful', { initialCount: initial, updatedCount: updated });
     }
 } 
