@@ -695,6 +695,7 @@ body {
 .o2-search-input{
   
   height: 36px;
+  width: 200px !important;
   .q-field__control{
     @extend .el-border-radius;
     @extend .el-border;
