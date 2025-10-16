@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="add-service-account-dialog column full-height">
+  <q-card class="o2-side-dialog column full-height">
     <q-card-section class=" q-py-md tw-w-full">
       <div class="row items-center no-wrap q-py-sm">
         <div class="col ">
@@ -244,9 +244,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.add-service-account-dialog {
-  width: 30vw;
-}
-</style>
