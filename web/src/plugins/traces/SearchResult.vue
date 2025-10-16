@@ -18,11 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="traces-search-result" class="col column overflow-hidden">
-    <div
-      data-test="traces-search-result-list"
-      class="search-list"
-      style="width: 100%"
-    >
+    <div data-test="traces-search-result-list" class="search-list tw-w-full">
       <!-- RED Metrics Dashboard -->
       <transition
         enter-active-class="transition-all duration-300 ease-in-out"
@@ -84,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
       >
-        <q-icon name="info" color="primary"
-size="md" /> No traces found. Please
+        <q-icon name="info"
+color="primary" size="md" /> No traces found. Please
         adjust the filters and try again.
       </div>
       <q-virtual-scroll
@@ -111,8 +107,8 @@ size="md" /> No traces found. Please
         :virtual-scroll-slice-ratio-before="10"
         @virtual-scroll="onScroll"
       >
-        <q-item data-test="traces-search-result-item"
-:key="index" dense>
+        <q-item data-test="traces-search-result-item" :key="index"
+dense>
           <TraceBlock
             :item="item"
             :index="index"
