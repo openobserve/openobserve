@@ -35,6 +35,14 @@ body {
   border-radius: 0.375rem;
 }
 
+.header-menu {
+  width: auto;
+  display: inline-flex;
+  background-color: var(--o2-header-menu-bg);
+  position: relative;
+  border-radius: 1rem;
+}
+
 // .element-box-shadow {
 //   box-shadow: var(--o2-box-shadow);
 // }
