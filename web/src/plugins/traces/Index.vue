@@ -47,6 +47,7 @@ id="tracePage" style="min-height: auto">
               ref="indexListRef"
               :field-list="searchObj.data.stream.selectedStreamFields"
               data-test="logs-search-index-list"
+              class="card-container"
               :key="searchObj.data.stream.streamLists"
               @update:changeStream="onChangeStream"
             />
@@ -61,82 +62,85 @@ id="tracePage" style="min-height: auto">
             />
           </template>
           <template #after>
-            <div
-              v-if="
-                searchObj.data.errorMsg !== '' && searchObj.loading == false
-              "
-            >
-              <h5 class="text-center">
-                <div
-                  data-test="logs-search-result-not-found-text"
-                  v-if="
-                    searchObj.data.stream.streamLists.length &&
-                    searchObj.data.errorCode == 0
-                  "
-                >
-                  Result not found.
-                </div>
-                <SanitizedHtmlRenderer
-                  data-test="logs-search-error-message"
-                  :htmlContent="`${searchObj.data.errorMsg}
-                  ${searchObj.data.errorDetail ? `<h6 style='font-size: 14px; margin: 0;'>${searchObj.data.errorDetail}</h6>` : ''}`"
-                />
-                <div
-                  data-test="logs-search-error-20003"
-                  v-if="parseInt(searchObj.data.errorCode) == 20003"
-                >
-                  <q-btn
-                    no-caps
-                    unelevated
-                    size="sm"
-                    bg-secondary
-                    class="no-border bg-secondary text-white"
-                    :to="
-                      '/streams?dialog=' +
-                      searchObj.data.stream.selectedStream.label
+            <div class="card-container tw-h-full">
+              <div
+                v-if="
+                  searchObj.data.errorMsg !== '' && searchObj.loading == false
+                "
+              >
+                <h5 class="text-center">
+                  <div
+                    data-test="logs-search-result-not-found-text"
+                    v-if="
+                      searchObj.data.stream.streamLists.length &&
+                      searchObj.data.errorCode == 0
                     "
-                    >Click here</q-btn
                   >
-                  to configure a full text search field to the stream.
-                </div>
-                <br />
-                <q-item-label>{{
-                  searchObj.data.additionalErrorMsg
-                }}</q-item-label>
-              </h5>
-            </div>
-            <div v-else-if="!isStreamSelected">
-              <h5
-                data-test="logs-search-no-stream-selected-text"
+                    Result not found.
+                  </div>
+                  <SanitizedHtmlRenderer
+                    data-test="logs-search-error-message"
+                    :htmlContent="`${searchObj.data.errorMsg}
+                  ${searchObj.data.errorDetail ? `<h6 style='font-size: 14px; margin: 0;'>${searchObj.data.errorDetail}</h6>` : ''}`"
+                  />
+                  <div
+                    data-test="logs-search-error-20003"
+                    v-if="parseInt(searchObj.data.errorCode) == 20003"
+                  >
+                    <q-btn
+                      no-caps
+                      unelevated
+                      size="sm"
+                      bg-secondary
+                      class="no-border bg-secondary text-white"
+                      :to="
+                        '/streams?dialog=' +
+                        searchObj.data.stream.selectedStream.label
+                      "
+                      >Click here</q-btn
+                    >
+                    to configure a full text search field to the stream.
+                  </div>
+                  <br />
+                  <q-item-label>{{
+                    searchObj.data.additionalErrorMsg
+                  }}</q-item-label>
+                </h5>
+              </div>
+              <div v-else-if="!isStreamSelected">
+                <h5
+                  data-test="logs-search-no-stream-selected-text"
+                  class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
+                >
+                  <q-icon name="info" color="primary"
+size="md" /> Select a
+                  stream and press 'Run query' to continue. Additionally, you
+                  can apply additional filters and adjust the date range to
+                  enhance search.
+                </h5>
+              </div>
+              <div
+                data-test="logs-search-result-not-found-text"
+                v-else-if="
+                  isStreamSelected &&
+                  !searchObj.searchApplied &&
+                  !searchObj.data.queryResults?.hits?.length
+                "
                 class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
               >
                 <q-icon name="info"
-color="primary" size="md" /> Select a stream
-                and press 'Run query' to continue. Additionally, you can apply
-                additional filters and adjust the date range to enhance search.
-              </h5>
-            </div>
-            <div
-              data-test="logs-search-result-not-found-text"
-              v-else-if="
-                isStreamSelected &&
-                !searchObj.searchApplied &&
-                !searchObj.data.queryResults?.hits?.length
-              "
-              class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
-            >
-              <q-icon name="info"
 color="primary" size="md" />
-              {{ t("search.applySearch") }}
-            </div>
+                {{ t("search.applySearch") }}
+              </div>
 
-            <div data-test="logs-search-search-result">
-              <search-result
-                ref="searchResultRef"
-                @update:datetime="setHistogramDate"
-                @update:scroll="getMoreData"
-                @shareLink="copyTracesUrl"
-              />
+              <div data-test="logs-search-search-result">
+                <search-result
+                  ref="searchResultRef"
+                  @update:datetime="setHistogramDate"
+                  @update:scroll="getMoreData"
+                  @shareLink="copyTracesUrl"
+                />
+              </div>
             </div>
           </template>
         </q-splitter>
