@@ -87,7 +87,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-td :props="props" side>
           <q-btn
             v-if="props.row.enableDelete && props.row.status != 'pending'"
-            :icon="outlinedDelete"
             :title="t('user.delete')"
             class="q-ml-xs"
             padding="sm"
@@ -98,10 +97,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="confirmDeleteAction(props)"
             style="cursor: pointer !important"
             :data-test="`delete-basic-user-${props.row.email}`"
-          />
+          >
+          <Trash class="o2-actions-icons" />
+          </q-btn>
           <q-btn
             v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
-            icon="edit"
             :title="t('user.update')"
             class="q-ml-xs"
             padding="sm"
@@ -112,7 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="addRoutePush(props)"
             style="cursor: pointer !important"
              :data-test="`edit-basic-user-${props.row.email}`"
-          />
+          >
+          <Pencil class="o2-actions-icons" />
+        </q-btn>
         </q-td>
       </template>
       <template #bottom="scope">
@@ -215,6 +217,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles } from "@/services/iam";
+import { Pencil, Trash } from "lucide-vue-next";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -224,6 +227,8 @@ export default defineComponent({
     NoData,
     AddUser,
     MemberInvitation,
+    Trash,
+    Pencil,
   },
   emits: [
     "updated:fields",

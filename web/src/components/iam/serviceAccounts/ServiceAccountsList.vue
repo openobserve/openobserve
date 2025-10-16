@@ -117,21 +117,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #body-cell-actions="props">
         <q-td :props="props" side>
           <q-btn
-          data-test="service-accounts-refresh"
-          icon="refresh"
-          :title="t('serviceAccounts.refresh')"
-          class="q-ml-xs"
-          padding="sm"
-          unelevated
-          size="sm"
-          round
-          flat
-          style="cursor: pointer !important"
-          @click="confirmRefreshAction(props.row)"
-          />
+            data-test="service-accounts-refresh"
+            :title="t('serviceAccounts.refresh')"
+            class="q-ml-xs"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            style="cursor: pointer !important"
+            @click="confirmRefreshAction(props.row)"
+          >
+            <RotateCw class="o2-actions-icons" />
+          </q-btn>
           <q-btn
             data-test="service-accounts-edit"
-            icon="edit"
             :title="t('serviceAccounts.update')"
             class="q-ml-xs"
             padding="sm"
@@ -141,10 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             @click="addRoutePush(props)"
             style="cursor: pointer !important"
-          />
+          >
+            <Pencil class="o2-actions-icons" />
+          </q-btn>
           <q-btn
             data-test="service-accounts-delete"
-            :icon="outlinedDelete"
             :title="t('serviceAccounts.delete')"
             class="q-ml-xs"
             padding="sm"
@@ -154,7 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             style="cursor: pointer !important"
             @click="confirmDeleteAction(props)"
-          />
+          >
+            <Trash class="o2-actions-icons" />
+          </q-btn>
 
         </q-td>
       </template>
@@ -339,9 +342,10 @@ import { computed, nextTick } from "vue";
 import { getRoles } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
+import { Trash, Pencil, RotateCw } from "lucide-vue-next";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { QTablePagination,  NoData,AddServiceAccount},
+  components: { QTablePagination,  NoData,AddServiceAccount, Trash, Pencil, RotateCw },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
