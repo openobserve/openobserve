@@ -665,20 +665,7 @@ body {
     height: 16px !important;
   }
 }
-.o2-table-checkbox-light{
-  .q-checkbox__inner--truthy .q-checkbox__bg, .q-checkbox__inner--indet .q-checkbox__bg {
-    background: #575FC5 !important;
-    border: 2px solid #575FC5 !important;
-  }
-}
 
-
-.o2-table-checkbox-dark{
-  .q-checkbox__inner--truthy .q-checkbox__bg, .q-checkbox__inner--indet .q-checkbox__bg {
-    background: #575FC5 !important;
-    border: 2px solid #575FC5 !important;
-  }
-}
 
 //this is used to target the radio button in the app
 //we need to add the class o2-radio-button-light or o2-radio-button-dark to the radio button directly
