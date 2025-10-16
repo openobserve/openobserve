@@ -120,7 +120,7 @@ import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
-import searchService from "@/services/search";
+import streamingSearch from "@/services/streaming_search";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { generateTraceContext } from "@/utils/zincutils";
 
@@ -220,6 +220,46 @@ export default defineComponent({
       return plan.trim();
     };
 
+    const parseSSEResponse = (sseText: string): any => {
+      // Parse Server-Sent Events format response
+      // Format: event: <event_type>\ndata: <json>\n\n
+      try {
+        const lines = sseText.split('\n');
+        let currentEvent = '';
+        let result: any = null;
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+
+          if (trimmed.startsWith('event:')) {
+            currentEvent = trimmed.substring(6).trim();
+          } else if (trimmed.startsWith('data:')) {
+            const dataContent = trimmed.substring(5).trim();
+
+            // Skip progress events and done marker
+            if (dataContent === '[[DONE]]' || currentEvent === 'progress') {
+              continue;
+            }
+
+            try {
+              const parsed = JSON.parse(dataContent);
+              // Look for actual search results with hits
+              if (parsed && (parsed.hits !== undefined || parsed.total !== undefined)) {
+                result = parsed;
+              }
+            } catch (e) {
+              // Not JSON, skip
+            }
+          }
+        }
+
+        return result;
+      } catch (err) {
+        console.error("Error parsing SSE response:", err);
+        return null;
+      }
+    };
+
     const extractAnalyzeMetrics = (plan: string) => {
       const metrics: Array<{ label: string; value: string }> = [];
 
@@ -293,20 +333,21 @@ export default defineComponent({
           },
         };
 
-        const traceparent = generateTraceContext()?.traceparent;
-        const response = await searchService.search(
-          {
-            org_identifier: store.state.selectedOrganization.identifier,
-            query: explainQueryPayload,
-            page_type: "logs",
-            traceparent,
-          },
-          "ui"
-        );
+        const { traceId } = generateTraceContext();
+        const response = await streamingSearch.search({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: explainQueryPayload,
+          page_type: "logs",
+          search_type: "ui",
+          traceId,
+        });
+
+        // Parse SSE response - streaming API returns Server-Sent Events format
+        const parsedData = parseSSEResponse(response.data);
 
         // Parse the response to extract logical and physical plans
-        if (response.data) {
-          parsePlans(response.data, false);
+        if (parsedData) {
+          parsePlans(parsedData, false);
 
           // Check if we got at least one plan
           if (!logicalPlan.value && !physicalPlan.value) {
@@ -349,20 +390,21 @@ export default defineComponent({
           },
         };
 
-        const traceparent = generateTraceContext()?.traceparent;
-        const response = await searchService.search(
-          {
-            org_identifier: store.state.selectedOrganization.identifier,
-            query: analyzeQueryPayload,
-            page_type: "logs",
-            traceparent,
-          },
-          "ui"
-        );
+        const { traceId } = generateTraceContext();
+        const response = await streamingSearch.search({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: analyzeQueryPayload,
+          page_type: "logs",
+          search_type: "ui",
+          traceId,
+        });
+
+        // Parse SSE response - streaming API returns Server-Sent Events format
+        const parsedData = parseSSEResponse(response.data);
 
         // Parse the response to extract logical and physical plans with metrics
-        if (response.data) {
-          parsePlans(response.data, true);
+        if (parsedData) {
+          parsePlans(parsedData, true);
 
           // Extract metrics from the physical plan (which has execution stats)
           if (physicalPlan.value) {
