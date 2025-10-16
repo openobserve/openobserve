@@ -1281,20 +1281,19 @@ body {
 
 .q-input {
   min-height: 2.25rem;
-  @extend .el-input-min-height;
   font-size: 0.813rem;
   .q-field__control {
     @extend .el-border;
     @extend .el-border-radius;
-    @extend .el-input-min-height;
-    @extend .el-input-max-height;
+    min-height: 2.25rem;
+    max-height: 2.25rem;
     background-color: transparent;
     line-height: 1.5rem;
     padding: 0rem 0.75rem !important;
   }
   .q-field__control-container{
       .q-field__native{
-       @extend .el-input-height;
+       height: 2.25rem !important;
     }
   }
   &:hover .q-field__control {
@@ -1309,13 +1308,13 @@ body {
    ============================================================================ */
 
 .q-select {
-  @extend .el-input-min-height;
+  min-height: 2.25rem;
   font-size: 0.813rem;
   .q-field__control {
     @extend .el-border;
     @extend .el-border-radius;
-    @extend .el-input-min-height;
-    @extend .el-input-max-height;
+    min-height: 2.25rem;
+    max-height: 2.25rem;
     background-color: transparent;
     line-height: 1.5rem;
     padding: 0rem 0.75rem !important;
@@ -1345,7 +1344,7 @@ body {
  */
 
  .o2-side-dialog {
-  @extend .el-side-dropdown-width;
+  width: 30vw !important;
  }
 
 
@@ -1369,8 +1368,8 @@ body {
   .q-field__control {
     @extend .el-border;
     @extend .el-border-radius;
-    @extend .el-input-file-min-height;
-    @extend .el-input-file-max-height;
+    min-height: 2.25rem;
+    max-height: 2.25rem;
     background-color: transparent;
     line-height: 1.5rem;
     padding: 0rem 0.75rem !important;
@@ -1379,5 +1378,3 @@ body {
     border-color: var(--border-color-hover) !important;
   }
 }
-
-
