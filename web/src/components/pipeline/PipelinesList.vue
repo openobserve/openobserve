@@ -17,15 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="currentRouteName === 'pipelines'">
     <div
-      class="full-wdith pipeline-list-table card-container"
-      style="height: calc(100vh - 57px);"
+      class="full-wdith pipeline-list-table"
+      style="height: calc(100vh - 52px);"
     >
-    <div class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-border-b-[1px] tw-h-[71px]">
+    <div class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-h-[71px]">
       <div class="q-table__title tw-font-[600]" data-test="pipeline-list-title">
             {{ t("pipeline.header") }}
           </div>
           <div class="tw-flex tw-items-center q-ml-auto">
-            <div class="app-tabs-container tw-h-[36px] q-mr-sm" :class="store.state.theme === 'dark' ? 'app-tabs-container-dark' : 'app-tabs-container-light'">
+            <div class="app-tabs-container tw-h-[36px] q-mr-sm">
               <app-tabs
               data-test="pipeline-list-tabs"
               class="tabs-selection-container"
@@ -43,16 +43,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               class="no-border o2-search-input"
               :placeholder="t('pipeline.search')"
-              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
             <q-btn
               data-test="pipeline-list-import-pipeline-btn"
               class="q-ml-sm o2-secondary-button tw-h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               padding="sm lg"
               no-caps
               flat
@@ -62,7 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               data-test="pipeline-list-add-pipeline-btn"
               class="q-ml-sm o2-primary-button tw-h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               flat
               no-caps
               :label="t(`pipeline.addPipeline`)"
@@ -85,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'width: 100%; height: calc(100vh - 114px)' 
             : 'width: 100%'"
         class="o2-quasar-table o2-quasar-table-header-sticky "
-        :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light'"
       >
         <template v-slot:body="props">
           <q-tr
@@ -97,7 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td auto-width>
               <q-checkbox
                 v-model="props.selected"
-                :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
                 class="o2-table-checkbox"
                 size="sm"
                 @click.stop
@@ -242,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <no-data />
         </template>
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'" class="o2-table-checkbox" />
+          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
         </template>
 
         <template v-slot:body-cell-function="props">
