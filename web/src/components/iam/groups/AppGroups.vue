@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pa-none">
+  <q-page class="q-pa-none card-container" style="min-height: inherit; height: calc(100vh - 42px);">
     <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
       :class="store.state.theme =='dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
       >
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-btn
           data-test="iam-groups-add-group-btn"
-          class="q-ml-md o2-primary-button tw-h-[36px]"
+          class="q-ml-sm o2-primary-button tw-h-[36px]"
           flat
           :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           no-caps
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="deleteConformDialog.show = false"
       v-model="deleteConformDialog.show"
     />
-  </div>
+  </q-page>
 </template>
 
 <script setup lang="ts">
