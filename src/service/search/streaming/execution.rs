@@ -174,13 +174,15 @@ pub async fn do_partitioned_search(
             );
         }
 
-        curr_res_size += total_hits;
-        if req_size > 0 && curr_res_size >= req_size {
-            log::info!(
-                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
-            );
-            search_res.hits.truncate(req_size as usize);
-            search_res.total = search_res.hits.len();
+        if !is_streaming_aggs {
+            curr_res_size += total_hits;
+            if req_size > 0 && curr_res_size >= req_size {
+                log::info!(
+                    "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
+                );
+                search_res.hits.truncate(req_size as usize);
+                search_res.total = search_res.hits.len();
+            }
         }
 
         search_res = order_search_results(search_res, fallback_order_by_col.clone());
