@@ -28,6 +28,7 @@ pub mod file_list;
 pub mod file_list_dump;
 pub mod folders;
 pub mod functions;
+pub mod github;
 pub mod grpc;
 pub mod ingestion;
 pub mod kv;

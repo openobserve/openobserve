@@ -33,16 +33,42 @@ pub const RE_PATTERN_PREFIX: &str = "/re_patterns/";
 pub const RE_PATTERN_ASSOCIATIONS_PREFIX: &str = "/re_pattern_associations/";
 
 pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
-    match infra::table::re_pattern::add(entry.clone()).await {
-        Ok(_) => {}
-        Err(errors::Error::DbError(DbError::UniqueViolation)) => {
-            return Err(anyhow::anyhow!(
-                "Pattern with given id/name already exists in the org"
-            ));
-        }
-        Err(e) => {
-            log::error!("error while saving pattern to db : {e}");
-            return Err(anyhow::anyhow!(e));
+    let mut pattern_entry = entry.clone();
+    let mut attempt = 0;
+    const MAX_ATTEMPTS: i32 = 100;
+
+    loop {
+        match infra::table::re_pattern::add(pattern_entry.clone()).await {
+            Ok(_) => break,
+            Err(errors::Error::DbError(DbError::UniqueViolation)) => {
+                // Duplicate name detected - generate a new name with suffix
+                attempt += 1;
+                if attempt >= MAX_ATTEMPTS {
+                    return Err(anyhow::anyhow!(
+                        "Failed to create pattern with unique name after {} attempts", MAX_ATTEMPTS
+                    ));
+                }
+
+                // Generate new name: "Pattern Name (2)", "Pattern Name (3)", etc.
+                pattern_entry.name = if attempt == 1 {
+                    format!("{} ({})", entry.name, attempt + 1)
+                } else {
+                    // Replace the suffix
+                    format!("{} ({})", entry.name, attempt + 1)
+                };
+
+                log::info!(
+                    "Pattern name '{}' already exists in org '{}', trying with name '{}'",
+                    entry.name,
+                    entry.org,
+                    pattern_entry.name
+                );
+                continue;
+            }
+            Err(e) => {
+                log::error!("error while saving pattern to db : {e}");
+                return Err(anyhow::anyhow!(e));
+            }
         }
     }
 
@@ -50,7 +76,7 @@ pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
     let cluster_coordinator = get_coordinator().await;
     cluster_coordinator
         .put(
-            &format!("{RE_PATTERN_PREFIX}{}", entry.id),
+            &format!("{RE_PATTERN_PREFIX}{}", pattern_entry.id),
             bytes::Bytes::new(), // no actual data, the receiver can query the db
             true,
             None,
@@ -61,26 +87,26 @@ pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
     {
         let config = o2_enterprise::enterprise::common::config::get_config();
         if config.super_cluster.enabled {
-            match o2_enterprise::enterprise::super_cluster::queue::patterns_put(entry.clone()).await
+            match o2_enterprise::enterprise::super_cluster::queue::patterns_put(pattern_entry.clone()).await
             {
                 Ok(_) => {
                     log::info!(
                         "successfully sent pattern add notification to super cluster queue for {}/{}",
-                        entry.org,
-                        entry.name
+                        pattern_entry.org,
+                        pattern_entry.name
                     );
                 }
                 Err(e) => {
                     log::error!(
                         "error in sending pattern add notification to super cluster queue for {}/{} : {e}",
-                        entry.org,
-                        entry.name
+                        pattern_entry.org,
+                        pattern_entry.name
                     );
                 }
             }
         }
     }
-    Ok(entry)
+    Ok(pattern_entry)
 }
 
 pub async fn update(id: &str, new_pattern: &str) -> Result<(), errors::Error> {

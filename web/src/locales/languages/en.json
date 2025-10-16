@@ -1373,6 +1373,22 @@
     "create_regex_pattern_field": "Redact / Drop using Regex",
     "import": "Import",
     "import_title": "Import Pattern",
-    "bottom_header": "Pattern(s)"
+    "bottom_header": "Pattern(s)",
+    "filter_by_tag": "Filter by Tag",
+    "refresh": "Refresh",
+    "loading_patterns": "Loading patterns...",
+    "try_again": "Try Again",
+    "showing_patterns": "Showing {count} pattern(s)",
+    "preview": "Preview",
+    "no_patterns_found": "No patterns found",
+    "no_description": "No description available",
+    "tags": "Tags",
+    "rarity": "Rarity",
+    "valid_examples": "Valid Examples",
+    "close": "Close",
+    "import_this_pattern": "Import This Pattern",
+    "patterns_loaded": "Loaded {count} pattern(s)",
+    "failed_to_load": "Failed to load patterns",
+    "no_patterns_selected": "Please select at least one pattern"
   }
 }
