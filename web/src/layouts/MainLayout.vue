@@ -1616,14 +1616,14 @@ export default defineComponent({
         }
 
         .q-item__label {
-          color: var(--o2-theme-color);
+          color: var(--o2-menu-color);
 
           // Light mode: make text blue for readability
           body.body--light & {
             color: var(--o2-menu-color) !important;
           }
         }
-        color: white;
+        color: var(--o2-menu-color);
 
         // Light mode: make item text blue
         body.body--light & {

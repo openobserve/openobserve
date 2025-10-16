@@ -195,11 +195,11 @@ export default defineComponent({
     // background-color: rgba(30, 41, 59, 0.6);
 
     .q-icon {
-      color: #cbd5e1;
+      color: var(--o2-menu-color);
     }
 
     .q-item-label {
-      color: #cbd5e1;
+      color: var(--o2-menu-color);
     }
   }
 
@@ -220,7 +220,7 @@ export default defineComponent({
     background: linear-gradient(135deg, var(--o2-menu-gradient-start) 0%, var(--o2-menu-gradient-end) 100%) !important;
     border: 1px solid rgba(89, 155, 174, 0.6) !important;
     box-shadow: 0 4px 12px rgba(89, 155, 174, 0.09) !important;
-    color: var(--o2-theme-color) !important;
+    color: var(--o2-menu-color) !important;
     transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
     // Subtle inner highlight for depth
     position: relative;
@@ -229,12 +229,12 @@ export default defineComponent({
     .q-icon {
       // Minimal icon glow
       filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.4));
-      color: var(--o2-theme-color); // Lighter purple for better visibility
+      color: var(--o2-menu-color); // Lighter purple for better visibility
     }
 
     .q-item-label {
       font-weight: 700;
-      color: var(--o2-theme-color); // Very light purple/white for contrast
+      color: var(--o2-menu-color); // Very light purple/white for contrast
       text-shadow: 0 0 4px rgba(168, 85, 247, 0.3);
     }
 
@@ -343,7 +343,7 @@ body.body--light {
 
       :deep(.q-icon),
       :deep(.q-item-label) {
-        color: #374151;
+        color: var(--o2-menu-color);
       }
     }
 
