@@ -251,8 +251,7 @@ export default defineComponent({
       background: linear-gradient(180deg, var(--o2-theme-color) 0%, var(--o2-theme-color) 50%, var(--o2-theme-color) 100%);
       border-radius: 0 2px 2px 0;
       // Minimal glow
-      box-shadow:
-        0 0 6px rgba(168, 85, 247, 0.5);
+      box-shadow: 0 0 6px var(--o2-menu-color);
     }
 
     // Subtle animated glow overlay
@@ -264,7 +263,7 @@ export default defineComponent({
       right: 0;
       bottom: 0;
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, transparent 50%, rgba(0, 0, 0, 0.1) 100%);
-      border-radius: 6px;
+      border-radius: 0 6px 6px 0;
       pointer-events: none;
     }
   }
@@ -338,6 +337,8 @@ export default defineComponent({
 // Light mode support - using :deep() to pierce scoped styles
 body.body--light {
   .q-item {
+    padding: 3px 5px;
+
     &:hover:not(.q-router-link--active) {
       background-color: rgba(241, 245, 249, 0.6);
 
@@ -349,7 +350,7 @@ body.body--light {
 
     &.q-router-link--active {
       background: linear-gradient(135deg, rgba(89, 155, 174, 0.04) 0%, rgba(89, 155, 174, 0.08) 100%) !important;
-      border: 1px solid rgba(89, 155, 174, 0.6) !important;
+      border: 0px solid rgba(89, 155, 174, 0.6) !important;
       box-shadow: 0 4px 12px rgba(89, 155, 174, 0.09) !important;
       color: var(--o2-menu-color) !important;
 
@@ -364,8 +365,8 @@ body.body--light {
       }
 
       &::before {
-        background: linear-gradient(180deg, var(--o2-body-primary-bg) 0%, var(--o2-body-secondary-bg) 100%) !important;
-        box-shadow: 0 0 8px rgba(37, 99, 235, 0.5) !important;
+        // background: linear-gradient(180deg, var(--o2-body-primary-bg) 0%, var(--o2-body-secondary-bg) 100%) !important;
+        box-shadow: 4px 0px 0px var(--o2-menu-color) !important;
       }
     }
   }
