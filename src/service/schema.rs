@@ -223,7 +223,7 @@ pub async fn get_merged_schema(
 // 2. get schema from db for update,
 // 3. if db_schema is identical to inferred_schema, return (means another thread has updated schema)
 // 4. if db_schema is not identical to inferred_schema, merge schema and update db
-async fn handle_diff_schema(
+pub(crate) async fn handle_diff_schema(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
