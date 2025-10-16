@@ -173,7 +173,19 @@
     "downloadCSV": "CSV",
     "downloadJSON": "JSON",
     "fileType": "File Type",
-    "showOnlyInterestingFields": "Interesting Fields"
+    "showOnlyInterestingFields": "Interesting Fields",
+    "explainQuery": "Explain Query",
+    "explainTooltip": "Show query execution plan",
+    "queryPlan": "Query Plan",
+    "analyze": "Analyze",
+    "analyzeTooltip": "Run query with execution metrics",
+    "executionMetrics": "Execution Metrics",
+    "loadingPlan": "Loading query plan...",
+    "runningAnalyze": "Running analyze...",
+    "noPlanFound": "No query plan found",
+    "noAnalyzePlanFound": "No analyze plan found",
+    "errorFetchingPlan": "Error fetching query plan",
+    "errorRunningAnalyze": "Error running analyze"
   },
   "menu": {
     "home": "Home",
