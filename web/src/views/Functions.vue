@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw-overflow-hidden"
     >
       <template v-slot:before>
-        <div v-if="showSidebar" class="functions-tabs">
+        <div v-if="showSidebar" class="functions-tabs spitter-container">
           <q-tabs
             v-model="activeTab"
             indicator-color="transparent"
@@ -203,7 +203,7 @@ export default defineComponent({
   }
 }
 .functions-tabs {
-  .q-tabs {
+  .q-tabs_bkcss {
     &--vertical {
       margin: 20px 16px 0 16px;
       .q-tab {
