@@ -22,7 +22,10 @@ use datafusion::{
     },
     config::ConfigOptions,
     physical_optimizer::PhysicalOptimizerRule,
-    physical_plan::{ExecutionPlan, joins::HashJoinExec},
+    physical_plan::{
+        ExecutionPlan,
+        joins::{HashJoinExec, PartitionMode},
+    },
 };
 
 #[cfg(feature = "enterprise")]
@@ -81,6 +84,7 @@ fn swap_join_order(plan: Arc<dyn ExecutionPlan>) -> Result<Transformed<Arc<dyn E
         if !is_aggregate_exec(left)
             && is_aggregate_exec(right)
             && hash_join.join_type().supports_swap()
+            && hash_join.mode != PartitionMode::CollectLeft
         {
             return Ok(Transformed::yes(HashJoinExec::swap_inputs(
                 hash_join,
@@ -95,17 +99,16 @@ fn swap_join_order(plan: Arc<dyn ExecutionPlan>) -> Result<Transformed<Arc<dyn E
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Int64Array, RecordBatch, StringArray};
     use arrow_schema::{DataType, Field, Schema};
     use datafusion::{
         common::Result,
-        datasource::MemTable,
         execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
         physical_plan::get_plan_string,
         prelude::{SessionConfig, SessionContext},
     };
 
     use super::*;
+    use crate::service::search::datafusion::table_provider::empty_table::NewEmptyTable;
 
     #[tokio::test]
     async fn test_join_reorder() -> Result<()> {
@@ -114,21 +117,6 @@ mod tests {
             Field::new("name", DataType::Utf8, false),
         ]));
 
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5])),
-                Arc::new(StringArray::from(vec![
-                    "openobserve",
-                    "observe",
-                    "openobserve",
-                    "oo",
-                    "o2",
-                ])),
-            ],
-        )
-        .unwrap();
-
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new().with_target_partitions(12))
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
@@ -136,7 +124,7 @@ mod tests {
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .build();
         let ctx = SessionContext::new_with_state(state);
-        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        let provider = NewEmptyTable::new("t", schema.clone()).with_partitions(12);
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
         let sql = "SELECT count(*) from t where name in (select distinct name from t)";
@@ -150,14 +138,17 @@ mod tests {
             "      AggregateExec: mode=Partial, gby=[], aggr=[count(Int64(1))]",
             "        ProjectionExec: expr=[]",
             "          CoalesceBatchesExec: target_batch_size=8192",
-            "            HashJoinExec: mode=CollectLeft, join_type=RightSemi, on=[(name@0, name@0)]",
+            "            HashJoinExec: mode=Partitioned, join_type=RightSemi, on=[(name@0, name@0)]",
             "              AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
             "                CoalesceBatchesExec: target_batch_size=8192",
             "                  RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
-            "                    RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
-            "                      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
-            "                        DataSourceExec: partitions=1, partition_sizes=[1]",
-            "              DataSourceExec: partitions=1, partition_sizes=[1]",
+            "                    AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
+            "                      CooperativeExec",
+            "                        NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
+            "              CoalesceBatchesExec: target_batch_size=8192",
+            "                RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "                  CooperativeExec",
+            "                    NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
