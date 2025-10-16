@@ -605,6 +605,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(re_pattern::test)
         .service(domain_management::get_domain_management_config)
         .service(domain_management::set_domain_management_config)
+        .service(license::get_license_info)
+        .service(license::store_license)
         .service(mcp::handle_mcp_post)
         .service(mcp::handle_mcp_get);
 

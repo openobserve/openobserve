@@ -1481,3 +1481,21 @@ pub fn generate_search_schema_diff(
 
     diff_fields
 }
+
+#[inline]
+pub fn check_search_allowed() -> Result<(), Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        // this is installation level limit for all orgs combined
+        if !o2_enterprise::enterprise::license::search_allowed() {
+            Err(Error::Message(
+                "This installation has exceeded its data ingestion limit".to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    Ok(())
+}
