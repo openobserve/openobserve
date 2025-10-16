@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="show" class="flex items-center rum-tabs">
+  <div v-if="show" class="flex items-center o2-tabs">
     <div
       :key="tab.value + tab.disabled"
       v-for="tab in tabs as Tab[]"
@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         :data-test="`tab-${tab.value}`"
-        class="q-px-lg q-py-sm rum-tab text-center"
+        class="q-px-lg q-py-sm o2-tab text-center"
         :style="tab.style"
         :title="tab.title || tab.label"
         :class="[

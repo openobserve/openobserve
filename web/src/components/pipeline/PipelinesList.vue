@@ -33,11 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("pipeline.header") }}
           </div>
           <div class="tw-flex tw-items-center q-ml-auto">
-            <div class="app-tabs-container tw-h-[36px] q-mr-md" :class="store.state.theme === 'dark' ? 'app-tabs-container-dark' : 'app-tabs-container-light'">
+            <div class="app-tabs-container tw-h-[36px] q-mr-sm" :class="store.state.theme === 'dark' ? 'app-tabs-container-dark' : 'app-tabs-container-light'">
               <app-tabs
               data-test="pipeline-list-tabs"
               class="tabs-selection-container"
-              :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
               :tabs="tabs"
               v-model:active-tab="activeTab"
               @update:active-tab="updateActiveTab"
@@ -60,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-input>
             <q-btn
               data-test="pipeline-list-import-pipeline-btn"
-              class="q-ml-md o2-secondary-button tw-h-[36px]"
+              class="q-ml-sm o2-secondary-button tw-h-[36px]"
               :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               padding="sm lg"
               no-caps
@@ -70,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <q-btn
               data-test="pipeline-list-add-pipeline-btn"
-              class="q-ml-md o2-primary-button tw-h-[36px]"
+              class="q-ml-sm o2-primary-button tw-h-[36px]"
               :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               flat
               no-caps

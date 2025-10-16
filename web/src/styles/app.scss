@@ -58,6 +58,10 @@ body {
   border: 0.0625rem solid var(--o2-border-color);
 }
 
+.el-border-radius {
+  border-radius: 0.375rem;
+}
+
 .table-container thead {
     // background: var(--o2-table-header-bg);
     // opacity: 0.9;
@@ -79,6 +83,8 @@ body {
     .q-tab {
       justify-content: flex-start;
       padding: 0 0.6rem 0 0.6rem;
+      border-radius: 0.375rem;
+      margin-bottom: 0.5rem;
       text-transform: capitalize;
 
       &:hover{
@@ -367,25 +373,23 @@ body {
     position: sticky;
     right: 0;
     z-index: 1;
-    background: #ffffff;
     box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
   }
 }
 //here we have dark theme styling for the table
 //`. we are changing the background color of the actions column
-.o2-quasar-table-dark{
-  th:last-child.actions-column,
-  td:last-child.actions-column {
-    background: var(--q-dark);
-    box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1);
-    width: 150px;
-  }
-}
+// .o2-quasar-table-dark{
+//   th:last-child.actions-column,
+//   td:last-child.actions-column {
+//     background: var(--q-dark);
+//     box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1);
+//     width: 150px;
+//   }
+// }
 
-.o2-quasar-table-light{
+.o2-quasar-table{
   th:last-child.actions-column,
   td:last-child.actions-column {
-    background: #ffffff;
     width: 150px;
     box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
   }
@@ -525,9 +529,9 @@ body {
 //so to make this work just introduce a new div around the app-tabs component and add the class app-tabs-container to it
 //and then add the class tabs-selection-container-dark or tabs-selection-container-light to the app-tabs component
 .app-tabs-container{
-  border: 1px solid #cacaca;
+  @extend .el-border;
+  @extend .el-border-radius;
   padding: 2px;
-  border-radius: 2px;
 }
 
 .tabs-selection-container-dark{
@@ -556,27 +560,26 @@ body {
   }
 }
 
-.tabs-selection-container-light{
-  border: none !important;
-  border-radius: none !important;
-  .rum-tab{
-    border-radius: 4px !important;
-    height: 30px !important;
-    margin: 0 2px !important;
-    padding: 4px 12px !important;
-    border-bottom: none !important;
-    width: auto !important;
-    white-space: normal !important;
+.tabs-selection-container{
+  border: none;
+  border-radius: none;
+  .o2-tab{
+    border-radius: 4px;
+    height: 30px;
+    margin: 0 2px;
+    padding: 4px 12px;
+    border-bottom: none;
+    width: auto;
+    white-space: normal;
   }
-  .rum-tab.active{
-    background-color: $primary !important;
-    color: white !important;
-    border: 1px solid #cacaca !important;
+  .o2-tab.active{
+    background-color: var(--o2-primary-btn-bg);
+    color: rgba(255,255,255) !important;
   }
-  .rum-tab:hover{
-    background-color: #f0f0f0 !important;
+  .o2-tab:hover{
+    background-color: var(--o2-tab-bg);
   }
-  .rum-tab.active:hover{
+  .o2-tab.active:hover{
     background-color: $primary !important;
   }
 }
@@ -674,75 +677,33 @@ body {
 //any non theme related styling should be done here inside the o2-search-input class
 
 .o2-search-input{
-  height: 36px !important;
+  
+  height: 36px;
   .q-field__control{
-  height: 36px !important;
-  border-radius: 4px !important;
-  display: flex;
-  align-items: end;
-  font-size: 13px;
-  padding: 0px 6px !important;
-  font-weight: 500 !important;
-  color: transparent !important;
-}
+    @extend .el-border-radius;
+    @extend .el-border;
+    
+    height: 36px;
+    display: flex;
+    align-items: end;
+    font-size: 13px;
+    padding: 0px 6px !important;
+    font-weight: 500;
+  }
   .q-field__prepend{
     height: 36px !important;
     padding-bottom: 4px !important;
   }
-  .q-field--highlighted{
-    .q-field__control{
-      background-color: red !important;
-    }
-  }
   .q-field__append{
     padding-top: 8px !important;
   }
-}
 
-.o2-search-input-light{
-  .q-field__control{
-    background-color: #ffffff !important;
-    outline: 1px solid #C9CCD6 !important;
-
+  .q-icon {
+    height: 16px;
+    width: 16px;
+    margin-right: 10px;
   }
 }
-.o2-search-input-dark{
-  .q-field__control{
-    background-color: #2B2D30 !important;
-    border: 1px solid #4E5157 !important;
-  }
-}
-//this is done because we need to select the search input when it is focused
-.o2-search-input-light.q-field--focused .q-field__control {
-  outline: 2px solid #575FC5 !important;
-  box-shadow: none !important;
-  background-color: #FFFFFF !important;
-  border-radius: 4px !important;
-}
-
-.o2-search-input-dark.q-field--focused .q-field__control {
-  outline: 2px solid #575FC5 !important;
-  box-shadow: none !important;
-  background-color: #2B2D30 !important;
-  border-radius: 4px !important;
-}
-
-//this is for search input icon
-//we have added the class o2-search-input-icon-light or o2-search-input-icon-dark to the search input icon
-//any non theme related styling should be done here inside the o2-search-input-icon class
-
-.o2-search-input-icon{
-  height: 16px !important;
-  width: 16px !important;
-  margin-right: 10px;
-}
-.o2-search-input-icon-light{
-  color: #818594;
-}
-.o2-search-input-icon-dark{
-  color: #6F737A;
-}
-
 //this is for o2 secondary button
 //in a page we can have multiple secondary buttons so we need to add the class o2-secondary-button-light or o2-secondary-button-dark to the button
 //any non theme related styling should be done here inside the o2-secondary-button class
