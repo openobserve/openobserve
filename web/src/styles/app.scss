@@ -403,6 +403,11 @@ body {
     box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
     border-radius: 0 0.375rem 0 0;
   }
+  tr{
+    td{
+      border-bottom: 1px solid var(--o2-border-color) !important;
+    }
+  }
 }
 //here we have dark theme styling for the table
 //`. we are changing the background color of the actions column
@@ -467,23 +472,6 @@ body {
 }
 
 
-//some times if there are less records or if user tries to search anything the last row of the table is not having border at the bottom
-
-.o2-last-row-border-light{
-  tr:last-child{
-    td{
-      border-bottom: 1px solid #E4E7EC !important;
-    }
-  }
-}
-
-.o2-last-row-border-dark{
-  tr:last-child{
-    td{
-      border-bottom: 1px solid #575A5A !important;
-    }
-  }
-}
 
 
 //this is used to target the table in the app-table component internally it uses q-table component
