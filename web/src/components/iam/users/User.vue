@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 57px);">
-    <div>
+    <div class="card-container">
       <div class="tw-flex tw-flex-row tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
     :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
     >
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="filterQuery"
               borderless
               dense
-              class="q-ml-auto no-border o2-search-input tw-h-[36px] tw-w-[150px]"
+              class="q-ml-auto no-border o2-search-input tw-h-[36px]"
               :placeholder="t('user.search')"
               :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             >
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-6" v-else>
             <q-btn
-              class="q-ml-md o2-primary-button tw-h-[36px]"
+              class="q-ml-sm o2-primary-button tw-h-[36px]"
               flat
               :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               no-caps
