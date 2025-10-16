@@ -113,7 +113,7 @@ style="min-height: auto">
                 <div v-else-if="!isStreamSelected">
                   <h5
                     data-test="logs-search-no-stream-selected-text"
-                    class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
+                    class="text-center tw-mx-[10%] tw-py-[40px] tw-mt-0 tw-text-[20px]"
                   >
                     <q-icon name="info"
 color="primary" size="md" /> Select a
@@ -1321,7 +1321,7 @@ watch(updateSelectedColumns, () => {
 
 <style lang="scss" scoped>
 .traces-search-result-container {
-  height: calc(100vh - 130px) !important;
+  height: calc(100vh - 136px) !important;
 }
 </style>
 <style lang="scss">
