@@ -102,7 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-td :props="props" side>
           <q-btn
             data-test="organization-name-edit"
-            icon="edit"
             :title="'Edit'"
             class="q-ml-xs"
             padding="sm"
@@ -112,7 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             @click="renameOrganization(props)"
             style="cursor: pointer !important"
-          />
+          >
+            <Pencil class="o2-actions-icons" />
+          </q-btn>
         </q-td>
       </template>
     </q-table>
@@ -145,6 +146,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
+import { Pencil } from "lucide-vue-next";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -152,6 +154,7 @@ export default defineComponent({
     AddUpdateOrganization,
     QTablePagination,
     NoData,
+    Pencil,
   },
   setup() {
     const store = useStore();

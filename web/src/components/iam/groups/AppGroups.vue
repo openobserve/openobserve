@@ -70,21 +70,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :hideTopPagination="true"
         :showBottomPaginationWithTitle="true"
       >
-        <template v-slot:actions="slotProps: any">
-          <div>
-            <q-icon
+        <template  v-slot:actions="slotProps: any">
+          <div class="tw-flex tw-items-center tw-gap-2 tw-justify-center">
+            <Pencil
               :data-test="`iam-groups-edit-${slotProps.column.row.group_name}-role-icon`"
-              size="14px"
-              name="edit"
-              class="cursor-pointer q-mr-md"
+              class="o2-actions-icons cursor-pointer"
               :title="t('common.edit')"
               @click="editGroup(slotProps.column.row)"
             />
-            <q-icon
+            <Trash
               :data-test="`iam-groups-delete-${slotProps.column.row.group_name}-role-icon`"
-              size="14px"
-              name="delete"
-              class="cursor-pointer"
+              class="o2-actions-icons cursor-pointer"
               :title="t('common.delete')"
               @click="showConfirmDialog(slotProps.column.row)"
             />
@@ -124,6 +120,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { Pencil, Trash } from "lucide-vue-next";
 
 const showAddGroup = ref(false);
 

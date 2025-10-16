@@ -72,20 +72,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :showBottomPaginationWithTitle="true"
     >
       <template v-slot:actions="slotProps: any">
-        <div>
-          <q-icon
+        <div class="tw-flex tw-items-center tw-gap-2 tw-justify-center">
+          <Pencil
             :data-test="`iam-roles-edit-${slotProps.column.row.role_name}-role-icon`"
-            size="14px"
-            name="edit"
-            class="cursor-pointer q-mr-md"
+            class="o2-actions-icons cursor-pointer"
             :title="t('common.edit')"
             @click="() => editRole(slotProps.column.row)"
           />
-          <q-icon
+          <Trash
             :data-test="`iam-roles-delete-${slotProps.column.row.role_name}-role-icon`"
-            size="14px"
-            name="delete"
-            class="cursor-pointer"
+            class="o2-actions-icons cursor-pointer"
             :title="t('common.delete')"
             @click="() => showConfirmDialog(slotProps.column.row)"
           />
@@ -123,6 +119,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { Pencil, Trash } from "lucide-vue-next";
 
 const { t } = useI18n();
 
