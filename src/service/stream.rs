@@ -16,7 +16,6 @@
 use std::io::Error;
 
 use actix_web::{HttpResponse, http, http::StatusCode};
-use arrow_schema::DataType;
 use config::{
     SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
@@ -28,7 +27,7 @@ use config::{
     },
     utils::{json, time::now_micros},
 };
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use hashbrown::HashMap;
 use infra::{
     cache::stats,
@@ -45,7 +44,7 @@ use crate::{
     common::meta::{
         authz::Authz,
         http::HttpResponse as MetaHttpResponse,
-        stream::{Stream, StreamProperty},
+        stream::{FieldUpdate, Stream, StreamProperty},
     },
     handler::http::router::ERROR_HEADER,
     service::{
@@ -292,7 +291,7 @@ pub async fn save_stream_settings(
                 format!("field [{key}] not found in schema"),
             )));
         };
-        if field.data_type() != &DataType::Utf8 {
+        if field.data_type() != &DataType::Utf8 && field.data_type() != &DataType::LargeUtf8 {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!("full text search field [{key}] must be text field"),
@@ -736,6 +735,68 @@ pub async fn stream_delete_inner(
         );
         return Err(e);
     }
+
+    Ok(())
+}
+
+pub fn parse_data_type(s: &str) -> Option<DataType> {
+    use DataType::*;
+    match s.to_lowercase().as_str() {
+        "utf8" => Some(Utf8),
+        "largeutf8" | "large_utf8" => Some(LargeUtf8),
+        "bool" | "boolean" => Some(Boolean),
+        "int64" => Some(Int64),
+        "uint64" => Some(UInt64),
+        "float64" => Some(Float64),
+        _ => None,
+    }
+}
+
+pub async fn update_fields_type(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: Option<StreamType>,
+    field_updates: &[FieldUpdate],
+) -> Result<(), anyhow::Error> {
+    if field_updates.is_empty() {
+        return Ok(());
+    }
+
+    // Build HashMap of field_name -> (DataType, nullable)
+    let mut updates = HashMap::with_capacity(field_updates.len());
+    for field_update in field_updates {
+        let dt = parse_data_type(&field_update.data_type).ok_or_else(|| {
+            anyhow::anyhow!(format!(
+                "Unsupported data_type '{}' for field '{}'",
+                field_update.data_type, field_update.name
+            ))
+        })?;
+        updates.insert(field_update.name.clone(), (dt, field_update.nullable));
+    }
+
+    // create a new schema with updated field types
+    let new_schema = Schema::new(
+        updates
+            .into_iter()
+            .map(|(name, (data_type, nullable))| {
+                Field::new(name, data_type.clone(), nullable.unwrap_or(true))
+            })
+            .collect::<Vec<_>>(),
+    );
+
+    // update schema in db
+    let min_ts = now_micros();
+    let mut schema_map = std::collections::HashMap::new();
+    super::schema::handle_diff_schema(
+        org_id,
+        stream_name,
+        stream_type.unwrap_or_default(),
+        false,
+        &new_schema,
+        min_ts,
+        &mut schema_map,
+    )
+    .await?;
 
     Ok(())
 }
