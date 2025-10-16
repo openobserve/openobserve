@@ -194,9 +194,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Actions Buttons -->
                 <q-btn
                   :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
-                  :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
                   class="q-ml-xs material-symbols-outlined"
-                  padding="sm"
+                  dense
                   unelevated
                   size="sm"
                   :color="props.row.enabled ? 'negative' : 'positive'"
@@ -206,7 +205,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     props.row.enabled ? t('alerts.pause') : t('alerts.start')
                   "
                   @click.stop="togglePipeline(props.row)"
-                />
+                >
+                  <Pause size="1rem" v-if="props.row.enabled"></Pause>
+                  <Play size="1rem" v-else></Play>
+                </q-btn>
                 <q-btn
                   :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
                   icon="edit"
@@ -610,6 +612,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
 import PipelineView from "./PipelineView.vue";
 import ResumePipelineDialog from "../ResumePipelineDialog.vue";
+import { Play, Pause } from 'lucide-vue-next';
 
 import { filter, update } from "lodash-es";
 

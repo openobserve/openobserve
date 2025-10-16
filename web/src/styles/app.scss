@@ -81,11 +81,11 @@ body {
 .q-tabs {
   &--vertical {
     .q-tab {
+      @extend .el-border-radius;
       justify-content: flex-start;
       padding: 0 0.6rem 0 0.6rem;
-      border-radius: 0.375rem;
-      margin-bottom: 0.5rem;
       text-transform: capitalize;
+      margin: 0.5rem;
 
       &:hover{
         background-color: var(--o2-tab-bg);
