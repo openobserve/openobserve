@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="row">
       <div class="float-right col q-mb-xs flex">
-        <div class="button-group logs-visualize-toggle element-box-shadow">
+        <div class="button-group logs-visualize-toggle element-box-shadow q-ml-xs">
           <div class="row">
             <div>
               <q-btn

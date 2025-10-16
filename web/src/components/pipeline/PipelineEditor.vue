@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-between items-center q-py-sm q-px-sm">
+  <div class="flex justify-between items-center q-py-sm q-px-sm tw-h-[calc(100vh - 42px)]">
     <div class="flex items-center tw-pl-3">
       <div class="text-h6" v-if="pipelineObj.isEditPipeline == true">
         {{ pipelineObj.currentSelectedPipeline.name }}
@@ -24,9 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="pipelineObj.currentSelectedPipeline.name"
           :label="t('pipeline.pipelineName')"
-          style="border: 1px solid #eaeaea; width: calc(30vw)"
           filled
           dense
+          class="tw-w-[300px]"
         />
       </div>
     </div>
