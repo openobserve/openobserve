@@ -695,6 +695,7 @@ body {
 .o2-search-input{
   
   height: 36px;
+  width: 200px !important;
   .q-field__control{
     @extend .el-border-radius;
     @extend .el-border;
@@ -1234,3 +1235,29 @@ body {
     color: var(--o2-primary-btn-bg) !important;
   }
 }
+
+
+
+/* ============================================================================
+   reusable side dialog  in the app
+   ============================================================================
+ */
+
+ .o2-side-dialog {
+  width: 30vw !important; 
+ }
+
+
+/* ============================================================================
+   use this as class for any icons in actions section of the table 
+   ============================================================================
+ */
+
+ .o2-actions-icons {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+
+
+
