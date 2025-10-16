@@ -234,12 +234,19 @@ export const convertSQLData = async (
     // get the limit series from the config
     // if top_results is enabled then use the top_results value
     // otherwise use the max_dashboard_series value
-    const limitSeries = top_results
+    let limitSeries = top_results
       ? (Math.min(
           top_results,
           store.state?.zoConfig?.max_dashboard_series ?? 100,
         ) ?? 100)
       : (store.state?.zoConfig?.max_dashboard_series ?? 100);
+
+    // For multi y-axis charts, divide the limit by number of y-axes
+    // to keep total series count at or below max_dashboard_series
+    // This applies when there are multiple y-axes AND breakdown fields
+    if (yAxisKeys.length > 1 && breakDownKeys.length > 0) {
+      limitSeries = Math.floor(limitSeries / yAxisKeys.length);
+    }
 
     const innerDataArray = data[0];
 
