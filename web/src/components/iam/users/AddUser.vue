@@ -105,13 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!existingUser"
             v-model="formData.first_name"
             :label="t('user.firstName')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-md showLabelOnTop q-mt-sm"
+            class="showLabelOnTop q-mt-sm"
             stack-label
-            outlined
-            filled
             dense
+            borderless
             data-test="user-first-name-field"
           />
 
@@ -119,13 +116,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!existingUser"
             v-model="formData.last_name"
             :label="t('user.lastName')"
-            color="input-border"
-            bg-color="input-bg"
             class="q-py-md showLabelOnTop"
             stack-label
-            outlined
-            filled
             dense
+            borderless
             data-test="user-last-name-field"
           />
           <q-select
@@ -137,15 +131,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.role"
             :label="t('user.role') + ' *'"
             :options="roles"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-pt-md q-pb-md showLabelOnTop"
+            class="q-pt-md q-pb-sm showLabelOnTop"
             emit-value
             map-options
             stack-label
-            outlined
-            filled
             dense
+            borderless
             :rules="[(val: any) => !!val || 'Field is required']"
             data-test="user-role-field"
           />
@@ -158,16 +149,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.custom_role"
             :label="t('user.customRole')"
             :options="filterdOption"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-pt-md q-pb-md showLabelOnTop"
+            class="q-pb-lg showLabelOnTop"
             multiple
             emit-value
             map-options
             stack-label
-            outlined
-            filled
             dense
+            borderless
             use-input
             @filter="filterFn"
             data-test="user-custom-role-field"
@@ -196,13 +184,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :type="isOldPwd ? 'password' : 'text'"
               v-model="formData.old_password"
               :label="t('user.oldPassword') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md showLabelOnTop"
+              class="showLabelOnTop"
               stack-label
-              outlined
-              filled
               dense
+              borderless
               :rules="[
                 (val: any) => !!val || 'Field is required',
                 (val: any) =>
@@ -225,13 +210,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :type="isNewPwd ? 'password' : 'text'"
               v-model="formData.new_password"
               :label="t('user.newPassword') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md showLabelOnTop"
+              class="showLabelOnTop"
               stack-label
-              outlined
-              filled
               dense
+              borderless
               :rules="[
                 (val: any) => !!val || 'Field is required',
                 (val: any) =>
@@ -274,13 +256,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             v-model="formData.other_organization"
             :label="t('user.otherOrganization')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-md showLabelOnTop q-mt-sm"
+            class="showLabelOnTop q-mt-sm"
             stack-label
-            outlined
-            filled
             dense
+            borderless
             :rules="[
               (val: any) =>
                 /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(val) ||

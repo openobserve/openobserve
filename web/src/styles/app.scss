@@ -1172,3 +1172,38 @@ body {
     border-color: var(--border-color-hover) !important;
   }
 }
+
+
+/* ============================================================================
+   Select Section (Dropdown)
+   Reusable Select Section across all pages with consistent borders and radius
+   ============================================================================ */
+
+.q-select {
+  min-height: 2.25rem;
+  font-size: 0.813rem;
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    min-height: 2.25rem;
+    max-height: 2.25rem;
+    background-color: transparent;
+    line-height: 1.5rem;
+    padding: 0rem 0.75rem !important;
+  }
+  &:not(.q-field--disabled):hover .q-field__control {
+    border-color: var(--border-color-hover) !important;
+  }
+}
+
+/* ============================================================================
+   Select Dropdown Options Hover
+   Adds hover background color and text color to q-select dropdown menu options
+   ============================================================================ */
+
+.q-menu .q-item {
+  &:hover {
+    background-color: var(--o2-tab-bg) !important;
+    color: var(--o2-primary-btn-bg) !important;
+  }
+}
