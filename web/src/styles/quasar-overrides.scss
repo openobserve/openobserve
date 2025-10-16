@@ -418,147 +418,147 @@ body.desktop .q-hoverable:hover > .q-focus-helper{
   font-size: 1rem;
 }
 
-// .q-list,
-// .q-splitter__panel,
-// .scroll {
-//   @include scrollbars;
-// }
+.q-list,
+.q-splitter__panel,
+.scroll {
+  @include scrollbars;
+}
 
-// .q-field {
-//   .q-field__control {
-//     border-radius: 0px;
-//   }
+.q-field {
+  .q-field__control {
+    border-radius: 0px;
+  }
 
-//   &--labeled.showLabelOnTop {
-//     padding-top: 32px;
+  &--labeled.showLabelOnTop {
+    padding-top: 32px;
 
-//     &.q-field {
-//       &--float .q-field__label {
-//         transform: translate(-0.75rem, -175%);
-//         font-weight: bold;
-//       }
-//       .q-field__native {
-//         padding: 0 !important;
-//       }
-//       .q-field__control {
-//         border: 1px solid $input-border;
-//         background-color: $input-bg;
-//       }
-//     }
-//     &.q-select {
-//       .q-field__control-container {
-//         padding-top: 0;
+    &.q-field {
+      &--float .q-field__label {
+        transform: translate(-0.75rem, -175%);
+        font-weight: bold;
+      }
+      .q-field__native {
+        padding: 0 !important;
+      }
+      .q-field__control {
+        border: 1px solid $input-border;
+        background-color: $input-bg;
+      }
+    }
+    &.q-select {
+      .q-field__control-container {
+        padding-top: 0;
 
-//         .q-field__native > :first-child {
-//           text-transform: capitalize;
-//           font-size: 0.875rem;
-//           // color: $dark-page;
-//           font-weight: 600;
-//         }
-//       }
-//     }
-//     .q-field__bottom {
-//       padding: 0.875rem 0 0;
-//     }
-//   }
+        .q-field__native > :first-child {
+          text-transform: capitalize;
+          font-size: 0.875rem;
+          // color: $dark-page;
+          font-weight: 600;
+        }
+      }
+    }
+    .q-field__bottom {
+      padding: 0.875rem 0 0;
+    }
+  }
 
-//   &--borderless {
-//     .q-field__control {
-//       border: none;
+  &--borderless {
+    .q-field__control {
+      border: none;
 
-//       .q-icon {
-//         transform: translateY(-2px);
-//       }
-//     }
-//   }
-// }
+      .q-icon {
+        transform: translateY(-2px);
+      }
+    }
+  }
+}
 
-// .q-btn:before {
-//   border: 1px solid $input-field-border-color;
-//   box-shadow: none;
-// }
+.q-btn:before {
+  border: 1px solid $input-field-border-color;
+  box-shadow: none;
+}
 
-// .q-btn--flat:before,
-// .q-btn.no-border::before {
-//   border: none;
-// }
+.q-btn--flat:before,
+.q-btn.no-border::before {
+  border: none;
+}
 
-// .q-btn-group {
-//   box-shadow: none;
-//   border: 1px solid $input-field-border-color;
-// }
+.q-btn-group {
+  box-shadow: none;
+  border: 1px solid $input-field-border-color;
+}
 
-// .q-btn.selected {
-//   color: $primary;
-//   background: #e3e5fa;
-//   font-weight: bolder;
-// }
+.q-btn.selected {
+  color: $primary;
+  background: #e3e5fa;
+  font-weight: bolder;
+}
 
-// .q-table th {
-//   font-weight: bold;
-// }
+.q-table th {
+  font-weight: bold;
+}
 
-// .q-date__calendar-item > div,
-// .q-date__calendar-item button {
-//   &::before {
-//     display: none;
-//   }
-// }
+.q-date__calendar-item > div,
+.q-date__calendar-item button {
+  &::before {
+    display: none;
+  }
+}
 
-// .q-table__card {
-//   box-shadow: unset;
-// }
+.q-table__card {
+  box-shadow: unset;
+}
 
-// .iconHoverBtn {
-//   filter: grayscale(1) brightness(0.2);
-//   transition: filter 0.25s ease;
+.iconHoverBtn {
+  filter: grayscale(1) brightness(0.2);
+  transition: filter 0.25s ease;
 
-//   &:hover {
-//     filter: none;
-//   }
-// }
+  &:hover {
+    filter: none;
+  }
+}
 
-// .o2-input {
-//   .q-field {
-//     &.showLabelOnTop {
-//       padding-top: 26px;
-//     }
+.o2-input {
+  .q-field {
+    &.showLabelOnTop {
+      padding-top: 26px;
+    }
 
-//     .q-field__control {
-//       height: 36px !important;
-//       min-height: 36px !important;
-//       background-color: #ffffff;
-//       border: 1px solid #e1e1e1;
+    .q-field__control {
+      height: 36px !important;
+      min-height: 36px !important;
+      background-color: #ffffff;
+      border: 1px solid #e1e1e1;
 
-//       .q-field__control-container {
-//         height: calc(100% - 1px) !important;
-//         padding-top: 0px;
+      .q-field__control-container {
+        height: calc(100% - 1px) !important;
+        padding-top: 0px;
 
-//         .q-field__native {
-//           min-height: calc(100% - 1px) !important;
-//         }
+        .q-field__native {
+          min-height: calc(100% - 1px) !important;
+        }
 
-//         .q-field__label {
-//           top: 8px;
-//         }
-//       }
+        .q-field__label {
+          top: 8px;
+        }
+      }
 
-//       .q-field__marginal {
-//         height: 32px !important;
+      .q-field__marginal {
+        height: 32px !important;
 
-//         .q-icon {
-//           font-size: 20px;
-//         }
-//       }
-//     }
+        .q-icon {
+          font-size: 20px;
+        }
+      }
+    }
 
-//     &.q-field--dark .q-field__control {
-//       background-color: #ffffff12;
-//     }
+    &.q-field--dark .q-field__control {
+      background-color: #ffffff12;
+    }
 
-//     .q-field__bottom {
-//       padding: 0.1rem 0 0;
-//       min-height: fit-content !important;
-//     }
-//   }
-// }
+    .q-field__bottom {
+      padding: 0.1rem 0 0;
+      min-height: fit-content !important;
+    }
+  }
+}
