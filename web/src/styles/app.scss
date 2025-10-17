@@ -898,7 +898,7 @@ body {
     height: 20px;
     border-radius: 16px;
     width: 36px;
-    background-color: #EBECF0;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__thumb:after{
@@ -911,6 +911,10 @@ body {
     margin-top: 6px;
   }
   .q-toggle__inner--truthy{
+      color: #ffffff !important;
+      .q-toggle__track{
+        background-color: var(--o2-toggle-track-bg);
+      }
     .q-toggle__thumb:after{
       position: relative;
       top: 3.2px !important;
@@ -952,7 +956,7 @@ body {
     height: 24px;
     border-radius: 16px;
     width: 44px;
-    background-color: #EBECF0;
+   background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__thumb:after{
@@ -973,6 +977,10 @@ body {
     margin-top: 6px;
   }
   .q-toggle__inner--truthy{
+    color: #ffffff;
+    .q-toggle__track{
+      background-color: var(--o2-toggle-track-bg);
+    }
     .q-toggle__thumb:after{
       top: 5.8px;
       left: 3.8px;
@@ -988,31 +996,6 @@ body {
   }
 }
 
-.o2-toggle-button-lg-light{
-  .q-toggle__track{
-    background-color: var(--o2-toggle-track-off-bg);
-    opacity: 100%;
-  }
-  .q-toggle__inner--truthy{
-    color: #ffffff;
-    .q-toggle__track{
-      background-color: var(--o2-toggle-track-bg);
-    }
-    }
-}
-
-.o2-toggle-button-lg-dark{
-  .q-toggle__track{
-    background-color: var(--o2-toggle-track-off-bg);
-    opacity: 100%;
-  }
-  .q-toggle__inner--truthy{
-    color: #ffffff;
-    .q-toggle__track{
-      background-color: var(--o2-toggle-track-bg);
-    }
-    }
-}
 
 
 //o2 in xs size
@@ -1046,7 +1029,7 @@ body {
     padding-bottom: 16px;
     border-radius: 16px;
     width: 30px;
-    background-color: #EBECF0;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__thumb:after{
@@ -1068,6 +1051,10 @@ body {
   }
 
   .q-toggle__inner--truthy{
+     color: #ffffff;
+      .q-toggle__track{
+        background-color: var(--o2-toggle-track-bg);
+      }
     .q-toggle__thumb:after{
       top: 0.5px;
       left: 1.2px;
@@ -1370,4 +1357,5 @@ body {
   background-color: var(--o2-card-bg);
   border-radius: 0.375rem;
   box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
+  padding: 1rem 1.5rem;
 }
