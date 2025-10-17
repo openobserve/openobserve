@@ -415,12 +415,16 @@ jobs:
           merge-multiple: true
 
       - name: Verify Downloaded Files
-        run: ls -R merged-coverage # Check the structure and contents
+        run: ls -R merged-coverage 2>/dev/null || echo "No coverage files downloaded"
 
       - name: Move Coverage Files to .nyc_output
         run: |
           mkdir -p tests/ui-testing/.nyc_output
-          mv merged-coverage/* tests/ui-testing/.nyc_output/ || echo "No files to move"
+          if [ -d "merged-coverage" ]; then
+            mv merged-coverage/* tests/ui-testing/.nyc_output/ 2>/dev/null || echo "No files to move"
+          else
+            echo "No merged-coverage directory found, skipping"
+          fi
 
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npm ci && npx nyc report
