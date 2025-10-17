@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #before>
           <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
-            <div class="tw-h-full card-container">
+            <div class="tw-h-full">
               <FolderList
                 type="alerts"
                 @update:activeFolderId="updateActiveFolderId"
