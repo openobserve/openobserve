@@ -47,6 +47,7 @@ use crate::service::search::datafusion::{
     },
     udf::{
         fuzzy_match_udf,
+        match_all_hash_udf::MATCH_ALL_HASH_UDF_NAME,
         match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
     },
 };
@@ -268,6 +269,49 @@ fn rewrite_match_all_physical(
         }
 
         Ok(disjunction(expr_list))
+    } else if name == MATCH_ALL_HASH_UDF_NAME {
+        if args.len() != 1 {
+            return Err(DataFusionError::Internal(format!(
+                "match_all_hash() expects 1 argument, got {}",
+                args.len()
+            )));
+        }
+
+        let item_expr = &args[0];
+        let item = extract_string_literal(item_expr)?;
+
+        // Hash the input string using MD5 - search for just the hash value (no brackets)
+        let digest = md5::compute(item.as_bytes());
+        let hash_value = format!("{digest:x}");
+
+        let mut expr_list = Vec::with_capacity(fields.len());
+
+        for (field, data_type) in fields.iter() {
+            let term = if cfg.common.utf8_view_enabled {
+                Arc::new(Literal::new(ScalarValue::Utf8View(Some(format!(
+                    "%{hash_value}%"
+                )))))
+            } else if data_type == &DataType::LargeUtf8 {
+                Arc::new(Literal::new(ScalarValue::LargeUtf8(Some(format!(
+                    "%{hash_value}%"
+                )))))
+            } else {
+                Arc::new(Literal::new(ScalarValue::Utf8(Some(format!(
+                    "%{hash_value}%"
+                )))))
+            };
+
+            let new_expr = create_like_expr_with_not_null_physical(schema.as_ref(), field, term);
+            expr_list.push(new_expr);
+        }
+
+        if expr_list.is_empty() {
+            return Err(DataFusionError::Internal(
+                infra::errors::ErrorCodes::FullTextSearchFieldNotFound.to_string(),
+            ));
+        }
+
+        Ok(disjunction(expr_list))
     } else {
         Err(DataFusionError::Internal(format!(
             "Unexpected function name: {name}",
@@ -313,7 +357,9 @@ fn has_match_all_function(expr: &Arc<dyn PhysicalExpr>) -> bool {
 fn is_match_all_physical(expr: &Arc<dyn PhysicalExpr>) -> bool {
     if let Some(scalar_fn) = expr.as_any().downcast_ref::<ScalarFunctionExpr>() {
         let name = scalar_fn.name();
-        name.to_lowercase() == MATCH_ALL_UDF_NAME || name == FUZZY_MATCH_ALL_UDF_NAME
+        name.to_lowercase() == MATCH_ALL_UDF_NAME
+            || name == FUZZY_MATCH_ALL_UDF_NAME
+            || name == MATCH_ALL_HASH_UDF_NAME
     } else {
         false
     }
