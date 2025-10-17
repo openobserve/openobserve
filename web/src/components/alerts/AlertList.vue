@@ -17,667 +17,659 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
-    data-test="alert-list-page"
-    class="q-pa-none flex"
-    style="height: calc(100vh - 65px);"
-    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
-  >
+  <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
     <div
-      v-if="!showAddAlertDialog && !showImportAlertDialog"
-      class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-border-b-[1px]"
-      :class="store.state.theme === 'dark' ? 'tw-border-gray-500' : 'tw-border-gray-200'"
+      data-test="alert-list-page"
+      class="q-pa-none flex card-container"
+      style="height: calc(100vh - 52px);"
     >
-      <div class="q-table__title tw-font-[600]" data-test="alerts-list-title" >
-        {{ t("alerts.header") }}
-      </div>
-      <div class="flex q-ml-auto tw-ps-2 items-center">
-        <div class="app-tabs-container tw-h-[36px] q-mr-md" :class="store.state.theme === 'dark' ? 'app-tabs-container-dark' : 'app-tabs-container-light'">
-          <app-tabs
-          class="tabs-selection-container"
-          :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
-          :tabs="tabs"
-          v-model:active-tab="activeTab"
-          @update:active-tab="filterAlertsByTab"
-        />
-        </div>
-        <q-input
-          v-model="dynamicQueryModel"
-          dense
-          borderless
-          :placeholder="
-            searchAcrossFolders
-              ? t('dashboard.searchAcross')
-              : t('alerts.search')
-          "
-          data-test="alert-list-search-input"
-          :clearable="searchAcrossFolders"
-          @clear="clearSearchHistory"
-
-          class="o2-search-input"
-          :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
-        >
-          <template #prepend>
-            <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
-          </template>
-        </q-input>
-        <div class="tw-mb-2">
-          <q-toggle
-            data-test="alert-list-search-across-folders-toggle"
-            v-model="searchAcrossFolders"
-            label="All Folders"
-            class="tw-mr-3 tw-h-[36px] o2-toggle-button-lg"
-            size="lg"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-          >
-          </q-toggle>
-          <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
-            {{
-              searchAcrossFolders
-                ? t("dashboard.searchSelf")
-                : t("dashboard.searchAll")
-            }}
-          </q-tooltip>
-        </div>
-      </div>
-      <q-btn
-        class="q-ml-md o2-secondary-button tw-h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-        no-caps
-        flat
-        :label="t(`dashboard.import`)"
-        @click="importAlert"
-        data-test="alert-import"
-
-      />
-      <q-btn
-        data-test="alert-list-add-alert-btn"
-        class="q-ml-md o2-primary-button tw-h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        no-caps
-        flat
-        :disable="!destinations.length"
-        :title="!destinations.length ? t('alerts.noDestinations') : ''"
-        :label="t(`alerts.add`)"
-        @click="showAddUpdateFn({})"
-      />
-    </div>
-    
-    <div
-      v-if="!showAddAlertDialog && !showImportAlertDialog"
-      class="full-width alert-list-table"
-      style="height: calc(100vh - 138px)"
-    >
-      <q-splitter
-        v-model="splitterModel"
-        unit="px"
-        :limits="[200, 500]"
-        style="height: calc(100vh - 112px)"
-        data-test="alert-list-splitter"
+      <div
+        v-if="!showAddAlertDialog && !showImportAlertDialog"
+        class="flex justify-between full-width tw-py-3 tw-px-4 items-center"
       >
-        <template #before>
-          <FolderList
-            type="alerts"
-            @update:activeFolderId="updateActiveFolderId"
+        <div class="q-table__title tw-font-[600]" data-test="alerts-list-title" >
+          {{ t("alerts.header") }}
+        </div>
+        <div class="flex q-ml-auto tw-ps-2 items-center">
+          <div class="app-tabs-container tw-h-[36px] q-mr-sm">
+            <app-tabs
+            class="tabs-selection-container"
+            :tabs="tabs"
+            v-model:active-tab="activeTab"
+            @update:active-tab="filterAlertsByTab"
           />
-        </template>
-        <template #after>
-          <q-table
-            v-model:selected="selectedAlerts"
-            :selected-rows-label="getSelectedString"
-            selection="multiple"
-            data-test="alert-list-table"
-            ref="qTable"
-            :rows="filteredResults || []"
-            :columns="columns"
-            row-key="alert_id"
-            :pagination="pagination"
-            style="width: 100%;"
-            :style="filteredResults?.length 
-            ? 'width: 100%; height: calc(100vh - 112px)' 
-            : 'width: 100%'"
+          </div>
+          <q-input
+            v-model="dynamicQueryModel"
+            dense
+            borderless
+            :placeholder="
+              searchAcrossFolders
+                ? t('dashboard.searchAcross')
+                : t('alerts.search')
+            "
+            data-test="alert-list-search-input"
+            :clearable="searchAcrossFolders"
+            @clear="clearSearchHistory"
 
-            class="o2-quasar-table o2-quasar-table-header-sticky"
-            :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light'"
+            class="o2-search-input"
           >
-          <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-              <q-th auto-width>
-                <q-checkbox
-                  v-model="props.selected"
-                  size="sm"
-                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                  class="o2-table-checkbox"
-                  @update:model-value="props.select"
-                />
-              </q-th>
-
-              <!-- Rendering the rest of the columns -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
-
-            <template v-slot:body-selection="scope">
-              <q-checkbox
-                v-model="scope.selected"
-                size="sm"
-                color="secondary"
-              />
+            <template #prepend>
+              <q-icon class="o2-search-input-icon" name="search" />
             </template>
-            <template v-slot:body="props">
-              <q-tr
-                :data-test="`stream-association-table-${props.row.trace_id}-row`"
-                :props="props"
-                style="cursor: pointer"
-                @click="triggerExpand(props)"
-              >
-                <q-td>
+          </q-input>
+          <div class="tw-mb-2">
+            <q-toggle
+              data-test="alert-list-search-across-folders-toggle"
+              v-model="searchAcrossFolders"
+              label="All Folders"
+              class="tw-mr-3 tw-h-[36px] o2-toggle-button-lg"
+              size="lg"
+            >
+            </q-toggle>
+            <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
+              {{
+                searchAcrossFolders
+                  ? t("dashboard.searchSelf")
+                  : t("dashboard.searchAll")
+              }}
+            </q-tooltip>
+          </div>
+        </div>
+        <q-btn
+          class="q-ml-sm o2-secondary-button tw-h-[36px]"
+          no-caps
+          flat
+          :label="t(`dashboard.import`)"
+          @click="importAlert"
+          data-test="alert-import"
+
+        />
+        <q-btn
+          data-test="alert-list-add-alert-btn"
+          class="q-ml-sm o2-primary-button tw-h-[36px]"
+          no-caps
+          flat
+          :disable="!destinations.length"
+          :title="!destinations.length ? t('alerts.noDestinations') : ''"
+          :label="t(`alerts.add`)"
+          @click="showAddUpdateFn({})"
+        />
+      </div>
+      
+      <div
+        v-if="!showAddAlertDialog && !showImportAlertDialog"
+        class="full-width alert-list-table"
+        style="height: calc(100vh - 138px)"
+      >
+        <q-splitter
+          v-model="splitterModel"
+          unit="px"
+          :limits="[200, 500]"
+          style="height: calc(100vh - 112px)"
+          data-test="alert-list-splitter"
+        >
+          <template #before>
+            <FolderList
+              type="alerts"
+              @update:activeFolderId="updateActiveFolderId"
+            />
+          </template>
+          <template #after>
+            <q-table
+              v-model:selected="selectedAlerts"
+              :selected-rows-label="getSelectedString"
+              selection="multiple"
+              data-test="alert-list-table"
+              ref="qTable"
+              :rows="filteredResults || []"
+              :columns="columns"
+              row-key="alert_id"
+              :pagination="pagination"
+              style="width: 100%;"
+              :style="filteredResults?.length 
+              ? 'width: 100%; height: calc(100vh - 112px)' 
+              : 'width: 100%'"
+
+              class="o2-quasar-table o2-quasar-table-header-sticky"
+            >
+            <template v-slot:header="props">
+              <q-tr :props="props">
+                <!-- Adding this block to render the select-all checkbox -->
+                <q-th auto-width>
                   <q-checkbox
                     v-model="props.selected"
                     size="sm"
-                    :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
                     class="o2-table-checkbox"
+                    @update:model-value="props.select"
                   />
-                </q-td>
+                </q-th>
 
-                <q-td v-for="col in columns" :key="col.name" :props="props">
-                  <template v-if="col.name === 'name'">
-                    {{ computedName(props.row[col.field]) }}
-                    <q-tooltip
-                      v-if="props.row[col.field]?.length > 30"
-                      class="alert-name-tooltip"
-                    >
-                      {{ props.row[col.field] }}
-                    </q-tooltip>
-                  </template>
-                  <template v-else-if="col.name === 'owner'">
-                    {{ computedOwner(props.row[col.field]) }}
-                    <q-tooltip
-                      v-if="props.row[col.field]?.length > 15"
-                      class="alert-name-tooltip"
-                    >
-                      {{ props.row[col.field] }}
-                    </q-tooltip>
-                  </template>
-                  <template
-                    v-else-if="
-                      col.name == 'last_triggered_at' ||
-                      col.name == 'last_satisfied_at'
-                    "
-                  >
-                    {{ props.row[col.field] }}
-                  </template>
-                  <template v-else-if="col.name === 'period'">
-                    {{ props.row[col.field] ?  props.row[col.field] + " Mins" : "--" }}
-                  </template>
-                  <template v-else-if="col.name === 'frequency'">
-                    {{ props.row[col.field] ? props.row[col.field] + (props.row?.frequency_type == "cron" ? "" : "Mins") : "--" }}
-                  </template>
-                  <template v-else-if="col.name === 'folder_name'">
-                    <div
-                      @click.stop="
-                        updateActiveFolderId(props.row[col.field].id)
+                <!-- Rendering the rest of the columns -->
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  :class="col.classes"
+                  :style="col.style"
+                >
+                  {{ col.label }}
+                </q-th>
+              </q-tr>
+            </template>
+
+              <template v-slot:body-selection="scope">
+                <q-checkbox
+                  v-model="scope.selected"
+                  size="sm"
+                  color="secondary"
+                />
+              </template>
+              <template v-slot:body="props">
+                <q-tr
+                  :data-test="`stream-association-table-${props.row.trace_id}-row`"
+                  :props="props"
+                  style="cursor: pointer"
+                  @click="triggerExpand(props)"
+                >
+                  <q-td>
+                    <q-checkbox
+                      v-model="props.selected"
+                      size="sm"
+                      class="o2-table-checkbox"
+                    />
+                  </q-td>
+
+                  <q-td v-for="col in columns" :key="col.name" :props="props">
+                    <template v-if="col.name === 'name'">
+                      {{ computedName(props.row[col.field]) }}
+                      <q-tooltip
+                        v-if="props.row[col.field]?.length > 30"
+                        class="alert-name-tooltip"
+                      >
+                        {{ props.row[col.field] }}
+                      </q-tooltip>
+                    </template>
+                    <template v-else-if="col.name === 'owner'">
+                      {{ computedOwner(props.row[col.field]) }}
+                      <q-tooltip
+                        v-if="props.row[col.field]?.length > 15"
+                        class="alert-name-tooltip"
+                      >
+                        {{ props.row[col.field] }}
+                      </q-tooltip>
+                    </template>
+                    <template
+                      v-else-if="
+                        col.name == 'last_triggered_at' ||
+                        col.name == 'last_satisfied_at'
                       "
                     >
-                      {{ props.row[col.field].name }}
-                    </div>
-                  </template>
-                  <template v-else-if="col.name == 'actions'">
-                    <div class="tw-flex tw-items-center actions-container"
-                    >
+                      {{ props.row[col.field] }}
+                    </template>
+                    <template v-else-if="col.name === 'period'">
+                      {{ props.row[col.field] ?  props.row[col.field] + " Mins" : "--" }}
+                    </template>
+                    <template v-else-if="col.name === 'frequency'">
+                      {{ props.row[col.field] ? props.row[col.field] + (props.row?.frequency_type == "cron" ? "" : "Mins") : "--" }}
+                    </template>
+                    <template v-else-if="col.name === 'folder_name'">
                       <div
-                        data-test="alert-list-loading-alert"
-                        v-if="alertStateLoadingMap[props.row.uuid]"
-                        style="
-                          display: inline-block;
-                          width: 33.14px;
-                          height: auto;
+                        @click.stop="
+                          updateActiveFolderId(props.row[col.field].id)
                         "
-                        class="flex justify-center items-center q-ml-xs"
-                        :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
                       >
-                        <q-circular-progress
-                          indeterminate
-                          rounded
-                          size="16px"
-                          :value="1"
-                          color="secondary"
+                        {{ props.row[col.field].name }}
+                      </div>
+                    </template>
+                    <template v-else-if="col.name == 'actions'">
+                      <div class="tw-flex tw-items-center actions-container"
+                      >
+                        <div
+                          data-test="alert-list-loading-alert"
+                          v-if="alertStateLoadingMap[props.row.uuid]"
+                          style="
+                            display: inline-block;
+                            width: 33.14px;
+                            height: auto;
+                          "
+                          class="flex justify-center items-center q-ml-xs"
+                          :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
+                        >
+                          <q-circular-progress
+                            indeterminate
+                            rounded
+                            size="16px"
+                            :value="1"
+                            color="secondary"
+                          />
+                        </div>
+                        <q-btn
+                          v-else
+                          :data-test="`alert-list-${props.row.name}-pause-start-alert`"
+                          :icon="
+                            props.row.enabled ? outlinedPause : outlinedPlayArrow
+                          "
+                          class="q-ml-xs material-symbols-outlined"
+                          padding="sm"
+                          unelevated
+                          size="sm"
+                          :color="props.row.enabled ? 'negative' : 'positive'"
+                          round
+                          flat
+                          :title="
+                            props.row.enabled
+                              ? t('alerts.pause')
+                              : t('alerts.start')
+                          "
+                          @click.stop="toggleAlertState(props.row)"
                         />
+                        <q-btn
+                          :data-test="`alert-list-${props.row.name}-update-alert`"
+                          icon="edit"
+                          unelevated
+                          size="sm"
+                          round
+                          flat
+                          :title="t('alerts.edit')"
+                          @click.stop="editAlert(props.row)"
+                        ></q-btn>
+                        <q-btn
+                          icon="content_copy"
+                          :title="t('alerts.clone')"
+                          unelevated
+                          size="sm"
+                          round
+                          flat
+                          @click.stop="duplicateAlert(props.row)"
+                          :data-test="`alert-list-${props.row.name}-clone-alert`"
+                        ></q-btn>
+                        <q-btn
+                          :icon="outlinedMoreVert"
+                          unelevated
+                          size="sm"
+                          round
+                          flat
+                          @click.stop="openMenu($event, props.row)"
+                          :data-test="`alert-list-${props.row.name}-more-options`"
+                        >
+                          <q-menu>
+                            <q-list style="min-width: 100px">
+                              <q-item
+                                class="flex items-center"
+                                clickable
+                                v-close-popup
+                                @click="moveAlertToAnotherFolder(props.row)"
+                              >
+                                <q-item-section dense avatar>
+                                  <q-icon
+                                    size="16px"
+                                    :name="outlinedDriveFileMove"
+                                  />
+                                </q-item-section>
+                                <q-item-section>Move</q-item-section>
+                              </q-item>
+
+                              <q-item
+                                class="flex items-center justify-center"
+                                clickable
+                                v-close-popup
+                                @click="showDeleteDialogFn(props)"
+                              >
+                                <q-item-section dense avatar>
+                                  <q-icon size="16px" :name="outlinedDelete" />
+                                </q-item-section>
+                                <q-item-section>{{
+                                  t("alerts.delete")
+                                }}</q-item-section>
+                              </q-item>
+                              <q-item
+                                class="flex items-center justify-center"
+                                clickable
+                                v-close-popup
+                                @click="exportAlert(props.row)"
+                              >
+                                <q-item-section dense avatar>
+                                  <q-icon size="16px" name="download" />
+                                </q-item-section>
+                                <q-item-section>Export</q-item-section>
+                              </q-item>
+                            </q-list>
+                          </q-menu>
+                        </q-btn>
+                    </div>
+                    </template>
+                    <template v-else>
+                      {{ props.row[col.field] }}
+                    </template>
+                  </q-td>
+                </q-tr>
+                <q-tr v-show="expandedRow === props.row.alert_id" :props="props">
+                  <q-td colspan="100%">
+                    <div class="text-left tw-px-2 q-mb-sm expand-content">
+                      <div class="tw-flex tw-items-start tw-justify-start">
+                        <strong
+                          >{{
+                            props.row.type == "sql" ? "SQL Query" : "Conditions"
+                          }}
+                          :
+                          <span
+                            v-if="
+                              props.row.conditions != '' &&
+                              props.row.conditions != '--'
+                            "
+                          >
+                            <q-btn
+                              @click.stop="
+                                copyToClipboard(
+                                  props.row.conditions,
+                                  'Conditions',
+                                )
+                              "
+                              size="xs"
+                              dense
+                              flat
+                              icon="content_copy"
+                              class="copy-btn-sql tw-ml-2 tw-py-2 tw-px-2" /></span
+                        ></strong>
+                      </div>
+
+                      <div
+                        data-test="scheduled-pipeline-expanded-sql"
+                        class="scroll-content expanded-sql"
+                      >
+                        <pre style="text-wrap: wrap"
+                          >{{
+                            props.row.conditions != "" &&
+                            props.row.conditions != "--"
+                              ? (props.row.type == 'sql' ? props.row.conditions : props.row.conditions.length != 2  ? `if ${props.row.conditions}` : 'No condition')
+                              : "No condition"
+                          }} </pre
+                        >
+                      </div>
+                    </div>
+                    <div class="text-left tw-px-2 q-mb-sm expand-content">
+                      <div class="tw-flex tw-items-start tw-justify-start">
+                        <strong>Description : <span></span></strong>
+                      </div>
+
+                      <div
+                        data-test="scheduled-pipeline-expanded-sql"
+                        class="scroll-content expanded-sql"
+                      >
+                        <pre style="text-wrap: wrap"
+                          >{{ props.row?.description || "No description" }}  </pre
+                        >
+                      </div>
+                    </div>
+                  </q-td>
+                </q-tr>
+              </template>
+              <template #no-data>
+                <div
+                  v-if="!templates.length || !destinations.length"
+                  class="full-width flex column justify-center items-center text-center"
+                >
+                  <div style="width: 600px" class="q-mt-xl">
+                    <template v-if="!templates.length">
+                      <div
+                        class="text-subtitle1"
+                        data-test="alert-list-create-template-text"
+                      >
+                        It looks like you haven't created any Templates yet. To
+                        create an Alert, you'll need to have at least one
+                        Destination and one Template in place
                       </div>
                       <q-btn
-                        v-else
-                        :data-test="`alert-list-${props.row.name}-pause-start-alert`"
-                        :icon="
-                          props.row.enabled ? outlinedPause : outlinedPlayArrow
-                        "
-                        class="q-ml-xs material-symbols-outlined"
-                        padding="sm"
-                        unelevated
-                        size="sm"
-                        :color="props.row.enabled ? 'negative' : 'positive'"
-                        round
-                        flat
-                        :title="
-                          props.row.enabled
-                            ? t('alerts.pause')
-                            : t('alerts.start')
-                        "
-                        @click.stop="toggleAlertState(props.row)"
+                        data-test="alert-list-create-template-btn"
+                        class="q-mt-md"
+                        label="Create Template"
+                        size="md"
+                        color="primary"
+                        no-caps
+                        style="border-radius: 4px"
+                        @click="routeTo('alertTemplates')"
                       />
-                      <q-btn
-                        :data-test="`alert-list-${props.row.name}-update-alert`"
-                        icon="edit"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
-                        :title="t('alerts.edit')"
-                        @click.stop="editAlert(props.row)"
-                      ></q-btn>
-                      <q-btn
-                        icon="content_copy"
-                        :title="t('alerts.clone')"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
-                        @click.stop="duplicateAlert(props.row)"
-                        :data-test="`alert-list-${props.row.name}-clone-alert`"
-                      ></q-btn>
-                      <q-btn
-                        :icon="outlinedMoreVert"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
-                        @click.stop="openMenu($event, props.row)"
-                        :data-test="`alert-list-${props.row.name}-more-options`"
+                    </template>
+                    <template v-if="!destinations.length && templates.length">
+                      <div
+                        class="text-subtitle1"
+                        data-test="alert-list-create-destination-text"
                       >
-                        <q-menu>
-                          <q-list style="min-width: 100px">
-                            <q-item
-                              class="flex items-center"
-                              clickable
-                              v-close-popup
-                              @click="moveAlertToAnotherFolder(props.row)"
-                            >
-                              <q-item-section dense avatar>
-                                <q-icon
-                                  size="16px"
-                                  :name="outlinedDriveFileMove"
-                                />
-                              </q-item-section>
-                              <q-item-section>Move</q-item-section>
-                            </q-item>
-
-                            <q-item
-                              class="flex items-center justify-center"
-                              clickable
-                              v-close-popup
-                              @click="showDeleteDialogFn(props)"
-                            >
-                              <q-item-section dense avatar>
-                                <q-icon size="16px" :name="outlinedDelete" />
-                              </q-item-section>
-                              <q-item-section>{{
-                                t("alerts.delete")
-                              }}</q-item-section>
-                            </q-item>
-                            <q-item
-                              class="flex items-center justify-center"
-                              clickable
-                              v-close-popup
-                              @click="exportAlert(props.row)"
-                            >
-                              <q-item-section dense avatar>
-                                <q-icon size="16px" name="download" />
-                              </q-item-section>
-                              <q-item-section>Export</q-item-section>
-                            </q-item>
-                          </q-list>
-                        </q-menu>
-                      </q-btn>
+                        It looks like you haven't created any Destinations yet. To
+                        create an Alert, you'll need to have at least one
+                        Destination and one Template in place
+                      </div>
+                      <q-btn
+                        data-test="alert-list-create-destination-btn"
+                        class="q-mt-md"
+                        label="Create Destination"
+                        size="md"
+                        color="primary"
+                        no-caps
+                        style="border-radius: 4px"
+                        @click="routeTo('alertDestinations')"
+                      />
+                    </template>
                   </div>
-                  </template>
-                  <template v-else>
-                    {{ props.row[col.field] }}
-                  </template>
-                </q-td>
-              </q-tr>
-              <q-tr v-show="expandedRow === props.row.alert_id" :props="props">
-                <q-td colspan="100%">
-                  <div class="text-left tw-px-2 q-mb-sm expand-content">
-                    <div class="tw-flex tw-items-start tw-justify-start">
-                      <strong
-                        >{{
-                          props.row.type == "sql" ? "SQL Query" : "Conditions"
-                        }}
-                        :
-                        <span
-                          v-if="
-                            props.row.conditions != '' &&
-                            props.row.conditions != '--'
-                          "
-                        >
-                          <q-btn
-                            @click.stop="
-                              copyToClipboard(
-                                props.row.conditions,
-                                'Conditions',
-                              )
-                            "
-                            size="xs"
-                            dense
-                            flat
-                            icon="content_copy"
-                            class="copy-btn-sql tw-ml-2 tw-py-2 tw-px-2" /></span
-                      ></strong>
-                    </div>
-
-                    <div
-                      data-test="scheduled-pipeline-expanded-sql"
-                      class="scroll-content expanded-sql"
-                    >
-                      <pre style="text-wrap: wrap"
-                        >{{
-                          props.row.conditions != "" &&
-                          props.row.conditions != "--"
-                            ? (props.row.type == 'sql' ? props.row.conditions : props.row.conditions.length != 2  ? `if ${props.row.conditions}` : 'No condition')
-                            : "No condition"
-                        }} </pre
-                      >
-                    </div>
-                  </div>
-                  <div class="text-left tw-px-2 q-mb-sm expand-content">
-                    <div class="tw-flex tw-items-start tw-justify-start">
-                      <strong>Description : <span></span></strong>
-                    </div>
-
-                    <div
-                      data-test="scheduled-pipeline-expanded-sql"
-                      class="scroll-content expanded-sql"
-                    >
-                      <pre style="text-wrap: wrap"
-                        >{{ props.row?.description || "No description" }}  </pre
-                      >
-                    </div>
-                  </div>
-                </q-td>
-              </q-tr>
-            </template>
-            <template #no-data>
-              <div
-                v-if="!templates.length || !destinations.length"
-                class="full-width flex column justify-center items-center text-center"
-              >
-                <div style="width: 600px" class="q-mt-xl">
-                  <template v-if="!templates.length">
-                    <div
-                      class="text-subtitle1"
-                      data-test="alert-list-create-template-text"
-                    >
-                      It looks like you haven't created any Templates yet. To
-                      create an Alert, you'll need to have at least one
-                      Destination and one Template in place
-                    </div>
-                    <q-btn
-                      data-test="alert-list-create-template-btn"
-                      class="q-mt-md"
-                      label="Create Template"
-                      size="md"
-                      color="primary"
-                      no-caps
-                      style="border-radius: 4px"
-                      @click="routeTo('alertTemplates')"
-                    />
-                  </template>
-                  <template v-if="!destinations.length && templates.length">
-                    <div
-                      class="text-subtitle1"
-                      data-test="alert-list-create-destination-text"
-                    >
-                      It looks like you haven't created any Destinations yet. To
-                      create an Alert, you'll need to have at least one
-                      Destination and one Template in place
-                    </div>
-                    <q-btn
-                      data-test="alert-list-create-destination-btn"
-                      class="q-mt-md"
-                      label="Create Destination"
-                      size="md"
-                      color="primary"
-                      no-caps
-                      style="border-radius: 4px"
-                      @click="routeTo('alertDestinations')"
-                    />
-                  </template>
                 </div>
-              </div>
-              <template v-else>
-                <NoData />
+                <template v-else>
+                  <NoData />
+                </template>
               </template>
-            </template>
 
-            <template v-slot:body-cell-function="props">
-              <q-td :props="props">
-                <q-tooltip>
-                  <pre>{{ props.row.sql }}</pre>
-                </q-tooltip>
-                <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
-              </q-td>
-            </template>
+              <template v-slot:body-cell-function="props">
+                <q-td :props="props">
+                  <q-tooltip>
+                    <pre>{{ props.row.sql }}</pre>
+                  </q-tooltip>
+                  <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
+                </q-td>
+              </template>
 
-            <!-- <template #top="scope">
-              <QTablePagination
-                :scope="scope"
-                :pageTitle="t('alerts.header')"
-                :position="'top'"
-                :resultTotal="resultTotal"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
-            </template> -->
-
-            <template #bottom="scope">
-              <div class="bottom-btn tw-h-[48px]">
-                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
-                  {{ resultTotal }} {{ t('alerts.header') }}
-                </div>
-
-                <q-btn
-                  v-if="selectedAlerts.length > 0"
-                  data-test="alert-list-move-across-folders-btn"
-                  class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  no-caps
-                  dense
-                  @click="moveMultipleAlerts"
-                  >
-                    <q-icon :name="outlinedDriveFileMove" size="16px" />
-                    <span class="tw-ml-2">Move</span>
-                </q-btn>
-                <q-btn
-                  v-if="selectedAlerts.length > 0"
-                  data-test="alert-list-export-alerts-btn"
-                  class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  no-caps
-                  dense
-                  @click="multipleExportAlert"
-                >
-                  <q-icon name="download" size="16px" />
-                  <span class="tw-ml-2">Export</span>
-              </q-btn>
-              <q-btn
-                  v-if="selectedAlerts.length > 0"
-                  data-test="alert-list-pause-alerts-btn"
-                  class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  no-caps
-                  dense
-                  @click="bulkToggleAlerts('pause')"
-                >
-                  <q-icon name="pause" size="16px" />
-                  <span class="tw-ml-2">Pause</span>
-              </q-btn>
-              <q-btn
-                  v-if="selectedAlerts.length > 0"
-                  data-test="alert-list-unpause-alerts-btn"
-                  class="tw-flex items-center no-border o2-secondary-button tw-h-[36px] tw-ml-md tw-w-[141px]"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  no-caps
-                  dense
-                  @click="bulkToggleAlerts('resume')"
-                >
-                  <q-icon name="play_arrow" size="16px" />
-                  <span class="tw-ml-2">Resume</span>
-              </q-btn>
+              <!-- <template #top="scope">
                 <QTablePagination
                   :scope="scope"
-                  :position="'bottom'"
+                  :pageTitle="t('alerts.header')"
+                  :position="'top'"
                   :resultTotal="resultTotal"
                   :perPageOptions="perPageOptions"
                   @update:changeRecordPerPage="changePagination"
                 />
-              </div>
-            </template>
-          </q-table>
-        </template>
-      </q-splitter>
-    </div>
-    <template v-else-if="showAddAlertDialog && !showImportAlertDialog">
-      <AddAlert
-        v-model="formData"
-        :isUpdated="isUpdated"
-        :destinations="destinations"
-        @update:list="refreshList"
-        @cancel:hideform="hideForm"
-        @refresh:destinations="refreshDestination"
+              </template> -->
+
+              <template #bottom="scope">
+                <div class="bottom-btn tw-h-[48px]">
+                  <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+                    {{ resultTotal }} {{ t('alerts.header') }}
+                  </div>
+
+                  <q-btn
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-move-across-folders-btn"
+                    class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    no-caps
+                    dense
+                    @click="moveMultipleAlerts"
+                    >
+                      <q-icon :name="outlinedDriveFileMove" size="16px" />
+                      <span class="tw-ml-2">Move</span>
+                  </q-btn>
+                  <q-btn
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-export-alerts-btn"
+                    class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    no-caps
+                    dense
+                    @click="multipleExportAlert"
+                  >
+                    <q-icon name="download" size="16px" />
+                    <span class="tw-ml-2">Export</span>
+                </q-btn>
+                <q-btn
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-pause-alerts-btn"
+                    class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    no-caps
+                    dense
+                    @click="bulkToggleAlerts('pause')"
+                  >
+                    <q-icon name="pause" size="16px" />
+                    <span class="tw-ml-2">Pause</span>
+                </q-btn>
+                <q-btn
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-unpause-alerts-btn"
+                    class="tw-flex items-center no-border o2-secondary-button tw-h-[36px] tw-ml-md tw-w-[141px]"
+                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    no-caps
+                    dense
+                    @click="bulkToggleAlerts('resume')"
+                  >
+                    <q-icon name="play_arrow" size="16px" />
+                    <span class="tw-ml-2">Resume</span>
+                </q-btn>
+                  <QTablePagination
+                    :scope="scope"
+                    :position="'bottom'"
+                    :resultTotal="resultTotal"
+                    :perPageOptions="perPageOptions"
+                    @update:changeRecordPerPage="changePagination"
+                  />
+                </div>
+              </template>
+            </q-table>
+          </template>
+        </q-splitter>
+      </div>
+      <template v-else-if="showAddAlertDialog && !showImportAlertDialog">
+        <AddAlert
+          v-model="formData"
+          :isUpdated="isUpdated"
+          :destinations="destinations"
+          @update:list="refreshList"
+          @cancel:hideform="hideForm"
+          @refresh:destinations="refreshDestination"
+        />
+      </template>
+      <template v-else>
+        <ImportAlert
+          :destinations="destinations"
+          :templates="templates"
+          :alerts="store?.state?.organizationData?.allAlertsListByFolderId[activeFolderId]"
+          @update:alerts="refreshImportedAlerts"
+          @update:destinations="refreshDestination"
+          @update:templates="getTemplates"
+        />
+      </template>
+      <ConfirmDialog
+        title="Delete Alert"
+        message="Are you sure you want to delete this alert?"
+        @update:ok="deleteAlertByAlertId"
+        @update:cancel="confirmDelete = false"
+        v-model="confirmDelete"
       />
-    </template>
-    <template v-else>
-      <ImportAlert
-        :destinations="destinations"
-        :templates="templates"
-        :alerts="store?.state?.organizationData?.allAlertsListByFolderId[activeFolderId]"
-        @update:alerts="refreshImportedAlerts"
-        @update:destinations="refreshDestination"
-        @update:templates="getTemplates"
-      />
-    </template>
-    <ConfirmDialog
-      title="Delete Alert"
-      message="Are you sure you want to delete this alert?"
-      @update:ok="deleteAlertByAlertId"
-      @update:cancel="confirmDelete = false"
-      v-model="confirmDelete"
-    />
-    <template>
-      <q-dialog class="q-pa-md" v-model="showForm" persistent>
-        <q-card class="clone-alert-popup">
-          <div class="row items-center no-wrap q-mx-md q-my-sm">
-            <div class="flex items-center">
-              <div
-                data-test="add-alert-back-btn"
-                class="flex justify-center items-center q-mr-md cursor-pointer"
-                style="
-                  border: 1.5px solid;
-                  border-radius: 50%;
-                  width: 22px;
-                  height: 22px;
-                "
-                title="Go Back"
-                @click="showForm = false"
-              >
-                <q-icon name="arrow_back_ios_new" size="14px" />
-              </div>
-              <div class="text-h6" data-test="clone-alert-title">
-                {{ t("alerts.cloneTitle") }}
+      <template>
+        <q-dialog class="q-pa-md" v-model="showForm" persistent>
+          <q-card class="clone-alert-popup">
+            <div class="row items-center no-wrap q-mx-md q-my-sm">
+              <div class="flex items-center">
+                <div
+                  data-test="add-alert-back-btn"
+                  class="flex justify-center items-center q-mr-md cursor-pointer"
+                  style="
+                    border: 1.5px solid;
+                    border-radius: 50%;
+                    width: 22px;
+                    height: 22px;
+                  "
+                  title="Go Back"
+                  @click="showForm = false"
+                >
+                  <q-icon name="arrow_back_ios_new" size="14px" />
+                </div>
+                <div class="text-h6" data-test="clone-alert-title">
+                  {{ t("alerts.cloneTitle") }}
+                </div>
               </div>
             </div>
-          </div>
-          <q-card-section>
-            <q-form @submit="submitForm">
-              <q-input
-                data-test="to-be-clone-alert-name"
-                v-model="toBeCloneAlertName"
-                label="Alert Name"
-              />
-              <q-select
-                data-test="to-be-clone-stream-type"
-                v-model="toBeClonestreamType"
-                label="Stream Type"
-                :options="streamTypes"
-                @update:model-value="updateStreams()"
-              />
-              <q-select
-                data-test="to-be-clone-stream-name"
-                v-model="toBeClonestreamName"
-                :loading="isFetchingStreams"
-                :disable="!toBeClonestreamType"
-                label="Stream Name"
-                :options="streamNames"
-                @change="updateStreamName"
-                @filter="filterStreams"
-                use-input
-                fill-input
-                hide-selected
-                :input-debounce="400"
-              />
-              <SelectFolderDropDown
-                  :type="'alerts'"
-                  @folder-selected="updateFolderIdToBeCloned"
-                  :activeFolderId="folderIdToBeCloned"
+            <q-card-section>
+              <q-form @submit="submitForm">
+                <q-input
+                  data-test="to-be-clone-alert-name"
+                  v-model="toBeCloneAlertName"
+                  label="Alert Name"
+                />
+                <q-select
+                  data-test="to-be-clone-stream-type"
+                  v-model="toBeClonestreamType"
+                  label="Stream Type"
+                  :options="streamTypes"
+                  @update:model-value="updateStreams()"
+                />
+                <q-select
+                  data-test="to-be-clone-stream-name"
+                  v-model="toBeClonestreamName"
+                  :loading="isFetchingStreams"
+                  :disable="!toBeClonestreamType"
+                  label="Stream Name"
+                  :options="streamNames"
+                  @change="updateStreamName"
+                  @filter="filterStreams"
+                  use-input
+                  fill-input
+                  hide-selected
+                  :input-debounce="400"
+                />
+                <SelectFolderDropDown
+                    :type="'alerts'"
+                    @folder-selected="updateFolderIdToBeCloned"
+                    :activeFolderId="folderIdToBeCloned"
+                    />
+                <div class="flex justify-center q-mt-lg">
+                  <q-btn
+                    data-test="clone-alert-cancel-btn"
+                    v-close-popup="true"
+                    class="q-mb-md text-bold"
+                    :label="t('alerts.cancel')"
+                    text-color="light-text"
+                    padding="sm md"
+                    no-caps
                   />
-              <div class="flex justify-center q-mt-lg">
-                <q-btn
-                  data-test="clone-alert-cancel-btn"
-                  v-close-popup="true"
-                  class="q-mb-md text-bold"
-                  :label="t('alerts.cancel')"
-                  text-color="light-text"
-                  padding="sm md"
-                  no-caps
-                />
-                <q-btn
-                  data-test="clone-alert-submit-btn"
-                  :label="t('alerts.save')"
-                  class="q-mb-md text-bold no-border q-ml-md"
-                  color="secondary"
-                  padding="sm xl"
-                  type="submit"
-                  :disable="isSubmitting"
-                  no-caps
-                />
-              </div>
-            </q-form>
-          </q-card-section>
-        </q-card>
-      </q-dialog>
-      <q-dialog
-        v-model="showMoveAlertDialog"
-        position="right"
-        full-height
-        maximized
-        data-test="dashboard-move-to-another-folder-dialog"
-      >
-        <MoveAcrossFolders
-          :activeFolderId="activeFolderToMove"
-          :moduleId="selectedAlertToMove"
-          type="alerts"
-          @updated="updateAcrossFolders"
-        />
-      </q-dialog>
-    </template>
+                  <q-btn
+                    data-test="clone-alert-submit-btn"
+                    :label="t('alerts.save')"
+                    class="q-mb-md text-bold no-border q-ml-md"
+                    color="secondary"
+                    padding="sm xl"
+                    type="submit"
+                    :disable="isSubmitting"
+                    no-caps
+                  />
+                </div>
+              </q-form>
+            </q-card-section>
+          </q-card>
+        </q-dialog>
+        <q-dialog
+          v-model="showMoveAlertDialog"
+          position="right"
+          full-height
+          maximized
+          data-test="dashboard-move-to-another-folder-dialog"
+        >
+          <MoveAcrossFolders
+            :activeFolderId="activeFolderToMove"
+            :moduleId="selectedAlertToMove"
+            type="alerts"
+            @updated="updateAcrossFolders"
+          />
+        </q-dialog>
+      </template>
+    </div>
   </div>
 </template>
 
