@@ -33,14 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="col-auto">
           <q-input
             v-model="newDomain"
-            :label="t('settings.domainPlaceholder')"
             :hint="t('settings.domainHint', { 'at_sign': '@' })"
-            color="input-border"
-            bg-color="input-bg"
             class="domain-input"
-            outlined
+            borderless
+            hide-bottom-space
             dense
             @keydown.enter="addDomain"
+            :placeholder="t('settings.domainPlaceholder')"
             :rules="[
               (val) => isValidDomain(val) || t('settings.invalidDomain')
             ]"
@@ -175,15 +174,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row q-gutter-md">
       <q-btn
         :label="t('common.cancel')"
-        class="text-bold text-capitalize no-border"
-        flat
-        color="grey-7"
+        class="no-border o2-secondary-button"
         @click="resetForm"
       />
       <q-btn
         :label="t('settings.saveChanges')"
-        color="secondary"
-        class="text-bold text-capitalize no-border"
+        class="no-border o2-primary-button"
         unelevated
         @click="saveChanges"
         :loading="saving"

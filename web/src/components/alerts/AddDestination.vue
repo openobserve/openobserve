@@ -45,16 +45,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div class="row q-col-gutter-sm q-px-md q-mt-md q-mb-xs">
         <div v-if="isAlerts" class="col-12 q-pb-md">
+         <div class="app-tabs-container tw-h-[36px] q-mr-sm tw-w-fit">
           <app-tabs
-            style="
-              border: 1px solid #8a8a8a;
-              border-radius: 4px;
-              overflow: hidden;
-              width: fit-content;
-            "
+            data-test="add-destination-tabs"
             :tabs="tabs"
+            class="tabs-selection-container"
             v-model:active-tab="formData.type"
           />
+          </div>
         </div>
         <div
           v-if="formData.type === 'email' && !getFormattedTemplates.length"
@@ -80,12 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-destination-name-input"
             v-model="formData.name"
             :label="t('alerts.name') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             v-bind:readonly="isUpdatingDestination"
             v-bind:disable="isUpdatingDestination"
@@ -106,12 +101,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.template"
               :label="t('alert_destinations.template') + ' *'"
               :options="getFormattedTemplates"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop no-case"
               stack-label
-              outlined
-              filled
+              borderless
+              hide-bottom-space
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
               tabindex="0"
@@ -127,12 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-destination-url-input"
               v-model="formData.url"
               :label="t('alert_destinations.url') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
+              hide-bottom-space
               dense
               :rules="[(val: any) => !!val.trim() || 'Field is required!']"
               tabindex="0"
@@ -146,14 +137,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.method"
               :label="t('alert_destinations.method') + ' *'"
               :options="apiMethods"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
+                            dense
+
+              borderless
+              hide-bottom-space
               :popup-content-style="{ textTransform: 'uppercase' }"
-              filled
-              dense
               :rules="[(val: any) => !!val || 'Field is required!']"
               tabindex="0"
             />
@@ -165,13 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.output_format"
               :label="t('alert_destinations.output_format') + ' *'"
               :options="outputFormats"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
+              borderless
+              hide-bottom-space
               :popup-content-style="{ textTransform: 'uppercase' }"
-              filled
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
               tabindex="0"
@@ -179,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             
           </div>
           <div class="col-12 q-py-sm">
-            <div class="text-bold q-py-xs" style="paddingleft: 10px">
+            <div class="text-bold q-py-xs">
               Headers
             </div>
             <div
@@ -191,11 +179,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-input
                   :data-test="`add-destination-header-${header['key']}-key-input`"
                   v-model="header.key"
-                  color="input-border"
-                  bg-color="input-bg"
                   stack-label
-                  outlined
-                  filled
+                  borderless
+                  hide-bottom-space
                   :placeholder="t('alert_destinations.api_header')"
                   dense
                   tabindex="0"
@@ -206,11 +192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`add-destination-header-${header['key']}-value-input`"
                   v-model="header.value"
                   :placeholder="t('alert_destinations.api_header_value')"
-                  color="input-border"
-                  bg-color="input-bg"
                   stack-label
-                  outlined
-                  filled
+                  borderless
+                  hide-bottom-space
                   dense
                   isUpdatingDestination
                   tabindex="0"
@@ -245,29 +229,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-          <div class="col-12 q-py-sm ">
-            <div class="">
+          <div class="col-12 q-py-sm">
               <q-toggle
                 data-test="add-destination-skip-tls-verify-toggle"
-                class="q-mt-sm o2-toggle-button-lg tw-mr-3 -tw-ml-4"
+                class="o2-toggle-button-lg tw-mr-3 -tw-ml-4"
                 size="lg"
                 :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
                 v-model="formData.skip_tls_verify"
                 :label="t('alert_destinations.skip_tls_verify')"
               />
-            </div>
           </div>
         </template>
         <template v-if="formData.type === 'email'">
           <q-input
             v-model="formData.emails"
             :label="t('reports.recipients') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             :rules="[
               (val: any) =>
@@ -277,7 +256,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
             tabindex="0"
             style="width: 100%"
-            borderless
             :placeholder="t('user.inviteByEmail')"
           />
         </template>
@@ -289,14 +267,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.action_id"
               :label="t('alert_destinations.action') + ' *'"
               :options="filteredActions"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop no-case"
               map-options
               emit-value
               stack-label
-              outlined
-              filled
+              borderless
               dense
               use-input
               :loading="isLoadingActions"

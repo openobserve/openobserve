@@ -55,12 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-template-name-input"
               v-model="formData.name"
               :label="t('alerts.name') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               v-bind:readonly="isUpdatingTemplate"
               v-bind:disable="isUpdatingTemplate"
@@ -75,28 +72,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div class="col-12 q-pb-md">
+            <div class="app-tabs-container tw-w-fit">
             <app-tabs
-              style="
-                border: 1px solid #8a8a8a;
-                border-radius: 4px;
-                overflow: hidden;
-                width: fit-content;
-              "
-              :tabs="tabs"
-              v-model:active-tab="formData.type"
-            />
+                class="tabs-selection-container"
+                :tabs="tabs"
+                v-model:active-tab="formData.type"
+              />
+            </div>
           </div>
           <div v-if="formData.type === 'email'" class="col-12 q-pt-xs o2-input">
             <q-input
               data-test="add-template-email-title-input"
               v-model="formData.title"
               :label="t('alerts.title') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[(val: any) => !!val.trim() || 'Field is required!']"
               tabindex="0"
@@ -450,6 +441,7 @@ const copyTemplateBody = (text: any) => {
   width: 100%;
   min-height: 310px !important;
   border-radius: 5px;
+  border: 1px solid var(--o2-border-color);
   // padding-bottom: 14px;
   resize: vertical;
   overflow: auto;
