@@ -253,24 +253,55 @@ class APICleanup {
                 const alertSuffix = failed.alertName.split('_').pop();
                 const expectedFolderName = `auto_${alertSuffix}`;
 
-                // Find matching folder
-                const folder = folders.find(f => f.name === expectedFolderName);
+                // Try to find matching folder by name first
+                let folder = folders.find(f => f.name === expectedFolderName);
+                let alerts = [];
 
                 if (!folder) {
-                    testLogger.warn('Could not find folder for alert', {
+                    testLogger.warn('Could not find expected folder, searching all folders for alert', {
                         alert: failed.alertName,
                         expectedFolder: expectedFolderName
                     });
-                    continue;
+
+                    // Search testfoldermove first, then all other folders
+                    const testFolderMove = folders.find(f => f.name === 'testfoldermove');
+                    const otherFolders = folders.filter(f => f.name !== 'testfoldermove');
+                    const searchOrder = testFolderMove ? [testFolderMove, ...otherFolders] : folders;
+
+                    // Search through each folder to find the alert
+                    for (const searchFolder of searchOrder) {
+                        const alertsInFolder = await this.fetchAlertsInFolder(searchFolder.folderId);
+                        const foundAlert = alertsInFolder.find(a => a.name === failed.alertName);
+
+                        if (foundAlert) {
+                            folder = searchFolder;
+                            alerts = alertsInFolder;
+                            testLogger.info('Found alert in folder', {
+                                alert: failed.alertName,
+                                folderId: folder.folderId,
+                                folderName: folder.name
+                            });
+                            break;
+                        }
+                    }
+
+                    if (!folder) {
+                        testLogger.error('Could not find alert in any folder', {
+                            alert: failed.alertName,
+                            searchedFolders: folders.length
+                        });
+                        continue;
+                    }
+                } else {
+                    testLogger.info('Found folder for alert', {
+                        folderId: folder.folderId,
+                        folderName: folder.name
+                    });
+
+                    // Step 5: Fetch alerts in folder
+                    alerts = await this.fetchAlertsInFolder(folder.folderId);
                 }
 
-                testLogger.info('Found folder for alert', {
-                    folderId: folder.folderId,
-                    folderName: folder.name
-                });
-
-                // Step 5: Fetch alerts in folder
-                const alerts = await this.fetchAlertsInFolder(folder.folderId);
                 testLogger.info('Alerts in folder', { count: alerts.length });
 
                 // Step 6: Delete all alerts in folder
