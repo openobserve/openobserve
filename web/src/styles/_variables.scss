@@ -315,6 +315,8 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
 
   --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, white);
   --o2-tab-text-color: #{$o2-gray-1400};
+
+  --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, white);
 }
 
 // Semantic Colors - Dark Mode
@@ -381,4 +383,6 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
 
   --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, #{$dark-theme-color});
   --o2-tab-text-color: #{$o2-gray-100};
+
+  --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, #{$dark-theme-color});
 }
