@@ -1646,8 +1646,8 @@ impl PostgresFileList {
         let ret: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
             format!(
                 r#"
-INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at, index_footer_offset, index_footer_size)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
     ON CONFLICT DO NOTHING
     RETURNING id;
                 "#
@@ -1668,6 +1668,8 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             .bind(meta.flattened)
             .bind(now_ts)
             .bind(now_ts)
+            .bind(meta.index_footer_offset)
+            .bind(meta.index_footer_size)
             .fetch_one(&pool).await;
         match ret {
             Err(sqlx::Error::Database(e)) => {

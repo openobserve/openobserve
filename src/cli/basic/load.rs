@@ -45,7 +45,7 @@ pub async fn load_file_list_from_s3(
             }
         } else {
             println!(
-                "INSERT INTO file_list (account, org, stream, date, file, deleted, flattened, min_ts, max_ts, records, original_size, compressed_size, index_size) VALUES ('{}', '{}', '{}/{}', '{}', '{}', FALSE, FALSE, {}, {}, {}, {}, {}, 0);",
+                "INSERT INTO file_list (account, org, stream, date, file, deleted, flattened, min_ts, max_ts, records, original_size, compressed_size, index_size, index_footer_offset, index_footer_size) VALUES ('{}', '{}', '{}/{}', '{}', '{}', FALSE, FALSE, {}, {}, {}, {}, {}, {}, {}, {});",
                 account,
                 org,
                 org,
@@ -56,7 +56,10 @@ pub async fn load_file_list_from_s3(
                 file_meta.max_ts,
                 file_meta.records,
                 file_meta.original_size,
-                file_meta.compressed_size
+                file_meta.compressed_size,
+                file_meta.index_size,
+                file_meta.index_footer_offset.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string()),
+                file_meta.index_footer_size.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
             );
         }
     }
@@ -308,7 +311,7 @@ mod tests {
         ) in test_cases
         {
             let sql = format!(
-                "INSERT INTO file_list (account, org, stream, date, file, deleted, flattened, min_ts, max_ts, records, original_size, compressed_size, index_size) VALUES ('{}', '{}', '{}/{}', '{}', '{}', FALSE, FALSE, {}, {}, {}, {}, {}, 0);",
+                "INSERT INTO file_list (account, org, stream, date, file, deleted, flattened, min_ts, max_ts, records, original_size, compressed_size, index_size, index_footer_offset, index_footer_size) VALUES ('{}', '{}', '{}/{}', '{}', '{}', FALSE, FALSE, {}, {}, {}, {}, {}, 0, NULL, NULL);",
                 account,
                 org,
                 org,
@@ -326,7 +329,7 @@ mod tests {
             assert!(sql.contains("INSERT INTO file_list"));
             assert!(sql.contains("VALUES"));
             assert!(sql.contains("FALSE, FALSE")); // deleted and flattened flags
-            assert!(sql.contains(", 0);")); // index_size at the end
+            assert!(sql.contains("NULL, NULL);")); // index_footer_offset and index_footer_size at the end
             assert!(sql.contains(account));
             assert!(sql.contains(org));
             assert!(sql.contains(date));

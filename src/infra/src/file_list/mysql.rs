@@ -1765,8 +1765,8 @@ impl MysqlFileList {
         DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
         match  sqlx::query(
             format!(r#"
-INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at, index_footer_offset, index_footer_size)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             "#).as_str(),
         )
         .bind(account)
@@ -1784,6 +1784,8 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
         .bind(meta.flattened)
         .bind(now_ts)
         .bind(now_ts)
+        .bind(meta.index_footer_offset)
+        .bind(meta.index_footer_size)
         .execute(&pool)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
