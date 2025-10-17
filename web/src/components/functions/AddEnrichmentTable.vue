@@ -15,89 +15,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-px-md q-py-md"
-  :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-  >
-    <div class="row items-center no-wrap">
-      <div class="col">
-        <div v-if="isUpdating" class="text-h6">
-          {{ t("function.updateEnrichmentTable") }}
+  <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+    <div class="q-px-md q-py-md card-container tw-h-[calc(100vh-50px)]">
+      <div class="row items-center no-wrap">
+        <div class="col">
+          <div v-if="isUpdating" class="text-h6">
+            {{ t("function.updateEnrichmentTable") }}
+          </div>
+          <div v-else class="text-h6">{{ t("function.addEnrichmentTable") }}</div>
         </div>
-        <div v-else class="text-h6">{{ t("function.addEnrichmentTable") }}</div>
       </div>
-    </div>
 
-    <q-separator />
-    <div>
-      <q-form ref="addJSTransformForm" @submit="onSubmit">
-        <div class="row">
-          <q-input
-            v-model="formData.name"
-            :label="t('function.name')"
-            color="input-border"
-            bg-color="input-bg"
-            class="col-12 q-py-md showLabelOnTop text-grey-8 text-bold"
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            tabindex="0"
-          />
+      <q-separator />
+      <div>
+        <q-form ref="addJSTransformForm" @submit="onSubmit">
+          <div class="row">
+            <q-input
+              v-model="formData.name"
+              :label="t('function.name')"
+              color="input-border"
+              bg-color="input-bg"
+              class="col-12 q-py-md showLabelOnTop text-grey-8 text-bold"
+              stack-label
+              outlined
+              filled
+              dense
+              v-bind:readonly="isUpdating"
+              v-bind:disable="isUpdating"
+              :rules="[(val: any) => !!val || 'Field is required!']"
+              tabindex="0"
+            />
 
-          <q-file
-            color="lime-11"
-            filled
-            v-model="formData.file"
-            :label="t('function.uploadCSVFile')"
-            bg-color="input-bg"
-            class="col-12 q-py-md showLabelOnTop lookup-table-file-uploader"
-            stack-label
-            outlined
-            accept=".csv"
-            dense
-            :rules="[(val: any) => !!val || 'CSV File is required!']"
-            hide-bottom-space
-          >
-            <template v-slot:prepend>
-              <q-icon name="attachment" />
-            </template>
-          </q-file>
-          <div v-if="isUpdating">
-            <q-toggle
-              class="col-12 q-py-md text-grey-8 text-bold"
-              v-model="formData.append"
-              :label="t('function.appendData')"
+            <q-file
+              color="lime-11"
+              filled
+              v-model="formData.file"
+              :label="t('function.uploadCSVFile')"
+              bg-color="input-bg"
+              class="col-12 q-py-md showLabelOnTop lookup-table-file-uploader"
+              stack-label
+              outlined
+              accept=".csv"
+              dense
+              :rules="[(val: any) => !!val || 'CSV File is required!']"
+              hide-bottom-space
+            >
+              <template v-slot:prepend>
+                <q-icon name="attachment" />
+              </template>
+            </q-file>
+            <div v-if="isUpdating">
+              <q-toggle
+                class="col-12 q-py-md text-grey-8 text-bold"
+                v-model="formData.append"
+                :label="t('function.appendData')"
+              />
+            </div>
+          </div>
+
+          <pre v-if="compilationErr" class="q-py-md showLabelOnTop text-bold text-h7">{{
+            compilationErr
+          }}</pre>
+
+          <div class="flex justify-start">
+            <q-btn
+              v-close-popup
+              class="q-mr-md o2-secondary-button tw-h-[36px]"
+              :label="t('function.cancel')"
+              no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              @click="$emit('cancel:hideform')"
+            />
+            <q-btn
+              class="o2-primary-button no-border tw-h-[36px]"
+              :label="t('function.save')"
+              type="submit"
+              no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             />
           </div>
-        </div>
-
-        <pre v-if="compilationErr" class="q-py-md showLabelOnTop text-bold text-h7">{{
-          compilationErr
-        }}</pre>
-
-        <div class="flex justify-start">
-          <q-btn
-            v-close-popup
-            class="q-mr-md o2-secondary-button tw-h-[36px]"
-            :label="t('function.cancel')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            @click="$emit('cancel:hideform')"
-          />
-          <q-btn
-            class="o2-primary-button no-border tw-h-[36px]"
-            :label="t('function.save')"
-            type="submit"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          />
-        </div>
-      </q-form>
+        </q-form>
+      </div>
     </div>
   </div>
 </template>
