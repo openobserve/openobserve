@@ -550,6 +550,9 @@ body {
   }
   .q-table{
     thead{
+    tr {
+      background: var(--o2-table-header-bg) !important;
+    }
       th:last-child.actions-column{
         position: sticky;
         right: 0;

@@ -14,10 +14,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 -->
-
+<!-- TODO: we need to completely remove the store.state.theme based styling on this page as we have moved it to central place app.scss -->
 <template>
   <q-page
-    class="quota-page text-left"
+    class="quota-page text-left card-container"
     :class="
       store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
     "
@@ -1806,6 +1806,13 @@ export default defineComponent({
 }
 
 .app-table-container {
+  .q-table{
+    thead{
+          tr {
+      background: var(--o2-table-header-bg) !important;
+    }
+    }
+  }
   .thead-sticky,
   .tfoot-sticky {
     position: sticky;

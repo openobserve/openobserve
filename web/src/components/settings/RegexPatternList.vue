@@ -60,16 +60,18 @@
           </div>
         </template> 
         <template v-slot:header="props">
-          <!-- render the header of the columns -->
-          <q-th
-            v-for="col in props.cols"
-            :key="col.name"
-            :props="props"
-            :class="col.classes"
-            :style="col.style"
-          >
-            {{ col.label }}
-          </q-th>
+         <q-tr :props="props">
+              <!-- render the table headers -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
         </template>
         <template v-slot:body="props">
           <q-tr :props="props">
@@ -226,7 +228,7 @@
           field: "created_at",
           label: t("regex_patterns.created_at"),
           align: "left",
-          style: "width: 150px",
+          style: "width: 180px",
         },
         {
           name: "updated_at",
@@ -234,7 +236,7 @@
           label: t("regex_patterns.updated_at"),
           align: "left",
           sortable: true,
-          style: "width: 150px",
+          style: "width: 180px",
         },
         {
           name: "actions",
@@ -484,35 +486,5 @@
 </script>
 
 <style lang="scss">
-.regex-pattern-list-table{
-  th,td {
-    padding: 0px 16px !important;
-    height: 36px !important;
-  };
-  th:last-child,
-  td:last-child {
-    position: sticky;
-    right: 0;
-    z-index: 1;
-  }
-}
 
-
-.dark-theme-regex-pattern-list{
-  th:last-child.actions-column,
-  td:last-child.actions-column {
-    background: var(--q-dark);
-    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
-    width: 120px;
-  }
-}
-
-.light-theme-regex-pattern-list{
-  th:last-child.actions-column,
-  td:last-child.actions-column {
-    background: #ffffff;
-    width: 120px;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
-  }
-}
 </style>
