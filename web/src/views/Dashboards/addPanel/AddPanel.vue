@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           "
           outline
-          padding="xs"
+          padding="sm"
           class="q-mr-sm tw-h-[36px]"
           no-caps
           icon="info_outline"
