@@ -69,9 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         class="o2-quasar-table o2-quasar-table-header-sticky"
         :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;' 
+            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;'
             : 'width: 100%'"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
+        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border'"
       >
         <template #no-data>
           <div
@@ -103,42 +103,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn
-              icon="download"
-              title="Export Destination"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click.stop="exportDestination(props.row)"
-              data-test="destination-export"
-            ></q-btn>
-            <q-btn
-              :data-test="`alert-destination-list-${props.row.name}-update-destination`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alert_destinations.edit')"
-              @click="editDestination(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alert_destinations.delete')"
-              @click="conformDeleteDestination(props.row)"
-            ></q-btn>
+            <div class="tw-flex tw-items-center tw-gap-1 tw-justify-center">
+              <q-btn
+                data-test="destination-export"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                title="Export Destination"
+                @click.stop="exportDestination(props.row)"
+              >
+                <Download class="o2-actions-icons" />
+              </q-btn>
+              <q-btn
+                :data-test="`alert-destination-list-${props.row.name}-update-destination`"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :title="t('alert_destinations.edit')"
+                @click="editDestination(props.row)"
+              >
+                <Pencil class="o2-actions-icons" />
+              </q-btn>
+              <q-btn
+                :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :title="t('alert_destinations.delete')"
+                @click="conformDeleteDestination(props.row)"
+              >
+                <Trash class="o2-actions-icons" />
+              </q-btn>
+            </div>
           </q-td>
         </template>
         <template #bottom="scope">
@@ -222,10 +224,10 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationPayload } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
 
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportDestination from "./ImportDestination.vue";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
+import { Download, Pencil, Trash } from "lucide-vue-next";
 
 interface ConformDelete {
   visible: boolean;
@@ -239,6 +241,9 @@ export default defineComponent({
     ConfirmDialog,
     QTablePagination,
     ImportDestination,
+    Download,
+    Pencil,
+    Trash,
   },
   setup() {
     const qTable = ref();
@@ -581,7 +586,6 @@ export default defineComponent({
       perPageOptions,
       resultTotal,
       pagination,
-      outlinedDelete,
       routeTo,
       exportDestination,
       showImportDestination,

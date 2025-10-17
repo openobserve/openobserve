@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div>
-    <div class="q-px-md q-py-md tw-mt-2">
+    <div class="q-px-md q-py-md">
       <div class="general-page-title">
         {{ t("settings.generalPageTitle") }}
       </div>

@@ -54,11 +54,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :pagination="pagination"
-        class="o2-quasar-table o2-quasar-table-header-sticky"
+        class="o2-quasar-table o2-quasar-table-header-sticky o2-last-row-border"
         :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;' 
+            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;'
             : 'width: 100%'"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
+        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light'"
       >
         <template #no-data>
           <template>
@@ -67,10 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn
+            <div class="tw-flex tw-justify-center tw-items-center">
+              <q-btn
               :data-test="`alert-destination-list-${props.row.name}-update-destination`"
-              icon="edit"
-              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
@@ -78,11 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               :title="t('alert_destinations.edit')"
               @click="editDestination(props.row)"
-            ></q-btn>
+            >
+              <Pencil class="o2-actions-icons" />
+            </q-btn>
             <q-btn
               :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
@@ -90,7 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               :title="t('alert_destinations.delete')"
               @click="conformDeleteDestination(props.row)"
-            ></q-btn>
+            >
+              <Trash class="o2-actions-icons" />
+            </q-btn>
+            </div>
           </q-td>
         </template>
         <template #bottom="scope">
@@ -161,6 +163,7 @@ import type { Template } from "@/ts/interfaces/index";
 
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useReo } from "@/services/reodotdev_analytics";
+import { Pencil, Trash } from "lucide-vue-next";
 
 interface ConformDelete {
   visible: boolean;
@@ -168,7 +171,7 @@ interface ConformDelete {
 }
 export default defineComponent({
   name: "PageAlerts",
-  components: { AddDestination, NoData, ConfirmDialog, QTablePagination },
+  components: { AddDestination, NoData, ConfirmDialog, QTablePagination, Pencil, Trash },
   setup() {
     const qTable = ref();
     const store = useStore();

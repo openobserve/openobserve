@@ -51,7 +51,7 @@
           :style="hasVisibleRows
             ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;' 
             : 'width: 100%'"
-          :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
+          :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border'"
         >
         <template #no-data>
           <div v-if="!listLoading && filterQuery == ''" class="full-width column flex-center q-mt-xs full-height" style="font-size: 1.5rem">
@@ -86,42 +86,44 @@
               {{ props.row[col.field] }}
             </template>
             <template v-else>
-              <q-btn
-              icon="download"
-              title="Export Regex Pattern"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click.stop="exportRegexPattern(props.row)"
-              :data-test="`regex-pattern-list-${props.row.id}-export-regex-pattern`"
-            ></q-btn>
-              <q-btn
-              :data-test="`regex-pattern-list-${props.row.id}-update-regex-pattern`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('regex_patterns.edit')"
-              @click.stop="editRegexPattern(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`regex-pattern-list-${props.row.id}-delete-regex-pattern`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('regex_patterns.delete')"
-              @click.stop="confirmDeleteRegexPattern(props.row)"
-            ></q-btn>
+              <div class="tw-flex tw-items-center tw-gap-1 tw-justify-center">
+                <q-btn
+                  :data-test="`regex-pattern-list-${props.row.id}-export-regex-pattern`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  title="Export Regex Pattern"
+                  @click.stop="exportRegexPattern(props.row)"
+                >
+                  <Download class="o2-actions-icons" />
+                </q-btn>
+                <q-btn
+                  :data-test="`regex-pattern-list-${props.row.id}-update-regex-pattern`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  :title="t('regex_patterns.edit')"
+                  @click.stop="editRegexPattern(props.row)"
+                >
+                  <Pencil class="o2-actions-icons" />
+                </q-btn>
+                <q-btn
+                  :data-test="`regex-pattern-list-${props.row.id}-delete-regex-pattern`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  :title="t('regex_patterns.delete')"
+                  @click.stop="confirmDeleteRegexPattern(props.row)"
+                >
+                  <Trash class="o2-actions-icons" />
+                </q-btn>
+              </div>
             </template>
           </q-td>
                       
@@ -173,11 +175,11 @@
     import { useStore } from "vuex";
     import NoRegexPatterns from "./NoRegexPatterns.vue";
     import regexPatternsService from "@/services/regex_pattern";
-    import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
     import AddRegexPattern from "./AddRegexPattern.vue";
     import ImportRegexPattern from "./ImportRegexPattern.vue";
     import config from "@/aws-exports";
     import NoData from "@/components/shared/grid/NoData.vue";
+    import { Download, Pencil, Trash } from "lucide-vue-next";
 
     export default defineComponent({
         name: "RegexPatternList",
@@ -187,7 +189,10 @@
             ConfirmDialog,
             AddRegexPattern,
             ImportRegexPattern,
-            NoData
+            NoData,
+            Download,
+            Pencil,
+            Trash,
         },
     setup() {
 
@@ -465,7 +470,6 @@
         changePagination,
         createRegexPattern,
         listLoading,
-        outlinedDelete,
         editRegexPattern,
         deleteRegexPattern,
         deleteDialog,
