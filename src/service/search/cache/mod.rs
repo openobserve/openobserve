@@ -327,7 +327,7 @@ pub async fn search(
     if is_aggregate
         && res.histogram_interval.is_none()
         && !c_resp.ts_column.is_empty()
-        && c_resp.histogram_interval > -1
+        && c_resp.histogram_interval > 0
     {
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
@@ -806,7 +806,10 @@ pub async fn write_results(
     let mut accept_start_time = req_query_start_time;
     let mut accept_end_time = req_query_end_time;
     let mut need_adjust_end_time = false;
-    if is_aggregate && let Some(interval) = res.histogram_interval {
+    if is_aggregate
+        && let Some(interval) = res.histogram_interval
+        && interval > 0
+    {
         let interval = interval * 1000 * 1000; // convert to microseconds
         // next interval of start_time
         if (accept_start_time % interval) != 0 {
@@ -859,6 +862,7 @@ pub async fn write_results(
     if need_adjust_end_time
         && is_aggregate
         && let Some(interval) = res.histogram_interval
+        && interval > 0
     {
         accept_end_time += interval * 1000 * 1000;
     }
@@ -1063,5 +1067,22 @@ pub async fn apply_regex_to_response(
             log::error!("error in processing records for patterns for stream {all_streams} : {e}");
             Err(infra::errors::Error::Message(e.to_string()))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_result_array_skip_vrl() {
+        let query_fn = r#"#ResultArray#SkipVRL#
+        arr1_final = []
+        for_each(array!(.)) -> |index, value| {
+            value.arr = {"a": 4}
+            arr1_final = push(arr1_final,value)
+        }
+        . = arr1_final"#;
+        assert!(is_result_array_skip_vrl(query_fn));
     }
 }
