@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div style="height: calc(100vh - 40px); overflow-y: auto" class="scroll">
     <div
-      class="flex items-center q-pa-sm"
+      class="flex items-center q-pa-sm card-container"
       :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
     >
       <div
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator></q-separator>
-    <div class="row" style="height: calc(100vh - 99px); overflow-y: auto">
+    <div class="row card-container" style="height: calc(100vh - 99px); overflow-y: auto">
       <div
         class="col scroll"
         style="
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #after>
-            <div class="row">
+            <div class="row card-container">
               <div
                 class="col scroll"
                 style="height: calc(100vh - 99px); overflow-y: auto"
