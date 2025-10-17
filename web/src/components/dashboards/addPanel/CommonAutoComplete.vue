@@ -5,6 +5,7 @@
       @update:model-value="onModelValueChanged"
       dense
       filled
+      borderless
       :label="label"
       @focus="showOptions = true"
       @blur="hideOptions"
