@@ -24,6 +24,30 @@ import {
 } from "./convertDataIntoUnitValue";
 import { getDataValue } from "./aliasUtils";
 
+// Build a lookup map for value mappings to avoid repeated searches
+const buildValueMappingCache = (mappings: any) => {
+  if (!mappings || !Array.isArray(mappings)) {
+    return null;
+  }
+
+  const cache = new Map<any, string>();
+
+  mappings.forEach((mapping: any) => {
+    if (mapping && mapping.text) {
+      // Handle range mappings
+      if (mapping.from !== undefined && mapping.to !== undefined) {
+        // Store range info for later lookup
+        cache.set(`__range_${mapping.from}_${mapping.to}`, mapping.text);
+      } else if (mapping.value !== undefined && mapping.value !== null) {
+        // Direct value mapping
+        cache.set(mapping.value, mapping.text);
+      }
+    }
+  });
+
+  return cache.size > 0 ? cache : null;
+};
+
 const applyValueMapping = (value: any, mappings: any) => {
   // Find the first valid mapping with a valid text
   const foundValue = findFirstValidMappedValue(value, mappings, "text");
@@ -31,6 +55,34 @@ const applyValueMapping = (value: any, mappings: any) => {
   // if foundValue is not null and foundValue.text is not null, then return foundValue.text
   if (foundValue && foundValue.text) {
     return foundValue.text;
+  }
+
+  return null;
+};
+
+// Fast lookup using pre-built cache
+const lookupValueMapping = (value: any, cache: Map<any, string> | null) => {
+  if (!cache) return null;
+
+  // Direct lookup first
+  if (cache.has(value)) {
+    return cache.get(value);
+  }
+
+  // Check range mappings
+  if (typeof value === 'number') {
+    const entries = Array.from(cache.entries());
+    for (let i = 0; i < entries.length; i++) {
+      const [key, text] = entries[i];
+      if (typeof key === 'string' && key.startsWith('__range_')) {
+        const parts = key.split('_');
+        const from = parseFloat(parts[2]);
+        const to = parseFloat(parts[3]);
+        if (!isNaN(from) && !isNaN(to) && value >= from && value <= to) {
+          return text;
+        }
+      }
+    }
   }
 
   return null;
@@ -61,12 +113,18 @@ export const convertTableData = (
   const x = panelSchema?.queries[0].fields?.x || [];
   const y = panelSchema?.queries[0].fields?.y || [];
   let columnData = [...x, ...y];
-  let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
+  // Avoid deep cloning - use shallow copy and work with original data
+  let tableRows = searchQueryData[0];
   const histogramFields: string[] = [];
+
+  // Build value mapping cache once for all cells
+  const valueMappingCache = buildValueMappingCache(panelSchema.config?.mappings);
 
   const overrideConfigs = panelSchema.config.override_config || [];
   const colorConfigMap: Record<string, any> = {};
   const unitConfigMap: Record<string, any> = {};
+  const fieldNameCache: Record<string, string> = {}; // Cache for case-insensitive lookups
+
   try {
     // Build maps for both color and unit configs
     overrideConfigs.forEach((o: any) => {
@@ -74,16 +132,24 @@ export const convertTableData = (
       const config = o?.config?.[0];
 
       if (alias && config) {
+        const aliasLower = alias;
         if (config.type === "unique_value_color") {
           const autoColor = config.autoColor;
-          colorConfigMap[alias] = { autoColor };
+          colorConfigMap[aliasLower] = { autoColor };
         } else if (config.type === "unit") {
           const unit = config.value?.unit;
           const customUnit = config.value?.customUnit;
-          unitConfigMap[alias] = { unit, customUnit };
+          unitConfigMap[aliasLower] = { unit, customUnit };
         }
       }
     });
+
+    // Pre-build case-insensitive field name cache
+    if (tableRows.length > 0) {
+      Object.keys(tableRows[0]).forEach((key) => {
+        fieldNameCache[key.toLowerCase()] = key;
+      });
+    }
   } catch (e) {}
 
   // use all response keys if tableDynamicColumns is true
@@ -166,34 +232,24 @@ export const convertTableData = (
     columns = columnData.map((it: any) => {
       let obj: any = {};
       const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
-      // Use case-insensitive field name that matches the actual data keys
-      const actualField =
-        tableRows.length > 0
-          ? Object.keys(tableRows[0]).find(
-              (key) => key.toLowerCase() === it.alias.toLowerCase(),
-            ) || it.alias
-          : it.alias;
+      // Use cached field name lookup
+      const aliasLower = it.alias.toLowerCase();
+      const actualField = fieldNameCache[aliasLower] || it.alias;
+
       obj["name"] = it.label;
       obj["field"] = actualField;
       obj["label"] = it.label;
       obj["align"] = !isNumber ? "left" : "right";
       obj["sortable"] = true;
-      // pass color mode info for renderer
-      // Use case-insensitive lookup for colorConfigMap
-      const colorConfigKey =
-        Object.keys(colorConfigMap).find(
-          (key) => key.toLowerCase() === it.alias.toLowerCase(),
-        ) || it.alias;
-      if (colorConfigMap?.[colorConfigKey]?.autoColor) {
+
+      // pass color mode info for renderer - use pre-lowercased lookup
+      if (colorConfigMap?.[aliasLower]?.autoColor) {
         obj["colorMode"] = "auto";
       }
 
       obj["format"] = (val: any) => {
-        // value mapping
-        const valueMapping = applyValueMapping(
-          val,
-          panelSchema.config?.mappings,
-        );
+        // value mapping - use cached lookup
+        const valueMapping = lookupValueMapping(val, valueMappingCache);
 
         if (valueMapping != null) {
           return valueMapping;
@@ -204,34 +260,26 @@ export const convertTableData = (
       // if number then sort by number and use decimal point config option in format
       if (isNumber) {
         obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
+
+        // Pre-fetch unit config to avoid repeated lookups
+        let unitToUse = null;
+        let customUnitToUse = null;
+        if (unitConfigMap[aliasLower]) {
+          unitToUse = unitConfigMap[aliasLower].unit;
+          customUnitToUse = unitConfigMap[aliasLower].customUnit;
+        }
+        if (!unitToUse) {
+          unitToUse = panelSchema.config?.unit;
+          customUnitToUse = panelSchema.config?.unit_custom;
+        }
+        const decimals = panelSchema.config?.decimals ?? 2;
+
         obj["format"] = (val: any) => {
-          // value mapping
-          const valueMapping = applyValueMapping(
-            val,
-            panelSchema.config?.mappings,
-          );
+          // value mapping - use cached lookup
+          const valueMapping = lookupValueMapping(val, valueMappingCache);
 
           if (valueMapping != null) {
             return valueMapping;
-          }
-
-          let unitToUse = null;
-          let customUnitToUse = null;
-
-          // Check unit config map first
-          // Use case-insensitive lookup for unitConfigMap
-          const unitConfigKey =
-            Object.keys(unitConfigMap).find(
-              (key) => key.toLowerCase() === it.alias.toLowerCase(),
-            ) || it.alias;
-          if (unitConfigMap[unitConfigKey]) {
-            unitToUse = unitConfigMap[unitConfigKey].unit;
-            customUnitToUse = unitConfigMap[unitConfigKey].customUnit;
-          }
-
-          if (!unitToUse) {
-            unitToUse = panelSchema.config?.unit;
-            customUnitToUse = panelSchema.config?.unit_custom;
           }
 
           return !Number.isNaN(val)
@@ -241,7 +289,7 @@ export const convertTableData = (
                     val,
                     unitToUse,
                     customUnitToUse,
-                    panelSchema.config?.decimals ?? 2,
+                    decimals,
                   ),
                 ) ?? 0
               }`
@@ -251,13 +299,13 @@ export const convertTableData = (
 
       // if current field is histogram field then return formatted date
       if (histogramFields.includes(it.alias)) {
+        // Cache timezone to avoid repeated lookups
+        const timezone = store.state.timezone;
+
         // if current field is histogram field then return formatted date
         obj["format"] = (val: any) => {
-          // value mapping
-          const valueMapping = applyValueMapping(
-            val,
-            panelSchema.config?.mappings,
-          );
+          // value mapping - use cached lookup
+          const valueMapping = lookupValueMapping(val, valueMappingCache);
 
           if (valueMapping != null) {
             return valueMapping;
@@ -276,7 +324,7 @@ export const convertTableData = (
             timestamp = new Date(val)?.getTime() / 1000;
           }
 
-          return formatDate(toZonedTime(timestamp, store.state.timezone));
+          return formatDate(toZonedTime(timestamp, timezone));
         };
       }
       return obj;
@@ -368,11 +416,8 @@ export const convertTableData = (
         }
 
         obj["format"] = (val: any) => {
-          // value mapping
-          const valueMapping = applyValueMapping(
-            val,
-            panelSchema.config?.mappings,
-          );
+          // value mapping - use cached lookup
+          const valueMapping = lookupValueMapping(val, valueMappingCache);
 
           if (valueMapping != null) {
             return valueMapping;
@@ -383,12 +428,15 @@ export const convertTableData = (
 
         if (isNumber) {
           obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
+
+          // Pre-fetch config values
+          const unit = panelSchema.config?.unit;
+          const unitCustom = panelSchema.config?.unit_custom;
+          const decimals = panelSchema.config?.decimals ?? 2;
+
           obj["format"] = (val: any) => {
-            // value mapping
-            const valueMapping = applyValueMapping(
-              val,
-              panelSchema.config?.mappings,
-            );
+            // value mapping - use cached lookup
+            const valueMapping = lookupValueMapping(val, valueMappingCache);
 
             if (valueMapping != null) {
               return valueMapping;
@@ -399,9 +447,9 @@ export const convertTableData = (
                   formatUnitValue(
                     getUnitValue(
                       val,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals ?? 2,
+                      unit,
+                      unitCustom,
+                      decimals,
                     ),
                   ) ?? 0
                 }`
@@ -411,12 +459,12 @@ export const convertTableData = (
 
         // Check if it's a histogram field and apply timezone conversion
         if (histogramFields.includes(it)) {
+          // Cache timezone
+          const timezone = store.state.timezone;
+
           obj["format"] = (val: any) => {
-            // value mapping
-            const valueMapping = applyValueMapping(
-              val,
-              panelSchema.config?.mappings,
-            );
+            // value mapping - use cached lookup
+            const valueMapping = lookupValueMapping(val, valueMappingCache);
 
             if (valueMapping != null) {
               return valueMapping;
@@ -435,7 +483,7 @@ export const convertTableData = (
               timestamp = new Date(val)?.getTime() / 1000;
             }
 
-            return formatDate(toZonedTime(timestamp, store.state.timezone));
+            return formatDate(toZonedTime(timestamp, timezone));
           };
         }
 
@@ -444,12 +492,16 @@ export const convertTableData = (
     ];
 
     // Transpose rows, adding 'label' as the first column
+    // Cache timezone to avoid repeated store lookups
+    const timezone = store.state.timezone;
+
     tableRows = columnData.map((it: any) => {
+      const isHistogramField = histogramFields.includes(it.alias);
       let obj = uniqueTransposeColumns.reduce(
         (acc: any, curr: any, reduceIndex: any) => {
           const value =
             getDataValue(searchQueryData[0][reduceIndex], it.alias) ?? "";
-          acc[curr] = histogramFields.includes(it.alias)
+          acc[curr] = isHistogramField
             ? (() => {
                 // Handle 16-digit microsecond timestamps
                 let timestamp;
@@ -464,7 +516,7 @@ export const convertTableData = (
                   timestamp = new Date(value)?.getTime() / 1000;
                 }
 
-                return formatDate(toZonedTime(timestamp, store.state.timezone));
+                return formatDate(toZonedTime(timestamp, timezone));
               })()
             : value;
           return acc;
