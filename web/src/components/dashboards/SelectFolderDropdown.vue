@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="index-dropdown-stream_type"
       input-debounce="0"
       behavior="menu"
-      filled
       borderless
       dense
       class="q-mb-xs showLabelOnTop"
