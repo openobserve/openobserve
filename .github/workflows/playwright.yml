@@ -18,14 +18,15 @@ on:
 
 env:
   COLUMNS: 150
-  ZO_ROOT_USER_EMAIL: root@example.com
-  ZO_ROOT_USER_PASSWORD: Complexpass#123
-  ZO_BASE_URL: http://localhost:5080
-  WS_ZO_BASE_URL: ws://localhost:5080
-  ZO_BASE_URL_SC: http://localhost:5080
-  ZO_BASE_URL_SC_UI: http://localhost:5080
-  INGESTION_URL: http://localhost:5080
-  ORGNAME: default
+  ZO_ROOT_USER_EMAIL: automation@tester.ai
+  ZO_ROOT_USER_PASSWORD: 12345678
+  ZO_BASE_URL: https://dev2.internal.zinclabs.dev/
+  WS_ZO_BASE_URL: https://dev2.internal.zinclabs.dev/
+  ZO_BASE_URL_SC: https://dev2.internal.zinclabs.dev/
+  ZO_BASE_URL_SC_UI: https://dev2.internal.zinclabs.dev/
+  INGESTION_URL: https://dev2.internal.zinclabs.dev/
+  ORGNAME: automationtesting
+  TEST_STEP_DELAY_MS: 500
   ZO_QUICK_MODE_NUM_FIELDS: 100
   ZO_QUICK_MODE_STRATEGY: first
   ZO_ALLOW_USER_DEFINED_SCHEMAS: true
@@ -43,67 +44,105 @@ env:
   ZO_UTF8_VIEW_ENABLED: false
 
 jobs:
-  build_binary:
-    name: build_binary
+  # build_binary:
+  #   name: build_binary
+  #   runs-on:
+  #     labels: repo-openobserve-standard-16
+
+  #   steps:
+  #     - name: Remove unused tools
+  #       run: |
+  #         sudo rm -rf /usr/share/dotnet
+  #         sudo rm -rf /opt/ghc
+  #         sudo rm -rf "/usr/local/share/boost"
+  #         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+  #     - name: Clone the current repo
+  #       uses: actions/checkout@v5
+  #       with:
+  #         fetch-depth: 0
+
+  #     - name: Setup Rust Toolchain
+  #       uses: dtolnay/rust-toolchain@master
+  #       with:
+  #         toolchain: nightly-2025-07-20
+  #         targets: x86_64-unknown-linux-gnu
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         cache-on-failure: true
+  #         prefix-key: playwright
+  #     - name: Install Protoc
+  #       uses: arduino/setup-protoc@v3
+  #       with:
+  #         version: "21.12"
+  #     - uses: actions/setup-node@v5
+  #       with:
+  #         node-version: 22
+
+  #     - name: Build frontend code
+  #       env:
+  #         NODE_OPTIONS: "--max-old-space-size=8192"
+  #         VITE_COVERAGE: "true"
+  #         COVERAGE: "true"
+  #       run: cd web && npm install && npm run build
+
+  #     - name: Build and run binary
+  #       run: cargo build --release --target x86_64-unknown-linux-gnu
+
+  #     - name: Upload artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: release-binary
+  #         path: target/x86_64-unknown-linux-gnu/release/openobserve
+  #         retention-days: 1
+
+  test_environment_data_cleanup:
+    name: Test Environment Data Cleanup
     runs-on:
-      labels: repo-openobserve-standard-16
-
+      labels: repo-openobserve-standard-8
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2025-07-20
-          targets: x86_64-unknown-linux-gnu
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          prefix-key: playwright
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "21.12"
+      - name: Ensure we are getting a reply from the server
+        run: |
+          echo "Testing deployed environment at: ${ZO_BASE_URL}"
+          curl -f ${ZO_BASE_URL}/login || (echo "Failed to reach deployed environment" && exit 1)
+
       - uses: actions/setup-node@v5
         with:
           node-version: 22
 
-      - name: Build frontend code
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
-          VITE_COVERAGE: "true"
-          COVERAGE: "true"
-        run: cd web && npm install && npm run build
-
-      - name: Build and run binary
-        run: cargo build --release --target x86_64-unknown-linux-gnu
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-binary
-          path: target/x86_64-unknown-linux-gnu/release/openobserve
-          retention-days: 1
+      - name: Run cleanup test
+        run: |
+          touch .env
+          echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
+          echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
+          echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
+          echo "WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
+          echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
+          echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
+          echo "INGESTION_URL=${INGESTION_URL}" >> .env
+          echo "ORGNAME=${ORGNAME}" >> .env
+          echo "TEST_STEP_DELAY_MS=${TEST_STEP_DELAY_MS}" >> .env
+          mv .env tests/ui-testing
+          cd tests/ui-testing && npm ci
+          npx playwright install --with-deps chromium
+          echo "Running pre-test cleanup to remove old test data..."
+          npx playwright test cleanup.spec.js
 
   ui_integration_tests:
     name: e2e / ${{ matrix.testfolder }}
-    needs: [build_binary]
+    needs: [test_environment_data_cleanup]
     runs-on:
       labels: repo-openobserve-standard-8
     # container:
     #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
     #   options: --user root
     strategy:
+      fail-fast: false
       matrix:
         include:
           - testfolder: "GeneralTests"
@@ -196,7 +235,7 @@ jobs:
           - testfolder: "Reports"
             browser: "chrome"
             run_files: [
-              "reportsUpdated.spec.js", 
+              "reportsUpdated.spec.js",
               "reportsUpdated2.spec.js"
               ]
           - testfolder: "Streams"
@@ -213,20 +252,39 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v5
-        with:
-          name: release-binary
-          path: release-binary
+      # - name: Download artifacts
+      #   uses: actions/download-artifact@v5
+      #   with:
+      #     name: release-binary
+      #     path: release-binary
 
-      - name: Start OpenObserve
-        run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
+      # - name: Start OpenObserve
+      #   run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
 
-      - name: Wait for start
-        run: sleep 60
+      # - name: Wait for start
+      #   run: sleep 60
 
       - name: Ensure we are getting a reply from the server
-        run: curl http://localhost:5080/web/login
+        run: |
+          echo "Testing deployed environment at: ${ZO_BASE_URL}"
+          curl -f ${ZO_BASE_URL}/login || (echo "Failed to reach deployed environment" && exit 1)
+
+      - name: Health Check ingestion API endpoint
+        run: |
+          echo "Testing ingestion endpoint with authentication:"
+          echo "INGESTION_URL: ${INGESTION_URL}"
+          echo "ORGNAME: ${ORGNAME}"
+
+          # Remove trailing slash from INGESTION_URL if present
+          BASE_URL=${INGESTION_URL%/}
+          echo "Attempting POST to: ${BASE_URL}/api/${ORGNAME}/e2e_automate/_json"
+
+          # Test with basic auth and sample data
+          curl -f -X POST \
+            -H "Authorization: Basic $(echo -n "${ZO_ROOT_USER_EMAIL}:${ZO_ROOT_USER_PASSWORD}" | base64)" \
+            -H "Content-Type: application/json" \
+            -d '{"test": "data", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' \
+            "${BASE_URL}/api/${ORGNAME}/e2e_automate/_json" || (echo "Ingestion API health check failed" && exit 1)
 
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
@@ -249,7 +307,7 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
-          npx playwright install --with-deps chromium 
+          npx playwright install --with-deps chromium
           # Get list of files to run using join function
           FILE_LIST="${{ join(matrix.run_files, ' ') }}"
           echo "DEBUG: FILE_LIST = $FILE_LIST"
@@ -268,9 +326,9 @@ jobs:
                 ACTUAL_FOLDER="${{ matrix.testfolder }}"
                 ;;
             esac
-            
+
             echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
-            
+
             # Build file paths
             FILE_PATHS=""
             for file in $FILE_LIST; do
@@ -278,7 +336,7 @@ jobs:
               echo "DEBUG: Will run file: $FILE_PATH"
               FILE_PATHS="$FILE_PATHS $FILE_PATH"
             done
-            
+
             # Run all specified files at once
             echo "DEBUG: Final command: npx playwright test$FILE_PATHS"
             npx playwright test $FILE_PATHS
@@ -368,7 +426,7 @@ jobs:
 
   generate_coverage_report:
     name: Generate Coverage Report
-    needs: [build_binary, ui_integration_tests]
+    needs: [ui_integration_tests]
     runs-on: repo-openobserve-standard-8
     if: success() || failure()
 
