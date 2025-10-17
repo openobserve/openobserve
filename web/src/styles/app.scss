@@ -352,11 +352,6 @@ body {
   }
 }
 
-.monaco-editor {
-  outline-width: 0px;
-  outline-style: none;
-}
-
 .o2-container-navbarheight {
   height: calc(100vh - 42px);
   overflow: auto;
@@ -1073,7 +1068,7 @@ body {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 32px;
+  min-height: 30px;
 }
 
 .o2-toggle-button-xs-light{
