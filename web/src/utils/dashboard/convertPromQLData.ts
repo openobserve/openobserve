@@ -104,7 +104,7 @@ export const convertPromQLData = async (
   let extras: any = {};
 
   // get the limit series from the config
-  let limitSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+  const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
 
   // get the total series
   let totalSeries = 0;
@@ -114,13 +114,19 @@ export const convertPromQLData = async (
     }
   });
 
-  // Limit number of series to limitSeries
+  // For multiple queries (multi y-axis equivalent), divide the limit equally
+  const numberOfQueries = searchQueryData.filter(
+    (q: any) => q.result?.length > 0,
+  ).length;
+  const limitPerQuery =
+    numberOfQueries > 1 ? Math.floor(maxSeries / numberOfQueries) : maxSeries;
+
+  // Limit number of series to limitPerQuery per query
   const limitedSearchQueryData = searchQueryData.map((queryData: any) => {
     if (!queryData || !queryData.result) {
       return queryData;
     }
-    const remainingSeries = queryData.result.slice(0, limitSeries);
-    limitSeries = limitSeries - remainingSeries.length;
+    const remainingSeries = queryData.result.slice(0, limitPerQuery);
     return {
       ...queryData,
       result: remainingSeries,

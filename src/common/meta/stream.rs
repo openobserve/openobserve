@@ -102,6 +102,23 @@ pub struct StreamDeleteFields {
     pub fields: Vec<String>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct FieldUpdate {
+    /// Field name to update
+    pub name: String,
+    /// Target data type (e.g., Utf8, LargeUtf8, Int64, Float64)
+    pub data_type: String,
+    /// Optionally set nullability; defaults to existing field nullability if not provided
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nullable: Option<bool>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct StreamUpdateFields {
+    /// List of field updates, each with name, target data_type, and optional nullability
+    pub fields: Vec<FieldUpdate>,
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::stream::{StreamSettings, StreamType};
