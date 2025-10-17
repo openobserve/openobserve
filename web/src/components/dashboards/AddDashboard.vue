@@ -51,13 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="dashboardData.name"
           :label="t('dashboard.name') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
           class="q-py-md showLabelOnTop"
           data-test="add-dashboard-name"
           stack-label
-          outlined
-          filled
+          hide-bottom-space
+          borderless
           dense
           :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
           :lazy-rules="true"
@@ -66,12 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="dashboardData.description"
           :label="t('dashboard.typeDesc')"
-          color="input-border"
-          bg-color="input-bg"
+          borderless
+          hide-bottom-space
           class="q-py-md showLabelOnTop"
           stack-label
-          outlined
-          filled
           dense
           data-test="add-dashboard-description"
         />
