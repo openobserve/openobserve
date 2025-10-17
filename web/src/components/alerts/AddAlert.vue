@@ -15,413 +15,421 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
-    <div class="card-container">
-      <div class="full-width q-mx-lg q-px-sm">
-        <div class="row items-center no-wrap q-mx-md q-my-sm">
-          <div class="flex items-center justify-between tw-w-full">
-            <div class="flex items-center">
-              <div
-              data-test="add-alert-back-btn"
-              class="flex justify-center items-center q-mr-md cursor-pointer"
-              style="
-                border: 1.5px solid;
-                border-radius: 50%;
-                width: 22px;
-                height: 22px;
-              "
-              title="Go Back"
-              @click="router.back()"
-            >
-              <q-icon name="arrow_back_ios_new" size="14px" />
-            </div>
-            <div v-if="beingUpdated" class="text-h6" data-test="add-alert-title">
-              {{ t("alerts.updateTitle") }}
-            </div>
-            <div v-else class="text-h6" data-test="add-alert-title">
-              {{ t("alerts.addTitle") }}
-            </div>
-            </div>
-            <div>
-              <q-btn
-                outline
-                class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode"
-                size="sm"
-                no-caps
-                icon="code"
-                data-test="pipeline-json-edit-btn"
-                @click="openJsonEditor"
-                >
-            <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
-            </q-btn>
-            </div>
-          </div>
-        </div>
-
-        <q-separator />
-        <div
-          ref="addAlertFormRef"
+  <div class="full-width q-mx-lg "  >
+    <div class="row items-center no-wrap tw-mx-2 q-my-sm">
+      <div class="flex items-center justify-between tw-w-full card-container tw-px-2 tw-py-3">
+        <div class="flex items-center">
+          <div
+          data-test="add-alert-back-btn"
+          class="flex justify-center items-center q-mr-md cursor-pointer"
           style="
-            max-height: calc(100vh - 165px);
-            overflow: auto;
-            scroll-behavior: smooth;
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
           "
+          title="Go Back"
+          @click="router.back()"
         >
-          <div class="row flex tw-gap-2 items-start" style="width: 100%">
-            <div class="col">
-              <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
-                <!-- alerts setup  section -->
-                <div
-                  class="flex tw-mt-1 justify-start items-center flex-wrap "
-                >
-                  <div class="tw-w-full tw-ml-2   ">
-                    <AlertsContainer 
-                      name="query"
-                      v-model:is-expanded="expandState.alertSetup"
-                      label="Alert Setup"
-                      subLabel="Set the stage for your alert."
-                      icon="edit"
-                      class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
-                      :iconClass="'tw-mt-[2px]'"
-                  />
-                  </div>
-                  <div v-if="expandState.alertSetup" class="tw-w-full row alert-setup-container">
-        
-                  <div class="tw-w-full ">
-
-                    <div
-                      class="alert-name-input o2-input flex justify-between items-center tw-gap-10 tw-pb-3"
-                      style="padding-top: 12px;"
-                      data-test="add-alert-name-input-container"
-                    >
-                      <q-input
-                        data-test="add-alert-name-input row"
-                        v-model="formData.name"
-                        :label="t('alerts.name') + ' *'"
-                        color="input-border"
-                          class="showLabelOnTop col"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        hide-bottom-space
-                        v-bind:readonly="beingUpdated"
-                        v-bind:disable="beingUpdated"
-                        :rules="[
-                          (val: any) =>
-                            !!val
-                              ? isValidResourceName(val) ||
-                                `Characters like :, ?, /, #, and spaces are not allowed.`
-                              : t('common.nameRequired'),
-                        ]"
-                        tabindex="0"
-                      />
-                      <div class="col" style="height: 62px;">
-                        <SelectFolderDropDown
-                          :disableDropdown="beingUpdated"
-                          :type="'alerts'"
-                          :style="'height: 30px'"
-                          @folder-selected="updateActiveFolderId"
-                          :activeFolderId="activeFolderId"
-                      />
-                      </div>
-                    
-                    </div>
-                  </div>
-
-                  <div
-                      class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-3"
-                      style="padding-top: 0px"
-                      data-test="add-alert-stream-type-select-container"
-                    >
-                      <div
-                        data-test="add-alert-stream-type-select"
-                        class="alert-stream-type o2-input tw-w-full col "
-                        style="padding-top: 0"
-
-                      >
-                        <q-select
-                          data-test="add-alert-stream-type-select-dropdown"
-                          v-model="formData.stream_type"
-                          :options="streamTypes"
-                          :label="t('alerts.streamType') + ' *'"
-                          :popup-content-style="{ textTransform: 'lowercase' }"
-                          color="input-border"
-                          class="q-py-sm showLabelOnTop no-case col"
-                          stack-label
-                          outlined
-                          filled
-                          dense
-                          v-bind:readonly="beingUpdated"
-                          v-bind:disable="beingUpdated"
-                          @update:model-value="updateStreams()"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
-                        />
-                      </div>
-                      <div
-                        data-test="add-alert-stream-select"
-                        class="o2-input col"
-                        style="padding-top: 0"
-                      >
-                        <q-select
-                          data-test="add-alert-stream-name-select-dropdown"
-                          v-model="formData.stream_name"
-                          :options="filteredStreams"
-                          :label="t('alerts.stream_name') + ' *'"
-                          :loading="isFetchingStreams"
-                          color="input-border"
-                          class="q-py-sm showLabelOnTop no-case col"
-                          filled
-                          stack-label
-                          dense
-                          use-input
-                          hide-selected
-                          fill-input
-                          :input-debounce="400"
-                          v-bind:readonly="beingUpdated"
-                          v-bind:disable="beingUpdated"
-                          @filter="filterStreams"
-                          @update:model-value="
-                            updateStreamFields(formData.stream_name)
-                          "
-                          behavior="menu"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
-                        />
-                      </div>
-                    </div>
-                    <div class="tw-flex tw-items-center tw-gap-5">
-                    <q-radio
-                      data-test="add-alert-scheduled-alert-radio"
-                      v-bind:readonly="beingUpdated"
-                      v-bind:disable="beingUpdated"
-                      v-model="formData.is_real_time"
-                      :checked="formData.is_real_time"
-                      val="false"
-                      dense
-                      :label="t('alerts.scheduled')"
-                      class="q-ml-none o2-radio-button"
-                    />
-                    <q-radio
-                      data-test="add-alert-realtime-alert-radio"
-                      v-bind:readonly="beingUpdated"
-                      v-bind:disable="beingUpdated"
-                      v-model="formData.is_real_time"
-                      :checked="!formData.is_real_time"
-                      val="true"
-                      dense
-                      :label="t('alerts.realTime')"
-                      class="q-ml-none o2-radio-button"
-                      />
-                  </div>
-                  </div>
-                </div>
-                
-
-                <div
-                  v-if="formData.is_real_time === 'true'"
-                  class="q-pr-sm q-pa-none q-ma-none"
-                  data-test="add-alert-query-input-title"
-                >
-                  <real-time-alert
-                    ref="realTimeAlertRef"
-                    :columns="filteredColumns"
-                    :conditions="formData.query_condition?.conditions || {}"
-                    @input:update="onInputUpdate"
-                    :expandState = expandState
-                    @update:expandState="updateExpandState"
-                    :trigger="formData.trigger_condition"
-                    :destinations="formData.destinations"
-                    :formattedDestinations="getFormattedDestinations"
-                    @refresh:destinations="refreshDestinations"
-                    @update:destinations="updateDestinations"
-                    @update:group="updateGroup"
-                    @remove:group="removeConditionGroup"
-
-                  />
-                </div>
-                <div v-else class="q-pa-none q-ma-none q-pr-sm  ">
-                  <scheduled-alert
-                    v-if="!isLoadingPanelData"
-                    ref="scheduledAlertRef"
-                    :columns="filteredColumns"
-                    :conditions="formData.query_condition?.conditions || {}"
-                    :expandState = expandState
-                    :alertData="formData"
-                    :sqlQueryErrorMsg="sqlQueryErrorMsg"
-                    :vrlFunctionError="vrlFunctionError"
-                    :showTimezoneWarning="showTimezoneWarning"
-                    :selectedStream="formData.stream_name"
-                    :selected-stream-type="formData.stream_type"
-                    :destinations="formData.destinations"
-                    :formattedDestinations="getFormattedDestinations"
-                    v-model:trigger="formData.trigger_condition"
-                    v-model:sql="formData.query_condition.sql"
-                    v-model:promql="formData.query_condition.promql"
-                    v-model:query_type="formData.query_condition.type"
-                    v-model:aggregation="formData.query_condition.aggregation"
-                    v-model:silence="formData.trigger_condition.silence"
-                    v-model:promql_condition="
-                      formData.query_condition.promql_condition
-                    "
-                    v-model:multi_time_range="
-                      formData.query_condition.multi_time_range
-                    "
-                    v-model:vrl_function="formData.query_condition.vrl_function"
-                    v-model:isAggregationEnabled="isAggregationEnabled"
-                    v-model:showVrlFunction="showVrlFunction"
-                    @update:group="updateGroup"
-                    @remove:group="removeConditionGroup"
-                    @input:update="onInputUpdate"
-                    @validate-sql="validateSqlQuery"
-                    @update:showVrlFunction="updateFunctionVisibility"
-                    @update:multi_time_range="updateMultiTimeRange"
-                    @update:expandState="updateExpandState"
-                    @update:silence="updateSilence"
-                    @refresh:destinations="refreshDestinations"
-                    @update:destinations="updateDestinations"
-                    class="q-mt-sm"
-                  />
-                </div>
-      
-                <!-- additional setup starts here -->
-                <div
-                  class="flex tw-mt-1 justify-start items-center q-pb-sm flex-wrap "
-                >
-                  <div class="tw-w-full tw-ml-2   ">
-                    <AlertsContainer 
-                        name="advanced"
-                        v-model:is-expanded="expandState.advancedSetup"
-                        label="Advanced Setup"
-                        :icon="'add'"
-                      class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
-                        />
-                </div>
-                <div v-if="expandState.advancedSetup" class=" tw-w-full row alert-setup-container" >
-
-                <div class="tw-w-full row" >
-                  <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full">
-                  <variables-input
-                    class="o2-input"
-                    :variables="formData.context_attributes"
-                    @add:variable="addVariable"
-                    @remove:variable="removeVariable"
-                  />
-                </div>
-
-                <div v-if="expandState.advancedSetup" class=" tw-w-full">
-                  <div data-test="add-alert-description-input tw-w-full ">
-                    <div class="flex items-center q-mb-sm ">
-                      <span class="text-bold custom-input-label">Description</span>
-                    </div>
-                    <q-input
-                      v-model="formData.description"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="showLabelOnTop q-mb-sm q-text-area-input"
-                      stack-label
-                      outlined
-                      filled
-                      dense
-                      tabindex="0"
-                      style="width: 100%; resize: none;"
-                      type="textarea"
-                      placeholder="Type something"
-                      rows="5"
-                      
-                    />
-                  </div>
-                  <div data-test="add-alert-row-input tw-w-full">
-                    <div class="flex items-center q-mb-sm">
-                      <span class="text-bold custom-input-label">Row Template</span>
-                      <q-btn
-                        data-test="add-alert-row-input-info-btn"
-                        style="color: #A0A0A0;"
-                        no-caps
-                        padding="xs"
-                        class="q-ml-xs"
-                        size="sm"
-                        flat
-                        icon="info_outline"
-                      >
-                    <q-tooltip>
-                  Row Template is used to format the alert message.
-                  </q-tooltip>
-              </q-btn>
-              </div>
-                    <q-input
-                      data-test="add-alert-row-input-textarea"
-                      v-model="formData.row_template"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="row-template-input"
-                      stack-label
-                      outlined
-                      filled
-                      dense
-                      tabindex="0"
-                      style="width: 100%; resize: none;"
-                      type="textarea"
-                      placeholder="e.g - Alert was triggered at {timestamp} "
-                      rows="5"
-                    >
-                    
-                  </q-input>
-                  </div>
-                </div>
-                </div>
-
-                </div>
-                </div>
-                
-
-
-
-
-              </q-form>
-
-            </div>
-            <div
-              style="width: 420px; height: 320px; position: sticky; top: 0 "
-              class=" col-2"
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
+        <div v-if="beingUpdated" class="text-h6" data-test="add-alert-title">
+          {{ t("alerts.updateTitle") }}
+        </div>
+        <div v-else class="text-h6" data-test="add-alert-title">
+          {{ t("alerts.addTitle") }}
+        </div>
+        </div>
+        <div>
+          <q-btn
+            outline
+            class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode"
+            size="sm"
+            no-caps
+            icon="code"
+            data-test="pipeline-json-edit-btn"
+            @click="openJsonEditor"
             >
-              <preview-alert
-                style="border: 1px solid #ececec; height: 300px; width: 412px;"
-                ref="previewAlertRef"
-                :formData="formData"
-                :query="previewQuery"
-                :selectedTab="scheduledAlertRef?.tab || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-              />
-
-            </div>
-            
-          </div>
-
+        <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+        </q-btn>
         </div>
-        <div class="flex justify-end items-center q-px-lg " style="bottom: 0; left: 0; height: 70px !important; z-index: 100;" :style="{ right: store.state.isAiChatEnabled ? '25%' : '0' }">
-          <q-btn
-            data-test="add-alert-cancel-btn"
-            v-close-popup="true"
-            class="q-mr-md o2-secondary-button tw-h-[36px]"
-            :label="t('alerts.cancel')"
-            no-caps
-            flat
-            @click="$emit('cancel:hideform')"
-          />
-          <q-btn
-            data-test="add-alert-submit-btn"
-            class="o2-primary-button no-border tw-h-[36px]"
-            :label="t('alerts.save')"
-            type="submit"
-            no-caps
-            flat
-            @click="onSubmit"
-          />
-        </div>
-
       </div>
     </div>
+
+    <div
+      ref="addAlertFormRef"
+      style="
+        max-height: calc(100vh - 180px);
+        overflow: auto;
+        scroll-behavior: smooth;
+      "
+      class="tw-mb-2"
+    >
+      <div class="row flex items-start" style="width: 100%">
+        <div class="col" :class="store.state.theme === 'dark' ? 'dark-mode1' : 'light-mode1'">
+          <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
+            <!-- alerts setup  section -->
+             <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
+            <div
+              class="flex justify-start items-center flex-wrap card-container"
+            >
+              <div class="tw-w-full tw-ml-2">
+                <AlertsContainer 
+                  name="query"
+                  v-model:is-expanded="expandState.alertSetup"
+                  label="Alert Setup"
+                  subLabel="Set the stage for your alert."
+                  icon="edit"
+                  class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
+                  :iconClass="'tw-mt-[2px]'"
+                />
+              </div>
+              <div v-if="expandState.alertSetup" class="tw-w-full row alert-setup-container o2-alert-tab-border tw-px-4 tw-pt-2 tw-pb-3">
+    
+              <div class="tw-w-full ">
+
+                <div
+                  class="alert-name-input o2-input flex justify-between items-center tw-gap-10 tw-pb-3"
+                  style="padding-top: 12px;"
+                  data-test="add-alert-name-input-container"
+                >
+                  <q-input
+                    data-test="add-alert-name-input row"
+                    v-model="formData.name"
+                    :label="t('alerts.name') + ' *'"
+                    color="input-border"
+                      class="showLabelOnTop col"
+                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                    stack-label
+                    outlined
+                    filled
+                    dense
+                    hide-bottom-space
+                    v-bind:readonly="beingUpdated"
+                    v-bind:disable="beingUpdated"
+                    :rules="[
+                      (val: any) =>
+                        !!val
+                          ? isValidResourceName(val) ||
+                            `Characters like :, ?, /, #, and spaces are not allowed.`
+                          : t('common.nameRequired'),
+                    ]"
+                    tabindex="0"
+                  />
+                  <div class="col" style="height: 62px;">
+                    <SelectFolderDropDown
+                      :disableDropdown="beingUpdated"
+                      :type="'alerts'"
+                      :style="'height: 30px'"
+                      @folder-selected="updateActiveFolderId"
+                      :activeFolderId="activeFolderId"
+                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                  />
+                  </div>
+                
+                </div>
+              </div>
+
+              <div
+                  class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-3"
+                  style="padding-top: 0px"
+                  data-test="add-alert-stream-type-select-container"
+                >
+                  <div
+                    data-test="add-alert-stream-type-select"
+                    class="alert-stream-type o2-input tw-w-full col "
+                    style="padding-top: 0"
+
+                  >
+                    <q-select
+                      data-test="add-alert-stream-type-select-dropdown"
+                      v-model="formData.stream_type"
+                      :options="streamTypes"
+                      :label="t('alerts.streamType') + ' *'"
+                      :popup-content-style="{ textTransform: 'lowercase' }"
+                      color="input-border"
+                      class="q-py-sm showLabelOnTop no-case col"
+                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                      stack-label
+                      outlined
+                      filled
+                      dense
+                      v-bind:readonly="beingUpdated"
+                      v-bind:disable="beingUpdated"
+                      @update:model-value="updateStreams()"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
+                    />
+                  </div>
+                  <div
+                    data-test="add-alert-stream-select"
+                    class="o2-input col"
+                    style="padding-top: 0"
+                  >
+                    <q-select
+                      data-test="add-alert-stream-name-select-dropdown"
+                      v-model="formData.stream_name"
+                      :options="filteredStreams"
+                      :label="t('alerts.stream_name') + ' *'"
+                      :loading="isFetchingStreams"
+                      color="input-border"
+                      class="q-py-sm showLabelOnTop no-case col"
+                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                      filled
+                      stack-label
+                      dense
+                      use-input
+                      hide-selected
+                      fill-input
+                      :input-debounce="400"
+                      v-bind:readonly="beingUpdated"
+                      v-bind:disable="beingUpdated"
+                      @filter="filterStreams"
+                      @update:model-value="
+                        updateStreamFields(formData.stream_name)
+                      "
+                      behavior="menu"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
+                    />
+                  </div>
+                </div>
+                <div class="tw-flex tw-items-center tw-gap-5">
+                <q-radio
+                  data-test="add-alert-scheduled-alert-radio"
+                  v-bind:readonly="beingUpdated"
+                  v-bind:disable="beingUpdated"
+                  v-model="formData.is_real_time"
+                  :checked="formData.is_real_time"
+                  val="false"
+                  dense
+                  :label="t('alerts.scheduled')"
+                  class="q-ml-none o2-radio-button"
+                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'"
+                />
+                <q-radio
+                  data-test="add-alert-realtime-alert-radio"
+                  v-bind:readonly="beingUpdated"
+                  v-bind:disable="beingUpdated"
+                  v-model="formData.is_real_time"
+                  :checked="!formData.is_real_time"
+                  val="true"
+                  dense
+                  :label="t('alerts.realTime')"
+                  class="q-ml-none o2-radio-button"
+                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'" 
+                  />
+              </div>
+              </div>
+            </div>
+          </div>
+
+            <div
+              v-if="formData.is_real_time === 'true'"
+              class="q-pa-none q-ma-none"
+              data-test="add-alert-query-input-title"
+            >
+              <real-time-alert
+                ref="realTimeAlertRef"
+                :columns="filteredColumns"
+                :conditions="formData.query_condition?.conditions || {}"
+                @input:update="onInputUpdate"
+                :expandState = expandState
+                @update:expandState="updateExpandState"
+                :trigger="formData.trigger_condition"
+                :destinations="formData.destinations"
+                :formattedDestinations="getFormattedDestinations"
+                @refresh:destinations="refreshDestinations"
+                @update:destinations="updateDestinations"
+                @update:group="updateGroup"
+                @remove:group="removeConditionGroup"
+
+              />
+            </div>
+            <div v-else class="q-pa-none q-ma-none  ">
+              <scheduled-alert
+                v-if="!isLoadingPanelData"
+                ref="scheduledAlertRef"
+                :columns="filteredColumns"
+                :conditions="formData.query_condition?.conditions || {}"
+                :expandState = expandState
+                :alertData="formData"
+                :sqlQueryErrorMsg="sqlQueryErrorMsg"
+                :vrlFunctionError="vrlFunctionError"
+                :showTimezoneWarning="showTimezoneWarning"
+                :selectedStream="formData.stream_name"
+                :selected-stream-type="formData.stream_type"
+                :destinations="formData.destinations"
+                :formattedDestinations="getFormattedDestinations"
+                v-model:trigger="formData.trigger_condition"
+                v-model:sql="formData.query_condition.sql"
+                v-model:promql="formData.query_condition.promql"
+                v-model:query_type="formData.query_condition.type"
+                v-model:aggregation="formData.query_condition.aggregation"
+                v-model:silence="formData.trigger_condition.silence"
+                v-model:promql_condition="
+                  formData.query_condition.promql_condition
+                "
+                v-model:multi_time_range="
+                  formData.query_condition.multi_time_range
+                "
+                v-model:vrl_function="formData.query_condition.vrl_function"
+                v-model:isAggregationEnabled="isAggregationEnabled"
+                v-model:showVrlFunction="showVrlFunction"
+                @update:group="updateGroup"
+                @remove:group="removeConditionGroup"
+                @input:update="onInputUpdate"
+                @validate-sql="validateSqlQuery"
+                @update:showVrlFunction="updateFunctionVisibility"
+                @update:multi_time_range="updateMultiTimeRange"
+                @update:expandState="updateExpandState"
+                @update:silence="updateSilence"
+                @refresh:destinations="refreshDestinations"
+                @update:destinations="updateDestinations"
+              />
+            </div>
+  
+            <!-- additional setup starts here -->
+             <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
+                   <div
+              class="flex justify-start items-center q-pb-sm flex-wrap card-container"
+            >
+              <div class="tw-w-full tw-ml-2   ">
+                <AlertsContainer 
+                    name="advanced"
+                    v-model:is-expanded="expandState.advancedSetup"
+                    label="Advanced Setup"
+                    :icon="'add'"
+                   class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
+                    />
+            </div>
+            <div v-if="expandState.advancedSetup" class=" tw-w-full row alert-setup-container tw-px-4 tw-pt-2 tw-pb-3 o2-alert-tab-border" >
+
+            <div class="tw-w-full row">
+              <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full ">
+              <variables-input
+                class="o2-input"
+                :variables="formData.context_attributes"
+                @add:variable="addVariable"
+                @remove:variable="removeVariable"
+              />
+            </div>
+
+            <div v-if="expandState.advancedSetup" class=" tw-w-full t">
+              <div data-test="add-alert-description-input tw-w-full " :class="store.state.theme === 'dark' ? '' : 'light-mode'">
+                <div class="flex items-center q-mb-sm ">
+                  <span class="text-bold custom-input-label">Description</span>
+                </div>
+                <q-input
+                  v-model="formData.description"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop q-mb-sm q-text-area-input"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  tabindex="0"
+                  style="width: 100%; resize: none;"
+                  type="textarea"
+                  placeholder="Type something"
+                  rows="5"
+                  
+                />
+              </div>
+              <div data-test="add-alert-row-input tw-w-full">
+                <div class="flex items-center q-mb-sm">
+                  <span class="text-bold custom-input-label">Row Template</span>
+                  <q-btn
+                    data-test="add-alert-row-input-info-btn"
+                    style="color: #A0A0A0;"
+                    no-caps
+                    padding="xs"
+                    class="q-ml-xs"
+                    size="sm"
+                    flat
+                    icon="info_outline"
+                  >
+                <q-tooltip>
+               Row Template is used to format the alert message.
+              </q-tooltip>
+          </q-btn>
+          </div>
+                <q-input
+                  data-test="add-alert-row-input-textarea"
+                  v-model="formData.row_template"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="row-template-input"
+                  :class="store.state.theme === 'dark' ? 'dark-mode-row-template' : 'light-mode-row-template'"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  tabindex="0"
+                  style="width: 100%; resize: none;"
+                  type="textarea"
+                  placeholder="e.g - Alert was triggered at {timestamp} "
+                  rows="5"
+                >
+                
+              </q-input>
+              </div>
+            </div>
+            </div>
+
+            </div>
+            </div>
+            
+             </div>
+
+
+
+
+          </q-form>
+
+        </div>
+        <div
+          style="width: 420px; height: 320px; position: sticky; top: 0 "
+          class=" col-2"
+        >
+          <preview-alert
+            style="border: 1px solid #ececec; height: 300px; width: 412px;"
+            ref="previewAlertRef"
+            :formData="formData"
+            :query="previewQuery"
+            :selectedTab="scheduledAlertRef?.tab || 'custom'"
+            :isAggregationEnabled="isAggregationEnabled"
+          />
+
+        </div>
+        
+      </div>
+
+    </div>
+    <div class="flex justify-end items-center tw-mt-2 tw-mx-2 card-container q-px-lg" :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: sticky; bottom: 0; height: 70px !important; z-index: 100; width: 100%;">
+      <q-btn
+        data-test="add-alert-cancel-btn"
+        v-close-popup="true"
+        class="q-mr-md o2-secondary-button tw-h-[36px]"
+        :label="t('alerts.cancel')"
+        no-caps
+        flat
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        @click="$emit('cancel:hideform')"
+      />
+      <q-btn
+        data-test="add-alert-submit-btn"
+        class="o2-primary-button no-border tw-h-[36px]"
+        :label="t('alerts.save')"
+        type="submit"
+        no-caps
+        flat
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        @click="onSubmit"
+      />
+    </div>
+
   </div>
+
     <q-dialog
       v-model="showJsonEditorDialog"
       position="right"
@@ -1842,7 +1850,9 @@ export default defineComponent({
 }
 
 
-
+.o2-alert-tab-border{
+  border-top: 0.0625rem solid var(--o2-border-color);
+}
   
 
 

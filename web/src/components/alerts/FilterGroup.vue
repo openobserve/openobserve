@@ -22,7 +22,6 @@
             @update:model-value="toggleLabel"
       >
         <q-tab
-        class=""
           data-test="scheduled-alert-custom-tab"
           name="or"
           :label="'OR'"
@@ -340,53 +339,35 @@ defineExpose({
   border-radius: 4px;
 }
 
-    .group-tabs {
-      .q-tab--active {
-        background-color: $primary;
-        color: $white;
-      }
+  .group-tabs {
+      border: 1px solid $border-color;
+      background-color: transparent !important;
+    .q-tab--active {
+      background-color: var(--o2-primary-btn-bg);
+      color: $white;
+    }
 
       .q-tab__indicator {
         display: none;
       }
 
-    }
-    .dark-mode-group-tabs  .q-tab--inactive{
-        background-color: #494A4A !important;
-        
-        color: $white
+  
+
+    .q-tab--inactive {
+      background-color: var(--o2-inactive-tab-bg);
     }
 
+    .q-tab{
+          &:hover:not(.q-tab--active) {
+    background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
+  }
 
-    .light-mode-group-tabs {
-      border: 1px solid #cdcdcd;
-      .q-tab--inactive{
-        background-color: #ffffff !important;
-        color: black;
-      }
-
+    &:hover.q-tab--active {
+      background-color: var(--o2-primary-btn-bg) !important;
     }
-    .dark-mode-group-tabs{
-      border: 1px solid #464646;
-        .q-tab--inactive{
-        background-color: #494A4A !important;
-        opacity: 1;
-        color: $white;
-      }      
-    }
-    .group-tabs{
-      .q-tab--active {
-        background-color: $primary;
-        color: $white;
-      }
-      .q-tab{
-        border: none;
-      }
-
-      .q-tab__indicator {
-        display: none;
       }
     }
+
 
 
   </style>
