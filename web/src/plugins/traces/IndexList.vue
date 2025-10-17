@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hide-header
         hide-bottom
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-        class="tw-w-full tw-h-[calc(100vh-13rem)]"
+        class="tw-w-full tw-h-[calc(100vh-13.175rem)]"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
