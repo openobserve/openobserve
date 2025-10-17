@@ -232,6 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.x[index].isDerived
                           "
+                          class="q-mt-sm"
                         >
                           <SortByBtnGrp
                             :fieldObj="
@@ -485,6 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.breakdown[index].isDerived
                           "
+                          class="q-mt-sm"
                         >
                           <SortByBtnGrp
                             :fieldObj="
@@ -800,6 +802,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.layout.currentQueryIndex
                         ].fields.y[index].isDerived
                       "
+                      class="q-mt-sm"
                     >
                       <SortByBtnGrp
                         :fieldObj="
@@ -1040,6 +1043,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].fields.z[index].isDerived
                         "
+                        class="q-mt-sm"
                       >
                         <SortByBtnGrp
                           :fieldObj="
