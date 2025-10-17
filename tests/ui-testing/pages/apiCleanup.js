@@ -165,6 +165,145 @@ class APICleanup {
     }
 
     /**
+     * Fetch all dashboard folders
+     * @returns {Promise<Array>} Array of folder objects
+     */
+    async fetchDashboardFolders() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/folders`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch dashboard folders', { status: response.status });
+                return [];
+            }
+
+            const folders = await response.json();
+            return folders || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch dashboard folders', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Fetch all dashboards in a specific folder
+     * @param {string} folderName - The folder name (e.g., 'default')
+     * @returns {Promise<Array>} Array of dashboard objects
+     */
+    async fetchDashboardsInFolder(folderName = 'default') {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/dashboards?page_num=0&page_size=1000&sort_by=name&desc=false&name=&folder=${folderName}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch dashboards', { folder: folderName, status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.dashboards || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch dashboards', { folder: folderName, error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single dashboard
+     * @param {string} dashboardId - The dashboard ID
+     * @param {string} folderId - The folder ID
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteDashboard(dashboardId, folderId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/dashboards/${dashboardId}?folder=${folderId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete dashboard', { dashboardId, folderId, status: response.status });
+                return { code: response.status, message: 'Failed to delete dashboard' };
+            }
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            testLogger.error('Failed to delete dashboard', { dashboardId, folderId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all dashboards owned by the automation test user
+     * Deletes dashboards from the 'default' folder where owner matches ZO_ROOT_USER_EMAIL
+     */
+    async cleanupDashboards() {
+        testLogger.info('Starting dashboard cleanup', { owner: this.email });
+
+        try {
+            // Fetch dashboards from default folder
+            const dashboards = await this.fetchDashboardsInFolder('default');
+            testLogger.info('Fetched dashboards', { total: dashboards.length });
+
+            // Filter dashboards owned by automation user
+            const ownedDashboards = dashboards.filter(d => d.owner === this.email);
+            testLogger.info('Found dashboards owned by automation user', { count: ownedDashboards.length });
+
+            if (ownedDashboards.length === 0) {
+                testLogger.info('No dashboards to clean up');
+                return;
+            }
+
+            // Delete each dashboard
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const dashboard of ownedDashboards) {
+                const result = await this.deleteDashboard(dashboard.dashboard_id, dashboard.folder_id);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted dashboard', {
+                        id: dashboard.dashboard_id,
+                        title: dashboard.title
+                    });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete dashboard', {
+                        id: dashboard.dashboard_id,
+                        title: dashboard.title,
+                        result
+                    });
+                }
+            }
+
+            testLogger.info('Dashboard cleanup completed', {
+                total: ownedDashboards.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Dashboard cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
      * Complete cascade cleanup: Alert -> Folder -> Destination -> Template
      * Only deletes resources linked to destinations matching the prefix
      * @param {string} prefix - Prefix to match destination names (e.g., 'auto_playwright')
