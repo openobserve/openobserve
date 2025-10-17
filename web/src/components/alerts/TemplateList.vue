@@ -65,11 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 100%"
         :rows-per-page-options="[0]"
         :pagination="pagination"
-        class="o2-quasar-table o2-quasar-table-header-sticky"
+        class="o2-quasar-table o2-quasar-table-header-sticky o2-last-row-border"
         :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;' 
+            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;'
             : 'width: 100%'"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
+        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light'"
       >
         <template #no-data>
           <NoData />
@@ -77,7 +77,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
-              icon="download"
               title="Export Template"
               class="q-ml-xs"
               padding="sm"
@@ -87,10 +86,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               @click.stop="exportTemplate(props.row)"
               data-test="destination-export"
-            ></q-btn>
+            >
+              <Download class="o2-actions-icons" />
+            </q-btn>
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-update-template`"
-              icon="edit"
               class="q-ml-xs"
               padding="sm"
               unelevated
@@ -99,10 +99,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               :title="t('alert_templates.edit')"
               @click="editTemplate(props.row)"
-            ></q-btn>
+            >
+              <Pencil class="o2-actions-icons" />
+            </q-btn>
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-delete-template`"
-              :icon="outlinedDelete"
               class="q-ml-xs"
               padding="sm"
               unelevated
@@ -111,7 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               :title="t('alert_templates.delete')"
               @click="conformDeleteDestination(props.row)"
-            ></q-btn>
+            >
+              <Trash class="o2-actions-icons" />
+            </q-btn>
           </q-td>
         </template>
         <template #bottom="scope">
@@ -179,6 +182,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportTemplate from "./ImportTemplate.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { Download, Pencil, Trash } from "lucide-vue-next";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
