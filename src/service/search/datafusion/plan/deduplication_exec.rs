@@ -27,7 +27,7 @@ use arrow_schema::{DataType, SortOptions, TimeUnit};
 use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::datatypes::SchemaRef,
-    common::{Result, Statistics, internal_err},
+    common::{Result, Statistics, internal_err, plan_datafusion_err},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::{
         EquivalenceProperties, LexRequirement, OrderingRequirements, Partitioning,
@@ -224,7 +224,10 @@ impl Stream for DeduplicationStream {
                 let timer = std::time::Instant::now();
                 // deduplication the batch based on the deduplication_columns
                 let deduplication_arrays =
-                    generate_deduplication_arrays(&self.deduplication_columns, &batch);
+                    match generate_deduplication_arrays(&self.deduplication_columns, &batch) {
+                        Ok(arrays) => arrays,
+                        Err(e) => return Poll::Ready(Some(Err(e))),
+                    };
 
                 let mut indexes = vec![];
                 if self.last_value.is_none() {
@@ -323,69 +326,116 @@ enum Value {
 fn generate_deduplication_arrays(
     deduplication_columns: &[Column],
     batch: &RecordBatch,
-) -> DeduplicationArrays {
+) -> Result<DeduplicationArrays> {
     let arrays = deduplication_columns
         .iter()
         .map(|column| {
             let array = batch.column(column.index());
             match array.data_type() {
-                DataType::Utf8 => Array::String(
+                DataType::Utf8 => Ok(Array::String(
                     array
                         .as_any()
                         .downcast_ref::<StringArray>()
-                        .unwrap()
+                        .ok_or_else(|| {
+                            plan_datafusion_err!(
+                                "Failed to downcast Utf8 array at column index {}",
+                                column.index()
+                            )
+                        })?
                         .clone(),
-                ),
-                DataType::Utf8View => Array::StringView(
+                )),
+                DataType::Utf8View => Ok(Array::StringView(
                     array
                         .as_any()
                         .downcast_ref::<StringViewArray>()
-                        .unwrap()
+                        .ok_or_else(|| {
+                            plan_datafusion_err!(
+                                "Failed to downcast Utf8View array at column index {}",
+                                column.index()
+                            )
+                        })?
                         .clone(),
-                ),
-                DataType::LargeUtf8 => Array::LargeString(
+                )),
+                DataType::LargeUtf8 => Ok(Array::LargeString(
                     array
                         .as_any()
                         .downcast_ref::<LargeStringArray>()
-                        .unwrap()
+                        .ok_or_else(|| {
+                            plan_datafusion_err!(
+                                "Failed to downcast LargeUtf8 array at column index {}",
+                                column.index()
+                            )
+                        })?
                         .clone(),
-                ),
-                DataType::Int64 => {
-                    Array::Int64(array.as_any().downcast_ref::<Int64Array>().unwrap().clone())
-                }
-                DataType::UInt64 => Array::UInt64(
+                )),
+                DataType::Int64 => Ok(Array::Int64(
+                    array
+                        .as_any()
+                        .downcast_ref::<Int64Array>()
+                        .ok_or_else(|| {
+                            plan_datafusion_err!(
+                                "Failed to downcast Int64 array at column index {}",
+                                column.index()
+                            )
+                        })?
+                        .clone(),
+                )),
+                DataType::UInt64 => Ok(Array::UInt64(
                     array
                         .as_any()
                         .downcast_ref::<UInt64Array>()
-                        .unwrap()
+                        .ok_or_else(|| {
+                            plan_datafusion_err!(
+                                "Failed to downcast UInt64 array at column index {}",
+                                column.index()
+                            )
+                        })?
                         .clone(),
-                ),
-                DataType::Boolean => Array::Boolean(
+                )),
+                DataType::Boolean => Ok(Array::Boolean(
                     array
                         .as_any()
                         .downcast_ref::<BooleanArray>()
-                        .unwrap()
+                        .ok_or_else(|| {
+                            plan_datafusion_err!(
+                                "Failed to downcast Boolean array at column index {}",
+                                column.index()
+                            )
+                        })?
                         .clone(),
-                ),
-                DataType::Float64 => Array::Float64(
+                )),
+                DataType::Float64 => Ok(Array::Float64(
                     array
                         .as_any()
                         .downcast_ref::<Float64Array>()
-                        .unwrap()
+                        .ok_or_else(|| {
+                            plan_datafusion_err!(
+                                "Failed to downcast Float64 array at column index {}",
+                                column.index()
+                            )
+                        })?
                         .clone(),
-                ),
-                DataType::Timestamp(TimeUnit::Microsecond, None) => Array::TimestampMicrosecond(
+                )),
+                DataType::Timestamp(TimeUnit::Microsecond, None) => Ok(Array::TimestampMicrosecond(
                     array
                         .as_any()
                         .downcast_ref::<TimestampMicrosecondArray>()
-                        .unwrap()
+                        .ok_or_else(|| {
+                            plan_datafusion_err!(
+                                "Failed to downcast TimestampMicrosecond array at column index {}",
+                                column.index()
+                            )
+                        })?
                         .clone(),
-                ),
-                _ => {
-                    panic!("Unsupported data type: {}", array.data_type());
-                }
+                )),
+                _ => Err(plan_datafusion_err!(
+                    "Unsupported data type '{}' at column '{}' (index {}). Deduplication only supports: Utf8, Utf8View, LargeUtf8, Int64, UInt64, Boolean, Float64, and Timestamp(Microsecond)",
+                    array.data_type(),
+                    column.name(),
+                    column.index()
+                )),
             }
         })
-        .collect_vec();
-    DeduplicationArrays { arrays }
+        .collect::<Result<Vec<_>>>()?;
+    Ok(DeduplicationArrays { arrays })
 }
