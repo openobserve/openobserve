@@ -43,7 +43,7 @@
       bg-color="input-bg"
       class="q-py-md showLabelOnTop"
       stack-label
-      outlined
+      borderless
       filled
       data-test="dashboard-config-panel-drilldown-name"
       dense
@@ -163,7 +163,7 @@
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop no-case"
             stack-label
-            outlined
+            borderless
             filled
             dense
             style="width: 100%"
@@ -191,7 +191,7 @@
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop no-case"
             stack-label
-            outlined
+            borderless
             filled
             dense
             style="width: 100%"
@@ -221,7 +221,7 @@
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop no-case"
             stack-label
-            outlined
+            borderless
             filled
             dense
             style="width: 100%"
