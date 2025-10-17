@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
     <div class="q-pa-md " style="height: calc(100vh - 130px); width: 100%;" >
       <div class="row items-baseline justify-between">
-        <div class="row text-body1 tw-font-bold tw-text-[16px] tw-opacity-[90%] q-pb-md">
+        <div class="row q-table__title tw-font-[600] q-pb-md">
           {{ t("billing.totalUsage") }}
         </div>
       </div>
