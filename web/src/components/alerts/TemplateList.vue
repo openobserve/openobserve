@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 100%"
         :rows-per-page-options="[0]"
         :pagination="pagination"
-        class="o2-quasar-table o2-quasar-table-header-sticky o2-last-row-border"
+        class="o2-quasar-table o2-quasar-table-header-sticky"
         :style="hasVisibleRows
             ? 'width: 100%; height: calc(100vh - 180px); overflow-y: auto;'
             : 'width: 100%'"
