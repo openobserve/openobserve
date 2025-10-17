@@ -16,42 +16,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="page" >
-    <div class="tw-flex tw-justify-between tw-items-center q-pb-md">
+  <q-page class="q-pa-none" style="min-height: inherit;" >
+    <div class="tw-flex tw-justify-between tw-items-center q-pb-md card-container tw-h-[62px] tw-mb-2 tw-mx-2 tw-px-4 tw-py-4">
     <div class="head q-table__title ">
       {{ headerBasedOnRoute() }}
     </div>
-    <div v-if="isUsageRoute" class="tw-flex tw-gap-2 tw-items-center tw-h-[32px]">
+    <div v-if="isUsageRoute" class="tw-flex tw-gap-2 tw-items-center tw-h-[40px]">
       <div class="custom-usage-date-select">
           <q-select
             dense
-            outlined
+            borderless
             v-model="usageDate"
             :options="options"
             emit-value
             map-options
             icon="schedule"
             @update:model-value="(value: any) => selectUsageDate()"
-            class="q-pa-none q-ma-none  "
-            :class="store.state.theme === 'dark' ? 'tw-bg-[#35353C]' : 'tw-bg-[#D5D6EF]'"
+            class="q-pa-none q-ma-none tw-h-[40px] "
           >
           <template v-slot:prepend>
             <q-icon name="schedule" size="xs" class="tw-mr-2" @click.stop.prevent />
           </template>
           </q-select>
         </div>
-        <div class="usage-data-type-tabs">
-          <AppTabs  :tabs="tabs" :activeTab="usageDataType" @update:activeTab="(value: any) => updateActiveTab(value)" />
+        <div class="tw-flex tw-items-center ">
+          <div class="app-tabs-container tw-h-[36px] ">
+              <AppTabs class=" tabs-selection-container"  :tabs="tabs" :activeTab="usageDataType" @update:activeTab="(value: any) => updateActiveTab(value)" />
+
+          </div>
         </div>
     </div>
       </div>
-    <q-separator class="separator" />
     <q-splitter
       v-model="splitterModel"
       unit="px"
-      style="min-height: calc(100vh - 130px)"
+      class="logs-splitter-smooth tw-overflow-hidden"
     >
       <template v-slot:before>
+        <div class="tw-w-full tw-px-[0.625rem] tw-pb-[0.625rem] ">
+          <div class="o2-container-navbarheight card-container">
         <q-tabs
           v-model="billingtab"
           indicator-color="transparent"
@@ -98,10 +101,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             content-class="tab_content"
           />
         </q-tabs>
+        <q-btn
+              data-test="logs-search-field-list-collapse-btn"
+              icon="drag_indicator"
+              :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+              dense
+              flat
+              :class="[
+                'splitter-section-collapse-btn',
+                showSidebar
+                  ? 'splitter-section-collapse-btn--visible'
+                  : 'splitter-section-collapse-btn--hidden',
+              ]"
+              
+              @click="collapseSidebar"
+            />
+          </div>
+        </div>
+
       </template>
 
       <template v-slot:after>
-          <router-view title=""> </router-view>
+                <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+          <div
+            class="o2-container-navbarheight card-container"
+          >
+            <router-view title=""> </router-view>
+          </div>
+          </div>
       </template>
     </q-splitter>
   </q-page>
@@ -130,6 +157,18 @@ export default defineComponent({
     const router: any = useRouter();
     const billingtab = ref("usage");
     const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
+    const showSidebar = ref(true);
+    const lastSplitterPosition = ref(200);
+    const splitterModel = ref(220);
+    const collapseSidebar = () => {
+      showSidebar.value = !showSidebar.value;
+      if (showSidebar.value) {
+        splitterModel.value = lastSplitterPosition.value;
+      } else {
+        lastSplitterPosition.value = splitterModel.value;
+        splitterModel.value = 0;
+      }
+    };
 
     onMounted(() => {
       if (router.currentRoute.value.name == "billings" || router.currentRoute.value.name == "plans") {
@@ -190,7 +229,7 @@ export default defineComponent({
       config,
       billingtab,
       getImageURL,
-      splitterModel: ref(200),
+      splitterModel,
       headerBasedOnRoute,
       options: [
         {label: "30 Days", value: "30days"}, 
@@ -203,100 +242,29 @@ export default defineComponent({
       tabs,
       usageDataType,
       updateActiveTab,
+      collapseSidebar,
+      showSidebar,
+      lastSplitterPosition,
     };
   },
 });
 </script>
 
 <style scoped lang="scss">
-.page {
-  padding: 1.5rem 1.5rem 0;
-  .q-tabs {
-    &--vertical {
-      margin: 1.5rem 1rem 0 0;
-      .q-tab {
-        justify-content: flex-start;
-        // padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        // color: $dark;
 
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          background-color: $accent;
-          color: black;
-        }
-      }
-    }
-  }
-}
 
-.usage-data-type-tabs {
-    height: 32px !important;
-
-    :deep(.rum-tabs) {
-      border: 1px solid #464646;
-      height: 32px !important;
-
-    }
-
-    :deep(.rum-tab) {
-      &:hover {
-        background: #464646;
-      }
-
-      &.active {
-        background: #5960b2;
-        color: #ffffff !important;
-      }
-    }
-  }
-
-.usage-data-type-tabs {
-  height: 32px !important;
-  
-
-  :deep(.rum-tabs) {
-    border: 1px solid #dcdcdc;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-    &:hover {
-      background: #eaeaea;
-      color: #000000 !important;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
 .custom-usage-date-select{
   ::v-deep(.q-field--auto-height.q-field--dense .q-field__control) {
   min-height: 32px !important;
-  height: 32px !important;
+  height: 40px !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
   align-items: center !important;
 }
 
 ::v-deep(.q-field--auto-height.q-field--dense .q-field__native) {
-  min-height: 32px !important;
-  height: 32px !important;
+  min-height: 42px !important;
+  height: 42px !important;
 }
 }
 </style>
