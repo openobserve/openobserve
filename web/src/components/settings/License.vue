@@ -125,6 +125,12 @@
                 </q-markup-table>
                 <div class="q-mt-md">
                   <q-btn
+                    color="primary"
+                    no-caps
+                    label="Request new License"
+                    @click="redirectToGetLicense"
+                  />
+                  <q-btn
                     no-caps
                     color="primary"
                     label="Add New License Key"

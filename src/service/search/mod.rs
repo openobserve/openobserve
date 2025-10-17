@@ -20,14 +20,14 @@ use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 use config::{
-    TIMESTAMP_COL_NAME,
+    META_ORG_ID, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
         cluster::RoleGroup,
         function::RESULT_ARRAY,
         search::{self},
-        self_reporting::usage::{RequestStats, UsageType},
+        self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::{OrderBy, TableReferenceExt, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
@@ -1483,9 +1483,13 @@ pub fn generate_search_schema_diff(
 }
 
 #[inline]
-pub fn check_search_allowed() -> Result<(), Error> {
+pub fn check_search_allowed(org_id: &str, stream: Option<&str>) -> Result<(), Error> {
     #[cfg(feature = "enterprise")]
     {
+        // for meta org usage and audit stream, we should always allow search
+        if org_id == META_ORG_ID && stream == Some(USAGE_STREAM) || stream == Some("audit") {
+            return Ok(());
+        }
         // this is installation level limit for all orgs combined
         if !o2_enterprise::enterprise::license::search_allowed() {
             Err(Error::Message(

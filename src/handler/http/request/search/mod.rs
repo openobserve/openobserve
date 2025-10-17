@@ -230,18 +230,6 @@ pub async fn search(
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
 
-    #[cfg(feature = "enterprise")]
-    {
-        if crate::service::search::check_search_allowed().is_err() {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    "installation has exceeded the ingestion limit".to_string(),
-                )),
-            );
-        }
-    }
-
     #[cfg(feature = "cloud")]
     {
         match is_org_in_free_trial_period(&org_id).await {
@@ -292,6 +280,20 @@ pub async fn search(
             return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
         }
     };
+
+    #[cfg(feature = "enterprise")]
+    for stream in stream_names.iter() {
+        {
+            if crate::service::search::check_search_allowed(&org_id, Some(stream)).is_err() {
+                return Ok(
+                    HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                        StatusCode::TOO_MANY_REQUESTS,
+                        "installation has exceeded the ingestion limit".to_string(),
+                    )),
+                );
+            }
+        }
+    }
 
     // Handle histogram data for UI
     let mut converted_histogram_query: Option<String> = None;
@@ -520,9 +522,11 @@ pub async fn around_v1(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
+    let (org_id, stream_name) = path.into_inner();
+
     #[cfg(feature = "enterprise")]
     {
-        if crate::service::search::check_search_allowed().is_err() {
+        if crate::service::search::check_search_allowed(&org_id, Some(&stream_name)).is_err() {
             return Ok(
                 HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
                     StatusCode::TOO_MANY_REQUESTS,
@@ -532,7 +536,6 @@ pub async fn around_v1(
         }
     }
 
-    let (org_id, stream_name) = path.into_inner();
     let http_span = if get_config().common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
@@ -643,9 +646,11 @@ pub async fn around_v2(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
+    let (org_id, stream_name) = path.into_inner();
+
     #[cfg(feature = "enterprise")]
     {
-        if crate::service::search::check_search_allowed().is_err() {
+        if crate::service::search::check_search_allowed(&org_id, Some(&stream_name)).is_err() {
             return Ok(
                 HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
                     StatusCode::TOO_MANY_REQUESTS,
@@ -655,7 +660,6 @@ pub async fn around_v2(
         }
     }
 
-    let (org_id, stream_name) = path.into_inner();
     let http_span = if get_config().common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
@@ -751,7 +755,7 @@ pub async fn values(
 
     #[cfg(feature = "enterprise")]
     {
-        if crate::service::search::check_search_allowed().is_err() {
+        if crate::service::search::check_search_allowed(&org_id, Some(&stream_name)).is_err() {
             return Ok(
                 HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
                     StatusCode::TOO_MANY_REQUESTS,
@@ -1401,18 +1405,6 @@ pub async fn search_partition(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    #[cfg(feature = "enterprise")]
-    {
-        if crate::service::search::check_search_allowed().is_err() {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    "installation has exceeded the ingestion limit".to_string(),
-                )),
-            );
-        }
-    }
-
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone())
     } else {
@@ -1451,6 +1443,25 @@ pub async fn search_partition(
 
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
+    }
+
+    let stream_names = match resolve_stream_names(&req.sql) {
+        Ok(v) => v.clone(),
+        Err(e) => {
+            return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
+        }
+    };
+
+    #[cfg(feature = "enterprise")]
+    for stream in stream_names.iter() {
+        if crate::service::search::check_search_allowed(&org_id, Some(stream)).is_err() {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "installation has exceeded the ingestion limit".to_string(),
+                )),
+            );
+        }
     }
 
     let search_res = SearchService::search_partition(

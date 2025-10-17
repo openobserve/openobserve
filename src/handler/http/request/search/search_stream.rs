@@ -106,16 +106,6 @@ pub async fn search_http2_stream(
     let cfg = get_config();
     let org_id = org_id.into_inner();
 
-    #[cfg(feature = "enterprise")]
-    {
-        if crate::service::search::check_search_allowed().is_err() {
-            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
-                "installation has exceeded the ingestion limit".to_string(),
-            ));
-        }
-    }
-
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search_stream", org_id = org_id.clone())
@@ -231,6 +221,15 @@ pub async fn search_http2_stream(
             return http_response;
         }
     };
+    #[cfg(feature = "enterprise")]
+    for stream in stream_names.iter() {
+        if crate::service::search::check_search_allowed(&org_id, Some(stream)).is_err() {
+            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
+                "installation has exceeded the ingestion limit".to_string(),
+            ));
+        }
+    }
 
     let mut sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
         Ok(sql) => sql,
@@ -573,16 +572,6 @@ pub async fn values_http2_stream(
     let cfg = get_config();
     let org_id = org_id.into_inner();
 
-    #[cfg(feature = "enterprise")]
-    {
-        if crate::service::search::check_search_allowed().is_err() {
-            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
-                "installation has exceeded the ingestion limit".to_string(),
-            ));
-        }
-    }
-
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_values_stream", org_id = org_id.clone())
@@ -635,6 +624,18 @@ pub async fn values_http2_stream(
     // check stream type from request
     if values_req.stream_type != stream_type {
         stream_type = values_req.stream_type;
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed(&org_id, Some(&values_req.stream_name))
+            .is_err()
+        {
+            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
+                "installation has exceeded the ingestion limit".to_string(),
+            ));
+        }
     }
 
     // Get use_cache from query params
