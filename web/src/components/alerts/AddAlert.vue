@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="full-width q-mx-lg "  >
-    <div class="row items-center no-wrap tw-mx-2 q-my-sm">
+    <div class="row items-center no-wrap card-container tw-mx-3 q-my-sm">
       <div class="flex items-center justify-between tw-w-full card-container tw-px-2 tw-py-3">
         <div class="flex items-center">
           <div
@@ -388,11 +388,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <div
-          style="width: 420px; height: 320px; position: sticky; top: 0 "
+          style="width: 430px; height: 320px; position: sticky; top: 0 "
           class=" col-2"
         >
           <preview-alert
-            style="border: 1px solid #ececec; height: 300px; width: 412px;"
+            style="border: 1px solid #ececec; height: 300px; width: 430px;"
             ref="previewAlertRef"
             :formData="formData"
             :query="previewQuery"
