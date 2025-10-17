@@ -341,9 +341,9 @@ jobs:
           path: tests/ui-testing/blob-report
           retention-days: 1
 
-      - name: Check OpenObserve logs
-        if: always()
-        run: cat o2.log
+      # - name: Check OpenObserve logs
+      #   if: always()
+      #   run: cat o2.log
 
   merge_and_upload_reports:
     name: Merge Reports and Upload to TestDino
