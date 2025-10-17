@@ -47,6 +47,11 @@ pub struct CacheQueryRequest {
     pub ts_column: String,
     pub histogram_interval: i64,
     pub is_descending: bool,
+    /// Flag indicating this is a histogram query with non-timestamp column ORDER BY.
+    /// When true, cache file timestamps must be calculated by scanning all hits,
+    /// not just first/last, since results may not be time-ordered.
+    /// Example: SELECT histogram(_timestamp), count(*) ... ORDER BY count DESC
+    pub is_histogram_non_ts_order: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
