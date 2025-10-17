@@ -112,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery &&
                       dashboardPanelData.data.queryType == 'sql'
                     "
+                    class="q-mt-sm"
                   >
                     <SortByBtnGrp
                       :fieldObj="
@@ -326,6 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery &&
                       dashboardPanelData.data.queryType == 'sql'
                     "
+                    class="q-mt-sm"
                   >
                     <SortByBtnGrp
                       :fieldObj="
