@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dashboard.description") }}
       </div>
       <q-input
-        outlined
+        borderless
         v-model="dashboardPanelData.data.description"
         filled
         autogrow
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dashboard.description") }}
       </div>
       <q-input
-        outlined
+        borderless
         v-model="dashboardPanelData.data.description"
         filled
         autogrow
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bg-color="input-bg"
       class="q-py-sm showLabelOnTop"
       stack-label
-      outlined
+      borderless
       filled
       dense
       label-slot
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-select
         :label="t('dashboard.trellisLayout')"
         data-test="dashboard-trellis-chart"
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.trellis.layout"
         :options="trellisOptions"
         dense
@@ -144,11 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="dashboardPanelData.data.config.trellis?.layout === 'custom'"
       >
         <q-input
-          outlined
+          borderless
           v-model.number="dashboardPanelData.data.config.trellis.num_of_columns"
-          color="input-border"
           :label="t('dashboard.numOfColumns')"
-          bg-color="input-bg"
           class="q-mr-sm showLabelOnTop"
           stack-label
           filled
@@ -297,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="o2-input">
       <q-select
         v-if="shouldShowLegendPosition(dashboardPanelData)"
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.legends_position"
         :options="legendsPositionOptions"
         dense
@@ -316,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-select
         v-if="shouldShowLegendType(dashboardPanelData)"
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.legends_type"
         :options="legendTypeOptions"
         dense
@@ -343,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           bg-color="input-bg"
           class="q-py-md showLabelOnTop q-mr-sm"
           stack-label
-          outlined
+          borderless
           filled
           dense
           label-slot
@@ -361,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           bg-color="input-bg"
           class="q-py-md showLabelOnTop q-mr-sm"
           stack-label
-          outlined
+          borderless
           filled
           dense
           label-slot
@@ -451,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-select
         v-if="shouldApplyChartAlign(dashboardPanelData)"
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.chart_align"
         :options="chartAlignOptions"
         dense
@@ -469,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-select
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.unit"
         :options="unitOptions"
         dense
@@ -508,6 +506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         value="2"
         min="0"
         max="100"
+        borderless
         @update:model-value="
           (value: any) =>
             (dashboardPanelData.data.config.decimals =
@@ -532,7 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-select
         v-if="dashboardPanelData.data.type == 'maps'"
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.map_type.type"
         :options="mapTypeOptions"
         dense
@@ -548,7 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-select
         v-if="dashboardPanelData.data.type == 'geomap'"
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.base_map.type"
         :options="basemapTypeOptions"
         dense
@@ -577,7 +576,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             bg-color="input-bg"
             class="col-6 q-py-md showLabelOnTop"
             stack-label
-            outlined
+            borderless
             filled
             dense
             label-slot
@@ -596,7 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             bg-color="input-bg"
             class="col-6 q-py-md showLabelOnTop"
             stack-label
-            outlined
+            borderless
             filled
             dense
             label-slot
@@ -614,7 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
           stack-label
-          outlined
+          borderless
           filled
           dense
           label-slot
@@ -627,7 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-select
           v-model="dashboardPanelData.data.config.map_symbol_style.size"
           :label="t('dashboard.symbolsize')"
-          outlined
+          borderless
           :options="symbolOptions"
           dense
           class="showLabelOnTop"
@@ -662,7 +661,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             bg-color="input-bg"
             class="col-6 q-py-md showLabelOnTop"
             stack-label
-            outlined
+            borderless
             filled
             dense
             label-slot
@@ -693,7 +692,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             bg-color="input-bg"
             class="col-6 q-py-md showLabelOnTop"
             stack-label
-            outlined
+            borderless
             filled
             dense
             label-slot
@@ -723,7 +722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           bg-color="input-bg"
           class="col-6 q-py-md showLabelOnTop"
           stack-label
-          outlined
+          borderless
           filled
           dense
           label-slot
@@ -793,7 +792,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-sm showLabelOnTop"
         stack-label
-        outlined
+        borderless
         filled
         dense
         label-slot
@@ -848,7 +847,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-sm showLabelOnTop"
         stack-label
-        outlined
+        borderless
         filled
         dense
         label-slot
@@ -950,7 +949,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="showLabelOnTop"
         stack-label
-        outlined
+        borderless
         label-slot
         style="
           top: none !important;
@@ -1042,7 +1041,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
       <q-select
         v-if="dashboardPanelData.data.type == 'geomap'"
-        outlined
+        borderless
         v-model="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -1087,7 +1086,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
+        borderless
         filled
         dense
         label-slot
@@ -1115,7 +1114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
+        borderless
         filled
         dense
         label-slot
@@ -1145,7 +1144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
+        borderless
         filled
         dense
         label-slot
@@ -1175,7 +1174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
+        borderless
         filled
         dense
         label-slot
@@ -1235,7 +1234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 50%"
           class="q-py-md showLabelOnTop"
           stack-label
-          outlined
+          borderless
           filled
           dense
           label-slot
@@ -1280,7 +1279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 50%"
           class="q-py-md showLabelOnTop"
           stack-label
-          outlined
+          borderless
           filled
           dense
           label-slot
@@ -1334,7 +1333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'h-stacked',
           ].includes(dashboardPanelData.data.type)
         "
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.label_option.position"
         :options="labelPositionOptions"
         dense
@@ -1387,7 +1386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
+        borderless
         filled
         dense
         label-slot
@@ -1410,7 +1409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type,
           )
         "
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.show_symbol"
         :options="showSymbol"
         dense
@@ -1450,7 +1449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type,
           )
         "
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.line_interpolation"
         :options="lineInterpolationOptions"
         dense
@@ -1506,7 +1505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-sm showLabelOnTop"
         stack-label
-        outlined
+        borderless
         filled
         dense
         label-slot

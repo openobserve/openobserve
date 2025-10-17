@@ -33,7 +33,7 @@
         unelevated
         size="sm"
         round
-        outline
+        borderless
         :title="t('dashboard.cancel')"
         @click.stop="cancelEdit"
         data-test="dashboard-color-by-series-cancel"
@@ -70,7 +70,7 @@
                   color="input-border"
                   bg-color="input-bg"
                   stack-label
-                  outlined
+                  borderless
                   label-slot
                   style="
                     top: none !important;
