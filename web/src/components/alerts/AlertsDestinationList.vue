@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-if="!showDestinationEditor && !showImportDestination" >
       <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
-      :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
       >
         <div class="q-table__title tw-font-[600]" data-test="alert-destinations-list-title">
             {{ t("alert_destinations.header") }}
@@ -32,15 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="destination-list-search-input"
               class="q-ml-auto no-border o2-search-input"
               :placeholder="t('alert_destinations.search')"
-              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
           <q-btn
             class="o2-secondary-button q-ml-md tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
             flat
             :label="t(`dashboard.import`)"
@@ -50,7 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="alert-destination-list-add-alert-btn"
             class="o2-primary-button q-ml-md tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             no-caps
             flat
             :disable="!templates.length"
@@ -69,9 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         class="o2-quasar-table o2-quasar-table-header-sticky"
         :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;'
+            ? 'width: 100%; height: calc(100vh - 180px); overflow-y: auto;'
             : 'width: 100%'"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border'"
       >
         <template #no-data>
           <div

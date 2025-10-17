@@ -412,15 +412,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="col-auto flex q-mb-sm ">
                 <q-input
                   v-model="filterQuery"
-                  filled
                   dense
-                  class="q-ml-none q-mb-xs q-mr-md"
+                  class="q-ml-none q-mb-xs q-mr-md o2-search-input"
+                  borderless
                   style="width: 400px;"
                   :placeholder="t('nodes.search')"
-                  clearable
                 >
                   <template #prepend>
-                    <q-icon name="search" />
+                    <q-icon name="search" class="o2-search-input-icon" />
                   </template>
                 </q-input>
                 <q-btn :label="t('common.refresh')" class="text-bold text-capitalize no-border o2-primary-button"

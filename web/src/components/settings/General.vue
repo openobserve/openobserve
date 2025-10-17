@@ -65,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
               data-test="general-settings-enable-websocket"
               class=" showLabelOnTop o2-toggle-button-lg"
-              :class="store.state.theme == 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             />
             <span class="individual-setting-description">
               Websockets Search uses sockets logic to improve performance.
@@ -83,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
               data-test="general-settings-enable-streaming"
               class="showLabelOnTop o2-toggle-button-lg"
-              :class="store.state.theme == 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             />
             <span class="individual-setting-description">
               Enabling search streaming will increase performance.
@@ -101,7 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
               data-test="general-settings-enable-streaming-aggregation"
               class="showLabelOnTop o2-toggle-button-lg"
-              :class="store.state.theme == 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             />
             <span class="individual-setting-description">
               Enabling streaming aggregates will help improve the performance of aggregate queries.
@@ -115,7 +112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="onSubmit.isLoading.value"
               :label="t('dashboard.save')"
               class="q-mb-md o2-primary-button no-border tw-h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               type="submit"
               no-caps
               size="md"
@@ -153,12 +149,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 type="button"
                 class="q-mr-sm"
-                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 no-caps
                 color="red"
                 icon="close"
                 dense
-                flat
                 size="sm"
                 @click="editingText = !editingText"
               ></q-btn>
@@ -169,8 +163,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mr-sm "
                 dense
                 size="sm"
-                flat
-                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 color="primary"
                 type="submit"
                 no-caps
@@ -248,12 +240,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 type="button"
                 class="q-mr-sm"
-                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 no-caps
                 color="red"
                 icon="close"
                 dense
-                flat
                 size="sm"
                 @click="files = null"
               ></q-btn>
@@ -264,8 +254,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mr-sm "
                 dense
                 size="sm"
-                flat
-                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 color="primary"
                 type="submit"
                 no-caps
@@ -301,14 +289,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button tw-h-[28px] no-border"
           flat
           no-caps
-          :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelConfirmDialog"
         />
         <q-btn
           data-test="logs-search-bar-confirm-dialog-ok-btn"
           :label="t('confirmDialog.ok')"
           class="o2-primary-button tw-h-[28px] no-border"
-          :class="store.state.theme == 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           no-caps
           flat
           @click="confirmDialogOK"

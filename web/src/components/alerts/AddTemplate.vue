@@ -128,7 +128,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.cancel')"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="$emit('cancel:hideform')"
               data-test="add-template-cancel-btn"
             />
@@ -137,7 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.save')"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               @click="saveTemplate"
               data-test="add-template-submit-btn"
             />
