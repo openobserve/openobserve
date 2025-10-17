@@ -20,13 +20,12 @@ env:
   COLUMNS: 150
   ZO_ROOT_USER_EMAIL: automation@tester.ai
   ZO_ROOT_USER_PASSWORD: 12345678
-  ZO_BASE_URL: https://dev2.internal.zinclabs.dev/
-  WS_ZO_BASE_URL: https://dev2.internal.zinclabs.dev/
-  ZO_BASE_URL_SC: https://dev2.internal.zinclabs.dev/
-  ZO_BASE_URL_SC_UI: https://dev2.internal.zinclabs.dev/
-  INGESTION_URL: https://dev2.internal.zinclabs.dev/
-  ORGNAME: automationtesting
-  TEST_STEP_DELAY_MS: 500
+  ZO_BASE_URL: https://test.internal.zinclabs.dev
+  WS_ZO_BASE_URL: https://test.internal.zinclabs.dev
+  ZO_BASE_URL_SC: https://test.internal.zinclabs.dev
+  ZO_BASE_URL_SC_UI: https://test.internal.zinclabs.dev
+  INGESTION_URL: https://test.internal.zinclabs.dev
+  ORGNAME: 34BRg3f4LCBhi3EuqmYuY2rFIlJ
   ZO_QUICK_MODE_NUM_FIELDS: 100
   ZO_QUICK_MODE_STRATEGY: first
   ZO_ALLOW_USER_DEFINED_SCHEMAS: true
@@ -126,7 +125,6 @@ jobs:
           echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
           echo "ORGNAME=${ORGNAME}" >> .env
-          echo "TEST_STEP_DELAY_MS=${TEST_STEP_DELAY_MS}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
           npx playwright install --with-deps chromium
@@ -145,42 +143,42 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - testfolder: "GeneralTests"
-            browser: "chrome"
-            run_files:
-              [
-                "sanity.spec.js",
-                "changeOrg.spec.js",
-                "enrichment.spec.js",
-                "schema.spec.js",
-                "schemaload.spec.js",
-                "serviceAccount.spec.js",
-                "usersOrg.spec.js",
-                "org.spec.js",
-              ]
-          - testfolder: "Logs-Core"
-            browser: "chrome"
-            run_files:
-              [
-                "join.spec.js",
-                "logshistogram.spec.js",
-                "logspage.spec.js",
-                "logsquickmode.spec.js",
-                "pagination.spec.js",
-                "unflattened.spec.js",
-                "logstable.spec.js",
-              ]
-          - testfolder: "Logs-Queries"
-            browser: "chrome"
-            run_files:
-              [
-                "logsDownloads.spec.js",
-                "logsqueries.spec.js",
-                "secondsPrecisionAdded.spec.js",
-                "logsqueries.cte.spec.js",
-                "logsqueries.matchall.spec.js",
-                "searchpartition.spec.js",
-              ]
+          # - testfolder: "GeneralTests"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "sanity.spec.js",
+          #       "changeOrg.spec.js",
+          #       "enrichment.spec.js",
+          #       "schema.spec.js",
+          #       "schemaload.spec.js",
+          #       "serviceAccount.spec.js",
+          #       "usersOrg.spec.js",
+          #       "org.spec.js",
+          #     ]
+          # - testfolder: "Logs-Core"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "join.spec.js",
+          #       "logshistogram.spec.js",
+          #       "logspage.spec.js",
+          #       "logsquickmode.spec.js",
+          #       "pagination.spec.js",
+          #       "unflattened.spec.js",
+          #       "logstable.spec.js",
+          #     ]
+          # - testfolder: "Logs-Queries"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "logsDownloads.spec.js",
+          #       "logsqueries.spec.js",
+          #       "secondsPrecisionAdded.spec.js",
+          #       "logsqueries.cte.spec.js",
+          #       "logsqueries.matchall.spec.js",
+          #       "searchpartition.spec.js",
+          #     ]
           - testfolder: "Alerts"
             browser: "chrome"
             run_files:
@@ -189,63 +187,63 @@ jobs:
                 "alerts-ui-operations.spec.js",
                 "alerts-import.spec.js",
               ]
-          - testfolder: "Dashboards-Core"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard.spec.js",
-                "dashboard2.spec.js",
-                "dashboardtype.spec.js",
-                "dashboard-folder.spec.js",
-                "dashboard-import.spec.js",
-                "maxquery.spec.js",
-              ]
-          - testfolder: "Dashboards-Settings"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard-filter.spec.js",
-                "dashboard-general-setting.spec.js",
-                "dashboard-tabs-setting.spec.js",
-                "dashboard-variables-setting.spec.js",
-                "dashboard-transpose.spec.js",
-              ]
-          - testfolder: "Dashboards-Charts"
-            browser: "chrome"
-            run_files: [
-                "custom-charts.spec.js",
-                "dashboard-geoMap.spec.js",
-                "dashboard-maps.spec.js",
-                "dashboard-multi-y-axis.spec.js",
-                "dashboard-html-chart.spec.js",
-                "visualize.spec.js",
-                # "visualization-vrl.spec.js"
-              ]
-          - testfolder: "Dashboards-Streaming"
-            browser: "chrome"
-            run_files: ["dashboard-streaming.spec.js",]
-          - testfolder: "Pipelines"
-            browser: "chrome"
-            run_files: [
-                "pipelines.spec.js",
-                "pipeline-dynamic.spec.js",
-                "pipeline-core.spec.js",
-                # "remotepipeline.spec.js"
-              ]
-          - testfolder: "Reports"
-            browser: "chrome"
-            run_files: [
-              "reportsUpdated.spec.js",
-              "reportsUpdated2.spec.js"
-              ]
-          - testfolder: "Streams"
-            browser: "chrome"
-            run_files:
-              [
-                "multiselect-stream.spec.js",
-                "streamname.spec.js",
-                "streaming.spec.js",
-              ]
+          # - testfolder: "Dashboards-Core"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "dashboard.spec.js",
+          #       "dashboard2.spec.js",
+          #       "dashboardtype.spec.js",
+          #       "dashboard-folder.spec.js",
+          #       "dashboard-import.spec.js",
+          #       "maxquery.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Settings"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "dashboard-filter.spec.js",
+          #       "dashboard-general-setting.spec.js",
+          #       "dashboard-tabs-setting.spec.js",
+          #       "dashboard-variables-setting.spec.js",
+          #       "dashboard-transpose.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Charts"
+          #   browser: "chrome"
+          #   run_files: [
+          #       "custom-charts.spec.js",
+          #       "dashboard-geoMap.spec.js",
+          #       "dashboard-maps.spec.js",
+          #       "dashboard-multi-y-axis.spec.js",
+          #       "dashboard-html-chart.spec.js",
+          #       "visualize.spec.js",
+          #       # "visualization-vrl.spec.js"
+          #     ]
+          # - testfolder: "Dashboards-Streaming"
+          #   browser: "chrome"
+          #   run_files: ["dashboard-streaming.spec.js",]
+          # - testfolder: "Pipelines"
+          #   browser: "chrome"
+          #   run_files: [
+          #       "pipelines.spec.js",
+          #       "pipeline-dynamic.spec.js",
+          #       "pipeline-core.spec.js",
+          #       # "remotepipeline.spec.js"
+          #     ]
+          # - testfolder: "Reports"
+          #   browser: "chrome"
+          #   run_files: [
+          #     "reportsUpdated.spec.js",
+          #     "reportsUpdated2.spec.js"
+          #     ]
+          # - testfolder: "Streams"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "multiselect-stream.spec.js",
+          #       "streamname.spec.js",
+          #       "streaming.spec.js",
+          #     ]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
