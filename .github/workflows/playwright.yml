@@ -98,7 +98,7 @@ jobs:
   test_environment_data_cleanup:
     name: Test Environment Data Cleanup
     runs-on:
-      labels: repo-openobserve-standard-8
+      labels: repo-openobserve-standard-4
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -225,12 +225,12 @@ jobs:
           #       "pipeline-core.spec.js",
           #       # "remotepipeline.spec.js"
           #     ]
-          # - testfolder: "Reports"
-          #   browser: "chrome"
-          #   run_files: [
-          #     "reportsUpdated.spec.js",
-          #     "reportsUpdated2.spec.js"
-          #     ]
+          - testfolder: "Reports"
+            browser: "chrome"
+            run_files: [
+              "reportsUpdated.spec.js",
+              # "reportsUpdated2.spec.js"
+              ]
           # - testfolder: "Streams"
           #   browser: "chrome"
           #   run_files:
