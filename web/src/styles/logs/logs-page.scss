@@ -173,19 +173,7 @@
   .row:nth-child(2) {
     height: 100%; /* or any other height you want to set */
   }
-
-  .empty-query .monaco-editor-background {
-    background-image: url("../../assets/images/common/query-editor.png");
-    background-repeat: no-repeat;
-    background-size: 115px;
-  }
-
-  .empty-function .monaco-editor-background {
-    background-image: url("../../assets/images/common/vrl-function.png");
-    background-repeat: no-repeat;
-    background-size: 170px;
-  }
-
+  
   .function-dropdown {
     width: 12.8125rem; // 205px
     padding-bottom: 0;
