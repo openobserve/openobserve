@@ -15,101 +15,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <q-splitter
-      v-model="splitterModel"
-      unit="px"
-      :limits="[0, 400]"
-      class="tw-overflow-hidden logs-splitter-smooth"
-    >
-      <template v-slot:before>
-        <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
-          <div v-if="showSidebar" class="o2-container-navbarheight card-container">
-            <q-tabs
-              v-model="activeTab"
-              indicator-color="transparent"
-              inline-label
-              vertical
-              class="card-container"
-            >
-              <q-route-tab
-                v-if="
-                  !store.state.zoConfig?.custom_hide_menus
-                    ?.split(',')
-                    .includes('pipelines')
-                "
-                data-test="stream-pipelines-tab"
-                name="streamPipelines"
-                :to="{
-                  name: 'pipelines',
-                  query: {
-                    org_identifier: store.state.selectedOrganization.identifier,
-                  },
-                }"
-                :label="t('function.streamPipeline')"
-                content-class="tab_content"
-              />
-              <q-route-tab
-                data-test="function-stream-tab"
-                default
-                name="functions"
-                :to="{
-                  name: 'functionList',
-                  query: {
-                    org_identifier: store.state.selectedOrganization.identifier,
-                  },
-                }"
-                :label="t('function.header')"
-                content-class="tab_content"
-              />
-              <q-route-tab
-                data-test="function-enrichment-table-tab"
-                name="enrichmentTables"
-                :to="{
-                  name: 'enrichmentTables',
-                  query: {
-                    org_identifier: store.state.selectedOrganization.identifier,
-                  },
-                }"
-                :label="t('function.enrichmentTables')"
-                content-class="tab_content"
-              />
-            </q-tabs>
+  <q-page>
+    <div class=" tw-pb-[0.625rem]">
+      <q-splitter
+        v-model="splitterModel"
+        unit="px"
+        :limits="[0, 400]"
+        class="tw-overflow-hidden logs-splitter-smooth"
+      >
+        <template v-slot:before>
+          <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+            <div v-if="showSidebar" class="card-container tw-h-[calc(100vh-50px)]">
+              <q-tabs
+                v-model="activeTab"
+                indicator-color="transparent"
+                inline-label
+                vertical
+                class="card-container"
+              >
+                <q-route-tab
+                  v-if="
+                    !store.state.zoConfig?.custom_hide_menus
+                      ?.split(',')
+                      .includes('pipelines')
+                  "
+                  data-test="stream-pipelines-tab"
+                  name="streamPipelines"
+                  :to="{
+                    name: 'pipelines',
+                    query: {
+                      org_identifier: store.state.selectedOrganization.identifier,
+                    },
+                  }"
+                  :label="t('function.streamPipeline')"
+                  content-class="tab_content"
+                />
+                <q-route-tab
+                  data-test="function-stream-tab"
+                  default
+                  name="functions"
+                  :to="{
+                    name: 'functionList',
+                    query: {
+                      org_identifier: store.state.selectedOrganization.identifier,
+                    },
+                  }"
+                  :label="t('function.header')"
+                  content-class="tab_content"
+                />
+                <q-route-tab
+                  data-test="function-enrichment-table-tab"
+                  name="enrichmentTables"
+                  :to="{
+                    name: 'enrichmentTables',
+                    query: {
+                      org_identifier: store.state.selectedOrganization.identifier,
+                    },
+                  }"
+                  :label="t('function.enrichmentTables')"
+                  content-class="tab_content"
+                />
+              </q-tabs>
 
-            <q-btn
-              data-test="logs-search-field-list-collapse-btn"
-              icon="drag_indicator"
-              :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
-              dense
-              flat
-              :class="[
-                'splitter-section-collapse-btn',
-                showSidebar
-                  ? 'splitter-section-collapse-btn--visible'
-                  : 'splitter-section-collapse-btn--hidden',
-              ]"
-              
-              @click="collapseSidebar"
-            />
+              <q-btn
+                data-test="logs-search-field-list-collapse-btn"
+                icon="drag_indicator"
+                :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+                dense
+                flat
+                :class="[
+                  'splitter-section-collapse-btn',
+                  showSidebar
+                    ? 'splitter-section-collapse-btn--visible'
+                    : 'splitter-section-collapse-btn--hidden',
+                ]"
+                
+                @click="collapseSidebar"
+              />
+            </div>
           </div>
-        </div>
-      </template>
-      <template v-slot:after>
-        <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
-          <div
-            class="o2-container-navbarheight card-container"
-          >
-            <!-- :templates="templates"
-              :functionAssociatedStreams="functionAssociatedStreams"
-              @get:functionAssociatedStreams="getFunctionAssociatedStreams"
-              @get:templates="getTemplates" -->
-            <RouterView v-slot="{ Component }">
-              <component :is="Component" @sendToAiChat="sendToAiChat" />
-            </RouterView>
-          </div>
-        </div>
-      </template>
-    </q-splitter>
+        </template>
+        <template v-slot:after>
+          <!-- :templates="templates"
+            :functionAssociatedStreams="functionAssociatedStreams"
+            @get:functionAssociatedStreams="getFunctionAssociatedStreams"
+            @get:templates="getTemplates" -->
+            <div :class="!showSidebar ? 'tw-ml-[0.625rem]' : ''">
+              <RouterView v-slot="{ Component }">
+                <component :is="Component" @sendToAiChat="sendToAiChat" />
+              </RouterView>
+            </div>
+        </template>
+      </q-splitter>
+    </div>
   </q-page>
 </template>
 
