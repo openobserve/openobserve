@@ -867,6 +867,7 @@ export const usePanelDataLoader = (
         state.loadingCompleted = 0;
         state.loadingProgressPercentage = 0;
         state.isOperationCancelled = false;
+        state.isPartialData = false;
         processApiError(response?.content, "sql");
       }
 
@@ -891,6 +892,7 @@ export const usePanelDataLoader = (
       state.loadingTotal = 0;
       state.loadingCompleted = 0;
       state.loadingProgressPercentage = 0;
+      state.isPartialData = false;
       state.errorDetail = {
         message: error?.message || "Unknown error in search response",
         code: error?.code ?? "",
@@ -993,6 +995,7 @@ export const usePanelDataLoader = (
     state.loadingCompleted = 0;
     state.loadingProgressPercentage = 0;
     state.isOperationCancelled = false;
+    state.isPartialData = false;
 
     processApiError(response?.content, "sql");
   };
@@ -1093,6 +1096,7 @@ export const usePanelDataLoader = (
       };
       state.loading = false;
       state.isOperationCancelled = false;
+      state.isPartialData = false;
     }
   };
 
@@ -1201,6 +1205,7 @@ export const usePanelDataLoader = (
       };
       state.loading = false;
       state.isOperationCancelled = false;
+      state.isPartialData = false;
     }
   };
 
@@ -2079,6 +2084,8 @@ export const usePanelDataLoader = (
    * @param {any} type - The type of error being processed.
    */
   const processApiError = async (error: any, type: any) => {
+    state.isPartialData = false;
+
     switch (type) {
       case "promql": {
         const errorDetailValue = error?.response?.data?.error || error?.message;
