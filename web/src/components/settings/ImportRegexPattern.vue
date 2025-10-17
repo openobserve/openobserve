@@ -579,8 +579,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }]);
           return false;
         }
-        // Note: Backend will handle duplicate names by appending a suffix like "(2)", "(3)", etc.
-        // This allows importing patterns with same names while keeping database unique constraint
+        // Note: Duplicate pattern names are allowed.
+        // Primary key is UUID-based (id), so multiple patterns can have the same name.
         if(!jsonObj.pattern || !jsonObj.pattern.trim() || typeof jsonObj.pattern !== 'string'){
           regexPatternErrorsToDisplay.value.push([{
             field: 'regex_pattern',
@@ -602,19 +602,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 pattern: jsonObj.pattern,
                 description: jsonObj.description,
             }
-            const response = await regexPatternsService.create(store.state.selectedOrganization.identifier, payload);
-
-            // Check if backend returned a message about duplicate name
-            const backendMessage = response?.data?.message || '';
-            const isDuplicate = backendMessage.includes('already exists');
-
-            const message = isDuplicate
-                ? `Regex pattern - ${index}: ${backendMessage}`
-                : `Regex pattern - ${index}: "${jsonObj.name}" created successfully \nNote: please remove the created regex pattern object ${jsonObj.name} from the json file`;
-
+            await regexPatternsService.create(store.state.selectedOrganization.identifier, payload);
             regexPatternCreators.value.push({
                 success: true,
-                message: message,
+                message: `Regex pattern - ${index}: "${jsonObj.name}" created successfully \nNote: please remove the created regex pattern object ${jsonObj.name} from the json file`,
             });
             return true;
         } catch (error: any) {
