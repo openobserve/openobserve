@@ -249,6 +249,116 @@ class APICleanup {
     }
 
     /**
+     * Fetch all reports
+     * @returns {Promise<Array>} Array of report objects
+     */
+    async fetchReports() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/reports`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch reports', { status: response.status });
+                return [];
+            }
+
+            const reports = await response.json();
+            return reports || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch reports', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single report
+     * @param {string} reportName - The report name
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteReport(reportName) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/reports/${reportName}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete report', { reportName, status: response.status });
+                return { code: response.status, message: 'Failed to delete report' };
+            }
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            testLogger.error('Failed to delete report', { reportName, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all reports owned by the automation test user
+     * Deletes all reports where owner matches ZO_ROOT_USER_EMAIL
+     */
+    async cleanupReports() {
+        testLogger.info('Starting reports cleanup', { owner: this.email });
+
+        try {
+            // Fetch all reports
+            const reports = await this.fetchReports();
+            testLogger.info('Fetched reports', { total: reports.length });
+
+            // Filter reports owned by automation user
+            const ownedReports = reports.filter(r => r.owner === this.email);
+            testLogger.info('Found reports owned by automation user', { count: ownedReports.length });
+
+            if (ownedReports.length === 0) {
+                testLogger.info('No reports to clean up');
+                return;
+            }
+
+            // Delete each report
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const report of ownedReports) {
+                const result = await this.deleteReport(report.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted report', {
+                        id: report.report_id,
+                        name: report.name
+                    });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete report', {
+                        id: report.report_id,
+                        name: report.name,
+                        result
+                    });
+                }
+            }
+
+            testLogger.info('Reports cleanup completed', {
+                total: ownedReports.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Reports cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
      * Clean up all dashboards owned by the automation test user
      * Deletes dashboards from the 'default' folder where owner matches ZO_ROOT_USER_EMAIL
      */

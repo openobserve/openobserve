@@ -28,6 +28,8 @@ export class ReportsPage {
     this.zoneInput = page.locator('[data-test="add-report-schedule-send-later-section"]').getByText('arrow_drop_down');
     this.timeZoneOption = (zone) => `role=option[name="${zone}"]`;
     this.signOutButton = page.getByText('Sign Out');
+    this.reportSearchInput = page.locator('[data-test="report-list-search-input"]');
+    this.descriptionInput = (reportName) => page.getByRole('textbox', { name: 'Description' });
   }
 
   async navigateToReports() {
@@ -188,6 +190,24 @@ export class ReportsPage {
     await this.saveButton.click({ force: true });
   }
 
+  async verifyReportCreated(reportName) {
+    // Wait for save success alert (reports API takes 10-11 seconds)
+    await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 15000 });
+    const saveAlert = this.page.getByRole('alert').filter({ hasText: 'Report saved successfully.' });
+    await expect(saveAlert).toBeVisible({ timeout: 5000 });
+
+    // Navigate to reports list to verify report exists
+    await this.page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+    await this.page.waitForLoadState('networkidle');
+
+    // Search for the report
+    await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
+    await this.page.waitForTimeout(2000);
+
+    // Verify report appears in the list
+    await expect(this.page.locator(`[data-test="report-list-${reportName}-pause-start-report"]`)).toBeVisible({ timeout: 5000 });
+  }
+
   async createReport(dashboardName) {
     await this.page.waitForSelector('[data-test="report-list-add-report-btn"]');
     await this.addReportButton.click({ force: true });
@@ -268,22 +288,31 @@ export class ReportsPage {
   }
 
   async updateReport(reportName) {
-    await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
-    await this.page
-      .locator(`[data-test="report-list-${reportName}-edit-report"]`)
-      .click({ force: true });
+    // Search for the report
+    await this.reportSearchInput.fill(reportName);
+    await this.page.waitForTimeout(1000);
 
-      await this.page.getByLabel('Description').click({ force: true });
-      await this.page.getByLabel('Description').fill('Report Updated');
-      await this.page.locator('[data-test="report-cached-toggle-btn"] div').nth(2).click({ force: true });
-      await this.page.locator('[data-test="report-cached-toggle-btn"] div').nth(2).click({ force: true });
-      await this.page.locator('[data-test="add-report-step1-continue-btn"]').click({ force: true });
-      await this.page.locator('[data-test="add-report-step2-continue-btn"]').click({ force: true });
-      await this.page.locator('[data-test="add-report-save-btn"]').click({ force: true });
-      // Wait for alert and find specific message
-      await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
-      const updateAlert = this.page.getByRole('alert').filter({ hasText: 'Report updated successfully.' });
-      await expect(updateAlert).toBeVisible({ timeout: 5000 });
+    // Click edit button
+    await this.page.locator(`[data-test="report-list-${reportName}-edit-report"]`).click();
+
+    // Wait for edit form to fully load
+    await this.page.waitForTimeout(3000);
+
+    // Update description
+    await this.page.getByRole('textbox', { name: 'Description' }).click();
+    await this.page.getByRole('textbox', { name: 'Description' }).fill('Report Updated');
+
+    // Click save button
+    await this.page.locator('[data-test="add-report-save-btn"]').click();
+
+    // Wait for save to process
+    await this.page.waitForTimeout(2000);
+
+    // Search for the report to filter and verify the update appears
+    await this.reportSearchInput.fill(reportName);
+
+    // Verify the updated description appears in the report cell (reports API takes 10-11 seconds)
+    await expect(this.page.getByRole('cell', { name: 'Report Updated' })).toBeVisible({ timeout: 15000 });
   }
 
   // async logedOut() {

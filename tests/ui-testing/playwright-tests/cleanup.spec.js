@@ -24,6 +24,9 @@ test.describe("Pre-Test Cleanup", () => {
     // 5. All remaining folders starting with 'auto_'
     await pm.apiCleanup.completeCascadeCleanup('auto_playwright');
 
+    // Clean up all reports owned by automation user
+    await pm.apiCleanup.cleanupReports();
+
     // Clean up all dashboards owned by automation user
     await pm.apiCleanup.cleanupDashboards();
 
