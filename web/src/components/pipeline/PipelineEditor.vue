@@ -15,91 +15,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-between items-center q-py-sm q-px-sm tw-h-[calc(100vh - 42px)]">
-    <div class="flex items-center tw-pl-3">
-      <div class="text-h6" v-if="pipelineObj.isEditPipeline == true">
-        {{ pipelineObj.currentSelectedPipeline.name }}
-      </div>
-      <div class="text-h6" v-if="pipelineObj.isEditPipeline == false">
-        <q-input
-          v-model="pipelineObj.currentSelectedPipeline.name"
-          :label="t('pipeline.pipelineName')"
-          filled
-          dense
-          class="tw-w-[300px]"
-        />
-      </div>
-    </div>
+  <div class="tw-w-full tw-h-full tw-pr-[0.625rem]">
+    <div class="card-container tw-h-[calc(100vh-50px)]">
+      <div class="flex justify-between items-center q-py-sm q-px-sm">
+        <div class="flex items-center tw-pl-3">
+          <div class="text-h6" v-if="pipelineObj.isEditPipeline == true">
+            {{ pipelineObj.currentSelectedPipeline.name }}
+          </div>
+          <div class="text-h6" v-if="pipelineObj.isEditPipeline == false">
+            <q-input
+              v-model="pipelineObj.currentSelectedPipeline.name"
+              :label="t('pipeline.pipelineName')"
+              filled
+              dense
+              class="tw-w-[300px]"
+            />
+          </div>
+        </div>
 
-    <div class="flex justify-end">
-      <!-- this is normal secondary button but only icon is there without label -->
-        <q-btn
-          class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw-h-[36px] o2-secondary-button tw-min-w-0"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          no-caps
-          flat
-          icon="code"
-          data-test="pipeline-json-edit-btn"
-          @click="openJsonEditor"
+        <div class="flex justify-end">
+          <!-- this is normal secondary button but only icon is there without label -->
+            <q-btn
+              class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw-h-[36px] o2-secondary-button tw-min-w-0"
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              no-caps
+              flat
+              icon="code"
+              data-test="pipeline-json-edit-btn"
+              @click="openJsonEditor"
+            >
+                  <q-tooltip>Edit Pipeline Json</q-tooltip>
+                </q-btn>
+          <q-btn
+            data-test="add-pipeline-cancel-btn"
+            label="Cancel"
+            flat
+            class="q-ml-md o2-secondary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            no-caps
+            @click="openCancelDialog"
+          />
+
+          <q-btn
+            data-test="add-pipeline-save-btn"
+            label="Save"
+            class="q-ml-md o2-primary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            no-caps
+            flat
+            :loading="isPipelineSaving"
+            :disable="isPipelineSaving"
+            @click="savePipeline"
+          />
+        </div>
+      </div>
+
+      <q-separator class="q-mb-sm q-px-sm" />
+
+      <div class="flex q-mt-md q-px-sm">
+        <div class="nodes-drag-container q-pr-md">
+          <div
+            data-test="pipeline-editor-nodes-list-title"
+            class="nodes-header q-mb-sm q-mx-sm"
+          >
+            {{ t("pipeline.nodes") }}
+          </div>
+
+
+          <div class="flex q-mt-sm">
+            <NodeSidebar
+              v-show="
+                !pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'
+              "
+              :nodeTypes="nodeTypes"
+            />
+          </div>
+        </div>
+        <div
+          id="pipelineChartContainer"
+          ref="chartContainerRef"
+          class="relative-position pipeline-chart-container o2vf_node"
+          :class="store.state.theme === 'dark' ? '' : 'bg-grey-2'"
+          v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
         >
-              <q-tooltip>Edit Pipeline Json</q-tooltip>
-            </q-btn>
-      <q-btn
-        data-test="add-pipeline-cancel-btn"
-        label="Cancel"
-        flat
-        class="q-ml-md o2-secondary-button tw-h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-        no-caps
-        @click="openCancelDialog"
-      />
-
-      <q-btn
-        data-test="add-pipeline-save-btn"
-        label="Save"
-        class="q-ml-md o2-primary-button tw-h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        no-caps
-        flat
-        :loading="isPipelineSaving"
-        :disable="isPipelineSaving"
-        @click="savePipeline"
-      />
-    </div>
-  </div>
-
-  <q-separator class="q-mb-sm q-px-sm" />
-
-  <div class="flex q-mt-md q-px-sm">
-    <div class="nodes-drag-container q-pr-md">
-      <div
-        data-test="pipeline-editor-nodes-list-title"
-        class="nodes-header q-mb-sm q-mx-sm"
-      >
-        {{ t("pipeline.nodes") }}
-      </div>
-
-
-      <div class="flex q-mt-sm">
-        <NodeSidebar
-          v-show="
-            !pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'
-          "
-          :nodeTypes="nodeTypes"
-        />
+          <PipelineFlow />
+        </div>
       </div>
     </div>
-    <div
-      id="pipelineChartContainer"
-      ref="chartContainerRef"
-      class="relative-position pipeline-chart-container o2vf_node"
-      :class="store.state.theme === 'dark' ? '' : 'bg-grey-2'"
-      v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
-    >
-      <PipelineFlow />
-    </div>
   </div>
-
   <q-dialog
     v-model="pipelineObj.dialog.show"
     full-width
