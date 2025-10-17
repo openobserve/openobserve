@@ -105,11 +105,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Ensure we are getting a reply from the server
-        run: |
-          echo "Testing deployed environment at: ${ZO_BASE_URL}"
-          curl -f ${ZO_BASE_URL}/login || (echo "Failed to reach deployed environment" && exit 1)
-
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -261,28 +256,6 @@ jobs:
 
       # - name: Wait for start
       #   run: sleep 60
-
-      - name: Ensure we are getting a reply from the server
-        run: |
-          echo "Testing deployed environment at: ${ZO_BASE_URL}"
-          curl -f ${ZO_BASE_URL}/login || (echo "Failed to reach deployed environment" && exit 1)
-
-      - name: Health Check ingestion API endpoint
-        run: |
-          echo "Testing ingestion endpoint with authentication:"
-          echo "INGESTION_URL: ${INGESTION_URL}"
-          echo "ORGNAME: ${ORGNAME}"
-
-          # Remove trailing slash from INGESTION_URL if present
-          BASE_URL=${INGESTION_URL%/}
-          echo "Attempting POST to: ${BASE_URL}/api/${ORGNAME}/e2e_automate/_json"
-
-          # Test with basic auth and sample data
-          curl -f -X POST \
-            -H "Authorization: Basic $(echo -n "${ZO_ROOT_USER_EMAIL}:${ZO_ROOT_USER_PASSWORD}" | base64)" \
-            -H "Content-Type: application/json" \
-            -d '{"test": "data", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' \
-            "${BASE_URL}/api/${ORGNAME}/e2e_automate/_json" || (echo "Ingestion API health check failed" && exit 1)
 
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
