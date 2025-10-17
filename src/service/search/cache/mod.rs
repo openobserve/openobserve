@@ -327,7 +327,7 @@ pub async fn search(
     if is_aggregate
         && res.histogram_interval.is_none()
         && !c_resp.ts_column.is_empty()
-        && c_resp.histogram_interval > -1
+        && c_resp.histogram_interval > 0
     {
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
