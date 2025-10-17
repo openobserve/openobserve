@@ -239,6 +239,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import regexPatternsService from "@/services/regex_pattern";
+import { RegexPatternCache } from "@/utils/regexPatternCache";
 
 interface PatternExample {
   Valid: string[];
@@ -311,17 +312,51 @@ export default defineComponent({
     const selectedCount = computed(() => selectedPatterns.value.length);
 
     // Methods
-    const fetchPatterns = async (forceRefresh = false) => {
+    const fetchPatterns = async (clearCache = false) => {
       loading.value = true;
       error.value = "";
 
       try {
-        const response = await regexPatternsService.getBuiltInPatterns(
-          store.state.selectedOrganization.identifier,
-          { force_refresh: forceRefresh }
-        );
+        const orgId = store.state.selectedOrganization.identifier;
 
-        patterns.value = response.data.patterns.map((p: BuiltInPattern) => ({
+        // Clear cache if requested (manual refresh)
+        if (clearCache) {
+          RegexPatternCache.clear(orgId);
+          console.log('[BuiltInPatternsTab] Cleared frontend cache, fetching fresh data');
+        }
+
+        // Check frontend cache first unless cleared
+        if (!clearCache) {
+          const cachedPatterns = RegexPatternCache.get<BuiltInPattern[]>(orgId);
+          if (cachedPatterns) {
+            patterns.value = cachedPatterns.map((p: BuiltInPattern) => ({
+              ...p,
+              selected: false,
+            }));
+
+            console.log(`[BuiltInPatternsTab] Loaded ${patterns.value.length} patterns from frontend cache`);
+
+            q.notify({
+              message: t('regex_patterns.patterns_loaded', { count: patterns.value.length }),
+              color: "positive",
+              position: "bottom",
+              timeout: 2000,
+            });
+            loading.value = false;
+            return;
+          }
+        }
+
+        // Fetch from backend (no backend caching)
+        const response = await regexPatternsService.getBuiltInPatterns(orgId);
+
+        const fetchedPatterns = response.data.patterns;
+
+        // Cache the fetched patterns in frontend
+        RegexPatternCache.set(orgId, fetchedPatterns);
+        console.log(`[BuiltInPatternsTab] Cached ${fetchedPatterns.length} patterns in frontend`);
+
+        patterns.value = fetchedPatterns.map((p: BuiltInPattern) => ({
           ...p,
           selected: false,
         }));

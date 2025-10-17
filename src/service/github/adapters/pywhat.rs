@@ -140,6 +140,32 @@ impl PyWhatAdapter {
         Ok(transformed)
     }
 
+    /// Fetch and transform patterns without backend caching
+    /// Used for frontend-only caching flow
+    pub async fn fetch_built_in_patterns_no_cache(
+        github_service: &crate::service::github::GitHubDataService,
+    ) -> Result<Vec<BuiltInPatternResponse>, GitHubError> {
+        let config = config::get_config();
+        let url = &config.common.regex_patterns_source_url;
+
+        log::info!(
+            "Fetching regex patterns without backend cache from: {}",
+            url
+        );
+
+        // Fetch raw data without caching
+        let data = github_service.fetch_raw(url).await?;
+
+        // Parse JSON
+        let patterns: Vec<GenericPattern> =
+            serde_json::from_slice(&data).map_err(|e| GitHubError::ParseError(e.to_string()))?;
+
+        log::info!("Successfully fetched {} patterns", patterns.len());
+
+        let transformed = patterns.into_iter().map(|p| p.into()).collect();
+        Ok(transformed)
+    }
+
     /// Filter patterns by search query
     pub fn filter_by_search(
         patterns: Vec<BuiltInPatternResponse>,

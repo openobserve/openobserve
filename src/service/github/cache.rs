@@ -117,14 +117,6 @@ pub struct CacheStats {
 
 /// Generate a cache key from URL
 pub fn generate_cache_key(url: &str) -> String {
-    use std::{
-        collections::hash_map::DefaultHasher,
-        hash::{Hash, Hasher},
-    };
-
-    let mut hasher = DefaultHasher::new();
-    url.hash(&mut hasher);
-    let hash = hasher.finish();
-
-    format!("github:data:{hash:x}")
+    // Use URL directly as cache key - simpler and more debuggable
+    url.to_string()
 }

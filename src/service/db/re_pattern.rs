@@ -19,7 +19,7 @@ use config::meta::stream::{PatternAssociation, StreamType, UpdateSettingsWrapper
 use infra::{
     coordinator::get_coordinator,
     db::Event,
-    errors::{self, DbError},
+    errors,
     table::{
         re_pattern::PatternEntry,
         re_pattern_stream_map::{ApplyPolicy, PatternAssociationEntry, PatternPolicy},
@@ -33,43 +33,11 @@ pub const RE_PATTERN_PREFIX: &str = "/re_patterns/";
 pub const RE_PATTERN_ASSOCIATIONS_PREFIX: &str = "/re_pattern_associations/";
 
 pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
-    let mut pattern_entry = entry.clone();
-    let mut attempt = 0;
-    const MAX_ATTEMPTS: i32 = 100;
-
-    loop {
-        match infra::table::re_pattern::add(pattern_entry.clone()).await {
-            Ok(_) => break,
-            Err(errors::Error::DbError(DbError::UniqueViolation)) => {
-                // Duplicate name detected - generate a new name with suffix
-                attempt += 1;
-                if attempt >= MAX_ATTEMPTS {
-                    return Err(anyhow::anyhow!(
-                        "Failed to create pattern with unique name after {} attempts",
-                        MAX_ATTEMPTS
-                    ));
-                }
-
-                // Generate new name: "Pattern Name (2)", "Pattern Name (3)", etc.
-                pattern_entry.name = if attempt == 1 {
-                    format!("{} ({})", entry.name, attempt + 1)
-                } else {
-                    // Replace the suffix
-                    format!("{} ({})", entry.name, attempt + 1)
-                };
-
-                log::info!(
-                    "Pattern name '{}' already exists in org '{}', trying with name '{}'",
-                    entry.name,
-                    entry.org,
-                    pattern_entry.name
-                );
-                continue;
-            }
-            Err(e) => {
-                log::error!("error while saving pattern to db : {e}");
-                return Err(anyhow::anyhow!(e));
-            }
+    match infra::table::re_pattern::add(entry.clone()).await {
+        Ok(_) => {}
+        Err(e) => {
+            log::error!("error while saving pattern to db : {e}");
+            return Err(anyhow::anyhow!(e));
         }
     }
 
@@ -77,7 +45,7 @@ pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
     let cluster_coordinator = get_coordinator().await;
     cluster_coordinator
         .put(
-            &format!("{RE_PATTERN_PREFIX}{}", pattern_entry.id),
+            &format!("{RE_PATTERN_PREFIX}{}", entry.id),
             bytes::Bytes::new(), // no actual data, the receiver can query the db
             true,
             None,
@@ -88,29 +56,26 @@ pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
     {
         let config = o2_enterprise::enterprise::common::config::get_config();
         if config.super_cluster.enabled {
-            match o2_enterprise::enterprise::super_cluster::queue::patterns_put(
-                pattern_entry.clone(),
-            )
-            .await
+            match o2_enterprise::enterprise::super_cluster::queue::patterns_put(entry.clone()).await
             {
                 Ok(_) => {
                     log::info!(
                         "successfully sent pattern add notification to super cluster queue for {}/{}",
-                        pattern_entry.org,
-                        pattern_entry.name
+                        entry.org,
+                        entry.name
                     );
                 }
                 Err(e) => {
                     log::error!(
                         "error in sending pattern add notification to super cluster queue for {}/{} : {e}",
-                        pattern_entry.org,
-                        pattern_entry.name
+                        entry.org,
+                        entry.name
                     );
                 }
             }
         }
     }
-    Ok(pattern_entry)
+    Ok(entry)
 }
 
 pub async fn update(id: &str, new_pattern: &str) -> Result<(), errors::Error> {
