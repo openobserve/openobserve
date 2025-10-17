@@ -192,7 +192,7 @@ pub async fn check_cache(
         is_descending,
         ..Default::default()
     };
-    if histogram_interval > -1 {
+    if histogram_interval > 0 {
         multi_resp.histogram_interval = histogram_interval / 1000 / 1000;
     }
     log::info!(
