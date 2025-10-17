@@ -361,11 +361,6 @@ body {
   }
 }
 
-.monaco-editor {
-  outline-width: 0px;
-  outline-style: none;
-}
-
 .o2-container-navbarheight {
   height: calc(100vh - 42px);
   overflow: auto;
@@ -1082,7 +1077,7 @@ body {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 32px;
+  min-height: 30px;
 }
 
 .o2-toggle-button-xs-light{
@@ -1362,3 +1357,31 @@ body {
   box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
   padding: 1rem 1.5rem;
 }
+
+
+//============================================================================
+//   Monaco Editor Styling Start
+//============================================================================ 
+
+   .monaco-editor {
+    outline-width: 0px;
+    outline-style: none;
+  }
+
+  .empty-query .monaco-editor-background {
+    background-image: url("../assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
+  }
+
+  .empty-function .monaco-editor-background {
+    background-image: url("../../assets/images/common/vrl-function.png");
+    background-repeat: no-repeat;
+    background-size: 170px;
+  }
+
+  
+//============================================================================
+//     Monaco Editor Styling End
+//============================================================================ 
+  

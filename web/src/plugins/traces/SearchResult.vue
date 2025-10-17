@@ -96,8 +96,8 @@ color="primary" size="md" /> No traces found. Please
         class="traces-table-container"
         :class="
           searchObj.meta.showHistogram
-            ? 'tw-h-[calc(100vh-28.375rem)]'
-            : 'tw-h-[calc(100vh-13.125rem)]'
+            ? 'tw-h-[calc(100vh-29.375rem)]'
+            : 'tw-h-[calc(100vh-14.375rem)]'
         "
         v-slot="{ item, index }"
         :virtual-scroll-item-size="25"
