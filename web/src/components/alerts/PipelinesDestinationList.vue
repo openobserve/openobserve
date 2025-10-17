@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit">
     <div v-if="!showDestinationEditor" >
       <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
-      :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
       >
         <div class="q-table__title tw-font-[600]" data-test="alert-destinations-list-title">
             {{ t("pipeline_destinations.header") }}
@@ -30,16 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               class="q-ml-auto no-border o2-search-input"
               :placeholder="t('pipeline_destinations.search')"
-              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
           <q-btn
             data-test="pipeline-destination-list-add-btn"
             class="o2-primary-button q-ml-md tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             no-caps
             flat
             :label="t(`alert_destinations.add`)"
@@ -56,9 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pagination="pagination"
         class="o2-quasar-table o2-quasar-table-header-sticky o2-last-row-border"
         :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;'
+            ? 'width: 100%; height: calc(100vh - 180px); overflow-y: auto;'
             : 'width: 100%'"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light'"
       >
         <template #no-data>
           <template>

@@ -1,9 +1,7 @@
 <template>
     <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
-    :class="store.state.theme === 'dark' ? 'dark-theme-list' : 'light-theme-list'"
     >
     <div v-if="!showImportRegexPatternDialog" class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
-      :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
     >
       <div class="q-table__title tw-font-[600]" data-test="regex-pattern-list-title">
             {{ t("regex_patterns.title") }}
@@ -14,15 +12,13 @@
                 dense
                 class="q-ml-auto no-border o2-search-input"
                 :placeholder="t('regex_patterns.search')"
-                :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
               >
                 <template #prepend>
-                  <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                  <q-icon class="o2-search-input-icon"  name="search" />
                 </template>
               </q-input>
           <q-btn
             class="o2-secondary-button q-ml-md tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
             flat
             :label="t(`regex_patterns.import`)"
@@ -32,7 +28,6 @@
           <q-btn
             data-test="regex-pattern-list-add-pattern-btn"
             class="o2-primary-button q-ml-md tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             no-caps
             flat
             :label="t(`regex_patterns.create_pattern`)"
@@ -49,9 +44,8 @@
           :pagination="pagination"
           class="o2-quasar-table o2-quasar-table-header-sticky"
           :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;' 
+            ? 'width: 100%; height: calc(100vh - 180px); overflow-y: auto;' 
             : 'width: 100%'"
-          :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border'"
         >
         <template #no-data>
           <div v-if="!listLoading && filterQuery == ''" class="full-width column flex-center q-mt-xs full-height" style="font-size: 1.5rem">
