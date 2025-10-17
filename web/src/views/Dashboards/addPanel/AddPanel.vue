@@ -34,8 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="dashboardPanelData.data.title"
             :label="t('panel.name') + '*'"
             class="q-ml-xl dynamic-input"
-            filled
             dense
+            borderless
             :style="inputStyle"
           />
         </div>
