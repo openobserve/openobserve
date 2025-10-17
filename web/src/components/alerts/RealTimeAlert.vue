@@ -19,7 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
     <!-- first section -->
-    <div class="tw-w-full tw-mt-2">
+     <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
+          <div class="flex tw-justify-center tw-items-center card-container">
       <div class="tw-w-full tw-ml-2"> 
         <AlertsContainer 
           name="Alert Settings"
@@ -33,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       </div>
 
-      <div v-if="expandState.thresholds" class= " tw-w-full row alert-setup-container " style=" margin-left: 8px;">
+      <div v-if="expandState.thresholds" class= " tw-w-full row alert-setup-container o2-alert-tab-border tw-px-4 tw-pt-2 tw-pb-3 " style=" margin-left: 8px;">
 
       <div>
       <div class="col-12 flex justify-start items-center q-mt-xs">
@@ -216,26 +217,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     </div>
   </div>
+     </div>
+        <!-- second section -->
 
-   <!-- second section -->
-   <div class="tw-w-full tw-mt-2">
-    <div class="tw-w-full tw-ml-2"> 
-        <AlertsContainer 
-            name="query"
-            v-model:is-expanded="expandState.realTimeMode"
-            label="Conditions"
-            :image="conditionsImage"
-            subLabel="What should trigger the alert."
-             class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
-             :iconClass="'tw-mt-[2px]'"
-            @update:is-expanded="()=>emits('update:expandState', expandState)"
-          />
-    </div>
-    <div v-if="expandState.realTimeMode" class=" tw-w-full row alert-setup-container " style=" margin-left: 8px;">
+      <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
+          <div class="flex tw-justify-center tw-items-center card-container ">
+          <div class="tw-w-full tw-ml-2"> 
+              <AlertsContainer 
+                  name="query"
+                  v-model:is-expanded="expandState.realTimeMode"
+                  label="Conditions"
+                  :image="conditionsImage"
+                  subLabel="What should trigger the alert."
+                  class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
+                  :iconClass="'tw-mt-[2px]'"
+                  @update:is-expanded="()=>emits('update:expandState', expandState)"
+                />
+          </div>
+          <div v-if="expandState.realTimeMode" class=" tw-w-full row alert-setup-containero2-alert-tab-border tw-px-4 tw-pt-2 tw-pb-3 ">
 
-      <FilterGroup :stream-fields="columns" :group="inputData" :depth="0" @add-condition="updateGroup" @add-group="updateGroup" @remove-group="removeConditionGroup" @input:update="(name, field) => emits('input:update', name, field)" />
+            <FilterGroup :stream-fields="columns" :group="inputData" :depth="0" @add-condition="updateGroup" @add-group="updateGroup" @remove-group="removeConditionGroup" @input:update="(name, field) => emits('input:update', name, field)" />
+            </div>
+        </div>
       </div>
-  </div>
+
   </div>
 </template>
 
