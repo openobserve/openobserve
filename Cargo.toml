@@ -60,6 +60,7 @@ actix-web-rust-embed-responder = { version = "2.2", default-features = false, fe
 actix-tls.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
+arc-swap.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
@@ -188,6 +189,7 @@ tokio-rustls.workspace = true
 roaring.workspace = true
 flight.workspace = true
 async-stream.workspace = true
+scc = { version = "3.1.2", features = ["equivalent"] }
 
 [dev-dependencies]
 async-walkdir.workspace = true
