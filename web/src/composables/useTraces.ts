@@ -83,6 +83,7 @@ const defaultObject = {
       { panelTitle: string; start: number; end: number }
     >(),
     showErrorOnly: false,
+    queryEditorPlaceholderFlag: true,
   },
   data: {
     query: "",

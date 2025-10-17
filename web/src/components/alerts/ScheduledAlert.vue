@@ -899,8 +899,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-flex lg:tw-flex-col  tw-items-start tw-gap-2">
               <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
                 Cycle
-                <span class="tw-cursor-pointer"> <q-icon :name="outlinedInfo" size="17px" class="q-ml-xs cursor-pointer" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
-                  <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px;">
+                <span class="tw-cursor-pointer"> <q-icon :name="outlinedInfo"
+size="17px"
+class="q-ml-xs cursor-pointer"
+:class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
+                  <q-tooltip anchor="center right"
+self="center left"
+max-width="300px"
+style="font-size: 12px;">
                     Compare results with the same time in the previous cycle.
                   </q-tooltip> 
                   </q-icon>
@@ -913,8 +919,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                 </div>
                 <div>
-                  <q-btn class="tw-rounded-full" flat dense icon="edit_outline" size="16px" @click="editCurrentWindow">
-                    <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px;">
+                  <q-btn class="tw-rounded-full"
+flat
+dense
+icon="edit_outline"
+size="16px"
+@click="editCurrentWindow">
+                    <q-tooltip anchor="center right"
+self="center left"
+max-width="300px"
+style="font-size: 12px;">
                       Edit Period and Frequency.
                     </q-tooltip>
                   </q-btn>
@@ -940,8 +954,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw-flex tw-items-center">
                   <span class="tw-mr-1"><q-icon name="schedule" size="16px" /></span>
                   Time Frame 
-                  <span class="tw-ml-2 tw-cursor-pointer"> <q-icon :name="outlinedInfo" size="17px" class="q-ml-xs cursor-pointer" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
-                    <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px;">
+                  <span class="tw-ml-2 tw-cursor-pointer"> <q-icon :name="outlinedInfo"
+size="17px"
+class="q-ml-xs cursor-pointer"
+:class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
+                    <q-tooltip anchor="center right"
+self="center left"
+max-width="300px"
+style="font-size: 12px;">
                       Time range for your query.
                     </q-tooltip>
                     </q-icon>
@@ -958,8 +978,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw-flex lg:tw-flex-col tw-items-start tw-gap-2">
                 <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
                     Cycle
-                    <span class="tw-cursor-pointer"> <q-icon :name="outlinedInfo" size="17px" class="q-ml-xs cursor-pointer" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
-                      <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px;">
+                    <span class="tw-cursor-pointer"> <q-icon :name="outlinedInfo"
+size="17px"
+class="q-ml-xs cursor-pointer"
+:class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
+                      <q-tooltip anchor="center right"
+self="center left"
+max-width="300px"
+style="font-size: 12px;">
                       Compare results with the same time in the previous cycle.
                     </q-tooltip>
                     </q-icon>
@@ -1001,7 +1027,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-caps
           @click="addTimeShift"
         >
-          <q-icon :class="store.state.theme === 'dark' ? 'tw-text-white  tw-font-bold q-ml-sm' : 'tw-text-black tw-font-bold q-ml-sm'" name="add" size="20px" />
+          <q-icon :class="store.state.theme === 'dark' ? 'tw-text-white  tw-font-bold q-ml-sm' : 'tw-text-black tw-font-bold q-ml-sm'"
+name="add"
+size="20px" />
         </q-btn>
       </div>
       </div>
@@ -1025,11 +1053,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:is-expanded="()=>emits('update:expandState', expandState)"
         />
     </div>
-    <div v-if="expandState.queryMode" class="  tw-w-full row alert-setup-container " style=" margin-left: 8px;">
+    <div v-if="expandState.queryMode"
+class="  tw-w-full row alert-setup-container "
+style=" margin-left: 8px;">
 
       <!-- query mode section -->
       <div class="tw-w-full" style="">
-        <div v-if="!disableQueryTypeSelection" class="scheduled-alert-tabs q-my-md"
+        <div v-if="!disableQueryTypeSelection"
+class="scheduled-alert-tabs q-my-md"
         :style="{
           width: alertData.stream_type === 'metrics' ? '400px' : '200px'
         }"
@@ -1051,7 +1082,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="custom"
             :label="t('alerts.quick')"
             >
-            <q-tooltip max-width="200px" style="font-size: 12px;" v-if="dateTimePicker.length > 0">
+            <q-tooltip max-width="200px"
+style="font-size: 12px;"
+v-if="dateTimePicker.length > 0">
               Quick mode is disabled when comparision window is added.
             </q-tooltip>
           </q-tab>
@@ -1069,8 +1102,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-tabs>
         </div>
-        <template v-if="tab === 'custom'" class='q-pa-none q-ma-none' ">
-          <FilterGroup :stream-fields="columns" :group="inputData " :depth="0" @add-condition="updateGroup" @add-group="updateGroup" @remove-group="removeConditionGroup" @input:update="(name, field) => emits('input:update', name, field)" />
+        <template v-if="tab === 'custom'"
+class='q-pa-none q-ma-none'
+">
+          <FilterGroup :stream-fields="columns"
+:group="inputData "
+:depth="0"
+@add-condition="updateGroup"
+@add-group="updateGroup"
+@remove-group="removeConditionGroup"
+@input:update="(name, field) => emits('input:update', name, field)" />
 
           
 
@@ -1082,7 +1123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-flex tw-items-start">
               <div :class="[
                 store.state.theme === 'dark' ? 'tw-bg-gray-600' : 'tw-bg-gray-200'
-              ]" class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 tw-py-1 tw-mr-2" >
+              ]"
+class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 tw-py-1 tw-mr-2" >
                 <img :src="sqlEditorImage" style="width: 16px; height: 16px;" />
 
               </div>
@@ -1220,7 +1262,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <img :style="{
                             width: '16px',
                             height: '16px',
-                          }" :src="getBtnO2Logo" />
+                          }"
+:src="getBtnO2Logo" />
                           <span  
                           class=" tw-font-[400] tw-pl-[4px] tw-text-[12px] tw-pr-[6px] tw-py-[4px] tw-text-[#7980cc]" 
                           > {{  tab == 'sql' ? 'Generate SQL' : 'Generate PromQL' }} </span>
@@ -1313,7 +1356,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }"
                     />
 
-                    <div style="height: 50px; overflow: auto;" v-show="!!sqlQueryErrorMsg && tab === 'sql'" class="text-negative q-py-sm invalid-sql-error">
+                    <div style="height: 50px; overflow: auto;"
+v-show="!!sqlQueryErrorMsg && tab === 'sql'"
+class="text-negative q-py-sm invalid-sql-error">
                     <span v-show="!!sqlQueryErrorMsg">
                       Error: {{ sqlQueryErrorMsg }}</span
                     >
@@ -1321,7 +1366,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- this is promql editor -->
                     <query-editor
                         v-if="tab === 'promql'"
-                        v data-test="scheduled-alert-promql-editor"
+                        v
+data-test="scheduled-alert-promql-editor"
                         ref="queryEditorRef"
                         editor-id="alerts-query-editor-dialog"
                         class="tw-w-full"
@@ -1360,7 +1406,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <img :style="{
                             width: '16px',
                             height: '16px',
-                          }" :src="getBtnO2Logo" />
+                          }"
+:src="getBtnO2Logo" />
                           <span  
                           class=" tw-font-[400] tw-pl-[4px] tw-text-[12px] tw-pr-[6px] tw-py-[4px] tw-text-[#7980cc]" 
                           >Generate VRL</span>
@@ -1523,7 +1570,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           </div>
 
-          <div v-if="tab !== 'promql'"  class="tw-w-full"
+          <div v-if="tab !== 'promql'"
+class="tw-w-full"
               :class="expandSqlOutput ? 
               expandCombinedOutput ?  'tw-flex-1 tw-h-[calc(50%-24px)]' : 'tw-flex-1tw-h-[calc(100%-24px)]' 
               : expandCombinedOutput ? 'tw-flex-1 tw-h-[24px]' : 'tw-flex-1 tw-h-[calc(100%-24px)]'"
@@ -2652,19 +2700,6 @@ defineExpose({
   .dark-mode .monaco-editor-add-alert{
     background-color: #18181A !important;
   }
-
-
-  .empty-query .monaco-editor-background {
-    background-image: url("../../assets/images/common/query-editor.png");
-    background-repeat: no-repeat;
-    background-size: 115px;
-  }
-
-  .empty-function .monaco-editor-background {
-    background-image: url("../../assets/images/common/vrl-function.png");
-    background-repeat: no-repeat;
-    background-size: 170px;
-  }
 }
 .scheduled-alerts-dialog {
   .monaco-editor {
@@ -2682,16 +2717,6 @@ defineExpose({
   .rounded-border-btn{
     border-radius: 50% !important;
     padding: 0px 4px !important;
-  }
-
-  .empty-query .monaco-editor-background {
-    background-image: url("../../assets/images/common/query-editor.png");
-    background-repeat: no-repeat;
-  }
-
-  .empty-function .monaco-editor-background {
-    background-image: url("../../assets/images/common/vrl-function.png");
-    background-repeat: no-repeat;
   }
 }
 

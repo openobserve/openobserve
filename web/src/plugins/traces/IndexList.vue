@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column index-menu tw-p-[0.25rem]">
+  <div class="column index-menu !tw-p-[0.375rem]">
     <q-select
       data-test="log-search-index-list-select-stream"
       v-model="searchObj.data.stream.selectedStream"
@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       use-input
       hide-selected
       fill-input
+      class="tw-mb-[0.375rem]"
       @filter="filterStreamFn"
       @update:model-value="onStreamChange"
     >
@@ -43,7 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-item>
       </template>
     </q-select>
-    <div class="index-table q-mt-xs">
+    <!-- <div
+      class="tw-w-full tw-h-[1px] tw-bg-[var(--o2-border-color)] tw-mb-[0.375rem]"
+    ></div> -->
+    <div class="index-table">
       <q-table
         data-test="log-search-index-list-fields-table"
         v-model="searchObj.data.stream.selectedFields"
@@ -56,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hide-header
         hide-bottom
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-        class="traces-field-table"
+        class="tw-w-full tw-h-[calc(100vh-13rem)]"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
@@ -109,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #top-right>
           <q-input
+            v-show="searchObj.data.stream?.selectedStream?.value"
             data-test="log-search-index-list-field-search-input"
             v-model="searchObj.data.stream.filterField"
             data-cy="index-field-search-input"
@@ -118,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
+            class="tw-p-0 tw-pb-[0.375rem]"
           >
             <template #prepend>
               <q-icon name="search" />
@@ -127,8 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="searchObj.loadingStream"
             class="tw-flex tw-items-center tw-justify-center tw-w-full tw-pt-[2rem]"
           >
-            <q-td colspan="100%"
-class="text-bold" style="opacity: 0.7">
+            <q-td colspan="100%" class="text-bold"
+style="opacity: 0.7">
               <div
                 class="text-subtitle2 text-weight-bold tw-w-fit tw-mx-auto tw-my-0 tw-flex-col tw-justify-items-center"
               >
@@ -259,9 +265,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.traces-field-table {
-  height: calc(100vh - 184px) !important;
-}
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
@@ -321,9 +324,6 @@ export default defineComponent({
     .q-table__top {
       border-bottom: unset;
     }
-  }
-  .traces-field-table {
-    width: 100%;
   }
 
   .field_list {
