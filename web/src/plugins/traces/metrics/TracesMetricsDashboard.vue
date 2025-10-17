@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="traces-metrics-dashboard tw-pt-2 tw-px-1">
+  <div class="traces-metrics-dashboard tw-w-full tw-pt-2 tw-px-1">
     <!-- Filters Section -->
     <div
       v-if="show"
@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="filters-label tw-text-sm tw-font-semibold">Filters:</span>
       <!-- Error Only Toggle -->
       <div
-        style="border: 1px solid #c4c4c4; border-radius: 5px"
-        class="q-pr-xs q-pl-xs tw-flex tw-items-center tw-justify-center"
+        class="tw-flex tw-items-center tw-justify-center tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-rounded-[0.375rem]"
       >
         <q-toggle
           v-model="showErrorOnly"
@@ -37,11 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? 'o2-toggle-button-xs-dark'
               : 'o2-toggle-button-xs-light'
           "
-          @update:model-value="onFilterChange"
           data-test="error-only-toggle"
         />
-        <q-icon name="error" size="18px"
-class="tw-mx-1" />
+        <q-icon name="error" size="1.1rem"
+class="tw-mx-1 tw-text-red-500" />
         <q-tooltip>Show Error Only</q-tooltip>
       </div>
 
@@ -49,7 +47,7 @@ class="tw-mx-1" />
       <div
         v-for="[panelId, filter] in rangeFilters"
         :key="panelId"
-        class="filter-chip"
+        class="filter-chip tw-h-[2rem] tw-px-[0.375rem]"
         data-test="range-filter-chip"
       >
         <span class="chip-label"
@@ -76,7 +74,7 @@ class="tw-mx-1" />
         </span>
         <q-icon
           name="close"
-          size="14px"
+          size="0.87rem"
           class="chip-close-icon"
           @click="removeRangeFilter(panelId)"
         />
@@ -419,11 +417,6 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-.traces-metrics-dashboard {
-  width: 100%;
-  border-radius: 4px;
-  background: var(--q-card-background, #fff);
-}
 // Filters label
 .filters-label {
   color: #333;
@@ -435,13 +428,11 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  background-color: #e3f2fd;
-  border: 1px solid #90caf9;
-  border-radius: 16px;
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
   font-size: 0.75rem;
   font-weight: 500;
-  color: #1976d2;
+  color: var(--o2-theme-color);
 
   .chip-label {
     user-select: none;

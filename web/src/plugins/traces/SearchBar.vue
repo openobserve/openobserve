@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row !tw-m-0 tw-p-[0.375rem]">
       <div class="float-right col flex items-center">
         <div
-          class="q-pr-xs tw-flex tw-items-center tw-justify-center tw-border-solid tw-border tw-border-[var(--o2-border-color)] tw-rounded-[0.375rem]"
+          class="q-pr-xs tw-mr-[0.375rem] tw-flex tw-items-center tw-justify-center tw-border-solid tw-border tw-border-[var(--o2-border-color)] tw-rounded-[0.375rem]"
         >
           <q-toggle
             data-test="traces-search-bar-show-metrics-toggle-btn"
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-caps
           size="13px"
           icon="restart_alt"
-          class="tw-flex tw-justify-center tw-items-center tw-w-[2rem] tw-min-h-[2rem] tw-h-[2rem] q-ml-xs tw-rounded-[0.375rem]"
+          class="tw-flex tw-justify-center tw-items-center tw-w-[2rem] tw-min-h-[2rem] tw-h-[2rem] tw-mr-[0.375rem] tw-rounded-[0.375rem]"
           @click="resetFilters"
         >
           <q-tooltip>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div class="float-right col-auto">
-        <div class="float-left">
+        <div class="float-left tw-mr-[0.375rem]">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -78,25 +78,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :queryRangeRestrictionMsg="
               searchObj.data.datetime.queryRangeRestrictionMsg
             "
+            class="tw-h-[2rem]"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
         </div>
-        <div class="search-time q-pl-sm float-left">
+        <div class="search-time tw-mr-[0.375rem] float-left">
           <q-btn
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
             dense
             flat
             :title="t('search.runQuery')"
-            class="search-button bg-secondary"
+            class="search-button bg-secondary tw-min-h-[2rem]"
             @click="searchData"
             :disable="isLoading"
             >{{ t("search.runQuery") }}</q-btn
           >
         </div>
         <q-btn
-          class="q-mr-sm float-left download-logs-btn q-pa-sm"
+          class="tw-mr-[0.375rem] float-left download-logs-btn q-pa-sm tw-min-h-[2rem]"
           size="sm"
           :disable="!searchObj.data.queryResults?.hits?.length"
           icon="download"
@@ -105,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           data-test="logs-search-bar-share-link-btn"
-          class="q-mr-sm download-logs-btn q-px-sm"
+          class="tw-mr-0 download-logs-btn q-px-sm tw-min-h-[2rem]"
           size="sm"
           icon="share"
           :title="t('search.shareLink')"
@@ -534,7 +535,6 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .search-bar-component {
-  border-bottom: 1px solid #e0e0e0;
   padding-bottom: 1px;
 
   .q-toggle__inner {
@@ -561,7 +561,6 @@ export default defineComponent({
   }
   .search-time {
     // width: 120px;
-    margin-right: 10px;
     .q-btn-group {
       border-radius: 3px;
 
