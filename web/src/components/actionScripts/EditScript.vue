@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="add-action-script-section"
-    class="full-width create-report-page"
+    class="full-width create-report-page tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]"
   >
     <div class="row items-center no-wrap q-mx-md q-my-sm">
       <div class="flex items-center">
