@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="addCipherKeyFormRef"
       @submit="onSubmit"
     >
-    <div style="height: calc(100vh - 218px); overflow: auto">
+    <div style="height: calc(100vh - 234px); overflow: auto">
       <div class="row">
         <div class="col-4 o2-input flex q-mx-md q-mt-md">
           <q-input
@@ -131,7 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-report-step1-continue-btn"
               @click="validateForm(2)"
               class="o2-primary-button tw-h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               flat
               no-caps
               :label="'Continue'"
@@ -153,7 +152,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               @click="step = 1"
               class="o2-secondary-button tw-h-[36px] q-mb-sm"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               :label="t('common.back')"
               no-caps
             />
@@ -161,9 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-step>
       </q-stepper>
     </div>
-      <div class="flex justify-end q-px-md q-py-md full-width "
+      <div class="flex justify-end q-px-md q-py-md full-width card-container"
       style="position: sticky; bottom: 0px; z-index: 2"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
       :style="{
         'box-shadow':
           store.state.theme === 'dark'
@@ -176,7 +173,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('common.cancel')"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="openCancelDialog"
         />
         <q-btn
@@ -189,7 +185,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="submit"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         />
       </div>
     </q-form>

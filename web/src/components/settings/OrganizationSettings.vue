@@ -71,7 +71,6 @@
         stack-label
         class="q-mt-sm o2-toggle-button-lg tw-mr-3 -tw-ml-4"
         size="lg"
-        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
       >
       </q-toggle>
     </div>
@@ -84,7 +83,6 @@
         :label="t('alerts.cancel')"
         no-caps
         flat
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         @click="$emit('cancel:hideform')"
       />
       <q-btn
@@ -94,7 +92,6 @@
         type="submit"
         no-caps
         flat
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         @click="saveOrgSettings"
       />
     </div>
