@@ -60,7 +60,6 @@
             borderless
             dense
             style="width: 100%"
-            outlined
             class="q-py-sm showLabelOnTop"
             stack-label
             emit-value
@@ -75,6 +74,7 @@
             stack-label
             filled
             dense
+            borderless
             label-slot
             style="width: 100%"
             :data-test="`dashboard-config-markline-name-${index}`"
@@ -90,6 +90,7 @@
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop"
+            borderless
             stack-label
             filled
             dense

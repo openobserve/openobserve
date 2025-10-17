@@ -5,6 +5,7 @@
     dense
     options-dense
     filled
+    borderless
     :options="filterOptions"
     @update:model-value="emitLogicalOperatorChange"
     class="condition-logical-operator"
