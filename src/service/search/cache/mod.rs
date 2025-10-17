@@ -806,7 +806,10 @@ pub async fn write_results(
     let mut accept_start_time = req_query_start_time;
     let mut accept_end_time = req_query_end_time;
     let mut need_adjust_end_time = false;
-    if is_aggregate && let Some(interval) = res.histogram_interval {
+    if is_aggregate
+        && let Some(interval) = res.histogram_interval
+        && interval > 0
+    {
         let interval = interval * 1000 * 1000; // convert to microseconds
         // next interval of start_time
         if (accept_start_time % interval) != 0 {
@@ -859,6 +862,7 @@ pub async fn write_results(
     if need_adjust_end_time
         && is_aggregate
         && let Some(interval) = res.histogram_interval
+        && interval > 0
     {
         accept_end_time += interval * 1000 * 1000;
     }
