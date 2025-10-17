@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'splitter-section-collapse-btn--hidden',
                     ]"
                     @click="collapseFieldList"
-                  ></q-btn>
+                  />
                 </div>
               </template>
               <template #after>
@@ -332,8 +332,8 @@ size="md" />
             <div
               class="search-history-empty__info q-mt-sm flex items-center justify-center"
             >
-              <q-icon name="info"
-class="q-mr-xs" size="20px" />
+              <q-icon name="info" class="q-mr-xs"
+size="20px" />
               <span class="text-h6 text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
                 reporting.</span
