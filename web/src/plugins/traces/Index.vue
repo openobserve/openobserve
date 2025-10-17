@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage" id="tracePage"
-style="min-height: auto">
+  <q-page class="tracePage"
+id="tracePage" style="min-height: auto">
     <div id="tracesSecondLevel">
       <div class="tw-min-h-[82px] tw-px-[0.625rem] tw-pb-[0.625rem]">
         <search-bar
@@ -33,7 +33,7 @@ style="min-height: auto">
       </div>
       <div
         id="tracesThirdLevel"
-        class="traces-search-result-container tw-w-full"
+        class="traces-search-result-container relative-position"
       >
         <!-- Note: Splitter max-height to be dynamically calculated with JS -->
         <q-splitter
@@ -41,10 +41,12 @@ style="min-height: auto">
           :limits="searchObj.config.splitterLimit"
           style="width: 100%"
           @update:model-value="onSplitterUpdate"
+          class="tw-h-full"
         >
-          <template #before v-if="searchObj.meta.showFields">
+          <template #before>
             <div class="tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
               <index-list
+                v-show="searchObj.meta.showFields"
                 ref="indexListRef"
                 :field-list="searchObj.data.stream.selectedStreamFields"
                 data-test="logs-search-index-list"
@@ -55,16 +57,28 @@ style="min-height: auto">
             </div>
           </template>
           <template #separator>
-            <q-avatar
-              color="primary"
-              text-color="white"
-              size="20px"
+            <q-btn
+              data-test="logs-search-field-list-collapse-btn"
               icon="drag_indicator"
-              style="top: 10px"
+              :title="
+                searchObj.meta.showFields ? 'Collapse Fields' : 'Open Fields'
+              "
+              flat
+              dense
+              :class="[
+                'splitter-section-collapse-btn',
+                searchObj.meta.showFields
+                  ? 'splitter-section-collapse-btn--visible'
+                  : 'splitter-section-collapse-btn--hidden',
+              ]"
+              @click="collapseFieldList"
             />
           </template>
           <template #after>
-            <div class="tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+            <div
+              class="tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]"
+              :class="searchObj.meta.showFields ? '' : 'tw-pl-[0.625rem]'"
+            >
               <div class="card-container tw-h-full">
                 <div
                   v-if="
@@ -115,8 +129,8 @@ style="min-height: auto">
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center tw-mx-[10%] tw-py-[40px] tw-mt-0 tw-text-[20px]"
                   >
-                    <q-icon name="info"
-color="primary" size="md" /> Select a
+                    <q-icon name="info" color="primary"
+size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -131,8 +145,8 @@ color="primary" size="md" /> Select a
                   "
                   class="text-center tw-mx-[10%] tw-py-[40px] tw-text-[20px]"
                 >
-                  <q-icon name="info" color="primary"
-size="md" />
+                  <q-icon name="info"
+color="primary" size="md" />
                   {{ t("search.applySearch") }}
                 </div>
 
@@ -213,6 +227,7 @@ const serviceColorIndex = ref(0);
 const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
 const indexListRef = ref(null);
 const { getStreams, getStream } = useStreams();
+const chartRedrawTimeout = ref(null);
 
 searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
 
@@ -1035,9 +1050,9 @@ function generateHistogramData() {
     layout: layout,
   };
 
-  if (searchResultRef.value?.reDrawChart) {
-    searchResultRef.value.reDrawChart();
-  }
+  // if (searchResultRef.value?.reDrawChart) {
+  //   searchResultRef.value.reDrawChart();
+  // }
 }
 
 async function loadPageData() {
@@ -1092,7 +1107,7 @@ onActivated(() => {
 
   if (router.currentRoute.value.path.indexOf("/traces") > -1) {
     setTimeout(() => {
-      if (searchResultRef.value) searchResultRef.value.reDrawChart();
+      // if (searchResultRef.value) searchResultRef.value?.reDrawChart();
     }, 300);
   }
 });
@@ -1140,7 +1155,7 @@ const refreshTimezone = () => {
   updateGridColumns();
   generateHistogramData();
 
-  searchResultRef.value.reDrawChart();
+  // searchResultRef.value?.reDrawChart();
 };
 
 const restoreFiltersFromQuery = (node: any) => {
@@ -1234,6 +1249,11 @@ const onChangeStream = () => {
   extractFields();
 };
 
+const collapseFieldList = () => {
+  if (searchObj.meta.showFields) searchObj.meta.showFields = false;
+  else searchObj.meta.showFields = true;
+};
+
 const showFields = computed(() => {
   return searchObj.meta.showFields;
 });
@@ -1264,15 +1284,19 @@ const runQuery = computed(() => {
 
 watch(showFields, () => {
   if (searchObj.meta.showHistogram == true && searchObj.meta.sqlMode == false) {
-    setTimeout(() => {
-      if (searchResultRef.value) searchResultRef.value.reDrawChart();
+    // Clear any existing timeout
+    if (chartRedrawTimeout.value) {
+      clearTimeout(chartRedrawTimeout);
+    }
+    chartRedrawTimeout.value = setTimeout(() => {
+      // if (searchResultRef.value) searchResultRef.value?.reDrawChart();
     }, 100);
   }
   if (searchObj.config.splitterModel > 0) {
     searchObj.config.lastSplitterPosition = searchObj.config.splitterModel;
   }
 
-  this.searchObj.config.splitterModel = this.searchObj.meta.showFields
+  searchObj.config.splitterModel = searchObj.meta.showFields
     ? searchObj.config.lastSplitterPosition
     : 0;
 });
@@ -1287,7 +1311,7 @@ watch(showFields, () => {
 
 watch(moveSplitter, () => {
   if (searchObj.meta.showFields == false) {
-    searchObj.meta.showFields = this.searchObj.config.splitterModel > 0;
+    searchObj.meta.showFields = searchObj.config.splitterModel > 0;
   }
 });
 
@@ -1321,7 +1345,7 @@ watch(updateSelectedColumns, () => {
 
 <style lang="scss" scoped>
 .traces-search-result-container {
-  height: calc(100vh - 136px) !important;
+  height: calc(100vh - 144px) !important;
 }
 </style>
 <style lang="scss">

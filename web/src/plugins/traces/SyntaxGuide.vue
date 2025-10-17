@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     dense
     flat
-    class="q-ml-xs q-pa-xs tw-cursor-pointer tw-border tw-border-[var(--o2-border-color)] tw-border-solid !tw-bg-transparent tw-w-[2rem] tw-min-h-[2rem] tw-h-[2rem] tw-rounded-[0.375rem] syntax-guide-button"
+    class="q-pa-xs tw-cursor-pointer tw-border tw-border-[var(--o2-border-color)] tw-border-solid !tw-bg-transparent tw-w-[2rem] tw-min-h-[2rem] tw-h-[2rem] tw-rounded-[0.375rem] syntax-guide-button"
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
     icon="help"
   >
