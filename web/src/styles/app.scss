@@ -644,11 +644,11 @@ body {
     line-height: 1.5rem;
   }
   .o2-tab.active{
-    background-color: var(--o2-primary-btn-bg);
+    background-color: var(--o2-primary-btn-bg) !important;
     color: rgba(255,255,255) !important;
   }
   .o2-tab:hover{
-    background-color: var(--o2-tab-bg);
+    background-color: var(--o2-tab-bg) !important;
   }
   .o2-tab.active:hover{
     background-color: $primary !important;
