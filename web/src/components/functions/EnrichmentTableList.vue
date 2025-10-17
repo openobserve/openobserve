@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-          <div class="card-container">
+          <div class="card-container tw-h-[calc(100vh-130px)]">
             <q-table
               ref="qTable"
               :rows="visibleRows"
