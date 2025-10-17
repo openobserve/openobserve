@@ -92,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('common.nameRequired'),
             ]"
             tabindex="0"
+            hide-bottom-space
           />
         </div>
         <div v-if="isAlerts" class="col-6 row q-py-xs">
@@ -234,7 +235,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="add-destination-skip-tls-verify-toggle"
                 class="o2-toggle-button-lg tw-mr-3 -tw-ml-4"
                 size="lg"
-                :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
                 v-model="formData.skip_tls_verify"
                 :label="t('alert_destinations.skip_tls_verify')"
               />
@@ -291,7 +291,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('alerts.cancel')"
         no-caps
         flat
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         @click="$emit('cancel:hideform')"
       />
       <q-btn
@@ -301,7 +300,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="submit"
         no-caps
         flat
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         @click="saveDestination"
       />
     </div>
