@@ -17,112 +17,114 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-    <div class="folder-header sticky-top" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
-      <div class="text-bold q-px-sm  q-py-sm tw-flex tw-items-center tw-justify-between tw-gap-2">
-         Folders
-         <div>
-          <q-btn
-            class="text-bold o2-secondary-button tw-h-[28px] tw-w-[32px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            no-caps
-            style="min-width: 0px !important; min-height: 0px !important;"
-            flat
-            @click.stop="addFolder"
-            data-test="dashboard-new-folder-btn"
-            title="Add Folder"
-          >
-          <q-icon name="add" size="xs" />
-        </q-btn>
-         </div>
-      </div>
-      <q-separator class="tw-mb-1 tw-mt-[3px]" size="2px"></q-separator>
-      
-      <!-- Search Input -->
-      <div style="width: 100%;" class="flex folder-item q-py-xs">
-        <q-input
-          v-model="searchQuery"   
-          dense
-          borderless
-          data-test="folder-search"
-          placeholder="Search Folder"
-          style="width: 100%;"
-          clearable
-          class="o2-search-input tw-mx-1 q-px-xs"
-          :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
-        >
-          <template #prepend>
-            <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
-          </template>
-        </q-input>
-      </div>
-    </div>
-    <div class="folders-tabs">
-      <q-tabs
-        indicator-color="transparent"
-        inline-label
-        vertical
-        v-model="activeFolderId"
-        data-test="dashboards-folder-tabs"
-    >
-        <q-tab
-        v-for="(tab, index) in filteredTabs"
-        :key="tab.folderId"
-        :name="tab.folderId"
-        content-class="tab_content full-width"
-        class="test-class"
-        :data-test="`dashboard-folder-tab-${tab.folderId}`"
-        >
-        <div class="folder-item full-width row justify-between no-wrap">
-            <span class="folder-name" :title="tab.name">{{
-            tab.name
-            }}</span>
-            <div class="hover-actions">
+  <div class="card-container">
+      <div class="folder-header sticky-top" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
+        <div class="text-bold q-px-sm  q-py-sm tw-flex tw-items-center tw-justify-between tw-gap-2">
+          Folders
+          <div>
             <q-btn
-                v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
-                dense
-                flat
-                no-caps
-                icon="more_vert"
-                style="cursor: pointer; justify-self: end; height: 0.5rem"
-                size="sm"
-                data-test="dashboard-more-icon"
+              class="text-bold o2-secondary-button tw-h-[28px] tw-w-[32px]"
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              no-caps
+              style="min-width: 0px !important; min-height: 0px !important;"
+              flat
+              @click.stop="addFolder"
+              data-test="dashboard-new-folder-btn"
+              title="Add Folder"
             >
-                <q-menu>
-                <q-list dense>
-                    <q-item
-                    v-close-popup
-                    clickable
-                    @click.stop="editFolder(tab.folderId)"
-                    data-test="dashboard-edit-folder-icon"
-                    >
-                    <q-item-section avatar>
-                        <q-icon :name="outlinedEdit" size="xs" />
-                    </q-item-section>
-                    <q-item-section>
-                        <q-item-label>Edit</q-item-label>
-                    </q-item-section>
-                    </q-item>
-                    <q-item
-                    v-close-popup
-                    clickable
-                    @click.stop="showDeleteFolderDialogFn(tab.folderId)"
-                    data-test="dashboard-delete-folder-icon"
-                    >
-                    <q-item-section avatar>
-                        <q-icon :name="outlinedDelete" size="xs" />
-                    </q-item-section>
-                    <q-item-section>
-                        <q-item-label>Delete</q-item-label>
-                    </q-item-section>
-                    </q-item>
-                </q-list>
-                </q-menu>
-            </q-btn>
-            </div>
+            <q-icon name="add" size="xs" />
+          </q-btn>
+          </div>
         </div>
-        <q-separator />
-        </q-tab>
-    </q-tabs>
+        <q-separator class="tw-mb-1 tw-mt-[3px]" size="2px"></q-separator>
+        
+        <!-- Search Input -->
+        <div style="width: 100%;" class="flex folder-item q-py-xs">
+          <q-input
+            v-model="searchQuery"   
+            dense
+            borderless
+            data-test="folder-search"
+            placeholder="Search Folder"
+            style="width: 100%;"
+            clearable
+            class="o2-search-input tw-mx-1 q-px-xs"
+            :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+          >
+            <template #prepend>
+              <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+            </template>
+          </q-input>
+        </div>
+      </div>
+      <div class="folders-tabs">
+        <q-tabs
+          indicator-color="transparent"
+          inline-label
+          vertical
+          v-model="activeFolderId"
+          data-test="dashboards-folder-tabs"
+      >
+          <q-tab
+          v-for="(tab, index) in filteredTabs"
+          :key="tab.folderId"
+          :name="tab.folderId"
+          content-class="tab_content full-width"
+          class="test-class"
+          :data-test="`dashboard-folder-tab-${tab.folderId}`"
+          >
+          <div class="folder-item full-width row justify-between no-wrap">
+              <span class="folder-name" :title="tab.name">{{
+              tab.name
+              }}</span>
+              <div class="hover-actions">
+              <q-btn
+                  v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
+                  dense
+                  flat
+                  no-caps
+                  icon="more_vert"
+                  style="cursor: pointer; justify-self: end; height: 0.5rem"
+                  size="sm"
+                  data-test="dashboard-more-icon"
+              >
+                  <q-menu>
+                  <q-list dense>
+                      <q-item
+                      v-close-popup
+                      clickable
+                      @click.stop="editFolder(tab.folderId)"
+                      data-test="dashboard-edit-folder-icon"
+                      >
+                      <q-item-section avatar>
+                          <q-icon :name="outlinedEdit" size="xs" />
+                      </q-item-section>
+                      <q-item-section>
+                          <q-item-label>Edit</q-item-label>
+                      </q-item-section>
+                      </q-item>
+                      <q-item
+                      v-close-popup
+                      clickable
+                      @click.stop="showDeleteFolderDialogFn(tab.folderId)"
+                      data-test="dashboard-delete-folder-icon"
+                      >
+                      <q-item-section avatar>
+                          <q-icon :name="outlinedDelete" size="xs" />
+                      </q-item-section>
+                      <q-item-section>
+                          <q-item-label>Delete</q-item-label>
+                      </q-item-section>
+                      </q-item>
+                  </q-list>
+                  </q-menu>
+              </q-btn>
+              </div>
+          </div>
+          <q-separator />
+          </q-tab>
+      </q-tabs>
+      </div>
     </div>
       <q-dialog
           v-model="showAddFolderDialog"
