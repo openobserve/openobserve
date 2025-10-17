@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page>
     <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
         <div class="card-container tw-mb-[0.625rem]">
-          <div class="flex items-center justify-between tw-py-3 tw-px-4 tw-h-[71px]">
+          <div class="flex items-center justify-between full-width tw-py-3 tw-px-4 tw-h-[71px]">
             <div class="q-table__title tw-font-[600]" data-test="log-stream-title-text">
               {{ t("logStream.header") }}
             </div>

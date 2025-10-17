@@ -15,28 +15,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="add-functions-section tw-pl-4 tw-py-1 tw-pr-0">
-    <div class="add-function-actions tw-pb-2 tw-pt-1">
-      <FunctionsToolbar
-        v-model:name="formData.name"
-        ref="functionsToolbarRef"
-        :disable-name="beingUpdated"
-        @test="onTestFunction"
-        @save="onSubmit"
-        @back="closeAddFunction"
-        @cancel="cancelAddFunction"
-        @open:chat="openChat"
-        :is-add-function-component="isAddFunctionComponent"
-        class="tw-pr-4"
-      />
-      <q-separator />
+  <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+    <div class="card-container tw-mb-[0.625rem]">
+      <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-pl-4 tw-pr-2 tw-h-[71px]">
+          <FunctionsToolbar
+            v-model:name="formData.name"
+            ref="functionsToolbarRef"
+            :disable-name="beingUpdated"
+            @test="onTestFunction"
+            @save="onSubmit"
+            @back="closeAddFunction"
+            @cancel="cancelAddFunction"
+            @open:chat="openChat"
+            :is-add-function-component="isAddFunctionComponent"
+            class="tw-pr-4"
+          />
+      </div>
     </div>
-  <div class="tw-flex tw-pr-2">
+  </div>
+  <div class="tw-flex">
 
 
     <div
       class="tw-flex tw-overflow-auto tw-pr-2 tw-pb-4"
-      :class="`tw-h-[calc(100vh-(112px + ${heightOffset}px))]`"
       :style="{
         width: store.state.isAiChatEnabled && !isAddFunctionComponent ? '75%' : '100%',
       }"
@@ -99,12 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template v-slot:after>
-          <div
-            class="q-px-md q-pt-sm q-pb-md tw-rounded-md tw-border-1 tw-border-gray-900 tw-h-max q-ml-sm"
-            :class="
-              store.state.theme === 'dark' ? 'tw-bg-gray-700' : 'tw-bg-zinc-100'
-            "
-          >
+          <div class="q-px-md q-pt-sm q-pb-md tw-h-max q-ml-sm card-container">
             <TestFunction
               ref="testFunctionRef"
               :vrlFunction="formData"
@@ -122,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
     </div>
   </div>
-  </div>
+  
   <confirm-dialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
