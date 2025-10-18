@@ -393,9 +393,21 @@ export class LogsPage {
     }
 
     async clearAndFillQueryEditor(query) {
+        // Wait for query editor to be ready
+        await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForTimeout(1000);
+
+        // Click and wait for focus
         await this.page.locator(this.queryEditor).click();
+        await this.page.waitForTimeout(500);
+
+        // Select all and delete
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.waitForTimeout(300);
         await this.page.keyboard.press("Backspace");
+        await this.page.waitForTimeout(300);
+
+        // Type new query
         await this.page.keyboard.type(query);
     }
 

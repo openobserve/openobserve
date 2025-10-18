@@ -31,24 +31,41 @@ async function globalSetup() {
     // Navigate to login page
     await page.goto(process.env["ZO_BASE_URL"]);
     testLogger.debug('Navigated to base URL', { url: process.env["ZO_BASE_URL"] });
-    
+
     await page.waitForLoadState('domcontentloaded');
-    
+
+    // Debug: Log current URL and page title
+    const currentUrl = page.url();
+    const pageTitle = await page.title();
+    testLogger.debug('Page loaded', { currentUrl, pageTitle });
+
     // Handle internal user login if needed
     const internalUserButton = page.getByText('Login as internal user');
     if (await internalUserButton.isVisible()) {
       await internalUserButton.click();
       testLogger.debug('Clicked internal user login button');
+      await page.waitForLoadState('domcontentloaded');
     }
-    
-    await page.waitForLoadState('domcontentloaded');
 
     // Fill login credentials
     const userIdField = page.locator('[data-cy="login-user-id"]');
     const passwordField = page.locator('[data-cy="login-password"]');
     const signInButton = page.locator('[data-cy="login-sign-in"]');
-    
-    await userIdField.waitFor({ state: 'visible' });
+
+    // Debug: Check if login fields exist
+    testLogger.debug('Waiting for login fields to appear...');
+    try {
+      await userIdField.waitFor({ state: 'visible', timeout: 10000 });
+    } catch (e) {
+      // Take screenshot and log page content for debugging
+      await page.screenshot({ path: path.join(__dirname, 'debug-login-page.png') });
+      const bodyText = await page.locator('body').textContent();
+      testLogger.error('Login field not found', {
+        url: page.url(),
+        bodyPreview: bodyText?.substring(0, 500)
+      });
+      throw new Error(`Login page did not load correctly. Current URL: ${page.url()}`);
+    }
     await userIdField.fill(process.env["ZO_ROOT_USER_EMAIL"]);
     
     await passwordField.waitFor({ state: 'visible' });
@@ -108,14 +125,31 @@ async function performGlobalIngestion(page) {
   };
 
   const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+    // Remove trailing slash from URL if present
+    const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+    const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify(logsdata)
     });
+
+    // Try to parse JSON, but handle cases where response is empty or not JSON
+    let data = null;
+    const contentType = fetchResponse.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        const text = await fetchResponse.text();
+        data = text ? JSON.parse(text) : null;
+      } catch (e) {
+        data = { error: 'Failed to parse JSON response', text: await fetchResponse.text() };
+      }
+    } else {
+      data = { text: await fetchResponse.text() };
+    }
+
     return {
       status: fetchResponse.status,
-      data: await fetchResponse.json()
+      data: data
     };
   }, {
     url: process.env.INGESTION_URL,
@@ -125,24 +159,29 @@ async function performGlobalIngestion(page) {
     logsdata: logsdata
   });
   
-  testLogger.debug('Data ingestion API response received', { 
-    status: response.status, 
-    orgId, 
-    streamName 
+  testLogger.debug('Data ingestion API response received', {
+    status: response.status,
+    orgId,
+    streamName,
+    data: response.data
   });
-  
+
   if (response.status !== 200) {
-    testLogger.error('Data ingestion failed', { 
-      status: response.status, 
-      response: response.data 
+    testLogger.error('Data ingestion failed', {
+      status: response.status,
+      response: response.data,
+      url: `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      orgId,
+      streamName
     });
-    throw new Error(`Data ingestion failed with status: ${response.status}`);
+    throw new Error(`Data ingestion failed with status: ${response.status}. Response: ${JSON.stringify(response.data)}`);
   }
-  
-  testLogger.info('Global data ingestion successful', { 
-    status: response.status, 
-    orgId, 
-    streamName 
+
+  testLogger.info('Global data ingestion successful', {
+    status: response.status,
+    orgId,
+    streamName,
+    responseData: response.data
   });
 }
 

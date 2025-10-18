@@ -27,8 +27,8 @@ test.describe("Alerts E2E Flow", () => {
     }
 
     await pm.commonActions.skipDataIngestionForScheduledAlert(testInfo.title);
-    
-    // Navigate to alerts page 
+
+    // Navigate to alerts page first
     await page.goto(
       `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
@@ -105,9 +105,19 @@ test.describe("Alerts E2E Flow", () => {
     testLogger.info('Successfully resumed alert', { alertName: newAlertName });
 
     // ===== Alert Movement and Cleanup =====
-    // Move alerts to target folder
+    // Clean up target folder before moving alerts
     const targetFolderName = 'testfoldermove';
     await pm.alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
+
+    // Navigate to target folder and clean up any existing alerts
+    await pm.alertsPage.navigateToFolder(targetFolderName);
+    await page.waitForLoadState('networkidle');
+    await pm.alertsPage.deleteAllAlertsInFolder();
+    testLogger.info('Cleaned up target folder before moving alerts', { targetFolderName });
+
+    // Navigate back to source folder and move alerts
+    await pm.alertsPage.navigateToFolder(folderName);
+    await page.waitForLoadState('networkidle');
     await pm.alertsPage.moveAllAlertsToFolder(targetFolderName);
     await page.waitForLoadState('networkidle');
 

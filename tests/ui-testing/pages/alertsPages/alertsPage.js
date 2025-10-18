@@ -56,7 +56,7 @@ export class AlertsPage {
         this.confirmButton = '[data-test="confirm-button"]';
 
         // Alert movement locators
-        this.selectAllCheckbox = '[data-test="alert-list-select-all-checkbox"]';
+        this.selectAllCheckboxRowName = '# Name Owner Period Frequency';
         this.moveAcrossFoldersButton = '[data-test="alert-list-move-across-folders-btn"]';
         this.folderDropdown = '[data-test="alerts-index-dropdown-stream_type"]';
         this.moveButton = '[data-test="alerts-folder-move"]';
@@ -64,6 +64,7 @@ export class AlertsPage {
 
         // Alert search and deletion locators
         this.alertSearchInput = '[data-test="alert-list-search-input"]';
+        this.searchAcrossFoldersToggle = '[data-test="alert-list-search-across-folders-toggle"]';
         this.alertDeleteOption = 'Delete';
         this.alertDeletedMessage = 'Alert deleted';
 
@@ -164,8 +165,19 @@ export class AlertsPage {
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
         await expect(this.page.locator(this.streamNameDropdown)).toBeVisible();
 
+        // Click stream dropdown
         await this.page.locator(this.streamNameDropdown).click();
-        await expect(this.page.getByText(`${streamName}`, { exact: true })).toBeVisible();
+
+        // Check if stream options appear, if not click twice more
+        try {
+            await expect(this.page.getByText(`${streamName}`, { exact: true })).toBeVisible({ timeout: 3000 });
+        } catch (e) {
+            testLogger.warn('Stream dropdown options not visible after first click, clicking twice more');
+            await this.page.locator(this.streamNameDropdown).click();
+            await this.page.locator(this.streamNameDropdown).click();
+            await expect(this.page.getByText(`${streamName}`, { exact: true })).toBeVisible();
+        }
+
         await this.page.getByText(`${streamName}`, { exact: true }).click();
         await expect(this.page.locator(this.realtimeAlertRadio)).toBeVisible();
 
@@ -318,8 +330,16 @@ export class AlertsPage {
         await this.page.getByRole('row', { name: `01 ${alertName}` })
             .locator(`[data-test="alert-list-${alertName}-pause-start-alert"]`)
             .click();
-        await this.page.getByRole('button', { name: 'start' }).click();
-        await expect(this.page.getByText('Alert Paused Successfully')).toBeVisible();
+
+        // Wait for the button to be visible before clicking
+        const startButton = this.page.getByRole('button', { name: 'start' });
+        await startButton.waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.waitForTimeout(500);
+        await startButton.click();
+
+        await expect(this.page.getByText('Alert Paused Successfully')).toBeVisible({ timeout: 10000 });
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
     }
 
     /**
@@ -327,11 +347,39 @@ export class AlertsPage {
      * @param {string} alertName - Name of the alert to resume
      */
     async resumeAlert(alertName) {
+        // Check if page is still open before proceeding
+        if (this.page.isClosed()) {
+            throw new Error('Page is closed before resumeAlert could execute');
+        }
+
         await this.page.getByRole('row', { name: `01 ${alertName}` })
             .locator(`[data-test="alert-list-${alertName}-pause-start-alert"]`)
             .click();
-        await this.page.getByRole('button', { name: 'start' }).click();
-        await expect(this.page.getByText('Alert Resumed Successfully')).toBeVisible();
+
+        // Wait for the button to be visible before clicking
+        try {
+            const startButton = this.page.getByRole('button', { name: 'start' });
+            await startButton.waitFor({ state: 'visible', timeout: 10000 });
+            await this.page.waitForTimeout(500);
+
+            // Check again before clicking
+            if (this.page.isClosed()) {
+                throw new Error('Page closed after pause button click but before start button click');
+            }
+
+            await startButton.click();
+            await expect(this.page.getByText('Alert Resumed Successfully')).toBeVisible({ timeout: 10000 });
+        } catch (error) {
+            testLogger.error('Error during resumeAlert', {
+                error: error.message,
+                pageClosed: this.page.isClosed(),
+                alertName
+            });
+            throw error;
+        }
+
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
     }
 
     /**
@@ -340,8 +388,18 @@ export class AlertsPage {
      */
     async deleteAlertByRow(alertName) {
         const kebabButton = this.page.locator(`//button[@data-test='alert-list-${alertName}-more-options']`).first();
+        await kebabButton.waitFor({ state: 'visible', timeout: 5000 });
         await kebabButton.click();
-        await this.page.waitForTimeout(1000);
+
+        // Wait for delete option to appear, retry kebab click if needed
+        try {
+            await this.page.getByText('Delete', { exact: true }).waitFor({ state: 'visible', timeout: 3000 });
+        } catch (e) {
+            testLogger.warn('Delete option not visible after first kebab click, retrying', { alertName });
+            await kebabButton.click();
+            await this.page.getByText('Delete', { exact: true }).waitFor({ state: 'visible', timeout: 5000 });
+        }
+
         await this.page.getByText('Delete', { exact: true }).click();
         await this.page.locator(this.confirmButton).click();
         await expect(this.page.getByText(this.alertDeletedMessage)).toBeVisible();
@@ -371,6 +429,59 @@ export class AlertsPage {
     }
 
     /**
+     * Search for an alert and delete ALL instances of it across all folders
+     * Used when cleaning up alerts that are blocking destination deletion
+     * @param {string} alertName - Name of the alert to search and delete
+     */
+    async searchAndDeleteAlert(alertName) {
+        testLogger.info('Searching for alert to delete across all folders', { alertName });
+
+        // Navigate to alerts page (assuming we're coming from destinations)
+        await this.page.locator(this.alertMenuItem).click();
+        await this.page.waitForTimeout(2000);
+
+        // Click "Search Across Folder" toggle - use force to bypass intercepting element
+        await this.page.locator(this.searchAcrossFoldersToggle).locator('div').nth(1).click({ force: true });
+        await this.page.waitForTimeout(500);
+
+        // Search for the alert - use original case, not lowercase
+        await this.page.locator(this.alertSearchInput).click();
+        await this.page.locator(this.alertSearchInput).fill('');
+        await this.page.locator(this.alertSearchInput).fill(alertName);
+        await this.page.waitForTimeout(2000);
+
+        // Delete all instances of this alert until search yields no results
+        let deletedCount = 0;
+        while (true) {
+            try {
+                // Check if alert exists in search results
+                await this.page.getByRole('cell', { name: alertName }).first().waitFor({ state: 'visible', timeout: 3000 });
+                testLogger.debug('Found alert instance, deleting', { alertName, instance: deletedCount + 1 });
+
+                // Delete the alert directly (no need to pause)
+                await this.deleteAlertByRow(alertName);
+                deletedCount++;
+                testLogger.debug('Deleted alert instance', { alertName, deletedCount });
+
+                // Wait a bit for deletion to complete
+                await this.page.waitForTimeout(1000);
+
+                // The search should still be active, check if more instances exist
+            } catch (e) {
+                // No more instances found in search results
+                testLogger.info('No more instances of alert found in search', { alertName, totalDeleted: deletedCount });
+                break;
+            }
+        }
+
+        if (deletedCount === 0) {
+            testLogger.warn('Alert not found for deletion', { alertName });
+        } else {
+            testLogger.info('Successfully deleted all instances of alert', { alertName, totalDeleted: deletedCount });
+        }
+    }
+
+    /**
      * Verify search results count
      * @param {number} expectedCount - Expected number of results
      */
@@ -382,6 +493,155 @@ export class AlertsPage {
     async verifySearchResultsUIValidation(expectedCount) {
         const resultText = expectedCount === 1 ? 'Showing 1 - 1 of' : 'Showing 1 - 2 of';
         await expect(this.page.getByText(resultText)).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Get the current alert count from the pagination text
+     * @returns {Promise<number>} The total number of alerts
+     */
+    async getAlertCount() {
+        try {
+            // Wait for pagination text like "Showing 1 - 10 of 25"
+            const paginationText = await this.page.locator('text=/Showing \\d+ - \\d+ of/').textContent({ timeout: 3000 });
+            const match = paginationText.match(/of (\d+)/);
+            if (match) {
+                const count = parseInt(match[1], 10);
+                testLogger.debug('Current alert count', { count });
+                return count;
+            }
+        } catch (e) {
+            // No pagination found, check if "No data available" is shown
+            testLogger.debug('No pagination text found, checking for "No data available"');
+        }
+
+        // Check if "No data available" is shown
+        try {
+            const noData = await this.page.getByText('No data available').isVisible({ timeout: 1000 });
+            if (noData) {
+                testLogger.debug('No alerts found in folder');
+                return 0;
+            }
+        } catch (e) {
+            // Neither pagination nor "No data available" found
+        }
+
+        return 0; // Default to 0 if we can't determine
+    }
+
+    /**
+     * Check if alerts exist in current view
+     * @returns {Promise<boolean>}
+     */
+    async hasAlerts() {
+        try {
+            const count = await this.getAlertCount();
+            return count > 0;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get all alert names from the current page
+     * @returns {Promise<string[]>} Array of alert names
+     */
+    async getAllAlertNames() {
+        const alertNames = [];
+
+        // Find all rows with alert data
+        const moreOptionsButtons = await this.page.locator('[data-test*="alert-list-"][data-test*="-more-options"]').all();
+
+        for (const button of moreOptionsButtons) {
+            const dataTest = await button.getAttribute('data-test');
+            // Extract alert name from data-test="alert-list-{alertName}-more-options"
+            const match = dataTest.match(/alert-list-(.+)-more-options/);
+            if (match && match[1]) {
+                alertNames.push(match[1]);
+            }
+        }
+
+        testLogger.debug('Found alert names', { alertNames, count: alertNames.length });
+        return alertNames;
+    }
+
+    /**
+     * Select all alerts using the checkbox
+     */
+    async selectAllAlerts() {
+        const selectAllCheckbox = this.page.getByRole('row', { name: this.selectAllCheckboxRowName }).getByRole('checkbox');
+        await selectAllCheckbox.waitFor({ state: 'visible', timeout: 5000 });
+        await selectAllCheckbox.click();
+        testLogger.debug('Selected all alerts');
+    }
+
+    /**
+     * Pause all selected alerts using the bulk pause button
+     */
+    async pauseAllSelectedAlerts() {
+        const pauseButton = this.page.locator('[data-test="alert-list-pause-alerts-btn"]');
+        await pauseButton.waitFor({ state: 'visible', timeout: 5000 });
+        await pauseButton.click();
+        await this.page.waitForTimeout(1000); // Wait for pause action to complete
+        testLogger.debug('Paused all selected alerts');
+    }
+
+    /**
+     * Delete all alerts in the current folder one by one
+     * This method:
+     * 1. Checks how many alerts exist
+     * 2. Gets all alert names
+     * 3. Deletes them one by one until none remain
+     */
+    async deleteAllAlertsInFolder() {
+        testLogger.info('Starting to delete all alerts in current folder');
+
+        // Wait for page to fully load and stabilize first
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(2000);
+
+        let totalDeleted = 0;
+
+        // Keep looping until no more alerts found
+        while (true) {
+            // Check if there are any alerts
+            const hasAny = await this.hasAlerts();
+            if (!hasAny) {
+                testLogger.info('No alerts found to delete', { totalDeleted });
+                break;
+            }
+
+            // Get all alert names on current page
+            let alertNames = await this.getAllAlertNames();
+            if (alertNames.length === 0) {
+                testLogger.info('No alert names found, stopping');
+                break;
+            }
+
+            testLogger.info('Found alerts to delete in this batch', { count: alertNames.length, alertNames });
+
+            // Delete all alerts from current page
+            for (const alertName of alertNames) {
+                testLogger.debug('Deleting alert', { alertName });
+                await this.deleteAlertByRow(alertName);
+                totalDeleted++;
+            }
+
+            // Wait for page to stabilize after deletions
+            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForTimeout(1000);
+        }
+
+        // Final verification
+        testLogger.info('Performing final verification');
+        await this.page.waitForTimeout(1000);
+        const finalHasAlerts = await this.hasAlerts();
+        if (finalHasAlerts) {
+            const remainingAlerts = await this.getAllAlertNames();
+            testLogger.error('Alerts still exist after deletion!', { remainingAlerts });
+            throw new Error(`Failed to delete all alerts. Remaining: ${remainingAlerts.join(', ')}`);
+        }
+
+        testLogger.info('Verification complete: All alerts in folder deleted', { totalDeleted });
     }
 
     /**
@@ -408,8 +668,19 @@ export class AlertsPage {
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
         await expect(this.page.locator(this.streamNameDropdown)).toBeVisible();
 
+        // Click stream dropdown
         await this.page.locator(this.streamNameDropdown).click();
-        await expect(this.page.getByText(streamName, { exact: true })).toBeVisible();
+
+        // Check if stream options appear, if not click twice more
+        try {
+            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 3000 });
+        } catch (e) {
+            testLogger.warn('Stream dropdown options not visible after first click, clicking twice more');
+            await this.page.locator(this.streamNameDropdown).click();
+            await this.page.locator(this.streamNameDropdown).click();
+            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible();
+        }
+
         await this.page.getByText(streamName, { exact: true }).click();
         await expect(this.page.locator('[data-test="add-alert-scheduled-alert-radio"]')).toBeVisible();
 
@@ -447,7 +718,7 @@ export class AlertsPage {
         await this.page.getByRole('button', { name: 'View Editor' }).click();
         await this.page.locator('.view-line').first().click();
         await this.page.locator('[data-test="scheduled-alert-sql-editor"]').locator('.inputarea')
-            .fill('SELECT name\n  FROM "auto_playwright_stream"\n  WHERE \n    gender = \'Male\'\n    AND age > 60\n    AND country IN (\'Germany\', \'Japan\', \'USA\')');
+            .fill('SELECT kubernetes_labels_name FROM "e2e_automate" where kubernetes_labels_name = \'ziox-querier\'');
         await this.page.getByRole('button', { name: 'Run Query' }).click();
         await this.page.waitForLoadState('networkidle');
 

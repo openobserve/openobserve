@@ -8,7 +8,11 @@ export class LoginPage {
     this.loginButton = page.locator('[data-cy="login-sign-in"]');
   }
   async gotoLoginPage() {
-    await this.page.goto(process.env["ZO_BASE_URL"]);
+    // Force navigation to correct URL (overrides any app redirect to localhost)
+    await this.page.goto(process.env["ZO_BASE_URL"], {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
     console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   }
 
@@ -41,15 +45,22 @@ export class LoginPage {
   }
 
   async gotoLoginPageSC() {
-    // Clear any existing session state that might interfere
-    await this.page.evaluate(() => {
-      localStorage.clear();
-      sessionStorage.clear();
+    // Force navigation to correct URL (overrides any app redirect to localhost)
+    await this.page.goto(process.env["ZO_BASE_URL_SC_UI"], {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
     });
-    
-    // Navigate and wait for page to be fully loaded
-    await this.page.goto(process.env["ZO_BASE_URL_SC_UI"]);
-    await this.page.waitForLoadState('domcontentloaded');
+
+    // Clear session state on the correct page
+    await this.page.evaluate(() => {
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch (e) {
+        console.log('Could not clear storage:', e);
+      }
+    });
+
     await this.page.waitForLoadState('networkidle');
     console.log("ZO_BASE_URL_SC_UI", process.env["ZO_BASE_URL_SC_UI"]);
   }
