@@ -5,7 +5,6 @@
     label="Histogram interval"
     :options="histogramIntervalOptions"
     behavior="menu"
-    filled
     borderless
     data-test="histogram-interval-dropdown"
     dense
@@ -13,7 +12,7 @@
     :display-value="`${
         histogramIntervalModel.label ?? 'Auto'
     }`"
-  >
+   hide-bottom-space>
   </q-select>
 </template>
 

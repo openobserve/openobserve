@@ -39,13 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-select
           dense
-          filled
           label="Select Tab"
           v-model="selectedMoveTabId"
           :options="moveTabOptions"
           class="select-container"
           data-test="dashboard-tab-move-select"
-        >
+         borderless hide-bottom-space>
           <!-- template when on options -->
           <template v-slot:no-option>
             <q-item data-test="dashboard-tab-move-select-no-option">

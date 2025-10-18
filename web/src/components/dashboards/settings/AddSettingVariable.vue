@@ -26,10 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <q-select
                 class="showLabelOnTop"
-                filled
                 stack-label
                 input-debounce="0"
-                outlined
                 dense
                 v-model="variableData.type"
                 :options="variableTypes"
@@ -38,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 map-options
                 emit-value
                 data-test="dashboard-variable-type-select"
-              ></q-select>
+               borderless hide-bottom-space></q-select>
             </div>
             <div class="text-body1 text-bold q-mt-sm">
               {{ t("dashboard.addGeneralSettings") }}
@@ -50,8 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="showLabelOnTop q-mr-sm"
                   :label="t('dashboard.nameOfVariable') + ' *'"
                   dense
-                  filled
-                  outlined
+                  borderless hide-bottom-space
                   stack-label
                   :rules="[
                     (val: any) => !!val.trim() || 'Field is required!',
@@ -68,11 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="showLabelOnTop"
                   :label="t('dashboard.labelOfVariable')"
                   dense
-                  filled
-                  outlined
                   stack-label
                   data-test="dashboard-variable-label"
-                ></q-input>
+                 borderless hide-bottom-space></q-input>
               </div>
             </div>
             <div
@@ -92,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="data.streamType"
                   input-debounce="0"
                   behavior="menu"
-                  filled
+                  hide-bottom-space
                   borderless
                   dense
                   stack-label
@@ -108,8 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   input-debounce="0"
                   behavior="menu"
                   use-input
-                  filled
                   borderless
+                  hide-bottom-space
                   dense
                   stack-label
                   @filter="streamsFilterFn"
@@ -126,7 +121,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-select
                 v-model="variableData.query_data.field"
                 :label="t('dashboard.selectField') + ' *'"
-                filled
                 stack-label
                 use-input
                 borderless
@@ -152,11 +146,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model.number="variableData.query_data.max_record_size"
                   :label="t('dashboard.DefaultSize')"
                   dense
-                  filled
-                  outlined
                   stack-label
                   data-test="dashboard-variable-max-record-size"
-                >
+                 borderless hide-bottom-space>
                   <q-btn
                     padding="xs"
                     round
@@ -201,8 +193,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="index"
                   >
                     <q-select
-                      filled
-                      outlined
                       emit-value
                       dense
                       hide-selected
@@ -237,7 +227,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-select>
                     <q-select
                       dense
-                      filled
                       v-model="filter.operator"
                       :display-value="filter.operator ? filter.operator : ''"
                       style="width: 18%"
@@ -323,8 +312,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('dashboard.ValueOfVariable') + ' *'"
               data-test="dashboard-variable-constant-value"
               dense
-              filled
-              outlined
               stack-label
               :rules="[(val: any) => !!val.trim() || 'Field is required!']"
             ></q-input>
@@ -336,10 +323,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('dashboard.DefaultValue')"
               data-test="dashboard-variable-textbox-default-value"
               dense
-              filled
-              outlined
               stack-label
-            ></q-input>
+             borderless hide-bottom-space></q-input>
           </div>
           <div v-if="variableData.type == 'custom'">
             <div class="tw-flex">
@@ -386,8 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <q-input
                 dense
-                filled
-                outlined
+                borderless hide-bottom-space
                 :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                 class="col textbox q-mr-sm"
                 v-model="variableData.options[index].value"
@@ -512,15 +496,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex q-mr-sm" style="width: 50%">
                   <q-input
                     dense
-                    filled
-                    outlined
                     stack-label
                     class="col textbox showLabelOnTop"
                     v-model="variableData.customMultiSelectValue[index]"
                     name="value"
                     placeholder="Enter value"
                     :data-test="`dashboard-variable-custom-value-${index}`"
-                  />
+                   borderless hide-bottom-space/>
                   <q-btn
                     v-if="variableData.multiSelect"
                     size="sm"

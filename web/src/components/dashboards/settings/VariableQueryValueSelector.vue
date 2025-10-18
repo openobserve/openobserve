@@ -18,8 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <q-select
       style="min-width: 150px"
-      filled
-      outlined
       dense
       v-model="selectedValue"
       :display-value="displayValue"
@@ -44,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onUpdateValue"
       @keydown="handleKeydown"
       ref="selectRef"
-    >
+     borderless hide-bottom-space>
       <template v-slot:no-option>
         <template v-if="filterText">
           <q-item clickable @click="handleCustomValue(filterText)">
