@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier">
+  <q-page :key="store.state.selectedOrganization.identifier" class="card-container">
     <div
       ref="fullscreenDiv"
       :class="`${isFullscreen ? 'fullscreen' : ''}  ${
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }`"
       >
         <div
-          class="tw-flex justify-between items-center q-pa-xs tw-w-full tw-min-w-0"
+          class="tw-flex justify-between items-center q-pa-xs tw-w-full tw-min-w-0 card-container"
         >
           <div class="tw-flex tw-flex-1 tw-overflow-hidden">
             <q-btn
