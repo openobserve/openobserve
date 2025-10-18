@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? 'o2-search-input-dark'
               : 'o2-search-input-light'
           "
-        >
+         hide-bottom-space>
           <template #prepend>
             <q-icon
               class="o2-search-input-icon"
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'o2-search-input-dark'
                     : 'o2-search-input-light'
                 "
-              >
+               hide-bottom-space>
                 <template #prepend>
                   <q-icon
                     class="o2-search-input-icon"

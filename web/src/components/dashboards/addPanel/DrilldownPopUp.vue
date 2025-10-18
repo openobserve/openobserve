@@ -44,7 +44,6 @@
       class="q-py-md showLabelOnTop"
       stack-label
       borderless
-      filled
       data-test="dashboard-config-panel-drilldown-name"
       dense
       :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
@@ -164,13 +163,12 @@
             class="q-py-sm showLabelOnTop no-case"
             stack-label
             borderless
-            filled
             dense
             style="width: 100%"
             :loading="getFoldersListLoading.isLoading.value"
             :disable="getFoldersListLoading.isLoading.value"
             data-test="dashboard-drilldown-folder-select"
-          >
+           hide-bottom-space>
             <!-- template when on options -->
             <template v-slot:no-option>
               <q-item>
@@ -192,13 +190,12 @@
             class="q-py-sm showLabelOnTop no-case"
             stack-label
             borderless
-            filled
             dense
             style="width: 100%"
             :loading="getDashboardListLoading.isLoading.value"
             :disable="getDashboardListLoading.isLoading.value"
             data-test="dashboard-drilldown-dashboard-select"
-          >
+           hide-bottom-space>
             <!-- template when on options -->
             <template v-slot:no-option>
               <q-item
@@ -222,13 +219,12 @@
             class="q-py-sm showLabelOnTop no-case"
             stack-label
             borderless
-            filled
             dense
             style="width: 100%"
             :loading="getTabListLoading.isLoading.value"
             :disable="getTabListLoading.isLoading.value"
             data-test="dashboard-drilldown-tab-select"
-          >
+           hide-bottom-space>
             <!-- template when on options -->
             <template v-slot:no-option>
               <q-item data-test="dashboard-drilldown-no-tab-available-option">

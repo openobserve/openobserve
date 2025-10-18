@@ -50,8 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             bg-color="input-bg"
             class="showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless hide-bottom-space
             dense
             type="number"
             :rules="[
