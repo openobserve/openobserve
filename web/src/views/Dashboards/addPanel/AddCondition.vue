@@ -9,7 +9,7 @@
       hide-bottom-space
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
-      class="condition-logical-operator"
+      class="condition-logical-operator q-mt-sm"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}}`"
     />
     <q-btn-group>
