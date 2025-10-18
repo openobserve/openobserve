@@ -217,14 +217,14 @@ jobs:
           # - testfolder: "Dashboards-Streaming"
           #   browser: "chrome"
           #   run_files: ["dashboard-streaming.spec.js",]
-          # - testfolder: "Pipelines"
-          #   browser: "chrome"
-          #   run_files: [
-          #       "pipelines.spec.js",
-          #       "pipeline-dynamic.spec.js",
-          #       "pipeline-core.spec.js",
-          #       # "remotepipeline.spec.js"
-          #     ]
+          - testfolder: "Pipelines"
+            browser: "chrome"
+            run_files: [
+                "pipelines.spec.js",
+                "pipeline-dynamic.spec.js",
+                "pipeline-core.spec.js",
+                # "remotepipeline.spec.js"
+              ]
           - testfolder: "Reports"
             browser: "chrome"
             run_files: [
