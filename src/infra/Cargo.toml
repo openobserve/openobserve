@@ -42,6 +42,7 @@ zstd.workspace = true
 tracing.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
+scc.workspace = true
 reqwest.workspace = true
 tonic.workspace = true
 opentelemetry.workspace = true
