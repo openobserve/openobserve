@@ -96,7 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div>
                   <q-input
                     dense
-                    filled
                     data-test="dashboard-source-item-input"
                     :label="t('common.label')"
                     v-model="
@@ -104,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.source.label
                     "
-                  />
+                   borderless hide-bottom-space/>
                   <div
                     v-if="
                       !dashboardPanelData.data.queries[
@@ -232,7 +231,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div>
                   <q-input
                     dense
-                    filled
                     label="Label"
                     data-test="dashboard-target-item-input"
                     v-model="
@@ -240,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.target.label
                     "
-                  />
+                   borderless hide-bottom-space/>
                   <div
                     v-if="
                       !dashboardPanelData.data.queries[
@@ -380,12 +378,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :options="triggerOperators"
                         dense
-                        filled
                         emit-value
                         map-options
                         :label="t('common.aggregation')"
                         data-test="dashboard-value-item-dropdown"
-                      >
+                       borderless hide-bottom-space>
                         <template v-slot:append>
                           <q-icon
                             name="close"
@@ -403,7 +400,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <q-input
                     dense
-                    filled
                     :label="t('common.label')"
                     data-test="dashboard-value-item-input"
                     v-model="
@@ -411,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.value.label
                     "
-                  />
+                   borderless hide-bottom-space/>
                   <div style="width: 100%" class="tw-mb-2">
                     <span class="tw-block tw-mb-1 tw-font-bold">Having</span>
 
@@ -431,21 +427,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <q-select
                         dense
-                        filled
                         v-model="getHavingCondition().operator"
                         :options="operators"
                         style="width: 30%"
-                      >
+                       borderless hide-bottom-space>
                       </q-select>
 
                       <q-input
                         dense
-                        filled
                         v-model.number="getHavingCondition().value"
                         style="width: 50%"
                         type="number"
                         placeholder="Value"
-                      />
+                       borderless hide-bottom-space/>
 
                       <q-btn
                         dense

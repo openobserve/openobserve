@@ -33,12 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="index-dropdown-stream_type"
         input-debounce="0"
         behavior="menu"
-        filled
         borderless
         dense
         class="q-mb-xs"
         :readonly="dashboardPanelDataPageKey === 'logs'"
-      ></q-select>
+       hide-bottom-space></q-select>
       <q-select
         v-model="
           dashboardPanelData.data.queries[
@@ -51,7 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         input-debounce="0"
         behavior="menu"
         use-input
-        filled
         borderless
         dense
         hide-selected
@@ -70,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : ''
         "
         :readonly="dashboardPanelDataPageKey === 'logs'"
-      >
+       hide-bottom-space>
         <template
           v-if="
             dashboardPanelData.data.queries[
@@ -518,14 +516,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             v-model="dashboardPanelData.meta.stream.filterField"
             data-test="index-field-search-input"
-            filled
             borderless
             dense
             clearable
             debounce="1"
             :loading="getStreamFields.isLoading.value"
             :placeholder="t('search.searchField')"
-          >
+           hide-bottom-space>
             <template #prepend>
               <q-icon name="search" />
             </template>

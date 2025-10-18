@@ -56,7 +56,6 @@
             :options="markLineTypeOptions"
             input-debounce="0"
             behavior="menu"
-            filled
             borderless
             dense
             style="width: 100%"
@@ -64,7 +63,7 @@
             stack-label
             emit-value
             :data-test="`dashboard-config-markline-type-${index}`"
-          ></q-select>
+           hide-bottom-space></q-select>
           <q-input
             v-model="dashboardPanelData.data.config.mark_line[index].name"
             label="Label"
@@ -72,13 +71,12 @@
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop"
             stack-label
-            filled
             dense
             borderless
             label-slot
             style="width: 100%"
             :data-test="`dashboard-config-markline-name-${index}`"
-          />
+           hide-bottom-space/>
           <q-input
             v-if="
               ['xAxis', 'yAxis'].includes(
@@ -92,12 +90,11 @@
             class="q-py-sm showLabelOnTop"
             borderless
             stack-label
-            filled
             dense
             label-slot
             style="width: 100%"
             :data-test="`dashboard-config-markline-name-${index}`"
-          />
+           hide-bottom-space/>
         </div>
 
         <q-icon

@@ -43,11 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="item.value"
           :label="item.label || item.name"
           dense
-          outlined
           readonly
           data-test="dashboard-variable-constant-selector"
           @update:model-value="onVariablesValueUpdated(index)"
-        ></q-input>
+         borderless hide-bottom-space></q-input>
       </div>
       <div v-else-if="item.type == 'textbox'">
         <q-input
@@ -58,10 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="item.value"
           :label="item.label || item.name"
           dense
-          outlined
           data-test="dashboard-variable-textbox-selector"
           @update:model-value="onVariablesValueUpdated(index)"
-        ></q-input>
+         borderless hide-bottom-space></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
         <VariableCustomValueSelector

@@ -65,11 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-list-search-input"
               v-model="filterQuery"
               borderless
-              filled
               dense
               class="q-ml-auto no-border"
               :placeholder="t('reports.search')"
-            >
+             hide-bottom-space>
               <template #prepend>
                 <q-icon name="search" class="cursor-pointer" />
               </template>

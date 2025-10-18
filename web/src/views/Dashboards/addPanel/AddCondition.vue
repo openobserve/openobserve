@@ -37,10 +37,10 @@
               input-debounce="0"
               behavior="menu"
               dense
-              filled
               style="width: 100%"
               use-input
               borderless
+              hide-bottom-space
               hide-selected
               fill-input
               emit-value
@@ -86,7 +86,8 @@
                     <div class="flex column" style="height: 220px">
                       <q-select
                         dense
-                        filled
+                        borderless
+                        hide-bottom-space
                         v-model="condition.operator"
                         :options="operators"
                         :label="t('common.operator')"
@@ -109,7 +110,8 @@
                   <q-tab-panel dense name="list" class="q-pa-none">
                     <q-select
                       dense
-                      filled
+                      borderless
+                      hide-bottom-space
                       v-model="condition.values"
                       :options="sortedFilteredListOptions"
                       :label="t('common.selectFilter')"

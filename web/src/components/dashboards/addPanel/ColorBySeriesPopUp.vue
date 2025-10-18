@@ -96,11 +96,10 @@
                 >
                   <q-input
                     v-model="series.color"
-                    filled
                     style="width: 90%"
                     class="input-spacing"
                     dense
-                  >
+                   borderless hide-bottom-space>
                     <template v-slot:append>
                       <q-icon
                         name="colorize"
