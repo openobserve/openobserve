@@ -26,8 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
           stack-label
-          outlined
-          filled
           dense
           :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
           data-test="dashboard-general-setting-name"
@@ -40,11 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
           stack-label
-          outlined
-          filled
           dense
           data-test="dashboard-general-setting-description"
-        />
+         borderless hide-bottom-space/>
         <div v-if="dateTimeValue" data-test="dashboard-general-setting-datetime-picker">
           <label>Default Duration</label>
           <DateTimePickerDashboard

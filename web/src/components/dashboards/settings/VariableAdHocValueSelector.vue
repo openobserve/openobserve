@@ -3,7 +3,6 @@
         <!-- <div class="q-mb-sm title" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
         <div class="row no-wrap items-center q-mb-xs" v-for="(item, index) in adhocVariables" :key="index">
             <q-input
-                filled
                 dense
                 v-model="adhocVariables[index].name"
                 debounce="1000"
@@ -11,12 +10,12 @@
                 placeholder="Enter Name"
                 @update:model-value="updateModelValueOfSelect(index, $event)"
                 class="textbox col no-case q-ml-sm"
-            >
+             borderless hide-bottom-space>
             </q-input>
-            <q-select dense filled v-model="adhocVariables[index].operator"
+            <q-select dense v-model="adhocVariables[index].operator"
                 :display-value="adhocVariables[index].operator ? adhocVariables[index].operator : ''"
-                :options="operatorOptions" style="width: auto" class="operator" data-test="dashboard-variable-adhoc-operator-selector" />
-            <q-input v-model="adhocVariables[index].value" placeholder="Enter Value" dense filled debounce="1000" style="width: 125px" class="" data-test="dashboard-variable-adhoc-value-selector" />
+                :options="operatorOptions" style="width: auto" class="operator" data-test="dashboard-variable-adhoc-operator-selector"  borderless hide-bottom-space/>
+            <q-input v-model="adhocVariables[index].value" placeholder="Enter Value" dense debounce="1000" style="width: 125px" class="" data-test="dashboard-variable-adhoc-value-selector"  borderless hide-bottom-space/>
             <q-btn class="close" size="xs" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-3'" padding="13px 2px" square flat dense @click="removeField(index)" icon="close" :data-test="`dashboard-variable-adhoc-close-${index}`"/>
             <!-- <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div> -->
         </div>

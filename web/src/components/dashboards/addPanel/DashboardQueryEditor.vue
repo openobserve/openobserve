@@ -208,7 +208,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       input-debounce="0"
                       behavior="menu"
                       use-input
-                      filled
                       borderless
                       dense
                       hide-selected
@@ -219,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       option-value="function"
                       @update:modelValue="onFunctionSelect"
                       style="width: 100%"
-                    >
+                     hide-bottom-space>
                       <template #no-option>
                         <q-item>
                           <q-item-section>

@@ -103,10 +103,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       color="input-border"
                       bg-color="input-bg"
                       stack-label
-                      filled
                       label-slot
                       :loading="isLoading == ImportType.URL"
-                    />
+                     borderless hide-bottom-space/>
                   </div>
 
                   <div
@@ -154,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <q-file
                       v-model="jsonFiles"
-                      filled
+                      
                       bottom-slots
                       :label="t('dashboard.dropFileMsg')"
                       accept=".json"
@@ -253,8 +252,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           bg-color="input-bg"
                           class="showLabelOnTop"
                           stack-label
-                          outlined
-                          filled
                           dense
                           tabindex="0"
                           @update:model-value="
@@ -263,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               errorMessage.dashboardIndex,
                             )
                           "
-                        />
+                         borderless hide-bottom-space/>
                       </div>
                     </span>
                     <span
@@ -282,7 +279,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           color="input-border"
                           bg-color="input-bg"
                           class="q-py-sm showLabelOnTop no-case"
-                          filled
                           stack-label
                           dense
                           use-input
@@ -299,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             )
                           "
                           behavior="menu"
-                        />
+                         borderless hide-bottom-space/>
                       </div>
                     </span>
 

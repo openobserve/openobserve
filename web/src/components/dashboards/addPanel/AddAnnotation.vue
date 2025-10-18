@@ -11,7 +11,7 @@
           stack-label
           class="q-py-md showLabelOnTop"
           dense
-          outlined
+          borderless hide-bottom-space
           style="margin-bottom: 10px"
           :rules="[(val) => !!val || 'Title is required.']"
         />
@@ -21,10 +21,9 @@
           stack-label
           class="q-py-md showLabelOnTop"
           dense
-          outlined
           type="textarea"
           :rows="3"
-        />
+         borderless hide-bottom-space/>
 
         <div class="q-mt-md">
           <q-select
@@ -38,8 +37,6 @@
             @update:model-value="updateSelectedPanels"
             :display-value="displayValue"
             style="min-width: 150px"
-            filled
-            outlined
             dense
             label="Select Panels"
             input-debounce="0"
@@ -48,7 +45,7 @@
             class="textbox col no-case showLabelOnTop"
             popup-no-route-dismiss
             popup-content-style="z-index: 10001"
-          >
+           borderless hide-bottom-space>
             <template v-slot:option="{ opt, selected, toggleOption }">
               <q-item
                 v-if="opt.isTab"
