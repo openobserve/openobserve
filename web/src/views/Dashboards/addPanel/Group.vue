@@ -4,8 +4,8 @@
     v-model="group.logicalOperator"
     dense
     options-dense
-    filled
     borderless
+    hide-bottom-space
     :options="filterOptions"
     @update:model-value="emitLogicalOperatorChange"
     class="condition-logical-operator"
