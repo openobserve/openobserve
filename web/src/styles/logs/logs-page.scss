@@ -107,8 +107,8 @@
 
     // Normalize all button heights
     .q-btn {
-      height: 1.8rem !important; // 32px
-      min-height: 1.8rem !important;
+      height: 2rem !important; // 32px
+      min-height: 2rem !important;
       border-radius: 0.375rem; // 6px - modern rounded borders
     }
 
@@ -119,6 +119,14 @@
         min-height: 2rem !important;
         border-radius: 0.375rem; // 6px
       }
+    }
+  }
+
+  .q-splitter {
+    .q-splitter__before,
+    .q-splitter__after {
+      transition: none !important;
+      padding-right: 0 !important;
     }
   }
 
@@ -347,7 +355,7 @@
   }
 
   .query-editor-container {
-    height: calc(100% - 2.1875rem) !important; // 35px
+    height: calc(100% - 3.31rem) !important; // 35px
   }
 
   .logs-auto-refresh-interval {
@@ -638,7 +646,7 @@
 
   .index-table {
     width: 100%;
-    height: calc(100% - 44px);
+    height: calc(100% - 40px);
     // border: 1px solid rgba(0, 0, 0, 0.02);
 
     .q-table {
@@ -994,8 +1002,8 @@
 
     .q-table__bottom {
       padding: 0 !important;
-      min-height: 1.95rem !important; // 31.2px
-      max-height: 1.95rem !important;
+      min-height: 2.43rem !important; // 31.2px
+      max-height: 2.43rem !important;
     }
 
     .pagination-field-count {
@@ -1007,7 +1015,7 @@
 
   .field-table {
     .q-table__bottom {
-      padding: 0.3125rem !important; // 5px
+      // padding: 0.3125rem !important; // 5px
     }
 
     .schema-field-toggle .q-btn {

@@ -50,12 +50,15 @@ body {
 .q-splitter--vertical {
   .q-splitter__separator {
     width: 0; // 10px
+    z-index: 999 !important;
+    height: 100%;
   }
 }
 
 .q-splitter--horizontal {
   .q-splitter__separator {
     height: 0; // 10px
+    z-index: 99;
   }
 }
 
