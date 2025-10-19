@@ -20,11 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="row">
-      <div class="float-right col q-mb-xs flex">
-        <div
-          class="button-group logs-visualize-toggle element-box-shadow q-ml-xs"
-        >
+    <div class="row !tw-m-0 !tw-p-[0.375rem] !tw-items-start">
+      <div class="float-right col flex">
+        <div class="button-group logs-visualize-toggle element-box-shadow">
           <div class="row">
             <div>
               <q-btn
@@ -59,8 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
               >
-                <img :src="visualizeIcon" alt="Visualize"
-class="icon-sm" />
+                <img :src="visualizeIcon"
+alt="Visualize" class="icon-sm" />
                 <q-tooltip v-if="isVisualizeDisabled">
                   {{ t("search.enableSqlModeOrSelectSingleStream") }}
                 </q-tooltip>
@@ -89,8 +87,8 @@ class="icon-sm" />
             "
           >
           </q-toggle>
-          <img :src="histogramIcon"
-alt="Histogram" class="toolbar-icon" />
+          <img :src="histogramIcon" alt="Histogram"
+class="toolbar-icon" />
           <q-tooltip>
             {{ t("search.showHistogramLabel") }}
           </q-tooltip>
@@ -109,8 +107,8 @@ alt="Histogram" class="toolbar-icon" />
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="sqlIcon"
-alt="SQL Mode" class="toolbar-icon" />
+            <img :src="sqlIcon" alt="SQL Mode"
+class="toolbar-icon" />
             <q-tooltip v-if="isSqlModeDisabled">
               {{ t("search.sqlModeDisabledForVisualization") }}
             </q-tooltip>
@@ -225,8 +223,8 @@ alt="SQL Mode" class="toolbar-icon" />
                       </q-tr>
                     </template>
                     <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props"
-class="field_list" no-hover>
+                      <q-td :props="props" class="field_list"
+no-hover>
                         <q-item
                           class="q-pa-sm saved-view-item"
                           clickable
@@ -613,8 +611,8 @@ class="field_list" no-hover>
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="quickModeIcon"
-alt="Quick Mode" class="toolbar-icon" />
+            <img :src="quickModeIcon" alt="Quick Mode"
+class="toolbar-icon" />
             <q-tooltip>
               {{ t("search.quickModeLabel") }}
             </q-tooltip>
@@ -622,7 +620,7 @@ alt="Quick Mode" class="toolbar-icon" />
         </div>
       </div>
 
-      <div class="float-right col-auto q-mb-xs">
+      <div class="float-right col-auto">
         <!-- this is moved to dropdown if ai chat is enabled -->
         <div
           v-if="!store.state.isAiChatEnabled"
@@ -746,8 +744,8 @@ alt="Quick Mode" class="toolbar-icon" />
                         downloadLogs(searchObj.data.queryResults.hits, 'csv')
                       "
                     >
-                      <q-icon name="grid_on"
-size="14px" class="q-pr-sm" />
+                      <q-icon name="grid_on" size="14px"
+class="q-pr-sm" />
                       <q-item-section>
                         <q-item-label
                           class="tw-flex tw-items-center tw-gap-2 q-mr-md"
@@ -765,8 +763,8 @@ size="14px" class="q-pr-sm" />
                         downloadLogs(searchObj.data.queryResults.hits, 'json')
                       "
                     >
-                      <q-icon name="data_object"
-size="14px" class="q-pr-sm" />
+                      <q-icon name="data_object" size="14px"
+class="q-pr-sm" />
                       <q-item-section>
                         <q-item-label
                           class="tw-flex tw-items-center tw-gap-2 q-mr-md"
@@ -1007,43 +1005,45 @@ size="14px" class="q-pr-sm" />
     </div>
     <div class="row query-editor-container">
       <div
-        class="col"
-        style="border-top: 1px solid #dbdbdb; height: 100%"
+        class="col tw-h-full"
         :class="{ 'expand-on-focus': isFocused }"
         :style="backgroundColorStyle"
       >
         <q-splitter
-          class="logs-search-splitter"
+          class="logs-search-splitter !tw-h-full"
           no-scroll
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"
-          style="width: 100%; height: 100%"
         >
           <template #before>
-            <code-query-editor
-              v-if="router.currentRoute.value.name === 'logs'"
-              data-test="logs-search-bar-query-editor"
-              editor-id="logsQueryEditor"
-              ref="queryEditorRef"
-              class="monaco-editor"
-              :style="editorWidthToggleFunction"
-              v-model:query="searchObj.data.query"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
-              :debounceTime="100"
-              @update:query="updateQueryValue"
-              @run-query="handleRunQueryFn"
-              @keydown="handleKeyDown"
-              :class="
-                searchObj.data.editorValue == '' &&
-                searchObj.meta.queryEditorPlaceholderFlag
-                  ? 'empty-query'
-                  : ''
-              "
-              language="sql"
-              @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
-              @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
-            />
+            <div
+              class="col tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mx-[0.375rem] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-full"
+            >
+              <code-query-editor
+                v-if="router.currentRoute.value.name === 'logs'"
+                data-test="logs-search-bar-query-editor"
+                editor-id="logsQueryEditor"
+                ref="queryEditorRef"
+                class="monaco-editor tw-px-[0.325rem] tw-py-[0.125rem]"
+                :style="editorWidthToggleFunction"
+                v-model:query="searchObj.data.query"
+                :keywords="autoCompleteKeywords"
+                :suggestions="autoCompleteSuggestions"
+                :debounceTime="100"
+                @update:query="updateQueryValue"
+                @run-query="handleRunQueryFn"
+                @keydown="handleKeyDown"
+                :class="
+                  searchObj.data.editorValue == '' &&
+                  searchObj.meta.queryEditorPlaceholderFlag
+                    ? 'empty-query'
+                    : ''
+                "
+                language="sql"
+                @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
+                @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
+              />
+            </div>
           </template>
           <template #after>
             <div
@@ -1053,29 +1053,35 @@ size="14px" class="q-pr-sm" />
             >
               <template v-if="showFunctionEditor">
                 <div class="tw-relative tw-h-full tw-w-full">
-                  <code-query-editor
-                    v-if="router.currentRoute.value.name === 'logs'"
-                    data-test="logs-vrl-function-editor"
-                    ref="fnEditorRef"
-                    editor-id="fnEditor"
-                    class="monaco-editor"
-                    v-model:query="searchObj.data.tempFunctionContent"
-                    :class="
-                      searchObj.data.tempFunctionContent == '' &&
-                      searchObj.meta.functionEditorPlaceholderFlag
-                        ? 'empty-function'
-                        : ''
-                    "
-                    :readOnly="
-                      searchObj.meta.logsVisualizeToggle === 'visualize'
-                    "
-                    @keydown="handleKeyDown"
-                    language="vrl"
-                    @focus="
-                      searchObj.meta.functionEditorPlaceholderFlag = false
-                    "
-                    @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
-                  />
+                  <div
+                    class="tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mr-[0.375rem] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-full"
+                  >
+                    <code-query-editor
+                      v-if="router.currentRoute.value.name === 'logs'"
+                      data-test="logs-vrl-function-editor"
+                      ref="fnEditorRef"
+                      editor-id="fnEditor"
+                      class="monaco-editor tw-px-[0.325rem] tw-py-[0.125rem]"
+                      v-model:query="searchObj.data.tempFunctionContent"
+                      :class="
+                        searchObj.data.tempFunctionContent == '' &&
+                        searchObj.meta.functionEditorPlaceholderFlag
+                          ? 'empty-function'
+                          : ''
+                      "
+                      :readOnly="
+                        searchObj.meta.logsVisualizeToggle === 'visualize'
+                      "
+                      @keydown="handleKeyDown"
+                      language="vrl"
+                      @focus="
+                        searchObj.meta.functionEditorPlaceholderFlag = false
+                      "
+                      @blur="
+                        searchObj.meta.functionEditorPlaceholderFlag = true
+                      "
+                    />
+                  </div>
                 </div>
                 <div
                   v-if="searchObj.meta.logsVisualizeToggle === 'visualize'"
@@ -1443,8 +1449,8 @@ size="14px" class="q-pr-sm" />
           <div>
             <div class="text-left q-mb-xs">
               No of Records:
-              <q-icon name="info"
-size="17px" class="q-ml-xs cursor-pointer">
+              <q-icon name="info" size="17px"
+class="q-ml-xs cursor-pointer">
                 <q-tooltip
                   anchor="center right"
                   self="center left"
@@ -1481,8 +1487,8 @@ size="17px" class="q-ml-xs cursor-pointer">
             style="opacity: 0.8"
             class="text-left mapping-warning-msg q-mt-md"
           >
-            <q-icon name="warning"
-color="red" class="q-mr-sm" />
+            <q-icon name="warning" color="red"
+class="q-mr-sm" />
             <span>Histogram will be disabled for the schedule job</span>
           </div>
         </q-card-section>

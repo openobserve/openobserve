@@ -50,12 +50,15 @@ body {
 .q-splitter--vertical {
   .q-splitter__separator {
     width: 0; // 10px
+    z-index: 999 !important;
+    height: 100%;
   }
 }
 
 .q-splitter--horizontal {
   .q-splitter__separator {
     height: 0; // 10px
+    z-index: 99;
   }
 }
 
@@ -1363,7 +1366,7 @@ body {
 //   Monaco Editor Styling Start
 //============================================================================ 
 
-   .monaco-editor {
+  .monaco-editor {
     outline-width: 0px;
     outline-style: none;
   }
@@ -1375,7 +1378,7 @@ body {
   }
 
   .empty-function .monaco-editor-background {
-    background-image: url("../../assets/images/common/vrl-function.png");
+    background-image: url("../assets/images/common/vrl-function.png");
     background-repeat: no-repeat;
     background-size: 170px;
   }
