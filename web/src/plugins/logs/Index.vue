@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <index-list
                     v-show="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
-                    class="full-height card-container"
+                    class="card-container"
                     @setInterestingFieldInSQLQuery="
                       setInterestingFieldInSQLQuery
                     "
