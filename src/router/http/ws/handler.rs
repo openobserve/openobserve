@@ -211,7 +211,8 @@ impl WsHandler {
                                         #[cfg(feature = "enterprise")]
                                         {
                                             let auth_str =
-                                                crate::common::utils::auth::extract_auth_str(&req);
+                                                crate::common::utils::auth::extract_auth_str(&req)
+                                                    .await;
                                             if let Err(e) =
                                                 ratelimit_check(&message, auth_str).await
                                             {
