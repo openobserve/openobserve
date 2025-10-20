@@ -1282,14 +1282,13 @@ body {
 
 .q-select {
   min-height: 2.25rem !important;
-  max-height: 2.25rem !important;
-  height: 2.25rem !important;
   font-size: 0.813rem;
-
   .q-field__inner {
     min-height: 2.25rem !important;
     max-height: 2.25rem !important;
   }
+
+
 
   .q-field__control {
     @extend .el-border;
@@ -1300,13 +1299,17 @@ body {
     background-color: transparent;
     line-height: 1.5rem;
     padding: 0rem 0.75rem !important;
+
+  }
+
+  .q-field__bottom{
+    padding: 4px !important
   }
 
   .q-field__control-container{
       .q-field__native{
         min-height: 2.25rem !important;
        height: 2.25rem !important;
-       padding: 0px !important;
     }
   }
 

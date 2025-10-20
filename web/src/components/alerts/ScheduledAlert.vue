@@ -593,7 +593,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       debounce="300"
                       @update:model-value="updateTrigger"
                     />
-                    <!-- here we added a 1.8 rem of margin bottom to match with the cron job at left -->
                     <q-select
                       data-test="add-report-schedule-start-timezone-select"
                       v-model="triggerData.timezone"
@@ -615,7 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="triggerData.timezone"
                       :label="t('logStream.timezone') + ' *'"
                       :display-value="`Timezone: ${browserTimezone}`"
-                      class="showLabelOnTop q-ml-sm tw-mb-[1.8rem]"
+                      class="showLabelOnTop q-ml-sm"
                       stack-label
                       style="width: 210px"
                     />
@@ -739,7 +738,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
         </div>
-        <div class=" flex justify-start q-mt-xs items-start">
+        <div class=" flex justify-start q-mt-xs items-start ">
                   <div
                     data-test="add-alert-destination-title"
                     class="tw-font-semibold"
@@ -747,7 +746,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ t("alerts.destination") + " *" }}
                   </div>
-                  <div data-test="add-alert-destination-select">
+                  <div data-test="add-alert-destination-select" class="tw-mb-2">
                     <q-select
                       ref="destinationSelectRef"
                       v-model="destinations"
