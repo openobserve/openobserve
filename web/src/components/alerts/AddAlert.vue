@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="full-width q-mx-lg "  >
-    <div class="row items-center no-wrap card-container tw-mx-[0.625rem] q-my-sm">
-      <div class="flex items-center justify-between tw-w-full card-container tw-px-2 tw-py-3">
+    <div class="row items-center no-wrap card-container tw-mx-[0.625rem]  q-my-sm">
+      <div class="flex items-center justify-between tw-w-full card-container tw-h-[71px] tw-px-2 tw-py-3">
         <div class="flex items-center">
           <div
           data-test="add-alert-back-btn"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       ref="addAlertFormRef"
       style="
-        max-height: calc(100vh - 180px);
+        max-height: calc(100vh - 194px);
         overflow: auto;
         scroll-behavior: smooth;
       "
