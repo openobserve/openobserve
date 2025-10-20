@@ -63,7 +63,7 @@ use crate::{
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
         search::{
             self as SearchService, datafusion::plan::projections::get_result_schema,
-            sql::visitor::pickup_where::pickup_where,
+            sql::visitor::pickup_where::pickup_where, utils::is_permissable_function_error,
         },
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
@@ -417,6 +417,15 @@ pub async fn search(
         Ok(mut res) => {
             res.set_took(start.elapsed().as_millis() as usize);
             res.converted_histogram_query = converted_histogram_query;
+
+            // Check if function error is only query limit default error and only `ui`
+            if req.search_type == Some(SearchEventType::UI)
+                && is_permissable_function_error(&res.function_error)
+            {
+                res.function_error.clear();
+                res.is_partial = false;
+            }
+
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
@@ -1229,7 +1238,7 @@ async fn values_v1(
                 .unwrap_or("".to_string());
             let num = row
                 .get("zo_sql_num")
-                .map(|v| v.as_i64().unwrap_or(0))
+                .and_then(json::Value::as_i64)
                 .unwrap_or(0);
             top_hits.push((key, num));
         }

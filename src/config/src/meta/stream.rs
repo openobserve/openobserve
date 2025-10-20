@@ -986,16 +986,16 @@ impl From<&str> for StreamSettings {
             defined_schema_fields = fields;
         }
 
-        let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());
+        let flatten_level = settings.get("flatten_level").and_then(Value::as_i64);
 
         let store_original_data = settings
             .get("store_original_data")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
 
         let approx_partition = settings
             .get("approx_partition")
-            .and_then(|v| v.as_bool())
+            .and_then(Value::as_bool)
             .unwrap_or(
                 get_config()
                     .common
@@ -1013,7 +1013,7 @@ impl From<&str> for StreamSettings {
 
         let index_updated_at = settings
             .get("index_updated_at")
-            .and_then(|v| v.as_i64())
+            .and_then(Value::as_i64)
             .unwrap_or_default();
 
         let mut extended_retention_days = vec![];
@@ -1024,26 +1024,26 @@ impl From<&str> for StreamSettings {
             for item in values {
                 let start = item
                     .get("start")
-                    .and_then(|v| v.as_i64())
+                    .and_then(Value::as_i64)
                     .unwrap_or_default();
-                let end = item.get("end").and_then(|v| v.as_i64()).unwrap_or_default();
+                let end = item.get("end").and_then(Value::as_i64).unwrap_or_default();
                 extended_retention_days.push(TimeRange::new(start, end));
             }
         }
 
         let index_original_data = settings
             .get("index_original_data")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
 
         let index_all_values = settings
             .get("index_all_values")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
         let enable_distinct_fields = settings
             .get("enable_distinct_fields")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(true);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
         Self {
             partition_time_level,
             partition_keys,

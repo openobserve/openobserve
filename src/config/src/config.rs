@@ -1198,10 +1198,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 128)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
     pub max_file_size_in_memory: usize,
     #[deprecated(
         since = "0.14.1",
@@ -1278,6 +1278,13 @@ pub struct Limit {
     pub query_partition_by_secs: usize,
     #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
     pub query_group_base_speed: usize,
+    // Default Config: Run Query Recommendation Analysis for last one hour for every hour
+    #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)]
+    pub query_recommendation_duration: i64,
+    #[env_config(name = "ZO_QUERY_RECOMMENDATION_INTERVAL", default = 3600000000)]
+    pub query_recommendation_analysis_interval: i64,
+    #[env_config(name = "ZO_QUERY_RECOMMENDATION_TOP_K", default = 128)]
+    pub query_recommendation_top_k: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
     #[env_config(name = "ZO_INGEST_ALLOWED_IN_FUTURE", default = 24)] // in hours - in future
@@ -1298,7 +1305,7 @@ pub struct Limit {
     pub metrics_max_series_per_query: usize,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
-    #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 100000)]
+    #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
     pub metrics_cache_max_entries: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
@@ -1448,13 +1455,13 @@ pub struct Limit {
     pub consistent_hash_vnodes: usize,
     #[env_config(
         name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES",
-        default = 100000,
+        default = 10000,
         help = "Maximum number of entries in the file stat cache. Higher values increase memory usage but may improve query performance."
     )]
     pub datafusion_file_stat_cache_max_entries: usize,
     #[env_config(
         name = "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES",
-        default = 100000,
+        default = 10000,
         help = "Maximum number of entries in the streaming aggs cache. Higher values increase memory usage but may improve query performance."
     )]
     pub datafusion_streaming_aggs_cache_max_entries: usize,
@@ -1624,7 +1631,7 @@ pub struct CacheLatestFiles {
 
 #[derive(EnvConfig, Default)]
 pub struct MemoryCache {
-    #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = true)]
+    #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = false)]
     pub enabled: bool,
     // Memory data cache strategy, default is lru, other value is fifo, time_lru
     #[env_config(name = "ZO_MEMORY_CACHE_STRATEGY", default = "lru")]
@@ -2330,7 +2337,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.metrics_max_points_per_series = 30_000;
     }
     if cfg.limit.metrics_cache_max_entries == 0 {
-        cfg.limit.metrics_cache_max_entries = 100_000;
+        cfg.limit.metrics_cache_max_entries = 10_000;
     }
 
     // check search job retention
