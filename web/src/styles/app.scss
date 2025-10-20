@@ -211,7 +211,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
   border-radius: 0.25rem;
-  background: transparent; // hidden by default
+  background: white; // hidden by default
   transition: background 0.3s ease;
   cursor: pointer;
 }

@@ -22,120 +22,128 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="min-height: calc(100vh - 130px)"
   >
     <template v-slot:before>
-      <q-tabs
-        v-model="ingestiontabs"
-        indicator-color="transparent"
-        inline-label
-        vertical
-      >
-        <q-route-tab
-          name="curl"
-          :to="{
-            name: 'curl',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          icon="data_object"
-          label="Curl"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="filebeat"
-          :to="{
-            name: 'filebeat',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/filebeat.png')"
-          label="Filebeat"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          default
-          name="fluentbit"
-          :to="{
-            name: 'fluentbit',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
-          label="FluentBit"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="fluentd"
-          :to="{
-            name: 'fluentd',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
-          label="Fluentd"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="vector"
-          :to="{
-            name: 'vector',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/vector.png')"
-          label="Vector"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="ingestLogsFromOtel"
-          :to="{
-            name: 'ingestLogsFromOtel',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-          label="OTEL Collector"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="logstash"
-          :to="{
-            name: 'logstash',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/logstash.svg')"
-          label="Logstash"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="syslogNg"
-          :to="{
-            name: 'syslogNg',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          icon="plagiarism"
-          label="Syslog-ng"
-          content-class="tab_content"
-        />
-      </q-tabs>
+      <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
+        <div class="card-container tw-h-[calc(100vh-165px)]">
+          <q-tabs
+            v-model="ingestiontabs"
+            indicator-color="transparent"
+            inline-label
+            vertical
+          >
+            <q-route-tab
+              name="curl"
+              :to="{
+                name: 'curl',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              icon="data_object"
+              label="Curl"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="filebeat"
+              :to="{
+                name: 'filebeat',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :icon="'img:' + getImageURL('images/ingestion/filebeat.png')"
+              label="Filebeat"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              default
+              name="fluentbit"
+              :to="{
+                name: 'fluentbit',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
+              label="FluentBit"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="fluentd"
+              :to="{
+                name: 'fluentd',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
+              label="Fluentd"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="vector"
+              :to="{
+                name: 'vector',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :icon="'img:' + getImageURL('images/ingestion/vector.png')"
+              label="Vector"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="ingestLogsFromOtel"
+              :to="{
+                name: 'ingestLogsFromOtel',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+              label="OTEL Collector"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="logstash"
+              :to="{
+                name: 'logstash',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :icon="'img:' + getImageURL('images/ingestion/logstash.svg')"
+              label="Logstash"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="syslogNg"
+              :to="{
+                name: 'syslogNg',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              icon="plagiarism"
+              label="Syslog-ng"
+              content-class="tab_content"
+            />
+          </q-tabs>
+        </div>
+      </div>
     </template>
 
     <template v-slot:after>
-      <router-view
-        :title="ingestiontabs"
-        :currOrgIdentifier="currOrgIdentifier"
-        :currUserEmail="currentUserEmail"
-        @copy-to-clipboard-fn="copyToClipboardFn"
-      >
-      </router-view>
+      <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
+        <div class="card-container tw-h-[calc(100vh-165px)]">
+          <router-view
+            :title="ingestiontabs"
+            :currOrgIdentifier="currOrgIdentifier"
+            :currUserEmail="currentUserEmail"
+            @copy-to-clipboard-fn="copyToClipboardFn"
+          >
+          </router-view>
+        </div>
+      </div>
     </template>
   </q-splitter>
 </template>
@@ -272,31 +280,7 @@ export default defineComponent({
   .head {
     padding-bottom: 1rem;
   }
-  .q-tabs {
-    &--vertical {
-      margin: 1.5rem 1rem 0 1rem;
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 0.6rem 0 0.6rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        text-transform: capitalize;
-
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          color: black;
-          background-color: $accent;
-        }
-      }
-    }
-  }
+  
 }
 </style>
 <style lang="scss">
