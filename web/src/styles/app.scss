@@ -1295,6 +1295,18 @@ body {
   &:not(.q-field--disabled):hover .q-field__control {
     border-color: var(--border-color-hover) !important;
   }
+  .q-field__append {
+    align-items: center;
+  }
+  .q-field__append .q-icon:not(.q-select__dropdown-icon) {
+    margin-top: 4px;
+  }
+  .q-select__dropdown-icon {
+    transition: transform 0.3s ease;
+  }
+  &.q-field--focused .q-select__dropdown-icon {
+    transform: rotate(180deg);
+  }
 }
 
 /* ============================================================================
