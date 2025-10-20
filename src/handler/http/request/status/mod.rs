@@ -847,7 +847,7 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     let conf = get_config();
 
     #[cfg(feature = "enterprise")]
-    let auth_str = extract_auth_str(&req);
+    let auth_str = extract_auth_str(&req).await;
     // Only get the user email from the auth_str, no need to check for permissions and others
     #[cfg(feature = "enterprise")]
     let user_email = get_user_email_from_auth_str(&auth_str).await;
