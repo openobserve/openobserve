@@ -210,11 +210,6 @@ export default defineConfig({
       target: "es2020",
     },
     exclude: [
-      "echarts/core",
-      "echarts/renderers",
-      "echarts/components",
-      "echarts/features",
-      "echarts/charts",
     ],
     force: false,
   },
