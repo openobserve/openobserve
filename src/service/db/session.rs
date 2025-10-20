@@ -99,7 +99,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if item_value.is_empty() {
                     continue;
                 }
-                USER_SESSIONS.insert(item_key.to_string(), item_value);
+                // DEBUG, for debug, we skip it for now
+                // USER_SESSIONS.insert(item_key.to_string(), item_value);
+                log::warn!(
+                    "skip watch_user: put key={}, value={}",
+                    item_key,
+                    item_value
+                );
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
