@@ -1302,6 +1302,14 @@ body {
     padding: 0rem 0.75rem !important;
   }
 
+  .q-field__control-container{
+      .q-field__native{
+        min-height: 2.25rem !important;
+       height: 2.25rem !important;
+       padding: 0px !important;
+    }
+  }
+
   .q-field__marginal {
     height: 2.25rem !important;
   }

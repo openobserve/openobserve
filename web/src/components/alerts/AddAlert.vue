@@ -297,13 +297,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-w-full row">
               <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full ">
               <variables-input
-                class="o2-input"
                 :variables="formData.context_attributes"
                 @add:variable="addVariable"
                 @remove:variable="removeVariable"
               />
             </div>
-
+            <!-- TODO: make text area also similar to qinput -->
             <div v-if="expandState.advancedSetup" class=" tw-w-full t">
               <div data-test="add-alert-description-input tw-w-full " :class="store.state.theme === 'dark' ? '' : 'light-mode'">
                 <div class="flex items-center q-mb-sm ">
@@ -323,7 +322,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="textarea"
                   placeholder="Type something"
                   rows="5"
-                  
                 />
               </div>
               <div data-test="add-alert-row-input tw-w-full">
