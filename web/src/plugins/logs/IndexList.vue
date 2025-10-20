@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :placeholder="placeHolderText"
         input-debounce="0"
         behavior="menu"
-        filled
         borderless
         dense
         use-input
@@ -524,16 +523,15 @@ color="primary" size="xs" /> No field found in
             data-test="log-search-index-list-field-search-input"
             v-model="searchObj.data.stream.filterField"
             data-cy="index-field-search-input"
-            filled
             borderless
             dense
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
-            class="!tw-pb-[0.375rem]"
+            class="!tw-pb-[0.375rem] indexlist-search-input"
           >
             <template #prepend>
-              <q-icon name="search" />
+              <q-icon name="search" size="20px" class="o2-search-input-icon" />
             </template>
           </q-input>
           <q-tr v-if="searchObj.loadingStream == true">
@@ -2020,4 +2018,31 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.indexlist-search-input{
+  
+  height: 36px;
+  .q-field__control{
+    
+    height: 36px;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    padding: 0px 6px !important;
+    font-weight: 500;
+  }
+  .q-field__prepend{
+    height: 36px !important;
+    padding-bottom: 4px !important;
+  }
+  .q-field__append{
+    padding-top: 8px !important;
+  }
+
+  .q-icon {
+    height: 16px;
+    width: 16px;
+    margin-right: 10px;
+  }
+}
+</style>
