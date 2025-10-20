@@ -362,6 +362,7 @@ export default defineComponent({
   &.folder-header-dark {
     background-color: #1a1a1a;
   }
+  border-radius: 0.625rem;
 }
 
 .folders-tabs {
