@@ -1281,29 +1281,48 @@ body {
    ============================================================================ */
 
 .q-select {
-  min-height: 2.25rem;
+  min-height: 2.25rem !important;
+  max-height: 2.25rem !important;
+  height: 2.25rem !important;
   font-size: 0.813rem;
+
+  .q-field__inner {
+    min-height: 2.25rem !important;
+    max-height: 2.25rem !important;
+  }
+
   .q-field__control {
     @extend .el-border;
     @extend .el-border-radius;
-    min-height: 2.25rem;
-    max-height: 2.25rem;
+    min-height: 2.25rem !important;
+    max-height: 2.25rem !important;
+    height: 2.25rem !important;
     background-color: transparent;
     line-height: 1.5rem;
     padding: 0rem 0.75rem !important;
   }
+
+  .q-field__marginal {
+    height: 2.25rem !important;
+  }
+
   &:not(.q-field--disabled):hover .q-field__control {
     border-color: var(--border-color-hover) !important;
   }
+
   .q-field__append {
     align-items: center;
+    height: 2.25rem !important;
   }
+
   .q-field__append .q-icon:not(.q-select__dropdown-icon) {
     margin-top: 4px;
   }
+
   .q-select__dropdown-icon {
     transition: transform 0.3s ease;
   }
+
   &.q-field--focused .q-select__dropdown-icon {
     transform: rotate(180deg);
   }
