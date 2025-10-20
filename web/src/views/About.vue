@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="aboutPage">
+  <q-page class="aboutPage card-container tw-mx-2 tw-my-3">
     <div class="tw-w-full">
       <!-- Hero Section -->
-      <div class="hero-section card-container">
+      <div class="hero-section">
         <div class="tw-flex tw-flex-col md:tw-flex-row tw-items-center tw-justify-between tw-gap-8">
           <div class="tw-flex-1">
             <img
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Features Grid -->
       <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
         <!-- Open Source Libraries -->
-        <div class="card-container feature-card">
+        <div class=" feature-card">
           <div class="tw-mb-4" style="min-height: 120px;">
             <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
               <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- License Info -->
         <div
           v-if="store.state.zoConfig.build_type == 'opensource' || (store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false')"
-          class="card-container feature-card license-feature"
+          class=" feature-card license-feature"
         >
           <div class="tw-mb-4">
             <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Community Card (if no license card) -->
         <div
           v-else
-          class="card-container feature-card"
+          class=" feature-card"
         >
           <div class="tw-mb-4" style="min-height: 120px;">
             <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
@@ -354,12 +354,18 @@ export default defineComponent({
     padding: 2rem;
     transition: all 0.3s ease;
     position: relative;
+    border: 1px solid;
+    border-radius: 12px;
 
     &:hover {
       transform: translateY(-3px);
       box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
     }
+    border: 0.0625rem solid var(--o2-border-color);
+  }
 
+
+  .feature-card {
     .icon-wrapper {
       width: 56px;
       height: 56px;
