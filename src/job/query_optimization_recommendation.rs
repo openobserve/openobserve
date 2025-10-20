@@ -77,7 +77,7 @@ impl QueryRecommendationEngine for OptimizerContext {
         recommendations: Vec<OptimiserRecommendation>,
     ) -> Pin<Box<dyn Future<Output = Result<IngestionResponse, anyhow::Error>> + Send>> {
         Box::pin(async move {
-            let ingester = Ingester;
+            let ingester = Ingester {};
             let request = IngestionRequest {
                 org_id: META_ORG_ID.to_string(),
                 stream_type: StreamType::Logs.to_string(),
