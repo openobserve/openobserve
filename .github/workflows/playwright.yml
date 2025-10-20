@@ -335,7 +335,7 @@ jobs:
         run: cd tests/ui-testing && npm ci
 
       - name: Download blob reports from GitHub Actions Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: tests/ui-testing/all-blob-reports
           pattern: blob-report-*
