@@ -228,38 +228,38 @@ mod tests {
     #[test]
     fn test_is_cachable_function_error() {
         let error = vec![];
-        assert_eq!(is_permissable_function_error(&error), true);
+        assert!(is_permissable_function_error(&error));
 
         let error = vec!["".to_string()];
-        assert_eq!(is_permissable_function_error(&error), true);
+        assert!(is_permissable_function_error(&error));
 
         let error = vec![
             CAPPED_RESULTS_MSG.to_string(),
             PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
         ];
-        assert_eq!(is_permissable_function_error(&error), true); // only this is cachable
+        assert!(is_permissable_function_error(&error)); // only this is cachable
 
         let error = vec![
             CAPPED_RESULTS_MSG.to_string(),
             PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
             "parquet not found".to_string(),
         ];
-        assert_eq!(is_permissable_function_error(&error), false);
+        assert!(!is_permissable_function_error(&error));
 
         let error = vec![
             "parquet not found".to_string(),
             PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
         ];
-        assert_eq!(is_permissable_function_error(&error), false);
+        assert!(!is_permissable_function_error(&error));
 
         let error = vec!["parquet not found".to_string()];
-        assert_eq!(is_permissable_function_error(&error), false);
+        assert!(!is_permissable_function_error(&error));
 
         let error = vec![
             "parquet not found".to_string(),
             CAPPED_RESULTS_MSG.to_string(),
         ];
-        assert_eq!(is_permissable_function_error(&error), false);
+        assert!(!is_permissable_function_error(&error));
     }
 
     #[test]
