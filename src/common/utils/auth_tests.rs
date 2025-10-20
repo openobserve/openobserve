@@ -3262,6 +3262,7 @@ mod tests {
                 inverted_index_min_token_length: usize::default(),
                 inverted_index_max_token_length: usize::default(),
                 cache_delay_secs: i64::default(),
+                aggs_min_num_partition_secs: usize::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),
