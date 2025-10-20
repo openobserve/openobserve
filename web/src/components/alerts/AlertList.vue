@@ -19,10 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="alert-list-page"
-    class="q-pa-none flex"
+    class="q-pa-none flex flex-col"
     style="height: calc(100vh - 60px);"
   >
-    <div class="tw-w-full tw-px-[0.625rem]" v-if="!showAddAlertDialog && !showImportAlertDialog">
+    <div class="tw-w-full tw-px-[0.625rem] tw-mb-[0.625rem]" v-if="!showAddAlertDialog && !showImportAlertDialog">
       <div class="card-container">
         <div
           class="flex justify-between full-width tw-py-3 tw-px-4 items-center"
@@ -101,13 +101,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       class="full-width alert-list-table"
-      style="height: calc(100vh - 138px)"
+      style="height: calc(100vh - 116px)"
     >
       <q-splitter
         v-model="splitterModel"
         unit="px"
         :limits="[200, 500]"
-        style="height: calc(100vh - 112px)"
+        style="height: calc(100vh - 116px)"
         data-test="alert-list-splitter"
       >
         <template #before>
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :pagination="pagination"
                 style="width: 100%;"
                 :style="filteredResults?.length 
-                ? 'width: 100%; height: calc(100vh - 112px)' 
+                ? 'width: 100%; height: calc(100vh - 124px)' 
                 : 'width: 100%'"
 
                 class="o2-quasar-table o2-quasar-table-header-sticky"

@@ -17,119 +17,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page
-    class="q-pa-none dashboards-list-page"
+  <div
+    class="q-pa-none flex flex-col"
     :key="store.state.selectedOrganization.identifier"
+    style="height: calc(100vh - 60px);"
   >
     <!-- searchBar at top -->
-    <div
-      class="q-table__top card-container"
-      style="
-        display: flex;
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-      "
-    >
-      <div class="q-table__title">{{ t("dashboard.header") }}</div>
+     <div class="tw-w-full tw-px-[0.625rem] tw-mb-[0.625rem]">
+      <div class="card-container">
+        <div class="flex justify-between full-width tw-py-3 tw-px-4 items-center">
+            <div class="q-table__title">{{ t("dashboard.header") }}</div>
 
-      <div class="flex q-ml-auto tw-ps-2">
-        <!-- :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-3'" -->
-        <q-input
-          v-model="dynamicQueryModel"
-          dense
-          borderless
-          :placeholder="
-            searchAcrossFolders
-              ? t('dashboard.searchAcross')
-              : t('dashboard.search')
-          "
-          data-test="dashboard-search"
-          :clearable="searchAcrossFolders"
-          @clear="clearSearchHistory"
-          class="o2-search-input"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-search-input-dark'
-              : 'o2-search-input-light'
-          "
-         hide-bottom-space>
-          <template #prepend>
-            <q-icon
-              class="o2-search-input-icon"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-search-input-icon-dark'
-                  : 'o2-search-input-icon-light'
-              "
-              name="search"
-            />
-          </template>
-        </q-input>
+              <div class="flex q-ml-auto tw-ps-2">
+                <q-input
+                  v-model="dynamicQueryModel"
+                  dense
+                  borderless
+                  :placeholder="
+                    searchAcrossFolders
+                      ? t('dashboard.searchAcross')
+                      : t('dashboard.search')
+                  "
+                  data-test="dashboard-search"
+                  :clearable="searchAcrossFolders"
+                  @clear="clearSearchHistory"
+                  class="o2-search-input"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-search-input-dark'
+                      : 'o2-search-input-light'
+                  "
+                hide-bottom-space>
+                  <template #prepend>
+                    <q-icon
+                      class="o2-search-input-icon"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'o2-search-input-icon-dark'
+                          : 'o2-search-input-icon-light'
+                      "
+                      name="search"
+                    />
+                  </template>
+                </q-input>
+              </div>
+              <div class="tw-mb-2">
+                <q-toggle
+                  data-test="dashboard-search-across-folders-toggle"
+                  v-model="searchAcrossFolders"
+                  label="All Folders"
+                  size="lg"
+                  class="tw-mr-3 tw-h-[36px] o2-toggle-button-lg"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-toggle-button-lg-dark'
+                      : 'o2-toggle-button-lg-light'
+                  "
+                >
+                </q-toggle>
+                <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
+                  {{
+                    searchAcrossFolders
+                      ? t("dashboard.searchSelf")
+                      : t("dashboard.searchAll")
+                  }}
+                </q-tooltip>
+              </div>
+              <q-btn
+                class="q-ml-md o2-secondary-button tw-h-[36px]"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-secondary-button-dark'
+                    : 'o2-secondary-button-light'
+                "
+                no-caps
+                flat
+                :label="t(`dashboard.import`)"
+                @click="importDashboard"
+                data-test="dashboard-import"
+              />
+              <!-- add dashboard button -->
+              <q-btn
+                class="q-ml-md o2-primary-button tw-h-[36px]"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-primary-button-dark'
+                    : 'o2-primary-button-light'
+                "
+                no-caps
+                flat
+                data-test="dashboard-add"
+                :label="t(`dashboard.add`)"
+                @click="addDashboard"
+              />
+        </div>
       </div>
-      <div class="tw-mb-2">
-        <q-toggle
-          data-test="dashboard-search-across-folders-toggle"
-          v-model="searchAcrossFolders"
-          label="All Folders"
-          size="lg"
-          class="tw-mr-3 tw-h-[36px] o2-toggle-button-lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
-        >
-        </q-toggle>
-        <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
-          {{
-            searchAcrossFolders
-              ? t("dashboard.searchSelf")
-              : t("dashboard.searchAll")
-          }}
-        </q-tooltip>
-      </div>
-      <q-btn
-        class="q-ml-md o2-secondary-button tw-h-[36px]"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-secondary-button-dark'
-            : 'o2-secondary-button-light'
-        "
-        no-caps
-        flat
-        :label="t(`dashboard.import`)"
-        @click="importDashboard"
-        data-test="dashboard-import"
-      />
-      <!-- add dashboard button -->
-      <q-btn
-        class="q-ml-md o2-primary-button tw-h-[36px]"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-primary-button-dark'
-            : 'o2-primary-button-light'
-        "
-        no-caps
-        flat
-        data-test="dashboard-add"
-        :label="t(`dashboard.add`)"
-        @click="addDashboard"
-      />
-    </div>
-    <q-splitter
-      v-model="splitterModel"
-      unit="px"
-      :limits="[200, 500]"
-      class="q-pt-sm"
-      style="height: calc(100vh - 112px)"
-      data-test="dashboard-splitter"
+     </div>
+     <div 
+      class="full-width alert-list-table"
+      style="height: calc(100vh - 116px)"
+     >
+       <q-splitter
+            v-model="splitterModel"
+            unit="px"
+            :limits="[200, 500]"
+            style="height: calc(100vh - 116px)"
+            data-test="dashboard-splitter"
     >
       <template v-slot:before>
-        <div class="card-container">
+        <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
+        <div class="tw-h-full">
+          <div class="card-container tw-h-full tw-flex tw-flex-col">
           <!-- folder list starts here -->
           <div
-            class="dashboard-folder-header dashboard-sticky-top"
+            class="dashboard-folder-header dashboard-sticky-top "
             :class="
               store.state.theme === 'dark'
                 ? 'dashboard-folder-header-dark'
@@ -192,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div></div>
             </div>
           </div>
-          <div class="dashboards-tabs">
+          <div class="dashboards-tabs tw-flex-1 tw-overflow-y-auto">
             <q-tabs
               indicator-color="transparent"
               inline-label
@@ -266,9 +267,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tabs>
           </div>
         </div>
+        </div>
+        </div>
       </template>
       <template v-slot:after>
-        <div class="card-container">
+          <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+            <div class="tw-h-full card-container">
           <!-- add dashboard table -->
           <q-table
             ref="qTable"
@@ -285,15 +289,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-table"
             :style="
               !filterQuery.length && dashboards.length > 0
-                ? 'height: calc(100vh - 112px)'
+                ? 'height: calc(100vh - 124px)'
                 : ''
             "
             class="o2-quasar-table o2-quasar-table-header-sticky"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark'
-                : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'
-            "
           >
             <!-- if data not available show nodata component -->
             <template #no-data>
@@ -543,9 +542,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="confirmDeleteFolderDialog"
           />
         </div>
+        </div>
       </template>
     </q-splitter>
-  </q-page>
+     </div>
+  </div>
 </template>
 
 <script lang="ts">
@@ -1348,6 +1349,11 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .dashboards-tabs {
+  .q-tabs {
+    height: auto !important;
+    max-height: none !important;
+  }
+
   .individual-tab {
     min-height: 1.5rem;
     margin-bottom: 6px;
