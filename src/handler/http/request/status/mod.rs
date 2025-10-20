@@ -149,6 +149,8 @@ struct ConfigResponse<'a> {
     license_expiry: i64,
     #[cfg(feature = "enterprise")]
     license_server_url: String,
+    #[cfg(feature = "enterprise")]
+    ingestion_quota_used: f64,
     log_page_default_field_list: String,
 }
 
@@ -306,6 +308,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let expiry_time = o2_enterprise::enterprise::license::get_expiry_time().await;
     #[cfg(feature = "enterprise")]
     let license_server_url = o2cfg.common.license_server_url.to_string();
+    #[cfg(feature = "enterprise")]
+    let ingestion_quota_used = o2_enterprise::enterprise::license::ingestion_used() * 100.0;
 
     let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
@@ -380,6 +384,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
         #[cfg(feature = "enterprise")]
         license_server_url,
+        #[cfg(feature = "enterprise")]
+        ingestion_quota_used
     }))
 }
 
