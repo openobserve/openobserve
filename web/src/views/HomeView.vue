@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page style="overflow-y: auto;" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
-    <div v-if="!no_data_ingest && !isLoadingSummary" class="card-container tw-w-full tw-h-full" style="display: flex; flex-direction: column; ">
+    <div v-if="!no_data_ingest && !isLoadingSummary" class="card-container tw-w-full tw-h-full tw-px-[0.625rem]" style="display: flex; flex-direction: column; ">
         <!-- 1st section -->
          <div>
           <TrialPeriod></TrialPeriod>
@@ -564,140 +564,181 @@ export default defineComponent({
       getSummary(store.state.selectedOrganization.identifier);
     }
 
-  const alertsPanelData = computed (() => ({
-    chartType: "custom_chart",
-    title: {
-      text: "Last 15 minutes",
-      left: "70%",
-      top: "35%",
-      textStyle: {
-        fontSize: 16,
-        fontWeight: "normal",
-        color: store.state.theme === 'dark' ? '#D9D9D9' : '#262626'
-      }
-    },
-    tooltip: {
-      trigger: "item"
-    },
-    legend: {
-      top: "50%",
-      orient: "vertical",
-      left: "70%",
-      textStyle: {
-        color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
-      }
-    },
-    series: [
-      {
-        name: "Alert Status",
-        type: "pie",
-        radius: ["35%", "55%"],
-        center: ["50%", "50%"],
-        right: "40%",
-        startAngle: 0,
-        endAngle: 360,
-        label: {
-          formatter: "{d}%",
-          show: true,
-          fontSize: 16,
-          color: store.state.theme === 'dark' ? '#ffffff' : '#000000'
-        },
-        labelLine: {
-          show: true,
-          length: 10,
-          length2: 10,
-          lineStyle: {
-            width: 2
-          }
-        },
-        data: [
-          {
-            value: summary.value.healthy_alerts,
-            name: "Success Alerts",
-            itemStyle: {
-              color: "#15ba73"
-            }
-          },
-          {
-            value: summary.value.failed_alerts,
-            name: "Failed Alerts",
-            itemStyle: {
-              color: "#db373a"
-            }
-          }
-        ]
-      }
-    ]
-  }));
+  const alertsPanelData = computed (() => {
+    const healthyAlerts = summary.value.healthy_alerts || 0;
+    const failedAlerts = summary.value.failed_alerts || 0;
+    const total = healthyAlerts + failedAlerts;
 
-  const pipelinesPanelData = computed(() => {
-
+    // If no data, show placeholder
+    if (total === 0) {
       return {
         chartType: "custom_chart",
-        xAxis: {
-          type: "category",
-          data: ["Healthy", "Failed", "Warning"],
-          name: "Last 15 minutes",
-          nameLocation: "middle",
-          nameGap: 30,
-          nameTextStyle: {
+        title: {
+          text: "No data available",
+          left: "center",
+          top: "center",
+          textStyle: {
             fontSize: 16,
             fontWeight: "normal",
             color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
-          },
-          axisLabel: {
-            fontSize: 14,
-            color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
           }
-        },
-        yAxis: {
-          type: "value",
-          min: 0,
-          max:Math.ceil((summary.value.healthy_pipelines + summary.value.failed_pipelines + summary.value.warning_pipelines) / 3 / 10) * 10 ,
-          interval: 10,
-          name: "Number of Pipelines",
-          nameLocation: "middle",
-          nameGap: 60,
-          nameRotate: 90,
-          nameTextStyle: {
-            fontSize: 16,
-            fontWeight: "normal",
-            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+        }
+      };
+    }
+
+    return {
+      chartType: "custom_chart",
+      title: {
+        text: "Last 15 minutes",
+        left: "65%",
+        top: "50%",
+        textStyle: {
+          fontSize: 16,
+          fontWeight: "normal",
+          color: store.state.theme === 'dark' ? '#D9D9D9' : '#262626'
+        }
+      },
+      tooltip: {
+        trigger: "item"
+      },
+      legend: {
+        top: "65%",
+        orient: "vertical",
+        left: "65%",
+        textStyle: {
+          color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
+        }
+      },
+      series: [
+        {
+          name: "Alert Status",
+          type: "pie",
+          radius: ["35%", "55%"],
+          center: ["35%", "50%"],
+          startAngle: 0,
+          endAngle: 360,
+          label: {
+            formatter: "{d}%",
+            show: true,
+            fontSize: 14,
+            color: store.state.theme === 'dark' ? '#ffffff' : '#000000'
           },
-          axisLabel: {
-            fontSize: 12,
-            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
-          },
-          splitLine: {
+          labelLine: {
+            show: true,
+            length: 15,
+            length2: 8,
             lineStyle: {
-              color: store.state.theme === 'dark' ? '#444' : '#e0e0e0'
+              width: 2
             }
           },
-          offset: -20
-
-        },
-
-        series: [
-          {
-            data: [summary.value.healthy_pipelines, summary.value.failed_pipelines, summary.value.warning_pipelines],
-            type: "bar",
-            barWidth: "50%",
-            label: {
-              show: true,
-              position: "top",
-              fontSize: 14,
-              fontWeight: "bold",
-              color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
+          data: [
+            {
+              value: healthyAlerts,
+              name: "Success Alerts",
+              itemStyle: {
+                color: "#15ba73"
+              }
             },
-            itemStyle: {
-              color: function (params: any) {
-                const colors = ['#16b26a', '#db373b', '#ffc328'];
-                return colors[params.dataIndex];
+            {
+              value: failedAlerts,
+              name: "Failed Alerts",
+              itemStyle: {
+                color: "#db373a"
               }
             }
-          }
           ]
+        }
+      ]
+    };
+  });
+
+  const pipelinesPanelData = computed(() => {
+    const healthyPipelines = summary.value.healthy_pipelines || 0;
+    const failedPipelines = summary.value.failed_pipelines || 0;
+    const warningPipelines = summary.value.warning_pipelines || 0;
+    const total = healthyPipelines + failedPipelines + warningPipelines;
+
+    // If no data, show placeholder
+    if (total === 0) {
+      return {
+        chartType: "custom_chart",
+        title: {
+          text: "No data available",
+          left: "center",
+          top: "center",
+          textStyle: {
+            fontSize: 16,
+            fontWeight: "normal",
+            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+          }
+        }
       };
+    }
+
+    return {
+      chartType: "custom_chart",
+      xAxis: {
+        type: "category",
+        data: ["Healthy", "Failed", "Warning"],
+        name: "Last 15 minutes",
+        nameLocation: "middle",
+        nameGap: 30,
+        nameTextStyle: {
+          fontSize: 16,
+          fontWeight: "normal",
+          color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+        },
+        axisLabel: {
+          fontSize: 14,
+          color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
+        }
+      },
+      yAxis: {
+        type: "value",
+        min: 0,
+        max: Math.ceil((healthyPipelines + failedPipelines + warningPipelines) / 3 / 10) * 10 || 10,
+        interval: 10,
+        name: "Number of Pipelines",
+        nameLocation: "middle",
+        nameGap: 60,
+        nameRotate: 90,
+        nameTextStyle: {
+          fontSize: 16,
+          fontWeight: "normal",
+          color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+        },
+        axisLabel: {
+          fontSize: 12,
+          color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+        },
+        splitLine: {
+          lineStyle: {
+            color: store.state.theme === 'dark' ? '#444' : '#e0e0e0'
+          }
+        },
+        offset: -20
+      },
+      series: [
+        {
+          data: [healthyPipelines, failedPipelines, warningPipelines],
+          type: "bar",
+          barWidth: "50%",
+          label: {
+            show: true,
+            position: "top",
+            fontSize: 14,
+            fontWeight: "bold",
+            color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
+          },
+          itemStyle: {
+            color: function (params: any) {
+              const colors = ['#16b26a', '#db373b', '#ffc328'];
+              return colors[params.dataIndex];
+            }
+          }
+        }
+      ]
+    };
   });
 
   const compressedSizeIcon = computed(() => {
