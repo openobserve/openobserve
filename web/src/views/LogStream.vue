@@ -17,10 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page>
+  <div
+    data-test="alert-list-page"
+    class="q-pa-none flex flex-col"
+    style="height: calc(100vh - 60px);"
+  >
     <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
         <div class="card-container tw-mb-[0.625rem]">
-          <div class="flex items-center justify-between full-width tw-py-3 tw-px-4 tw-h-[71px]">
+          <div class="flex items-center justify-between full-width tw-py-3 tw-px-4 tw-h-[68px]">
             <div class="q-table__title tw-font-[600]" data-test="log-stream-title-text">
               {{ t("logStream.header") }}
             </div>
@@ -73,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-        <div class="card-container tw-h-[calc(100vh-130px)]">
+      <div class="tw-w-full tw-h-full">
+        <div class="card-container tw-h-[calc(100vh-126px)]">
           <q-table
             data-test="log-stream-table"
             class="o2-quasar-table o2-quasar-table-header-sticky"
@@ -89,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :filter="filterQuery"
             :filter-method="filterData"
             :style="logStream?.length
-                  ? 'width: 100%; height: calc(100vh - 130px)' 
+                  ? 'width: 100%; height: calc(100vh - 126px)' 
                   : 'width: 100%'"
             :rows-per-page-options="perPageOptions"
             @request="onRequest"
@@ -319,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-actions>
       </q-card>
     </q-dialog>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">

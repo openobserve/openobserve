@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
       <div class="card-container tw-mb-[0.625rem]">
-        <div class="tw-flex tw-justify-between tw-items-center tw-w-full tw-py-3 tw-px-4 tw-h-[71px]">
+        <div class="tw-flex tw-justify-between tw-items-center tw-w-full tw-py-3 tw-px-4 tw-h-[68px]">
           <div class="q-table__title tw-font-[600]" data-test="report-list-title">
             {{ t("reports.header") }}
           </div>
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-        <div class="card-container full-width o2-quasar-table o2-quasar-table-header-sticky tw-h-[calc(100vh-130px)]">
+        <div class="card-container full-width o2-quasar-table o2-quasar-table-header-sticky tw-h-[calc(100vh-126px)]">
           <q-table
             data-test="report-list-table"
             ref="reportListTableRef"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :filter-method="filterData"
             style="width: 100%"
             :style="hasVisibleRows
-                ? 'width: 100%; height: calc(100vh - 130px)' 
+                ? 'width: 100%; height: calc(100vh - 126px)' 
                 : 'width: 100%'"
           >
             <template #no-data>
@@ -277,7 +277,7 @@ const columns: any = ref<QTableProps["columns"]>([
     label: "#",
     field: "#",
     align: "left",
-    style: "width: 67px",
+    style: "width: 67px;",
   },
   {
     name: "name",
