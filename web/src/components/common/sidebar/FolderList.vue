@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="card-container">
+  <div class="card-container tw-h-full">
       <div class="folder-header sticky-top" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
         <div class="text-bold q-px-sm  q-py-sm tw-flex tw-items-center tw-justify-between tw-gap-2">
           Folders
