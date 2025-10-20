@@ -436,7 +436,7 @@ pub async fn test(web::Json(req): web::Json<PatternTestRequest>) -> Result<HttpR
         let pattern = req.pattern;
         let inputs = req.test_records;
         // Default to Redact if policy not specified for backward compatibility
-        let policy = req.policy.as_ref().map(|p| p.as_str()).unwrap_or("Redact");
+        let policy = req.policy.as_deref().unwrap_or("Redact");
         let policy = PatternPolicy::from(policy);
 
         let mut ret = Vec::with_capacity(inputs.len());

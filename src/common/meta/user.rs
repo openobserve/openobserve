@@ -456,6 +456,13 @@ pub struct AuthTokensExt {
     pub expires_in: i64,
 }
 
+impl AuthTokensExt {
+    /// Checks if the token is still valid or not
+    pub fn has_expired(&self) -> bool {
+        chrono::Utc::now().timestamp() - self.request_time > self.expires_in
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;

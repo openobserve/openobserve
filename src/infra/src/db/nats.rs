@@ -790,7 +790,7 @@ fn key_encode(key: &str) -> String {
 
 #[inline]
 fn key_decode(key: &str) -> String {
-    base64::decode(&key.replace('-', "+").replace('_', "/")).unwrap()
+    base64::decode(key.replace('-', "+").replace('_', "/")).unwrap()
 }
 
 #[cfg(test)]
