@@ -337,32 +337,9 @@ export default defineComponent({
 // Light mode support - using :deep() to pierce scoped styles
 body.body--light {
   .q-item {
-    padding: 3px 5px;
 
-    &:hover:not(.q-router-link--active) {
-      background-color: rgba(241, 245, 249, 0.6);
-
-      :deep(.q-icon),
-      :deep(.q-item-label) {
-        color: var(--o2-menu-color);
-      }
-    }
 
     &.q-router-link--active {
-      background: linear-gradient(135deg, rgba(89, 155, 174, 0.04) 0%, rgba(89, 155, 174, 0.08) 100%) !important;
-      border: 0px solid rgba(89, 155, 174, 0.6) !important;
-      box-shadow: 0 4px 12px rgba(89, 155, 174, 0.09) !important;
-      color: var(--o2-menu-color) !important;
-
-      :deep(.q-icon) {
-        color: var(--o2-menu-color) !important;
-        filter: drop-shadow(0 0 8px rgba(37, 99, 235, 0.5)) !important;
-      }
-
-      :deep(.q-item-label) {
-        color: var(--o2-menu-color) !important;
-        font-weight: 700 !important;
-      }
 
       &::before {
         // background: linear-gradient(180deg, var(--o2-body-primary-bg) 0%, var(--o2-body-secondary-bg) 100%) !important;
