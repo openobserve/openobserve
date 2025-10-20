@@ -19,10 +19,12 @@ use actix_web::{Error, FromRequest, HttpRequest, dev::Payload};
 use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::SaltString};
 use base64::Engine;
 use config::utils::json;
+use futures::future::{Ready, ready};
 use once_cell::sync::Lazy;
 use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
+    crate::common::infra::config::USER_SESSIONS,
     crate::common::{meta, meta::ingestion::INGESTION_EP},
     jsonwebtoken::TokenData,
     o2_dex::service::auth::get_dex_jwks,
@@ -172,20 +174,17 @@ pub struct UserEmail {
 
 impl FromRequest for UserEmail {
     type Error = Error;
-    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self, Self::Error>>>>;
+    type Future = Ready<Result<Self, Error>>;
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let req = req.clone();
-        Box::pin(async move {
-            if let Some(auth_header) = req.headers().get("user_id")
-                && let Ok(user_str) = auth_header.to_str()
-            {
-                return Ok(UserEmail {
-                    user_id: user_str.to_owned(),
-                });
-            }
-            Err(actix_web::error::ErrorUnauthorized("No user found"))
-        })
+        if let Some(auth_header) = req.headers().get("user_id")
+            && let Ok(user_str) = auth_header.to_str()
+        {
+            return ready(Ok(UserEmail {
+                user_id: user_str.to_owned(),
+            }));
+        }
+        ready(Err(actix_web::error::ErrorUnauthorized("No user found")))
     }
 }
 
