@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="action-scripts-list-page">
     <div v-if="!showAddActionScriptDialog" class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
       <div class="card-container tw-mb-[0.625rem]">
-        <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-w-full tw-h-[71px]">
+        <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-w-full tw-h-[68px]">
           <div class="tw-font-[600] tw-text-[20px]" data-test="alerts-list-title">
                   {{ t("actions.header") }}
                 </div>
@@ -32,17 +32,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-ml-auto no-border o2-search-input"
                     :placeholder="t('actions.search')"
                     data-test="action-list-search-input"
-                    :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                   >
                     <template #prepend>
-                      <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                      <q-icon class="o2-search-input-icon" name="search" />
                     </template>
                   </q-input>
                 <q-btn
                   data-test="action-list-add-btn"
                   class="q-ml-md o2-primary-button tw-h-[36px]"
                   flat
-                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                   no-caps
                   :label="t(`actions.add`)"
                   @click="showAddUpdateFn({})"
@@ -51,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-        <div class="card-container tw-h-[calc(100vh-130px)]">
+        <div class="card-container tw-h-[calc(100vh-124px)]">
           <q-table
             data-test="action-scripts-table"
             ref="qTable"
@@ -60,9 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             :pagination="pagination"
             style="width: 100%;"
-            :style="{ height: hasVisibleRows ? 'calc(100vh - 130px)' : '' }"
+            :style="{ height: hasVisibleRows ? 'calc(100vh - 124px)' : '' }"
             class="o2-quasar-table o2-quasar-table-header-sticky o2-last-row-border"
-            :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
             >
             <template #no-data>
               <NoData />
@@ -371,7 +368,7 @@ export default defineComponent({
         name: "#",
         label: "#",
         field: "#",
-        align: "left",
+        align: "center",
         style: "width: 67px;",
       },
       {
@@ -435,25 +432,39 @@ export default defineComponent({
     const activeTab: any = ref("alerts");
     const destinations = ref([0]);
     const templates = ref([0]);
+    // TEMPORARY DUMMY DATA FOR TESTING - REMOVE AFTER TESTING
+    const generateDummyData = () => {
+      const dummyActions = [];
+      for (let i = 1; i <= 30; i++) {
+        dummyActions.push({
+          id: `action_${i}`,
+          name: `Action Script ${i}`,
+          uuid: getUUID(),
+          created_by: i % 3 === 0 ? 'admin@example.com' : i % 2 === 0 ? 'user@example.com' : 'developer@example.com',
+          created_at: Date.now() - (i * 86400000), // i days ago
+          last_run_at: i % 2 === 0 ? Date.now() - (i * 3600000) : null, // i hours ago for even numbers
+          last_successful_at: i % 3 === 0 ? Date.now() - (i * 7200000) : null, // i*2 hours ago for multiples of 3
+          status: i % 4 === 0 ? 'failed' : i % 3 === 0 ? 'running' : 'success',
+          execution_details_type: i % 3 === 0 ? 'repeat' : i % 2 === 0 ? 'service' : 'once',
+          sql: `SELECT * FROM logs WHERE level='error' LIMIT ${i * 10}`
+        });
+      }
+      return dummyActions;
+    };
+
     const getActionScripts = () => {
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading actions...",
       });
 
-      getAllActions()
-        .then(() => {
-          var counter = 1;
-          resultTotal.value = store.state.organizationData.actions.length;
-          alerts.value = store.state.organizationData.actions.map(
-            (alert: any) => {
-              return {
-                ...alert,
-                uuid: getUUID(),
-              };
-            },
-          );
-          actionsScriptRows.value = alerts.value.map((data: any) => {
+      // TEMPORARY: Using dummy data instead of API call
+      const dummyData = generateDummyData();
+      var counter = 1;
+      resultTotal.value = dummyData.length;
+      alerts.value = dummyData;
+
+      actionsScriptRows.value = alerts.value.map((data: any) => {
             if (data.execution_details_type === "repeat")
               data.execution_details_type = "Cron Job";
 
@@ -482,29 +493,82 @@ export default defineComponent({
               execution_details_type: data.execution_details_type,
             };
           });
-          actionsScriptRows.value.forEach((alert: ActionScriptList) => {
-            alertStateLoadingMap.value[alert.uuid as string] = false;
-          });
-          if (router.currentRoute.value.query.action == "add") {
-            showAddUpdateFn({ row: undefined });
-          }
-          if (router.currentRoute.value.query.action == "update") {
-            const alertName = router.currentRoute.value.query.id as string;
-            showAddUpdateFn({
-              row: getAlertByName(alertName),
-            });
-          }
-          dismiss();
-        })
-        .catch((e) => {
-          console.error(e);
-          dismiss();
-          $q.notify({
-            type: "negative",
-            message: "Error while pulling Actions.",
-            timeout: 2000,
-          });
+      actionsScriptRows.value.forEach((alert: ActionScriptList) => {
+        alertStateLoadingMap.value[alert.uuid as string] = false;
+      });
+      if (router.currentRoute.value.query.action == "add") {
+        showAddUpdateFn({ row: undefined });
+      }
+      if (router.currentRoute.value.query.action == "update") {
+        const alertName = router.currentRoute.value.query.id as string;
+        showAddUpdateFn({
+          row: getAlertByName(alertName),
         });
+      }
+      dismiss();
+
+      // COMMENTED OUT FOR TESTING - RESTORE AFTER TESTING
+      // getAllActions()
+      //   .then(() => {
+      //     var counter = 1;
+      //     resultTotal.value = store.state.organizationData.actions.length;
+      //     alerts.value = store.state.organizationData.actions.map(
+      //       (alert: any) => {
+      //         return {
+      //           ...alert,
+      //           uuid: getUUID(),
+      //         };
+      //       },
+      //     );
+      //     actionsScriptRows.value = alerts.value.map((data: any) => {
+      //       if (data.execution_details_type === "repeat")
+      //         data.execution_details_type = "Cron Job";
+      //       if (data.execution_details_type === "service")
+      //         data.execution_details_type = "Real Time";
+      //       if (data.execution_details_type === "once")
+      //         data.execution_details_type = "Once";
+      //       return {
+      //         "#": counter <= 9 ? `0${counter++}` : counter++,
+      //         id: data.id,
+      //         name: data.name,
+      //         uuid: data.uuid,
+      //         created_by: data.created_by,
+      //         created_at: data.created_at
+      //           ? convertUnixToQuasarFormat(data.created_at)
+      //           : "-",
+      //         last_run_at: data.last_run_at
+      //           ? convertUnixToQuasarFormat(data.last_run_at)
+      //           : "-",
+      //         last_successful_at: data.last_successful_at
+      //           ? convertUnixToQuasarFormat(data.last_successful_at)
+      //           : "-",
+      //         status: data.status,
+      //         execution_details_type: data.execution_details_type,
+      //       };
+      //     });
+      //     actionsScriptRows.value.forEach((alert: ActionScriptList) => {
+      //       alertStateLoadingMap.value[alert.uuid as string] = false;
+      //     });
+      //     if (router.currentRoute.value.query.action == "add") {
+      //       showAddUpdateFn({ row: undefined });
+      //     }
+      //     if (router.currentRoute.value.query.action == "update") {
+      //       const alertName = router.currentRoute.value.query.id as string;
+      //       showAddUpdateFn({
+      //         row: getAlertByName(alertName),
+      //       });
+      //     }
+      //     dismiss();
+      //   })
+      //   .catch((e) => {
+      //     console.error(e);
+      //     dismiss();
+      //     $q.notify({
+      //       type: "negative",
+      //       message: "Error while pulling Actions.",
+      //       timeout: 2000,
+      //     });
+      //   });
     };
 
     const getAlertByName = (id: string) => {
