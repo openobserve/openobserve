@@ -24,12 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`${type}-index-dropdown-stream_type`"
         input-debounce="0"
         behavior="menu"
-        filled
         borderless
         dense
-        class="q-mb-xs showLabelOnTop no-case "
-        :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-        style="width: calc(100% - 40px)"
+        class="showLabelOnTop no-case tw-mr-1"
+        style="width: calc(100% - 44px)"
         :disable="disableDropdown"
       >
         <template #no-option>
@@ -40,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-select>
 
       <q-btn
-        class="q-mb-md text-bold add-folder-btn "
+        class="q-mb-md text-bold add-folder-btn"
         :class="store.state.theme === 'dark' ? 'add-folder-btn-dark' : 'add-folder-btn-light'"
         :data-test="`${type}-folder-move-new-add`"
         label="+"
