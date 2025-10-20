@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="full-width q-mx-lg "  >
-    <div class="row items-center no-wrap card-container tw-mx-3 q-my-sm">
-      <div class="flex items-center justify-between tw-w-full card-container tw-px-2 tw-py-3">
+    <div class="row items-center no-wrap card-container tw-mx-[0.625rem]  q-my-sm">
+      <div class="flex items-center justify-between tw-w-full card-container tw-h-[71px] tw-px-2 tw-py-3">
         <div class="flex items-center">
           <div
           data-test="add-alert-back-btn"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       ref="addAlertFormRef"
       style="
-        max-height: calc(100vh - 180px);
+        max-height: calc(100vh - 194px);
         overflow: auto;
         scroll-behavior: smooth;
       "
@@ -89,22 +89,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw-w-full ">
 
                 <div
-                  class="alert-name-input o2-input flex justify-between items-center tw-gap-10 tw-pb-3"
-                  style="padding-top: 12px;"
+                  class="alert-name-input flex justify-between items-center tw-gap-10 tw-pb-3"
                   data-test="add-alert-name-input-container"
                 >
                   <q-input
                     data-test="add-alert-name-input row"
                     v-model="formData.name"
                     :label="t('alerts.name') + ' *'"
-                    color="input-border"
                       class="showLabelOnTop col"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                     stack-label
-                    outlined
-                    filled
                     dense
-                    hide-bottom-space
+                    borderless
                     v-bind:readonly="beingUpdated"
                     v-bind:disable="beingUpdated"
                     :rules="[
@@ -115,15 +110,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : t('common.nameRequired'),
                     ]"
                     tabindex="0"
+                    hide-bottom-space
                   />
-                  <div class="col" style="height: 62px;">
+                  <div class="col" style="height: 68px;">
                     <SelectFolderDropDown
                       :disableDropdown="beingUpdated"
                       :type="'alerts'"
-                      :style="'height: 30px'"
+                      :style="'height: 32px'"
                       @folder-selected="updateActiveFolderId"
                       :activeFolderId="activeFolderId"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                   />
                   </div>
                 
@@ -131,13 +126,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                  class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-3"
+                  class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-4"
                   style="padding-top: 0px"
                   data-test="add-alert-stream-type-select-container"
                 >
                   <div
                     data-test="add-alert-stream-type-select"
-                    class="alert-stream-type o2-input tw-w-full col "
+                    class="tw-w-full col "
                     style="padding-top: 0"
 
                   >
@@ -147,13 +142,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="streamTypes"
                       :label="t('alerts.streamType') + ' *'"
                       :popup-content-style="{ textTransform: 'lowercase' }"
-                      color="input-border"
                       class="q-py-sm showLabelOnTop no-case col"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                       stack-label
-                      outlined
-                      filled
+                      borderless
                       dense
+                      hide-bottom-space
                       v-bind:readonly="beingUpdated"
                       v-bind:disable="beingUpdated"
                       @update:model-value="updateStreams()"
@@ -162,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     data-test="add-alert-stream-select"
-                    class="o2-input col"
+                    class="col"
                     style="padding-top: 0"
                   >
                     <q-select
@@ -173,12 +166,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :loading="isFetchingStreams"
                       color="input-border"
                       class="q-py-sm showLabelOnTop no-case col"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                      filled
                       stack-label
                       dense
                       use-input
+                      borderless
                       hide-selected
+                      hide-bottom-space
                       fill-input
                       :input-debounce="400"
                       v-bind:readonly="beingUpdated"
@@ -203,7 +196,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   :label="t('alerts.scheduled')"
                   class="q-ml-none o2-radio-button"
-                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'"
                 />
                 <q-radio
                   data-test="add-alert-realtime-alert-radio"
@@ -215,7 +207,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   :label="t('alerts.realTime')"
                   class="q-ml-none o2-radio-button"
-                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'" 
                   />
               </div>
               </div>
@@ -306,13 +297,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-w-full row">
               <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full ">
               <variables-input
-                class="o2-input"
                 :variables="formData.context_attributes"
                 @add:variable="addVariable"
                 @remove:variable="removeVariable"
               />
             </div>
-
+            <!-- TODO: make text area also similar to qinput -->
             <div v-if="expandState.advancedSetup" class=" tw-w-full t">
               <div data-test="add-alert-description-input tw-w-full " :class="store.state.theme === 'dark' ? '' : 'light-mode'">
                 <div class="flex items-center q-mb-sm ">
@@ -332,7 +322,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="textarea"
                   placeholder="Type something"
                   rows="5"
-                  
                 />
               </div>
               <div data-test="add-alert-row-input tw-w-full">

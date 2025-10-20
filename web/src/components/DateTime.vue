@@ -1150,7 +1150,6 @@ export default defineComponent({
       min-width: 286px;
     }
     &.hideRelative {
-      background-color: red;
       width: fit-content;
     }
   }

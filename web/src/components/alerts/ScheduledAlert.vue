@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tab === 'promql' &&
               promqlCondition
             "
-            class="flex justify-start items-center text-bold tw-pb-1 o2-input"
+            class="flex justify-start items-center text-bold tw-pb-1 "
           >
             <div style="width: 190px">Trigger if the value is</div>
             <div class="flex justify-start items-center">
@@ -52,8 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="triggerOperators"
                   color="input-border"
                   class="no-case q-py-none q-mr-xs"
-                  :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                  filled
                   borderless
                   dense
                   use-input
@@ -66,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 data-test="scheduled-alert-promlq-condition-value"
                 style="width: 160px; margin-left: 0 !important"
-                class=" o2-input"
+                class=" "
               >
                 <q-input
                   v-model="promqlCondition.value"
@@ -74,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   filled
                   min="0"
+                  borderless
                   style="background: none"
                   placeholder="Value"
                   @update:model-value="updatePromqlCondition"
@@ -94,7 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="md"
               color="primary"
               class="text-bold q-pl-0 o2-toggle-button-sm tw-h-[36px] tw-ml-1"
-              :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
               :disable="tab === 'sql' || tab === 'promql'"
               @update:model-value="updateAggregation"
             />
@@ -120,16 +118,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   :data-test="`scheduled-alert-group-by-${index + 1}`"
-                  class="flex justify-start items-center no-wrap o2-input"
+                  class="flex justify-start items-center no-wrap"
                 >
                   <div data-test="scheduled-alert-group-by-column-select">
                     <q-select
                       v-model="aggregationData.group_by[index]"
                       :options="filteredFields"
-                      color="input-border"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                      class="no-case q-py-none tw-pb-1"
-                      filled
+                      class="no-case q-py-none q-mb-sm"
                       borderless
                       dense
                       use-input
@@ -166,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="scheduled-alert-group-by-add-btn"
                 icon="add"
-                class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
+                class="iconHoverBtn q-mb-sm q-mr-sm"
                 :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
                 padding="xs"
                 unelevated
@@ -217,16 +212,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="tw-flex tw-items-center">
                     <div
                     data-test="scheduled-alert-threshold-function-select"
-                    class=" q-mr-xs o2-input"
+                    class=" q-mr-xs"
                   >
                     <q-select
                       v-model="aggregationData.function"
                       :options="aggFunctions"
-                      color="input-border"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                      class="no-case q-py-none"
-                      filled
+                      class="no-case q-py-none q-mb-xs"
                       borderless
+                      hide-bottom-space
                       dense
                       use-input
                       hide-selected
@@ -236,17 +229,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <div
-                    class="monaco-editor-test q-mr-xs o2-input"
+                    class="q-mr-xs"
                     data-test="scheduled-alert-threshold-column-select"
                   >
                     <q-select
                       v-model="aggregationData.having.column"
                       :options="filteredNumericColumns"
-                      color="input-border"
-                    :class="[store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light',
-                    ]"
-                      class="no-case q-py-none"
-                      filled
+                      class="no-case q-py-none q-mb-xs"
                       borderless
                       dense
                       use-input
@@ -266,15 +255,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center q-mt-xs">
                     <div
                     data-test="scheduled-alert-threshold-operator-select"
-                    class="monaco-editor-test q-mr-xs o2-input tw-pb-1"
+                    class="monaco-editor-test q-mr-xs tw-pb-1"
                   >
                     <q-select
                       v-model="aggregationData.having.operator"
                       :options="triggerOperators"
                       color="input-border"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                       class="no-case q-py-none"
-                      filled
                       borderless
                       dense
                       use-input
@@ -288,14 +275,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       data-test="scheduled-alert-threshold-value-input"
                       style="width: 250px; margin-left: 0 !important"
-                      class=" o2-input"
                     >
                       <q-input
                         v-model="aggregationData.having.value"
                         type="number"
-                        :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                         dense
-                        filled
+                        borderless
                         min="0"
                         placeholder="Value"
                         @update:model-value="updateAggregation"
@@ -312,29 +297,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else>
                 <div class="flex justify-start items-center">
                   <div
-                    class="monaco-editor-test"
                     data-test="scheduled-alert-threshold-operator-select"
                   >
                     <q-select
                       v-model="triggerData.operator"
                       :options="triggerOperators"
-                      color="input-border"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                       class="showLabelOnTop no-case q-py-none"
-                      filled
                       borderless
                       dense
                       use-input
                       hide-selected
                       fill-input
                       :rules="[(val: any) => !!val || 'Field is required!']"
-                      style="width: 88px; border: 1px solid rgba(0, 0, 0, 0.05)"
+                      style="width: 88px;"
                       @update:model-value="updateTrigger"
                     />
                   </div>
                   <div
                     class="flex items-center"
-                    style="border: 1px solid rgba(0, 0, 0, 0.05); border-left: none"
+                    style="border-left: none"
                   >
                     <div
                       style="width: 89px; margin-left: 0 !important"
@@ -344,9 +325,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         v-model="triggerData.threshold"
                         type="number"
-                        :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                         dense
-                        filled
+                        borderless
                         min="1"
                         style="background: none"
                         debounce="300"
@@ -358,10 +338,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="
                         min-width: 90px;
                         margin-left: 0 !important;
-                        height: 40px;
+                        height: 36px;
                         font-weight: normal;
                       "
-                      :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
+                      :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c;' : ''"
 
                       :class="
                         store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
@@ -415,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 class="flex items-center q-mr-sm"
-                style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
+                style="width: fit-content"
               >
                 <div
                   data-test="scheduled-alert-period-input"
@@ -424,11 +404,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <q-input
                     v-model="triggerData.period"
-                    :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                     type="number"
-                    class="scheduled-alert-period-input"
                     dense
-                    filled
+                    borderless
                     min="1"
                     style="background: none"
                     debounce="300"
@@ -440,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="
                     min-width: 90px;
                     margin-left: 0 !important;
-                    height: 40px;
+                    height: 36px;
                     font-weight: normal;
                   "
                   :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
@@ -501,7 +479,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="triggerData.frequency_type"
                     :true-value="'cron'"
                     class="q-mt-sm o2-toggle-button-sm tw-h-[36px] tw-ml-1"
-                    :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
                     :false-value="'minutes'"
                     @update:model-value="updateTrigger"
                     size="md"
@@ -590,11 +567,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-input
                     data-test="scheduled-alert-frequency-input-field"
                     v-if="triggerData.frequency_type == 'minutes'"
-                    :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                     v-model="triggerData.frequency"
                     type="number"
                     dense
-                    filled
+                    borderless
                     :min="
                       Math.ceil(
                         store.state?.zoConfig?.min_auto_refresh_interval / 60,
@@ -602,22 +578,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     style="background: none; width: 100%;"
                     debounce="300"
-                    class="tw-flex"
                     @update:model-value="updateTrigger"
-                    :style="store.state.theme === 'dark' ? '' : 'border: 1px solid rgba(0, 0, 0, 0.05)'"
                   />
-                  <div v-else class="tw-flex tw-items-center o2-input">
+                  <div v-else class="tw-flex tw-items-center">
                     <q-input
                       data-test="scheduled-alert-cron-input-field"
                       v-model="triggerData.cron"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                       dense
-                      filled
+                      borderless
                       :label="t('reports.cron') + ' *'"
                       style="background: none; width: 180px"
                       class="showLabelOnTop"
                       stack-label
-                      outlined
                       debounce="300"
                       @update:model-value="updateTrigger"
                     />
@@ -625,7 +597,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-report-schedule-start-timezone-select"
                       v-model="triggerData.timezone"
                       :options="filteredTimezone"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                       @blur="
                         browserTimezone =
                           browserTimezone == ''
@@ -636,16 +607,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @filter="timezoneFilterFn"
                       input-debounce="0"
                       dense
-                      filled
+                      borderless
                       emit-value
                       fill-input
                       hide-selected
                       :title="triggerData.timezone"
                       :label="t('logStream.timezone') + ' *'"
                       :display-value="`Timezone: ${browserTimezone}`"
-                      class="timezone-select showLabelOnTop q-ml-sm"
+                      class="showLabelOnTop q-ml-sm"
                       stack-label
-                      outlined
                       style="width: 210px"
                     />
                   </div>
@@ -656,7 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="
                     min-width: 90px;
                     margin-left: 0 !important;
-                    height: 40px;
+                    height: 36px;
                     font-weight: normal;
                   "
                   :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
@@ -722,7 +692,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="col-8 row justify-left align-center q-gutter-sm">
                       <div
                         class="flex items-center"
-                        style="border: 1px solid rgba(0, 0, 0, 0.05)"
                       >
                         <div
                           data-test="add-alert-delay-input"
@@ -731,10 +700,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <q-input
                             v-model="triggerData.silence"
-                            :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                             type="number"
                             dense
-                            filled
+                            borderless
                             min="0"
                             style="background: none"
                             @update:model-value="updateTrigger"
@@ -746,7 +714,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             min-width: 90px;
                             margin-left: 0 !important;
                             background: #f2f2f2;
-                            height: 40px;
+                            height: 36px;
                           "
                           :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
                           :class="
@@ -770,7 +738,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
         </div>
-        <div class="o2-input flex justify-start q-mt-xs items-start">
+        <div class=" flex justify-start q-mt-xs items-start ">
                   <div
                     data-test="add-alert-destination-title"
                     class="tw-font-semibold"
@@ -778,19 +746,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ t("alerts.destination") + " *" }}
                   </div>
-                  <div data-test="add-alert-destination-select">
+                  <div data-test="add-alert-destination-select" class="tw-mb-2">
                     <q-select
                       ref="destinationSelectRef"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                       v-model="destinations"
                       :options="filteredDestinations"
                       :input-debounce="300"
-                      color="input-border"
-                      bg-color="input-bg"
                       class="no-case"
                       stack-label
-                      outlined
-                      filled
+                      borderless
                       dense
                       multiple
                       use-input
@@ -1108,15 +1072,15 @@ v-if="dateTimePicker.length > 0">
         </q-tabs>
         </div>
         <template v-if="tab === 'custom'"
-class='q-pa-none q-ma-none'
-">
+          class='q-pa-none q-ma-none'
+          ">
           <FilterGroup :stream-fields="columns"
-:group="inputData "
-:depth="0"
-@add-condition="updateGroup"
-@add-group="updateGroup"
-@remove-group="removeConditionGroup"
-@input:update="(name, field) => emits('input:update', name, field)" />
+            :group="inputData "
+            :depth="0"
+            @add-condition="updateGroup"
+            @add-group="updateGroup"
+            @remove-group="removeConditionGroup"
+            @input:update="(name, field) => emits('input:update', name, field)" />
 
           
 
@@ -1267,7 +1231,7 @@ class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 t
                           > {{  tab == 'sql' ? 'Generate SQL' : 'Generate PromQL' }} </span>
                       </q-btn>
                       </div>
-                      <div class="tw-h-full tw-flex tw-justify-center tw-items-center o2-select-input o2-input tw-w-full col"
+                      <div class="tw-h-full tw-flex tw-justify-center tw-items-center o2-select-input  tw-w-full col"
                       style="padding-top: 0"                       >
                         <q-select
                           v-model="selectedColumn"
@@ -1411,7 +1375,7 @@ data-test="scheduled-alert-promql-editor"
                           >Generate VRL</span>
                       </q-btn>
                       </div>
-                        <div class="tw-h-full tw-flex tw-justify-center tw-items-center o2-select-input o2-input tw-w-full col"
+                        <div class="tw-h-full tw-flex tw-justify-center tw-items-center o2-select-input  tw-w-full col"
                         style="padding-top: 0;"                       >
                           <q-select
                           v-model="selectedFunction"
