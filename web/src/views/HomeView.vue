@@ -991,6 +991,13 @@ export default defineComponent({
   border-left: 3px solid var(--accent-blue);
   contain: layout style;
   padding: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px var(--hover-shadow);
+  }
 }
 
 .streams-header {
@@ -1094,12 +1101,26 @@ export default defineComponent({
 
 .tile-content {
   @include tile-base;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+
+  &:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 24px var(--hover-shadow);
+  }
 }
 
 .dashboards-tile-content,
 .functions-tile-content {
   @include tile-base;
   animation: fadeInUp 0.5s ease-out backwards;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+
+  &:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 24px var(--hover-shadow);
+  }
 }
 
 .functions-tile-content {
@@ -1109,6 +1130,7 @@ export default defineComponent({
 .dashboards-tile-content {
   animation-delay: 300ms;
 }
+
 .dark-tile-content,
 .light-tile-content {
   background: var(--tile-bg);
@@ -1165,6 +1187,13 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   contain: layout style;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+
+  &:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 12px 32px var(--hover-shadow);
+  }
 }
 
 // Layout for charts section
