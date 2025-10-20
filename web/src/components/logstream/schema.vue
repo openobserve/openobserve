@@ -269,19 +269,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
                 <div class="flex justify-between items-center full-width">
                   <div class="flex items-center">
+                    <div class="app-tabs-container">
                     <app-tabs
-                      v-if="isSchemaUDSEnabled"
-                      class="schema-fields-tabs"
-                      style="
-                        border: 1px solid #8a8a8a;
-                        border-radius: 4px;
-                        overflow: hidden;
-                      "
-                      data-test="schema-fields-tabs"
-                      :tabs="tabs"
-                      :active-tab="activeTab"
-                      @update:active-tab="updateActiveTab"
-                    />
+                          v-if="isSchemaUDSEnabled"
+                          class="tabs-selection-container"
+                          data-test="schema-fields-tabs"
+                          :tabs="tabs"
+                          :active-tab="activeTab"
+                          @update:active-tab="updateActiveTab"
+                        />
+                    </div>
+                   
                     <div v-if="hasUserDefinedSchema" class="q-ml-sm">
                       <q-icon
                         name="info"
@@ -528,7 +526,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color="input-border"
                         bg-color="input-bg"
                         class="mini-select"
-                        :class="store.state.theme == 'dark' ? 'schema-index-select-dropdown-dark' : 'schema-index-select-dropdown-light'"
                         input-class="mini-select"
                         :option-disable="
                           (_option) => disableOptions(props.row, _option)
@@ -540,7 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         autoclose
                         borderless
                         dense
-                        input-style="height: 12px; min-height: 8px; margin: 0px; width: 120px;"
+                        input-style="height: 12px !important; min-height: 8px !important; margin: 0px; width: 120px;"
                         style="width: 190px;"
                         @update:model-value="val => updateIndexType(props, val)"
                       >
@@ -591,7 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="tw-text-sm tw-w-full tw-flex tw-justify-">
                       </div>
                       <QTablePagination
-                      class="tw-pr-0 tw-py-0  2xl:tw-pl-[230px] lg:tw-pl-[50px]"
+                      class="tw-pr-0 tw-py-0"
                       :scope="scope"
                       :position="'bottom'"
                       :resultTotal="resultTotal"
@@ -2465,5 +2462,39 @@ export default defineComponent({
 }
 .single-line-tab {
   display: inline-flex;
+}
+.mini-select{
+  min-height: 24px !important;
+  max-height: 24px !important;
+  height: 24px !important;
+  font-size: 0.813rem;
+
+  .q-field__inner {
+    min-height: 24px !important;
+    height: 24px !important;
+    max-height: 24px !important;
+  }
+
+  .q-field__control {
+    min-height: 24px !important;
+    max-height: 24px !important;
+    height: 24px !important;
+    padding: 0px 8px !important;
+  }
+
+  .q-field__control-container {
+    .q-field__native {
+      min-height: 24px !important;
+      height: 24px !important;
+    }
+  }
+
+  .q-field__marginal {
+    height: 24px !important;
+  }
+
+  .q-field__append {
+    height: 24px !important;
+  }
 }
 </style>

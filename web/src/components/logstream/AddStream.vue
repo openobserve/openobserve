@@ -35,18 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator />
-    <div class="q-px-md o2-input add-stream-inputs">
+    <div class="q-px-md  add-stream-inputs">
       <q-form @submit="saveStream">
         <div data-test="add-stream-name-input">
           <q-input
             v-model="streamInputs.name"
             :label="t('common.name') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             :rules="[(val: any) => !!val.trim() || 'Field is required!']"
             tabindex="0"
@@ -60,14 +57,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="filteredStreamTypes"
             :label="t('alerts.streamType') + ' *'"
             :popup-content-style="{ textTransform: 'capitalize' }"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop no-case"
             map-options
             stack-label
             emit-value
-            outlined
-            filled
+            borderless
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
             style="min-width: 220px"
@@ -78,12 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             v-model="streamInputs.dataRetentionDays"
             :label="t('logStream.dataRetention') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             type="number"
             :rules="[(val: any) => val > 0 || 'Field is required!']"
