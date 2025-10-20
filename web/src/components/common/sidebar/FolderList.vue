@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="card-container tw-h-full">
-      <div class="folder-header sticky-top" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
+  <div class="card-container tw-h-full tw-flex tw-flex-col">
+      <div class="folder-header" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
         <div class="text-bold q-px-sm  q-py-sm tw-flex tw-items-center tw-justify-between tw-gap-2">
           Folders
           <div>
@@ -37,11 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <q-separator class="tw-mb-1 tw-mt-[3px]" size="2px"></q-separator>
-        
+
         <!-- Search Input -->
         <div style="width: 100%;" class="flex folder-item q-py-xs">
           <q-input
-            v-model="searchQuery"   
+            v-model="searchQuery"
             dense
             borderless
             data-test="folder-search"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
         </div>
       </div>
-      <div class="folders-tabs">
+      <div class="folders-tabs tw-flex-1 tw-overflow-y-auto">
         <q-tabs
           indicator-color="transparent"
           inline-label
@@ -365,6 +365,11 @@ export default defineComponent({
 }
 
 .folders-tabs {
+  .q-tabs {
+    height: auto !important;
+    max-height: none !important;
+  }
+
   .test-class {
     min-height: 1.5rem;
     margin-bottom: 6px;
