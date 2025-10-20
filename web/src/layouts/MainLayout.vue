@@ -107,6 +107,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-btn
           v-if="
+            config.isEnterprise == 'true' &&
+            store.state.zoConfig.ingestion_quota_used >= 85
+          "
+          round
+          flat
+          dense
+          :ripple="false"
+          data-test="ingestion-quota-warning-icon"
+        >
+          <div class="row items-center no-wrap">
+            <q-icon
+              name="warning"
+              size="24px"
+              class="header-icon"
+              :style="{
+                color:
+                  store.state.zoConfig.ingestion_quota_used >= 95
+                    ? 'red'
+                    : 'orange',
+              }"
+            ></q-icon>
+          </div>
+          <q-tooltip anchor="top middle" self="bottom middle">
+            Warning: {{ store.state.zoConfig.ingestion_quota_used }}% of
+            ingestion limit used
+          </q-tooltip>
+        </q-btn>
+        <q-btn
+          v-if="
             config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
           "
           :ripple="false"
