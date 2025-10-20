@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 data-test="add-action-script-type"
-                class="report-name-input  tw-mb-[1.8rem]"
+                class="report-name-input "
               >
                 <q-select
                   data-test="add-action-script-type-select"

@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                  class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-4 tw-mb-10"
+                  class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-4"
                   style="padding-top: 0px"
                   data-test="add-alert-stream-type-select-container"
                 >
