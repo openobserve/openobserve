@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     
       <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
-        <div class="card-container tw-h-[calc(100vh-130px)] tw-overflow-auto">
+        <div class="card-container tw-h-[calc(100vh-162px)] tw-overflow-auto">
           <div ref="addAlertFormRef" class="q-px-lg q-pb-md" style="width: 1024px">
             <q-form
               class="create-report-form"
@@ -52,18 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 data-test="add-action-script-name-input"
-                class="report-name-input o2-input"
+                class="report-name-input "
                 style="padding-top: 12px"
               >
                 <q-input
                   v-model.trim="formData.name"
                   :label="t('alerts.name') + ' *'"
-                  color="input-border"
-                  bg-color="input-bg"
                   class="showLabelOnTop"
                   stack-label
-                  outlined
-                  filled
+                  borderless
                   dense
                   :rules="[
                     (val: any) =>
@@ -82,17 +79,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 data-test="add-action-script-description-input"
-                class="report-name-input o2-input q-pb-sm"
+                class="report-name-input  q-pb-sm"
               >
                 <q-input
                   v-model="formData.description"
                   :label="t('reports.description')"
-                  color="input-border"
-                  bg-color="input-bg"
                   class="showLabelOnTop"
                   stack-label
-                  outlined
-                  filled
+                  borderless
                   dense
                   tabindex="0"
                   style="width: 800px"
@@ -101,21 +95,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 data-test="add-action-script-type"
-                class="report-name-input o2-input q-pb-sm"
+                class="report-name-input  tw-mb-[1.8rem]"
               >
                 <q-select
                   data-test="add-action-script-type-select"
                   v-model="formData.type"
                   :label="t('common.type') + ' *'"
                   :options="actionTypes"
-                  color="input-border"
-                  bg-color="input-bg"
                   class="showLabelOnTop no-case tw-w-[400px]"
                   stack-label
                   map-options
                   emit-value
-                  outlined
-                  filled
+                  borderless
                   dense
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   :disable="isEditingActionScript"
@@ -140,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div
                     data-test="add-action-script-file-input"
-                    class="flex items-center o2-input"
+                    class="flex items-center "
                   >
                     <q-file
                       v-if="!isEditingActionScript || formData.fileNameToShow == ''"
@@ -271,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <template v-if="frequency.type === 'repeat'">
-                      <div class="flex items-center justify-start q-mt-md o2-input">
+                      <div class="flex items-center justify-start q-mt-md ">
                         <div
                           data-test="add-action-script-cron-input"
                           class="q-mr-sm"
@@ -312,12 +303,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <q-input
-                            filled
                             v-model="frequency.cron"
-                            color="input-border"
-                            bg-color="input-bg"
+                            class="showLabelOnTop"
                             type="text"
-                            outlined
+                            borderless
                             :rules="[
                               (val: any) =>
                                 !!val.length
@@ -341,12 +330,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('actions.timezone') + ' *'"
                           :loading="isFetchingServiceAccounts"
                           :popup-content-style="{ textTransform: 'lowercase' }"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="showLabelOnTop no-case"
-                          filled
+                          class="showLabelOnTop no-case tw-mb-[2.4rem]"
+                          borderless
                           stack-label
-                          outlined
                           dense
                           use-input
                           hide-selected
@@ -396,8 +382,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :done="step > 3"
                   class="q-mt-md"
                 >
-                  <div class="flex items-center o2-input">
-                    <div class="o2-input service-account-selector">
+                  <div class="flex items-center ">
+                    <div class=" service-account-selector">
                       <div
                         data-test="add-action-script-service-account-title"
                         class="q-mb-xs text-bold text-grey-8"
@@ -427,11 +413,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="filteredServiceAccounts"
                         :loading="isFetchingServiceAccounts"
                         :popup-content-style="{ textTransform: 'lowercase' }"
-                        color="input-border"
-                        bg-color="input-bg"
                         class="q-py-sm no-case"
-                        filled
-                        outlined
+                        borderless
                         dense
                         use-input
                         hide-selected
@@ -477,18 +460,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="(header, index) in environmentalVariables"
                     :key="header.uuid"
-                    class="row q-col-gutter-sm o2-input"
+                    class="row q-col-gutter-sm "
                     data-test="add-action-script-env-variable"
                   >
                     <div class="col-5 q-ml-none">
                       <q-input
                         :data-test="`add-action-script-header-${header['key']}-key-input`"
                         v-model="header.key"
-                        color="input-border"
-                        bg-color="input-bg"
                         stack-label
-                        outlined
-                        filled
+                        borderless
                         :placeholder="'Key'"
                         dense
                         tabindex="0"
@@ -499,11 +479,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`add-action-script-header-${header['key']}-value-input`"
                         v-model="header.value"
                         :placeholder="t('alert_destinations.api_header_value')"
-                        color="input-border"
-                        bg-color="input-bg"
                         stack-label
-                        outlined
-                        filled
+                        borderless
                         dense
                         isUpdatingDestination
                         tabindex="0"
@@ -543,7 +520,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       flat
                       @click="step = 3"
                       class="o2-secondary-button tw-h-[36px]"
-                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                       :label="'Back'"
                       no-caps
                     />
@@ -551,32 +527,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-step>
               </q-stepper>
             </q-form>
-
-            <div
-          class="text-right"
-        >
-          <q-btn
-            data-test="add-action-script-cancel-btn"
-            class="o2-secondary-button tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            flat
-            :label="t('alerts.cancel')"
-            no-caps
-            @click="openCancelDialog"
-          />
-          <q-btn
-            data-test="add-action-script-save-btn"
-            :label="t('alerts.save')"
-            class="o2-primary-button tw-h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
-            @click="saveActionScript"
-          />
-        </div>
-        
           </div>
         </div>
+      </div>
+      <div
+        class="flex justify-end q-px-md full-width tw-py-3"
+        style="position: sticky; bottom: 0px; z-index: 2"
+        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        :style="{
+          'box-shadow':
+            store.state.theme === 'dark'
+              ? 'rgb(45 45 45) 0px -4px 7px 0px'
+              : 'rgb(240 240 240) 0px -4px 7px 0px',
+        }"
+      >
+        <q-btn
+          data-test="add-action-script-cancel-btn"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
+          flat
+          :label="t('alerts.cancel')"
+          no-caps
+          @click="openCancelDialog"
+        />
+        <q-btn
+          data-test="add-action-script-save-btn"
+          :label="t('alerts.save')"
+          class="o2-primary-button tw-h-[36px]"
+          flat
+          no-caps
+          @click="saveActionScript"
+        />
       </div>
     </div>
     
