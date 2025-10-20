@@ -19,60 +19,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-splitter
     v-model="splitterModel"
     unit="px"
-    style="min-height: calc(100vh - 130px)"
+    class="tw-h-[calc(100vh-165px)]"
   >
     <template v-slot:before>
-      <q-tabs
-        v-model="tabs"
-        indicator-color="transparent"
-        inline-label
-        vertical
-      >
-        <q-route-tab
-          default
-          name="ingestLogs"
-          :to="{
-            name: 'ingestLogs',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :label="t('ingestion.logsLabel')"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="ingestMetrics"
-          :to="{
-            name: 'ingestMetrics',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :label="t('ingestion.metricsLabel')"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="ingestTraces"
-          :to="{
-            name: 'ingestTraces',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :label="t('ingestion.tracesLabel')"
-          content-class="tab_content"
-        />
-      </q-tabs>
+      <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
+        <div class="card-container tw-h-[calc(100vh-165px)]">
+          <q-tabs
+            v-model="tabs"
+            indicator-color="transparent"
+            inline-label
+            vertical
+          >
+            <q-route-tab
+              default
+              name="ingestLogs"
+              :to="{
+                name: 'ingestLogs',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.logsLabel')"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="ingestMetrics"
+              :to="{
+                name: 'ingestMetrics',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.metricsLabel')"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="ingestTraces"
+              :to="{
+                name: 'ingestTraces',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.tracesLabel')"
+              content-class="tab_content"
+            />
+          </q-tabs>
+        </div>
+      </div>
     </template>
 
     <template v-slot:after>
-      <router-view
-        :title="tabs"
-        :currOrgIdentifier="currOrgIdentifier"
-        :currUserEmail="currentUserEmail"
-        @copy-to-clipboard-fn="copyToClipboardFn"
-      >
-      </router-view>
+      <div class="tw-overflow-hidden tw-h-full tw-pr-[0.625rem]">
+        <router-view
+          :title="tabs"
+          :currOrgIdentifier="currOrgIdentifier"
+          :currUserEmail="currentUserEmail"
+          @copy-to-clipboard-fn="copyToClipboardFn"
+        >
+        </router-view>
+      </div>
     </template>
   </q-splitter>
 </template>
@@ -225,31 +231,7 @@ export default defineComponent({
   .head {
     padding-bottom: 1rem;
   }
-  .q-tabs {
-    &--vertical {
-      margin: 1.5rem 1rem 0 1rem;
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 0.6rem 0 0.6rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        text-transform: capitalize;
-
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          color: black;
-          background-color: $accent;
-        }
-      }
-    }
-  }
+  
 }
 </style>
 <style lang="scss">

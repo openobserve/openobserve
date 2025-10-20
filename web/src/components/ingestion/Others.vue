@@ -18,50 +18,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-splitter
     v-model="splitterModel"
     unit="px"
-    style="min-height: calc(100vh - 130px)"
   >
     <template v-slot:before>
-      <q-input
-        data-test="others-list-search-input"
-        v-model="tabsFilter"
-        borderless
-        filled
-        dense
-        class="no-border"
-        :placeholder="t('common.search')"
-      >
-        <template #prepend>
-          <q-icon name="search" class="cursor-pointer" />
-        </template>
-      </q-input>
-      <q-tabs
-        v-model="ingestTabType"
-        indicator-color="transparent"
-        inline-label
-        vertical
-        class="data-sources-database-tabs !tw-mt-3 item-left"
-      >
-        <template v-for="(tab, index) in filteredList" :key="tab.name">
-          <q-route-tab
-            :title="tab.name"
-            :default="index === 0"
-            :name="tab.name"
-            :to="tab.to"
-            :icon="tab.icon"
-            :label="tab.label"
-            content-class="tab_content"
-          />
-        </template>
-      </q-tabs>
+      <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+        <div class="card-container tw-h-[calc(100vh-165px)] el-border-radius">
+          <div class="tw-overflow-hidden tw-h-full">
+            <q-input
+              data-test="others-list-search-input"
+              v-model="tabsFilter"
+              borderless
+              filled
+              dense
+              class="no-border"
+              :placeholder="t('common.search')"
+            >
+              <template #prepend>
+                <q-icon name="search" class="cursor-pointer" />
+              </template>
+            </q-input>
+            <q-tabs
+              v-model="ingestTabType"
+              indicator-color="transparent"
+              inline-label
+              vertical
+              class="data-sources-database-tabs !tw-mt-3 item-left"
+            >
+              <template v-for="(tab, index) in filteredList" :key="tab.name">
+                <q-route-tab
+                  :title="tab.name"
+                  :default="index === 0"
+                  :name="tab.name"
+                  :to="tab.to"
+                  :icon="tab.icon"
+                  :label="tab.label"
+                  content-class="tab_content"
+                />
+              </template>
+            </q-tabs>
+          </div>
+        </div>
+      </div>
     </template>
 
     <template v-slot:after>
-      <router-view
-        :title="tabs"
-        :currOrgIdentifier="currOrgIdentifier"
-        :currUserEmail="currentUserEmail"
-      >
-      </router-view>
+      <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+        <div class=" card-container tw-h-[calc(100vh-165px)]">
+          <div class="tw-overflow-auto tw-h-full">
+            <router-view
+              :title="tabs"
+              :currOrgIdentifier="currOrgIdentifier"
+              :currUserEmail="currentUserEmail"
+            >
+            </router-view>
+          </div>
+        </div>
+      </div>
     </template>
   </q-splitter>
 </template>
