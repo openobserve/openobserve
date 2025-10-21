@@ -192,7 +192,7 @@ pub async fn check_cache(
         is_descending,
         ..Default::default()
     };
-    if histogram_interval > -1 {
+    if histogram_interval > 0 {
         multi_resp.histogram_interval = histogram_interval / 1000 / 1000;
     }
     log::info!(
@@ -277,6 +277,7 @@ pub async fn check_cache(
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.file_path = file_path.to_string();
         multi_resp.order_by = order_by;
+        multi_resp.is_aggregate = is_aggregate;
         multi_resp
     } else {
         let c_resp = match get_cached_results(
@@ -366,6 +367,7 @@ pub async fn check_cache(
         multi_resp.ts_column = result_ts_col;
         multi_resp.file_path = file_path.to_string();
         multi_resp.order_by = order_by;
+        multi_resp.is_aggregate = is_aggregate;
         multi_resp
     }
 }

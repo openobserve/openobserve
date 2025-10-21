@@ -222,8 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openDrilldown(index)"
             style="cursor: pointer; display: flex; align-items: center"
           >
-            <q-icon class="q-mr-xs q-mt-xs"
-size="16px" name="link" />
+            <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
             <span>{{ drilldown.name }}</span>
           </div>
         </div>
@@ -916,6 +915,34 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Listen for layout changes to update chart dimensions
+    const handleWindowLayoutChanges = async () => {
+      if (chartPanelRef.value) {
+        await nextTick();
+        await convertPanelDataCommon();
+      }
+    };
+
+    // ResizeObserver to detect chartPanelRef dimension changes
+    let resizeObserver: ResizeObserver | null = null;
+
+    onMounted(() => {
+      if (chartPanelRef.value) {
+        resizeObserver = new ResizeObserver(() => {
+          handleWindowLayoutChanges();
+        });
+
+        resizeObserver.observe(chartPanelRef.value);
+      }
+    });
+
+    onUnmounted(() => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+        resizeObserver = null;
+      }
+    });
+
     watch(
       panelData,
       () => {
@@ -1281,7 +1308,7 @@ export default defineComponent({
 
     // get interval from resultMetaData if it exists
     const interval = computed(
-      () => resultMetaData?.value?.[0]?.histogram_interval,
+      () => resultMetaData?.value?.[0]?.[0]?.histogram_interval,
     );
 
     // get interval in micro seconds
@@ -1416,7 +1443,11 @@ export default defineComponent({
           variableValue =
             variable.value === null
               ? ""
-              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
+              : `${
+                  variable.escapeSingleQuotes
+                    ? escapeSingleQuotes(variable.value)
+                    : variable.value
+                }`;
           // if (query.includes(variableName)) {
           //   metadata.push({
           //     type: "variable",

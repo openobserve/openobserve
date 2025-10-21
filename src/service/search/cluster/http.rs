@@ -36,7 +36,9 @@ use o2_enterprise::enterprise::actions::{
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
-use crate::service::search::{SearchResult, cluster::flight, sql::Sql};
+use crate::service::search::{
+    SearchResult, cluster::flight, sql::Sql, utils::is_default_query_limit_exceeded,
+};
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
 pub async fn search(
@@ -59,7 +61,7 @@ pub async fn search(
     // this being to avoid performance impact of query fn being applied during query
     // execution
     let use_query_fn = query.uses_zo_fn;
-    let mut query_fn = query.query_fn.clone();
+    let query_fn = query.query_fn.clone();
     #[cfg(feature = "enterprise")]
     let action_id = query.action_id.clone();
 
@@ -88,8 +90,16 @@ pub async fn search(
     if !merge_batches.is_empty() {
         let schema = merge_batches[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = merge_batches.iter().collect();
-        let json_rows = record_batches_to_json_rows(&batches_query_ref)
+        let mut json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+
+        // Check if query limit exceeded, if so truncate and do not truncate if query is a limit
+        // query
+        let default_query_limit = config::get_config().limit.query_default_limit as usize;
+        if is_default_query_limit_exceeded(json_rows.len(), &sql) {
+            json_rows.truncate(default_query_limit);
+        }
+
         let mut sources: Vec<json::Value> = if query_fn.is_empty() {
             json_rows
                 .into_iter()
@@ -101,9 +111,6 @@ pub async fn search(
             let input_fn = query_fn.trim();
 
             let apply_over_hits = super::super::RESULT_ARRAY.is_match(input_fn);
-            if apply_over_hits {
-                query_fn = super::super::RESULT_ARRAY.replace(input_fn, "").to_string();
-            }
             let mut runtime = crate::common::utils::functions::init_vrl_runtime();
             let program =
                 match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {

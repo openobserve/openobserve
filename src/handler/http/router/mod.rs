@@ -408,6 +408,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(stream::schema)
         .service(stream::create)
         .service(stream::update_settings)
+        .service(stream::update_fields)
         .service(stream::delete_fields)
         .service(stream::delete)
         .service(stream::list)
@@ -561,7 +562,10 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(service_accounts::save)
         .service(service_accounts::delete)
         .service(service_accounts::update)
-        .service(service_accounts::get_api_token);
+        .service(service_accounts::get_api_token)
+        .service(mcp::handle_mcp_post)
+        .service(mcp::handle_mcp_get)
+        .service(mcp::oauth_authorization_server_metadata);
 
     #[cfg(feature = "enterprise")]
     let service = service

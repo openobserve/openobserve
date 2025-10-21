@@ -253,6 +253,13 @@ const loadDashboard = async () => {
 
       convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
         "queries"
+      ][0].query.replace(
+        "[STREAM_NAME]",
+        `"${searchObj.data.stream.selectedStream.value}"`,
+      );
+
+      convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
+        "queries"
       ][0].query.replace("[WHERE_CLAUSE]", whereClause);
     });
 

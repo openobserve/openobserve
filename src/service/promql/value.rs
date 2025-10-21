@@ -313,7 +313,7 @@ impl<'de> Deserialize<'de> for Exemplar {
 
 impl From<&json::Map<String, json::Value>> for Exemplar {
     fn from(data: &json::Map<String, json::Value>) -> Self {
-        let timestamp = data.get("_timestamp").map(|v| v.as_i64().unwrap_or(0));
+        let timestamp = data.get("_timestamp").and_then(json::Value::as_i64);
         let value = data.get("value").map(|v| v.as_f64().unwrap_or(0.0));
         let mut labels = vec![];
         for (k, v) in data.iter() {
