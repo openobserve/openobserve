@@ -21,6 +21,7 @@ use std::{
     time::Duration,
 };
 
+pub use async_nats::Event as NatsEvent;
 use async_nats::{Client, ServerAddr, jetstream};
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -34,9 +35,17 @@ use config::{
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
-use tokio::sync::{Mutex, OnceCell, mpsc};
+use tokio::{
+    sync::{Mutex, OnceCell, mpsc},
+    task::JoinHandle,
+};
 
-use crate::{coordinator, db::Event, dist_lock, errors::*};
+use crate::{
+    coordinator,
+    db::{Event, EventData},
+    dist_lock,
+    errors::*,
+};
 
 const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
 
@@ -130,6 +139,91 @@ impl NatsDb {
             }
         }
     }
+
+    async fn kv_watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
+        let (tx, rx) = mpsc::channel(65535);
+        let prefix = prefix.to_string();
+        let self_prefix = self.prefix.to_string();
+        let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
+            loop {
+                if cluster::is_offline() {
+                    break;
+                }
+                let (bucket, new_key) = match get_bucket_by_key(&self_prefix, &prefix).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!("[NATS:kv_watch] prefix: {prefix}, get bucket error: {e}");
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        continue;
+                    }
+                };
+                let bucket_prefix = "/".to_string() + bucket.name.trim_start_matches(&self_prefix);
+                log::debug!(
+                    "[NATS:kv_watch] bucket: {}, prefix: {}",
+                    bucket.name,
+                    prefix
+                );
+                let mut entries = match bucket.watch_all().await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!(
+                            "[NATS:kv_watch] prefix: {prefix}, bucket.watch_all error: {e}"
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        continue;
+                    }
+                };
+                loop {
+                    match entries.next().await {
+                        None => {
+                            log::error!("[NATS:kv_watch] prefix: {prefix}, get message error");
+                            break;
+                        }
+                        Some(entry) => {
+                            let entry = match entry {
+                                Ok(entry) => entry,
+                                Err(e) => {
+                                    log::error!(
+                                        "[NATS:kv_watch] prefix: {prefix}, get message error: {e}"
+                                    );
+                                    break;
+                                }
+                            };
+                            let item_key = key_decode(&entry.key);
+                            if !item_key.starts_with(new_key) {
+                                continue;
+                            }
+                            let new_key = bucket_prefix.to_string() + &item_key;
+                            let ret = match entry.operation {
+                                jetstream::kv::Operation::Put => {
+                                    tx.try_send(Event::Put(EventData {
+                                        key: new_key.clone(),
+                                        value: Some(entry.value),
+                                        start_dt: None,
+                                    }))
+                                }
+                                jetstream::kv::Operation::Delete
+                                | jetstream::kv::Operation::Purge => {
+                                    tx.try_send(Event::Delete(EventData {
+                                        key: new_key.clone(),
+                                        value: None,
+                                        start_dt: None,
+                                    }))
+                                }
+                            };
+                            if let Err(e) = ret {
+                                log::warn!(
+                                    "[NATS:kv_watch] prefix: {prefix}, key: {new_key}, send error: {e}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(())
+        });
+        Ok(Arc::new(rx))
+    }
 }
 
 impl Default for NatsDb {
@@ -206,7 +300,7 @@ impl super::Db for NatsDb {
             .put(&encode_key, value.clone())
             .await
             .map_err(|e| Error::Message(format!("[NATS:put] bucket.put error: {e}")))?;
-        if need_watch {
+        if need_watch && !use_kv_watcher(&local_key) {
             coordinator::events::put_event(&local_key, start_dt, Some(value)).await?;
         }
         Ok(())
@@ -295,7 +389,7 @@ impl super::Db for NatsDb {
                 .purge(purge_key)
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {e}")))?;
-            if need_watch {
+            if need_watch && !use_kv_watcher(key) {
                 coordinator::events::delete_event(key, start_dt).await?;
             }
             return Ok(());
@@ -309,7 +403,7 @@ impl super::Db for NatsDb {
                 .purge(encode_key)
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {e}")))?;
-            if need_watch {
+            if need_watch && !use_kv_watcher(&purge_key) {
                 coordinator::events::delete_event(&purge_key, start_dt).await?;
             }
         }
@@ -451,7 +545,11 @@ impl super::Db for NatsDb {
     }
 
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
-        coordinator::events::watch(prefix).await
+        if use_kv_watcher(prefix) {
+            self.kv_watch(prefix).await
+        } else {
+            coordinator::events::watch(prefix).await
+        }
     }
 
     async fn close(&self) -> Result<()> {
@@ -793,9 +891,23 @@ fn key_decode(key: &str) -> String {
     base64::decode(key.replace('-', "+").replace('_', "/")).unwrap()
 }
 
+#[inline]
+fn use_kv_watcher(key: &str) -> bool {
+    config::NATS_KV_WATCH_MODULES
+        .iter()
+        .any(|prefix| key.starts_with(prefix))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_use_kv_watcher() {
+        assert!(!use_kv_watcher("/super_cluster_kv_nodes/"));
+        assert!(!use_kv_watcher("/super_cluster_kv_clusters/"));
+        assert!(!use_kv_watcher("/other_prefix/"));
+    }
 
     #[test]
     fn test_key_encode_simple() {
