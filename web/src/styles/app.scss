@@ -729,6 +729,26 @@ html, body {
   }
 }
 
+
+.o2-negative-button-light{
+  background-color: #ec1414 !important;
+  color: #ffffff !important;
+  border: 1px solid #ec1414 !important;
+  &:hover{
+    background-color: #f13939 !important;
+    border: 1px solid #f13939 !important;
+  }
+}
+.o2-negative-button-dark{
+  background-color: #ec1414 !important;
+  color: #ffffff !important;
+  border: 1px solid #ec1414 !important;
+  &:hover{
+    background-color: #f13939 !important;
+    border: 1px solid #f13939 !important;
+  }
+}
+
 //q-toggle in small size
 .o2-toggle-button-sm{
   .q-toggle__track{

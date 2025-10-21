@@ -23,10 +23,11 @@ use crate::{
     errors,
 };
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum PatternPolicy {
     DropField,
     Redact,
+    Hash,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -56,6 +57,7 @@ where
         match value.as_ref() {
             "DropField" => Self::DropField,
             "Redact" => Self::Redact,
+            "Hash" => Self::Hash,
             _ => Self::Redact,
         }
     }
@@ -66,6 +68,7 @@ impl std::fmt::Display for PatternPolicy {
         match self {
             Self::DropField => write!(f, "DropField"),
             Self::Redact => write!(f, "Redact"),
+            Self::Hash => write!(f, "Hash"),
         }
     }
 }

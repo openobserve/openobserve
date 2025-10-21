@@ -171,7 +171,7 @@
                   <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
                       Redact
                       <span class="tw-font-[400] individual-section-sub-information">
-                        This will redact the matched expression
+                        Replace with [REDACTED]
                       </span>
                     </div>
 
@@ -183,10 +183,22 @@
                   <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
                       Drop
                       <span class="tw-font-[400] individual-section-sub-information">
-                        This will drop the field completely
+                        Drop the field completely
                       </span>
                     </div>
-                    
+
+                </div>
+                <div class="tw-flex tw-items-start">
+                  <q-radio v-model="policy" val="Hash" data-test="associated-regex-patterns-hash-radio">
+
+                  </q-radio>
+                  <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
+                      Hash
+                      <span class="tw-font-[400] individual-section-sub-information">
+                        Replace with searchable hash
+                      </span>
+                    </div>
+
                 </div>
                 </div>
               </div>
@@ -460,7 +472,7 @@ export default defineComponent({
             expandState.value.outputString = true;
             outputString.value = "";
             testLoading.value = true;
-            const response = await regexPatternsService.test(store.state.selectedOrganization.identifier, userClickedPattern.value.pattern, [testString.value]);
+            const response = await regexPatternsService.test(store.state.selectedOrganization.identifier, userClickedPattern.value.pattern, [testString.value], policy.value);
             outputString.value = response.data.results[0];
           } catch (error) {
             $q.notify({

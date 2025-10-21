@@ -43,8 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex q-gutter-sm">
         <q-btn
           outline
-          padding="sm"
-          class="q-mr-sm"
+          padding="xs sm"
+          class="q-mr-sm tw-h-[36px]"
           no-caps
           label="Dashboard Tutorial"
           @click="showTutorial"
@@ -57,8 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           "
           outline
-          padding="sm"
-          class="q-mr-sm"
+          padding="xs"
+          class="q-mr-sm tw-h-[36px]"
           no-caps
           icon="info_outline"
           @click="showViewPanel = true"
@@ -73,23 +73,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="selectedDate"
           ref="dateTimePickerRef"
           :disable="disable"
+          class="tw-h-[36px]"
           @hide="setTimeForVariables"
         />
         <q-btn
-          class="q-ml-md text-bold"
           outline
-          padding="sm lg"
           color="red"
           no-caps
+          flat
+          class="o2-secondary-button tw-h-[36px] q-ml-md"
+          style="color: red !important"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           :label="t('panel.discard')"
           @click="goBackToDashboardList"
           data-test="dashboard-panel-discard"
         />
         <q-btn
-          class="q-ml-md text-bold"
-          outline
-          padding="sm lg"
+          class="o2-secondary-button tw-h-[36px] q-ml-md"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           no-caps
+          flat
           :label="t('panel.save')"
           data-test="dashboard-panel-save"
           @click.stop="savePanelData.execute()"
@@ -100,21 +111,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-btn
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-            class="q-ml-md text-bold no-border"
             data-test="dashboard-cancel"
-            padding="sm lg"
-            color="negative"
             no-caps
+            dense
+            flat
+            class="o2-primary-button tw-h-[36px] q-ml-md"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-negative-button-dark'
+                : 'o2-negative-button-light'
+            "
             :label="t('panel.cancel')"
             @click="cancelAddPanelQuery"
           />
           <q-btn
             v-else
-            class="q-ml-md text-bold no-border"
             data-test="dashboard-apply"
-            padding="sm lg"
-            color="secondary"
+            class="o2-primary-button tw-h-[36px] q-ml-md"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             no-caps
+            flat
+            dense
             :label="t('panel.apply')"
             @click="runQuery"
           />
@@ -230,7 +251,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </div>
-                  <div class="tw-flex tw-justify-end tw-mr-2">
+                  <div class="tw-flex tw-justify-end tw-mr-2 tw-items-center">
+                    <!-- Error/Warning tooltips moved here -->
+                    <q-btn
+                      v-if="errorMessage"
+                      :icon="outlinedWarning"
+                      flat
+                      size="xs"
+                      padding="2px"
+                      data-test="dashboard-panel-error-data-inline"
+                      class="warning q-mr-xs"
+                    >
+                      <q-tooltip
+                        anchor="bottom right"
+                        self="top right"
+                        max-width="220px"
+                      >
+                        <div style="white-space: pre-wrap">
+                          {{ errorMessage }}
+                        </div>
+                      </q-tooltip>
+                    </q-btn>
+                    <q-btn
+                      v-if="maxQueryRangeWarning"
+                      :icon="outlinedWarning"
+                      flat
+                      size="xs"
+                      padding="2px"
+                      data-test="dashboard-panel-max-duration-warning-inline"
+                      class="warning q-mr-xs"
+                    >
+                      <q-tooltip
+                        anchor="bottom right"
+                        self="top right"
+                        max-width="220px"
+                      >
+                        <div style="white-space: pre-wrap">
+                          {{ maxQueryRangeWarning }}
+                        </div>
+                      </q-tooltip>
+                    </q-btn>
+                    <q-btn
+                      v-if="limitNumberOfSeriesWarningMessage"
+                      :icon="symOutlinedDataInfoAlert"
+                      flat
+                      size="xs"
+                      padding="2px"
+                      data-test="dashboard-panel-series-limit-warning-inline"
+                      class="warning q-mr-xs"
+                    >
+                      <q-tooltip
+                        anchor="bottom right"
+                        self="top right"
+                        max-width="220px"
+                      >
+                        <div style="white-space: pre-wrap">
+                          {{ limitNumberOfSeriesWarningMessage }}
+                        </div>
+                      </q-tooltip>
+                    </q-btn>
                     <span v-if="lastTriggeredAt" class="lastRefreshedAt">
                       <span class="lastRefreshedAtIcon">🕑</span
                       ><RelativeTime
@@ -243,6 +322,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <PanelSchemaRenderer
                       v-if="chartData"
                       @metadata-update="metaDataValue"
+                      @result-metadata-update="handleResultMetadataUpdate"
+                      @limit-number-of-series-warning-message-update="
+                        handleLimitNumberOfSeriesWarningMessage
+                      "
                       :key="dashboardPanelData.data.type"
                       :panelSchema="chartData"
                       :dashboard-id="queryParams?.dashboard"
@@ -426,6 +509,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <PanelSchemaRenderer
                         v-if="chartData"
                         @metadata-update="metaDataValue"
+                        @result-metadata-update="handleResultMetadataUpdate"
+                        @limit-number-of-series-warning-message-update="
+                          handleLimitNumberOfSeriesWarningMessage
+                        "
                         :key="dashboardPanelData.data.type"
                         :panelSchema="chartData"
                         :dashboard-id="queryParams?.dashboard"
@@ -520,7 +607,16 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
-import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
+import {
+  createDashboardsContextProvider,
+  contextRegistry,
+} from "@/composables/contextProviders";
+import {
+  outlinedWarning,
+  outlinedRunningWithErrors,
+} from "@quasar/extras/material-icons-outlined";
+import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import { processQueryMetadataErrors } from "@/utils/zincutils";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -601,6 +697,11 @@ export default defineComponent({
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
     };
+
+    // Warning messages
+    const maxQueryRangeWarning = ref("");
+    const limitNumberOfSeriesWarningMessage = ref("");
+    const errorMessage = ref("");
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
@@ -707,8 +808,8 @@ export default defineComponent({
       removeAiContextHandler();
 
       // Clean up dashboard context provider
-      contextRegistry.unregister('dashboards');
-      contextRegistry.setActive('');
+      contextRegistry.unregister("dashboards");
+      contextRegistry.setActive("");
 
       // console.timeEnd("onUnmounted");
 
@@ -777,13 +878,13 @@ export default defineComponent({
 
       // Set up dashboard context provider
       const dashboardProvider = createDashboardsContextProvider(
-        route, 
-        store, 
-        dashboardPanelData, 
-        editMode.value
+        route,
+        store,
+        dashboardPanelData,
+        editMode.value,
       );
-      contextRegistry.register('dashboards', dashboardProvider);
-      contextRegistry.setActive('dashboards');
+      contextRegistry.register("dashboards", dashboardProvider);
+      contextRegistry.setActive("dashboards");
 
       // console.timeEnd("add panel loadDashboard");
     });
@@ -815,11 +916,11 @@ export default defineComponent({
       // console.time("AddPanel:loadDashboard");
       let data = JSON.parse(
         JSON.stringify(
-          await getDashboard(
+          (await getDashboard(
             store,
             route.query.dashboard,
             route.query.folder ?? "default",
-          ) ?? {},
+          )) ?? {},
         ),
       );
       // console.timeEnd("AddPanel:loadDashboard");
@@ -1279,17 +1380,33 @@ export default defineComponent({
       }
     };
 
-    const handleChartApiError = (errorMessage: {
-      message: string;
-      code: string;
-    }) => {
-      if (errorMessage?.message) {
+    const handleChartApiError = (errorMsg: any) => {
+      if (typeof errorMsg === "string") {
+        errorMessage.value = errorMsg;
         const errorList = errorData.errors ?? [];
         errorList.splice(0);
-        errorList.push(errorMessage.message);
+        errorList.push(errorMsg);
+      } else if (errorMsg?.message) {
+        errorMessage.value = errorMsg.message ?? "";
+        const errorList = errorData.errors ?? [];
+        errorList.splice(0);
+        errorList.push(errorMsg.message);
+      } else {
+        errorMessage.value = "";
       }
     };
 
+    // Handle limit number of series warning from PanelSchemaRenderer
+    const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
+      limitNumberOfSeriesWarningMessage.value = message;
+    };
+
+    const handleResultMetadataUpdate = (metadata: any) => {
+      maxQueryRangeWarning.value = processQueryMetadataErrors(
+        metadata,
+        store.state.timezone,
+      );
+    };
     const onDataZoom = (event: any) => {
       // console.time("onDataZoom");
       const selectedDateObj = {
@@ -1719,6 +1836,14 @@ export default defineComponent({
       dateTimeForVariables,
       seriesDataUpdate,
       seriesData,
+      maxQueryRangeWarning,
+      limitNumberOfSeriesWarningMessage,
+      errorMessage,
+      handleLimitNumberOfSeriesWarningMessage,
+      handleResultMetadataUpdate,
+      outlinedWarning,
+      symOutlinedDataInfoAlert,
+      outlinedRunningWithErrors,
     };
   },
   methods: {
@@ -1761,5 +1886,9 @@ export default defineComponent({
   min-width: 200px;
   max-width: 500px;
   transition: width 0.2s ease;
+}
+
+.warning {
+  color: var(--q-warning);
 }
 </style>

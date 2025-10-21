@@ -58,8 +58,13 @@ const regexPatterns = {
     org_identifier: string,
     pattern: string,
     test_records: Array<string>,
+    policy?: string,
   ) => {
-    return http().post(`/api/${org_identifier}/re_patterns/test`, { pattern, test_records });
+    const payload: any = { pattern, test_records };
+    if (policy) {
+      payload.policy = policy;
+    }
+    return http().post(`/api/${org_identifier}/re_patterns/test`, payload);
   }
 };
 
