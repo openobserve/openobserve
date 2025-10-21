@@ -28,10 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="recommended-list-search-input"
               v-model="tabsFilter"
               borderless
-              filled
               dense
-              class="no-border"
+              clearable
               :placeholder="t('common.search')"
+              class="tw-px-[0.625rem] tw-pt-[0.625rem] indexlist-search-input"
             >
               <template #prepend>
                 <q-icon name="search" class="cursor-pointer" />
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               indicator-color="transparent"
               inline-label
               vertical
-              class="data-sources-recommended-tabs !tw-mt-3"
+              class="data-sources-recommended-tabs"
             >
               <template v-for="(tab, index) in filteredList" :key="tab.name">
                 <q-route-tab

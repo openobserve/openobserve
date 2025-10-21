@@ -27,9 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="others-list-search-input"
               v-model="tabsFilter"
               borderless
-              filled
               dense
-              class="no-border"
+              clearable
+              class="tw-px-[0.625rem] tw-pt-[0.625rem] indexlist-search-input"
               :placeholder="t('common.search')"
             >
               <template #prepend>
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               indicator-color="transparent"
               inline-label
               vertical
-              class="data-sources-database-tabs !tw-mt-3 item-left"
+              class="data-sources-database-tabs item-left"
             >
               <template v-for="(tab, index) in filteredList" :key="tab.name">
                 <q-route-tab
@@ -232,31 +232,6 @@ export default defineComponent({
   padding: 1.5rem 0 0;
   .head {
     padding-bottom: 1rem;
-  }
-  .q-tabs {
-    &--vertical {
-      margin: 1.5rem 1rem 0 1rem;
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 0.6rem 0 0.6rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        text-transform: capitalize;
-
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          color: black;
-          background-color: $accent;
-        }
-      }
-    }
   }
 }
 </style>
