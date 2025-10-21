@@ -56,7 +56,7 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::request::search::error_utils::map_error_to_http_response,
+    handler::http::request::search::{Headers, error_utils::map_error_to_http_response},
     service::{
         search as SearchService, search::streaming::process_search_stream_request_multi,
         self_reporting::report_request_usage_stats, setup_tracing_with_trace_id,
@@ -1455,7 +1455,6 @@ mod tests {
                 query_fn: None,
                 is_old_format: false,
             }],
-            streams: vec!["logs".to_string()],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1480,8 +1479,6 @@ mod tests {
         assert!(!request.sql.is_empty());
         assert_eq!(request.size, 10);
         assert_eq!(request.from, 0);
-        assert_eq!(request.streams.len(), 1);
-        assert_eq!(request.streams[0], "logs");
     }
 
     #[test]
@@ -1512,7 +1509,6 @@ mod tests {
                 query_fn: None,
                 is_old_format: false,
             }],
-            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1542,7 +1538,6 @@ mod tests {
     fn test_search_multi_empty_queries() {
         let request = MultiStreamRequest {
             sql: vec![],
-            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1577,7 +1572,6 @@ mod tests {
                 query_fn: Some("base64_encoded_vrl_function".to_string()),
                 is_old_format: false,
             }],
-            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1613,7 +1607,6 @@ mod tests {
                 query_fn: None,
                 is_old_format: false,
             }],
-            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1657,7 +1650,6 @@ mod tests {
                     is_old_format: false,
                 },
             ],
-            streams: vec!["logs".to_string(), "metrics".to_string()],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1697,7 +1689,6 @@ mod tests {
                 query_fn: None,
                 is_old_format: false,
             }],
-            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
