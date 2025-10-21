@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-caps
           size="13px"
           icon="restart_alt"
-          class="tw-flex tw-justify-center tw-items-center tw-w-[2rem] tw-min-h-[2rem] tw-h-[2rem] tw-mr-[0.375rem] tw-rounded-[0.375rem]"
+          class="tw-flex tw-justify-center tw-items-center tw-w-[2rem] tw-min-h-[2rem] tw-h-[2rem] tw-mr-[0.375rem] tw-rounded-[0.375rem] el-border"
           @click="resetFilters"
         >
           <q-tooltip>
@@ -90,14 +90,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             flat
             :title="t('search.runQuery')"
-            class="search-button bg-secondary tw-min-h-[2rem]"
+            class="search-button bg-primary tw-min-h-[2rem]"
             @click="searchData"
             :disable="isLoading"
             >{{ t("search.runQuery") }}</q-btn
           >
         </div>
         <q-btn
-          class="tw-mr-[0.375rem] float-left download-logs-btn q-pa-sm tw-min-h-[2rem]"
+          class="tw-mr-[0.375rem] float-left download-logs-btn q-pa-sm tw-min-h-[2rem] el-border"
           size="sm"
           :disable="!searchObj.data.queryResults?.hits?.length"
           icon="download"
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           data-test="logs-search-bar-share-link-btn"
-          class="tw-mr-0 download-logs-btn q-px-sm tw-min-h-[2rem]"
+          class="tw-mr-0 download-logs-btn q-px-sm tw-min-h-[2rem] el-border"
           size="sm"
           icon="share"
           :title="t('search.shareLink')"
