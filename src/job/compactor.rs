@@ -85,12 +85,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
     );
 
-    // spawn_pausable_job!("run_merge", get_config().compact.interval + 2, {
-    //     log::debug!("[COMPACTOR::JOB] Running data merge");
-    //     if let Err(e) = compact::run_merge(scheduler.tx().clone()).await {
-    //         log::error!("[COMPACTOR::JOB] run data merge error: {e}");
-    //     }
-    // });
+    spawn_pausable_job!("run_merge", get_config().compact.interval + 2, {
+        log::debug!("[COMPACTOR::JOB] Running data merge");
+        if let Err(e) = compact::run_merge(scheduler.tx().clone()).await {
+            log::error!("[COMPACTOR::JOB] run data merge error: {e}");
+        }
+    });
 
     spawn_pausable_job!("run_retention", get_config().compact.interval + 3, {
         log::debug!("[COMPACTOR::JOB] Running data retention");
