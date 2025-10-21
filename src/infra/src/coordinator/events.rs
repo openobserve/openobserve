@@ -94,7 +94,7 @@ pub async fn init() -> Result<()> {
                     for (prefix, tx) in r.iter() {
                         if event.key.starts_with(prefix) {
                             log::debug!(
-                                "[COORDINATOR::EVENTS] sending event to watcher: [{:?}]{:?}",
+                                "[COORDINATOR::EVENTS] sending event to watcher: {:?}:{}",
                                 event.action,
                                 event.key
                             );
