@@ -218,7 +218,7 @@ export default defineComponent({
     //   0 2px 8px rgba(168, 85, 247, 0.25),
     //   inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
     background: linear-gradient(135deg, var(--o2-menu-gradient-start) 0%, var(--o2-menu-gradient-end) 100%) !important;
-    border: 1px solid rgba(89, 155, 174, 0.6) !important;
+
     box-shadow: 0 4px 12px rgba(89, 155, 174, 0.09) !important;
     color: var(--o2-menu-color) !important;
     transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -241,8 +241,8 @@ export default defineComponent({
     // Phase 3: Enhanced active indicator with minimal shadow
     &::before {
       content: " ";
-      width: 4px;
-      height: 48px;
+      width: 6px;
+      height: 100%;
       position: absolute;
       left: -8px;
       top: 50%;
@@ -341,10 +341,10 @@ body.body--light {
 
     &.q-router-link--active {
 
-      &::before {
-        // background: linear-gradient(180deg, var(--o2-body-primary-bg) 0%, var(--o2-body-secondary-bg) 100%) !important;
-        box-shadow: 4px 0px 0px var(--o2-menu-color) !important;
-      }
+      // &::before {
+      //   // background: linear-gradient(180deg, var(--o2-body-primary-bg) 0%, var(--o2-body-secondary-bg) 100%) !important;
+      //   box-shadow: 4px 0px 0px var(--o2-menu-color) !important;
+      // }
     }
   }
 }
