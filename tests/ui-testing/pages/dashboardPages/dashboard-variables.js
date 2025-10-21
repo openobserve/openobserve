@@ -8,13 +8,14 @@ export default class DashboardVariables {
   }
 
   // Method to add a dashboard variable
-  // Parameters: name, streamtype, streamName, field
+  // Parameters: name, streamtype, streamName, field, customValueSearch, filterConfig
   async addDashboardVariable(
     name,
     streamtype,
     streamName,
     field,
-    customValueSearch = false // it is used only when we want to search custom value from variable dropdown
+    customValueSearch = false, // it is used only when we want to search custom value from variable dropdown
+    filterConfig = null // optional filter configuration { filterName, operator, value }
   ) {
     // Open Variable Tab
     await this.page
@@ -57,16 +58,45 @@ export default class DashboardVariables {
       .fill(field);
     await this.page.getByText(field).click();
 
-    // Save Variable and Close Settings (skip if customValueSearch is true)
-    if (!customValueSearch) {
-      await this.page
-        .locator('[data-test="dashboard-variable-save-btn"]')
-        .click();
-      await this.page
-        .locator('[data-test="dashboard-settings-close-btn"]')
-        .click();
-    }
+    // Add Filter Configuration if provided
+    if (filterConfig) {
 
+      const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
+      await addFilterBtn.waitFor({ state: "visible", timeout: 10000 });
+      await addFilterBtn.click();
+      
+      // Wait for and interact with Filter Name selector
+      const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]');
+      await filterNameSelector.waitFor({ state: "visible", timeout: 10000 });
+      await filterNameSelector.click();
+      await filterNameSelector.fill(filterConfig.filterName);
+      
+      // Wait for and select the filter name option
+      const filterNameOption = this.page.getByRole("option", { name: filterConfig.filterName });
+      await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
+      await filterNameOption.click();
+      
+      // Wait for and interact with Operator selector
+      const operatorSelector = this.page.locator('[data-test="dashboard-query-values-filter-operator-selector"]');
+      await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
+      await operatorSelector.click();
+      
+      // Wait for and select the operator option
+      const operatorOption = this.page.getByRole("option", { name: filterConfig.operator, exact: true }).locator("div").nth(2);
+      await operatorOption.waitFor({ state: "visible", timeout: 10000 });
+      await operatorOption.click();
+      
+      // Wait for and interact with value input
+      const autoComplete = this.page.locator('[data-test="common-auto-complete"]');
+      await autoComplete.waitFor({ state: "visible", timeout: 10000 });
+      await autoComplete.click();
+      await autoComplete.fill(filterConfig.value);
+      
+      // await this.page
+      //   .locator('[data-test="common-auto-complete-option"]')
+      //   .getByText(filterConfig.value, { exact: true })
+      //   .click();
+    }
     // Custom Value Search if want to search custom value from variable dropdown
     if (customValueSearch) {
       await this.page
@@ -89,15 +119,24 @@ export default class DashboardVariables {
       await this.page
         .locator('[data-test="dashboard-variable-custom-value-0"]')
         .fill("test");
-
-      // Save Variable and Close Settings
-      await this.page
-        .locator('[data-test="dashboard-variable-save-btn"]')
-        .click();
-      await this.page
-        .locator('[data-test="dashboard-settings-close-btn"]')
-        .click();
     }
+
+    // Save Variable and Close Settings (skip if customValueSearch is true)
+    // if (!customValueSearch) {
+    const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
+    await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    await saveBtn.click();
+
+    // Wait for the save action to complete and DOM to stabilize
+    // await this.page.waitForTimeout(3000);
+    await this.page.waitForLoadState("networkidle");
+
+    // Use JavaScript evaluation to click the close button to avoid DOM instability issues
+    await this.page.evaluate(() => {
+      const closeBtn = document.querySelector('[data-test="dashboard-settings-close-btn"]');
+      if (closeBtn) closeBtn.click();
+    });
+    // }
   }
 
   // Dynamic function to fill input by label
@@ -112,5 +151,43 @@ export default class DashboardVariables {
     const option = this.page.getByRole("option", { name: value });
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
+  }
+
+  // Method to wait for dependent variables API calls to complete
+  // Parameters: expectedCallCount - number of API calls to wait for
+  //             valuesResponsesArray - reference to the array tracking API responses
+  //             timeout - maximum time to wait in milliseconds (default: 15000)
+  // This method uses native Promise-based waiting without hard timeouts
+  async waitForDependentVariablesToLoad(valuesResponsesArray, expectedCallCount, timeout = 15000) {
+    const startTime = Date.now();
+
+    // Use Promise.race to wait efficiently without polling
+    while (valuesResponsesArray.length < expectedCallCount) {
+      if (Date.now() - startTime > timeout) {
+        throw new Error(
+          `Timeout waiting for ${expectedCallCount} API calls. Only received ${valuesResponsesArray.length} calls after ${timeout}ms`
+        );
+      }
+
+      // Wait for the next network response matching the values API pattern
+      try {
+        await Promise.race([
+          this.page.waitForResponse(
+            response => response.url().includes('/api/') && response.url().includes('/values'),
+            { timeout: 2000 }
+          ),
+          // Small delay to allow array to be updated
+          new Promise(resolve => setTimeout(resolve, 100))
+        ]);
+      } catch (error) {
+        // Continue if no response in 2s, will check array length again
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    // Wait for DOM to stabilize after all API calls complete
+    await this.page.waitForLoadState('domcontentloaded');
+
+    return true;
   }
 }
