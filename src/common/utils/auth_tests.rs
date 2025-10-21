@@ -3363,6 +3363,7 @@ mod tests {
                 event_max_age: u64::default(),
                 queue_max_size: i64::default(),
                 v211_support: bool::default(),
+                kv_watch_modules: String::default(),
             },
             s3: config::S3 {
                 provider: String::default(),
