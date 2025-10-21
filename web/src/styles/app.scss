@@ -42,11 +42,12 @@ body {
 }
 
 .header-menu {
+  @extend .el-border-radius;
+
   width: auto;
   display: inline-flex;
   background-color: var(--o2-header-menu-bg);
   position: relative;
-  border-radius: 1rem;
 }
 
 // .element-box-shadow {
