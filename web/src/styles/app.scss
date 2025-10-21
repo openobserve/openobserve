@@ -1176,12 +1176,12 @@ body {
   }
 
   .splitter-section-collapse-btn--visible {
-    transform: translateY(50%) translateX(-10px) !important;
+    // transform: translateY(50%) translateX(-10px) !important;
   }
 
   // When hovering over the splitter area, slide out the collapsed button
   &:hover .splitter-section-collapse-btn--hidden {
-    transform: translateY(50%) translateX(10px) !important;
+    // transform: translateY(50%) translateX(10px) !important;
   }
 }
 
@@ -1214,19 +1214,19 @@ body {
   }
 
   &--visible {
-    right: -10px !important;
+    right: 0px !important;
     top: 5% !important;
     transform: translateY(-50%) !important;
 
   }
 
   &--hidden {
-    left: -10px !important;
+    left: 0px !important;
     top: 5% !important;
     transform: translateY(-50%) !important;
 
     &:hover {
-      transform: translateY(-50%) translateX(10px) !important;
+      transform: translateY(-50%) translateX(0px) !important;
     }
   }
 }

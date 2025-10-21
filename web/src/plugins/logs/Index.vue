@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #before>
                 <div
-                  class="relative-position tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]"
+                  class="relative-position tw-h-full tw-px-[0.625rem]"
                 >
                   <index-list
                     v-show="searchObj.meta.showFields"
@@ -71,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   />
                   <q-btn
+                    v-if="searchObj.config.splitterModel > 0"
                     data-test="logs-search-field-list-collapse-btn"
                     icon="drag_indicator"
                     :title="
@@ -91,6 +92,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #after>
+                <q-btn
+                  v-if="searchObj.config.splitterModel == 0"
+                    data-test="logs-search-field-list-collapse-btn"
+                    icon="drag_indicator"
+                    :title="
+                      searchObj.meta.showFields
+                        ? 'Collapse Fields'
+                        : 'Open Fields'
+                    "
+                    flat
+                    dense
+                    :class="[
+                      'splitter-section-collapse-btn',
+                      searchObj.meta.showFields
+                        ? 'splitter-section-collapse-btn--visible'
+                        : 'splitter-section-collapse-btn--hidden',
+                    ]"
+                    @click="collapseFieldList"
+                  />
                 <div
                   class="tw-pr-[0.625rem] tw-pb-[0.625rem] tw-h-full"
                   :class="searchObj.meta.showFields ? '' : 'tw-pl-[0.625rem]'"
