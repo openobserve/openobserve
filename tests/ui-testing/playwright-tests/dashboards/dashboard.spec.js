@@ -853,13 +853,15 @@ test.describe("dashboard UI testcases", () => {
       { timeout: 15000 }
     );
 
-    // await page.waitForTimeout(2000);
-    // await page.waitForLoadState("networkidle");
+    // Wait for canvas elements to be rendered
+    await page.waitForSelector('[data-test="chart-renderer"] canvas', {
+      state: "attached",
+      timeout: 15000,
+    });
 
     // Validate chart is properly rendered
     const chartContainer = page.locator('[data-test="chart-renderer"]');
     const boundingBox = await chartContainer.boundingBox();
-    // await page.waitForLoadState("networkidle");
     const canvasCount = await page
       .locator('[data-test="chart-renderer"] canvas')
       .count();
