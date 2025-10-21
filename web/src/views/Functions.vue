@@ -78,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-tabs>
 
               <q-btn
+                v-if="showSidebar"
                 data-test="logs-search-field-list-collapse-btn"
                 icon="drag_indicator"
                 :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
@@ -96,6 +97,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template v-slot:after>
+          <q-btn
+            v-if="!showSidebar"
+            data-test="logs-search-field-list-collapse-btn"
+            icon="drag_indicator"
+            :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+            dense
+            flat
+            :class="[
+              'splitter-section-collapse-btn',
+              showSidebar
+                ? 'splitter-section-collapse-btn--visible'
+                : 'splitter-section-collapse-btn--hidden',
+            ]"
+            
+            @click="collapseSidebar"
+          />
           <!-- :templates="templates"
             :functionAssociatedStreams="functionAssociatedStreams"
             @get:functionAssociatedStreams="getFunctionAssociatedStreams"
