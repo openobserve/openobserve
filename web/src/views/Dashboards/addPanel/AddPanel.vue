@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="height: calc(100vh - 40px); overflow-y: auto" class="scroll">
-    <div
+    <div class="tw-px-[0.625rem] tw-mb-[0.625rem]">
+      <div
       class="flex items-center q-pa-sm card-container"
       :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
     >
@@ -142,10 +143,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
     </div>
-    <q-separator></q-separator>
-    <div class="row card-container" style="height: calc(100vh - 99px); overflow-y: auto">
+    </div>
+    <div class="tw-pr-[0.625rem]">
+    <div class="row" style="height: calc(100vh - 110px); overflow-y: auto">
+      <div class="tw-pl-[0.625rem]">
       <div
-        class="col scroll"
+        class="col scroll card-container"
         style="
           overflow-y: auto;
           height: 100%;
@@ -158,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-chart-type="resetAggregationFunction"
         />
       </div>
+      </div>
       <q-separator vertical />
       <!-- for query related chart only -->
       <div
@@ -167,21 +171,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           )
         "
         class="col"
-        style="width: 100%; height: 100%"
+        style="width: 100%; height: 100%; display: flex; flex-direction: row; overflow-x: hidden"
       >
+        <!-- collapse field list bar -->
+        <div
+          v-if="!dashboardPanelData.layout.showFieldList"
+          class="field-list-sidebar-header-collapsed card-container"
+          @click="collapseFieldList"
+          style="width: 50px; height: 100%; flex-shrink: 0"
+        >
+          <q-icon
+            name="expand_all"
+            class="field-list-collapsed-icon rotate-90"
+            data-test="dashboard-field-list-collapsed-icon"
+          />
+          <div class="field-list-collapsed-title">{{ t("panel.fields") }}</div>
+        </div>
         <q-splitter
           v-model="dashboardPanelData.layout.splitter"
-          @update:model-value="layoutSplitterUpdated"
-          style="width: 100%; height: 100%"
+          :limits="[0, 20]"
+          :style="{
+            width: dashboardPanelData.layout.showFieldList ? '100%' : 'calc(100% - 50px)',
+            height: '100%'
+          }"
         >
           <template #before>
+            <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
             <div
-              class="col scroll"
-              style="height: calc(100vh - 99px); overflow-y: auto"
+              v-if="dashboardPanelData.layout.showFieldList"
+              class="col scroll card-container"
+              style="height: calc(100vh - 110px); overflow-y: auto"
             >
               <div class="column" style="height: 100%">
-                <div class="col-auto q-pa-sm">
-                  <span class="text-weight-bold">{{ t("panel.fields") }}</span>
+                <div class="col-auto q-pa-sm ">
+                  <span class="text-weight-bold ">{{ t("panel.fields") }}</span>
                 </div>
                 <div class="col" style="width: 100%">
                   <!-- <GetFields :editMode="editMode" /> -->
@@ -189,22 +212,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
+            </div>
           </template>
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
-            <q-avatar
+            <q-btn
               color="primary"
-              text-color="white"
-              size="20px"
-              icon="drag_indicator"
-              style="top: 10px; left: 3.5px"
+              size="sm"
+              :icon="
+                dashboardPanelData.layout.showFieldList
+                  ? 'chevron_left'
+                  : 'chevron_right'
+              "
+              dense
+              round
+              style="top: 14px; z-index: 100"
+              @click.stop="collapseFieldList"
             />
           </template>
           <template #after>
-            <div class="row card-container">
+              <div class="row card-container">
               <div
                 class="col scroll"
-                style="height: calc(100vh - 99px); overflow-y: auto"
+                style="height: calc(100vh - 110px); overflow-y: auto"
               >
                 <div class="layout-panel-container col">
                   <DashboardQueryBuilder
@@ -423,13 +453,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'custom_chart'"
-        class="col column"
-        style="height: calc(100vh - 99px); overflow-y: auto"
+        class="col"
+        style="height: calc(100vh - 99px); overflow-y: auto; display: flex; flex-direction: row; overflow-x: hidden"
       >
+        <!-- collapse field list bar -->
+        <div
+          v-if="!dashboardPanelData.layout.showFieldList"
+          class="field-list-sidebar-header-collapsed card-container"
+          @click="collapseFieldList"
+          style="width: 50px; height: 100%; flex-shrink: 0"
+        >
+          <q-icon
+            name="expand_all"
+            class="field-list-collapsed-icon rotate-90"
+            data-test="dashboard-field-list-collapsed-icon"
+          />
+          <div class="field-list-collapsed-title">{{ t("panel.fields") }}</div>
+        </div>
         <q-splitter
           v-model="dashboardPanelData.layout.splitter"
-          @update:model-value="layoutSplitterUpdated"
-          style="width: 100%; height: 100%"
+          :limits="[0, 20]"
+          :style="{
+            width: dashboardPanelData.layout.showFieldList ? '100%' : 'calc(100% - 50px)',
+            height: '100%'
+          }"
         >
           <template #before>
             <div
@@ -455,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="splitter-vertical splitter-enabled"></div>
             <q-btn
               color="primary"
-              size="12px"
+              size="sm"
               :icon="
                 dashboardPanelData.layout.showFieldList
                   ? 'chevron_left'
@@ -464,12 +511,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               round
               style="top: 14px; z-index: 100"
-              :style="{
-                right: dashboardPanelData.layout.showFieldList
-                  ? '-20px'
-                  : '-0px',
-                left: dashboardPanelData.layout.showFieldList ? '5px' : '12px',
-              }"
               @click="collapseFieldList"
             />
           </template>
@@ -560,6 +601,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-splitter>
       </div>
+    </div>
     </div>
   </div>
 </template>
@@ -1880,6 +1922,29 @@ export default defineComponent({
 
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
+}
+
+.field-list-sidebar-header-collapsed {
+  cursor: pointer;
+  width: 50px;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  margin-right: 0.625rem;
+}
+
+.field-list-collapsed-icon {
+  margin-top: 10px;
+  font-size: 20px;
+}
+
+.field-list-collapsed-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: bold;
 }
 
 .dynamic-input {

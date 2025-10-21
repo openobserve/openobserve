@@ -1430,3 +1430,25 @@ body {
 //     Monaco Editor Styling End
 //============================================================================ 
   
+.o2-custom-select-dashboard{
+  min-height: 3rem !important;
+
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    min-height: 3rem !important;
+    max-height: 3rem !important;
+    height: 3rem !important;
+  }
+
+
+  .q-field__append {
+    align-items: center;
+    height: 3rem !important;
+  }
+
+}
+
+.dashboard-chart-border{
+  border: 0.03rem solid var(--o2-border-color);
+}
