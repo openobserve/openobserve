@@ -790,7 +790,7 @@ pub fn signature(labels: &Labels) -> u64 {
 /// matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 {
-    let mut hasher = std::hash::DefaultHasher::new();
+    let mut hasher = ahash::AHasher::default();
     labels
         .iter()
         .filter(|item| !exclude_names.contains(&item.name.as_str()))
@@ -834,13 +834,18 @@ mod tests {
     fn test_signature_without_labels() {
         let labels: Labels = generate_test_labels();
 
-        let sig = signature(&labels);
-        assert_eq!(sig, 17855692611899080986);
+        let sig_all = signature(&labels);
+        let sig_without_ac = signature_without_labels(&labels, &["a", "c"]);
 
-        let sig = signature_without_labels(&labels, &["a", "c"]);
-        assert_eq!(sig, 2422580394001170964);
+        // Signatures should be different when excluding labels
+        assert_ne!(sig_all, sig_without_ac);
 
+        // Signature with empty exclusion list should match full signature
         assert_eq!(signature(&labels), signature_without_labels(&labels, &[]));
+
+        // Same labels should produce same signature (deterministic)
+        assert_eq!(sig_all, signature(&labels));
+        assert_eq!(sig_without_ac, signature_without_labels(&labels, &["a", "c"]));
     }
 
     #[test]
