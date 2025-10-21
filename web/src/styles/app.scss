@@ -35,6 +35,12 @@ body {
   border-radius: 0.375rem;
 }
 
+.q-btn {
+  &::before {
+    border: none;
+  }
+}
+
 .header-menu {
   width: auto;
   display: inline-flex;
