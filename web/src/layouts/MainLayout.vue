@@ -1636,7 +1636,7 @@ export default defineComponent({
       border-radius: 5px;
 
       .q-icon {
-        height: 1rem;
+        height: 1.5rem;
         width: 1rem;
       }
 
