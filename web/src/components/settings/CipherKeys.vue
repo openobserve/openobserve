@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pagination="pagination"
         class="o2-quasar-table o2-quasar-table-header-sticky"
         :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 180px); overflow-y: auto;' 
+            ? 'width: 100%; height: calc(100vh - 115px); overflow-y: auto;' 
             : 'width: 100%'"
       >
         <template #no-data><NoData /></template>
