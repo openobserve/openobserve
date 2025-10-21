@@ -1588,7 +1588,7 @@ export default defineComponent({
       border-radius: 5px;
 
       .q-icon {
-        height: 1rem;
+        height: 1.5rem;
         width: 1rem;
       }
 
@@ -1686,20 +1686,20 @@ export default defineComponent({
   }
 }
 .q-list {
-  &.leftNavList {
-    .q-item {
-      .q-icon {
-        height: 1rem;
-        width: 1rem;
-      }
+  // &.leftNavList {
+  //   .q-item {
+  //     .q-icon {
+  //       height: 1rem;
+  //       width: 1rem;
+  //     }
 
-      &.q-router-link--active {
-        .q-icon img {
-          filter: brightness(100);
-        }
-      }
-    }
-  }
+  //     &.q-router-link--active {
+  //       .q-icon img {
+  //         filter: brightness(100);
+  //       }
+  //     }
+  //   }
+  // }
 
   .flagIcon img {
     border-radius: 3px;
