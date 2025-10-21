@@ -268,7 +268,30 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
         .compact
         .old_data_streams
         .split(',')
-        .map(|s| s.trim().to_string())
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect()
+});
+
+pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
+    get_config()
+        .nats
+        .kv_watch_modules
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
         .collect()
 });
 
@@ -1765,6 +1788,12 @@ pub struct Nats {
         default = false
     )]
     pub v211_support: bool,
+    #[env_config(
+        name = "ZO_NATS_KV_WATCH_MODULES",
+        help = "Set the modules which need to use kv watcher",
+        default = ""
+    )]
+    pub kv_watch_modules: String,
 }
 
 #[derive(Debug, Default, EnvConfig)]
