@@ -70,47 +70,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       setInterestingFieldInSQLQuery
                     "
                   />
-                  <q-btn
-                    v-if="searchObj.config.splitterModel > 0"
-                    data-test="logs-search-field-list-collapse-btn"
-                    icon="drag_indicator"
-                    :title="
-                      searchObj.meta.showFields
-                        ? 'Collapse Fields'
-                        : 'Open Fields'
-                    "
-                    flat
-                    dense
-                    :class="[
-                      'splitter-section-collapse-btn',
-                      searchObj.meta.showFields
-                        ? 'splitter-section-collapse-btn--visible'
-                        : 'splitter-section-collapse-btn--hidden',
-                    ]"
-                    @click="collapseFieldList"
-                  />
                 </div>
               </template>
-              <template #after>
+              <template #separator>
                 <q-btn
-                  v-if="searchObj.config.splitterModel == 0"
-                    data-test="logs-search-field-list-collapse-btn"
-                    icon="drag_indicator"
-                    :title="
-                      searchObj.meta.showFields
-                        ? 'Collapse Fields'
-                        : 'Open Fields'
-                    "
-                    flat
-                    dense
-                    :class="[
-                      'splitter-section-collapse-btn',
-                      searchObj.meta.showFields
-                        ? 'splitter-section-collapse-btn--visible'
-                        : 'splitter-section-collapse-btn--hidden',
-                    ]"
-                    @click="collapseFieldList"
-                  />
+                  data-test="logs-search-field-list-collapse-btn"
+                  icon="drag_indicator"
+                  :title="
+                    searchObj.meta.showFields
+                      ? 'Collapse Fields'
+                      : 'Open Fields'
+                  "
+                  flat
+                  dense
+                  :class="[
+                    'splitter-section-collapse-btn',
+                    searchObj.meta.showFields
+                      ? 'splitter-section-collapse-btn--visible'
+                      : 'splitter-section-collapse-btn--hidden',
+                  ]"
+                  @click="collapseFieldList"
+                />
+              </template>
+              <template #after>
                 <div
                   v-if="
                     searchObj.data.filterErrMsg !== '' &&
