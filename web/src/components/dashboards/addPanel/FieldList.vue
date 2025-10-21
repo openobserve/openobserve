@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="column index-menu"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
-    <div class="col-auto">
+    <div class="col-auto tw-mx-[0.625rem]">
       <!-- stream type selection will be hidden for metrics page -->
       <q-select
         v-if="dashboardPanelDataPageKey !== 'metrics'"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         behavior="menu"
         borderless
         dense
-        class="q-mb-xs"
+        class="q-mb-xs o2-custom-select-dashboard"
         :readonly="dashboardPanelDataPageKey === 'logs'"
        hide-bottom-space></q-select>
       <q-select
@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         option-label="name"
         option-value="name"
         emit-value
+        class="o2-custom-select-dashboard"
         :class="
           selectedMetricTypeIcon &&
           dashboardPanelData.data.queries[
@@ -522,6 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             debounce="1"
             :loading="getStreamFields.isLoading.value"
             :placeholder="t('search.searchField')"
+            class="tw-mx-[0.625rem]"
            hide-bottom-space>
             <template #prepend>
               <q-icon name="search" />
