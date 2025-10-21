@@ -165,7 +165,7 @@ class="toolbar-icon" />
             @click="fnSavedView"
             @show="loadSavedView"
             split
-            class="saved-views-dropdown"
+            class="saved-views-dropdown no-border"
           >
             <q-list
               :style="
