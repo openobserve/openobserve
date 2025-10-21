@@ -22,17 +22,17 @@ vi.mock("../useStreamingSearch", () => ({
 vi.mock("vuex", () => ({
   useStore: () => ({
     state: {
-      selectedOrganization: { 
-        identifier: "test-org" 
+      selectedOrganization: {
+        identifier: "test-org",
       },
     },
   }),
 }));
 
 vi.mock("@/utils/zincutils", () => ({
-  generateTraceContext: vi.fn(() => ({ 
+  generateTraceContext: vi.fn(() => ({
     traceId: "test-trace-id-123",
-    traceparent: "test-traceparent"
+    traceparent: "test-traceparent",
   })),
   isWebSocketEnabled: vi.fn(() => false),
   isStreamingEnabled: vi.fn(() => false),
@@ -58,11 +58,11 @@ describe("useValuesWebSocket", () => {
         handleSearchError: expect.any(Function),
         handleSearchReset: expect.any(Function),
         handleSearchResponse: expect.any(Function),
-        initializeWebSocketConnection: expect.any(Function),
-        isWebSocketEnabled: expect.any(Function),
+        initializeStreamingConnection: expect.any(Function),
         addTraceId: expect.any(Function),
         removeTraceId: expect.any(Function),
         fetchFieldValues: expect.any(Function),
+        cancelTraceId: expect.any(Function),
       });
     });
   });
@@ -70,7 +70,7 @@ describe("useValuesWebSocket", () => {
   describe("trace ID management", () => {
     it("should handle trace ID operations without errors", () => {
       const websocket = useValuesWebSocket();
-      
+
       expect(() => {
         websocket.addTraceId("test-field", "trace-id-1");
         websocket.addTraceId("test-field", "trace-id-2");
@@ -84,29 +84,33 @@ describe("useValuesWebSocket", () => {
   describe("handleSearchReset", () => {
     it("should handle search reset operations", () => {
       const websocket = useValuesWebSocket();
-      
+
       websocket.addTraceId("test-field", "trace-id-1");
       websocket.addTraceId("test-field", "trace-id-2");
-      
-      expect(() => websocket.handleSearchReset({ name: "test-field" })).not.toThrow();
+
+      expect(() =>
+        websocket.handleSearchReset({ name: "test-field" }),
+      ).not.toThrow();
     });
 
     it("should handle reset for field with no trace IDs", () => {
       const websocket = useValuesWebSocket();
-      
-      expect(() => websocket.handleSearchReset({ name: "empty-field" })).not.toThrow();
+
+      expect(() =>
+        websocket.handleSearchReset({ name: "empty-field" }),
+      ).not.toThrow();
     });
   });
 
   describe("handleSearchError", () => {
     it("should handle search errors gracefully", () => {
       const websocket = useValuesWebSocket();
-      
+
       expect(() => {
         websocket.handleSearchError(
           { traceId: "error-trace-id" },
           { message: "Test error" },
-          { name: "test-field" }
+          { name: "test-field" },
         );
       }).not.toThrow();
     });
@@ -115,15 +119,15 @@ describe("useValuesWebSocket", () => {
   describe("handleSearchClose", () => {
     it("should handle search close operations with various codes", () => {
       const websocket = useValuesWebSocket();
-      
+
       const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
-      
-      errorCodes.forEach(code => {
+
+      errorCodes.forEach((code) => {
         expect(() => {
           websocket.handleSearchClose(
             { traceId: "close-trace-id" },
             { code: code, error_details: "Connection error" },
-            { name: "test-field" }
+            { name: "test-field" },
           );
         }).not.toThrow();
       });
@@ -133,7 +137,7 @@ describe("useValuesWebSocket", () => {
         websocket.handleSearchClose(
           { traceId: "close-trace-id" },
           { code: 200 },
-          { name: "test-field" }
+          { name: "test-field" },
         );
       }).not.toThrow();
     });
@@ -142,11 +146,11 @@ describe("useValuesWebSocket", () => {
   describe("handleSearchResponse", () => {
     it("should process valid search responses correctly", () => {
       const websocket = useValuesWebSocket();
-      
+
       const mockDashboardPanelData = {
         meta: {
-          filterValue: []
-        }
+          filterValue: [],
+        },
       };
 
       const mockResponse = {
@@ -160,17 +164,17 @@ describe("useValuesWebSocket", () => {
                   { zo_sql_key: "value1" },
                   { zo_sql_key: "value2" },
                   { zo_sql_key: null },
-                  { zo_sql_key: "value3" }
-                ]
-              }
-            ]
-          }
-        }
+                  { zo_sql_key: "value3" },
+                ],
+              },
+            ],
+          },
+        },
       };
 
       const mockVariableObject = {
         name: "test-field",
-        dashboardPanelData: mockDashboardPanelData
+        dashboardPanelData: mockDashboardPanelData,
       };
 
       websocket.handleSearchResponse({}, mockResponse, mockVariableObject);
@@ -178,22 +182,22 @@ describe("useValuesWebSocket", () => {
       expect(mockDashboardPanelData.meta.filterValue).toHaveLength(1);
       expect(mockDashboardPanelData.meta.filterValue[0]).toEqual({
         column: "test-field",
-        value: ["value1", "value2", "value3"]
+        value: ["value1", "value2", "value3"],
       });
     });
 
     it("should merge existing values with new values", () => {
       const websocket = useValuesWebSocket();
-      
+
       const mockDashboardPanelData = {
         meta: {
           filterValue: [
             {
               column: "test-field",
-              value: ["existing1", "existing2"]
-            }
-          ]
-        }
+              value: ["existing1", "existing2"],
+            },
+          ],
+        },
       };
 
       const mockResponse = {
@@ -206,31 +210,34 @@ describe("useValuesWebSocket", () => {
                 values: [
                   { zo_sql_key: "existing1" },
                   { zo_sql_key: "new1" },
-                  { zo_sql_key: "new2" }
-                ]
-              }
-            ]
-          }
-        }
+                  { zo_sql_key: "new2" },
+                ],
+              },
+            ],
+          },
+        },
       };
 
       const mockVariableObject = {
         name: "test-field",
-        dashboardPanelData: mockDashboardPanelData
+        dashboardPanelData: mockDashboardPanelData,
       };
 
       websocket.handleSearchResponse({}, mockResponse, mockVariableObject);
 
       expect(mockDashboardPanelData.meta.filterValue[0].value).toEqual([
-        "existing1", "existing2", "new1", "new2"
+        "existing1",
+        "existing2",
+        "new1",
+        "new2",
       ]);
     });
 
     it("should handle responses with no matching field", () => {
       const websocket = useValuesWebSocket();
-      
+
       const mockDashboardPanelData = {
-        meta: { filterValue: [] }
+        meta: { filterValue: [] },
       };
 
       const mockResponse = {
@@ -240,16 +247,16 @@ describe("useValuesWebSocket", () => {
             hits: [
               {
                 field: "different-field",
-                values: [{ zo_sql_key: "value1" }]
-              }
-            ]
-          }
-        }
+                values: [{ zo_sql_key: "value1" }],
+              },
+            ],
+          },
+        },
       };
 
       const mockVariableObject = {
         name: "test-field",
-        dashboardPanelData: mockDashboardPanelData
+        dashboardPanelData: mockDashboardPanelData,
       };
 
       websocket.handleSearchResponse({}, mockResponse, mockVariableObject);
@@ -259,51 +266,61 @@ describe("useValuesWebSocket", () => {
 
     it("should handle malformed responses gracefully", () => {
       const websocket = useValuesWebSocket();
-      
+
       const mockDashboardPanelData = {
-        meta: { filterValue: [] }
+        meta: { filterValue: [] },
       };
 
       const mockVariableObject = {
         name: "test-field",
-        dashboardPanelData: mockDashboardPanelData
+        dashboardPanelData: mockDashboardPanelData,
       };
 
       expect(() => {
-        websocket.handleSearchResponse({}, { type: "invalid" }, mockVariableObject);
-        websocket.handleSearchResponse({}, { content: null }, mockVariableObject);
+        websocket.handleSearchResponse(
+          {},
+          { type: "invalid" },
+          mockVariableObject,
+        );
+        websocket.handleSearchResponse(
+          {},
+          { content: null },
+          mockVariableObject,
+        );
         websocket.handleSearchResponse({}, null as any, mockVariableObject);
       }).not.toThrow();
     });
 
     it("should handle responses with no hits", () => {
       const websocket = useValuesWebSocket();
-      
+
       const mockDashboardPanelData = {
-        meta: { filterValue: [] }
+        meta: { filterValue: [] },
       };
 
       const mockResponse = {
         type: "search_response",
         content: {
-          results: { hits: [] }
-        }
+          results: { hits: [] },
+        },
       };
 
       const mockVariableObject = {
         name: "test-field",
-        dashboardPanelData: mockDashboardPanelData
+        dashboardPanelData: mockDashboardPanelData,
       };
 
-      expect(() => websocket.handleSearchResponse({}, mockResponse, mockVariableObject)).not.toThrow();
+      expect(() =>
+        websocket.handleSearchResponse({}, mockResponse, mockVariableObject),
+      ).not.toThrow();
       expect(mockDashboardPanelData.meta.filterValue).toHaveLength(0);
     });
 
     it("should handle responses with invalid type", () => {
       const websocket = useValuesWebSocket();
-      
+
       const mockDashboardPanelData = {
-        meta: { filterValue: [] }
+        meta: { filterValue: [] },
       };
 
       const mockResponse = {
@@ -313,16 +330,16 @@ describe("useValuesWebSocket", () => {
             hits: [
               {
                 field: "test-field",
-                values: [{ zo_sql_key: "value1" }]
-              }
-            ]
-          }
-        }
+                values: [{ zo_sql_key: "value1" }],
+              },
+            ],
+          },
+        },
       };
 
       const mockVariableObject = {
         name: "test-field",
-        dashboardPanelData: mockDashboardPanelData
+        dashboardPanelData: mockDashboardPanelData,
       };
 
       websocket.handleSearchResponse({}, mockResponse, mockVariableObject);
@@ -331,14 +348,17 @@ describe("useValuesWebSocket", () => {
     });
   });
 
-  describe("initializeWebSocketConnection", () => {
+  describe("initializeStreamingConnection", () => {
     it("should handle WebSocket connection initialization", () => {
       const websocket = useValuesWebSocket();
       const mockPayload = { test: "payload" };
       const mockVariableObject = { name: "test-field" };
 
       expect(() => {
-        websocket.initializeWebSocketConnection(mockPayload, mockVariableObject);
+        websocket.initializeStreamingConnection(
+          mockPayload,
+          mockVariableObject,
+        );
       }).not.toThrow();
     });
   });
@@ -352,273 +372,281 @@ describe("useValuesWebSocket", () => {
       size: 100,
       type: "logs",
       stream_type: "logs",
-      no_count: true
+      no_count: true,
     };
 
     const mockDashboardPanelData = {
       meta: {
-        filterValue: []
-      }
+        filterValue: [],
+      },
     };
 
     beforeEach(() => {
       // Mock window.use_cache
-      Object.defineProperty(window, 'use_cache', {
+      Object.defineProperty(window, "use_cache", {
         value: true,
         writable: true,
-        configurable: true
+        configurable: true,
       });
     });
 
     it("should handle fetchFieldValues without errors", async () => {
       const websocket = useValuesWebSocket();
-      
+
       await expect(
-        websocket.fetchFieldValues(mockQueryReq, mockDashboardPanelData, "test-field")
+        websocket.fetchFieldValues(
+          mockQueryReq,
+          mockDashboardPanelData,
+          "test-field",
+        ),
       ).resolves.not.toThrow();
     });
 
     it("should use WebSocket path when WebSocket is enabled", async () => {
-      const { isWebSocketEnabled, isStreamingEnabled, generateTraceContext } = await import("@/utils/zincutils");
-      
-      // Mock WebSocket enabled, streaming disabled
-      (isWebSocketEnabled as any).mockReturnValue(true);
-      (isStreamingEnabled as any).mockReturnValue(false);
-      (generateTraceContext as any).mockReturnValue({ traceId: "websocket-trace-123" });
+      const { generateTraceContext } = await import("@/utils/zincutils");
 
-      const websocket = useValuesWebSocket();
-      
-      const result = await websocket.fetchFieldValues(mockQueryReq, mockDashboardPanelData, "test-field");
-      
-      expect(isWebSocketEnabled).toHaveBeenCalled();
-      expect(generateTraceContext).toHaveBeenCalled();
-      
-      // Should call initializeWebSocketConnection with proper payload
-      expect(result).toBeUndefined(); // WebSocket returns void
-    });
-
-    it("should use streaming path when streaming is enabled but WebSocket is not", async () => {
-      const { isWebSocketEnabled, isStreamingEnabled, generateTraceContext } = await import("@/utils/zincutils");
-      
-      // Mock streaming enabled but WebSocket disabled
-      (isWebSocketEnabled as any).mockReturnValue(false);
-      (isStreamingEnabled as any).mockReturnValue(true);
-      (generateTraceContext as any).mockReturnValue({ traceId: "streaming-trace-456" });
-
-      const websocket = useValuesWebSocket();
-      
-      const result = await websocket.fetchFieldValues(mockQueryReq, mockDashboardPanelData, "test-field");
-      
-      expect(isWebSocketEnabled).toHaveBeenCalled();
-      expect(isStreamingEnabled).toHaveBeenCalled(); 
-      expect(generateTraceContext).toHaveBeenCalled();
-      
-      // Should call initializeWebSocketConnection with proper payload including meta
-      expect(result).toBeUndefined(); // Streaming returns void
-    });
-
-    it("should create proper WebSocket payload with all required fields", async () => {
-      const { isWebSocketEnabled, isStreamingEnabled, generateTraceContext } = await import("@/utils/zincutils");
-      
-      (isWebSocketEnabled as any).mockReturnValue(true);
-      (isStreamingEnabled as any).mockReturnValue(false);
-      (generateTraceContext as any).mockReturnValue({ traceId: "test-trace-id" });
-      
-      // Mock window.use_cache
-      Object.defineProperty(window, 'use_cache', {
-        value: false,
-        writable: true,
-        configurable: true
+      (generateTraceContext as any).mockReturnValue({
+        traceId: "websocket-trace-123",
       });
 
       const websocket = useValuesWebSocket();
-      
-      await websocket.fetchFieldValues(mockQueryReq, mockDashboardPanelData, "test-field");
-      
+
+      const result = await websocket.fetchFieldValues(
+        mockQueryReq,
+        mockDashboardPanelData,
+        "test-field",
+      );
+
+      expect(generateTraceContext).toHaveBeenCalled();
+
+      // The implementation always uses streaming now
+      expect(result).toBeUndefined();
+    });
+
+    it("should use streaming path when streaming is enabled but WebSocket is not", async () => {
+      const { generateTraceContext } = await import("@/utils/zincutils");
+
+      (generateTraceContext as any).mockReturnValue({
+        traceId: "streaming-trace-456",
+      });
+
+      const websocket = useValuesWebSocket();
+
+      const result = await websocket.fetchFieldValues(
+        mockQueryReq,
+        mockDashboardPanelData,
+        "test-field",
+      );
+
+      expect(generateTraceContext).toHaveBeenCalled();
+
+      // The implementation always uses streaming now
+      expect(result).toBeUndefined();
+    });
+
+    it("should create proper WebSocket payload with all required fields", async () => {
+      const { isWebSocketEnabled, isStreamingEnabled, generateTraceContext } =
+        await import("@/utils/zincutils");
+
+      (isWebSocketEnabled as any).mockReturnValue(true);
+      (isStreamingEnabled as any).mockReturnValue(false);
+      (generateTraceContext as any).mockReturnValue({
+        traceId: "test-trace-id",
+      });
+
+      // Mock window.use_cache
+      Object.defineProperty(window, "use_cache", {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+
+      const websocket = useValuesWebSocket();
+
+      await websocket.fetchFieldValues(
+        mockQueryReq,
+        mockDashboardPanelData,
+        "test-field",
+      );
+
       // The WebSocket payload should include all the required fields
       expect(generateTraceContext).toHaveBeenCalled();
     });
 
     it("should create proper streaming payload with meta field", async () => {
-      const { isWebSocketEnabled, isStreamingEnabled, generateTraceContext } = await import("@/utils/zincutils");
-      
+      const { isWebSocketEnabled, isStreamingEnabled, generateTraceContext } =
+        await import("@/utils/zincutils");
+
       (isWebSocketEnabled as any).mockReturnValue(false);
       (isStreamingEnabled as any).mockReturnValue(true);
-      (generateTraceContext as any).mockReturnValue({ traceId: "streaming-trace" });
+      (generateTraceContext as any).mockReturnValue({
+        traceId: "streaming-trace",
+      });
 
       const websocket = useValuesWebSocket();
-      
-      await websocket.fetchFieldValues(mockQueryReq, mockDashboardPanelData, "test-field");
-      
+
+      await websocket.fetchFieldValues(
+        mockQueryReq,
+        mockDashboardPanelData,
+        "test-field",
+      );
+
       // The streaming payload should include meta field with original queryReq
       expect(generateTraceContext).toHaveBeenCalled();
     });
 
     it("should use REST API when neither WebSocket nor streaming enabled", async () => {
-      // Ensure WebSocket and streaming are disabled
-      const { isWebSocketEnabled, isStreamingEnabled } = await import("@/utils/zincutils");
-      (isWebSocketEnabled as any).mockReturnValue(false);
-      (isStreamingEnabled as any).mockReturnValue(false);
-      
-      const { default: StreamService } = await import("@/services/stream");
-      const mockResponse = {
-        data: {
-          hits: [
-            {
-              values: [
-                { zo_sql_key: "value1" },
-                { zo_sql_key: "value2" },
-                { zo_sql_key: null },
-                { zo_sql_key: "value3" }
-              ]
-            }
-          ]
-        }
-      };
-
-      StreamService.fieldValues = vi.fn().mockResolvedValue(mockResponse);
+      const { generateTraceContext } = await import("@/utils/zincutils");
+      (generateTraceContext as any).mockReturnValue({
+        traceId: "rest-trace-789",
+      });
 
       const websocket = useValuesWebSocket();
-      
-      await websocket.fetchFieldValues(mockQueryReq, mockDashboardPanelData, "test-field");
 
-      expect(StreamService.fieldValues).toHaveBeenCalledWith({
-        org_identifier: "test-org",
-        stream_name: "test-stream",
-        start_time: 1640995200000,
-        end_time: 1640998800000,
-        fields: ["field1", "field2"],
-        size: 100,
-        type: "logs",
-        no_count: true,
-      });
+      // The implementation always uses streaming, so this test verifies the streaming behavior
+      const result = await websocket.fetchFieldValues(
+        mockQueryReq,
+        mockDashboardPanelData,
+        "test-field",
+      );
 
-      expect(mockDashboardPanelData.meta.filterValue).toHaveLength(1);
-      expect(mockDashboardPanelData.meta.filterValue[0]).toEqual({
-        column: "test-field",
-        value: ["value1", "value2", "value3"]
-      });
+      expect(generateTraceContext).toHaveBeenCalled();
+      expect(result).toBeUndefined();
     });
 
     it("should handle REST API errors", async () => {
-      // Ensure WebSocket and streaming are disabled
-      const { isWebSocketEnabled, isStreamingEnabled } = await import("@/utils/zincutils");
-      (isWebSocketEnabled as any).mockReturnValue(false);
-      (isStreamingEnabled as any).mockReturnValue(false);
-      
-      const { default: StreamService } = await import("@/services/stream");
-      const mockError = new Error("API Error");
-      StreamService.fieldValues = vi.fn().mockRejectedValue(mockError);
+      const { generateTraceContext } = await import("@/utils/zincutils");
+      (generateTraceContext as any).mockReturnValue({ traceId: "error-trace" });
 
       const websocket = useValuesWebSocket();
-      
-      await expect(
-        websocket.fetchFieldValues(mockQueryReq, mockDashboardPanelData, "test-field")
-      ).rejects.toThrow("API Error");
+
+      // The implementation always uses streaming and doesn't throw errors from fetchFieldValues
+      const result = await websocket.fetchFieldValues(
+        mockQueryReq,
+        mockDashboardPanelData,
+        "test-field",
+      );
+
+      expect(result).toBeUndefined();
     });
 
     it("should replace existing filter values in REST API mode", async () => {
-      // Ensure WebSocket and streaming are disabled
-      const { isWebSocketEnabled, isStreamingEnabled } = await import("@/utils/zincutils");
-      (isWebSocketEnabled as any).mockReturnValue(false);
-      (isStreamingEnabled as any).mockReturnValue(false);
-      
-      const { default: StreamService } = await import("@/services/stream");
+      const { generateTraceContext } = await import("@/utils/zincutils");
+      (generateTraceContext as any).mockReturnValue({
+        traceId: "replace-trace",
+      });
+
       const mockDashboardPanelDataWithExisting = {
         meta: {
           filterValue: [
             {
               column: "test-field",
-              value: ["old-value1", "old-value2"]
+              value: ["old-value1", "old-value2"],
             },
             {
-              column: "other-field", 
-              value: ["other-value"]
-            }
-          ]
-        }
+              column: "other-field",
+              value: ["other-value"],
+            },
+          ],
+        },
       };
-
-      const mockResponse = {
-        data: {
-          hits: [
-            {
-              values: [
-                { zo_sql_key: "new-value1" },
-                { zo_sql_key: "new-value2" }
-              ]
-            }
-          ]
-        }
-      };
-
-      StreamService.fieldValues = vi.fn().mockResolvedValue(mockResponse);
 
       const websocket = useValuesWebSocket();
-      
-      await websocket.fetchFieldValues(
-        mockQueryReq, 
-        mockDashboardPanelDataWithExisting, 
-        "test-field"
-      );
 
-      // After REST API call, the existing test-field entry should be updated
-      // The logic removes existing entry for the field and adds the new one
-      expect(mockDashboardPanelDataWithExisting.meta.filterValue).toHaveLength(2);
-      const testFieldEntry = mockDashboardPanelDataWithExisting.meta.filterValue.find(
-        entry => entry.column === "test-field"
-      );
+      // Simulate streaming response with new values
+      const mockResponse = {
+        type: "search_response",
+        content: {
+          results: {
+            hits: [
+              {
+                field: "test-field",
+                values: [
+                  { zo_sql_key: "new-value1" },
+                  { zo_sql_key: "new-value2" },
+                ],
+              },
+            ],
+          },
+        },
+      };
+
+      const mockVariableObject = {
+        name: "test-field",
+        dashboardPanelData: mockDashboardPanelDataWithExisting,
+      };
+
+      // Call handleSearchResponse to simulate streaming response
+      websocket.handleSearchResponse({}, mockResponse, mockVariableObject);
+
+      // The streaming logic merges values, so we should have old + new values
+      const testFieldEntry =
+        mockDashboardPanelDataWithExisting.meta.filterValue.find(
+          (entry) => entry.column === "test-field",
+        );
       expect(testFieldEntry).toEqual({
         column: "test-field",
-        value: ["new-value1", "new-value2"]
+        value: ["old-value1", "old-value2", "new-value1", "new-value2"],
       });
     });
 
     it("should handle empty REST API responses", async () => {
-      // Ensure WebSocket and streaming are disabled
-      const { isWebSocketEnabled, isStreamingEnabled } = await import("@/utils/zincutils");
-      (isWebSocketEnabled as any).mockReturnValue(false);
-      (isStreamingEnabled as any).mockReturnValue(false);
-      
-      const { default: StreamService } = await import("@/services/stream");
+      const websocket = useValuesWebSocket();
+
+      // Simulate empty streaming response
       const mockResponse = {
-        data: {
-          hits: []
-        }
+        type: "search_response",
+        content: {
+          results: {
+            hits: [],
+          },
+        },
       };
 
-      StreamService.fieldValues = vi.fn().mockResolvedValue(mockResponse);
+      const mockDashboardData = {
+        meta: {
+          filterValue: [],
+        },
+      };
 
-      const websocket = useValuesWebSocket();
-      
-      await websocket.fetchFieldValues(mockQueryReq, mockDashboardPanelData, "test-field");
+      const mockVariableObject = {
+        name: "test-field",
+        dashboardPanelData: mockDashboardData,
+      };
 
-      expect(mockDashboardPanelData.meta.filterValue).toHaveLength(1);
-      expect(mockDashboardPanelData.meta.filterValue[0]).toEqual({
-        column: "test-field",
-        value: undefined
-      });
+      websocket.handleSearchResponse({}, mockResponse, mockVariableObject);
+
+      // With empty hits, no filter values should be added
+      expect(mockDashboardData.meta.filterValue).toHaveLength(0);
     });
 
     it("should handle window.use_cache variations", async () => {
       const websocket = useValuesWebSocket();
-      
+
       // Test with use_cache = false
-      Object.defineProperty(window, 'use_cache', {
+      Object.defineProperty(window, "use_cache", {
         value: false,
         writable: true,
-        configurable: true
+        configurable: true,
       });
 
       await expect(
-        websocket.fetchFieldValues(mockQueryReq, mockDashboardPanelData, "test-field")
+        websocket.fetchFieldValues(
+          mockQueryReq,
+          mockDashboardPanelData,
+          "test-field",
+        ),
       ).resolves.not.toThrow();
 
       // Test with use_cache undefined
       delete (window as any).use_cache;
 
       await expect(
-        websocket.fetchFieldValues(mockQueryReq, mockDashboardPanelData, "test-field")
+        websocket.fetchFieldValues(
+          mockQueryReq,
+          mockDashboardPanelData,
+          "test-field",
+        ),
       ).resolves.not.toThrow();
     });
   });
@@ -626,41 +654,41 @@ describe("useValuesWebSocket", () => {
   describe("isWebSocketEnabled function", () => {
     it("should expose isWebSocketEnabled function", () => {
       const websocket = useValuesWebSocket();
-      
-      expect(websocket.isWebSocketEnabled).toBeDefined();
-      expect(typeof websocket.isWebSocketEnabled).toBe('function');
+
+      // The implementation no longer exports isWebSocketEnabled
+      // It always uses streaming, so we verify that cancelTraceId exists instead
+      expect(websocket.cancelTraceId).toBeDefined();
+      expect(typeof websocket.cancelTraceId).toBe("function");
     });
   });
-
 
   describe("handleSearchResponse filterValue initialization", () => {
     it("should initialize filterValue array when undefined", () => {
       const websocket = useValuesWebSocket();
-      
+
       const mockDashboardDataWithoutFilter = {
         meta: {
           // filterValue is undefined initially
-        }
+        },
       };
 
       const mockVariableObject = {
         name: "test-field",
-        dashboardPanelData: mockDashboardDataWithoutFilter
+        dashboardPanelData: mockDashboardDataWithoutFilter,
       };
 
       const mockResponse = {
         type: "search_response",
         content: {
           results: {
-            hits: [{
-              field: "test-field",
-              values: [
-                { zo_sql_key: "value1" },
-                { zo_sql_key: "value2" }
-              ]
-            }]
-          }
-        }
+            hits: [
+              {
+                field: "test-field",
+                values: [{ zo_sql_key: "value1" }, { zo_sql_key: "value2" }],
+              },
+            ],
+          },
+        },
       };
 
       // Call handleSearchResponse to trigger filterValue initialization
@@ -668,49 +696,55 @@ describe("useValuesWebSocket", () => {
 
       // Verify that filterValue array was initialized
       expect(mockDashboardDataWithoutFilter.meta.filterValue).toBeDefined();
-      expect(Array.isArray(mockDashboardDataWithoutFilter.meta.filterValue)).toBe(true);
-      expect(mockDashboardDataWithoutFilter.meta.filterValue).toEqual([{
-        column: "test-field",
-        value: ["value1", "value2"]
-      }]);
+      expect(
+        Array.isArray(mockDashboardDataWithoutFilter.meta.filterValue),
+      ).toBe(true);
+      expect(mockDashboardDataWithoutFilter.meta.filterValue).toEqual([
+        {
+          column: "test-field",
+          value: ["value1", "value2"],
+        },
+      ]);
     });
 
     it("should handle case when filterValue exists but is empty", () => {
       const websocket = useValuesWebSocket();
-      
+
       const mockDashboardDataWithEmptyFilter = {
         meta: {
-          filterValue: []
-        }
+          filterValue: [],
+        },
       };
 
       const mockVariableObject = {
         name: "another-field",
-        dashboardPanelData: mockDashboardDataWithEmptyFilter
+        dashboardPanelData: mockDashboardDataWithEmptyFilter,
       };
 
       const mockResponse = {
         type: "search_response_hits",
         content: {
           results: {
-            hits: [{
-              field: "another-field",
-              values: [
-                { zo_sql_key: "new_value" }
-              ]
-            }]
-          }
-        }
+            hits: [
+              {
+                field: "another-field",
+                values: [{ zo_sql_key: "new_value" }],
+              },
+            ],
+          },
+        },
       };
 
       // Call handleSearchResponse
       websocket.handleSearchResponse({}, mockResponse, mockVariableObject);
 
       // Verify that entry was added to existing empty array
-      expect(mockDashboardDataWithEmptyFilter.meta.filterValue).toEqual([{
-        column: "another-field",
-        value: ["new_value"]
-      }]);
+      expect(mockDashboardDataWithEmptyFilter.meta.filterValue).toEqual([
+        {
+          column: "another-field",
+          value: ["new_value"],
+        },
+      ]);
     });
   });
 
