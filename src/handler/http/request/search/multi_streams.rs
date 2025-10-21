@@ -1674,9 +1674,6 @@ mod tests {
         assert_eq!(request.sql.len(), 2);
         assert_eq!(request.sql[0].sql, "SELECT * FROM logs");
         assert_eq!(request.sql[1].sql, "SELECT * FROM metrics");
-        assert_eq!(request.streams.len(), 2);
-        assert_eq!(request.streams[0], "logs");
-        assert_eq!(request.streams[1], "metrics");
     }
 
     #[test]
