@@ -2775,7 +2775,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
     if cfg.compact.interval < 1 {
-        cfg.compact.interval = 60;
+        cfg.compact.interval = 10;
     }
 
     // check compact_max_file_size to MB
@@ -2804,7 +2804,11 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.compact.batch_size < 1 {
-        cfg.compact.batch_size = cfg.limit.cpu_num as i64;
+        if cfg.common.local_mode {
+            cfg.compact.batch_size = 100;
+        } else {
+            cfg.compact.batch_size = cfg.limit.cpu_num as i64 * 4;
+        }
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
