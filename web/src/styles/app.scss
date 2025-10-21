@@ -1213,6 +1213,8 @@ body {
   height: 36px !important;
   padding: 0 !important;
   cursor: pointer;
+  top: 1rem;
+  transform: translateY(50%) translateX(-86%);
 
   .q-icon {
     color: rgba(0, 0, 0, 0.5) !important;
@@ -1230,20 +1232,11 @@ body {
   }
 
   &--visible {
-    right: 0px !important;
-    top: 5% !important;
-    transform: translateY(-50%) !important;
-
+    right: 10px !important;
   }
 
   &--hidden {
-    left: 0px !important;
-    top: 5% !important;
-    transform: translateY(-50%) !important;
-
-    &:hover {
-      transform: translateY(-50%) translateX(0px) !important;
-    }
+    left: 10px !important;
   }
 }
 
