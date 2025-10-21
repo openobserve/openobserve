@@ -232,6 +232,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model:selected="selectedStatuses" 
                       id="nodesStatusFilter"
                       class="q-pa-none q-ma-none node-list-filter-table"
+                      :style="hasVisibleRows
+                        ? 'width: 100%; height: calc(100vh - 115px); overflow-y: auto;' 
+                        : 'width: 100%'"
                     >
                       <template v-slot:header-selection="scope">
                         <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
@@ -387,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
-      <template style="background-color: red" v-slot:after>
+      <template v-slot:after>
         <q-table
           ref="qTable"
           :rows="tabledata"
@@ -399,6 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           class="nodes-list-table"
           dense
+          style="width: 100%; height: calc(100vh - 40px); overflow-y: auto;"
         >
           <template #no-data><NoData /></template>
           <template #top="scope">
