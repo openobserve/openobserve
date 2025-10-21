@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="running-queries-page q-pt-md q-px-md" v-if="isMetaOrg">
+  <div class="running-queries-page q-pt-md q-px-md" v-if="isMetaOrg" style="min-height: 95vh;">
     <div class="flex justify-between items-center full-width">
       <div class="text-h6 q-my-xs" data-test="log-stream-title-text">
         {{ t("queries.runningQueries") }}
