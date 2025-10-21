@@ -317,24 +317,20 @@ describe("General", () => {
     it("should save organization settings successfully", async () => {
       const wrapper = createWrapper();
 
-      Object.assign(wrapper.vm, {
-        enable_streaming_search: false,
-        scrape_interval: 30,
-        streaming_aggregation_enabled: false,
-      });
+      // Set the scrape interval in the component
+      wrapper.vm.scrapeIntereval = 30;
       await wrapper.vm.$nextTick();
 
       const form = wrapper.find('[data-test-stub="q-form"]');
       await form.trigger("submit");
       await nextTick();
 
+      // The dispatch is called with the spread of existing organizationSettings plus scrape_interval
       expect(mockStore.dispatch).toHaveBeenCalledWith(
         "setOrganizationSettings",
-        {
+        expect.objectContaining({
           scrape_interval: 30,
-          enable_streaming_search: false,
-          streaming_aggregation_enabled: false,
-        },
+        }),
       );
 
       expect(mockOrganizations.post_organization_settings).toHaveBeenCalledWith(

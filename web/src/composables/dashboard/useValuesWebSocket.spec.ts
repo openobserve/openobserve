@@ -16,6 +16,7 @@ vi.mock("../useSearchWebSocket", () => ({
 vi.mock("../useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: vi.fn(),
+    cancelStreamQueryBasedOnRequestId: vi.fn(),
   }),
 }));
 
