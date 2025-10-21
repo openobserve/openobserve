@@ -17,12 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier" class="card-container">
+  <q-page :key="store.state.selectedOrganization.identifier" style="min-height: inherit; height: calc(100vh - 108px);" >
     <div
       ref="fullscreenDiv"
-      :class="`${isFullscreen ? 'fullscreen' : ''}  ${
-        store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
-      }`"
+      :class="`${isFullscreen ? 'fullscreen' : ''}`"
+      class="tw-h-full tw-mx-[0.625rem]"
     >
       <div
         :class="`${
@@ -32,11 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'fullscreenHeader'
             : ''
         }`"
+        class="tw-mb-[0.625rem]"
       >
         <div
-          class="tw-flex justify-between items-center q-pa-xs tw-w-full tw-min-w-0 card-container"
+          class="tw-flex justify-between items-center tw-w-full tw-px-[0.626rem] tw-min-w-0 card-container tw-h-[48px]"
         >
-          <div class="tw-flex tw-flex-1 tw-overflow-hidden">
+          <div class="tw-flex tw-flex-1 tw-overflow-hidden ">
             <q-btn
               v-if="!isFullscreen"
               no-caps
