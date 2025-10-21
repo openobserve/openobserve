@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page v-if="currentRouteName === 'pipelines'">
     <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
       <div class="card-container tw-mb-[0.625rem]">
-        <div class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-h-[71px]">
+        <div class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-h-[68px]">
           <div class="q-table__title tw-font-[600]" data-test="pipeline-list-title">
                 {{ t("pipeline.header") }}
               </div>
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
         
       <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-        <div class="card-container tw-h-[calc(100vh-130px)]">
+        <div class="card-container tw-h-[calc(100vh-127px)]">
           <q-table
             data-test="pipeline-list-table"
             ref="qTableRef"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selection="multiple"
             v-model:selected="selectedPipelines"
             :style="hasVisibleRows
-                ? 'width: 100%; height: calc(100vh - 130px)' 
+                ? 'width: 100%; height: calc(100vh - 127px)' 
                 : 'width: 100%'"
             class="o2-quasar-table o2-quasar-table-header-sticky "
           >
