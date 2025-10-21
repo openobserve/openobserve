@@ -408,6 +408,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(stream::schema)
         .service(stream::create)
         .service(stream::update_settings)
+        .service(stream::update_fields)
         .service(stream::delete_fields)
         .service(stream::delete)
         .service(stream::list)
@@ -561,7 +562,10 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(service_accounts::save)
         .service(service_accounts::delete)
         .service(service_accounts::update)
-        .service(service_accounts::get_api_token);
+        .service(service_accounts::get_api_token)
+        .service(mcp::handle_mcp_post)
+        .service(mcp::handle_mcp_get)
+        .service(mcp::oauth_authorization_server_metadata);
 
     #[cfg(feature = "enterprise")]
     let service = service
@@ -604,9 +608,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(re_pattern::delete)
         .service(re_pattern::test)
         .service(domain_management::get_domain_management_config)
-        .service(domain_management::set_domain_management_config)
-        .service(mcp::handle_mcp_post)
-        .service(mcp::handle_mcp_get);
+        .service(domain_management::set_domain_management_config);
 
     #[cfg(feature = "cloud")]
     let service = service
@@ -624,11 +626,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(cloud::marketing::handle_new_attribution_event)
         .service(organization::org::all_organizations)
         .service(organization::org::extend_trial_period);
-
-    #[cfg(not(feature = "enterprise"))]
-    let service = service
-        .service(mcp::handle_mcp_post)
-        .service(mcp::handle_mcp_get);
 
     svc.service(service);
 }

@@ -106,6 +106,7 @@ itertools.workspace = true
 jsonwebtoken = "9.3"
 log.workspace = true
 maxminddb = "0.26"
+md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.43", default-features = false, optional = true }
 once_cell.workspace = true
@@ -253,9 +254,9 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "50.1.0"
-datafusion-proto = "50.1.0"
-datafusion-functions-aggregate-common = "50.1.0"
+datafusion = "50.2.0"
+datafusion-proto = "50.2.0"
+datafusion-functions-aggregate-common = "50.2.0"
 datafusion-functions-json = "0.50.0"
 expect-test = "1.4"
 arrow = { version = "56.0.0", features = ["ipc_compression", "prettyprint"] }

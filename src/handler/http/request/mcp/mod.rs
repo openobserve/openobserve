@@ -18,8 +18,18 @@ use actix_web::{HttpResponse, get, post, web};
 use {
     actix_web::HttpRequest,
     futures_util::StreamExt,
-    o2_enterprise::enterprise::mcp::{MCPRequest, handle_mcp_request, handle_mcp_request_stream},
+    o2_enterprise::enterprise::mcp::{
+        MCPRequest, OAuthServerMetadata, handle_mcp_request, handle_mcp_request_stream,
+    },
 };
+
+#[cfg(not(feature = "enterprise"))]
+/// Returns a 404 response for non-enterprise builds
+fn mcp_only_in_enterprise() -> actix_web::Result<HttpResponse> {
+    Ok(HttpResponse::NotFound().json(serde_json::json!({
+        "error": "MCP server is only available in enterprise edition"
+    })))
+}
 
 /// Handler for MCP POST requests (single request/response)
 #[cfg(feature = "enterprise")]
@@ -112,6 +122,9 @@ pub async fn handle_mcp_post(
 #[get("/{org_id}/mcp")]
 pub async fn handle_mcp_get(
     _org_id: web::Path<String>,
+    // This is `Bytes` because body in HTTP GET is not defined,
+    // and actix-web tends to drop JSON body.
+    // This is a workaround to prevent that.
     body: web::Bytes,
     req: HttpRequest,
 ) -> actix_web::Result<HttpResponse> {
@@ -176,9 +189,7 @@ pub async fn handle_mcp_post(
     _org_id: web::Path<String>,
     _body: web::Bytes,
 ) -> actix_web::Result<HttpResponse> {
-    Ok(HttpResponse::NotFound().json(serde_json::json!({
-        "error": "MCP server is only available in enterprise edition"
-    })))
+    mcp_only_in_enterprise()
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -202,7 +213,58 @@ pub async fn handle_mcp_get(
     _org_id: web::Path<String>,
     _body: web::Bytes,
 ) -> actix_web::Result<HttpResponse> {
-    Ok(HttpResponse::NotFound().json(serde_json::json!({
-        "error": "MCP server is only available in enterprise edition"
-    })))
+    mcp_only_in_enterprise()
+}
+
+/// Handler for OAuth 2.0 Authorization Server Metadata (Enterprise)
+/// RFC 8414: https://datatracker.ietf.org/doc/html/rfc8414
+/// This endpoint provides discovery information for OAuth clients
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "MCP",
+    operation_id = "OAuthServerMetadata",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json"),
+    ),
+)]
+#[get("/{org_id}/.well-known/oauth-authorization-server")]
+pub async fn oauth_authorization_server_metadata(
+    _org_id: web::Path<String>,
+) -> actix_web::Result<HttpResponse> {
+    use once_cell::sync::Lazy;
+
+    static METADATA: Lazy<OAuthServerMetadata> = Lazy::new(|| {
+        let dex_config = o2_dex::config::get_config();
+        let base_url = dex_config.dex_url.as_str();
+        OAuthServerMetadata::build(base_url)
+    });
+    Ok(HttpResponse::Ok()
+        .content_type("application/json")
+        .json(&*METADATA))
+}
+
+/// Handler for OAuth 2.0 Authorization Server Metadata (Non-Enterprise)
+/// RFC 8414: https://datatracker.ietf.org/doc/html/rfc8414
+/// This endpoint provides discovery information for OAuth clients
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "MCP",
+    operation_id = "OAuthServerMetadata",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 404, description = "Not Found - MCP server is only available in enterprise edition", content_type = "application/json"),
+    ),
+)]
+#[get("/{org_id}/.well-known/oauth-authorization-server")]
+pub async fn oauth_authorization_server_metadata(
+    _org_id: web::Path<String>,
+) -> actix_web::Result<HttpResponse> {
+    mcp_only_in_enterprise()
 }
