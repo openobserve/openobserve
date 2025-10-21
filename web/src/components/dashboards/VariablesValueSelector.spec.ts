@@ -561,17 +561,15 @@ describe("VariablesValueSelector", () => {
 
       expect(regionVariable.isLoading).toBe(false);
 
-      // Mock streaming to track loading state changes
+      // Mock streaming to track loading state changes and complete properly
       let loadingStateWhenCalled = false;
       mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
         (payload: any, handlers: any) => {
           // Capture loading state when streaming is initiated
           loadingStateWhenCalled = regionVariable.isLoading;
 
-          // Simulate completion after a delay
-          setTimeout(() => {
-            handlers.complete(payload, { type: "end" });
-          }, 0);
+          // Simulate immediate completion
+          handlers.complete(payload, { type: "end" });
         },
       );
 
@@ -585,6 +583,8 @@ describe("VariablesValueSelector", () => {
       expect(loadingStateWhenCalled).toBe(true);
 
       await loadPromise;
+      // Wait for completion handler to finish
+      await nextTick();
       await nextTick();
 
       // Check loading state is reset after completion
