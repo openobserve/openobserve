@@ -40,8 +40,12 @@ use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     scheduler::get_scheduler_max_retries,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::recommendations::service::QueryRecommendationService;
 use proto::cluster_rpc;
 
+#[cfg(feature = "enterprise")]
+use crate::service::alerts::scheduler::query_optimization_recommendation::QueryOptimizerContext;
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
 use crate::service::{
@@ -65,6 +69,9 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::Alert => handle_alert_triggers(trace_id, trigger).await,
         db::scheduler::TriggerModule::DerivedStream => {
             handle_derived_stream_triggers(trace_id, trigger).await
+        }
+        config::meta::triggers::TriggerModule::QueryRecommendations => {
+            handle_query_recommendations_triggers(trace_id, trigger).await
         }
     }
 }
@@ -729,6 +736,96 @@ async fn handle_alert_triggers(
     );
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream).await;
+
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_query_recommendations_triggers(
+    _trace_id: &str,
+    _trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn handle_query_recommendations_triggers(
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use std::{
+        sync::Arc,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use config::meta::triggers::{Trigger, TriggerStatus};
+
+    let cfg = get_config();
+    let query_recommendation_analysis_interval = cfg.limit.query_recommendation_analysis_interval;
+    let next_run_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Basic relative time")
+        .as_micros() as i64
+        + query_recommendation_analysis_interval * 1_000_000;
+
+    if trigger.status == TriggerStatus::Processing && trigger.retries == 0 {
+        let new_trigger = db::scheduler::Trigger {
+            status: TriggerStatus::Waiting,
+            retries: 3,
+            next_run_at,
+            ..trigger.clone()
+        };
+        db::scheduler::update_trigger(new_trigger, false, trace_id).await?;
+        return Err(anyhow::anyhow!(
+            "Query Recommendations Job failed through all retries"
+        ));
+    }
+
+    log::info!("Generating Query Recommendations. trace_id={trace_id}");
+    let trigger = Trigger {
+        status: TriggerStatus::Processing,
+        retries: trigger.retries - 1,
+        ..trigger
+    };
+    db::scheduler::update_trigger(trigger.clone(), false, trace_id)
+        .await
+        .inspect_err(|e| log::error!("Error updating trigger state for processing. e={:?}", e))?;
+    let query_recommendation_service = QueryRecommendationService {
+        ctx: Arc::new(QueryOptimizerContext),
+        query_recommendation_analysis_interval: cfg.limit.query_recommendation_analysis_interval,
+        query_recommendation_duration: cfg.limit.query_recommendation_duration,
+        query_recommendation_top_k: cfg.limit.query_recommendation_top_k,
+    };
+
+    let result = query_recommendation_service
+        .run()
+        .await
+        .inspect_err(|e| {
+            log::error!(
+                "Recommendation service stopped with an error: Error={:?}",
+                e
+            );
+        })
+        .inspect(|_| {
+            log::warn!("Recommendation job completed. trace_id={trace_id}!");
+        });
+
+    if let Err(e) = result {
+        return Err(anyhow::anyhow!(
+            "Query Recommendations Job operation encounted an error: e={:?}",
+            e
+        ));
+    }
+
+    let new_trigger = db::scheduler::Trigger {
+        status: TriggerStatus::Waiting,
+        retries: 3,
+        next_run_at,
+        ..trigger
+    };
+    db::scheduler::update_trigger(new_trigger, false, trace_id)
+        .await
+        .inspect_err(|e| log::error!("Failed to update QueryRecommendations trigger. e={:?}", e))?;
 
     Ok(())
 }

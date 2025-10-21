@@ -46,8 +46,6 @@ pub(crate) mod pipeline;
 mod pipeline_error_cleanup;
 mod promql;
 mod promql_self_consume;
-#[cfg(feature = "enterprise")]
-mod query_optimization_recommendation;
 mod stats;
 
 pub use file_downloader::{download_from_node, queue_download};
@@ -305,10 +303,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move {
             o2_enterprise::enterprise::re_patterns::get_pattern_manager().await
         });
-
-        if LOCAL_NODE.is_alert_manager() {
-            tokio::task::spawn(async move { query_optimization_recommendation::run().await });
-        }
     }
 
     // additional for cloud
