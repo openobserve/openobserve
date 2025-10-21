@@ -859,7 +859,7 @@ test.describe("dashboard UI testcases", () => {
     // Validate chart is properly rendered
     const chartContainer = page.locator('[data-test="chart-renderer"]');
     const boundingBox = await chartContainer.boundingBox();
-    await page.waitForLoadState("networkidle");
+    // await page.waitForLoadState("networkidle");
     const canvasCount = await page
       .locator('[data-test="chart-renderer"] canvas')
       .count();
