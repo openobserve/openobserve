@@ -144,90 +144,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 self="top middle"
                 class="organization-menu-o2"
               >
-                <q-list data-test="organization-menu-list" style="width: 470px">
-                  <q-item data-test="organization-menu-item" style="padding: 0">
-                    <q-item-section
-                      data-test="organization-menu-item-section"
-                      class="column"
-                      style="padding: 0px"
-                    >
-                      <q-table
-                        data-test="organization-menu-table"
-                        :rows="filteredOrganizations"
-                        :row-key="(row) => 'org_' + row.identifier"
-                        :visible-columns="['label']"
-                        hide-header
-                        :pagination="{ rowsPerPage }"
-                        :rows-per-page-options="[]"
-                        class="org-table"
+                <q-table
+                  data-test="organization-menu-table"
+                  :rows="filteredOrganizations"
+                  :row-key="(row) => 'org_' + row.identifier"
+                  :columns="[{ name: 'label', field: 'label', align: 'left' }]"
+                  :visible-columns="['label']"
+                  hide-header
+                  :pagination="{ rowsPerPage }"
+                  :rows-per-page-options="[]"
+                  class="org-table"
+                  style="width: 470px"
+                >
+                  <template #top>
+                    <div class="full-width">
+                      <q-input
+                        data-test="organization-search-input"
+                        v-model="searchQuery"
+                        data-cy="index-field-search-input"
+                        borderless
+                        dense
+                        clearable
+                        debounce="1"
+                        autofocus
+                        :placeholder="'Search Organization'"
                       >
-                        <template #top>
-                          <div class="full-width">
-                            <q-input
-                              data-test="organization-search-input"
-                              v-model="searchQuery"
-                              data-cy="index-field-search-input"
-                              filled
-                              borderless
-                              dense
-                              clearable
-                              debounce="1"
-                              :placeholder="'Search Organization'"
-                            >
-                              <template #prepend>
-                                <q-icon name="search" />
-                              </template>
-                            </q-input>
-                          </div>
+                        <template #prepend>
+                          <q-icon name="search" />
                         </template>
+                      </q-input>
+                    </div>
+                  </template>
 
-                        <template v-slot:body-cell-label="props">
-                          <q-td
-                            data-test="organization-menu-item-label"
-                            :props="props"
-                            class="org-list-item"
-                          >
-                            <q-item
-                              data-test="organization-menu-item-label-item"
-                              clickable
-                              v-close-popup
-                              dense
-                              :class="{
-                                'text-primary':
-                                  props.row.identifier ===
-                                  userClickedOrg?.identifier,
-                              }"
-                              @click="
-                                selectedOrg = props.row;
-                                updateOrganization();
-                              "
-                            >
-                              <q-item-section>
-                                <q-item-label
-                                    data-test="organization-menu-item-label-item-label"
-                                    class="tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis tw-max-w-[450px]"
-                                  >
-                                    {{ props.row.label.length > 30 ? props.row.label.substring(0, 30) + '... | ' + props.row.identifier : props.row.label + ' | ' + props.row.identifier }}
-                                    <q-tooltip v-if="props.row.label.length > 30"  anchor="bottom middle" self="top start">
-                                      {{ props.row.label }}
-                                    </q-tooltip>
-                                  </q-item-label>
-                              </q-item-section>
-                            </q-item>
-                          </q-td>
-                        </template>
-                        <template v-slot:no-data>
-                          <div
-                            data-test="organization-menu-no-data"
-                            class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center"
-                          >
-                            No organizations found
-                          </div>
-                        </template>
-                      </q-table>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
+                  <template v-slot:body-cell-label="props">
+                    <q-td
+                      :props="props"
+                      class="org-list-item-cell"
+                      @click="
+                        selectedOrg = props.row;
+                        updateOrganization();
+                      "
+                    >
+                      <div
+                        class="org-menu-item"
+                        v-close-popup
+                        :class="{
+                          'org-menu-item--active':
+                            props.row.identifier === userClickedOrg?.identifier,
+                        }"
+                      >
+                        {{ props.row.label.length > 30 ? props.row.label.substring(0, 30) + '... | ' + props.row.identifier : props.row.label + ' | ' + props.row.identifier }}
+                        <q-tooltip v-if="props.row.label.length > 30" anchor="bottom middle" self="top start">
+                          {{ props.row.label }}
+                        </q-tooltip>
+                      </div>
+                    </q-td>
+                  </template>
+
+                  <template v-slot:no-data>
+                    <div
+                      data-test="organization-menu-no-data"
+                      class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center"
+                    >
+                      No organizations found
+                    </div>
+                  </template>
+                </q-table>
               </q-menu>
             </q-btn>
           </div>
@@ -692,7 +674,7 @@ export default defineComponent({
 
     const filteredOrganizations = computed(() => {
       //we will return all organizations if searchQuery is empty
-      //else we will search based upon label or identifier that we get from the search query 
+      //else we will search based upon label or identifier that we get from the search query
       //if anyone of the orgs matches either label or identifier then we will return that orgs
       if (!searchQuery.value) return orgOptions.value;
       const toBeSearched = searchQuery.value.toLowerCase().trim();
@@ -1846,69 +1828,80 @@ body.ai-chat-open {
 
 .organization-menu-o2 {
   .org-table {
+    // Disable global table row hover
+    tbody .q-tr:hover {
+      background: transparent !important;
+    }
+
     td {
-      padding: 0;
-      height: 25px !important;
-      min-height: 25px !important;
-    }
-
-    .q-table__control {
-      margin: 0px !important;
-      width: 100% !important;
-      text-align: right;
-    }
-
-    .q-table__bottom {
-      padding: 0px !important;
-      min-height: 35px;
-
-      .q-table__control {
-        padding: 0px 10px !important;
-      }
+      padding: 0 !important;
+      height: 32px !important;
+      min-height: 32px !important;
     }
 
     .q-table__top {
-      padding: 0px !important;
-      margin: 0px !important;
-      left: 0px;
-      width: 100%;
+      padding: 10px !important;
 
-      .q-table__separator {
-        display: none;
-      }
-
-      .q-table__control {
-        padding: 0px !important;
-      }
-    }
-
-    .q-field--filled .q-field__control {
-      padding: 0px 5px !important;
-    }
-
-    .saved-view-item {
-      padding: 4px 5px 4px 10px !important;
-    }
-
-    .q-item__section--main ~ .q-item__section--side {
-      padding-left: 5px !important;
-    }
-    .org-table {
-      .text-primary {
-        color: var(--q-primary) !important;
-        font-weight: 500;
-        background: rgba(89, 96, 178, 0.08);
-      }
-    }
-  }
-  .q-menu {
-    .q-input {
       .q-field__control {
         height: 40px;
       }
 
       input {
         font-size: 14px;
+      }
+    }
+
+    .q-table__bottom {
+      padding: 8px 12px !important;
+      min-height: 40px;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+
+      .q-table__control {
+        display: flex !important;
+        align-items: center !important;
+      }
+
+      // Ensure pagination arrows are visible
+      .q-btn {
+        display: inline-flex !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+      }
+    }
+
+    // Table cell with no padding
+    .org-list-item-cell {
+      padding: 0 !important;
+      cursor: pointer;
+    }
+
+    // Individual org menu item
+    .org-menu-item {
+      padding: 6px 12px;
+      width: 100%;
+      display: block;
+      transition: background-color 0.2s ease;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+
+      // Hover effect only on the div
+      &:hover {
+        background: color-mix(in srgb, var(--o2-theme-color) 5%, var(--o2-theme-mode) 90%) !important;
+      }
+
+      // Active/selected state
+      &--active {
+        color: var(--q-primary) !important;
+        font-weight: 500;
+        background: rgba(89, 96, 178, 0.08);
+
+        &:hover {
+          background: rgba(89, 96, 178, 0.12) !important;
+        }
       }
     }
   }
