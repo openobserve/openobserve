@@ -59,9 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <div
-                  class="relative-position tw-h-full tw-px-[0.625rem]"
-                >
+                <div class="relative-position tw-h-full tw-px-[0.625rem]">
                   <index-list
                     v-show="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
@@ -126,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       class="tw-justify-center"
                     >
-                      <h5 class="text-center q-ma-none">
+                      <h5 class="text-center q-ma-none tw-pt-[2rem]">
                         <div
                           data-test="logs-search-result-not-found-text"
                           class="q-pt-lg"
@@ -198,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <h6
                         data-test="logs-search-no-stream-selected-text"
-                        class="text-center col-10 q-mx-none !tw-mt-none"
+                        class="text-center col-10 q-mx-none !tw-mt-none tw-pt-[2rem]"
                       >
                         <q-icon name="info" color="primary"
 size="md" /> Select
@@ -218,7 +216,7 @@ size="md" /> Select
                     >
                       <h6
                         data-test="logs-search-error-message"
-                        class="text-center q-ma-none col-10"
+                        class="text-center q-ma-none col-10 tw-pt-[2rem]"
                       >
                         <q-icon name="info" color="primary"
 size="md" />
@@ -246,7 +244,7 @@ size="md" />
                     >
                       <h6
                         data-test="logs-search-error-message"
-                        class="text-center q-ma-none col-10"
+                        class="text-center q-ma-none col-10 tw-pt-[2rem]"
                       >
                         <q-icon name="info" color="primary"
 size="md" />
@@ -269,7 +267,7 @@ size="md" />
                       />
                     </div>
                     <div class="text-center col-10 q-ma-none">
-                      <h5>
+                      <h5 class="tw-my-none tw-pt-[1rem]">
                         <span v-if="disableMoreErrorDetails">
                           <SanitizedHtmlRenderer
                             data-test="logs-search-detail-error-message"
@@ -642,7 +640,7 @@ export default defineComponent({
     const isLogsMounted = ref(false);
 
     const expandedLogs = ref([]);
-    const splitterModel = ref(10);
+    const splitterModel = ref(15);
     const chartRedrawTimeout = ref(null);
     const updateColumnsTimeout = ref(null);
 
@@ -2692,6 +2690,11 @@ export default defineComponent({
     box-sizing: border-box !important;
     height: 100% !important;
     overflow: visible !important; /* Changed from hidden to visible for button */
+  }
+
+  .logs-horizontal-splitter .q-splitter__before {
+    z-index: auto;
+    overflow: visible;
   }
 
   // .search-result-container {
