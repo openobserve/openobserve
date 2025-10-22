@@ -178,24 +178,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-route-tab>
                 </q-tabs>
               </div>
-                  <q-btn
-                data-test="logs-search-field-list-collapse-btn-management"
-                icon="drag_indicator"
-                :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
-                dense
-                flat
-                :class="[
-                    'splitter-section-collapse-btn',
-                    showManagementTabs
-                      ? 'splitter-section-collapse-btn--visible'
-                      : 'splitter-section-collapse-btn--hidden',
-                  ]"
-                color="primary"
-                @click="controlManagementTabs"
-              />
             </div>
           </div>
         </div>
+      </template>
+      <template #separator>
+          <q-btn
+            data-test="logs-search-field-list-collapse-btn-management"
+            icon="drag_indicator"
+            :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
+            dense
+            flat
+            :class="[
+                'splitter-section-collapse-btn',
+                showManagementTabs
+                  ? 'splitter-section-collapse-btn--visible'
+                  : 'splitter-section-collapse-btn--hidden',
+              ]"
+            @click="controlManagementTabs"
+              />
       </template>
 
       <template v-slot:after>

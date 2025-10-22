@@ -17,22 +17,24 @@
             @update:activeTab="updateActiveTab"
           />
           </div>
-          <q-btn
-              data-test="iam-tabs-collapse-btn"
-              icon="drag_indicator"
-              :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
-              dense
-              flat
-              :class="[
-                'splitter-section-collapse-btn',
-                showSidebar
-                  ? 'splitter-section-collapse-btn--visible'
-                  : 'splitter-section-collapse-btn--hidden',
-              ]"
-              
-              @click="collapseSidebar"
-            />
         </div>
+      </template>
+      <template #separator>
+          <q-btn
+            data-test="logs-search-field-list-collapse-btn"
+            icon="drag_indicator"
+            :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+            dense
+            flat
+            :class="[
+              'splitter-section-collapse-btn',
+              showSidebar
+                ? 'splitter-section-collapse-btn--visible'
+                : 'splitter-section-collapse-btn--hidden',
+            ]"
+            
+            @click="collapseSidebar"
+          />
       </template>
       <template v-slot:after>
         <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
