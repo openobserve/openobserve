@@ -92,7 +92,7 @@
 .logs-search-bar-component {
   padding-bottom: 0.0625rem; // 1px
   height: 100%;
-  overflow: hidden;
+  overflow: visible;
 
   // Align all top bar elements vertically
   > .row:first-child {
@@ -1089,6 +1089,7 @@
     align-items: center !important;
     overflow: visible !important;
     top: -3px;
+    border: none !important;
 
     &:before,
     &:after {
@@ -1098,34 +1099,40 @@
 
   .q-field__native {
     padding: 0 0.25rem !important;
-    min-height: 1.75rem !important;
-    line-height: 1.75rem !important;
+    min-height: 100% !important;
+    line-height: 100% !important;
     font-size: 0.75rem !important;
     overflow: visible !important;
+    height: 100% !important;
+    display: flex;
+    align-items: center;
 
-    input,
     span {
-      line-height: 1.15rem !important;
       padding: 0 !important;
-      margin: -4px 0 0 0 !important;
+      height: auto;
+    }
+
+    input {
+      display: none;
     }
   }
 
   .q-field__input {
     padding: 0 !important;
-    line-height: 1.75rem !important;
+    line-height: 100% !important;
   }
 
   .q-field__append {
     padding: 0 !important;
     padding-left: 0.25rem !important;
-    height: 1.75rem !important;
+    height: 100% !important;
     display: flex !important;
     align-items: center !important;
   }
 
   .q-icon {
     font-size: 1rem !important;
+    transform: none !important;
   }
 
   // Selected value display
