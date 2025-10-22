@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="add-action-script-section">
     <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
       <div class="card-container">
-        <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-pl-4 tw-pr-2 tw-h-[71px]">
+        <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-pl-4 tw-pr-2 tw-h-[68px]">
         
           <div
             data-test="add-action-script-back-btn"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     
       <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
-        <div class="card-container tw-h-[calc(100vh-162px)] tw-overflow-auto">
+        <div class="card-container tw-h-[calc(100vh-159px)] tw-overflow-auto">
           <div ref="addAlertFormRef" class="q-px-lg q-pb-md" style="width: 1024px">
             <q-form
               class="create-report-form"

@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none card-container" style="min-height: inherit; height: calc(100vh - 42px);">
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
+  <q-page class="q-pa-none card-container" style="min-height: inherit; height: calc(100vh - 45px);">
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
       style="position: sticky; top: 0; z-index: 1000 ;"
       >
           <div  class="q-table__title full-width tw-font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>

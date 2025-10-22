@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-none card-container" style="min-height: inherit; height: calc(100vh - 42px);">
-    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px]"
+    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px]"
       >
       <div
         data-test="iam-roles-section-title"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <app-table
       data-test="iam-roles-table-section"
       class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
-      :tableStyle="hasVisibleRows ? 'height: calc(100vh - 114px); overflow-y: auto;' : ''"
+      :tableStyle="hasVisibleRows ? 'height: calc(100vh - 111px); overflow-y: auto;' : ''"
       :rows="visibleRows"
       :columns="columns"
       pagination
