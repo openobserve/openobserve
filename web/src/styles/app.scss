@@ -1090,31 +1090,6 @@ body {
   min-height: 30px;
 }
 
-.o2-toggle-button-xs-light{
-  .q-toggle__track{
-    background-color: var(--o2-toggle-track-off-bg);
-    opacity: 100%;
-  }
-  .q-toggle__inner--truthy{
-    color: #ffffff;
-    .q-toggle__track{
-      background-color: var(--o2-toggle-track-bg);
-    }
-  }
-}
-
-.o2-toggle-button-xs-dark{
-  .q-toggle__track{
-    background-color: var(--o2-toggle-track-off-bg);
-    opacity: 100%;
-  }
-  .q-toggle__inner--truthy{
-    color: #ffffff;
-    .q-toggle__track{
-      background-color: var(--o2-toggle-track-bg);
-    }
-    }
-}
 
 
 .o2-input-text-box-light{
