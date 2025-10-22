@@ -78,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tr :props="props">
               <q-th v-for="col in props.cols"
               :class="col.classes"
+              :style="col.style"
               :key="col.name" :props="props">
                 <span>{{ col.label }}</span>
               </q-th>
@@ -88,7 +89,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 v-if="props.row.enableDelete && props.row.status != 'pending'"
                 :title="t('user.delete')"
-                class="q-ml-xs"
                 padding="sm"
                 unelevated
                 size="sm"
@@ -103,7 +103,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
                 :title="t('user.update')"
-                class="q-ml-xs"
                 padding="sm"
                 unelevated
                 size="sm"
@@ -341,8 +340,9 @@ export default defineComponent({
         name: "actions",
         field: "actions",
         label: t("user.actions"),
-        align: "left",
-        classes: 'actions-column'
+        align: "center",
+        classes: 'actions-column',
+        style: "width: 100px"
       },
     ]);
     const userEmail: any = ref("");

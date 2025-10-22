@@ -115,38 +115,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #body-cell-actions="props">
               <q-td :props="props">
                 <q-btn
-                  icon="search"
                   :title="t('logStream.explore')"
-                  class="q-ml-xs"
                   padding="sm"
                   unelevated
                   size="sm"
                   round
                   flat
                   @click="exploreStream(props)"
-                />
+                >
+                <Search size="1rem" />
+              </q-btn>
                 <q-btn
-                  icon="list_alt"
                   :title="t('logStream.schemaHeader')"
-                  class="q-ml-xs"
                   padding="sm"
                   unelevated
                   size="sm"
                   round
                   flat
                   @click="listSchema(props)"
-                />
+                >
+                <TableProperties size="1rem" />
+              </q-btn>
                 <q-btn
-                  :icon="outlinedDelete"
                   :title="t('logStream.delete')"
-                  class="q-ml-xs"
                   padding="sm"
                   unelevated
                   size="sm"
                   round
                   flat
                   @click="confirmDeleteAction(props)"
-                />
+                >
+                <Trash size="1rem" />
+              </q-btn>
               </q-td>
             </template>
             <template v-slot:pagination="scope">
@@ -358,9 +358,10 @@ import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { Trash, TableProperties, Search } from "lucide-vue-next";
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, AddStream, AppTabs },
+  components: { QTablePagination, SchemaIndex, NoData, AddStream, AppTabs, Trash, TableProperties, Search },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();
