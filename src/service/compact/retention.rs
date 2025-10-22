@@ -430,12 +430,8 @@ pub async fn delete_by_date(
 
     // update stream stats retention time
     let mut stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
-    let mut min_ts = infra_file_list::get_min_ts(org_id, stream_type, stream_name)
-        .await
-        .unwrap_or_default();
-    if min_ts == 0 {
-        min_ts = stats.doc_time_min;
-    };
+    // we use date_end as the new min doc time
+    let min_ts = date_end.timestamp_micros();
     infra_file_list::reset_stream_stats_min_ts(
         org_id,
         format!("{org_id}/{stream_type}/{stream_name}").as_str(),
