@@ -92,7 +92,7 @@
 .logs-search-bar-component {
   padding-bottom: 0.0625rem; // 1px
   height: 100%;
-  overflow: hidden;
+  overflow: visible;
 
   // Align all top bar elements vertically
   > .row:first-child {
