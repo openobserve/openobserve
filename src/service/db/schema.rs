@@ -407,13 +407,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     Some(start_dt) => start_dt.parse::<i64>().unwrap_or_default(),
                     None => 0,
                 };
-                log::warn!(
-                    "[Schema:watch] Deleting schema for {org_id}/{stream_type}/{stream_name} with start_dt {start_dt}",
-                );
                 if start_dt > 0 {
                     // delete only one version
                     continue;
                 }
+                log::warn!(
+                    "[Schema:watch] Deleting schema for {org_id}/{stream_type}/{stream_name} with start_dt {start_dt}",
+                );
                 let mut w = STREAM_SCHEMAS.write().await;
                 w.remove(item_key);
                 w.shrink_to_fit();
