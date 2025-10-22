@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page style="overflow-y: auto;" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
-    <div v-if="!no_data_ingest && !isLoadingSummary" class="tw-w-full tw-h-full tw-px-[0.625rem]" style="display: flex; flex-direction: column; ">
+  <q-page style="overflow-y: auto; min-height: inherit; height: calc(100vh - 50px);" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
+    <div v-if="!no_data_ingest && !isLoadingSummary" class="tw-w-full tw-h-full tw-px-[0.625rem] card-container" style="display: flex; flex-direction: column; ">
         <!-- 1st section -->
          <div>
           <TrialPeriod></TrialPeriod>
