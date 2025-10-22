@@ -1784,6 +1784,30 @@ export default defineComponent({
   width: 80px !important;
 }
 
+.header-menu {
+  .q-btn {
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+    }
+
+    // Skip bounce effect for AI button and org selector
+    &.ai-hover-btn {
+      &:hover {
+        transform: none;
+      }
+    }
+  }
+
+  // Skip bounce for org selector (inside div)
+  [data-test="navbar-organizations-select"] .q-btn {
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
 .header-icon {
   opacity: 0.7;
 }
