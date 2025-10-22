@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit">
     <div v-if="!showImportTemplate && !showTemplateEditor" >
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
       >
         <div class="q-table__title tw-font-[600]" data-test="alert-templates-list-title">
             {{ t("alert_templates.header") }}
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pagination="pagination"
         class="o2-quasar-table o2-quasar-table-header-sticky"
         :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 115px); overflow-y: auto;'
+            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
             : 'width: 100%'"
       >
         <template #no-data>
