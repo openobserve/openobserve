@@ -164,9 +164,18 @@ export class SanityPage {
     async displayResultTextAndPagination() {
         await this.page.locator(this.refreshButton).click();
         await this.page.waitForLoadState('networkidle');
-        
+
         await expect(this.page.getByText("Showing 1 to 50")).toBeVisible({ timeout: 15000 });
-        await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+        await this.page.waitForTimeout(1000);
+
+        try {
+            await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+        } catch (error) {
+            testLogger.warn('Pagination element not found, retrying with refresh button click');
+            await this.page.locator(this.refreshButton).click();
+            await this.page.waitForLoadState('networkidle');
+            await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+        }
     }
 
     // Histogram Methods

@@ -304,6 +304,121 @@ class APICleanup {
     }
 
     /**
+     * Fetch all pipelines
+     * @returns {Promise<Array>} Array of pipeline objects
+     */
+    async fetchPipelines() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/pipelines`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch pipelines', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.list || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch pipelines', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single pipeline
+     * @param {string} pipelineId - The pipeline ID
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deletePipeline(pipelineId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/pipelines/${pipelineId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete pipeline', { pipelineId, status: response.status });
+                return { code: response.status, message: 'Failed to delete pipeline' };
+            }
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            testLogger.error('Failed to delete pipeline', { pipelineId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all pipelines for specific streams
+     * Deletes pipelines where source.stream_name matches any of the target streams
+     * @param {Array<string>} streamNames - Array of stream names to match (default: ['e2e_automate', 'e2e_automate1', 'e2e_automate2', 'e2e_automate3'])
+     */
+    async cleanupPipelines(streamNames = ['e2e_automate', 'e2e_automate1', 'e2e_automate2', 'e2e_automate3']) {
+        testLogger.info('Starting pipeline cleanup', { streams: streamNames });
+
+        try {
+            // Fetch all pipelines
+            const pipelines = await this.fetchPipelines();
+            testLogger.info('Fetched pipelines', { total: pipelines.length });
+
+            // Filter pipelines by source stream name
+            const matchingPipelines = pipelines.filter(p =>
+                p.source && streamNames.includes(p.source.stream_name)
+            );
+            testLogger.info('Found pipelines matching target streams', { count: matchingPipelines.length });
+
+            if (matchingPipelines.length === 0) {
+                testLogger.info('No pipelines to clean up');
+                return;
+            }
+
+            // Delete each pipeline
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const pipeline of matchingPipelines) {
+                const result = await this.deletePipeline(pipeline.pipeline_id);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted pipeline', {
+                        id: pipeline.pipeline_id,
+                        name: pipeline.name,
+                        stream: pipeline.source.stream_name
+                    });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete pipeline', {
+                        id: pipeline.pipeline_id,
+                        name: pipeline.name,
+                        stream: pipeline.source.stream_name,
+                        result
+                    });
+                }
+            }
+
+            testLogger.info('Pipeline cleanup completed', {
+                total: matchingPipelines.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Pipeline cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
      * Clean up all reports owned by the automation test user
      * Deletes all reports where owner matches ZO_ROOT_USER_EMAIL
      */

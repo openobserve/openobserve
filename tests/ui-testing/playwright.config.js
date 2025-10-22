@@ -33,7 +33,7 @@ module.exports = defineConfig({
   /* Retry failed tests: 2 times on CI, 1 time locally */
   retries: process.env.CI ? 5 : 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 5 : undefined,
+  workers: process.env.CI ? 5 : 5,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI
     ? [['blob']] // Use blob reporter in CI for merging across shards

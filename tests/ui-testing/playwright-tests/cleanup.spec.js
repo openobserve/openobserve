@@ -30,6 +30,9 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up all dashboards owned by automation user
     await pm.apiCleanup.cleanupDashboards();
 
+    // Clean up all pipelines for e2e_automate streams
+    await pm.apiCleanup.cleanupPipelines();
+
     testLogger.info('Pre-test cleanup completed successfully');
   });
 });
