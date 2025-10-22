@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="q-mx-sm q-mt-md">
-    <div class="flex q-mx-md items-center no-wrap">
+    <div class="card-container flex q-mx-md items-center no-wrap tw-py-3 tw-px-4">
       <div class="col">
         <div class="flex">
           <q-btn
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator class="q-my-sm" />
     <div class="flex">
       <div
-        class="dashboard-import-type-tabs flex items-center justify-center q-mx-md"
+        class="card-container dashboard-import-type-tabs flex items-center justify-center q-mx-md"
       >
         <app-tabs
           data-test="dashboard-import-type-tabs"
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
                 <div
                   style="width: calc(100% - 10px)"
-                  class="q-mb-md flex full-width editor-form"
+                  class="card-container tw-py-3 tw-px-4 q-mb-md flex full-width editor-form"
                 >
                   <div
                     data-test="dashboard-import-file-input"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-file>
                   </div>
                   <div
-                    style="width: calc(30%)"
+                    style="width: calc(30%);"
                     class="dashboard-folder-dropdown"
                   >
                     <select-folder-dropdown
@@ -221,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               data-test="dashboard-import-error-container"
               style="width: 100%; height: 100%"
+              class="card-container tw-py-3 tw-px-4 tw-mt-4"
             >
               <div class="text-center text-h6">Error Validations</div>
               <q-separator class="q-mt-md" />
