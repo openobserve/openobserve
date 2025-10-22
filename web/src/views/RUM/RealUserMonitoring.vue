@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </router-view>
     </template>
     <template v-else>
-      <div class="q-pa-lg enable-rum">
+      <div class="q-pa-lg tw-mx-[0.625rem] enable-rum card-container">
         <div class="q-pb-lg">
           <div class="text-left text-h6 text-bold q-pb-md">
             {{ t("rum.aboutRUMTitle") }}
@@ -79,11 +79,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-btn
           class="o2-primary-button tw-h-[36px]"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-primary-button-dark'
-              : 'o2-primary-button-light'
-          "
           flat
           no-caps
           :title="t('rum.getStartedTitle')"
@@ -366,6 +361,8 @@ const getRumDataFields = () => {
 }
 
 .enable-rum {
-  max-width: 1024px;
+  max-width: 100%;
+  max-height: 100%;
+  height: calc(100vh - 50px);
 }
 </style>
