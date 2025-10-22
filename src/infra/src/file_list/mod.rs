@@ -118,12 +118,6 @@ pub trait FileList: Sync + Send + 'static {
         date_range: Option<(String, String)>,
     ) -> Result<String>;
     // stream stats
-    async fn get_min_ts(
-        &self,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-    ) -> Result<i64>;
     async fn get_max_pk_value(&self) -> Result<i64>;
     async fn get_min_pk_value(&self) -> Result<i64>;
     async fn clean_by_min_pk_value(&self, val: i64) -> Result<()>;
@@ -357,11 +351,6 @@ pub async fn get_min_date(
     CLIENT
         .get_min_date(org_id, stream_type, stream_name, date_range)
         .await
-}
-
-#[inline]
-pub async fn get_min_ts(org_id: &str, stream_type: StreamType, stream_name: &str) -> Result<i64> {
-    CLIENT.get_min_ts(org_id, stream_type, stream_name).await
 }
 
 #[inline]
