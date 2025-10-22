@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :style="hasVisibleRows
                 ? 'width: 100%; height: calc(100vh - 127px)' 
                 : 'width: 100%'"
-            class="o2-quasar-table o2-quasar-table-header-sticky "
+            class="o2-quasar-table o2-quasar-table-header-sticky"
           >
             <template v-slot:body="props">
               <q-tr
@@ -120,7 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Actions Buttons -->
                     <q-btn
                       :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
-                      class="q-ml-xs material-symbols-outlined"
                       dense
                       unelevated
                       size="sm"
@@ -137,8 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-btn>
                     <q-btn
                       :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
-                      icon="edit"
-                      class="q-ml-xs"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -146,11 +143,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       flat
                       :title="t('pipeline.edit')"
                       @click.stop="editPipeline(props.row)"
-                    ></q-btn>
+                    >
+                    <Pencil size="1rem" />
+                  </q-btn>
                     <q-btn
                       :data-test="`pipeline-list-${props.row.name}-export-pipeline`"
-                      icon="download"
-                      class="q-ml-xs"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -158,11 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       flat
                       :title="t('pipeline.export')"
                       @click.stop="exportPipeline(props.row)"
-                    ></q-btn>
+                    >
+                    <ArrowDownToLine size="1rem" />
+                  </q-btn>
                     <q-btn
                       :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
-                      :icon="outlinedDelete"
-                      class="q-ml-xs"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -170,11 +167,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       flat
                       :title="t('pipeline.delete')"
                       @click.stop="openDeleteDialog(props.row)"
-                    ></q-btn>
+                    >
+                    <Trash size="1rem" />
+                  </q-btn>
                     <q-btn
                       :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
-                      :icon="outlinedVisibility"
-                      class="q-ml-xs"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -182,16 +179,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       flat
                       :title="t('pipeline.view')"
                     >
+                    <Eye size="1rem" />
                       <q-tooltip position="bottom">
                         <PipelineView :pipeline="props.row" />
                       </q-tooltip>
                     </q-btn>
                     <!-- Error Indicator - Always render to maintain alignment -->
-                    <div class="q-ml-xs pipeline-error-slot">
+                    <div class="pipeline-error-slot">
                       <q-btn
                         v-if="props.row.last_error"
                         :data-test="`pipeline-list-${props.row.name}-error-indicator`"
-                        icon="error"
                         class="pipeline-error-indicator"
                         padding="sm"
                         unelevated
@@ -200,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         flat
                         @click.stop="showErrorDialog(props.row)"
                       >
+                      <Info size="1rem" />
                         <q-tooltip>
                           Last error: {{ new Date(props.row.last_error.last_error_timestamp / 1000).toLocaleString() }}
                         </q-tooltip>
@@ -475,7 +473,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
 import PipelineView from "./PipelineView.vue";
 import ResumePipelineDialog from "../ResumePipelineDialog.vue";
-import { Play, Pause } from 'lucide-vue-next';
+import { Play, Pause, Pencil, Download, Trash, View,  Info, Eye , ArrowDownToLine } from 'lucide-vue-next';
 
 import { filter, update } from "lodash-es";
 

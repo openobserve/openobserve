@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="reportsStateLoadingMap[props.row.uuid]"
                   data-test="report-list-toggle-report-state-loader"
                   style="display: inline-block; width: 33.14px; height: auto"
-                  class="flex justify-center items-center q-ml-xs"
+                  class="flex justify-center items-center"
                   :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
                 >
                   <q-circular-progress
@@ -98,8 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-else
                   :data-test="`report-list-${props.row.name}-pause-start-report`"
-                  :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-                  class="q-ml-xs material-symbols-outlined"
                   padding="sm"
                   unelevated
                   size="sm"
@@ -108,11 +106,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
                   @click="toggleReportState(props.row)"
-                />
+                >
+                <Pause size="1rem" v-if="props.row.enabled"/>
+                <Play size="1rem" v-else />
+              </q-btn>
                 <q-btn
                   :data-test="`report-list-${props.row.name}-edit-report`"
-                  icon="edit"
-                  class="q-ml-xs"
                   padding="sm"
                   unelevated
                   size="sm"
@@ -120,11 +119,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   :title="t('alerts.edit')"
                   @click="editReport(props.row)"
-                ></q-btn>
+                >
+                <Pencil size="1rem" />
+              </q-btn>
                 <q-btn
                   :data-test="`report-list-${props.row.name}-delete-report`"
-                  :icon="outlinedDelete"
-                  class="q-ml-xs"
                   padding="sm"
                   unelevated
                   size="sm"
@@ -132,7 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   :title="t('alerts.delete')"
                   @click="confirmDeleteReport(props.row)"
-                ></q-btn>
+                >
+                <Trash size="1rem" />
+              </q-btn>
               </q-td>
             </template>
 
@@ -210,6 +211,7 @@ import reports from "@/services/reports";
 import { cloneDeep } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { Trash, Pencil, Pause, Play } from "lucide-vue-next";
 
 const reportsTableRows: Ref<any[]> = ref([]);
 

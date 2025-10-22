@@ -68,8 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-slot:body-cell-actions="props">
                 <q-td :props="props">
                   <q-btn
-                    icon="edit"
-                    class="q-ml-xs"
                     padding="sm"
                     unelevated
                     size="sm"
@@ -77,10 +75,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     :title="t('function.updateTitle')"
                     @click="showAddUpdateFn(props)"
-                  ></q-btn>
+                  >
+                  <Pencil size="1rem" />
+                </q-btn>
                   <q-btn
-                    :icon="outlinedDelete"
-                    class="q-ml-xs"
                     padding="sm"
                     unelevated
                     size="sm"
@@ -88,10 +86,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     :title="t('function.delete')"
                     @click="showDeleteDialogFn(props)"
-                  ></q-btn>
+                  >
+                  <Trash size="1rem"
+                   />
+
+                </q-btn>
                   <q-btn
-                    :icon="outlinedAccountTree"
-                    class="q-ml-xs"
                     padding="sm"
                     unelevated
                     size="sm"
@@ -99,7 +99,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     :title="'Associated Pipelines'"
                     @click="getAssociatedPipelines(props)"
-                  ></q-btn>
+                  >
+                  <Network size="1rem" />
+                </q-btn>
                 </q-td>
               </template>
 
@@ -238,6 +240,7 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import useLogs from "@/composables/useLogs";
 import { useReo } from "@/services/reodotdev_analytics";
+import { Pencil, Trash, Network } from "lucide-vue-next";
 
 export default defineComponent({
   name: "functionList",
@@ -246,6 +249,9 @@ export default defineComponent({
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),
     NoData,
     ConfirmDialog,
+    Pencil,
+    Trash,
+    Network
   },
   emits: [
     "updated:fields",
