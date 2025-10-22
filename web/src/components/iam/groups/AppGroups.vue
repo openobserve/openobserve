@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none card-container" style="min-height: inherit; height: calc(100vh - 42px);">
+  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+    <div>
+    <div class="card-container tw-mb-[0.625rem]">
     <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px]"
       >
     <div
@@ -48,11 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <div>
-      <app-table
+    </div>
+    <div class="tw-w-full tw-h-full">
+      <div class="card-container tw-h-[calc(100vh-127px)]">      
+        <app-table
         data-test="iam-groups-table-section"
         class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
-        :tableStyle="hasVisibleRows ? 'height: calc(100vh - 111px); overflow-y: auto;' : ''"
+        :tableStyle="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
         :rows="visibleRows"
         :columns="columns"
         pagination
@@ -84,7 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </app-table>
     </div>
-
+    </div>
+    </div>
     <q-dialog v-model="showAddGroup" position="right" full-height maximized>
       <AddGroup
         style="width: 30vw"
