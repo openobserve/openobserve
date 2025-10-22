@@ -23,7 +23,7 @@ use config::{
     get_config,
     ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
-    utils::{json, schema_ext::SchemaExt},
+    utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
 use once_cell::sync::Lazy;
@@ -194,7 +194,7 @@ pub async fn get_versions(
     drop(r);
 
     let db = infra_db::get_db().await;
-    Ok(match db.get(&key).await {
+    let ret = match db.get(&key).await {
         Err(e) => {
             if let Error::DbError(DbError::KeyNotExists(_)) = e {
                 vec![]
@@ -212,7 +212,25 @@ pub async fn get_versions(
                 vec![json::from_slice(&v)?]
             }
         }
-    })
+    };
+    if ret.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // cache the latest versions
+    let latest_schema = ret.last().cloned().unwrap();
+    let start_dt = unwrap_stream_start_dt(&latest_schema).unwrap_or(now_micros());
+    let schema_versions = vec![(start_dt, latest_schema)];
+    let mut w = STREAM_SCHEMAS.write().await;
+    w.entry(cache_key.to_string())
+        .and_modify(|existing_vec| {
+            existing_vec.retain(|(v, _)| schema_versions.iter().all(|(v1, _)| v1 != v));
+            existing_vec.extend(schema_versions.clone())
+        })
+        .or_insert(schema_versions);
+    drop(w);
+
+    Ok(ret)
 }
 
 pub async fn get_settings(
@@ -272,6 +290,13 @@ pub fn unwrap_stream_created_at(schema: &Schema) -> Option<i64> {
     schema
         .metadata()
         .get("created_at")
+        .and_then(|v| v.parse().ok())
+}
+
+pub fn unwrap_stream_start_dt(schema: &Schema) -> Option<i64> {
+    schema
+        .metadata()
+        .get("start_dt")
         .and_then(|v| v.parse().ok())
 }
 
