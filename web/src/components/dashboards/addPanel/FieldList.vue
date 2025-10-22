@@ -1512,6 +1512,6 @@ export default defineComponent({
 .fieldList-pagination {
   // min-height: 80px;
   display: flex;
-  padding-bottom: 2rem;
+  // padding-bottom: 2rem; //why we added this not sure but need to check and for now removing it because it is showing too much space at the bottom
 }
 </style>
