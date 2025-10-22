@@ -442,7 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-drawer
       v-model="drawer"
       show-if-above
-      :width="90"
+      :width="84"
       :breakpoint="500"
       role="navigation"
       aria-label="Main navigation"
