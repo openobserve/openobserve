@@ -245,6 +245,10 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
     #[cfg(feature = "cloud")]
     svc.service(web::scope("/webhook").service(cloud::billings::handle_stripe_event));
 
+    // OAuth 2.0 Authorization Server Metadata endpoint (RFC 8414)
+    // Must be publicly accessible (no auth) at root per MCP spec
+    svc.service(mcp::oauth_authorization_server_metadata);
+
     svc.service(
         web::scope("/auth")
             .wrap(cors.clone())
@@ -564,8 +568,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(service_accounts::update)
         .service(service_accounts::get_api_token)
         .service(mcp::handle_mcp_post)
-        .service(mcp::handle_mcp_get)
-        .service(mcp::oauth_authorization_server_metadata);
+        .service(mcp::handle_mcp_get);
 
     #[cfg(feature = "enterprise")]
     let service = service
