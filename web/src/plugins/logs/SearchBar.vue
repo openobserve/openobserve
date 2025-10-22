@@ -1165,7 +1165,7 @@ class="q-pr-sm" />
         round
         color="primary"
         @click="isFocused = !isFocused"
-        style="position: absolute; top: 45px; right: 3px; z-index: 20"
+        class="tw-absolute tw-top-[3.1rem] tw-right-[1.2rem] tw-z-50"
       ></q-btn>
     </div>
 
@@ -3756,14 +3756,14 @@ export default defineComponent({
         backgroundColor:
           searchObj.data.transformType === "function" && isFocused.value
             ? isDarkMode
-              ? "#575A5A"
-              : "#E0E0E0" // Dark mode: grey, Light mode: yellow (or any color)
+              ? "var(--o2-card-bg)"
+              : "var(--o2-card-bg)" // Dark mode: grey, Light mode: yellow (or any color)
             : "",
         borderBottom:
           searchObj.data.transformType === "function" && isFocused.value
             ? isDarkMode
-              ? "2px solid #575A5A "
-              : "2px solid #E0E0E0"
+              ? "0.375rem solid var(--o2-card-bg)"
+              : "0.375rem solid var(--o2-card-bg)"
             : "none",
       };
     });
