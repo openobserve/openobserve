@@ -706,6 +706,7 @@ pub async fn stream_delete_inner(
 ) -> Result<(), anyhow::Error> {
     // delete stream schema cache
     let key = format!("{org_id}/{stream_type}/{stream_name}");
+    log::warn!("Deleting schema cache for key: {key}");
     let mut w = STREAM_SCHEMAS.write().await;
     w.remove(&key);
     drop(w);
