@@ -35,14 +35,16 @@ pub enum TriggerModule {
     #[default]
     Alert,
     DerivedStream,
+    QueryRecommendations,
 }
 
 impl std::fmt::Display for TriggerModule {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            TriggerModule::Alert => write!(f, "alert"),
-            TriggerModule::Report => write!(f, "report"),
-            TriggerModule::DerivedStream => write!(f, "derived_stream"),
+            Self::Alert => write!(f, "alert"),
+            Self::Report => write!(f, "report"),
+            Self::DerivedStream => write!(f, "derived_stream"),
+            Self::QueryRecommendations => write!(f, "query_recommendations"),
         }
     }
 }

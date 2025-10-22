@@ -275,7 +275,30 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
         .compact
         .old_data_streams
         .split(',')
-        .map(|s| s.trim().to_string())
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect()
+});
+
+pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
+    get_config()
+        .nats
+        .kv_watch_modules
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
         .collect()
 });
 
@@ -1279,9 +1302,9 @@ pub struct Limit {
     #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
     pub query_group_base_speed: usize,
     // Default Config: Run Query Recommendation Analysis for last one hour for every hour
-    #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)]
+    #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)] // microseconds
     pub query_recommendation_duration: i64,
-    #[env_config(name = "ZO_QUERY_RECOMMENDATION_INTERVAL", default = 3600000000)]
+    #[env_config(name = "ZO_QUERY_RECOMMENDATION_INTERVAL", default = 3600)] // seconds
     pub query_recommendation_analysis_interval: i64,
     #[env_config(name = "ZO_QUERY_RECOMMENDATION_TOP_K", default = 128)]
     pub query_recommendation_top_k: usize,
@@ -1781,6 +1804,12 @@ pub struct Nats {
         default = false
     )]
     pub v211_support: bool,
+    #[env_config(
+        name = "ZO_NATS_KV_WATCH_MODULES",
+        help = "Set the modules which need to use kv watcher",
+        default = ""
+    )]
+    pub kv_watch_modules: String,
 }
 
 #[derive(Debug, Default, EnvConfig)]
@@ -2775,7 +2804,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
     if cfg.compact.interval < 1 {
-        cfg.compact.interval = 60;
+        cfg.compact.interval = 10;
     }
 
     // check compact_max_file_size to MB
@@ -2804,7 +2833,11 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.compact.batch_size < 1 {
-        cfg.compact.batch_size = cfg.limit.cpu_num as i64;
+        if cfg.common.local_mode {
+            cfg.compact.batch_size = 100;
+        } else {
+            cfg.compact.batch_size = cfg.limit.cpu_num as i64 * 4;
+        }
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
