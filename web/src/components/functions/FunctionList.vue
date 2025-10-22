@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!showAddJSTransformDialog">
       <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
         <div class="card-container tw-mb-[0.625rem]">
-          <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-h-[71px]">
+          <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-h-[68px]">
             <div class="q-table__title tw-font-[600]">
                 {{ t("function.header") }}
               </div>
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-          <div class="card-container tw-h-[calc(100vh-130px)]">
+          <div class="card-container tw-h-pen[calc(100vh-127px)]">
             <q-table
               ref="qTable"
               :rows="visibleRows"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :filter="filterQuery"
               style="width: 100%"
               :style="hasVisibleRows
-                  ? 'width: 100%; height: calc(100vh - 130px)' 
+                  ? 'width: 100%; height: calc(100vh - 127x)' 
                   : 'width: 100%'"
               class="o2-quasar-table o2-quasar-table-header-sticky"
             >
