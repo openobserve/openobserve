@@ -306,14 +306,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @filter="timezoneFilterFn"
           input-debounce="0"
           dense
-          filled
+          borderless
           emit-value
           fill-input
           hide-selected
           :label="t('logStream.timezone')"
           @update:modelValue="onTimezoneChange"
           :display-value="`Timezone: ${timezone}`"
-          class="timezone-select"
+          class="timezone-select o2-custom-select-dashboard"
           popup-content-style="z-index: 10002"
         >
         </q-select>
