@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page style="overflow-y: auto;" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
-    <div v-if="!no_data_ingest && !isLoadingSummary" class="card-container tw-w-full tw-h-full tw-px-[0.625rem]" style="display: flex; flex-direction: column; ">
+    <div v-if="!no_data_ingest && !isLoadingSummary" class="tw-w-full tw-h-full tw-px-[0.625rem]" style="display: flex; flex-direction: column; ">
         <!-- 1st section -->
          <div>
           <TrialPeriod></TrialPeriod>
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="margin: 0 auto; justify-content: center"
     >
     <TrialPeriod></TrialPeriod>
-      <div class="my-card card-container">
+      <div class="my-card">
         <div align="center" flat
 bordered class="my-card q-py-md">
           <div class="text-h6">{{ t("home.noData") }}</div>
