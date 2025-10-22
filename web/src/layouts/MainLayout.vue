@@ -1589,7 +1589,7 @@ export default defineComponent({
       border-radius: 5px;
 
       .q-icon {
-        height: 1.5rem;
+        height: 1.3rem;
         width: 1rem;
       }
 
@@ -1621,7 +1621,7 @@ export default defineComponent({
       &__label {
         font-size: 12px;
         font-weight: 600;
-        color: grey;
+        color: var(--o2-text-secondary);
       }
     }
   }
