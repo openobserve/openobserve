@@ -83,8 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <q-btn
                   :data-test="`alert-list-${props.row.name}-update-alert`"
-                  icon="edit"
-                  class="q-ml-xs"
                   padding="sm"
                   unelevated
                   size="sm"
@@ -92,11 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   :title="t('alerts.edit')"
                   @click="showAddUpdateFn(props)"
-                ></q-btn>
+                >
+                <Pencil size="1rem" />
+              </q-btn>
                 <q-btn
                   :data-test="`alert-list-${props.row.name}-delete-alert`"
-                  :icon="outlinedDelete"
-                  class="q-ml-xs"
                   padding="sm"
                   unelevated
                   size="sm"
@@ -104,7 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   :title="t('alerts.delete')"
                   @click="showDeleteDialogFn(props)"
-                ></q-btn>
+                >
+                <Trash size="1rem" />
+              </q-btn>
               </q-td>
             </template>
 
@@ -289,6 +289,7 @@ import {
 import actions from "@/services/action_scripts";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
+import { Pencil, Trash } from "lucide-vue-next";
 
 interface ActionScriptList {
   "#": string | number; // If this represents a serial number or row index
@@ -314,6 +315,8 @@ export default defineComponent({
     ),
     NoData,
     ConfirmDialog,
+    Trash,
+    Pencil
   },
   emits: [
     "updated:fields",
@@ -427,6 +430,7 @@ export default defineComponent({
         align: "center",
         sortable: false,
         classes: "actions-column",
+        style: "width: 100px"
       },
     ]);
     const activeTab: any = ref("alerts");

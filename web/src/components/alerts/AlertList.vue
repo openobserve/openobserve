@@ -254,9 +254,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-btn
                             v-else
                             :data-test="`alert-list-${props.row.name}-pause-start-alert`"
-                            :icon="
-                              props.row.enabled ? outlinedPause : outlinedPlayArrow
-                            "
                             class="q-ml-xs material-symbols-outlined"
                             padding="sm"
                             unelevated
@@ -270,19 +267,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 : t('alerts.start')
                             "
                             @click.stop="toggleAlertState(props.row)"
-                          />
+                          >
+                          <Pause size="1rem" v-if="props.row.enabled" />
+                          <Play size="1rem" v-else />
+                        </q-btn>
                           <q-btn
                             :data-test="`alert-list-${props.row.name}-update-alert`"
-                            icon="edit"
                             unelevated
                             size="sm"
                             round
                             flat
                             :title="t('alerts.edit')"
                             @click.stop="editAlert(props.row)"
-                          ></q-btn>
+                          >
+                          <Pencil size="1rem" />
+                        </q-btn>
                           <q-btn
-                            icon="content_copy"
                             :title="t('alerts.clone')"
                             unelevated
                             size="sm"
@@ -290,9 +290,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             flat
                             @click.stop="duplicateAlert(props.row)"
                             :data-test="`alert-list-${props.row.name}-clone-alert`"
-                          ></q-btn>
+                          >
+                          <Copy size="1rem" />
+                        </q-btn>
                           <q-btn
-                            :icon="outlinedMoreVert"
                             unelevated
                             size="sm"
                             round
@@ -300,6 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="openMenu($event, props.row)"
                             :data-test="`alert-list-${props.row.name}-more-options`"
                           >
+                          <EllipsisVertical size="1rem"/>
                             <q-menu>
                               <q-list style="min-width: 100px">
                                 <q-item
@@ -309,14 +311,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="moveAlertToAnotherFolder(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
-                                      size="16px"
-                                      :name="outlinedDriveFileMove"
-                                    />
+                                    <FolderInput size="1rem" />
                                   </q-item-section>
                                   <q-item-section>Move</q-item-section>
                                 </q-item>
-
+                                <q-separator />
                                 <q-item
                                   class="flex items-center justify-center"
                                   clickable
@@ -324,12 +323,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="showDeleteDialogFn(props)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon size="16px" :name="outlinedDelete" />
+                                    <Trash size="1rem" />
                                   </q-item-section>
                                   <q-item-section>{{
                                     t("alerts.delete")
                                   }}</q-item-section>
                                 </q-item>
+                                <q-separator />
                                 <q-item
                                   class="flex items-center justify-center"
                                   clickable
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="exportAlert(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon size="16px" name="download" />
+                                    <ArrowDownToLine size="1rem" />
                                   </q-item-section>
                                   <q-item-section>Export</q-item-section>
                                 </q-item>
@@ -732,6 +732,7 @@ import { nextTick } from "vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 // import alertList from "./alerts";
+import { Pencil, Pause, Play, Copy, EllipsisVertical,FolderInput , Trash,ArrowDownToLine   } from "lucide-vue-next";
 
 export default defineComponent({
   name: "AlertList",
@@ -747,6 +748,13 @@ export default defineComponent({
     MoveAcrossFolders,
     AppTabs,
     SelectFolderDropDown,
+    Pencil, 
+    Pause, 
+    Play, 
+    Copy, 
+    EllipsisVertical,
+    FolderInput, 
+    Trash,ArrowDownToLine
   },
   emits: [
     "updated:fields",
