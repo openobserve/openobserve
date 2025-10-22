@@ -579,7 +579,7 @@ import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
-import { Home, Search, BarChart3, GitBranch, Layout, FileText,AlertTriangle, TvMinimal, Database, Users, Code, FileBarChart, Settings } from 'lucide-vue-next';
+import { Home, Search, BarChart3, GitBranch, Layout, FileText,AlertTriangle, TvMinimal, Database, Users, ShieldUser, Code, FileBarChart, Settings } from 'lucide-vue-next';
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -779,7 +779,7 @@ export default defineComponent({
       },
       {
         title: t("menu.iam"),
-        iconComponent: markRaw(Users),
+        iconComponent: markRaw(ShieldUser),
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
