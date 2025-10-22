@@ -70,30 +70,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-td :props="props">
                   <q-btn
                     :data-test="`${props.row.name}-explore-btn`"
-                    icon="search"
                     :title="t('logStream.explore')"
-                    class="q-ml-xs"
                     padding="sm"
                     unelevated
                     size="sm"
                     round
                     flat
                     @click="exploreEnrichmentTable(props)"
-                  />
+                  >
+                  <Search size="1rem" />
+                </q-btn>
                   <q-btn
-                    icon="list_alt"
                     :title="t('logStream.schemaHeader')"
-                    class="q-ml-xs"
                     padding="sm"
                     unelevated
                     size="sm"
                     round
                     flat
                     @click="listSchema(props)"
-                  />
+                  >
+                   <TableProperties size="1rem" />
+                </q-btn>
                   <q-btn
-                    icon="edit"
-                    class="q-ml-xs"
                     padding="sm"
                     unelevated
                     size="sm"
@@ -101,10 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     :title="t('function.enrichmentTables')"
                     @click="showAddUpdateFn(props)"
-                  ></q-btn>
+                  >
+                  <Pencil size="1rem" />
+                </q-btn>
                   <q-btn
-                    :icon="outlinedDelete"
-                    class="q-ml-xs"
                     padding="sm"
                     unelevated
                     size="sm"
@@ -112,7 +110,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     :title="t('function.delete')"
                     @click="showDeleteDialogFn(props)"
-                  ></q-btn>
+                  >
+                  <Trash size="1rem" />
+                </q-btn>
                 </q-td>
               </template>
 
@@ -209,6 +209,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { Pencil, PencilOff, Search, TableProperties, Trash} from "lucide-vue-next";
 
 export default defineComponent({
   name: "EnrichmentTableList",
@@ -218,6 +219,10 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     EnrichmentSchema,
+    Pencil,
+    Search,
+    TableProperties, 
+    Trash
   },
   emits: [
     "updated:fields",
