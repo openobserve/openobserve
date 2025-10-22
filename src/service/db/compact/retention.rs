@@ -121,7 +121,13 @@ pub async fn delete_stream_done(
     date_range: Option<(&str, &str)>,
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name, date_range);
-    db::delete_if_exists(&format!("/compact/delete/{key}"), false, db::NEED_WATCH).await?;
+    // only watch if deleting all data
+    let need_watch = if date_range.is_none() {
+        db::NEED_WATCH
+    } else {
+        false
+    };
+    db::delete_if_exists(&format!("/compact/delete/{key}"), false, need_watch).await?;
 
     // remove in cache
     CACHE.remove(&key);
