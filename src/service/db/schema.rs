@@ -411,6 +411,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     // delete only one version
                     continue;
                 }
+                log::warn!(
+                    "[Schema:watch] Deleting schema cache for {org_id}/{stream_type}/{stream_name} with start_dt {start_dt}",
+                );
                 let mut w = STREAM_SCHEMAS.write().await;
                 w.remove(item_key);
                 w.shrink_to_fit();
