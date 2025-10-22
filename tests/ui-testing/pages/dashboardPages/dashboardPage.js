@@ -46,11 +46,31 @@ export class DashboardPage {
       .locator("span")
       .filter({ hasText: /^e2e_automate$/ })
       .click();
-    await this.page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]'
-      )
-      .click();
+
+    // Scroll within the field list dropdown to find kubernetes_container_hash
+    const fieldLocator = this.page.locator(
+      '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]'
+    );
+
+    // Wait for field list to load and scroll multiple times to find the element
+    await this.page.waitForTimeout(1000);
+    let found = false;
+    for (let i = 0; i < 10; i++) {
+      const isVisible = await fieldLocator.isVisible();
+      if (isVisible) {
+        found = true;
+        break;
+      }
+      // Scroll down within the field list container
+      await this.page.mouse.wheel(0, 300);
+      await this.page.waitForTimeout(300);
+    }
+
+    if (!found) {
+      throw new Error('Could not find kubernetes_container_hash field after scrolling');
+    }
+
+    await fieldLocator.click();
     await this.page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-b-data"]'
