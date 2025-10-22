@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="column logs-index-menu !tw-p-[0.375rem] tw-h-full"
+    class="column logs-index-menu !tw-p-[0.375rem] tw-h-[calc(100%-0.7rem)]"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div>
@@ -73,8 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-no-field-found-text"
         class="text-center col-10 q-mx-none"
       >
-        <q-icon name="info"
-color="primary" size="xs" /> No field found in
+        <q-icon name="info" color="primary"
+size="xs" /> No field found in
         selected stream.
       </h3>
     </div>
@@ -528,15 +528,16 @@ color="primary" size="xs" /> No field found in
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
-            class="!tw-pb-[0.375rem] indexlist-search-input"
+            class="!tw-mb-[0.375rem] indexlist-search-input"
           >
             <template #prepend>
-              <q-icon name="search" size="20px" class="o2-search-input-icon" />
+              <q-icon name="search" size="20px"
+class="o2-search-input-icon" />
             </template>
           </q-input>
           <q-tr v-if="searchObj.loadingStream == true">
-            <q-td colspan="100%"
-class="text-bold" style="opacity: 0.7">
+            <q-td colspan="100%" class="text-bold"
+style="opacity: 0.7">
               <div class="text-subtitle2 text-weight-bold">
                 <q-spinner-hourglass size="20px" />
                 {{ t("confirmDialog.loading") }}
@@ -2019,11 +2020,9 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.indexlist-search-input{
-  
+.indexlist-search-input {
   height: 36px;
-  .q-field__control{
-    
+  .q-field__control {
     height: 36px;
     display: flex;
     align-items: center;
@@ -2031,11 +2030,11 @@ export default defineComponent({
     padding: 0px 6px !important;
     font-weight: 500;
   }
-  .q-field__prepend{
+  .q-field__prepend {
     height: 36px !important;
     padding-bottom: 4px !important;
   }
-  .q-field__append{
+  .q-field__append {
     padding-top: 8px !important;
   }
 
