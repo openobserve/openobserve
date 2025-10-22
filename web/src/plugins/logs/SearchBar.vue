@@ -1281,8 +1281,7 @@ class="q-pr-sm" />
               bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[
                 (val) => !!val.trim() || 'This field is required',
@@ -1306,22 +1305,20 @@ class="q-pr-sm" />
               bg-color="input-bg"
               class="q-py-sm showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
           </div>
         </q-card-section>
 
-        <q-card-actions align="right" class="bg-white text-teal">
+        <q-card-actions align="right">
           <q-btn
             data-test="saved-view-dialog-cancel-btn"
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
-            color="secondary"
             v-close-popup
           />
           <q-btn
@@ -1330,8 +1327,7 @@ class="q-pr-sm" />
             unelevated
             no-caps
             :label="t('common.save')"
-            color="primary"
-            class="text-bold"
+            class="o2-primary-button"
             @click="handleSavedView"
           />
           <q-btn
@@ -1353,7 +1349,8 @@ class="q-pr-sm" />
         </q-card-section>
 
         <q-card-section class="q-pt-none">
-          <span>Update</span>
+          <div class="tw-flex tw-items-center ">
+          <span class="tw-mt-2">Update</span>
           <q-toggle
             data-test="saved-function-action-toggle"
             v-bind:disable="functionOptions.length == 0"
@@ -1362,20 +1359,20 @@ class="q-pr-sm" />
             true-value="create"
             false-value="update"
             label=""
+            size="lg"
+            class="o2-toggle-button-lg"
             @change="savedFunctionName = ''"
           />
-          <span>Create</span>
+          <span class="tw-mt-2">Create</span>
+          </div>
           <div v-if="isSavedFunctionAction == 'create'">
             <q-input
               data-test="saved-function-name-input"
               v-model="savedFunctionName"
               :label="t('search.saveFunctionName')"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[
                 (val) => !!val.trim() || 'This field is required',
@@ -1395,26 +1392,22 @@ class="q-pr-sm" />
               :label="t('search.saveFunctionName')"
               placeholder="Select Function Name"
               :popup-content-style="{ textTransform: 'capitalize' }"
-              color="input-border"
-              bg-color="input-bg"
               class="q-py-sm showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
           </div>
         </q-card-section>
 
-        <q-card-actions align="right" class="bg-white text-teal">
+        <q-card-actions align="right">
           <q-btn
             data-test="saved-function-dialog-cancel-btn"
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
-            color="secondary"
             v-close-popup
           />
           <q-btn
@@ -1423,8 +1416,7 @@ class="q-pr-sm" />
             unelevated
             no-caps
             :label="t('confirmDialog.ok')"
-            color="primary"
-            class="text-bold"
+            class="o2-primary-button"
             @click="saveFunction"
           />
           <q-btn
@@ -1433,8 +1425,7 @@ class="q-pr-sm" />
             unelevated
             no-caps
             :label="t('confirmDialog.loading')"
-            color="primary"
-            class="text-bold"
+            class="o2-primary-button"
           />
         </q-card-actions>
       </q-card>
@@ -1473,8 +1464,7 @@ class="q-ml-xs cursor-pointer">
               bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               tabindex="0"
               min="100"
@@ -1493,14 +1483,13 @@ class="q-mr-sm" />
           </div>
         </q-card-section>
 
-        <q-card-actions align="right" class="text-teal">
+        <q-card-actions align="right">
           <q-btn
             data-test="search-scheduler-max-records-cancel-btn"
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
-            color="secondary"
             v-close-popup
             @click="
               {
@@ -1514,8 +1503,7 @@ class="q-mr-sm" />
             unelevated
             no-caps
             :label="t('confirmDialog.ok')"
-            color="primary"
-            class="text-bold"
+            class="o2-primary-button"
             @click="addJobScheduler"
             v-close-popup
           />
