@@ -17,8 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none card-container" style="min-height: inherit; height: calc(100vh - 44px);">
+  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
     <div>
+    <div class="card-container tw-mb-[0.625rem]">
       <div class="tw-flex tw-flex-row tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
     >
       <div
@@ -56,79 +57,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-    </div>
-    <q-table
-      ref="qTable"
-      :rows="visibleRows"
-      :columns="columns"
-      row-key="id"
-      :pagination="pagination"
-      :filter="filterQuery"
-      :style="hasVisibleRows ? 'height: calc(100vh - 111px); overflow-y: auto;' : ''"
-      class="o2-quasar-table o2-quasar-table-header-sticky"
-    >
-      <template #no-data>
-        <NoData></NoData>
-      </template>
-      <template v-slot:header="props">
-        <q-tr :props="props">
-          <q-th v-for="col in props.cols"
-          :class="col.classes"
-          :key="col.name" :props="props">
-            <span>{{ col.label }}</span>
-          </q-th>
-        </q-tr>
-      </template>
-      <template #body-cell-actions="props">
-        <q-td :props="props" side>
-          <q-btn
-            v-if="props.row.enableDelete && props.row.status != 'pending'"
-            :title="t('user.delete')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="confirmDeleteAction(props)"
-            style="cursor: pointer !important"
-            :data-test="`delete-basic-user-${props.row.email}`"
-          >
-          <Trash class="o2-actions-icons" />
-          </q-btn>
-          <q-btn
-            v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
-            :title="t('user.update')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="addRoutePush(props)"
-            style="cursor: pointer !important"
-             :data-test="`edit-basic-user-${props.row.email}`"
-          >
-          <Pencil class="o2-actions-icons" />
-        </q-btn>
-        </q-td>
-      </template>
-      <template #bottom="scope">
-        <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-          <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
-            {{ resultTotal }} {{ t('user.header') }}
-          </div>
-          <QTablePagination
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-        />
         </div>
-        
-      </template>
-    </q-table>
+    </div>
+    <div class="tw-w-full tw-h-full">
+      <div class="card-container tw-h-[calc(100vh-127px)]">
+        <q-table
+          ref="qTable"
+          :rows="visibleRows"
+          :columns="columns"
+          row-key="id"
+          :pagination="pagination"
+          :filter="filterQuery"
+          :style="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
+          class="o2-quasar-table o2-quasar-table-header-sticky"
+        >
+          <template #no-data>
+            <NoData></NoData>
+          </template>
+          <template v-slot:header="props">
+            <q-tr :props="props">
+              <q-th v-for="col in props.cols"
+              :class="col.classes"
+              :key="col.name" :props="props">
+                <span>{{ col.label }}</span>
+              </q-th>
+            </q-tr>
+          </template>
+          <template #body-cell-actions="props">
+            <q-td :props="props" side>
+              <q-btn
+                v-if="props.row.enableDelete && props.row.status != 'pending'"
+                :title="t('user.delete')"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                @click="confirmDeleteAction(props)"
+                style="cursor: pointer !important"
+                :data-test="`delete-basic-user-${props.row.email}`"
+              >
+              <Trash class="o2-actions-icons" />
+              </q-btn>
+              <q-btn
+                v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
+                :title="t('user.update')"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                @click="addRoutePush(props)"
+                style="cursor: pointer !important"
+                :data-test="`edit-basic-user-${props.row.email}`"
+              >
+              <Pencil class="o2-actions-icons" />
+            </q-btn>
+            </q-td>
+          </template>
+          <template #bottom="scope">
+            <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+              <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+                {{ resultTotal }} {{ t('user.header') }}
+              </div>
+              <QTablePagination
+              :scope="scope"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              position="bottom"
+              @update:changeRecordPerPage="changePagination"
+            />
+            </div>
+            
+          </template>
+        </q-table>
+        </div>
+    </div>
     </div>
 
     <q-dialog

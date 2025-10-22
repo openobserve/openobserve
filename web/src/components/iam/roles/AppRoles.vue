@@ -15,45 +15,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none card-container" style="min-height: inherit; height: calc(100vh - 42px);">
-    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px]"
-      >
-      <div
-        data-test="iam-roles-section-title"
-        class="q-table__title tw-font-[600]"
-      >
-        {{ t("iam.roles") }}
-      </div>
-      <div class="row items-center justify-end">
-          <div data-test="iam-roles-search-input">
-            <q-input
-              v-model="filterQuery"
-              borderless
-              dense
-              class="q-ml-auto no-border o2-search-input tw-h-[36px]"
-              :placeholder="t('iam.searchRole')"
-            >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
-              </template>
-            </q-input>
-          </div>
-
-          <q-btn
-            data-test="alert-list-add-alert-btn"
-            class="q-ml-sm o2-primary-button tw-h-[36px]"
-            flat
-            no-caps
-            :label="t(`iam.addRole`)"
-            @click="addRole"
-          />
+  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+    <div>
+      <div class="card-container tw-mb-[0.625rem]">
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px]"
+        >
+        <div
+          data-test="iam-roles-section-title"
+          class="q-table__title tw-font-[600]"
+        >
+          {{ t("iam.roles") }}
         </div>
+        <div class="row items-center justify-end">
+            <div data-test="iam-roles-search-input">
+              <q-input
+                v-model="filterQuery"
+                borderless
+                dense
+                class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+                :placeholder="t('iam.searchRole')"
+              >
+                <template #prepend>
+                  <q-icon class="o2-search-input-icon" name="search" />
+                </template>
+              </q-input>
+            </div>
+
+            <q-btn
+              data-test="alert-list-add-alert-btn"
+              class="q-ml-sm o2-primary-button tw-h-[36px]"
+              flat
+              no-caps
+              :label="t(`iam.addRole`)"
+              @click="addRole"
+            />
+          </div>
+      </div>
     </div>
-  <div>
+      <div class="tw-w-full tw-h-full">
+      <div class="card-container tw-h-[calc(100vh-127px)]">
     <app-table
       data-test="iam-roles-table-section"
       class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
-      :tableStyle="hasVisibleRows ? 'height: calc(100vh - 111px); overflow-y: auto;' : ''"
+      :tableStyle="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
       :rows="visibleRows"
       :columns="columns"
       pagination
@@ -84,6 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </app-table>
+  </div>
+  </div>
   </div>
   <q-dialog v-model="showAddGroup" position="right" full-height maximized>
     <AddRole
