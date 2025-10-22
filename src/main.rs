@@ -22,13 +22,17 @@ use std::{
         Arc,
         atomic::{AtomicU16, Ordering},
     },
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use actix_web::{App, HttpServer, dev::ServerHandle, http::KeepAlive, middleware, web};
 use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
-use config::{get_config, utils::size::bytes_to_human_readable};
+use config::{
+    META_ORG_ID, get_config,
+    meta::triggers::{Trigger, TriggerModule, TriggerStatus},
+    utils::size::bytes_to_human_readable,
+};
 use log::LevelFilter;
 #[cfg(feature = "enterprise")]
 use openobserve::handler::http::{
@@ -59,8 +63,13 @@ use openobserve::{
     },
     job, migration, router,
     service::{
-        cluster_info::ClusterInfoService, db, metadata, node::NodeService, search::SEARCH_SERVER,
-        self_reporting, tls::http_tls_config,
+        cluster_info::ClusterInfoService,
+        db::{self, scheduler::TriggerModule::QueryRecommendations},
+        metadata,
+        node::NodeService,
+        search::SEARCH_SERVER,
+        self_reporting,
+        tls::http_tls_config,
     },
 };
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
@@ -413,6 +422,47 @@ async fn main() -> Result<(), anyhow::Error> {
     if !start_ok {
         return Err(anyhow::anyhow!("set node schedulable failed"));
     }
+
+    // Check for query recommendations trigger & create one
+    match db::scheduler::list(Some(QueryRecommendations)).await {
+        Ok(list) if list.len() == 1 => {}
+        _ => {
+            let _ = db::scheduler::delete(
+                META_ORG_ID,
+                TriggerModule::QueryRecommendations,
+                "QueryRecommendations",
+            )
+            .await
+            .inspect_err(|e| {
+                log::error!("Error while purging recommendations triggers. e={:?}", e);
+            });
+            let now = SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_micros() as i64;
+            // Get the next minute on the clock (e.g., if now is 10:37:25am, next_minute is
+            // 10:38:00am)
+            let minute_micros = 60 * 1_000_000; // 60 seconds in microseconds
+            let next_minute = (now / minute_micros + 1) * minute_micros;
+            let trigger = Trigger {
+                org: META_ORG_ID.to_string(),
+                module: TriggerModule::QueryRecommendations,
+                module_key: "QueryRecommendations".to_string(),
+                next_run_at: next_minute,
+                status: TriggerStatus::Waiting,
+                start_time: Some(next_minute),
+                end_time: None,
+                retries: 3,
+                ..Default::default()
+            };
+            let _ = db::scheduler::push(trigger).await.inspect_err(|e| {
+                log::error!(
+                    "Failed to setup the initial trigger for recommendations. e={:?}",
+                    e
+                )
+            });
+        }
+    };
 
     // init http server
     if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
