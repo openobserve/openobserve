@@ -50,12 +50,18 @@ pub async fn token_validator(
     };
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
+    // Check if this is an MCP endpoint request
+    let is_mcp_request = path_columns.get(1).map(|s| *s == "mcp").unwrap_or(false);
+
+    // For MCP endpoints with dynamic clients, skip audience validation
+    let login_flow = !is_mcp_request;
+
     match jwt::verify_decode_token(
         auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
         &keys,
         &get_dex_config().client_id,
         false,
-        true,
+        login_flow,
     ) {
         Ok(res) => {
             let user_id = &res.0.user_email;
@@ -75,6 +81,9 @@ pub async fn token_validator(
                 let is_list_invite_call = path_columns.len() <= 2
                     && path_columns.first().is_some_and(|p| p.eq(&"invites"))
                     && (auth_info.method.eq("GET") || auth_info.method.eq("DELETE"));
+
+                // For MCP endpoints, allow any authenticated user from Dex
+                let allow_nonexistent_user = is_mcp_request;
                 let path_suffix = path_columns.last().unwrap_or(&"");
                 if path_suffix.eq(&"organizations")
                     || path_suffix.eq(&"clusters")
@@ -119,7 +128,10 @@ pub async fn token_validator(
                     // nothing else. Similarly for accepting invite, we will not have the
                     // user in db anymore, and the fn checks based on email and token, so ok to
                     // bypass
-                    None if (is_list_invite_call || is_member_subscription) => {
+                    None if (is_list_invite_call
+                        || is_member_subscription
+                        || allow_nonexistent_user) =>
+                    {
                         let mut req = req;
 
                         if req.method().eq(&Method::POST)

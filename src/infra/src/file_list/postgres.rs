@@ -1516,7 +1516,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
                     .or_default()
                     .entry(stream_type)
                     .and_modify(|e| {
-                        *e = counts;
+                        *e += counts;
                     })
                     .or_insert(counts);
             }

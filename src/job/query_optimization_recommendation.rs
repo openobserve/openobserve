@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#![cfg(feature = "enterprise")]
-
 use std::{pin::Pin, sync::Arc};
 
 use config::{META_ORG_ID, get_config, meta::stream::StreamType};
@@ -79,7 +77,7 @@ impl QueryRecommendationEngine for OptimizerContext {
         recommendations: Vec<OptimiserRecommendation>,
     ) -> Pin<Box<dyn Future<Output = Result<IngestionResponse, anyhow::Error>> + Send>> {
         Box::pin(async move {
-            let ingester = Ingester::default();
+            let ingester = Ingester {};
             let request = IngestionRequest {
                 org_id: META_ORG_ID.to_string(),
                 stream_type: StreamType::Logs.to_string(),
@@ -95,8 +93,7 @@ impl QueryRecommendationEngine for OptimizerContext {
             Ok(ingester
                 .ingest(tonic::Request::new(request))
                 .await?
-                .into_inner()
-                .into())
+                .into_inner())
         })
     }
 }

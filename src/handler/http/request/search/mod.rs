@@ -1238,7 +1238,7 @@ async fn values_v1(
                 .unwrap_or("".to_string());
             let num = row
                 .get("zo_sql_num")
-                .map(|v| v.as_i64().unwrap_or(0))
+                .and_then(json::Value::as_i64)
                 .unwrap_or(0);
             top_hits.push((key, num));
         }
