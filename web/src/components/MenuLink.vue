@@ -34,7 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'q-router-link--active':
         router.currentRoute.value.path.indexOf(link) == 0 && link != '/',
       'q-link-function': title == 'Functions',
+      'menu-item-animated': true,
     }"
+    :style="{ '--animation-index': animationIndex }"
     :target="target"
     :aria-current="isActive ? 'page' : undefined"
     :aria-label="ariaLabel"
@@ -124,6 +126,12 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
+
+    // Staggered animation index
+    animationIndex: {
+      type: Number,
+      default: 0,
+    },
   },
   setup(props) {
     const store = useStore();
@@ -164,6 +172,25 @@ export default defineComponent({
 <style scoped lang="scss">
 @import "../styles/menu-variables";
 @import "../styles/menu-animations";
+
+// Staggered entrance animation keyframes
+@keyframes menuItemSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0);
+  }
+}
+
+// Apply staggered animation to menu items
+.menu-item-animated {
+  animation: menuItemSlideIn 0.5s ease-out forwards;
+  animation-delay: calc(var(--animation-index) * 0.08s);
+  opacity: 0; // Start invisible
+}
 
 .q-item {
   padding: 1px 8px;
@@ -287,7 +314,7 @@ export default defineComponent({
   }
 }
 
-// Phase 3: Enhanced icon container with 3D effects
+// Phase 3: Enhanced icon container with 3D effects and spring bounce-back
 .q-item__section--avatar {
   margin: 0;
   padding: 0;
@@ -297,14 +324,15 @@ export default defineComponent({
   .q-icon {
     padding: 4px;
     border-radius: 12px;
-    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    // Spring bounce-back effect: overshoots and bounces back
+    transition: all 600ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
     transform-style: preserve-3d;
   }
 }
 
-// Add transition to label
+// Add spring bounce-back transition to label
 .q-item-label {
-  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
   transform-style: preserve-3d;
 }
 
