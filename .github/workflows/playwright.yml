@@ -151,18 +151,18 @@ jobs:
                 "usersOrg.spec.js",
                 "org.spec.js",
               ]
-          # - testfolder: "Logs-Core"
-          #   browser: "chrome"
-          #   run_files:
-          #     [
-          #       "join.spec.js",
-          #       "logshistogram.spec.js",
-          #       "logspage.spec.js",
-          #       "logsquickmode.spec.js",
-          #       "pagination.spec.js",
-          #       "unflattened.spec.js",
-          #       "logstable.spec.js",
-          #     ]
+          - testfolder: "Logs-Core"
+            browser: "chrome"
+            run_files:
+              [
+                "join.spec.js",
+                # "logshistogram.spec.js",
+                # "logspage.spec.js",
+                # "logsquickmode.spec.js",
+                # "pagination.spec.js",
+                # "unflattened.spec.js",
+                # "logstable.spec.js",
+              ]
           # - testfolder: "Logs-Queries"
           #   browser: "chrome"
           #   run_files:
