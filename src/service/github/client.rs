@@ -43,7 +43,7 @@ impl GitHubDataService {
     pub fn with_config(config: GitHubServiceConfig) -> Self {
         let client = reqwest::Client::builder()
             .timeout(config.timeout)
-            .user_agent("OpenObserve/1.0")
+            .user_agent("OpenObserve")
             .build()
             .expect("Failed to create HTTP client");
 
