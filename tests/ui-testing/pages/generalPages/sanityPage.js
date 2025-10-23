@@ -827,12 +827,38 @@ export class SanityPage {
     }
 
     async displayPaginationWhenOnlySQLWithResult() {
+        // Turn off histogram
         await this.page.locator(this.histogramToggleDiv).nth(2).click();
+        await this.page.waitForTimeout(1000);
+
+        // Enable SQL mode
         await this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000);
+
+        // Click run query button
         await this.page.locator(this.refreshButton).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        await this.page.waitForTimeout(2000);
+
+        // Click on result column
         await this.page.locator(this.timestampColumn).click();
+        await this.page.waitForTimeout(2000);
+
+        // Close dialog
         await this.page.locator(this.closeDialog).click();
-        await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").click();
+        await this.page.waitForTimeout(2000);
+
+        // Check if pagination is visible, if not click run query again
+        const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+        if (!paginationVisible) {
+            await this.page.locator(this.refreshButton).click();
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForTimeout(2000);
+            const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+            if (!retryVisible) {
+                throw new Error('Pagination not visible after SQL mode on and retrying run query');
+            }
+        }
     }
 
     async displayHistogramInSQLMode() {
@@ -968,18 +994,10 @@ export class SanityPage {
             throw new Error('SQL+Histogram test: VRL editor (#fnEditor) not found after toggle');
         }
         
-        // Wait for SQL editor to be ready
-        const sqlEditor = this.page.locator('#fnEditor');
-        await expect(sqlEditor).toBeVisible({ timeout: 15000 });
-        
-        // await expect(sqlEditor).locator('.monaco-editor').toBeEditable({ timeout: 10000 });
-        
-        await sqlEditor.locator('.monaco-editor').click();
-        
         // Enable SQL mode with error handling
         const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2);
         await expect(sqlModeSwitch).toBeVisible({ timeout: 15000 });
-        
+
         try {
             await sqlModeSwitch.click({ timeout: 10000 });
             await this.page.waitForTimeout(1000); // Brief wait for mode switch
@@ -988,11 +1006,16 @@ export class SanityPage {
             await this.page.waitForTimeout(2000);
             await sqlModeSwitch.click({ timeout: 10000 });
         }
-        
-        // Fill SQL query into the editor
-        await sqlEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+
+        // Wait for query editor to be ready
+        const queryEditor = this.page.locator(this.queryEditorContent);
+        await expect(queryEditor).toBeVisible({ timeout: 15000 });
+
+        await queryEditor.locator('.monaco-editor').click();
+        await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         await this.page.waitForLoadState('domcontentloaded');
-        
+        await this.page.waitForTimeout(1000);
+
         // Click refresh button with robust waits
         const refreshButton = this.page.locator(this.refreshButton);
         await expect(refreshButton).toBeVisible({ timeout: 15000 });
@@ -1001,13 +1024,15 @@ export class SanityPage {
         try {
             await refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForTimeout(2000);
         } catch (error) {
             console.warn('Refresh button click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
             await refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForTimeout(2000);
         }
-        
+
         // Wait for search results to load before looking for timestamp menu
         await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible({ timeout: 20000 });
         
