@@ -568,8 +568,18 @@ export class SanityPage {
         
         await expect(this.page.locator(this.closeDialog)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.closeDialog).click();
-        
-        await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+        await this.page.waitForTimeout(2000);
+
+        const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+        if (!paginationVisible) {
+            await this.page.locator(this.refreshButton).click();
+            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForTimeout(2000);
+            const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+            if (!retryVisible) {
+                throw new Error('Pagination not visible after clicking result summary and retrying run query');
+            }
+        }
     }
 
     // Sanity2-Specific Methods
