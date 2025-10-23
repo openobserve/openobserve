@@ -143,7 +143,7 @@ jobs:
             run_files:
               [
                 "sanity.spec.js",
-                # "changeOrg.spec.js",
+                "changeOrg.spec.js",
                 "enrichment.spec.js",
                 "schema.spec.js",
                 "schemaload.spec.js",
