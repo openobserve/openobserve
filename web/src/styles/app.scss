@@ -446,7 +446,7 @@ body {
 .q-table {
   border-radius: 0.375rem;
   tbody .q-tr:hover {
-    background: color-mix(in srgb, var(--o2-theme-color) 5%, var(--o2-theme-mode) 90%) !important;
+    background: color-mix(in srgb, var(--o2-theme-color) 5%, var(--o2-theme-mode) 90%);
   }
 }
 
