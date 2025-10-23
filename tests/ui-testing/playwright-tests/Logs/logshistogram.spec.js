@@ -79,7 +79,7 @@ test.describe("Logs Histogram testcases", () => {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing error handling and no results found with histogram');
-    
+
     // Check if histogram is off and toggle it on if needed
     const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (!isHistogramOn) {
@@ -87,26 +87,22 @@ test.describe("Logs Histogram testcases", () => {
     }
 
     // Type invalid query and verify error
-    await pm.logsPage.typeQuery("match_all('invalid')");
+    await pm.logsPage.clearAndFillQueryEditor("match_all('invalid')");
     await pm.logsPage.setDateTimeFilter();
-    // Strategic 500ms wait for query processing - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.clickRefresh();
-    // Strategic 500ms wait for refresh completion - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.waitForTimeout(3000);
     await pm.logsPage.clickErrorMessage();
     await pm.logsPage.clickResetFilters();
 
     // Type SQL query and verify no results
-    await pm.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate' where code > 500");
-    // Strategic 500ms wait for SQL query processing - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clearAndFillQueryEditor("SELECT count(*) FROM 'e2e_automate' where code > 500");
+    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.clickRefresh();
-    // Strategic 500ms wait for SQL refresh completion - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.waitForTimeout(3000);
     await pm.logsPage.clickNoDataFound();
     await pm.logsPage.clickResultDetail();
-    
+
     testLogger.info('Error handling and no results verification completed');
   });
 
