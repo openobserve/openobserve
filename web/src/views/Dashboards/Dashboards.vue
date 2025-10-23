@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:before>
         <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
         <div class="tw-h-full">
-          <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <div class="card-container tw-h-full tw-flex tw-flex-col tw-pb-[0.3rem]">
           <!-- folder list starts here -->
           <div
             class="dashboard-folder-header dashboard-sticky-top "

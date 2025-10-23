@@ -18,23 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="edit-group-section" class="relative-position full-height">
     <div
       data-test="edit-group-section-title"
-      style="font-size: 18px"
-      class="q-py-sm q-px-md tw-font-[600]"
+      class="tw-pb-[0.625rem]"
     >
+    <div class="card-container q-py-sm">
+      <span style="font-size: 18px" class="q-px-md ">
       {{ groupDetails.group_name }}
-    </div>
-
-    <div class="full-width bg-grey-4" style="height: 1px" />
-
+      </span>
+  <q-separator />
     <AppTabs
       data-test="edit-group-tabs"
       :tabs="tabs"
       :active-tab="activeTab"
       @update:active-tab="updateActiveTab"
     />
-
-    <q-separator />
-    <div style="min-height: calc(100% - (39px + 55px + 43px + 4px))">
+    </div>
+    </div>
+    <div style="min-height: calc(100% - (39px + 55px + 43px + 5px))">
       <GroupUsers
         v-show="activeTab === 'users'"
         :groupUsers="groupDetails.users"
@@ -60,28 +59,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div
-      class="flex justify-end q-px-md q-py-sm full-width"
-      style="position: sticky; bottom: 0px; z-index: 2"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+    class="flex justify-end tw-w-full"
+      style="position: sticky; bottom: 0.45rem; z-index: 2"
     >
+      <div class="card-container tw-w-full tw-py-2 tw-px-3 tw-justify-end tw-flex">
       <q-btn
         data-test="edit-group-cancel-btn"
-        class="text-bold"
+        class="o2-secondary-button"
         :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
         no-caps
         @click="cancelEditGroup"
       />
       <q-btn
         data-test="edit-group-submit-btn"
         :label="t('alerts.save')"
-        class="text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
+        class="o2-primary-button q-ml-md"
         no-caps
         @click="saveGroupChanges"
       />
+      </div>
     </div>
   </div>
 </template>

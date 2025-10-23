@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="iam-roles-selection-section" class="col q-pa-none" >
     <div
-      class="flex justify-start bordered q-px-md q-py-sm"
+      class="flex justify-start q-px-md q-py-sm card-container"
       style="position: sticky; top: 0px; z-index: 2"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     >
       <div class="q-mr-md">
         <div
           data-test="iam-roles-selection-show-toggle"
-          class="flex items-center q-pt-xs"
+          class="flex items-center"
         >
           <span
             data-test="iam-roles-selection-show-text"
@@ -37,7 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="
               border: 1px solid #d7d7d7;
               width: fit-content;
-              border-radius: 2px;
+              border-radius: 0.3rem;
+              padding: 2px;
             "
           >
             <template v-for="visual in usersDisplayOptions" :key="visual.value">
@@ -50,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="11px"
                 class="q-px-md visual-selection-btn"
                 @click="updateUserTable(visual.value)"
+                style="height: 30px;"
               >
                 {{ visual.label }}</q-btn
               >
@@ -59,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         data-test="iam-roles-selection-search-input"
-        class="o2-input q-mr-md"
+        class="q-mr-md"
         style="width: 400px"
       >
         <q-input
@@ -68,16 +70,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           borderless
           dense
           class="no-border o2-search-input tw-h-[36px] tw-w-[200px]"
-          :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
           placeholder="Search Roles"
         >
           <template #prepend>
-            <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+            <q-icon name="search" class="cursor-pointer o2-search-input-icon" />
           </template>
         </q-input>
       </div>
     </div>
-    <div data-test="iam-roles-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;">
+    <div data-test="iam-roles-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;" class="card-container">
       <template v-if="rows.length">
         <app-table
           :rows="visibleRows"
@@ -86,7 +87,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :virtual-scroll="false"
           :title="t('iam.roles')"
           class="o2-quasar-table o2-quasar-table-header-sticky"
-          :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
           :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
           :hideTopPagination="true"
           :showBottomPaginationWithTitle="true"
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="iam-roles-selection-table-no-users-text"
         v-if="!rows.length"
-        class="q-mt-md text-bold q-pl-md"
+        class="text-bold q-pl-md q-py-md"
       >
         No users added
       </div>
