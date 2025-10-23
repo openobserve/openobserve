@@ -885,7 +885,6 @@ pub async fn search_partition(
     if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
         total_secs += 1;
     }
-    total_secs = 4;
 
     // If total secs is <= aggs_min_num_partition_secs (default 3 seconds), then disable
     // partitioning even if streaming aggs is true. This optimization avoids partition overhead
@@ -911,7 +910,6 @@ pub async fn search_partition(
     if part_num > 1000 {
         part_num = 1000;
     }
-    part_num = 10;
 
     log::info!(
         "[trace_id {trace_id}] search_partition: original_size: {}, cpu_cores: {}, base_speed: {}, partition_secs: {}, part_num: {}",
