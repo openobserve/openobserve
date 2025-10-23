@@ -27,6 +27,7 @@ class EnrichmentPage {
         // VRL editor locator
         this.vrlEditor = '#fnEditor';
         this.refreshButton = "[data-test='logs-search-bar-refresh-btn']";
+        this.showQueryToggleBtn = '[data-test="logs-search-bar-show-query-toggle-btn"] div';
         
         // Table and validation locators
         this.tableRows = 'tbody tr';
@@ -396,10 +397,25 @@ abc, err = get_enrichment_table_record("${fileName}", {
         }
         
         // Wait for VRL editor to appear after potential URL modification
-        await this.page.waitForSelector(this.vrlEditor, { 
-            state: 'visible',
-            timeout: 15000 
-        });
+        try {
+            await this.page.waitForSelector(this.vrlEditor, {
+                state: 'visible',
+                timeout: 3000
+            });
+        } catch (error) {
+            testLogger.warn('VRL editor not visible, clicking show query toggle button');
+
+            // Click the show query toggle button to reveal the VRL editor
+            await this.page.locator(this.showQueryToggleBtn).nth(1).click({ force: true });
+            await this.page.waitForTimeout(1000);
+
+            // Retry waiting for VRL editor
+            await this.page.waitForSelector(this.vrlEditor, {
+                state: 'visible',
+                timeout: 10000
+            });
+            testLogger.debug('VRL editor visible after clicking toggle button');
+        }
         
         const vrlEditorExists = await this.page.locator('#fnEditor').count();
         testLogger.debug('VRL Editor count after URL logic', { vrlEditorExists });
@@ -412,6 +428,10 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Apply query with multiple clicks for VRL test reliability
         await this.applyQueryMultipleClicks();
+
+        // Wait for query results to load
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForTimeout(2000);
 
         // Verify that no warning is shown for query execution
         await this.verifyNoQueryWarning();
