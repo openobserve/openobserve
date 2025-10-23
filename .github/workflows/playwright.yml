@@ -25,7 +25,7 @@ env:
   ZO_BASE_URL_SC: https://test.internal.zinclabs.dev
   ZO_BASE_URL_SC_UI: https://test.internal.zinclabs.dev
   INGESTION_URL: https://test.internal.zinclabs.dev
-  ORGNAME: 34BRg3f4LCBhi3EuqmYuY2rFIlJ
+  ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 100
   ZO_QUICK_MODE_STRATEGY: first
   ZO_ALLOW_USER_DEFINED_SCHEMAS: true
