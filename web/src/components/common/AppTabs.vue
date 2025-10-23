@@ -72,14 +72,14 @@ const changeTab = (tab: Tab) => {
 </script>
 
 <style lang="scss" scoped>
-.rum-tabs {
-  .rum-tab {
+.o2-tabs {
+  .o2-tab {
     border-bottom: 2px solid transparent;
     width: 140px;
     white-space: nowrap;
   }
   .active {
-    border-bottom: 2px solid $primary;
+    border-bottom: 2px solid var(--o2-theme-color);
   }
 }
 </style>
