@@ -19,7 +19,7 @@ use bytes::Bytes;
 use serde::de::DeserializeOwned;
 
 use super::{
-    cache::{CacheManager, generate_cache_key},
+    cache::{CacheManager},
     types::{CachedData, GitHubError, GitHubServiceConfig},
 };
 
@@ -69,7 +69,7 @@ impl GitHubDataService {
         url: &str,
         force_refresh: bool,
     ) -> Result<Bytes, GitHubError> {
-        let cache_key = generate_cache_key(url);
+        let cache_key = url.to_string();
 
         // Check cache first unless force refresh
         if !force_refresh && let Some(cached_data) = self.cache.get(&cache_key).await {
@@ -111,7 +111,7 @@ impl GitHubDataService {
 
     /// Invalidate cache for a specific URL
     pub async fn invalidate_cache(&self, url: &str) {
-        let cache_key = generate_cache_key(url);
+        let cache_key = url.to_string();
         self.cache.invalidate(&cache_key).await;
     }
 

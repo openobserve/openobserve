@@ -35,6 +35,11 @@ pub const RE_PATTERN_ASSOCIATIONS_PREFIX: &str = "/re_pattern_associations/";
 pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
     match infra::table::re_pattern::add(entry.clone()).await {
         Ok(_) => {}
+        Err(errors::Error::DbError(errors::DbError::UniqueViolation)) => {
+            return Err(anyhow::anyhow!(
+                "Pattern with given id/name already exists in the org"
+            ));
+        }
         Err(e) => {
             log::error!("error while saving pattern to db : {e}");
             return Err(anyhow::anyhow!(e));

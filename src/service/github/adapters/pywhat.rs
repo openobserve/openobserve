@@ -117,39 +117,16 @@ impl From<GenericPattern> for BuiltInPatternResponse {
 pub struct PyWhatAdapter;
 
 impl PyWhatAdapter {
-    /// Fetch and parse patterns from configured source URL
-    /// Supports PyWhat format, custom formats, and minimal JSON with just name+pattern
-    pub async fn fetch_patterns(
-        github_service: &crate::service::github::GitHubDataService,
-    ) -> Result<Vec<GenericPattern>, GitHubError> {
-        let config = config::get_config();
-        let url = &config.common.regex_patterns_source_url;
-
-        log::info!("Fetching regex patterns from: {}", url);
-        let patterns: Vec<GenericPattern> = github_service.fetch_json(url).await?;
-        log::info!("Successfully fetched {} patterns", patterns.len());
-        Ok(patterns)
-    }
-
-    /// Fetch and transform patterns to OpenObserve format
-    pub async fn fetch_built_in_patterns(
-        github_service: &crate::service::github::GitHubDataService,
-    ) -> Result<Vec<BuiltInPatternResponse>, GitHubError> {
-        let patterns = Self::fetch_patterns(github_service).await?;
-        let transformed = patterns.into_iter().map(|p| p.into()).collect();
-        Ok(transformed)
-    }
-
-    /// Fetch and transform patterns without backend caching
+    /// Fetch and transform patterns
     /// Used for frontend-only caching flow
-    pub async fn fetch_built_in_patterns_no_cache(
+    pub async fn fetch_built_in_patterns(
         github_service: &crate::service::github::GitHubDataService,
     ) -> Result<Vec<BuiltInPatternResponse>, GitHubError> {
         let config = config::get_config();
         let url = &config.common.regex_patterns_source_url;
 
         log::info!(
-            "Fetching regex patterns without backend cache from: {}",
+            "Fetching regex patterns from: {}",
             url
         );
 

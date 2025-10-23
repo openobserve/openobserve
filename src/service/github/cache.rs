@@ -114,9 +114,3 @@ pub struct CacheStats {
     pub total_size_bytes: usize,
     pub max_size_bytes: usize,
 }
-
-/// Generate a cache key from URL
-pub fn generate_cache_key(url: &str) -> String {
-    // Use URL directly as cache key - simpler and more debuggable
-    url.to_string()
-}

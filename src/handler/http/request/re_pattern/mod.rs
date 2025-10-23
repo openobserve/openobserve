@@ -509,7 +509,7 @@ pub async fn get_built_in_patterns(
     let github_service = GitHubDataService::new();
 
     // Fetch patterns without backend caching
-    let mut patterns = match PyWhatAdapter::fetch_built_in_patterns_no_cache(&github_service).await
+    let mut patterns = match PyWhatAdapter::fetch_built_in_patterns(&github_service).await
     {
         Ok(patterns) => patterns,
         Err(e) => {
