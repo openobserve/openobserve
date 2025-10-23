@@ -622,7 +622,7 @@
   width: 100%;
 
   .q-menu {
-    box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
+    // box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
     transform: translateY(0.5rem);
     border-radius: 0px;
 
@@ -814,7 +814,7 @@
 
     &.selected {
       .field_overlay {
-        background-color: rgba(89, 96, 178, 0.3);
+        background-color: var(--o2-hover-accent);
 
         .field_icons {
           opacity: 0;
@@ -868,10 +868,10 @@
   &.theme-light {
     .field_list {
       &:hover {
-        box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
+        // box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
 
         .field_overlay {
-          background-color: #e8e8e8;
+          background-color: var(--o2-hover-accent);
           opacity: 1;
         }
       }
