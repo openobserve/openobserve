@@ -275,7 +275,30 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
         .compact
         .old_data_streams
         .split(',')
-        .map(|s| s.trim().to_string())
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect()
+});
+
+pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
+    get_config()
+        .nats
+        .kv_watch_modules
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
         .collect()
 });
 
@@ -1198,10 +1221,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 128)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
     pub max_file_size_in_memory: usize,
     #[deprecated(
         since = "0.14.1",
@@ -1279,9 +1302,9 @@ pub struct Limit {
     #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
     pub query_group_base_speed: usize,
     // Default Config: Run Query Recommendation Analysis for last one hour for every hour
-    #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)]
+    #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)] // microseconds
     pub query_recommendation_duration: i64,
-    #[env_config(name = "ZO_QUERY_RECOMMENDATION_INTERVAL", default = 3600000000)]
+    #[env_config(name = "ZO_QUERY_RECOMMENDATION_INTERVAL", default = 3600)] // seconds
     pub query_recommendation_analysis_interval: i64,
     #[env_config(name = "ZO_QUERY_RECOMMENDATION_TOP_K", default = 128)]
     pub query_recommendation_top_k: usize,
@@ -1305,7 +1328,7 @@ pub struct Limit {
     pub metrics_max_series_per_query: usize,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
-    #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 100000)]
+    #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
     pub metrics_cache_max_entries: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
@@ -1455,13 +1478,13 @@ pub struct Limit {
     pub consistent_hash_vnodes: usize,
     #[env_config(
         name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES",
-        default = 100000,
+        default = 10000,
         help = "Maximum number of entries in the file stat cache. Higher values increase memory usage but may improve query performance."
     )]
     pub datafusion_file_stat_cache_max_entries: usize,
     #[env_config(
         name = "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES",
-        default = 100000,
+        default = 10000,
         help = "Maximum number of entries in the streaming aggs cache. Higher values increase memory usage but may improve query performance."
     )]
     pub datafusion_streaming_aggs_cache_max_entries: usize,
@@ -1631,7 +1654,7 @@ pub struct CacheLatestFiles {
 
 #[derive(EnvConfig, Default)]
 pub struct MemoryCache {
-    #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = true)]
+    #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = false)]
     pub enabled: bool,
     // Memory data cache strategy, default is lru, other value is fifo, time_lru
     #[env_config(name = "ZO_MEMORY_CACHE_STRATEGY", default = "lru")]
@@ -1781,6 +1804,12 @@ pub struct Nats {
         default = false
     )]
     pub v211_support: bool,
+    #[env_config(
+        name = "ZO_NATS_KV_WATCH_MODULES",
+        help = "Set the modules which need to use kv watcher",
+        default = ""
+    )]
+    pub kv_watch_modules: String,
 }
 
 #[derive(Debug, Default, EnvConfig)]
@@ -2337,7 +2366,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.metrics_max_points_per_series = 30_000;
     }
     if cfg.limit.metrics_cache_max_entries == 0 {
-        cfg.limit.metrics_cache_max_entries = 100_000;
+        cfg.limit.metrics_cache_max_entries = 10_000;
     }
 
     // check search job retention
@@ -2775,7 +2804,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
     if cfg.compact.interval < 1 {
-        cfg.compact.interval = 60;
+        cfg.compact.interval = 10;
     }
 
     // check compact_max_file_size to MB
@@ -2804,7 +2833,11 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.compact.batch_size < 1 {
-        cfg.compact.batch_size = cfg.limit.cpu_num as i64;
+        if cfg.common.local_mode {
+            cfg.compact.batch_size = 100;
+        } else {
+            cfg.compact.batch_size = cfg.limit.cpu_num as i64 * 4;
+        }
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
