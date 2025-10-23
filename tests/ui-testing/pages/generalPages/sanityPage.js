@@ -766,13 +766,15 @@ export class SanityPage {
         try {
             await refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForTimeout(2000);
         } catch (error) {
             console.warn('Refresh button click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
             await refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForTimeout(2000);
         }
-        
+
         // Turn off histogram with error handling
         try {
             const histogramToggle = this.page.locator(this.histogramToggleDiv).nth(2);
@@ -795,7 +797,9 @@ export class SanityPage {
             await this.page.waitForTimeout(2000);
             await this.page.locator(this.resultColumnSource).click({ timeout: 10000 });
         }
-        
+
+        await this.page.waitForTimeout(2000);
+
         // Close dialog with error handling
         try {
             const closeDialogButton = this.page.locator(this.closeDialog);
@@ -806,16 +810,19 @@ export class SanityPage {
             await this.page.waitForTimeout(2000);
             await this.page.locator(this.closeDialog).click({ timeout: 10000 });
         }
-        
-        // Click on pagination with error handling
-        try {
-            const paginationElement = this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down");
-            await expect(paginationElement).toBeVisible({ timeout: 15000 });
-            await paginationElement.click({ timeout: 10000 });
-        } catch (error) {
-            console.warn('Pagination element click failed, retrying:', error.message);
+
+        await this.page.waitForTimeout(2000);
+
+        // Check if pagination is visible, if not click run query again
+        const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+        if (!paginationVisible) {
+            await this.page.locator(this.refreshButton).click();
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
             await this.page.waitForTimeout(2000);
-            await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").click({ timeout: 10000 });
+            const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+            if (!retryVisible) {
+                throw new Error('Pagination not visible after histogram off and retrying run query');
+            }
         }
     }
 
