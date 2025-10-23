@@ -25,7 +25,7 @@
 //! let service = GitHubDataService::new();
 //! let data = service
 //!     .fetch_json::<Vec<Pattern>>(
-//!         "https://raw.githubusercontent.com/bee-san/pyWhat/main/pywhat/Data/regex.json",
+//!         "https://raw.githubusercontent.com/openobserve/sdr_patterns/main/regex.json",
 //!     )
 //!     .await?;
 //! ```

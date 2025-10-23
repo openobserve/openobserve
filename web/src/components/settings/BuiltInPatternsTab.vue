@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-list bordered separator>
           <q-item
             v-for="(pattern, index) in filteredPatterns"
-            :key="index"
+            :key="`${pattern.name}-${pattern.pattern.substring(0, 20)}`"
             class="pattern-item"
             :data-test="`pattern-item-${index}`"
           >
