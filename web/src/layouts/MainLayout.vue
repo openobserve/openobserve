@@ -446,13 +446,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :breakpoint="500"
       role="navigation"
       aria-label="Main navigation"
+      class="card-container"
     >
       <q-list class="leftNavList">
         <menu-link
-          v-for="(nav, index) in linksList"
+          v-for="nav in linksList"
           :key="nav.title"
           :link-name="nav.name"
-          :animation-index="index"
           v-bind="{ ...nav, mini: miniMode }"
         />
       </q-list>
@@ -1496,20 +1496,8 @@ export default defineComponent({
   }
 }
 
-// Phase 3: Enhanced drawer with glassmorphism
-.q-drawer {
-  background: transparent;
-  // background: linear-gradient(180deg, #0f172a 0%, #020617 100%) !important;
-  // backdrop-filter: blur(12px);
-  // border-right: 1px solid rgba(71, 85, 105, 0.5) !important;
-  // transition: background-color 500ms ease-in-out,
-              // border-color 500ms ease-in-out;
-
-  // Light mode
-  body.body--light & {
-    // background: rgba(255, 255, 255, 0.8) !important;
-    // border-right: 1px solid rgba(226, 232, 240, 0.5) !important;
-  }
+.q-drawer{
+  border-radius: 0.625rem;
 }
 
 .warning-msg {
@@ -1930,5 +1918,8 @@ body.ai-chat-open {
       }
     }
   }
+}
+.q-drawer{
+  margin-bottom: 0.4rem;
 }
 </style>
