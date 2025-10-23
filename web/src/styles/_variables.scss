@@ -250,6 +250,8 @@ $dark-body-secondary-bg: rgba(14, 19, 29, 0.4);
 $menu-gradient-start: rgba(89, 155, 174, 0.04);
 $menu-gradient-end: rgba(89, 155, 174, 0.08);
 $menu-border-color: rgba(89, 155, 174, 0.6);
+$actions-column-box-shawdow: rgba(0, 0, 0, 0.1);
+$actions-column-box-shawdow-dark: rgba(125, 125, 125, 0.694);
 
 // Semantic Colors - Light Mode
 :root {
@@ -317,6 +319,8 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
   --o2-tab-text-color: #{$o2-gray-1400};
 
   --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, white);
+
+  --o2-actions-column-shawdow: #{$actions-column-box-shawdow};
 }
 
 // Semantic Colors - Dark Mode
@@ -385,4 +389,5 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
   --o2-tab-text-color: #{$o2-gray-100};
 
   --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, #{$dark-theme-color});
+  --o2-actions-column-shawdow: #{$actions-column-box-shawdow-dark};
 }
