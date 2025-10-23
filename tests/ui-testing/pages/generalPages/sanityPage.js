@@ -47,6 +47,7 @@ export class SanityPage {
         // Menu Navigation locators
         this.pipelineMenuItem = '[data-test="menu-link-\\/pipeline-item"]';
         this.realtimeTab = '[data-test="tab-realtime"]';
+        this.streamPipelinesTab = '[data-test="stream-pipelines-tab"]';
         this.functionStreamTab = '[data-test="function-stream-tab"]';
         this.dashboardsMenuItem = '[data-test="menu-link-\\/dashboards-item"]';
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
@@ -364,9 +365,16 @@ export class SanityPage {
 
     async createFunctionViaFunctionsPage() {
         await this.page.locator(this.pipelineMenuItem).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForTimeout(500);
+        await this.page.locator(this.streamPipelinesTab).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForTimeout(500);
         await this.page.locator(this.realtimeTab).click();
+        await this.page.waitForTimeout(500);
         await this.page.locator(this.functionStreamTab).click();
-        
+        await this.page.waitForTimeout(500);
+
         await this.page.getByRole(this.createNewFunctionButton.role, { name: this.createNewFunctionButton.name }).click();
         await this.page.getByLabel(this.nameLabel.label).click();
         await this.page.getByLabel(this.nameLabel.label).fill("sanitytest");
@@ -393,21 +401,27 @@ export class SanityPage {
     async createAndDeleteFolder(folderName) {
         await this.page.locator(this.dashboardsMenuItem).click();
         await this.page.waitForLoadState('domcontentloaded');
-        
+        await this.page.waitForTimeout(2000);
+
         await this.page.locator(this.dashboardSearch).click();
         await this.page.locator(this.newFolderButton).click();
-        
-        await expect(this.page.locator(this.folderAddName)).toBeVisible({ timeout: 10000 });
+        await this.page.waitForTimeout(2000);
+        await this.page.locator(this.folderAddName).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForTimeout(1000);
         await this.page.locator(this.folderAddName).fill(folderName);
+        await this.page.waitForTimeout(1000);
         await this.page.locator(this.folderAddSave).click();
-        
+        await this.page.waitForTimeout(2000);
+
         await expect(this.page.getByText(folderName)).toBeVisible({ timeout: 10000 });
         await this.page.getByText(folderName).click();
-        
+        await this.page.waitForTimeout(2000);
+
         await this.page.waitForLoadState('domcontentloaded');
         
         await this.page.locator(`[data-test^="dashboard-folder-tab"]:has-text("${folderName}") [data-test="dashboard-more-icon"]`).click();
         await this.page.locator(this.deleteFolderIcon).click({ force: true });
+        await this.page.waitForTimeout(2000);
         await this.page.locator(this.confirmButton).click();
 
         await expect(this.page.getByText("Folder deleted successfully")).toBeVisible({ timeout: 10000 });
@@ -429,10 +443,12 @@ export class SanityPage {
         
         await this.page.locator(this.streamsMenuItem).click();
         await this.page.waitForLoadState('domcontentloaded');
-        
+        await this.page.waitForTimeout(2000);
+
         await this.page.locator(this.addStreamButton).click();
-        
-        await expect(this.page.getByLabel("Name *")).toBeVisible({ timeout: 10000 });
+        await this.page.waitForTimeout(2000);
+        await this.page.getByLabel("Name *").waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForTimeout(2000);
         await this.page.getByLabel("Name *").fill(uniqueStreamName);
         
         await this.page.locator(this.streamTypeDropdown).getByText("arrow_drop_down").click();
@@ -504,9 +520,11 @@ export class SanityPage {
         
         // Wait for search results to load using proper wait
         await this.page.waitForLoadState('networkidle');
-        
+        await this.page.waitForTimeout(2000);
+
         // Click delete button for the specific stream using first() to handle search results
         await this.page.getByRole("button", { name: "Delete" }).first().click();
+        await this.page.waitForTimeout(2000);
         
         // Wait for and click confirmation dialog button - try different variations
         const confirmButtonVariants = ["Ok", "OK", "Delete", "Confirm", "Yes"];
@@ -526,8 +544,18 @@ export class SanityPage {
         if (!confirmClicked) {
             throw new Error('No confirmation dialog button found with variants: ' + confirmButtonVariants.join(', '));
         }
-            
+
         await this.page.waitForLoadState('networkidle');
+
+        // Verify stream was deleted - search should return no results
+        await this.page.getByPlaceholder("Search Stream").clear();
+        await this.page.getByPlaceholder("Search Stream").fill(uniqueStreamName);
+        await this.page.waitForTimeout(1000);
+
+        const streamStillExists = await this.page.getByText(uniqueStreamName).isVisible({ timeout: 3000 }).catch(() => false);
+        if (streamStillExists) {
+            throw new Error(`Stream ${uniqueStreamName} was not deleted successfully`);
+        }
     }
 
     // Result Summary Methods

@@ -33,6 +33,15 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up all pipelines for e2e_automate streams
     await pm.apiCleanup.cleanupPipelines();
 
+    // Clean up all functions matching pattern "Pipeline" + 3 digits
+    await pm.apiCleanup.cleanupFunctions();
+
+    // Clean up all enrichment tables matching pattern "protocols_" + UUID + "_csv"
+    await pm.apiCleanup.cleanupEnrichmentTables();
+
+    // Clean up all streams starting with "sanitylogstream_"
+    await pm.apiCleanup.cleanupStreams();
+
     testLogger.info('Pre-test cleanup completed successfully');
   });
 });

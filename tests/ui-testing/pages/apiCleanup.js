@@ -359,6 +359,215 @@ class APICleanup {
     }
 
     /**
+     * Fetch all functions
+     * @returns {Promise<Array>} Array of function objects
+     */
+    async fetchFunctions() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch functions', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.list || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch functions', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single function
+     * @param {string} functionName - The function name
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteFunction(functionName) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/functions/${functionName}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete function', { functionName, status: response.status });
+                return { code: response.status, message: 'Failed to delete function' };
+            }
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            testLogger.error('Failed to delete function', { functionName, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Fetch all enrichment tables
+     * @returns {Promise<Array>} Array of enrichment table objects
+     */
+    async fetchEnrichmentTables() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams?type=enrichment_tables`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch enrichment tables', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.list || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch enrichment tables', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single enrichment table
+     * @param {string} tableName - The enrichment table name
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteEnrichmentTable(tableName) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${tableName}?type=enrichment_tables&delete_all=true`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete enrichment table', { tableName, status: response.status });
+                return { code: response.status, message: 'Failed to delete enrichment table' };
+            }
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            testLogger.error('Failed to delete enrichment table', { tableName, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all enrichment tables matching pattern "protocols_" followed by UUID and "_csv"
+     * Deletes tables like protocols_f916681d_b71b_4edd_a4c1_00a8bf34b86d_csv
+     */
+    async cleanupEnrichmentTables() {
+        testLogger.info('Starting enrichment tables cleanup');
+
+        try {
+            // Fetch all enrichment tables
+            const tables = await this.fetchEnrichmentTables();
+            testLogger.info('Fetched enrichment tables', { total: tables.length });
+
+            // Filter tables matching pattern: "protocols_" + UUID pattern + "_csv"
+            const pattern = /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/;
+            const matchingTables = tables.filter(t => pattern.test(t.name));
+            testLogger.info('Found enrichment tables matching cleanup pattern', { count: matchingTables.length });
+
+            if (matchingTables.length === 0) {
+                testLogger.info('No enrichment tables to clean up');
+                return;
+            }
+
+            // Delete each table
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const table of matchingTables) {
+                const result = await this.deleteEnrichmentTable(table.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted enrichment table', { name: table.name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete enrichment table', { name: table.name, result });
+                }
+            }
+
+            testLogger.info('Enrichment tables cleanup completed', {
+                total: matchingTables.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Enrichment tables cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Clean up all functions matching pattern "Pipeline" followed by exactly 3 digits
+     * Deletes functions like Pipeline936, Pipeline657, etc.
+     * Does NOT delete Pipeline1234, test123, alpha123, etc.
+     */
+    async cleanupFunctions() {
+        testLogger.info('Starting functions cleanup');
+
+        try {
+            // Fetch all functions
+            const functions = await this.fetchFunctions();
+            testLogger.info('Fetched functions', { total: functions.length });
+
+            // Filter functions matching pattern: "Pipeline" followed by exactly 3 digits
+            const pattern = /^Pipeline\d{3}$/;
+            const matchingFunctions = functions.filter(f => pattern.test(f.name));
+            testLogger.info('Found functions matching cleanup pattern', { count: matchingFunctions.length });
+
+            if (matchingFunctions.length === 0) {
+                testLogger.info('No functions to clean up');
+                return;
+            }
+
+            // Delete each function
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const func of matchingFunctions) {
+                const result = await this.deleteFunction(func.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted function', { name: func.name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete function', { name: func.name, result });
+                }
+            }
+
+            testLogger.info('Functions cleanup completed', {
+                total: matchingFunctions.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Functions cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
      * Clean up all pipelines for specific streams
      * Deletes pipelines where source.stream_name matches any of the target streams
      * @param {Array<string>} streamNames - Array of stream names to match (default: ['e2e_automate', 'e2e_automate1', 'e2e_automate2', 'e2e_automate3'])
@@ -525,6 +734,109 @@ class APICleanup {
 
         } catch (error) {
             testLogger.error('Dashboard cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Fetch all log streams
+     * @returns {Promise<Array>} Array of stream objects
+     */
+    async fetchStreams() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams?type=logs`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch streams', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.list || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch streams', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single stream
+     * @param {string} streamName - The stream name
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteStream(streamName) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=logs&delete_all=true`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete stream', { streamName, status: response.status });
+                return { code: response.status, message: 'Failed to delete stream' };
+            }
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            testLogger.error('Failed to delete stream', { streamName, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all streams starting with "sanitylogstream_"
+     * Deletes streams like sanitylogstream_61hj, sanitylogstream_abc123, etc.
+     */
+    async cleanupStreams() {
+        testLogger.info('Starting streams cleanup');
+
+        try {
+            // Fetch all log streams
+            const streams = await this.fetchStreams();
+            testLogger.info('Fetched streams', { total: streams.length });
+
+            // Filter streams starting with "sanitylogstream_"
+            const matchingStreams = streams.filter(s => s.name.startsWith('sanitylogstream_'));
+            testLogger.info('Found streams matching cleanup pattern', { count: matchingStreams.length });
+
+            if (matchingStreams.length === 0) {
+                testLogger.info('No streams to clean up');
+                return;
+            }
+
+            // Delete each stream
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const stream of matchingStreams) {
+                const result = await this.deleteStream(stream.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted stream', { name: stream.name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete stream', { name: stream.name, result });
+                }
+            }
+
+            testLogger.info('Streams cleanup completed', {
+                total: matchingStreams.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Streams cleanup failed', { error: error.message });
         }
     }
 
