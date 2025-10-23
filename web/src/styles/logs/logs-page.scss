@@ -835,8 +835,8 @@
         box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
 
         .field_overlay {
-          background-color: #3f4143;
           opacity: 1;
+          background-color: var(--o2-hover-accent);
         }
       }
     }
