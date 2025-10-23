@@ -17,12 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="col column full-height" style="overflow: hidden !important; padding: 0 !important; margin: 0 !important; height: 100%;">
-    <div
-      class="search-list full-height full-width"
-      ref="searchListContainer"
-    >
-      <div class="row tw-min-h-[28px]">
+  <div
+    class="col column full-height"
+    style="
+      overflow: hidden !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      height: 100%;
+    "
+  >
+    <div class="search-list full-height full-width" ref="searchListContainer">
+      <div class="row tw-min-h-[28px] tw-pt-[0.375rem]">
         <div
           class="col-7 text-left q-pl-lg bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
@@ -32,10 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div
-          v-else
-          class="col-7 text-left q-pl-lg warning flex items-center"
-        >
+        <div v-else class="col-7 text-left q-pl-lg warning flex items-center">
           {{ noOfRecordsTitle }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
             <q-spinner-hourglass
@@ -48,7 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="center left"
               max-width="300px"
             >
-              <span class="search-loading-text">Fetching the search events</span>
+              <span class="search-loading-text"
+                >Fetching the search events</span
+              >
             </q-tooltip>
           </span>
           <div
@@ -65,7 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- {{ searchObj.data.histogram.errorMsg }} -->
-            <q-icon name="info" color="warning" size="sm"> </q-icon>
+            <q-icon name="info"
+color="warning" size="sm"> </q-icon>
             <q-tooltip position="top" class="tw-text-sm tw-font-semi-bold">
               {{ searchObj.data.histogram.errorMsg }}
             </q-tooltip>
@@ -124,7 +129,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         :class="[
           'histogram-container',
-          searchObj.meta.showHistogram ? 'histogram-container--visible' : 'histogram-container--hidden'
+          searchObj.meta.showHistogram
+            ? 'histogram-container--visible'
+            : 'histogram-container--hidden',
         ]"
         v-if="
           searchObj.data?.histogram?.errorMsg == '' &&
@@ -153,7 +160,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <h3 class="text-center">
             <span class="histogram-empty__message">
-              <q-icon name="warning" color="warning" size="xs"></q-icon> No data
+              <q-icon name="warning"
+color="warning" size="xs"></q-icon> No data
               found for histogram.</span
             >
           </h3>
@@ -166,14 +174,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <h3 class="text-center">
-            <span class="histogram-empty__message" style="color: transparent">.</span>
+            <span class="histogram-empty__message"
+style="color: transparent"
+              >.</span
+            >
           </h3>
         </div>
 
-        <div
-          class="q-pb-sm histogram-loader"
-          v-if="histogramLoader"
-        >
+        <div class="q-pb-sm histogram-loader" v-if="histogramLoader">
           <q-spinner-hourglass
             color="primary"
             size="25px"
@@ -195,7 +203,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.histogram.errorCode != -1
           "
         >
-          <q-icon name="warning" color="warning" size="xs"></q-icon> Error while
+          <q-icon name="warning"
+color="warning" size="xs"></q-icon> Error while
           fetching histogram data.
           <q-btn
             @click="toggleErrorDetails"
@@ -238,13 +247,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : searchObj.data.query.toLowerCase()
         "
         :default-columns="!searchObj.data.stream.selectedFields.length"
-        class="col-12"
+        class="col-12 tw-pt-[0.375rem]"
         :class="[
           !searchObj.meta.showHistogram ||
           (searchObj.meta.showHistogram &&
             searchObj.data.histogram.errorCode == -1)
             ? 'table-container--without-histogram'
-            : 'table-container--with-histogram'
+            : 'table-container--with-histogram',
         ]"
         @update:columnSizes="handleColumnSizesUpdate"
         @update:columnOrder="handleColumnOrderUpdate"
@@ -326,7 +335,7 @@ import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
-import {useSearchStream} from "@/composables/useLogs/useSearchStream";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
@@ -393,7 +402,7 @@ export default defineComponent({
           this.searchObj.data.stream.selectedStream
         ] = [...newColOrder];
 
-        if(newColOrder.length > 0){
+        if (newColOrder.length > 0) {
           this.searchObj.organizationIdentifier =
             this.store.state.selectedOrganization.identifier;
           let selectedFields = this.reorderSelectedFields();
@@ -522,14 +531,12 @@ export default defineComponent({
     const router = useRouter();
     const { searchAroundData } = useSearchAround();
     const { refreshPagination } = useSearchStream();
-    const { refreshPartitionPagination, refreshJobPagination } = usePagination();
+    const { refreshPartitionPagination, refreshJobPagination } =
+      usePagination();
     const { updatedLocalLogFilterField } = logsUtils();
     const { extractFTSFields, filterHitsColumns } = useStreamFields();
 
-    const {
-      reorderSelectedFields,
-      getFilterExpressionByFieldType,
-    } = useLogs();
+    const { reorderSelectedFields, getFilterExpressionByFieldType } = useLogs();
 
     const { searchObj } = searchState();
 
@@ -736,13 +743,13 @@ export default defineComponent({
         plotChart.value = {};
         searchObj.meta.resetPlotChart = false;
       }
-    });    
-    
+    });
+
     const selectedStreamFullTextSearchKeys = computed(() => {
       const defaultFTSKeys = store?.state?.zoConfig?.default_fts_keys || [];
-      const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields.filter(
-        (field: string) => field.ftsKey
-      ).map((field: any) => field.name);
+      const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields
+        .filter((field: string) => field.ftsKey)
+        .map((field: any) => field.name);
       //merge default FTS keys with selected stream FTS keys
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
     });
@@ -793,7 +800,7 @@ export default defineComponent({
       getSocketPaginations,
       resetPlotChart,
       columnSizes,
-      selectedStreamFullTextSearchKeys
+      selectedStreamFullTextSearchKeys,
     };
   },
   computed: {
@@ -831,6 +838,5 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-@import '@/styles/logs/search-result.scss';
+@import "@/styles/logs/search-result.scss";
 </style>
-
