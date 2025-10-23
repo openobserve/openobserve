@@ -390,7 +390,12 @@ impl super::Db for NatsDb {
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {e}")))?;
             if need_watch && !use_kv_watcher(key) {
-                coordinator::events::delete_event(key, start_dt).await?;
+                let key = if start_dt.is_some() {
+                    format!("{}/{}", key, start_dt.unwrap())
+                } else {
+                    key.to_string()
+                };
+                coordinator::events::delete_event(&key, start_dt).await?;
             }
             return Ok(());
         }
