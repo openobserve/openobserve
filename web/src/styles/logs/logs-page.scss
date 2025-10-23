@@ -1355,16 +1355,17 @@
 
 .logs-json-preview-tabs {
   height: fit-content;
-  .rum-tab {
+  overflow: hidden;
+  
+  .o2-tab {
     width: fit-content !important;
-    padding: 2px 12px !important;
-    border: none !important;
+    padding: 0.25rem 0.5rem !important;
     font-size: 12px !important;
+    border-bottom: 2px solid var(--o2-border-color) !important;
+  }
 
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
+  .active {
+    border-bottom: 2px solid var(--o2-theme-color) !important;
   }
 }
 
