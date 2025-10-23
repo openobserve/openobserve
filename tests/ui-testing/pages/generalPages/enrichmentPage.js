@@ -437,6 +437,17 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 });
         await this.page.waitForTimeout(2000);
 
+        // Check if error occurred and capture details for debugging
+        const errorDetailsBtn = this.page.locator('[data-test="logs-page-result-error-details-btn"]');
+        if (await errorDetailsBtn.isVisible()) {
+            testLogger.warn('Error detected after running VRL query, clicking error details button');
+            await errorDetailsBtn.click();
+            await this.page.waitForTimeout(1000);
+            await this.page.screenshot({ path: 'test-results/error-details-vrl-enrichment.png', fullPage: true });
+            testLogger.error('Error details screenshot saved to test-results/error-details-vrl-enrichment.png');
+            throw new Error('VRL query execution failed - check test-results/error-details-vrl-enrichment.png for details');
+        }
+
         // Verify that no warning is shown for query execution
         await this.verifyNoQueryWarning();
 
