@@ -149,7 +149,7 @@ jobs:
                 "schemaload.spec.js",
                 "serviceAccount.spec.js",
                 "usersOrg.spec.js",
-                # "org.spec.js",
+                "org.spec.js",
               ]
           # - testfolder: "Logs-Core"
           #   browser: "chrome"
