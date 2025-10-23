@@ -419,7 +419,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
         
         const vrlEditorExists = await this.page.locator('#fnEditor').count();
         testLogger.debug('VRL Editor count after URL logic', { vrlEditorExists });
-        
+
+        // Wait for enrichment table to be fully indexed and available for querying
+        testLogger.debug('Waiting for enrichment table to be ready for VRL queries');
+        await this.page.waitForTimeout(5000);
+
         // Now proceed with VRL processing
         await this.fillVRLQuery(fileName);
 
