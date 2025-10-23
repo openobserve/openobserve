@@ -371,7 +371,7 @@ $actions-column-box-shawdow-dark: rgba(125, 125, 125, 0.694);
   --o2-toggle-track-bg: color-mix(in srgb, var(--o2-theme-color) 90%, white);
   --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-theme-color) 1%, #{$dark-theme-color});
 
-  --o2-card-bg: #1d2527;
+  --o2-card-bg: #171e1f;
 
   --o2-header-menu-bg: rgba(0, 0, 0, 1);
 
@@ -383,7 +383,7 @@ $actions-column-box-shawdow-dark: rgba(125, 125, 125, 0.694);
   --o2-menu-border-color: #{$dark-theme-color};
   --o2-menu-color: #{$o2-gray-100};
 
-  --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 5%, #{$dark-theme-color});
+  --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
 
   --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, #{$dark-theme-color});
   --o2-tab-text-color: #{$o2-gray-100};
