@@ -5,6 +5,7 @@ import logging
 import time
 import re
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
 # Configure logger for test output
 logger = logging.getLogger(__name__)
@@ -29,16 +30,6 @@ def safe_sql_identifier(identifier):
     return identifier
 
 
-def safe_sql_value(value):
-    """
-    Safely escape SQL string values to prevent injection.
-    """
-    if not isinstance(value, str):
-        raise ValueError("Value must be a string")
-    
-    # Basic escaping for single quotes in string values
-    escaped_value = value.replace("'", "''")
-    return escaped_value
 
 
 @pytest.mark.parametrize(
@@ -63,8 +54,10 @@ def test_pipeline_dynamic_template_substitution(create_session, base_url, source
     condition_node_id = str(uuid.uuid4())
     output_node_id = str(uuid.uuid4())
     
-    # Load test data for later ingestion
-    with open("../test-data/logs_data.json") as f:
+    # Load test data for later ingestion using absolute path
+    # Path structure: tests/api-testing/tests/test_pipeline_dynamic.py -> tests/test-data/logs_data.json
+    test_data_path = Path(__file__).parent.parent.parent / "test-data" / "logs_data.json"
+    with open(test_data_path) as f:
         logs_data = json.load(f)
 
     # Pipeline payload with DYNAMIC TEMPLATE destination stream name
