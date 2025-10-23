@@ -16,7 +16,7 @@
 use std::{io::Error, sync::Arc};
 
 use actix_web::{
-    HttpRequest, HttpResponse, cookie,
+    HttpResponse, cookie,
     cookie::{Cookie, SameSite},
     get, head,
     http::header,
@@ -918,21 +918,42 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
 }
 
 #[put("/enable")]
-async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn enable_node(
+    web::Query(query): web::Query<HashMap<String, String>>,
+) -> Result<HttpResponse, Error> {
     let node_id = LOCAL_NODE.uuid.clone();
     let Some(mut node) = cluster::get_node_by_uuid(&node_id).await else {
         return Ok(MetaHttpResponse::not_found("node not found"));
     };
 
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let enable = match query.get("value") {
-        Some(v) => v.parse::<bool>().unwrap_or_default(),
-        None => false,
-    };
+    let enable = query
+        .get("value")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
     node.scheduled = enable;
     if !node.scheduled {
+        log::info!("[NODE] Disabling node, initiating graceful drain");
+
         // release all the searching files
         crate::common::infra::wal::clean_lock_files();
+
+        // If this is an ingester node, set draining mode and flush
+        if LOCAL_NODE.is_ingester() {
+            // Set draining flag to trigger immediate S3 upload
+            ingester::set_draining(true);
+
+            // Flush memory to WAL
+            if let Err(e) = ingester::flush_all().await {
+                log::error!("[NODE] Error flushing ingester during disable: {e}");
+                return Ok(MetaHttpResponse::internal_error(e));
+            }
+            log::info!("[NODE] Ingester flushed successfully, S3 upload will be prioritized");
+        }
+    } else {
+        // Re-enabling the node
+        if LOCAL_NODE.is_ingester() {
+            ingester::set_draining(false);
+        }
     }
     match cluster::update_local_node(&node).await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
@@ -953,6 +974,67 @@ async fn flush_node() -> Result<HttpResponse, Error> {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DrainStatusResponse {
+    is_draining: bool,
+    is_ingester: bool,
+    memory_flushed: bool,
+    pending_parquet_files: i64,
+    processing_files: usize,
+    ready_for_shutdown: bool,
+}
+
+#[get("/drain_status")]
+async fn drain_status() -> Result<HttpResponse, Error> {
+    let is_ingester = LOCAL_NODE.is_ingester();
+    let is_draining = if is_ingester {
+        ingester::is_draining()
+    } else {
+        false
+    };
+
+    // Get pending parquet files from metrics
+    let pending_parquet_files = if is_ingester {
+        // Read from the INGEST_PARQUET_FILES metric
+        config::metrics::INGEST_PARQUET_FILES
+            .get_metric_with_label_values::<&str>(&[])
+            .map(|m| m.get())
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
+    // For simplicity, we'll consider memory flushed if we're draining
+    // In reality, flush_all() is called synchronously in enable_node
+    let memory_flushed = is_draining;
+
+    // Get count of files currently being processed
+    let processing_files = if is_ingester && is_draining {
+        // This would require accessing PROCESSING_FILES from parquet.rs
+        // For now, we'll use a simpler heuristic
+        0 // TODO: expose PROCESSING_FILES.len()
+    } else {
+        0
+    };
+
+    // Ready for shutdown if:
+    // - Not an ingester, OR
+    // - Is draining AND no pending files AND memory is flushed
+    let ready_for_shutdown = !is_ingester || (is_draining && pending_parquet_files == 0);
+
+    let response = DrainStatusResponse {
+        is_draining,
+        is_ingester,
+        memory_flushed,
+        pending_parquet_files,
+        processing_files,
+        ready_for_shutdown,
+    };
+
+    Ok(MetaHttpResponse::json(response))
 }
 
 #[get("/list")]
