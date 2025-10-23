@@ -26,7 +26,7 @@ use crate::{
         function::VRLResultResolver,
         stream::{StreamParams, StreamType},
     },
-    utils::{json},
+    utils::json,
 };
 
 pub mod components;
