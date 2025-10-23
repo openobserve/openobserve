@@ -157,7 +157,7 @@ jobs:
               [
                 "join.spec.js",
                 "logshistogram.spec.js",
-                # "logspage.spec.js",
+                "logspage.spec.js",
                 # "logsquickmode.spec.js",
                 # "pagination.spec.js",
                 # "unflattened.spec.js",

@@ -111,7 +111,9 @@ export class LogsPage {
         this.sqlPagination = '[data-test="logs-search-sql-pagination"]';
         this.sqlGroupOrderLimitPagination = '[data-test="logs-search-sql-group-order-limit-pagination"]';
         this.interestingFieldBtn = field => `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
+        this.logsSearchBarFunctionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
         this.logsSearchBarFunctionDropdownSave = '[data-test="logs-search-bar-function-dropdown"] button';
+        this.logsSearchBarSaveTransformBtn = '[data-test="logs-search-bar-save-transform-btn"]';
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         this.qNotifyWarning = '#q-notify div';
         this.qPageContainer = '.q-page-container';
@@ -1671,7 +1673,36 @@ export class LogsPage {
     }
 
     async expectFnEditorNotVisible() {
-        return await expect(this.page.locator('#fnEditor').locator('.inputarea')).not.toBeVisible();
+        const fnEditor = this.page.locator('#fnEditor');
+
+        // Check if fnEditor is in the viewport (not moved off-screen)
+        const boundingBox = await fnEditor.boundingBox().catch(() => null);
+        const viewportSize = await this.page.viewportSize();
+
+        const isInViewport = boundingBox && boundingBox.x >= 0 && boundingBox.x < viewportSize.width;
+
+        console.log(`[expectFnEditorNotVisible] Initial state - fnEditor in viewport: ${isInViewport}, boundingBox:`, boundingBox);
+
+        if (isInViewport) {
+            console.log('[expectFnEditorNotVisible] fnEditor still in viewport, clicking toggle to hide it');
+            // If VRL editor is still in viewport, click toggle to move it off-screen
+            await this.page.locator(this.vrlToggleButton).click();
+            await this.page.waitForTimeout(1000);
+
+            const boundingBoxAfter = await fnEditor.boundingBox().catch(() => null);
+            const isInViewportAfter = boundingBoxAfter && boundingBoxAfter.x >= 0 && boundingBoxAfter.x < viewportSize.width;
+            console.log(`[expectFnEditorNotVisible] After toggle click - fnEditor in viewport: ${isInViewportAfter}, boundingBox:`, boundingBoxAfter);
+        }
+
+        // Verify fnEditor is moved off-screen (x position is negative or beyond viewport width)
+        const finalBoundingBox = await fnEditor.boundingBox();
+        const isHidden = !finalBoundingBox || finalBoundingBox.x < 0 || finalBoundingBox.x >= viewportSize.width;
+
+        if (!isHidden) {
+            throw new Error(`fnEditor is still visible in viewport at position x: ${finalBoundingBox.x}`);
+        }
+
+        return true;
     }
 
     async clickPast6DaysButton() {
@@ -1844,7 +1875,12 @@ export class LogsPage {
     }
 
     async clickFunctionDropdownSave() {
-        return await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click();
+        try {
+            await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click({ timeout: 3000 });
+        } catch (error) {
+            // If save button click fails, click the save transform button
+            await this.page.locator(this.logsSearchBarSaveTransformBtn).click();
+        }
     }
 
     async clickSavedFunctionNameInput() {

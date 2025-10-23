@@ -223,62 +223,66 @@ test.describe("Logs Queries testcases", () => {
     testLogger.info('Match_all query functionality test completed');
   });
 
-  test("should display error when save function is clicked without any VRL function", {
-    tag: ['@functionValidation', '@all', '@logs']
-  }, async ({ page }) => {
-    testLogger.info('Testing VRL function save validation without function definition');
-    await pm.logsPage.clickFunctionDropdownSave();
-    await pm.logsPage.expectWarningNoFunctionDefinition();
-    
-    testLogger.info('VRL function save validation test completed');
-  });
+  // Duplicate test - kept in logspage.spec.js
+  // test("should display error when save function is clicked without any VRL function", {
+  //   tag: ['@functionValidation', '@all', '@logs']
+  // }, async ({ page }) => {
+  //   testLogger.info('Testing VRL function save validation without function definition');
+  //   await pm.logsPage.clickFunctionDropdownSave();
+  //   await pm.logsPage.expectWarningNoFunctionDefinition();
+  //
+  //   testLogger.info('VRL function save validation test completed');
+  // });
 
-  test("should display click save directly while creating a function", {
-    tag: ['@functionSaveValidation', '@all', '@logs']
-  }, async ({ page }) => {
-    testLogger.info('Testing function save validation when clicking save directly');
-    await pm.logsPage.waitForTimeout(1000);
-    await pm.logsPage.toggleVrlEditor();
-    await pm.logsPage.clickVrlEditor();
-    await pm.logsPage.waitForTimeout(1000);
-    await pm.logsPage.clickFunctionDropdownSave();
-    await pm.logsPage.clickSavedViewDialogSave();
-    await pm.logsPage.expectFunctionNameNotValid();
-    
-    testLogger.info('Function save validation test completed');
-  });
+  // Duplicate test - kept in logspage.spec.js
+  // test("should display click save directly while creating a function", {
+  //   tag: ['@functionSaveValidation', '@all', '@logs']
+  // }, async ({ page }) => {
+  //   testLogger.info('Testing function save validation when clicking save directly');
+  //   await pm.logsPage.waitForTimeout(1000);
+  //   await pm.logsPage.toggleVrlEditor();
+  //   await pm.logsPage.clickVrlEditor();
+  //   await pm.logsPage.waitForTimeout(1000);
+  //   await pm.logsPage.clickFunctionDropdownSave();
+  //   await pm.logsPage.clickSavedViewDialogSave();
+  //   await pm.logsPage.expectFunctionNameNotValid();
+  //
+  //   testLogger.info('Function save validation test completed');
+  // });
 
-  test("should display error on adding only blank spaces under function name", {
-    tag: ['@functionNameValidation', '@all', '@logs']
-  }, async ({ page }) => {
-    testLogger.info('Testing function name validation with blank spaces');
-    await pm.logsPage.waitForTimeout(1000);
-    await pm.logsPage.toggleVrlEditor();
-    await pm.logsPage.clickVrlEditor();
-    await pm.logsPage.waitForTimeout(1000);
-    await pm.logsPage.clickFunctionDropdownSave();
-    await pm.logsPage.fillSavedFunctionNameInput(' ');
-    await pm.logsPage.clickSavedViewDialogSave();
-    await pm.logsPage.expectFunctionNameNotValid();
-    
-    testLogger.info('Function name blank spaces validation test completed');
-  });
+  // Duplicate test - kept in logspage.spec.js
+  // test("should display error on adding only blank spaces under function name", {
+  //   tag: ['@functionNameValidation', '@all', '@logs']
+  // }, async ({ page }) => {
+  //   testLogger.info('Testing function name validation with blank spaces');
+  //   await pm.logsPage.waitForTimeout(1000);
+  //   await pm.logsPage.toggleVrlEditor();
+  //   await pm.logsPage.clickVrlEditor();
+  //   await pm.logsPage.waitForTimeout(1000);
+  //   await pm.logsPage.clickFunctionDropdownSave();
+  //   await pm.logsPage.fillSavedFunctionNameInput(' ');
+  //   await pm.logsPage.clickSavedViewDialogSave();
+  //   await pm.logsPage.expectFunctionNameNotValid();
+  //
+  //   testLogger.info('Function name blank spaces validation test completed');
+  // });
 
-  test("should display error on adding invalid characters under function name", {
-    tag: ['@functionNameValidation', '@all', '@logs']
-  }, async ({ page }) => {
-    testLogger.info('Testing function name validation with invalid characters');
-    await pm.logsPage.waitForTimeout(1000);
-    await pm.logsPage.toggleVrlEditor();
-    await pm.logsPage.clickVrlEditor();
-    await pm.logsPage.waitForTimeout(1000);
-    await pm.logsPage.clickFunctionDropdownSave();
-    await pm.logsPage.fillSavedFunctionNameInput('e2e@@@');
-    await pm.logsPage.clickSavedViewDialogSave();
-    await pm.logsPage.expectFunctionNameNotValid();
-    
-    testLogger.info('Function name invalid characters validation test completed');
-  });
+  // Duplicate test - kept in logspage.spec.js
+  // test("should display error on adding invalid characters under function name", {
+  //   tag: ['@functionNameValidation', '@all', '@logs']
+  // }, async ({ page }) => {
+  //   testLogger.info('Testing function name validation with invalid characters');
+  //   await pm.logsPage.waitForTimeout(1000);
+  //   await pm.logsPage.toggleVrlEditor();
+  //   await pm.logsPage.clickVrlEditor();
+  //   await pm.logsPage.waitForTimeout(1000);
+  //   await pm.logsPage.clickFunctionDropdownSave();
+  //   await pm.logsPage.fillSavedFunctionNameInput('e2e@@@');
+  //   await pm.logsPage.clickSavedViewDialogSave();
+  //   await pm.logsPage.expectFunctionNameNotValid();
+  //
+  //   testLogger.info('Function name invalid characters validation test completed');
+  // });
 
   test("should display added function on switching between tabs and again navigate to log", {
     tag: ['@functionPersistence', '@all', '@logs']
