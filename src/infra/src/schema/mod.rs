@@ -193,6 +193,8 @@ pub async fn get_versions(
     }
     drop(r);
 
+    log::warn!("get_versions: cache missing and get from db for key: {cache_key}");
+
     let db = infra_db::get_db().await;
     let ret = match db.get(&key).await {
         Err(e) => {
@@ -216,6 +218,8 @@ pub async fn get_versions(
     if ret.is_empty() {
         return Ok(vec![]);
     }
+
+    log::warn!("get_versions: got from db and cache for key: {cache_key}");
 
     // cache the latest versions
     let latest_schema = ret.last().cloned().unwrap();
