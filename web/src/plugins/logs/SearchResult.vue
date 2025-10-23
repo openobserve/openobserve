@@ -247,7 +247,7 @@ color="warning" size="xs"></q-icon> Error while
             : searchObj.data.query.toLowerCase()
         "
         :default-columns="!searchObj.data.stream.selectedFields.length"
-        class="col-12 tw-pt-[0.375rem]"
+        class="col-12 tw-mt-[0.375rem]"
         :class="[
           !searchObj.meta.showHistogram ||
           (searchObj.meta.showHistogram &&
