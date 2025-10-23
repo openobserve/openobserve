@@ -148,7 +148,7 @@ jobs:
                 "schema.spec.js",
                 "schemaload.spec.js",
                 "serviceAccount.spec.js",
-                # "usersOrg.spec.js",
+                "usersOrg.spec.js",
                 # "org.spec.js",
               ]
           # - testfolder: "Logs-Core"
