@@ -18,12 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="col">
     <div
       data-test="iam-users-selection-filters"
-      class="flex justify-start bordered q-px-md q-py-sm"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      class="flex justify-start q-px-md q-py-sm card-container"
       style="position: sticky; top: 0px; z-index: 2"
     >
       <div data-test="iam-users-selection-show-toggle" class="q-mr-md">
-        <div class="flex items-center q-pt-xs">
+        <div class="flex items-center">
           <span
             data-test="iam-users-selection-show-text"
             style="font-size: 14px"
@@ -35,7 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="
               border: 1px solid #d7d7d7;
               width: fit-content;
-              border-radius: 2px;
+              border-radius: 0.3rem;
+              padding: 2px;
             "
           >
             <template v-for="visual in usersDisplayOptions" :key="visual.value">
@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="11px"
                 class="q-px-md visual-selection-btn"
                 @click="updateUserTable(visual.value)"
+                style="height: 30px;"
               >
                 {{ visual.label }}</q-btn
               >
@@ -57,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         data-test="iam-users-selection-search-input"
-        class="o2-input q-mr-md"
+        class="q-mr-md"
         style="width: 400px"
       >
         <q-input
@@ -65,12 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="userSearchKey"
           borderless
           dense
-          class=" no-border o2-search-input tw-h-[36px] tw-w-[200px]"
-          :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+          class="no-border o2-search-input tw-h-[36px] tw-w-[200px]"
           placeholder="Search User"
         >
           <template #prepend>
-            <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+            <q-icon name="search" class="cursor-pointer o2-search-input-icon"/>
           </template>
         </q-input>
       </div>
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
     </div>
-    <div data-test="iam-users-selection-table">
+    <div data-test="iam-users-selection-table" style="height: calc(100vh - 250px);" class="card-container">
       <template v-if="rows.length">
         <app-table
           :rows="visibleRows"
@@ -114,7 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :title="t('iam.users')"
           class="o2-quasar-table o2-quasar-table-header-sticky"
-          :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
           :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
           :hideTopPagination="true"
           :showBottomPaginationWithTitle="true"
@@ -158,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="iam-users-selection-table-no-users-text"
         v-if="!rows.length"
-        class="q-mt-md text-bold q-pl-md"
+        class="text-bold q-pl-md q-py-md"
       >
         No users added
       </div>
