@@ -233,38 +233,6 @@ test.describe("Logs Queries testcases", () => {
     testLogger.info('VRL function save validation test completed');
   });
 
-  test("should create a function and then delete it", {
-    tag: ['@functionCRUD', '@all', '@logs']
-  }, async ({ page }) => {
-    testLogger.info('Testing VRL function creation and deletion (CRUD operations)');
-    await pm.logsPage.clickRefreshButton();
-    await pm.logsPage.clickFunctionDropdownSave();
-    await pm.logsPage.toggleVrlEditor();
-    await pm.logsPage.clickVrlEditor();
-    await pm.logsPage.waitForTimeout(2000); // Strategic 2000ms wait for VRL editor DOM stabilization - this is functionally necessary
-    await pm.logsPage.clickFunctionDropdownSave();
-    await pm.logsPage.clickSavedFunctionNameInput();
-    const randomString = pm.logsPage.generateRandomString();
-    const functionName = 'e2efunction_' + randomString;
-    await pm.logsPage.fillSavedFunctionNameInput(functionName);
-    await pm.logsPage.clickSavedViewDialogSave();
-    await pm.logsPage.waitForTimeout(2000);
-    await pm.logsPage.clickMenuLinkPipelineItem();
-    // Strategic 2000ms wait for navigation to pipeline page - this is functionally necessary
-    // Wait for the realtime tab to be available
-    await page.waitForSelector('[data-test="tab-realtime"]');
-    await pm.logsPage.clickTabRealtime();
-    // Strategic 1000ms wait for realtime tab activation - this is functionally necessary
-    await pm.logsPage.waitForTimeout(1000);
-    await pm.logsPage.clickFunctionStreamTab();
-    await pm.logsPage.clickSearchFunctionInput();
-    await pm.logsPage.fillSearchFunctionInput(randomString);
-    await pm.logsPage.clickDeleteFunctionButton();
-    await pm.logsPage.clickConfirmButton();
-    
-    testLogger.info('VRL function CRUD operations test completed');
-  });
-
   test("should display click save directly while creating a function", {
     tag: ['@functionSaveValidation', '@all', '@logs']
   }, async ({ page }) => {

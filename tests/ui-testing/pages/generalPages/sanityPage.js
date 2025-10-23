@@ -39,7 +39,8 @@ export class SanityPage {
         this.confirmButton = '[data-test="confirm-button"]';
         
         // Function locators
-        this.functionDropdown = '[data-test="logs-search-bar-function-dropdown"] button';
+        this.functionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
+        this.functionSaveButton = '[data-test="logs-search-bar-save-transform-btn"]';
         this.fnEditor = '#fnEditor';
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         
@@ -291,46 +292,58 @@ export class SanityPage {
         await this.page.locator(this.refreshButton).click();
         await this.page.waitForLoadState('networkidle');
         
-        const functionDropdown = this.page.locator(this.functionDropdown).filter({ hasText: "save" });
-        await functionDropdown.click();
-        
         const fnEditor = this.page.locator(this.fnEditor);
-        
+
+        // Check if VRL editor is visible, if not try to enable it via toggle
         if (await fnEditor.count() === 0) {
             const vrlToggle = this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
-            
+
             if (await vrlToggle.count() > 0 && await vrlToggle.isVisible()) {
-                await vrlToggle.locator('div').nth(2).click();
+                await vrlToggle.locator('div').nth(2).click({ force: true });
+                await this.page.waitForTimeout(1000);
                 await this.page.waitForLoadState('domcontentloaded');
             }
         }
-        
+
         const fnEditorTextbox = this.page.locator(this.fnEditor).locator('.monaco-editor');
-        
+
         try {
-            await expect(fnEditorTextbox).toBeVisible({ timeout: 15000 });
-            // await expect(fnEditorTextbox).toBeEditable({ timeout: 10000 });
+            await expect(fnEditorTextbox).toBeVisible({ timeout: 5000 });
             await this.page.waitForLoadState('domcontentloaded');
-            await fnEditorTextbox.click();
+            await fnEditorTextbox.click({ force: true });
         } catch (error) {
-            const cmContent = this.page.locator('.monaco-editor').first();
-            if (await cmContent.count() > 0) {
-                await cmContent.click();
+            // Monaco editor not visible, try clicking toggle button
+            testLogger.warn('Monaco editor not visible, trying toggle button');
+            const vrlToggle = this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
+            if (await vrlToggle.count() > 0) {
+                await vrlToggle.locator('div').nth(1).click({ force: true });
+                await this.page.waitForTimeout(1000);
+
+                // Retry clicking monaco editor
+                await expect(fnEditorTextbox).toBeVisible({ timeout: 10000 });
+                await fnEditorTextbox.click({ force: true });
             } else {
-                throw error;
+                // Fallback to any monaco editor
+                const cmContent = this.page.locator('.monaco-editor').first();
+                if (await cmContent.count() > 0) {
+                    await cmContent.click({ force: true });
+                } else {
+                    throw error;
+                }
             }
         }
         
         await this.page.locator(this.fnEditor).locator(".inputarea").fill(".a=2");
         await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
-        
-        await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
-        
+
+        // Click the Save button (separate button next to function dropdown)
+        await this.page.locator(this.functionSaveButton).click();
+
         try {
           await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'attached', timeout: 3000 });
           await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
         } catch (error) {
-          await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
+          await this.page.locator(this.functionSaveButton).click();
           await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 5000 });
         }
         
