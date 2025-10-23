@@ -189,17 +189,21 @@ export default defineComponent({
   will-change: transform;
   transform: translateZ(0);
 
-  // Phase 2: Enhanced hover state
+  // Phase 2: Enhanced hover state with 3D icon effect
   &:hover:not(.q-router-link--active) {
     transform: translateZ(0);
     // background-color: rgba(30, 41, 59, 0.6);
 
     .q-icon {
       color: var(--o2-menu-color);
+      // 3D pop-out effect with slight rotation
+      transform: translateZ(20px) scale(1.15) rotateY(5deg);
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
     }
 
     .q-item-label {
       color: var(--o2-menu-color);
+      transform: translateY(-2px);
     }
   }
 
@@ -283,17 +287,25 @@ export default defineComponent({
   }
 }
 
-// Phase 3: Enhanced icon container
+// Phase 3: Enhanced icon container with 3D effects
 .q-item__section--avatar {
   margin: 0;
   padding: 0;
   min-width: 40px;
+  perspective: 1000px; // Enable 3D space
 
   .q-icon {
     padding: 4px;
     border-radius: 12px;
-    transition: all 200ms ease-out;
+    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    transform-style: preserve-3d;
   }
+}
+
+// Add transition to label
+.q-item-label {
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
 }
 
 // Phase 4: Badge support
