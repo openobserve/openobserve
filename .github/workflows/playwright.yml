@@ -159,7 +159,7 @@ jobs:
                 "logshistogram.spec.js",
                 "logspage.spec.js",
                 "logsquickmode.spec.js",
-                # "pagination.spec.js",
+                "pagination.spec.js",
                 # "unflattened.spec.js",
                 # "logstable.spec.js",
               ]
