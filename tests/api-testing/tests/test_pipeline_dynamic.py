@@ -1,7 +1,44 @@
 import pytest
 import json
 import uuid
+import logging
+import time
+import re
 from datetime import datetime, timezone, timedelta
+
+# Configure logger for test output
+logger = logging.getLogger(__name__)
+
+
+def safe_sql_identifier(identifier):
+    """
+    Safely escape SQL identifiers to prevent injection.
+    Only allows alphanumeric characters, underscores, hyphens, dots, and curly braces.
+    """
+    if not isinstance(identifier, str):
+        raise ValueError("Identifier must be a string")
+    
+    # Allow alphanumeric, underscore, hyphen, dot, and curly braces for template variables
+    if not re.match(r'^[a-zA-Z0-9_\-\.{}]+$', identifier):
+        raise ValueError(f"Invalid characters in identifier: {identifier}")
+    
+    # Additional length check to prevent excessively long identifiers
+    if len(identifier) > 100:
+        raise ValueError(f"Identifier too long: {identifier}")
+    
+    return identifier
+
+
+def safe_sql_value(value):
+    """
+    Safely escape SQL string values to prevent injection.
+    """
+    if not isinstance(value, str):
+        raise ValueError("Value must be a string")
+    
+    # Basic escaping for single quotes in string values
+    escaped_value = value.replace("'", "''")
+    return escaped_value
 
 
 @pytest.mark.parametrize(
@@ -94,15 +131,15 @@ def test_pipeline_dynamic_template_substitution(create_session, base_url, source
     }
 
     # Create the pipeline
-    print(f"🧪 Creating pipeline with DYNAMIC TEMPLATE: {pipeline_name}")
-    print(f"📋 Template: '{destination_template}' should become '{expected_destination}'")
+    logger.info(f"Creating pipeline with DYNAMIC TEMPLATE: {pipeline_name}")
+    logger.info(f"Template: '{destination_template}' should become '{expected_destination}'")
     resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
     
     if resp_create_pipeline.status_code != expected_status:
-        print(f"❌ Pipeline creation failed. Response: {resp_create_pipeline.text}")
+        logger.error(f"Pipeline creation failed. Response: {resp_create_pipeline.text}")
     
     assert resp_create_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_create_pipeline.status_code}"
-    print(f"✅ Pipeline created successfully: {pipeline_name}")
+    logger.info(f"Pipeline created successfully: {pipeline_name}")
 
     # Get pipeline list to verify creation and get pipeline_id
     resp_list_pipelines = session.get(f"{url}api/{org_id}/pipelines")
@@ -118,48 +155,47 @@ def test_pipeline_dynamic_template_substitution(create_session, base_url, source
             break
 
     assert pipeline_id, f"Pipeline ID not found for the created pipeline: {pipeline_name}"
-    print(f"Pipeline ID: {pipeline_id}")
+    logger.info(f"Pipeline ID: {pipeline_id}")
 
     # 🔍 CRITICAL BUG CHECK: Inspect the actual destination stream name in the saved pipeline
-    print(f"🔍 CHECKING FOR BUG: Inspecting saved pipeline configuration...")
+    logger.info("CHECKING FOR BUG: Inspecting saved pipeline configuration...")
     
     # Extract the output node from the saved pipeline to see what destination was actually saved
     output_nodes = [node for node in created_pipeline.get("nodes", []) if node.get("io_type") == "output"]
     if output_nodes:
         actual_saved_destination = output_nodes[0].get("data", {}).get("stream_name", "NOT_FOUND")
-        print(f"📝 Template used: '{destination_template}'")
-        print(f"💾 Actually saved: '{actual_saved_destination}'")
+        logger.info(f"Template used: '{destination_template}'")
+        logger.info(f"Actually saved: '{actual_saved_destination}'")
         
         # 🐛 BUG DETECTION: Check if template was improperly converted
         if "_kubernetes.namespace_name_" in actual_saved_destination or "_k8s_namespace_name_" in actual_saved_destination:
-            print(f"🐛 BUG DETECTED! Template was converted to literal underscore format: '{actual_saved_destination}'")
-            print(f"🚨 This is the bug - template substitution is broken!")
+            logger.error(f"BUG DETECTED! Template was converted to literal underscore format: '{actual_saved_destination}'")
+            logger.error("This is the bug - template substitution is broken!")
             
             # On main repo (with bug): This assertion should FAIL
             # On main environment (with fix): This assertion should PASS
             assert actual_saved_destination == expected_destination, f"BUG: Expected '{expected_destination}' but got '{actual_saved_destination}' - template substitution failed!"
         
         elif actual_saved_destination == expected_destination:
-            print(f"✅ Template substitution working correctly!")
+            logger.info("Template substitution working correctly!")
         elif actual_saved_destination == destination_template:
-            print(f"⚠️  Template was saved literally without substitution - may be processed at runtime")
+            logger.warning("Template was saved literally without substitution - may be processed at runtime")
         else:
-            print(f"❓ Unexpected destination format: '{actual_saved_destination}'")
+            logger.warning(f"Unexpected destination format: '{actual_saved_destination}'")
 
     # Enable the pipeline
     resp_enable_pipeline = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value=true")
     assert resp_enable_pipeline.status_code == 200, f"Failed to enable pipeline. Status: {resp_enable_pipeline.status_code}"
-    print(f"✅ Pipeline enabled: {pipeline_name}")
+    logger.info(f"Pipeline enabled: {pipeline_name}")
     
     # NOW ingest data after pipeline is created and enabled
     ingest_url = f"{url}api/{org_id}/{source_stream}/_json"
     resp_ingest = session.post(ingest_url, json=logs_data)
-    print(f"📊 Data ingestion to {source_stream} AFTER pipeline creation: Status {resp_ingest.status_code}")
+    logger.info(f"Data ingestion to {source_stream} AFTER pipeline creation: Status {resp_ingest.status_code}")
     assert resp_ingest.status_code == 200, f"Data ingestion failed with status {resp_ingest.status_code}"
     
     # Wait for pipeline to process the newly ingested data
-    import time
-    print(f"⏳ Waiting 15 seconds for pipeline to process data...")
+    logger.info("Waiting 15 seconds for pipeline to process data...")
     time.sleep(15)
     
     # Verify the pipeline is running and enabled
@@ -169,13 +205,13 @@ def test_pipeline_dynamic_template_substitution(create_session, base_url, source
     assert pipeline_state is not None, f"Pipeline {pipeline_id} not found"
     assert pipeline_state["enabled"] is True, f"Pipeline {pipeline_id} is not enabled"
     
-    print(f"✅ Pipeline verification successful:")
-    print(f"   Name: {pipeline_name}")
-    print(f"   Source: {source_stream}")
-    print(f"   Template: {destination_template}")
-    print(f"   Expected Destination: {expected_destination}")
-    print(f"   Condition: {condition_field} contains '{condition_value}'")
-    print(f"   Status: Enabled")
+    logger.info("Pipeline verification successful")
+    logger.info(f"Name: {pipeline_name}")
+    logger.info(f"Source: {source_stream}")
+    logger.info(f"Template: {destination_template}")
+    logger.info(f"Expected Destination: {expected_destination}")
+    logger.info(f"Condition: {condition_field} contains '{condition_value}'")
+    logger.info("Status: Enabled")
     
     # 🎯 FINAL VERIFICATION: Check if the EXPECTED destination stream was created
     now = datetime.now(timezone.utc)
@@ -183,9 +219,10 @@ def test_pipeline_dynamic_template_substitution(create_session, base_url, source
     start_time = int((now - timedelta(minutes=5)).timestamp() * 1000000)
     
     # Check if the EXPECTED destination stream exists (should exist if template substitution worked)
+    safe_expected_destination = safe_sql_identifier(expected_destination)
     expected_search_payload = {
         "query": {
-            "sql": f'SELECT COUNT(*) as count FROM "{expected_destination}"',
+            "sql": f'SELECT COUNT(*) as count FROM "{safe_expected_destination}"',
             "start_time": start_time,
             "end_time": end_time,
             "from": 0,
@@ -198,22 +235,23 @@ def test_pipeline_dynamic_template_substitution(create_session, base_url, source
         search_result = resp_expected_search.json()
         if search_result.get("hits", []):
             count = search_result["hits"][0].get("count", 0) 
-            print(f"✅ EXPECTED destination stream '{expected_destination}' has {count} records")
+            logger.info(f"EXPECTED destination stream '{expected_destination}' has {count} records")
             
             if count > 0:
-                print(f"🎉 TEMPLATE SUBSTITUTION SUCCESS! Data was routed to correctly substituted stream name")
+                logger.info("TEMPLATE SUBSTITUTION SUCCESS! Data was routed to correctly substituted stream name")
             else:
-                print(f"⚠️  Expected stream exists but no records - may be timing issue")
+                logger.warning("Expected stream exists but no records - may be timing issue")
         else:
-            print(f"⚠️  Expected destination stream '{expected_destination}' exists but no records found")
+            logger.warning(f"Expected destination stream '{expected_destination}' exists but no records found")
     else:
-        print(f"❌ EXPECTED destination stream '{expected_destination}' does not exist (Status: {resp_expected_search.status_code})")
-        print(f"🐛 This suggests template substitution failed - data may have gone to literal template name")
+        logger.error(f"EXPECTED destination stream '{expected_destination}' does not exist (Status: {resp_expected_search.status_code})")
+        logger.error("This suggests template substitution failed - data may have gone to literal template name")
         
         # Check if data went to the literal template name instead
+        safe_template_name = safe_sql_identifier(destination_template)
         literal_search_payload = {
             "query": {
-                "sql": f'SELECT COUNT(*) as count FROM "{destination_template}"',
+                "sql": f'SELECT COUNT(*) as count FROM "{safe_template_name}"',
                 "start_time": start_time,
                 "end_time": end_time,
                 "from": 0,
@@ -226,9 +264,9 @@ def test_pipeline_dynamic_template_substitution(create_session, base_url, source
             literal_result = resp_literal_search.json()
             if literal_result.get("hits", []) and literal_result["hits"][0].get("count", 0) > 0:
                 literal_count = literal_result["hits"][0].get("count", 0)
-                print(f"🐛 BUG CONFIRMED! Data was routed to literal template name '{destination_template}' ({literal_count} records)")
-                print(f"🚨 Template substitution is not working - this is the bug!")
+                logger.error(f"BUG CONFIRMED! Data was routed to literal template name '{destination_template}' ({literal_count} records)")
+                logger.error("Template substitution is not working - this is the bug!")
 
     # Keep pipeline running for analysis
-    print(f"✅ Pipeline '{pipeline_name}' will remain active for bug analysis")
-    print(f"🔬 Check the monitor to see which stream(s) actually received data")
+    logger.info(f"Pipeline '{pipeline_name}' will remain active for bug analysis")
+    logger.info("Check the monitor to see which stream(s) actually received data")
