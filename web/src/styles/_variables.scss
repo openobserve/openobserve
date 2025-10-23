@@ -236,7 +236,7 @@ $o2-dark-teal-900: #9BDDD6;
   // --o2-bg-dark: #0d1117;
 
 $theme-color: #3F7994;
-$dark-theme-color: #0E131D;
+$dark-theme-color: #112027;
 
 $theme-mode: white;
 $dark-theme-mode: $dark-theme-color;
@@ -371,7 +371,7 @@ $actions-column-box-shawdow-dark: rgba(125, 125, 125, 0.694);
   --o2-toggle-track-bg: color-mix(in srgb, var(--o2-theme-color) 90%, white);
   --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-theme-color) 1%, #{$dark-theme-color});
 
-  --o2-card-bg: rgba(0, 0, 0, 0.8);
+  --o2-card-bg: #1d2527;
 
   --o2-header-menu-bg: rgba(0, 0, 0, 1);
 
