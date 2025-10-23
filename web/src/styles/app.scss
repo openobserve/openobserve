@@ -459,8 +459,6 @@ body {
     position: sticky;
     right: 0;
     z-index: 1;
-    box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
-    border-radius: 0 0.375rem 0 0;
   }
   tr{
     td{
@@ -468,22 +466,12 @@ body {
     }
   }
 }
-//here we have dark theme styling for the table
-//`. we are changing the background color of the actions column
-// .o2-quasar-table-dark{
-//   th:last-child.actions-column,
-//   td:last-child.actions-column {
-//     background: var(--q-dark);
-//     box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1);
-//     width: 150px;
-//   }
-// }
 
 .o2-quasar-table{
   th:last-child.actions-column,
   td:last-child.actions-column {
     width: 150px;
-    box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
+    box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
   }
 }
 //this is for in some of pages we are having a header for eg: pipelines ,functions ,enrichments listing pages
@@ -550,7 +538,8 @@ body {
       position: sticky;
       right: 0;
       z-index: 1;
-      width: 150px !important;
+      width: 100px ;
+    box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
     }
   }
   .q-table{
@@ -562,43 +551,8 @@ body {
         position: sticky;
         right: 0;
         z-index: 1;
-      }
-    }
-  }
-}
-.o2-quasar-app-table-light{
-  .q-virtual-scroll__content{
-    td:last-child.actions-column {
-      background: #ffffff !important;
-      box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1) !important;
-      width: 150px !important;
-    }
-  }
-  .q-table{
-    thead{
-      th:last-child.actions-column{
-        background: #ffffff !important;
-        box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1) !important;
-        width: 150px !important;
-      }
-    }
-  }
-}
-
-.o2-quasar-app-table-dark{
-  .q-virtual-scroll__content{
-    td:last-child.actions-column {
-      background: var(--q-dark) !important;
-      box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1) !important;
-      width: 150px !important;
-    }
-  }
-  .q-table{
-    thead{
-      th:last-child.actions-column{
-        background: var(--q-dark) !important;
-        box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1) !important;
-        width: 150px !important;
+        box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
+        width: 100px;
       }
     }
   }
