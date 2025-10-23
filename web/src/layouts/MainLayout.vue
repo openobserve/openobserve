@@ -468,9 +468,10 @@ class="padding-none" />
     >
       <q-list class="leftNavList">
         <menu-link
-          v-for="nav in linksList"
+          v-for="(nav, index) in linksList"
           :key="nav.title"
           :link-name="nav.name"
+          :animation-index="index"
           v-bind="{ ...nav, mini: miniMode }"
         />
       </q-list>
