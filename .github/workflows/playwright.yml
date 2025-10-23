@@ -142,7 +142,7 @@ jobs:
             browser: "chrome"
             run_files:
               [
-                # "sanity.spec.js",
+                "sanity.spec.js",
                 # "changeOrg.spec.js",
                 "enrichment.spec.js",
                 "schema.spec.js",
