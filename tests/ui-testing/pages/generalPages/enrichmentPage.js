@@ -437,15 +437,30 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 });
         await this.page.waitForTimeout(2000);
 
-        // Check if error occurred and capture details for debugging
+        // Check if error occurred and retry with additional wait
         const errorDetailsBtn = this.page.locator('[data-test="logs-page-result-error-details-btn"]');
         if (await errorDetailsBtn.isVisible()) {
-            testLogger.warn('Error detected after running VRL query, clicking error details button');
-            await errorDetailsBtn.click();
-            await this.page.waitForTimeout(1000);
-            await this.page.screenshot({ path: 'test-results/error-details-vrl-enrichment.png', fullPage: true });
-            testLogger.error('Error details screenshot saved to test-results/error-details-vrl-enrichment.png');
-            throw new Error('VRL query execution failed - check test-results/error-details-vrl-enrichment.png for details');
+            testLogger.warn('Error detected after first VRL query attempt, waiting 5s and retrying');
+
+            // Wait additional 5 seconds for enrichment table to be fully ready
+            await this.page.waitForTimeout(5000);
+
+            // Retry the query
+            await this.applyQueryMultipleClicks();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            await this.page.waitForTimeout(2000);
+
+            // Check again if error persists
+            if (await errorDetailsBtn.isVisible()) {
+                testLogger.error('Error persists after retry, capturing details');
+                await errorDetailsBtn.click();
+                await this.page.waitForTimeout(1000);
+                await this.page.screenshot({ path: 'test-results/error-details-vrl-enrichment.png', fullPage: true });
+                testLogger.error('Error details screenshot saved to test-results/error-details-vrl-enrichment.png');
+                throw new Error('VRL query execution failed after retry - check test-results/error-details-vrl-enrichment.png for details');
+            } else {
+                testLogger.info('VRL query succeeded after retry');
+            }
         }
 
         // Verify that no warning is shown for query execution

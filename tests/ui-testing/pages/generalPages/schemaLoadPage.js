@@ -158,10 +158,11 @@ class SchemaLoadPage {
     // Stream management methods
     async searchStreamInStreamsPage(streamName) {
         testLogger.debug('Searching stream in streams page', { streamName });
-        
+
         await this.page.waitForSelector(`input[placeholder="${this.schemaLoadLocators.streamSearchPlaceholder}"]`, { state: 'visible' });
         await this.page.getByPlaceholder(this.schemaLoadLocators.streamSearchPlaceholder).click();
         await this.page.getByPlaceholder(this.schemaLoadLocators.streamSearchPlaceholder).fill(streamName);
+        await this.page.waitForTimeout(1000); // Wait for search to filter results
         await this.page.waitForLoadState('domcontentloaded');
     }
 
@@ -212,16 +213,16 @@ class SchemaLoadPage {
             await this.searchStreamInStreamsPage(streamName);
             
             // Wait for stream to be visible in streams page
-            await waitUtils.smartWait(this.page, 2000, 'stream to appear in streams page');
             const streamExists = await this.page.locator(`text="${streamName}"`).isVisible();
             if (!streamExists) {
                 testLogger.error('Stream not found in streams page', { streamName });
                 throw new Error(`Stream ${streamName} not found in streams page after ingestion`);
             }
             testLogger.debug('Stream verified in streams page', { streamName });
-            
+
             // Step 2: Navigate to logs and verify stream is available in log search
             await this.navigateToLogs();
+            await this.page.waitForTimeout(1000); // Wait after navigating back to logs
             
             // Try a more direct approach - just check if we can see any streams at all
             await this.page.waitForSelector(this.schemaLoadLocators.logSearchIndexSelectStream, { state: 'visible' });
