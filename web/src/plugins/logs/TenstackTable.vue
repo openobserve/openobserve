@@ -248,7 +248,8 @@ class="q-mr-xs" />
                 : 'tw-flex',
               (tableRows[virtualRow.index] as any)[
                 store.state.zoConfig.timestamp_column
-              ] === highlightTimestamp
+              ] === highlightTimestamp &&
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? store.state.theme === 'dark'
                   ? 'tw-bg-zinc-700'
                   : 'tw-bg-zinc-300'
