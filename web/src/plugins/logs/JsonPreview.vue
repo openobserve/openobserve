@@ -3,8 +3,7 @@
     <div class="q-pb-xs flex justify-start q-px-md copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="logs-json-preview-tabs q-mr-sm"
-        style="border: 1px solid #8a8a8a; border-radius: 4px; overflow: hidden"
+        class="logs-json-preview-tabs q-mr-sm tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-rounded-[0.25rem] tw-text-[]"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -16,7 +15,7 @@
         dense
         size="sm"
         no-caps
-        class="q-px-sm copy-log-btn q-mr-sm"
+        class="q-px-sm copy-log-btn q-mr-sm tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-font-normal"
         icon="content_copy"
         @click="copyLogToClipboard"
       />
@@ -101,7 +100,8 @@
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <q-spinner-hourglass v-if="loading" size="lg" color="primary" />
+      <q-spinner-hourglass v-if="loading"
+size="lg" color="primary" />
       <div v-if="!loading">
         <code-query-editor
           v-model:query="unflattendData"
@@ -114,6 +114,7 @@
       </div>
     </div>
     <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
+      {
       <div
         class="log_json_content"
         v-for="(key, index) in Object.keys(value)"
@@ -269,9 +270,14 @@
         </q-btn-dropdown>
 
         <span class="q-pl-xs" :data-test="`log-expand-detail-key-${key}`">
-          <LogsHighLighting :data="{ [key]: value[key] }" :show-braces="false" :query-string="highlightQuery" /><span v-if="index < Object.keys(value).length - 1">,</span>
+          <LogsHighLighting
+            :data="{ [key]: value[key] }"
+            :show-braces="false"
+            :query-string="highlightQuery"
+          /><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>
+      }
       <div
         v-if="showMenu"
         class="context-menu shadow-lg rounded-sm"
@@ -288,7 +294,8 @@
         "
       >
         <div class="context-menu-item" @click="copySelectedText">
-          <q-icon name="content_copy" size="xs" class="q-mr-sm" />
+          <q-icon name="content_copy"
+size="xs" class="q-mr-sm" />
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">
