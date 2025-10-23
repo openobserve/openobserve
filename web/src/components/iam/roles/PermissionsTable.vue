@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           parent ? parent.name : 'main'
         }-permissions-table`"
         :id="`permissions-table-${parent.resourceName}`"
-        style="max-height: 725px; overflow-x: hidden; overflow-y: auto"
+        style="max-height: 725px; overflow-x: hidden; overflow-y: auto; height: calc(100vh - 310px);"
         :style="{
           'max-height': level > 0 ? '400px' : '100%',
         }"
@@ -122,10 +122,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter="filter && filter.value"
         :filter-method="filter && filter.method"
         hide-bottom
-        class="full-height"
       >
         <template v-if="!level" v-slot:before>
-          <thead class="thead-sticky text-left">
+          <thead class="thead-sticky text-left o2-custom-table-header-bg">
             <tr
               data-test="edit-role-permissions-table-header"
               :props="props"
