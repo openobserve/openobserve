@@ -145,7 +145,7 @@ jobs:
                 # "sanity.spec.js",
                 # "changeOrg.spec.js",
                 "enrichment.spec.js",
-                # "schema.spec.js",
+                "schema.spec.js",
                 # "schemaload.spec.js",
                 "serviceAccount.spec.js",
                 # "usersOrg.spec.js",
