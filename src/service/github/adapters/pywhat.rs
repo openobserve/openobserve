@@ -125,10 +125,7 @@ impl PyWhatAdapter {
         let config = config::get_config();
         let url = &config.common.regex_patterns_source_url;
 
-        log::info!(
-            "Fetching regex patterns from: {}",
-            url
-        );
+        log::info!("Fetching regex patterns from: {}", url);
 
         // Fetch raw data without caching
         let data = github_service.fetch_raw(url).await?;

@@ -19,7 +19,7 @@ use bytes::Bytes;
 use serde::de::DeserializeOwned;
 
 use super::{
-    cache::{CacheManager},
+    cache::CacheManager,
     types::{CachedData, GitHubError, GitHubServiceConfig},
 };
 

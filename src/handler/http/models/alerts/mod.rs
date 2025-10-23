@@ -223,9 +223,10 @@ pub struct Condition {
     pub ignore_case: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
 pub enum Operator {
     #[serde(rename = "=")]
+    #[default]
     EqualTo,
     #[serde(rename = "!=")]
     NotEqualTo,
@@ -239,12 +240,6 @@ pub enum Operator {
     LessThanEquals,
     Contains,
     NotContains,
-}
-
-impl Default for Operator {
-    fn default() -> Self {
-        Self::EqualTo
-    }
 }
 
 #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
