@@ -172,7 +172,7 @@ size="xs" /> No field found in
                   !props.row.isSchemaField ||
                   !props.row.showValues
                 "
-                class="field-container flex content-center ellipsis q-pl-lg full-width"
+                class="field-container flex content-center ellipsis q-pl-lg full-width hover:tw-bg-[var(--o2-hover-accent)] tw-rounded-[0.25rem]"
                 :title="props.row.name"
               >
                 <div
@@ -209,7 +209,7 @@ size="xs" /> No field found in
                   </span>
                 </div>
                 <div
-                  class="field_overlay"
+                  class="field_overlay tw-rounded-[0.25rem]"
                   v-if="
                     props.row.name !== store.state.zoConfig.timestamp_column
                   "
@@ -290,6 +290,7 @@ size="xs" /> No field found in
                 expanded-icon="
                   expand_less
                 "
+                class="hover:tw-bg-[var(--o2-hover-accent)] tw-rounded-[0.25rem]"
                 @before-show="
                   (event: any) => openFilterCreator(event, props.row)
                 "
@@ -333,7 +334,9 @@ size="xs" /> No field found in
                         />
                       </span>
                     </div>
-                    <div class="field_overlay">
+                    <div
+                      class="field_overlay tw-rounded-[0.25rem] tw-overflow-hidden"
+                    >
                       <q-btn
                         v-if="props.row.isSchemaField"
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"

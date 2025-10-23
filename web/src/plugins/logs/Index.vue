@@ -267,7 +267,7 @@ size="md" />
                       />
                     </div>
                     <div class="text-center col-10 q-ma-none">
-                      <h5 class="tw-my-none tw-pt-[1rem]">
+                      <h5 class="tw-my-none">
                         <span v-if="disableMoreErrorDetails">
                           <SanitizedHtmlRenderer
                             data-test="logs-search-detail-error-message"
