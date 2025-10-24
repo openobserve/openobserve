@@ -245,6 +245,19 @@ body {
   flex-shrink: 0 !important; // Prevent icon from shrinking
 }
 
+/* ============================================================================
+   CUSTOM TAB ICON STYLING
+   Icon styling for vertical tabs with Lucide icons
+   ============================================================================ */
+
+.o2-tab-icon {
+  width: 20px !important;
+  height: 20px !important;
+  margin-right: 0.6rem !important; // 12px spacing after icon
+  margin-left: 0.1rem !important; // 12px spacing after icon
+  flex-shrink: 0 !important; // Prevent icon from shrinking
+}
+
 .spitter-container {
   width: 100%;
   height: 100%;
