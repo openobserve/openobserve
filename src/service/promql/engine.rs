@@ -263,7 +263,7 @@ impl Engine {
                         .iter()
                         .map(|v| RangeValue {
                             labels: v.labels.to_owned(),
-                            samples: vec![v.sample.clone()],
+                            samples: vec![v.sample],
                             exemplars: None,
                             time_window: time_window.clone(),
                         })
@@ -271,7 +271,7 @@ impl Engine {
                     Value::Instant(v) => {
                         vec![RangeValue {
                             labels: v.labels.to_owned(),
-                            samples: vec![v.sample.clone()],
+                            samples: vec![v.sample],
                             exemplars: None,
                             time_window,
                         }]
