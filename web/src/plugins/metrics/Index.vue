@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="row" style="height: calc(100vh - 106px); overflow-y: auto">
          <div class="tw-pl-[0.625rem]">
           <div
-            class="col scroll card-container"
+            class="col scroll card-container tw-mr-[0.625rem]"
             style="
               overflow-y: auto;
               height: 100%;
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
           >
             <template #before>
-              <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+              <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
                 class="col scroll card-container"
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #after>
-              <div class="row card-container">
+              <div class="row card-container tw-ml-[0.625rem]">
                 <div
                   class="row"
                   style="height: calc(100vh - 106px); overflow-y: auto"
