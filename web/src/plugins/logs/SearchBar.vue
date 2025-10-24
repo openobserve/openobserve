@@ -35,9 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="onLogsVisualizeToggleUpdate('logs')"
                 no-caps
                 size="sm"
-                icon="search"
                 class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm btn-height-32"
               >
+              <ScanSearch size="1.2rem" />
                 <q-tooltip>
                   {{ t("common.search") }}
                 </q-tooltip>
@@ -57,8 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
               >
-                <img :src="visualizeIcon"
-alt="Visualize" class="icon-sm" />
+              <ChartLine size='1.2rem' />
                 <q-tooltip v-if="isVisualizeDisabled">
                   {{ t("search.enableSqlModeOrSelectSingleStream") }}
                 </q-tooltip>
@@ -87,8 +86,8 @@ alt="Visualize" class="icon-sm" />
             "
           >
           </q-toggle>
-          <img :src="histogramIcon" alt="Histogram"
-class="toolbar-icon" />
+          <ChartNoAxesColumn size="1rem" />
+          <q-tooltip class="toolbar-icon" />
           <q-tooltip>
             {{ t("search.showHistogramLabel") }}
           </q-tooltip>
@@ -140,10 +139,10 @@ class="toolbar-icon" />
           no-caps
           flat
           dense
-          icon="restart_alt"
           class="toolbar-reset-btn element-box-shadow"
           @click="resetFilters"
         >
+        <RefreshCcw size="1rem" />
           <q-tooltip>
             {{ t("search.resetFilters") }}
           </q-tooltip>
@@ -160,13 +159,14 @@ class="toolbar-icon" />
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
             v-model="savedViewDropdownModel"
-            icon="save"
-            icon-right="saved_search"
             @click="fnSavedView"
             @show="loadSavedView"
             split
             class="saved-views-dropdown no-border"
           >
+            <template v-slot:label>
+              <Bookmark size="1rem" />
+            </template>
             <q-list
               :style="
                 localSavedViews.length > 0 ? 'width: 500px' : 'width: 250px'
@@ -682,9 +682,9 @@ class="toolbar-icon" />
           data-test="logs-search-bar-share-link-btn"
           class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
           size="xs"
-          icon="share"
           @click="shareLink.execute()"
           :loading="shareLink.isLoading.value"
+          icon="share"
         >
           <q-tooltip>
             {{ t("search.shareLink") }}
@@ -694,8 +694,8 @@ class="toolbar-icon" />
         <q-btn
           data-test="logs-search-bar-more-options-btn"
           class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
-          icon="menu"
         >
+        <Menu size="1rem" />
           <q-menu>
             <q-list>
               <q-item
@@ -1158,7 +1158,6 @@ class="q-pr-sm" />
       </div>
       <q-btn
         data-test="logs-query-editor-full_screen-btn"
-        :icon="isFocused ? 'fullscreen_exit' : 'fullscreen'"
         :title="isFocused ? 'Collapse' : 'Expand'"
         dense
         size="10px"
@@ -1166,7 +1165,10 @@ class="q-pr-sm" />
         color="primary"
         @click="isFocused = !isFocused"
         class="tw-absolute tw-top-[3.1rem] tw-right-[1.2rem] tw-z-50"
-      ></q-btn>
+      >
+      <Maximize size='0.8rem' v-if="!isFocused" />
+      <Minimize size="0.8rem" v-else />
+    </q-btn>
     </div>
 
     <q-dialog ref="confirmDialog" v-model="confirmDialogVisible">
@@ -1584,7 +1586,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar, copyToClipboard, is } from "quasar";
+import { useQuasar, copyToClipboard, is, QTooltip } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
@@ -1638,6 +1640,7 @@ import {
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
+import { Bookmark, ChartLine, ChartNoAxesColumn, RefreshCcw, ScanSearch, Share, Menu, Maximize, Minimize } from "lucide-vue-next";
 
 const defaultValue: any = () => {
   return {
@@ -1659,6 +1662,15 @@ export default defineComponent({
     FunctionSelector,
     CodeQueryEditor,
     QueryPlanDialog,
+    ScanSearch,
+    ChartLine,
+    ChartNoAxesColumn,
+    RefreshCcw,
+    Bookmark,
+    Share,
+    Menu,
+    Maximize,
+    Minimize,
   },
   emits: [
     "searchdata",
