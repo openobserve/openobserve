@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-mt-md full-width">
-    <div class="flex q-mx-md items-center no-wrap">
+<div class="card-container tw-w-full tw-mb-[0.625rem] tw-mr-2 tw-mx-2">
+    <div class="flex tw-py-3 tw-px-4 items-center no-wrap tw-h-[68px]">
       <div class="col">
         <div class="flex">
           <q-btn
@@ -55,44 +55,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-
-    <q-separator class="q-my-sm q-mx-md" />
   </div>
-  <div class="flex">
-    <div class="report-list-tabs flex items-center justify-center q-mx-md">
-      <app-tabs
-        data-test="alert-import-tabs"
-        class="q-mr-md"
-        :tabs="tabs"
-        v-model:active-tab="activeTab"
-        @update:active-tab="updateActiveTab"
-      />
-    </div>
+  <div class="flex tw-mx-2">
 
     <div class="flex">
       <q-splitter
         class="logs-search-splitter"
         no-scroll
         v-model="splitterModel"
-        style="width: calc(95vw - 20px); height: 100%"
+        style="width: calc(95vw - 26px); height: 100%"
       >
+      
         <template #before>
+              <div class="tw-w-full tw-h-full ">
+          <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
+                   <div class="app-tabs-container tw-h-[36px] tw-w-fit">
+            <app-tabs
+              data-test="alert-import-tabs"
+              class="tabs-selection-container"
+              :tabs="tabs"
+              v-model:active-tab="activeTab"
+              @update:active-tab="updateActiveTab"
+            />
+            </div>
+           </div>
           <div
             v-if="activeTab == 'import_json_url'"
-            class="editor-container-url"
+            class="editor-container-url card-container tw-py-1"
           >
-            <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: calc(100% - 10px)" class="q-mb-md flex">
+            <q-form class="tw-mx-2 q-mt-md tw-pb-2" @submit="onSubmit">
+              <div style="width: calc(100% - 10px)" class="flex">
                 <div style="width: calc(69%)" class="q-pr-sm">
                   <q-input
                     data-test="alert-import-url-input"
                     v-model="url"
                     :label="t('dashboard.addURL')"
-                    color="input-border"
-                    bg-color="input-bg"
                     stack-label
-                    filled
+                    borderless
                     label-slot
+                    style="padding: 10px;"
                   />
                 </div>
 
@@ -130,9 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="activeTab == 'import_json_file'"
-            class="editor-container-json"
+            class="editor-container-json card-container tw-py-1"
           >
-            <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
+            <q-form class="tw-mx-2 q-mt-md tw-pb-2" @submit="onSubmit">
               <div style="width: calc(100% - 10px)" class="q-mb-md flex">
                 <div style="width: calc(69%)" class="q-pr-sm">
                   <q-file
@@ -185,11 +186,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div></div>
             </q-form>
           </div>
+        </div>
         </template>
         <template #after>
           <div
             data-test="alert-import-output-editor"
-            style="width: 100%; height: 100%"
+            style="width: calc(100% - 10px); height: 100%"
+            class="card-container tw-ml-[0.625rem] tw-h-full"
           >
             <div
               v-if="alertErrorsToDisplay.length > 0"
@@ -197,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               Error Validations
             </div>
-            <div v-else class="text-center text-h6">Output Messages</div>
+            <div v-else class="text-center text-h6 tw-py-2 ">Output Messages</div>
             <q-separator class="q-mx-md q-mt-md" />
             <div class="error-report-container">
               <!-- Alert Errors Section -->
@@ -1450,29 +1453,36 @@ export default defineComponent({
   background-size: 170px;
 }
 .editor-container {
-  height: calc(78vh - 20px) !important;
+  height: calc(75vh - 20px) !important;
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(70vh - 16px) !important; /* Total editor height */
+    height: calc(69vh - 26px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
+        padding-top: 12px;
+
   }
+
 }
 .editor-container-json {
   .monaco-editor {
-    height: calc(70vh - 22px) !important; /* Total editor height */
+   height: calc(66vh - 24px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
+        padding-top: 12px;
+
   }
 }
 .monaco-editor {
-  height: calc(81vh - 14px) !important; /* Total editor height */
+  height: calc(68vh - 14px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none; /* Remove resize behavior */
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
 }
 .error-report-container {
-  height: calc(78vh - 24px) !important; /* Total editor height */
+  height: calc(100vh - 190px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none;
 }
@@ -1482,7 +1492,7 @@ export default defineComponent({
 
   flex-direction: column;
   border: 1px solid #ccc;
-  height: calc(100% - 100px) !important; /* Total container height */
+  height: calc(100% - 80px) !important; /* Total container height */
 }
 
 .error-section {

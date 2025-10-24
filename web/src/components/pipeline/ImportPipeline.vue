@@ -15,93 +15,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex q-mx-md items-center no-wrap tw-h-[61px]">
-    <div class="col">
-      <div class="flex">
+   <div class="card-container tw-mb-[0.625rem] tw-mr-2">
+    <div class="flex tw-py-3 tw-px-4 items-center no-wrap tw-h-[68px]">
+      <div class="col">
+        <div class="flex">
+          <q-btn
+            no-caps
+            padding="xs"
+            outline
+            @click="router.back()"
+            icon="arrow_back_ios_new"
+            data-test="pipeline-import-back-btn"
+          />
+          <div class="tw-font-[600] tw-text-[20px] q-ml-md">Import Pipeline</div>
+        </div>
+      </div>
+      <div class="flex justify-center">
         <q-btn
+          v-close-popup
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
+          :label="t('function.cancel')"
           no-caps
-          padding="xs"
-          outline
+          flat
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           @click="router.back()"
-          icon="arrow_back_ios_new"
-          data-test="pipeline-import-back-btn"
+          data-test="pipeline-import-cancel-btn"
         />
-        <div class="tw-font-[600] tw-text-[20px] q-ml-md">Import Pipeline</div>
+        <q-btn
+          class="o2-primary-button no-border tw-h-[36px]"
+          :label="t('dashboard.import')"
+          type="submit"
+          no-caps
+          flat
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-primary-button-dark'
+              : 'o2-primary-button-light'
+          "
+          @click="importJson"
+          data-test="pipeline-import-json-btn"
+        />
       </div>
     </div>
-    <div class="flex justify-center">
-      <q-btn
-        v-close-popup
-        class="q-mr-md o2-secondary-button tw-h-[36px]"
-        :label="t('function.cancel')"
-        no-caps
-        flat
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-secondary-button-dark'
-            : 'o2-secondary-button-light'
-        "
-        @click="router.back()"
-        data-test="pipeline-import-cancel-btn"
-      />
-      <q-btn
-        class="o2-primary-button no-border tw-h-[36px]"
-        :label="t('dashboard.import')"
-        type="submit"
-        no-caps
-        flat
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-primary-button-dark'
-            : 'o2-primary-button-light'
-        "
-        @click="importJson"
-        data-test="pipeline-import-json-btn"
-      />
-    </div>
   </div>
-  <q-separator class="q-mx-md q-mb-sm" />
-  <div class="flex">
-    <div class="report-list-tabs flex items-center justify-center q-mx-md">
-      <app-tabs
-        data-test="pipeline-import-tabs"
-        class="q-mr-md"
-        :tabs="tabs"
-        v-model:active-tab="activeTab"
-        @update:active-tab="updateActiveTab"
-      />
-    </div>
-
-    <div class="flex" style="width: calc(100% - 20px)">
+  <div class="flex tw-pr-[0.625rem]">
+    <div class="flex" style="width: 100%">
       <q-splitter
         class="logs-search-splitter"
         no-scroll
         v-model="splitterModel"
-        style="width: calc(95vw - 20px); height: 100%"
+        style="width: calc(98vw - 12px); height: 100%"
       >
         <template #before>
+        <div class="tw-w-full tw-h-full ">
+          <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
+                   <div class="app-tabs-container tw-h-[36px] tw-w-fit">
+          <app-tabs
+            data-test="pipeline-import-tabs"
+            class="tabs-selection-container"
+            :tabs="tabs"
+            v-model:active-tab="activeTab"
+            @update:active-tab="updateActiveTab"
+          />
+          </div>
+          </div>
           <div
             v-if="activeTab == 'import_json_url'"
-            class="editor-container-url"
+            class="editor-container-url card-container tw-py-1 "
           >
-            <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: 100%" class="q-mb-md">
+            <q-form class="q-mt-md tw-pb-2" @submit="onSubmit">
+              <div style="width: 100%" class="q-mb-md tw-px-2">
                 <q-input
                   data-test="pipeline-import-url-input"
                   v-model="url"
-                  :label="t('dashboard.addURL')"
-                  color="input-border"
-                  bg-color="input-bg"
+                  :placeholder="t('dashboard.addURL')"
                   stack-label
-                  filled
-                  label-slot
+                  borderless
                 />
               </div>
               <query-editor
                 data-test="pipeline-import-sql-editor"
                 ref="queryEditorRef"
                 editor-id="pipeline-import-query-editor"
-                class="monaco-editor"
+                class="monaco-editor tw-mx-2"
                 :debounceTime="300"
                 v-model:query="jsonStr"
                 language="json"
@@ -119,10 +119,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="activeTab == 'import_json_file'"
-            class="editor-container-json"
+            class="editor-container-json card-container tw-py-1"
           >
-            <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: 100%" class="q-mb-md">
+            <q-form class=" q-mt-md tw-pb-2" @submit="onSubmit">
+              <div style="width: 100%" class="q-mb-md tw-px-2">
                 <q-file
                   data-test="pipeline-import-json-file-input"
                   v-model="jsonFiles"
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="pipeline-import-sql-editor"
                 ref="queryEditorRef"
                 editor-id="pipeline-import-query-editor"
-                class="monaco-editor"
+                class="monaco-editor tw-mx-2"
                 :debounceTime="300"
                 v-model:query="jsonStr"
                 language="json"
@@ -165,11 +165,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div></div>
             </q-form>
           </div>
+          </div>
         </template>
         <template #after>
           <div
             data-test="pipeline-import-output-editor"
-            style="width: 100%; height: 100%"
+            style="width: calc(100% - 10px); height: 100%"
+            class="card-container tw-ml-[0.625rem] tw-h-full"
           >
             <div
               v-if="pipelineErrorsToDisplay.length > 0"
@@ -177,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               Error Validations
             </div>
-            <div v-else class="text-center text-h6">Output Messages</div>
+            <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
             <q-separator class="q-mx-md q-mt-md" />
             <div class="error-report-container">
               <!-- Pipeline Errors Section -->
@@ -1708,25 +1710,29 @@ export default defineComponent({
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(70vh - 16px) !important; /* Total editor height */
+    height: calc(71vh - 27px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .editor-container-json {
   .monaco-editor {
-    height: calc(68vh - 20px) !important; /* Total editor height */
+    height: calc(67vh - 32px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .monaco-editor {
-  height: calc(81vh - 14px) !important; /* Total editor height */
+  height: calc(81vh - 16px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none; /* Remove resize behavior */
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
+  padding-top: 0.3rem;
+
 }
 .error-report-container {
-  height: calc(78vh - 24px) !important; /* Total editor height */
+  height: calc(79vh - 10px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none;
 }
