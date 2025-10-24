@@ -628,7 +628,7 @@ mod tests {
     async fn test_get_enrichment_table_data() {
         // This will fail in test environment due to missing dependencies,
         // but tests the function structure
-        let result = get_enrichment_table_data("test_org", "test_table").await;
+        let result = get_enrichment_table_data("test_org", "test_table", false).await;
         assert!(result.is_err());
     }
 
