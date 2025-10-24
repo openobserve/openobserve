@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="alert-list-page"
     class="q-pa-none flex flex-col"
-    style="height: calc(100vh - 60px);"
   >
     <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
         <div class="card-container tw-mb-[0.625rem]">
