@@ -51,29 +51,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             style="max-width: 150px; max-height: 31px"
           />
-          <img
-            v-if="store.state.zoConfig.custom_hide_self_logo == false"
-            class="appLogo"
-            loading="lazy"
-            :src="
-              store?.state?.theme == 'dark'
-                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-                : getImageURL('images/common/openobserve_latest_light_2.svg')
-            "
-            @click="goToHome"
-          />
+          <div v-if="store.state.zoConfig.custom_hide_self_logo == false" class="logo-container">
+            <!-- Animated Favicon (shows first, rotates once) -->
+            <img
+              v-show="showFavicon"
+              class="favicon-animated"
+              :src="getImageURL('images/common/openobserve_favicon.png')"
+              @click="goToHome"
+            />
+            <!-- Favicon + Text Logo (slides in after favicon rotation) -->
+            <div v-show="!showFavicon" class="logo-with-text" @click="goToHome">
+              <img
+                class="favicon-static"
+                :src="getImageURL('images/common/openobserve_favicon.png')"
+              />
+              <span class="logo-text">
+                <span v-for="(char, index) in logoText" :key="index" class="logo-char" :style="{ animationDelay: `${index * 0.15}s` }">{{ char }}</span>
+              </span>
+            </div>
+          </div>
         </div>
-        <div v-else class="flex relative-position q-mr-sm">
+        <div v-else class="flex relative-position q-mr-sm logo-container">
+          <!-- Animated Favicon (shows first, rotates once) -->
           <img
-            class="appLogo"
-            loading="lazy"
-            :src="
-              store?.state?.theme == 'dark'
-                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-                : getImageURL('images/common/openobserve_latest_light_2.svg')
-            "
+            v-show="showFavicon"
+            class="favicon-animated"
+            :src="getImageURL('images/common/openobserve_favicon.png')"
             @click="goToHome"
           />
+          <!-- Favicon + Text Logo (slides in after favicon rotation) -->
+          <div v-show="!showFavicon" class="logo-with-text" @click="goToHome">
+            <img
+              class="favicon-static"
+              :src="getImageURL('images/common/openobserve_favicon.png')"
+            />
+            <span class="logo-text">
+              <span v-for="(char, index) in logoText" :key="index" class="logo-char" :style="{ animationDelay: `${index * 0.15}s` }">{{ char }}</span>
+            </span>
+          </div>
         </div>
 
         <q-toolbar-title></q-toolbar-title>
@@ -226,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="row items-center no-wrap">
               <q-icon
-                ><component :is="slackIcon" size="25px" class="header-icon"
+                ><component :is="slackIcon" size="32px" class="header-icon"
               /></q-icon>
             </div>
             <q-tooltip anchor="top middle" self="bottom middle">
@@ -662,6 +677,10 @@ export default defineComponent({
     const miniMode = ref(false);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
+
+    // Logo animation state
+    const showFavicon = ref(true);
+    const logoText = ref("OpenObserve".split(""));
     const { getStreams, resetStreams } = useStreams();
     const { closeSocket } = useSearchWebSocket();
 
@@ -875,6 +894,11 @@ export default defineComponent({
     });
 
     onMounted(async () => {
+      // Logo animation sequence: favicon rotates for 1.5s, then show full logo
+      setTimeout(() => {
+        showFavicon.value = false;
+      }, 1500); // 1.5 seconds for favicon rotation
+
       filterMenus();
 
       // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
@@ -1423,6 +1447,8 @@ export default defineComponent({
       updateActionsMenu,
       getConfig,
       setRumUser,
+      showFavicon,
+      logoText,
     };
   },
   computed: {
@@ -1482,6 +1508,86 @@ export default defineComponent({
 @import "../styles/app.scss";
 @import "../styles/menu-variables";
 @import "../styles/menu-animations";
+
+// Logo animation keyframes - Single rotation for 1.5 seconds
+@keyframes rotateFavicon {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+// Character reveal animation - 5 seconds total for all characters
+@keyframes revealChar {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+// Logo container
+.logo-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  min-width: 40px;
+}
+
+// Favicon animation - single rotation for 1.5 seconds
+.favicon-animated {
+  height: 32px;
+  width: auto;
+  cursor: pointer;
+  animation: rotateFavicon 1.5s linear 1;
+  transform-origin: center center;
+  display: block;
+}
+
+// Logo with text container
+.logo-with-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+
+  .favicon-static {
+    height: 32px;
+    width: auto;
+  }
+
+  .logo-text {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 24px;
+    letter-spacing: -0.02em;
+    color: #121212;
+    white-space: nowrap;
+    display: inline-flex;
+
+    // Dark theme text color
+    body.body--dark & {
+      color: #ffffff;
+    }
+
+    // Light theme text color
+    body.body--light & {
+      color: #121212;
+    }
+
+    .logo-char {
+      display: inline-block;
+      opacity: 0;
+      animation: revealChar 0.3s ease-out forwards;
+    }
+  }
+}
 
 .printMode {
   .q-header {
