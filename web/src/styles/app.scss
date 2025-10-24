@@ -24,6 +24,16 @@ body {
   //   rgba(89, 185, 122, 0.4)
   // );
 }
+
+//here also we need to change whenever we decided to change the bg 
+//because we are using this in alert destination import , pipeline destination import , sdr import 
+//because there the after slot is covered with card container so using thig
+.o2-custom-bg{
+    background: var(--o2-body-secondary-bg);  /* fallback for old browsers */
+  background: -webkit-linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));  /* Chrome 10-25, Safari 5.1-6 */
+  background: linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg)); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+  overflow: hidden;
+}
   
 .card-container {
   background-color: var(--o2-card-bg);

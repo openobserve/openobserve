@@ -13,10 +13,13 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
-
+<!-- 
+TODO IMPORTANT:
+PICKTHIS UP after recent changes are merged
+ -->
 <template>
-  <div class="q-mt-md full-width">
-    <div class="flex q-mx-md items-center no-wrap">
+  <div class="full-width">
+    <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]">
       <div class="col">
         <div class="flex">
           <q-btn
