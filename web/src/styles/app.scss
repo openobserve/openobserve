@@ -1114,8 +1114,8 @@ body {
 }
 
 /* ============================================================================
-   SPLITTER SECTION COLLAPSE BUTTON
-   Reusable collapse button for splitter sections across all pages
+   SPLITTER TRANSITIONS
+   Disable transitions for smoother splitter behavior
    ============================================================================ */
 
 .q-splitter {
@@ -1127,80 +1127,12 @@ body {
   .q-splitter__separator {
     transition: none !important;
     z-index: 1 !important; // Lower z-index so scrollbar overlaps it
-    // Separator IS draggable, but scrollbar will be on top where they overlap
-  }
-
-  .splitter-section-collapse-btn--visible {
-    // transform: translateY(50%) translateX(-10px) !important;
-  }
-
-  // When hovering over the splitter area, slide out the collapsed button
-  &:hover .splitter-section-collapse-btn--hidden {
-    // transform: translateY(50%) translateX(10px) !important;
-  }
-}
-
-.splitter-section-collapse-btn {
-  z-index: 1001 !important;
-  position: absolute !important;
-  background: lightgray !important;
-  border-radius: 4px !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-  transition: all 0.2s ease;
-  min-width: 0.70rem !important;
-  width: 0.70rem !important;
-  height: 36px !important;
-  padding: 0 !important;
-  cursor: pointer;
-  top: 1rem;
-  transform: translateY(50%) translateX(-86%);
-
-  .q-icon {
-    color: rgba(0, 0, 0, 0.5) !important;
-    font-size: 18px !important;
-  }
-
-  &:hover {
-    background: var(--q-primary) !important;
-    opacity: 0.85;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
-
-    .q-icon {
-      color: white !important;
-    }
-  }
-
-  &--visible {
-    right: 10px !important;
-  }
-
-  &--hidden {
-    left: 10px !important;
   }
 }
 
 .q-splitter--vertical > .q-splitter__separator > div {
   left:0px;
   right: 0px;
-}
-
-/* ============================================================================
-   SPLITTER ICON COLLAPSE/EXPAND BUTTONS
-   Specific styles for collapse/expand icons in splitter separators
-   ============================================================================ */
-
-.splitter-icon-collapse {
-  position: absolute !important;
-  top: 14px !important;
-  left: 14px !important;
-  z-index: 100 !important;
-}
-
-.splitter-icon-expand {
-  position: absolute !important;
-  top: 14px !important;
-  left: -2px !important;
-  z-index: 100 !important;
 }
 
 
@@ -1413,4 +1345,19 @@ body {
 
 .o2-custom-table-header-bg{
   background: var(--o2-table-header-bg);
+}
+
+
+.splitter-icon-collapse {
+  position: absolute !important;
+  top: 14px !important;
+  left: 0px !important;
+  z-index: 100 !important;
+}
+
+.splitter-icon-expand {
+  position: absolute !important;
+  top: 14px !important;
+  left: 16px;
+  z-index: 100 !important;
 }

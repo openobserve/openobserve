@@ -7,7 +7,7 @@
       class="tw-overflow-hidden logs-splitter-smooth"
     >
       <template v-slot:before>
-        <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+        <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
         <div v-if="showSidebar" class="iam-tabs spitter-container card-container o2-container-navbarheight" style="height: calc(100vh - 50px);">
           <route-tabs
             ref="iamRouteTabsRef"
@@ -22,22 +22,18 @@
       <template #separator>
           <q-btn
             data-test="logs-search-field-list-collapse-btn"
-            icon="drag_indicator"
+            :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
             :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+            :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
+            color="primary"
+            size="sm"
             dense
-            flat
-            :class="[
-              'splitter-section-collapse-btn',
-              showSidebar
-                ? 'splitter-section-collapse-btn--visible'
-                : 'splitter-section-collapse-btn--hidden',
-            ]"
-            
+            round
             @click="collapseSidebar"
           />
       </template>
       <template v-slot:after>
-        <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+        <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
           <div class="o2-container-navbarheight">
             <RouterView />
           </div>
