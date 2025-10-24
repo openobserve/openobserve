@@ -73,20 +73,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #separator>
                 <q-btn
                   data-test="logs-search-field-list-collapse-btn"
-                  icon="drag_indicator"
+                  :icon="
+                  searchObj.meta.showFields
+                    ? 'chevron_left'
+                    : 'chevron_right'
+                "
                   :title="
                     searchObj.meta.showFields
                       ? 'Collapse Fields'
                       : 'Open Fields'
                   "
-                  flat
+                  :class="searchObj.meta.showFields ? 'splitter-icon-expand' : 'splitter-icon-collapse'"
+                  color="primary"
+                  size="sm"
                   dense
-                  :class="[
-                    'splitter-section-collapse-btn',
-                    searchObj.meta.showFields
-                      ? 'splitter-section-collapse-btn--visible'
-                      : 'splitter-section-collapse-btn--hidden',
-                  ]"
+                  round
                   @click="collapseFieldList"
                 />
               </template>
