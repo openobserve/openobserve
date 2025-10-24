@@ -64,17 +64,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-route-tab
                   name="general"
                   :to="`/settings/general?org_identifier=${store.state.selectedOrganization?.identifier}`"
-                  :icon="outlinedSettings"
-                  :label="t('settings.generalLabel')"
                   content-class="tab_content"
-                />
+                >
+                  <template v-slot:default>
+                    <div class="tw-flex tw-items-center tw-w-full">
+                      <Bolt :size="24" class="o2-tab-icon" />
+                      <span class="q-tab__label">{{ t('settings.generalLabel') }}</span>
+                    </div>
+                  </template>
+                </q-route-tab>
                 <q-route-tab
                   name="organization"
                   :to="`/settings/organization?org_identifier=${store.state.selectedOrganization?.identifier}`"
-                  icon="business"
-                  :label="t('settings.orgLabel')"
                   content-class="tab_content"
-                />
+                >
+                  <template v-slot:default>
+                    <div class="tw-flex tw-items-center tw-w-full">
+                      <Building :size="24" class="o2-tab-icon" />
+                      <span class="q-tab__label">{{ t('settings.orgLabel') }}</span>
+                    </div>
+                  </template>
+                </q-route-tab>
                 <q-route-tab
                   v-if="config.isEnterprise == 'true' && isMetaOrg"
                   data-test="domain-management-tab"
@@ -98,10 +108,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  icon="location_on"
-                  :label="t('alert_destinations.header')"
                   content-class="tab_content"
-                />
+                >
+                  <template v-slot:default>
+                    <div class="tw-flex tw-items-center tw-w-full">
+                      <MapPin :size="24" class="o2-tab-icon" />
+                      <span class="q-tab__label">{{ t('alert_destinations.header') }}</span>
+                    </div>
+                  </template>
+                </q-route-tab>
                 <q-route-tab
                   v-if="config.isEnterprise == 'true'"
                   data-test="pipeline-destinations-tab"
@@ -112,10 +127,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  icon="person_pin_circle"
-                  :label="t('pipeline_destinations.header')"
                   content-class="tab_content"
-                />
+                >
+                  <template v-slot:default>
+                    <div class="tw-flex tw-items-center tw-w-full">
+                      <MapPinned :size="24" class="o2-tab-icon" />
+                      <span class="q-tab__label">{{ t('pipeline_destinations.header') }}</span>
+                    </div>
+                  </template>
+                </q-route-tab>
                 <q-route-tab
                   data-test="alert-templates-tab"
                   name="templates"
@@ -125,10 +145,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  icon="description"
-                  :label="t('alert_templates.header')"
                   content-class="tab_content"
-                />
+                >
+                  <template v-slot:default>
+                    <div class="tw-flex tw-items-center tw-w-full">
+                      <FileText :size="24" class="o2-tab-icon" />
+                      <span class="q-tab__label">{{ t('alert_templates.header') }}</span>
+                    </div>
+                  </template>
+                </q-route-tab>
                 <q-route-tab
                   v-if="config.isEnterprise == 'true'"
                   data-test="management-cipher-key-tab"
@@ -139,10 +164,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  icon="key"
-                  :label="t('settings.cipherKeys')"
                   content-class="tab_content"
-                />
+                >
+                  <template v-slot:default>
+                    <div class="tw-flex tw-items-center tw-w-full">
+                      <KeyRound :size="24" class="o2-tab-icon" />
+                      <span class="q-tab__label">{{ t('settings.cipherKeys') }}</span>
+                    </div>
+                  </template>
+                </q-route-tab>
                 <q-route-tab
                   v-if="config.isCloud == 'true' && isMetaOrg"
                   data-test="organization-management-tab"
@@ -226,11 +256,19 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
-import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
+import { Bolt, Building, MapPin, MapPinned, FileText, KeyRound } from "lucide-vue-next";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
 export default defineComponent({
   name: "AppSettings",
+  components: {
+    Bolt,
+    Building,
+    MapPin,
+    MapPinned,
+    FileText,
+    KeyRound,
+  },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -312,7 +350,6 @@ export default defineComponent({
       config,
       settingsTab,
       splitterModel,
-      outlinedSettings,
       isMetaOrg,
       showManagementTabs,
       controlManagementTabs,
