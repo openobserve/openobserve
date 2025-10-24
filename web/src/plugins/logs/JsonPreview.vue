@@ -3,7 +3,7 @@
     <div class="q-pb-xs flex justify-start q-px-md copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="logs-json-preview-tabs q-mr-sm tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-rounded-[0.25rem] tw-text-[]"
+        class="tw-mb-[0.375rem] logs-json-preview-tabs q-mr-sm tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-rounded-[0.25rem] tw-text-[]"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -15,7 +15,7 @@
         dense
         size="sm"
         no-caps
-        class="q-px-sm copy-log-btn q-mr-sm tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-font-normal"
+        class="tw-mb-[0.375rem] q-px-sm copy-log-btn q-mr-sm tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-font-normal"
         icon="content_copy"
         @click="copyLogToClipboard"
       />
