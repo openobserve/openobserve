@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{
-    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, Metadata, VALUE_LABEL},
-    utils::hash::{Sum64, gxhash},
-};
+use std::hash::Hasher;
+
+use config::meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, Metadata, VALUE_LABEL};
 use datafusion::arrow::datatypes::Schema;
 
 pub mod json;
@@ -53,12 +52,12 @@ pub fn signature_without_labels(
         .collect();
     labels.sort_by(|a, b| a.0.cmp(b.0));
 
-    let key = labels
-        .iter()
-        .map(|(key, value)| format!("{key}:{value}"))
-        .collect::<Vec<String>>()
-        .join("|");
-    gxhash::new().sum64(&key)
+    let mut hasher = config::utils::hash::gxhash::new_hasher();
+    labels.iter().for_each(|(key, value)| {
+        hasher.write(key.as_bytes());
+        hasher.write(value.as_bytes());
+    });
+    hasher.finish()
 }
 
 fn get_exclude_labels() -> Vec<&'static str> {

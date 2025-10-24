@@ -790,7 +790,7 @@ pub fn signature(labels: &Labels) -> u64 {
 /// matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 {
-    let mut hasher = ahash::AHasher::default();
+    let mut hasher = config::utils::hash::gxhash::new_hasher();
     labels
         .iter()
         .filter(|item| !exclude_names.contains(&item.name.as_str()))
