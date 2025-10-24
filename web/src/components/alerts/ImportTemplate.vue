@@ -15,341 +15,342 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-mt-md full-width">
-    <div class="flex q-mx-md items-center no-wrap">
-      <div class="col">
-        <div class="flex">
+   <div class="o2-custom-bg" style="height: calc(100vh - 50px);">
+    <div class="card-container tw-mb-[0.625rem] ">
+      <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]">
+        <div class="col">
+          <div class="flex">
+            <q-btn
+              no-caps
+              padding="xs"
+              outline
+              @click="arrowBackFn"
+              icon="arrow_back_ios_new"
+              data-test="template-import-back-btn"
+            />
+            <div class="text-h6 q-ml-md">Import Template</div>
+          </div>
+        </div>
+        <div class="flex justify-center">
           <q-btn
+            v-close-popup
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
+            :label="t('function.cancel')"
             no-caps
-            padding="xs"
-            outline
-            @click="arrowBackFn"
-            icon="arrow_back_ios_new"
-            data-test="template-import-back-btn"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            @click="router.back()"
+            data-test="template-import-cancel-btn"
           />
-          <div class="text-h6 q-ml-md">Import Template</div>
+          <q-btn
+            class="o2-primary-button no-border tw-h-[36px]"
+            :label="t('dashboard.import')"
+            type="submit"
+            no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            @click="importJson"
+            data-test="template-import-json-btn"
+          />
         </div>
       </div>
-      <div class="flex justify-center">
-        <q-btn
-          v-close-popup
-          class="q-mr-md o2-secondary-button tw-h-[36px]"
-          :label="t('function.cancel')"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          @click="router.back()"
-          data-test="template-import-cancel-btn"
-        />
-        <q-btn
-          class="o2-primary-button no-border tw-h-[36px]"
-          :label="t('dashboard.import')"
-          type="submit"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          @click="importJson"
-          data-test="template-import-json-btn"
-        />
-      </div>
     </div>
+    <div class="flex">
 
-    <q-separator class="q-my-sm q-mx-md" />
-  </div>
-  <div class="flex">
-    <div class="report-list-tabs flex items-center justify-center q-mx-md">
-      <app-tabs
-        data-test="template-import-tabs"
-        class="q-mr-md"
-        :tabs="tabs"
-        v-model:active-tab="activeTab"
-        @update:active-tab="updateActiveTab"
-      />
-    </div>
-
-    <div class="flex" style="width: 100%">
-      <q-splitter
-        class="logs-search-splitter"
-        no-scroll
-        v-model="splitterModel"
-        :style="{
-          width: '100%',
-          height: '100%',
-        }"
-      >
-        <template #before>
-          <div
-            v-if="activeTab == 'import_json_url'"
-            class="editor-container-url"
-          >
-            <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: 100%" class="q-mb-md">
-                <q-input
-                  data-test="template-import-url-input"
-                  v-model="url"
-                  :label="t('dashboard.addURL')"
-                  color="input-border"
-                  bg-color="input-bg"
-                  stack-label
-                  filled
-                  label-slot
+      <div class="flex" style="width: calc(100% - 1px)">
+        <q-splitter
+          class="logs-search-splitter"
+          no-scroll
+          v-model="splitterModel"
+          :style="{
+            width: '100%',
+            height: '100%',
+          }"
+        >
+          <template #before>
+           <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
+              <div class="app-tabs-container tw-h-[36px] tw-w-fit">
+                <app-tabs
+                  data-test="template-import-tabs"
+                  class="tabs-selection-container"
+                  :tabs="tabs"
+                  v-model:active-tab="activeTab"
+                  @update:active-tab="updateActiveTab"
                 />
               </div>
-              <query-editor
-                data-test="template-import-sql-editor"
-                ref="queryEditorRef"
-                editor-id="template-import-query-editor"
-                class="monaco-editor"
-                :debounceTime="300"
-                v-model:query="jsonStr"
-                language="json"
-                :class="
-                  jsonStr == '' && queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="queryEditorPlaceholderFlag = true"
-              />
-
-              <div></div>
-            </q-form>
-          </div>
-          <div
-            v-if="activeTab == 'import_json_file'"
-            class="editor-container-json"
-            data-test="template-import-json-file-container"
-          >
-            <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: 100%" class="q-mb-md">
-                <q-file
-                  data-test="template-import-json-file-input"
-                  v-model="jsonFiles"
-                  filled
-                  bottom-slots
-                  :label="t('dashboard.dropFileMsg')"
-                  accept=".json"
-                  multiple
-                >
-                  <template v-slot:prepend>
-                    <q-icon name="cloud_upload" @click.stop.prevent />
-                  </template>
-                  <template v-slot:append>
-                    <q-icon
-                      name="close"
-                      @click.stop.prevent="jsonFiles = null"
-                      class="cursor-pointer"
-                    />
-                  </template>
-                  <template v-slot:hint> .json files only </template>
-                </q-file>
-              </div>
-              <query-editor
-                data-test="template-import-sql-editor"
-                ref="queryEditorRef"
-                editor-id="template-import-query-editor"
-                class="monaco-editor"
-                :debounceTime="300"
-                v-model:query="jsonStr"
-                language="json"
-                :class="
-                  jsonStr == '' && queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="queryEditorPlaceholderFlag = true"
-              />
-
-              <div></div>
-            </q-form>
-          </div>
-        </template>
-
-        <template #after>
-          <div
-            data-test="template-import-output-editor"
-            style="width: 100%; height: 100%"
-          >
-            <div
-              v-if="templateErrorsToDisplay.length > 0"
-              class="text-center text-h6"
-            >
-              Error Validations
             </div>
-            <div v-else class="text-center text-h6">Output Messages</div>
-            <q-separator class="q-mx-md q-mt-md" />
-            <div class="error-report-container">
-              <!-- Alert Errors Section -->
-              <div
-                class="error-section"
-                v-if="templateErrorsToDisplay.length > 0"
-              >
-                <div class="error-list">
-                  <!-- Iterate through the outer array -->
-                  <div
-                    v-for="(errorGroup, index) in templateErrorsToDisplay"
-                    :key="index"
-                    :data-test="`template-import-error-${index}`"
+            <div
+              v-if="activeTab == 'import_json_url'"
+              class="editor-container-url card-container tw-py-1 "
+            >
+              <q-form class="q-mt-sm tw-pb-2" @submit="onSubmit">
+                <div style="width: 100%" class="q-mb-md tw-px-2">
+                  <q-input
+                    data-test="template-import-url-input"
+                    v-model="url"
+                    :placeholder="t('dashboard.addURL')"
+                    stack-label
+                    borderless
+                  />
+                </div>
+                <query-editor
+                  data-test="template-import-sql-editor"
+                  ref="queryEditorRef"
+                  editor-id="template-import-query-editor"
+                  class="monaco-editor tw-mx-2"
+                  :debounceTime="300"
+                  v-model:query="jsonStr"
+                  language="json"
+                  :class="
+                    jsonStr == '' && queryEditorPlaceholderFlag
+                      ? 'empty-query'
+                      : ''
+                  "
+                  @focus="queryEditorPlaceholderFlag = false"
+                  @blur="queryEditorPlaceholderFlag = true"
+                />
+
+                <div></div>
+              </q-form>
+            </div>
+            <div
+              v-if="activeTab == 'import_json_file'"
+               class="editor-container-json card-container tw-py-1 "
+              data-test="template-import-json-file-container"
+            >
+              <q-form class="q-mt-sm tw-pb-2" @submit="onSubmit">
+                <div style="width: 100%" class="q-mb-md">
+                  <q-file
+                    data-test="template-import-json-file-input"
+                    v-model="jsonFiles"
+                    filled
+                    bottom-slots
+                    :label="t('dashboard.dropFileMsg')"
+                    accept=".json"
+                    multiple
+                    class="tw-mx-2"
                   >
-                    <!-- Iterate through each inner array (the individual error message) -->
+                    <template v-slot:prepend>
+                      <q-icon name="cloud_upload" @click.stop.prevent />
+                    </template>
+                    <template v-slot:append>
+                      <q-icon
+                        name="close"
+                        @click.stop.prevent="jsonFiles = null"
+                        class="cursor-pointer"
+                      />
+                    </template>
+                    <template v-slot:hint> .json files only </template>
+                  </q-file>
+                </div>
+                <query-editor
+                  data-test="template-import-sql-editor"
+                  ref="queryEditorRef"
+                  editor-id="template-import-query-editor"
+                  class="monaco-editor tw-mx-2"
+                  :debounceTime="300"
+                  v-model:query="jsonStr"
+                  language="json"
+                  :class="
+                    jsonStr == '' && queryEditorPlaceholderFlag
+                      ? 'empty-query'
+                      : ''
+                  "
+                  @focus="queryEditorPlaceholderFlag = false"
+                  @blur="queryEditorPlaceholderFlag = true"
+                />
+
+                <div></div>
+              </q-form>
+            </div>
+          </template>
+
+          <template #after>
+            <div
+              data-test="template-import-output-editor"
+              style="width: calc(100% - 10px); height: 100%"
+             class="card-container tw-ml-[0.625rem] tw-h-full"
+            >
+              <div
+                v-if="templateErrorsToDisplay.length > 0"
+                class="text-center text-h6 tw-py-2"
+              >
+                Error Validations
+              </div>
+              <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
+              <q-separator class="q-mx-md q-mt-md" />
+              <div class="error-report-container">
+                <!-- Alert Errors Section -->
+                <div
+                  class="error-section"
+                  v-if="templateErrorsToDisplay.length > 0"
+                >
+                  <div class="error-list">
+                    <!-- Iterate through the outer array -->
                     <div
-                      v-for="(errorMessage, errorIndex) in errorGroup"
-                      :key="errorIndex"
-                      class="error-item"
-                      :data-test="`template-import-error-${index}-${errorIndex}`"
+                      v-for="(errorGroup, index) in templateErrorsToDisplay"
+                      :key="index"
+                      :data-test="`template-import-error-${index}`"
                     >
-                      <span
-                        class="text-red"
-                        v-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'template_name'
-                        "
+                      <!-- Iterate through each inner array (the individual error message) -->
+                      <div
+                        v-for="(errorMessage, errorIndex) in errorGroup"
+                        :key="errorIndex"
+                        class="error-item"
+                        :data-test="`template-import-error-${index}-${errorIndex}`"
                       >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-input
-                            data-test="template-import-name-input"
-                            v-model="userSelectedTemplateNames[index]"
-                            :label="'Template Name *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateTemplateName($event, index)
-                            "
-                          />
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'body'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-input
-                            data-test="template-import-body-input"
-                            v-model="userSelectedTemplateBodies[index]"
-                            :label="'Template Body *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateTemplateBody($event, index)
-                            "
-                          />
-                        </div>
-                      </span>
-                      <!-- Check if the errorMessage is an object, if so, display the 'message' property -->
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'type'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-select
-                            data-test="template-import-type-input"
-                            v-model="userSelectedTemplateTypes[index]"
-                            :options="destinationTypes"
-                            :label="'Template Type *'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
-                            :input-debounce="400"
-                            @update:model-value="
-                              updateTemplateType($event, index)
-                            "
-                            behavior="menu"
-                          />
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'title'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-input
-                            data-test="template-import-title-input"
-                            v-model="userSelectedTemplateTitles[index]"
-                            :label="'Template Title *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateTemplateTitle($event, index)
-                            "
-                          />
-                        </div>
-                      </span>
-                      <span class="text-red" v-else>{{ errorMessage }}</span>
+                        <span
+                          class="text-red"
+                          v-if="
+                            typeof errorMessage === 'object' &&
+                            errorMessage.field == 'template_name'
+                          "
+                        >
+                          {{ errorMessage.message }}
+                          <div style="width: 300px">
+                            <q-input
+                              data-test="template-import-name-input"
+                              v-model="userSelectedTemplateNames[index]"
+                              :label="'Template Name *'"
+                              color="input-border"
+                              bg-color="input-bg"
+                              class="showLabelOnTop"
+                              stack-label
+                              outlined
+                              filled
+                              dense
+                              tabindex="0"
+                              @update:model-value="
+                                updateTemplateName($event, index)
+                              "
+                            />
+                          </div>
+                        </span>
+                        <span
+                          class="text-red"
+                          v-else-if="
+                            typeof errorMessage === 'object' &&
+                            errorMessage.field == 'body'
+                          "
+                        >
+                          {{ errorMessage.message }}
+                          <div style="width: 300px">
+                            <q-input
+                              data-test="template-import-body-input"
+                              v-model="userSelectedTemplateBodies[index]"
+                              :label="'Template Body *'"
+                              color="input-border"
+                              bg-color="input-bg"
+                              class="showLabelOnTop"
+                              stack-label
+                              outlined
+                              filled
+                              dense
+                              tabindex="0"
+                              @update:model-value="
+                                updateTemplateBody($event, index)
+                              "
+                            />
+                          </div>
+                        </span>
+                        <!-- Check if the errorMessage is an object, if so, display the 'message' property -->
+                        <span
+                          class="text-red"
+                          v-else-if="
+                            typeof errorMessage === 'object' &&
+                            errorMessage.field == 'type'
+                          "
+                        >
+                          {{ errorMessage.message }}
+                          <div style="width: 300px">
+                            <q-select
+                              data-test="template-import-type-input"
+                              v-model="userSelectedTemplateTypes[index]"
+                              :options="destinationTypes"
+                              :label="'Template Type *'"
+                              :popup-content-style="{
+                                textTransform: 'lowercase',
+                              }"
+                              color="input-border"
+                              bg-color="input-bg"
+                              class="q-py-sm showLabelOnTop no-case"
+                              filled
+                              stack-label
+                              dense
+                              use-input
+                              hide-selected
+                              fill-input
+                              :input-debounce="400"
+                              @update:model-value="
+                                updateTemplateType($event, index)
+                              "
+                              behavior="menu"
+                            />
+                          </div>
+                        </span>
+                        <span
+                          class="text-red"
+                          v-else-if="
+                            typeof errorMessage === 'object' &&
+                            errorMessage.field == 'title'
+                          "
+                        >
+                          {{ errorMessage.message }}
+                          <div style="width: 300px">
+                            <q-input
+                              data-test="template-import-title-input"
+                              v-model="userSelectedTemplateTitles[index]"
+                              :label="'Template Title *'"
+                              color="input-border"
+                              bg-color="input-bg"
+                              class="showLabelOnTop"
+                              stack-label
+                              outlined
+                              filled
+                              dense
+                              tabindex="0"
+                              @update:model-value="
+                                updateTemplateTitle($event, index)
+                              "
+                            />
+                          </div>
+                        </span>
+                        <span class="text-red" v-else>{{ errorMessage }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="error-section" v-if="tempalteCreators.length > 0">
+                  <div
+                    class="section-title text-primary"
+                    data-test="template-import-creation-title"
+                  >
+                    Template Creation
+                  </div>
+                  <div
+                    class="error-list"
+                    v-for="(val, index) in tempalteCreators"
+                    :key="index"
+                    :data-test="`template-import-creation-${index}`"
+                  >
+                    <div
+                      :class="{
+                        'error-item text-bold': true,
+                        'text-green ': val.success,
+                        'text-red': !val.success,
+                      }"
+                      :data-test="`template-import-creation-${index}-message`"
+                    >
+                      <pre>{{ val.message }}</pre>
                     </div>
                   </div>
                 </div>
               </div>
-
-              <div class="error-section" v-if="tempalteCreators.length > 0">
-                <div
-                  class="section-title text-primary"
-                  data-test="template-import-creation-title"
-                >
-                  Template Creation
-                </div>
-                <div
-                  class="error-list"
-                  v-for="(val, index) in tempalteCreators"
-                  :key="index"
-                  :data-test="`template-import-creation-${index}`"
-                >
-                  <div
-                    :class="{
-                      'error-item text-bold': true,
-                      'text-green ': val.success,
-                      'text-red': !val.success,
-                    }"
-                    :data-test="`template-import-creation-${index}-message`"
-                  >
-                    <pre>{{ val.message }}</pre>
-                  </div>
-                </div>
-              </div>
             </div>
-          </div>
-        </template>
-      </q-splitter>
+          </template>
+        </q-splitter>
+      </div>
     </div>
   </div>
 </template>
@@ -839,22 +840,27 @@ export default defineComponent({
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(66vh - 8px) !important; /* Total editor height */
+    height: calc(70vh - 13px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .editor-container-json {
   .monaco-editor {
-    height: calc(65vh - 20px) !important; /* Total editor height */
+    height: calc(66vh - 18px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
+
   }
 }
 .monaco-editor {
   height: calc(60vh - 14px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none; /* Remove resize behavior */
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
+  padding-top: 0.3rem;
+
 }
 .error-report-container {
   height: calc(60vh - 8px) !important; /* Total editor height */
