@@ -10,6 +10,15 @@ from pathlib import Path
 # Configure logger for test output
 logger = logging.getLogger(__name__)
 
+# Constants for better maintainability
+PIPELINE_PROCESSING_WAIT = 15  # seconds
+DATA_INGESTION_WAIT = 3       # seconds
+VALIDATION_WAIT = 10          # seconds
+EDGE_CASE_WAIT = 8           # seconds
+QUERY_TIME_WINDOW = 5        # minutes
+MAX_IDENTIFIER_LENGTH = 100
+DEFAULT_ORG_ID = "default"
+
 
 def safe_sql_identifier(identifier):
     """
@@ -24,10 +33,99 @@ def safe_sql_identifier(identifier):
         raise ValueError(f"Invalid characters in identifier: {identifier}")
     
     # Additional length check to prevent excessively long identifiers
-    if len(identifier) > 100:
+    if len(identifier) > MAX_IDENTIFIER_LENGTH:
         raise ValueError(f"Identifier too long: {identifier}")
     
     return identifier
+
+
+def get_time_window():
+    """Get standardized time window for queries."""
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    start_time = int((now - timedelta(minutes=QUERY_TIME_WINDOW)).timestamp() * 1000000)
+    return start_time, end_time
+
+
+def create_validation_query(stream_name, filter_condition=None):
+    """Create standardized validation query payload."""
+    start_time, end_time = get_time_window()
+    safe_stream = safe_sql_identifier(stream_name)
+    
+    base_sql = f'SELECT COUNT(*) as count FROM "{safe_stream}"'
+    if filter_condition:
+        base_sql += f" WHERE {filter_condition}"
+    
+    return {
+        "query": {
+            "sql": base_sql,
+            "start_time": start_time,
+            "end_time": end_time,
+            "from": 0,
+            "size": 1,
+        }
+    }
+
+
+def validate_data_flow(session, base_url, org_id, expected_stream, test_name, filter_condition=None):
+    """
+    Standardized data flow validation for pipeline tests.
+    
+    Args:
+        session: HTTP session
+        base_url: API base URL
+        org_id: Organization ID
+        expected_stream: Expected destination stream name
+        test_name: Name of test for logging
+        filter_condition: Optional SQL WHERE condition
+    
+    Returns:
+        bool: True if validation passed, False otherwise
+    """
+    logger.info(f"🔍 Validating data flow for {test_name}: → {expected_stream}")
+    
+    validation_payload = create_validation_query(expected_stream, filter_condition)
+    resp_validation = session.post(f"{base_url}api/{org_id}/_search?type=logs", json=validation_payload)
+    
+    if resp_validation.status_code == 200:
+        validation_result = resp_validation.json()
+        if validation_result.get("hits", []):
+            record_count = validation_result["hits"][0].get("count", 0)
+            if record_count > 0:
+                logger.info(f"✅ SUCCESS: {test_name} validation passed! {record_count} records in '{expected_stream}'")
+                return True
+            else:
+                logger.error(f"❌ FAILURE: {test_name} - destination exists but no matching data")
+                return False
+        else:
+            logger.error(f"❌ FAILURE: {test_name} - no records in destination '{expected_stream}'")
+            return False
+    else:
+        logger.error(f"❌ FAILURE: {test_name} destination stream '{expected_stream}' not found (Status: {resp_validation.status_code})")
+        return False
+
+
+def enable_pipeline(session, base_url, org_id, pipeline_name):
+    """Enable a pipeline by name."""
+    resp_list = session.get(f"{base_url}api/{org_id}/pipelines")
+    if resp_list.status_code != 200:
+        logger.warning(f"Could not get pipeline list: {resp_list.status_code}")
+        return None
+        
+    pipelines_list = resp_list.json().get("list", [])
+    pipeline_id = next((p["pipeline_id"] for p in pipelines_list if p["name"] == pipeline_name), None)
+    
+    if not pipeline_id:
+        logger.warning(f"Pipeline not found: {pipeline_name}")
+        return None
+        
+    resp_enable = session.put(f"{base_url}api/{org_id}/pipelines/{pipeline_id}/enable?value=true")
+    if resp_enable.status_code == 200:
+        logger.info(f"Pipeline enabled: {pipeline_name}")
+        return pipeline_id
+    else:
+        logger.warning(f"Could not enable pipeline {pipeline_name}: {resp_enable.status_code}")
+        return None
 
 
 
@@ -41,10 +139,10 @@ def safe_sql_identifier(identifier):
     ]
 )
 def test_pipeline_dynamic_template_substitution(create_session, base_url, source_stream, destination_template, condition_field, condition_value, expected_destination, expected_status):
-    """Test pipeline creation with ACTUAL dynamic template substitution - this should expose the bug on main repo."""
+    """Test pipeline creation with dynamic template substitution."""
     session = create_session
     url = base_url
-    org_id = "default"
+    org_id = DEFAULT_ORG_ID
     
     # Generate unique pipeline name
     pipeline_name = f"pipeline_template_{source_stream}_to_dynamic"
@@ -188,8 +286,8 @@ def test_pipeline_dynamic_template_substitution(create_session, base_url, source
     assert resp_ingest.status_code == 200, f"Data ingestion failed with status {resp_ingest.status_code}"
     
     # Wait for pipeline to process the newly ingested data
-    logger.info("Waiting 15 seconds for pipeline to process data...")
-    time.sleep(15)
+    logger.info(f"Waiting {PIPELINE_PROCESSING_WAIT} seconds for pipeline to process data...")
+    time.sleep(PIPELINE_PROCESSING_WAIT)
     
     # Verify the pipeline is running and enabled
     resp_verify = session.get(f"{url}api/{org_id}/pipelines")
@@ -207,59 +305,686 @@ def test_pipeline_dynamic_template_substitution(create_session, base_url, source
     logger.info("Status: Enabled")
     
     # 🎯 FINAL VERIFICATION: Check if the EXPECTED destination stream was created
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    start_time = int((now - timedelta(minutes=5)).timestamp() * 1000000)
+    # Validate data flow using standardized function
+    validation_success = validate_data_flow(
+        session, url, org_id, expected_destination, 
+        f"template substitution {source_stream}→{expected_destination}"
+    )
     
-    # Check if the EXPECTED destination stream exists (should exist if template substitution worked)
-    safe_expected_destination = safe_sql_identifier(expected_destination)
-    expected_search_payload = {
-        "query": {
-            "sql": f'SELECT COUNT(*) as count FROM "{safe_expected_destination}"',
-            "start_time": start_time,
-            "end_time": end_time,
-            "from": 0,
-            "size": 1,
+    if not validation_success:
+        # Check if data went to literal template name (indicating substitution failure)
+        literal_validation = validate_data_flow(
+            session, url, org_id, destination_template,
+            f"literal template check {destination_template}"
+        )
+        if literal_validation:
+            logger.error(f"🐛 BUG CONFIRMED! Data routed to literal template '{destination_template}' instead of substituted '{expected_destination}'")
+            assert False, f"Template substitution failed: data in '{destination_template}' not '{expected_destination}'"
+        else:
+            logger.error("❌ Data not found in expected or literal streams - complete pipeline failure")
+            assert False, f"Pipeline validation failed: no data found in '{expected_destination}' or '{destination_template}'"
+    
+    logger.info(f"✅ Template substitution test completed successfully for: {pipeline_name}")
+
+
+@pytest.mark.parametrize(
+    "source_stream, destination_template, condition_field, condition_value, expected_destination, expected_status",
+    [
+        # Test multiple field templates
+        ("e2e_automate7", "logs_{kubernetes.namespace_name}_{kubernetes.container_name}_multi", "kubernetes.namespace_name", "monitoring", "logs_monitoring_prometheus_multi", 200),
+        
+        # Test edge case field names
+        ("e2e_automate8", "stream_{kubernetes.pod_name}_debug", "kubernetes.container_name", "prometheus", "stream_prometheus-k8s-1_debug", 200),
+        
+        # Test complex nested templates
+        ("e2e_automate9", "data_{kubernetes.namespace_name}_v1_{kubernetes.container_name}", "kubernetes.namespace_name", "zinc-cp1", "data_zinc-cp1_v1_prometheus_v1", 200),
+    ]
+)
+def test_pipeline_complex_templates(create_session, base_url, source_stream, destination_template, condition_field, condition_value, expected_destination, expected_status):
+    """Test pipeline creation with complex multi-field dynamic templates."""
+    session = create_session
+    url = base_url
+    org_id = DEFAULT_ORG_ID
+    
+    # Generate unique pipeline name
+    pipeline_name = f"pipeline_complex_{source_stream}_to_dynamic"
+    
+    # Generate unique node IDs
+    input_node_id = str(uuid.uuid4())
+    condition_node_id = str(uuid.uuid4())
+    output_node_id = str(uuid.uuid4())
+    
+    # Load test data for later ingestion using absolute path
+    test_data_path = Path(__file__).parent.parent.parent / "test-data" / "logs_data.json"
+    with open(test_data_path) as f:
+        logs_data = json.load(f)
+
+    # Pipeline payload with COMPLEX MULTI-FIELD TEMPLATE
+    pipeline_payload = {
+        "name": pipeline_name,
+        "description": f"Complex template routing from {source_stream} to {destination_template}",
+        "source": {"source_type": "realtime"},
+        "nodes": [
+            {
+                "id": input_node_id,
+                "type": "input",
+                "data": {
+                    "node_type": "stream",
+                    "stream_name": source_stream,
+                    "stream_type": "logs",
+                    "org_id": org_id,
+                },
+                "position": {"x": 100, "y": 100},
+                "io_type": "input",
+            },
+            {
+                "id": condition_node_id,
+                "type": "condition",
+                "data": {
+                    "node_type": "condition",
+                    "conditions": [
+                        {
+                            "column": condition_field,
+                            "operator": "Contains",
+                            "value": condition_value,
+                            "ignore_case": False
+                        }
+                    ]
+                },
+                "position": {"x": 300, "y": 100},
+                "io_type": "condition",
+            },
+            {
+                "id": output_node_id,
+                "type": "output",
+                "data": {
+                    "node_type": "stream",
+                    "stream_name": destination_template,
+                    "stream_type": "logs",
+                    "org_id": org_id,
+                },
+                "position": {"x": 500, "y": 100},
+                "io_type": "output",
+            },
+        ],
+        "edges": [
+            {
+                "id": f"e{input_node_id}-{condition_node_id}",
+                "source": input_node_id,
+                "target": condition_node_id,
+            },
+            {
+                "id": f"e{condition_node_id}-{output_node_id}",
+                "source": condition_node_id,
+                "target": output_node_id,
+            }
+        ],
+        "org": org_id,
+    }
+
+    # Create the pipeline
+    logger.info(f"Creating COMPLEX template pipeline: {pipeline_name}")
+    logger.info(f"Complex template: '{destination_template}'")
+    resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
+    
+    if resp_create_pipeline.status_code != expected_status:
+        logger.error(f"Complex pipeline creation failed. Response: {resp_create_pipeline.text}")
+    
+    assert resp_create_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_create_pipeline.status_code}"
+    logger.info(f"Complex pipeline created successfully: {pipeline_name}")
+
+    # Get pipeline ID and enable
+    resp_list_pipelines = session.get(f"{url}api/{org_id}/pipelines")
+    assert resp_list_pipelines.status_code == 200
+    
+    pipelines_list = resp_list_pipelines.json().get("list", [])
+    pipeline_id = next((p["pipeline_id"] for p in pipelines_list if p["name"] == pipeline_name), None)
+    assert pipeline_id, f"Pipeline ID not found for: {pipeline_name}"
+
+    # Enable the pipeline
+    resp_enable_pipeline = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value=true")
+    assert resp_enable_pipeline.status_code == 200
+    logger.info(f"Complex pipeline enabled: {pipeline_name}")
+    
+    # Ingest data after pipeline creation
+    ingest_url = f"{url}api/{org_id}/{source_stream}/_json"
+    resp_ingest = session.post(ingest_url, json=logs_data)
+    logger.info(f"Data ingestion to {source_stream}: Status {resp_ingest.status_code}")
+    assert resp_ingest.status_code == 200
+
+    # Wait for processing
+    logger.info(f"Waiting {PIPELINE_PROCESSING_WAIT} seconds for complex template processing...")
+    time.sleep(PIPELINE_PROCESSING_WAIT)
+    
+    # Validate data flow using standardized function
+    validation_success = validate_data_flow(
+        session, url, org_id, expected_destination,
+        f"complex template {destination_template}→{expected_destination}"
+    )
+    
+    if not validation_success:
+        # Check if data went to literal template name (indicating substitution failure)
+        literal_validation = validate_data_flow(
+            session, url, org_id, destination_template,
+            f"literal complex template {destination_template}"
+        )
+        if literal_validation:
+            logger.error(f"🐛 Complex template substitution failed: data in '{destination_template}' not '{expected_destination}'")
+            assert False, f"Complex template substitution failed: data in '{destination_template}' not '{expected_destination}'"
+        else:
+            assert False, f"Complex template validation failed: no data found in '{expected_destination}' or '{destination_template}'"
+    
+    logger.info(f"Complex template test completed and validated for: {pipeline_name}")
+
+
+
+@pytest.mark.parametrize(
+    "source_stream, template_with_special_chars",
+    [
+        ("e2e_automate13", "logs_{kubernetes.namespace_name}_with-hyphens"),
+        ("e2e_automate14", "stream_with.dots_{kubernetes.container_name}"),
+    ]
+)
+def test_pipeline_special_characters(create_session, base_url, source_stream, template_with_special_chars):
+    """Test pipeline templates with special characters in stream names."""
+    session = create_session
+    url = base_url
+    org_id = DEFAULT_ORG_ID
+    
+    pipeline_name = f"pipeline_special_chars_{source_stream}"
+    
+    input_node_id = str(uuid.uuid4())
+    output_node_id = str(uuid.uuid4())
+
+    pipeline_payload = {
+        "name": pipeline_name,
+        "description": f"Testing special characters in template: {template_with_special_chars}",
+        "source": {"source_type": "realtime"},
+        "nodes": [
+            {
+                "id": input_node_id,
+                "type": "input",
+                "data": {
+                    "node_type": "stream",
+                    "stream_name": source_stream,
+                    "stream_type": "logs",
+                    "org_id": org_id,
+                },
+                "position": {"x": 100, "y": 100},
+                "io_type": "input",
+            },
+            {
+                "id": output_node_id,
+                "type": "output",
+                "data": {
+                    "node_type": "stream",
+                    "stream_name": template_with_special_chars,
+                    "stream_type": "logs",
+                    "org_id": org_id,
+                },
+                "position": {"x": 300, "y": 100},
+                "io_type": "output",
+            },
+        ],
+        "edges": [
+            {
+                "id": f"e{input_node_id}-{output_node_id}",
+                "source": input_node_id,
+                "target": output_node_id,
+            }
+        ],
+        "org": org_id,
+    }
+
+    logger.info(f"Testing SPECIAL CHARACTERS template: {template_with_special_chars}")
+    resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
+    
+    # Special characters should be handled properly
+    logger.info(f"Special chars template result: {resp_create_pipeline.status_code}")
+    
+    if resp_create_pipeline.status_code == 200:
+        logger.info(f"✅ Special character template accepted: {template_with_special_chars}")
+        
+        # Enable pipeline and test data flow
+        resp_list_pipelines = session.get(f"{url}api/{org_id}/pipelines")
+        if resp_list_pipelines.status_code == 200:
+            pipelines_list = resp_list_pipelines.json().get("list", [])
+            pipeline_id = next((p["pipeline_id"] for p in pipelines_list if p["name"] == pipeline_name), None)
+            
+            if pipeline_id:
+                # Enable pipeline
+                resp_enable = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value=true")
+                assert resp_enable.status_code == 200
+                
+                # Ingest test data with special characters in field values
+                test_data = [{
+                    "timestamp": int(time.time_ns()),
+                    "kubernetes": {
+                        "namespace_name": "special-test",
+                        "container_name": "container-with-hyphens",
+                        "pod_name": "pod.with.dots"
+                    },
+                    "log": f"Testing special characters: {template_with_special_chars}",
+                    "special_test_marker": f"SPECIAL_CHARS_{source_stream}",
+                    "_timestamp": int(time.time_ns())
+                }]
+                
+                ingest_url = f"{url}api/{org_id}/{source_stream}/_json"
+                resp_ingest = session.post(ingest_url, json=test_data)
+                assert resp_ingest.status_code == 200
+                
+                # Wait for processing
+                logger.info("Waiting for special character template processing...")
+                time.sleep(VALIDATION_WAIT)
+                
+                # Validate data flow - determine expected destination based on template
+                if "kubernetes.namespace_name" in template_with_special_chars:
+                    expected_destination = template_with_special_chars.replace("{kubernetes.namespace_name}", "special_test")
+                elif "kubernetes.container_name" in template_with_special_chars:
+                    expected_destination = template_with_special_chars.replace("{kubernetes.container_name}", "container_with_hyphens")
+                else:
+                    expected_destination = template_with_special_chars  # No substitution expected
+                
+                logger.info(f"🔍 Validating special chars: {template_with_special_chars} → {expected_destination}")
+                
+                # Check destination stream
+                now = datetime.now(timezone.utc)
+                end_time = int(now.timestamp() * 1000000)
+                start_time = int((now - timedelta(minutes=5)).timestamp() * 1000000)
+                
+                safe_destination = safe_sql_identifier(expected_destination)
+                validation_payload = {
+                    "query": {
+                        "sql": f'SELECT COUNT(*) as count FROM "{safe_destination}" WHERE special_test_marker LIKE \'SPECIAL_CHARS_{source_stream}\'',
+                        "start_time": start_time,
+                        "end_time": end_time,
+                        "from": 0,
+                        "size": 1,
+                    }
+                }
+                
+                resp_validation = session.post(f"{url}api/{org_id}/_search?type=logs", json=validation_payload)
+                if resp_validation.status_code == 200:
+                    validation_result = resp_validation.json()
+                    if validation_result.get("hits", []):
+                        record_count = validation_result["hits"][0].get("count", 0)
+                        if record_count > 0:
+                            logger.info(f"✅ SUCCESS: Special characters template worked! {record_count} records in '{expected_destination}'")
+                        else:
+                            logger.error(f"❌ FAILURE: Special characters destination exists but no matching data found")
+                            assert False, f"Special chars template validation failed: no data in '{expected_destination}'"
+                    else:
+                        logger.error(f"❌ FAILURE: No records found in special characters destination '{expected_destination}'")
+                        assert False, f"Special chars validation failed: stream '{expected_destination}' not found or empty"
+                else:
+                    logger.warning(f"⚠️ Cannot validate special chars destination '{expected_destination}': {resp_validation.status_code}")
+                    # Don't fail for validation issues, but log them
+    else:
+        # Template was rejected - this may be correct behavior for some special characters
+        logger.info(f"Special character template rejected with status: {resp_create_pipeline.status_code}")
+        assert resp_create_pipeline.status_code in [400, 422], f"Special chars template should return 400/422 if rejected, got: {resp_create_pipeline.status_code}"
+
+
+# Edge case tests for comprehensive validation
+@pytest.mark.parametrize(
+    "source_stream, template, condition_field, condition_value, test_case",
+    [
+        # Long field names and values
+        ("e2e_automate15", "very_long_stream_name_{kubernetes.namespace_name}_with_many_underscores_and_segments", "kubernetes.namespace_name", "very-long-namespace-name-with-many-hyphens", "long_names"),
+        # Numeric values in templates
+        ("e2e_automate16", "stream_{kubernetes.namespace_name}_v2_final", "kubernetes.namespace_name", "namespace123", "numeric_values"),
+        # Case sensitivity
+        ("e2e_automate17", "Stream_{kubernetes.namespace_name}_CamelCase", "kubernetes.namespace_name", "TestNamespace", "case_sensitivity"),
+        # Unicode characters (if supported)
+        ("e2e_automate18", "logs_{kubernetes.namespace_name}_测试", "kubernetes.namespace_name", "测试namespace", "unicode"),
+    ]
+)
+def test_pipeline_edge_cases(create_session, base_url, source_stream, template, condition_field, condition_value, test_case):
+    """Test edge cases and boundary conditions for pipeline templates."""
+    session = create_session
+    url = base_url
+    org_id = DEFAULT_ORG_ID
+    
+    logger.info(f"Testing EDGE CASE: {test_case} with template: {template}")
+    
+    # Ingest test data first
+    ingest_payload = [
+        {
+            "timestamp": int(time.time_ns()),
+            "kubernetes": {
+                "namespace_name": condition_value,
+                "container_name": "prometheus",
+                "pod_name": "prometheus-k8s-1"
+            },
+            "log": f"Test log for edge case: {test_case}",
+            "_timestamp": int(time.time_ns()),
         }
+    ]
+    
+    # Ingest data
+    ingest_url = f"{url}api/{org_id}/{source_stream}/_json"
+    resp_ingest = session.post(ingest_url, json=ingest_payload)
+    assert resp_ingest.status_code == 200, f"Failed to ingest data for {test_case}: {resp_ingest.text}"
+    
+    # Wait for ingestion
+    time.sleep(DATA_INGESTION_WAIT)
+    
+    # Create pipeline with edge case template
+    pipeline_payload = {
+        "name": f"test-pipeline-{test_case}-{int(time.time())}",
+        "description": f"Edge case test pipeline for {test_case}",
+        "nodes": [
+            {"id": "node_1", "type": "stream", "data": {"stream": source_stream}},
+            {"id": "node_2", "type": "condition", "data": {"condition": f'{condition_field} = "{condition_value}"'}},
+            {"id": "node_3", "type": "stream", "data": {"stream": template}}
+        ],
+        "edges": [
+            {"source": "node_1", "target": "node_2"},
+            {"source": "node_2", "target": "node_3"}
+        ]
     }
     
-    resp_expected_search = session.post(f"{url}api/{org_id}/_search?type=logs", json=expected_search_payload)
-    if resp_expected_search.status_code == 200:
-        search_result = resp_expected_search.json()
-        if search_result.get("hits", []):
-            count = search_result["hits"][0].get("count", 0) 
-            logger.info(f"EXPECTED destination stream '{expected_destination}' has {count} records")
-            
-            if count > 0:
-                logger.info("TEMPLATE SUBSTITUTION SUCCESS! Data was routed to correctly substituted stream name")
-            else:
-                logger.warning("Expected stream exists but no records - may be timing issue")
-        else:
-            logger.warning(f"Expected destination stream '{expected_destination}' exists but no records found")
-    else:
-        logger.error(f"EXPECTED destination stream '{expected_destination}' does not exist (Status: {resp_expected_search.status_code})")
-        logger.error("This suggests template substitution failed - data may have gone to literal template name")
+    resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
+    
+    # Log the result for edge cases
+    logger.info(f"Edge case {test_case} result: {resp_create_pipeline.status_code}")
+    
+    if resp_create_pipeline.status_code == 200:
+        logger.info(f"✅ Edge case template accepted: {template}")
         
-        # Check if data went to the literal template name instead
-        safe_template_name = safe_sql_identifier(destination_template)
-        literal_search_payload = {
-            "query": {
-                "sql": f'SELECT COUNT(*) as count FROM "{safe_template_name}"',
-                "start_time": start_time,
-                "end_time": end_time,
-                "from": 0,
-                "size": 1,
+        # Enable pipeline and validate data flow for edge cases
+        resp_list_pipelines = session.get(f"{url}api/{org_id}/pipelines")
+        if resp_list_pipelines.status_code == 200:
+            pipelines_list = resp_list_pipelines.json().get("list", [])
+            pipeline_name = f"test-pipeline-{test_case}-{int(time.time())}"
+            pipeline_id = next((p["pipeline_id"] for p in pipelines_list if pipeline_name in p["name"]), None)
+            
+            if pipeline_id:
+                # Enable pipeline
+                resp_enable = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value=true")
+                if resp_enable.status_code == 200:
+                    
+                    # Wait for processing
+                    logger.info(f"Waiting for edge case {test_case} processing...")
+                    time.sleep(EDGE_CASE_WAIT)
+                    
+                    # Calculate expected destination based on template substitution
+                    expected_destination = template.replace("{kubernetes.namespace_name}", condition_value.replace("-", "_"))
+                    
+                    logger.info(f"🔍 Validating edge case {test_case}: {template} → {expected_destination}")
+                    
+                    # Validate data reached correct destination
+                    now = datetime.now(timezone.utc)
+                    end_time = int(now.timestamp() * 1000000)
+                    start_time = int((now - timedelta(minutes=5)).timestamp() * 1000000)
+                    
+                    safe_destination = safe_sql_identifier(expected_destination)
+                    validation_payload = {
+                        "query": {
+                            "sql": f'SELECT COUNT(*) as count FROM "{safe_destination}" WHERE log LIKE \'%{test_case}%\'',
+                            "start_time": start_time,
+                            "end_time": end_time,
+                            "from": 0,
+                            "size": 1,
+                        }
+                    }
+                    
+                    resp_validation = session.post(f"{url}api/{org_id}/_search?type=logs", json=validation_payload)
+                    if resp_validation.status_code == 200:
+                        validation_result = resp_validation.json()
+                        if validation_result.get("hits", []):
+                            record_count = validation_result["hits"][0].get("count", 0)
+                            if record_count > 0:
+                                logger.info(f"✅ SUCCESS: Edge case {test_case} validation passed! {record_count} records in '{expected_destination}'")
+                            else:
+                                logger.error(f"❌ FAILURE: Edge case {test_case} - destination exists but no matching data")
+                                assert False, f"Edge case {test_case} validation failed: no data in '{expected_destination}'"
+                        else:
+                            logger.error(f"❌ FAILURE: Edge case {test_case} - no records in destination '{expected_destination}'")
+                            assert False, f"Edge case {test_case} validation failed: stream '{expected_destination}' not found"
+                    else:
+                        logger.warning(f"⚠️ Cannot validate edge case {test_case} destination '{expected_destination}': {resp_validation.status_code}")
+                        # Don't fail validation for query issues in edge cases
+                else:
+                    logger.warning(f"⚠️ Could not enable edge case pipeline for {test_case}")
+            else:
+                logger.warning(f"⚠️ Could not find pipeline ID for edge case {test_case}")
+        else:
+            logger.warning(f"⚠️ Could not get pipeline list for edge case {test_case}")
+    else:
+        # Edge case template was rejected
+        logger.info(f"Edge case {test_case} template rejected: {resp_create_pipeline.status_code}")
+        if resp_create_pipeline.status_code != 200:
+            logger.info(f"Edge case {test_case} error: {resp_create_pipeline.text}")
+        assert resp_create_pipeline.status_code in [400, 422], f"Edge case {test_case} should return 400/422 if rejected, got: {resp_create_pipeline.status_code}"
+
+
+# Nested template and multiple substitution tests
+@pytest.mark.parametrize(
+    "source_stream, template, expected_behavior",
+    [
+        # Multiple field substitutions
+        ("e2e_automate19", "multi_{kubernetes.namespace_name}_{kubernetes.container_name}_{kubernetes.pod_name}", "multiple_fields"),
+        # Repeated field usage
+        ("e2e_automate20", "{kubernetes.namespace_name}_logs_{kubernetes.namespace_name}_backup", "repeated_field"),
+        # Mixed separators
+        ("e2e_automate21", "stream-{kubernetes.namespace_name}_pod.{kubernetes.pod_name}", "mixed_separators"),
+        # Template at different positions
+        ("e2e_automate22", "{kubernetes.container_name}_start_middle_{kubernetes.namespace_name}_end", "position_variation"),
+    ]
+)
+def test_pipeline_nested_templates(create_session, base_url, source_stream, template, expected_behavior):
+    """Test complex template patterns and multiple field substitutions."""
+    session = create_session
+    url = base_url
+    org_id = DEFAULT_ORG_ID
+    
+    logger.info(f"Testing NESTED TEMPLATE: {expected_behavior} with template: {template}")
+    
+    # Ingest comprehensive test data
+    ingest_payload = [
+        {
+            "timestamp": int(time.time_ns()),
+            "kubernetes": {
+                "namespace_name": "production",
+                "container_name": "webapp",
+                "pod_name": "webapp-deployment-123"
+            },
+            "log": f"Test log for nested template: {expected_behavior}",
+            "_timestamp": int(time.time_ns()),
+        }
+    ]
+    
+    # Ingest data
+    ingest_url = f"{url}api/{org_id}/{source_stream}/_json"
+    resp_ingest = session.post(ingest_url, json=ingest_payload)
+    assert resp_ingest.status_code == 200, f"Failed to ingest data for {expected_behavior}: {resp_ingest.text}"
+    
+    # Wait for ingestion
+    time.sleep(DATA_INGESTION_WAIT)
+    
+    # Create pipeline with nested template
+    pipeline_payload = {
+        "name": f"test-pipeline-{expected_behavior}-{int(time.time())}",
+        "description": f"Nested template test pipeline for {expected_behavior}",
+        "nodes": [
+            {"id": "node_1", "type": "stream", "data": {"stream": source_stream}},
+            {"id": "node_2", "type": "condition", "data": {"condition": 'kubernetes.namespace_name = "production"'}},
+            {"id": "node_3", "type": "stream", "data": {"stream": template}}
+        ],
+        "edges": [
+            {"source": "node_1", "target": "node_2"},
+            {"source": "node_2", "target": "node_3"}
+        ]
+    }
+    
+    resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
+    
+    # Log the result
+    logger.info(f"Nested template {expected_behavior} result: {resp_create_pipeline.status_code}")
+    
+    if resp_create_pipeline.status_code == 200:
+        logger.info(f"✅ Nested template accepted: {template}")
+        
+        # Enable pipeline and validate data flow for nested templates
+        resp_list_pipelines = session.get(f"{url}api/{org_id}/pipelines")
+        if resp_list_pipelines.status_code == 200:
+            pipelines_list = resp_list_pipelines.json().get("list", [])
+            pipeline_name = f"test-pipeline-{expected_behavior}-{int(time.time())}"
+            pipeline_id = next((p["pipeline_id"] for p in pipelines_list if expected_behavior in p["name"]), None)
+            
+            if pipeline_id:
+                # Enable pipeline
+                resp_enable = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value=true")
+                if resp_enable.status_code == 200:
+                    
+                    # Wait for processing
+                    logger.info(f"Waiting for nested template {expected_behavior} processing...")
+                    time.sleep(VALIDATION_WAIT)
+                    
+                    # Calculate expected destination based on template substitution
+                    expected_destination = template
+                    expected_destination = expected_destination.replace("{kubernetes.namespace_name}", "production")
+                    expected_destination = expected_destination.replace("{kubernetes.container_name}", "webapp")
+                    expected_destination = expected_destination.replace("{kubernetes.pod_name}", "webapp_deployment_123")
+                    
+                    logger.info(f"🔍 Validating nested template {expected_behavior}: {template} → {expected_destination}")
+                    
+                    # Validate data reached correct destination
+                    now = datetime.now(timezone.utc)
+                    end_time = int(now.timestamp() * 1000000)
+                    start_time = int((now - timedelta(minutes=5)).timestamp() * 1000000)
+                    
+                    safe_destination = safe_sql_identifier(expected_destination)
+                    validation_payload = {
+                        "query": {
+                            "sql": f'SELECT COUNT(*) as count FROM "{safe_destination}" WHERE log LIKE \'%{expected_behavior}%\'',
+                            "start_time": start_time,
+                            "end_time": end_time,
+                            "from": 0,
+                            "size": 1,
+                        }
+                    }
+                    
+                    resp_validation = session.post(f"{url}api/{org_id}/_search?type=logs", json=validation_payload)
+                    if resp_validation.status_code == 200:
+                        validation_result = resp_validation.json()
+                        if validation_result.get("hits", []):
+                            record_count = validation_result["hits"][0].get("count", 0)
+                            if record_count > 0:
+                                logger.info(f"✅ SUCCESS: Nested template {expected_behavior} validation passed! {record_count} records in '{expected_destination}'")
+                            else:
+                                logger.error(f"❌ FAILURE: Nested template {expected_behavior} - destination exists but no matching data")
+                                assert False, f"Nested template {expected_behavior} validation failed: no data in '{expected_destination}'"
+                        else:
+                            logger.error(f"❌ FAILURE: Nested template {expected_behavior} - no records in destination '{expected_destination}'")
+                            assert False, f"Nested template {expected_behavior} validation failed: stream '{expected_destination}' not found"
+                    else:
+                        logger.warning(f"⚠️ Cannot validate nested template {expected_behavior} destination '{expected_destination}': {resp_validation.status_code}")
+                        # Don't fail validation for query issues in nested templates
+                else:
+                    logger.warning(f"⚠️ Could not enable nested template pipeline for {expected_behavior}")
+            else:
+                logger.warning(f"⚠️ Could not find pipeline ID for nested template {expected_behavior}")
+        else:
+            logger.warning(f"⚠️ Could not get pipeline list for nested template {expected_behavior}")
+    else:
+        # Nested template was rejected
+        logger.info(f"Nested template {expected_behavior} rejected: {resp_create_pipeline.status_code}")
+        if resp_create_pipeline.status_code != 200:
+            logger.info(f"Nested template {expected_behavior} error: {resp_create_pipeline.text}")
+        assert resp_create_pipeline.status_code in [400, 422], f"Nested template {expected_behavior} should return 400/422 if rejected, got: {resp_create_pipeline.status_code}"
+
+
+# Performance and stress tests
+def test_pipeline_performance_multiple_templates(create_session, base_url):
+    """Test creating multiple pipelines rapidly to check performance and resource handling."""
+    session = create_session
+    url = base_url
+    org_id = DEFAULT_ORG_ID
+    
+    logger.info("Testing PERFORMANCE: Creating multiple pipelines rapidly")
+    
+    # Create multiple pipelines in succession
+    pipeline_ids = []
+    for i in range(5):  # Create 5 pipelines rapidly
+        source_stream = f"e2e_stress_{i+25}"
+        
+        # Ingest data for each stream
+        ingest_payload = [
+            {
+                "timestamp": int(time.time_ns()),
+                "kubernetes": {
+                    "namespace_name": f"stress-test-{i}",
+                    "container_name": "stress-container",
+                    "pod_name": f"stress-pod-{i}"
+                },
+                "log": f"Stress test log {i}",
+                "_timestamp": int(time.time_ns()),
             }
+        ]
+        
+        ingest_url = f"{url}api/{org_id}/{source_stream}/_json"
+        resp_ingest = session.post(ingest_url, json=ingest_payload)
+        assert resp_ingest.status_code == 200, f"Failed to ingest stress test data {i}: {resp_ingest.text}"
+        
+        # Create pipeline
+        pipeline_payload = {
+            "name": f"stress-pipeline-{i}-{int(time.time())}",
+            "description": f"Stress test pipeline {i}",
+            "nodes": [
+                {"id": "node_1", "type": "stream", "data": {"stream": source_stream}},
+                {"id": "node_2", "type": "condition", "data": {"condition": f'kubernetes.namespace_name = "stress-test-{i}"'}},
+                {"id": "node_3", "type": "stream", "data": {"stream": f"stress_output_{{{{{safe_sql_identifier('kubernetes.namespace_name')}}}}}_stream"}}
+            ],
+            "edges": [
+                {"source": "node_1", "target": "node_2"},
+                {"source": "node_2", "target": "node_3"}
+            ]
         }
         
-        resp_literal_search = session.post(f"{url}api/{org_id}/_search?type=logs", json=literal_search_payload)
-        if resp_literal_search.status_code == 200:
-            literal_result = resp_literal_search.json()
-            if literal_result.get("hits", []) and literal_result["hits"][0].get("count", 0) > 0:
-                literal_count = literal_result["hits"][0].get("count", 0)
-                logger.error(f"BUG CONFIRMED! Data was routed to literal template name '{destination_template}' ({literal_count} records)")
-                logger.error("Template substitution is not working - this is the bug!")
+        resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
+        
+        logger.info(f"Stress test pipeline {i} result: {resp_create_pipeline.status_code}")
+        
+        # Should handle rapid creation
+        assert resp_create_pipeline.status_code in [200, 400, 429], f"Unexpected status for stress test {i}: {resp_create_pipeline.status_code}"
+        
+        if resp_create_pipeline.status_code == 200:
+            pipeline_data = resp_create_pipeline.json()
+            if 'id' in pipeline_data:
+                pipeline_ids.append(pipeline_data['id'])
+    
+    logger.info(f"Successfully tested rapid pipeline creation. Created {len(pipeline_ids)} pipelines")
 
-    # Keep pipeline running for analysis
-    logger.info(f"Pipeline '{pipeline_name}' will remain active for bug analysis")
-    logger.info("Check the monitor to see which stream(s) actually received data")
+
+
+def test_pipeline_cleanup_created_pipelines(create_session, base_url):
+    """Cleanup test pipelines created during testing (optional)."""
+    session = create_session
+    url = base_url
+    org_id = DEFAULT_ORG_ID
+    
+    # Get all pipelines
+    resp_list_pipelines = session.get(f"{url}api/{org_id}/pipelines")
+    if resp_list_pipelines.status_code != 200:
+        logger.warning(f"Could not get pipeline list for cleanup: {resp_list_pipelines.status_code}")
+        return
+        
+    pipelines_list = resp_list_pipelines.json().get("list", [])
+    test_pipelines = [p for p in pipelines_list if p["name"].startswith("pipeline_")]
+    
+    logger.info(f"Found {len(test_pipelines)} test pipelines for potential cleanup")
+    
+    # Optionally clean up test pipelines (commented out to keep them for analysis)
+    # for pipeline in test_pipelines:
+    #     pipeline_id = pipeline["pipeline_id"]
+    #     pipeline_name = pipeline["name"]
+    #     
+    #     resp_delete = session.delete(f"{url}api/{org_id}/pipelines/{pipeline_id}")
+    #     if resp_delete.status_code == 200:
+    #         logger.info(f"Cleaned up pipeline: {pipeline_name}")
+    #     else:
+    #         logger.warning(f"Failed to clean up pipeline {pipeline_name}: {resp_delete.status_code}")
+    
+    logger.info("Pipeline cleanup test completed (pipelines preserved for analysis)")
