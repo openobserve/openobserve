@@ -59,18 +59,15 @@ id="tracePage" style="min-height: auto">
           <template #separator>
             <q-btn
               data-test="logs-search-field-list-collapse-btn"
-              icon="drag_indicator"
+              :icon="searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'"
               :title="
                 searchObj.meta.showFields ? 'Collapse Fields' : 'Open Fields'
               "
-              flat
+              :class="searchObj.meta.showFields ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
+              color="primary"
+              size="sm"
               dense
-              :class="[
-                'splitter-section-collapse-btn',
-                searchObj.meta.showFields
-                  ? 'splitter-section-collapse-btn--visible'
-                  : 'splitter-section-collapse-btn--hidden',
-              ]"
+              round
               @click="collapseFieldList"
             />
           </template>
