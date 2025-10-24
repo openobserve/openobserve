@@ -346,20 +346,42 @@ pub(crate) async fn handle_diff_schema(
 
     // Automatically enable User-defined schema when
     // 1. allow_user_defined_schemas is enabled
-    // 2. log ingestion
+    // 2. log/metrics/traces ingestion
     // 3. user defined schema is not already enabled
-    // 4. final schema fields count exceeds schema_max_fields_to_enable_uds
+    // 4. final schema fields count exceeds the respective threshold
     // user-defined schema does not include _timestamp or _all columns
-    if cfg.common.allow_user_defined_schemas
-        && cfg.limit.schema_max_fields_to_enable_uds > 0
-        && stream_type == StreamType::Logs
-        && defined_schema_fields.is_empty()
-        && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds
-    {
-        let mut uds_fields = HashSet::with_capacity(cfg.limit.schema_max_fields_to_enable_uds);
+
+    // Check which threshold to use based on stream type
+    let (should_enable_uds, uds_max_fields) = match stream_type {
+        StreamType::Logs => (
+            cfg.common.allow_user_defined_schemas
+                && cfg.limit.schema_max_fields_to_enable_uds > 0
+                && defined_schema_fields.is_empty()
+                && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds,
+            cfg.limit.schema_max_fields_to_enable_uds,
+        ),
+        StreamType::Metrics => (
+            cfg.common.allow_user_defined_schemas
+                && cfg.limit.schema_max_fields_to_enable_uds_metrics > 0
+                && defined_schema_fields.is_empty()
+                && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds_metrics,
+            cfg.limit.schema_max_fields_to_enable_uds_metrics,
+        ),
+        StreamType::Traces => (
+            cfg.common.allow_user_defined_schemas
+                && cfg.limit.schema_max_fields_to_enable_uds_traces > 0
+                && defined_schema_fields.is_empty()
+                && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds_traces,
+            cfg.limit.schema_max_fields_to_enable_uds_traces,
+        ),
+        _ => (false, 0),
+    };
+
+    if should_enable_uds {
+        let mut uds_fields = HashSet::with_capacity(uds_max_fields);
 
         // Helper to check if a field should be skipped
-        let should_skip = |field_name: &str| {
+        let should_skip_common = |field_name: &str| {
             field_name == TIMESTAMP_COL_NAME
                 || field_name == ID_COL_NAME
                 || field_name == ORIGINAL_DATA_COL_NAME
@@ -367,41 +389,172 @@ pub(crate) async fn handle_diff_schema(
                 || field_name == cfg.common.column_all
         };
 
-        // Add FTS fields first
-        for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-            if final_schema.field_with_name(field).is_ok()
-                && !should_skip(field)
-                && uds_fields.insert(field.to_string())
-                && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
-            {
-                break;
-            }
-        }
+        match stream_type {
+            StreamType::Logs => {
+                // For logs: prioritize FTS fields first
+                for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
+                    if final_schema.field_with_name(field).is_ok()
+                        && !should_skip_common(field)
+                        && uds_fields.insert(field.to_string())
+                        && uds_fields.len() >= uds_max_fields
+                    {
+                        break;
+                    }
+                }
 
-        // Add fields from current schema if available
-        if let Some(stream_schema) = stream_schema_map.get(stream_name) {
-            for field in stream_schema.schema().fields() {
-                let field = field.name();
-                if !should_skip(field)
-                    && uds_fields.insert(field.to_string())
-                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
-                {
-                    break;
+                // Add fields from current schema if available
+                if let Some(stream_schema) = stream_schema_map.get(stream_name) {
+                    for field in stream_schema.schema().fields() {
+                        let field = field.name();
+                        if !should_skip_common(field)
+                            && uds_fields.insert(field.to_string())
+                            && uds_fields.len() >= uds_max_fields
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                // Add remaining fields from final schema
+                if uds_fields.len() < uds_max_fields {
+                    for field in final_schema.fields() {
+                        let field = field.name();
+                        if !should_skip_common(field)
+                            && uds_fields.insert(field.to_string())
+                            && uds_fields.len() >= uds_max_fields
+                        {
+                            break;
+                        }
+                    }
                 }
             }
-        }
+            StreamType::Metrics => {
+                use config::meta::promql::{
+                    BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, QUANTILE_LABEL,
+                    TYPE_LABEL, VALUE_LABEL,
+                };
 
-        // Add remaining fields from final schema
-        if uds_fields.len() < cfg.limit.schema_max_fields_to_enable_uds {
-            for field in final_schema.fields() {
-                let field = field.name();
-                if !should_skip(field)
-                    && uds_fields.insert(field.to_string())
-                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
-                {
-                    break;
+                // For metrics: skip core metric fields (they're always included)
+                let should_skip_metric = |field_name: &str| {
+                    should_skip_common(field_name)
+                        || field_name == NAME_LABEL
+                        || field_name == TYPE_LABEL
+                        || field_name == HASH_LABEL
+                        || field_name == VALUE_LABEL
+                        || field_name == BUCKET_LABEL
+                        || field_name == QUANTILE_LABEL
+                        || field_name == EXEMPLARS_LABEL
+                };
+
+                // Add common important labels first
+                const IMPORTANT_METRIC_LABELS: &[&str] = &["service_name", "job", "instance"];
+                for label in IMPORTANT_METRIC_LABELS {
+                    if final_schema.field_with_name(label).is_ok()
+                        && !should_skip_metric(label)
+                        && uds_fields.insert(label.to_string())
+                        && uds_fields.len() >= uds_max_fields
+                    {
+                        break;
+                    }
+                }
+
+                // Add FTS fields if configured
+                if uds_fields.len() < uds_max_fields {
+                    for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
+                        if final_schema.field_with_name(field).is_ok()
+                            && !should_skip_metric(field)
+                            && uds_fields.insert(field.to_string())
+                            && uds_fields.len() >= uds_max_fields
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                // Add remaining labels from schema
+                if uds_fields.len() < uds_max_fields {
+                    for field in final_schema.fields() {
+                        let field = field.name();
+                        if !should_skip_metric(field)
+                            && uds_fields.insert(field.to_string())
+                            && uds_fields.len() >= uds_max_fields
+                        {
+                            break;
+                        }
+                    }
                 }
             }
+            StreamType::Traces => {
+                // For traces: skip core trace fields (they're always included)
+                const CORE_TRACE_FIELDS: &[&str] = &[
+                    "trace_id",
+                    "span_id",
+                    "parent_span_id",
+                    "start_time",
+                    "end_time",
+                    "duration",
+                    "service_name",
+                    "operation_name",
+                    "span_kind",
+                    "span_status",
+                    "flags",
+                    "events",
+                    "links",
+                    "reference",
+                ];
+                let should_skip_trace = |field_name: &str| {
+                    should_skip_common(field_name) || CORE_TRACE_FIELDS.contains(&field_name)
+                };
+
+                // Add semantic convention attributes (HTTP, DB, RPC)
+                const SEMANTIC_ATTRS: &[&str] = &[
+                    "http.method",
+                    "http.status_code",
+                    "http.target",
+                    "http.route",
+                    "db.system",
+                    "db.statement",
+                    "db.name",
+                    "rpc.method",
+                    "rpc.service",
+                ];
+                for attr in SEMANTIC_ATTRS {
+                    if final_schema.field_with_name(attr).is_ok()
+                        && !should_skip_trace(attr)
+                        && uds_fields.insert(attr.to_string())
+                        && uds_fields.len() >= uds_max_fields
+                    {
+                        break;
+                    }
+                }
+
+                // Add FTS fields if configured
+                if uds_fields.len() < uds_max_fields {
+                    for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
+                        if final_schema.field_with_name(field).is_ok()
+                            && !should_skip_trace(field)
+                            && uds_fields.insert(field.to_string())
+                            && uds_fields.len() >= uds_max_fields
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                // Add remaining attributes from schema
+                if uds_fields.len() < uds_max_fields {
+                    for field in final_schema.fields() {
+                        let field = field.name();
+                        if !should_skip_trace(field)
+                            && uds_fields.insert(field.to_string())
+                            && uds_fields.len() >= uds_max_fields
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
 
         defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();

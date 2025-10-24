@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod uds;
+
 use std::{collections::HashMap, io::Error, sync::Arc, time::Instant};
 
 use actix_web::{HttpResponse, http, web};
@@ -760,6 +762,19 @@ async fn write_traces(
         .await
         .unwrap_or_default();
 
+    // Get UDS configuration
+    let uds_fields = if !stream_settings.defined_schema_fields.is_empty() {
+        let mut fields =
+            std::collections::HashSet::from_iter(stream_settings.defined_schema_fields.clone());
+        // Ensure timestamp is always included
+        if !fields.contains(TIMESTAMP_COL_NAME) {
+            fields.insert(TIMESTAMP_COL_NAME.to_string());
+        }
+        Some(fields)
+    } else {
+        None
+    };
+
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level =
         PartitionTimeLevel::from(cfg.limit.traces_file_retention.as_str());
@@ -798,13 +813,25 @@ async fn write_traces(
     // End get stream alert
 
     // Start check for schema
-    let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
+    // Apply UDS filtering to all spans BEFORE schema inference
+    let mut filtered_json_data = Vec::with_capacity(json_data.len());
+    if let Some(ref defined_fields) = uds_fields {
+        for (timestamp, record_val) in json_data {
+            let filtered =
+                crate::service::traces::uds::refactor_span_attributes(record_val, defined_fields);
+            filtered_json_data.push((timestamp, filtered));
+        }
+    } else {
+        filtered_json_data = json_data;
+    }
+
+    let min_timestamp = filtered_json_data.iter().map(|(ts, _)| ts).min().unwrap();
     let _ = check_for_schema(
         org_id,
         stream_name,
         StreamType::Traces,
         &mut traces_schema_map,
-        json_data.iter().map(|(_, v)| v).collect(),
+        filtered_json_data.iter().map(|(_, v)| v).collect(),
         *min_timestamp,
         false, // is_derived is false for traces
     )
@@ -821,10 +848,10 @@ async fn write_traces(
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
-    let mut trace_index_values = Vec::with_capacity(json_data.len());
+    let mut trace_index_values = Vec::with_capacity(filtered_json_data.len());
 
     // Start write data
-    for (timestamp, record_val) in json_data {
+    for (timestamp, record_val) in filtered_json_data {
         // get service_name
         let service_name = json::get_string_value(record_val.get("service_name").unwrap());
         // get distinct_value item

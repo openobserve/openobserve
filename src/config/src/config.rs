@@ -1239,9 +1239,21 @@ pub struct Limit {
     #[env_config(
         name = "ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS",
         default = 1000,
-        help = "Exceeding this limit will auto enable user-defined schema"
+        help = "Exceeding this limit will auto enable user-defined schema for logs"
     )]
     pub schema_max_fields_to_enable_uds: usize,
+    #[env_config(
+        name = "ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS_METRICS",
+        default = 50,
+        help = "Exceeding this limit will auto enable user-defined schema for metrics"
+    )]
+    pub schema_max_fields_to_enable_uds_metrics: usize,
+    #[env_config(
+        name = "ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS_TRACES",
+        default = 100,
+        help = "Exceeding this limit will auto enable user-defined schema for traces"
+    )]
+    pub schema_max_fields_to_enable_uds_traces: usize,
     #[env_config(
         name = "ZO_USER_DEFINED_SCHEMA_MAX_FIELDS",
         default = 1000,

@@ -150,6 +150,12 @@ pub async fn handle_otlp_request(
 
     let mut partial_success = ExportMetricsPartialSuccess::default();
 
+    // UDS maps
+    let mut user_defined_schema_map: HashMap<String, Option<std::collections::HashSet<String>>> =
+        HashMap::new();
+    let mut streams_need_original: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values: HashMap<String, bool> = HashMap::new();
+
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<json::Value>> = HashMap::new();
 
@@ -398,6 +404,24 @@ pub async fn handle_otlp_request(
         }
     }
 
+    // Get UDS configuration for all metrics streams
+    let stream_params: Vec<StreamParams> = json_data_by_stream
+        .keys()
+        .map(|stream_name| StreamParams {
+            org_id: org_id.to_owned().into(),
+            stream_name: stream_name.to_owned().into(),
+            stream_type: StreamType::Metrics,
+        })
+        .collect();
+
+    crate::service::ingestion::get_uds_and_original_data_streams(
+        &stream_params,
+        &mut user_defined_schema_map,
+        &mut streams_need_original,
+        &mut streams_need_all_values,
+    )
+    .await;
+
     for (local_metric_name, json_data) in json_data_by_stream {
         // get partition keys
         let partition_det = stream_partitioning_map.get(&local_metric_name).unwrap();
@@ -405,10 +429,27 @@ pub async fn handle_otlp_request(
         let partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
 
+        // Get UDS configuration for this stream
+        let uds_fields = user_defined_schema_map
+            .get(&local_metric_name)
+            .and_then(|opt| opt.as_ref());
+
         for mut rec in json_data {
             // get json object
             let val_map: &mut serde_json::Map<String, serde_json::Value> =
                 rec.as_object_mut().unwrap();
+
+            // Apply UDS filtering if configured
+            if let Some(defined_fields) = uds_fields {
+                let filtered = crate::service::metrics::uds::refactor_metric_map(
+                    val_map.clone(),
+                    defined_fields,
+                );
+                // Recalculate hash after UDS filtering
+                let filtered_with_hash =
+                    crate::service::metrics::uds::recalculate_metric_hash(filtered, defined_fields);
+                *val_map = filtered_with_hash;
+            }
 
             let timestamp = val_map
                 .get(TIMESTAMP_COL_NAME)

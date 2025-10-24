@@ -1130,25 +1130,23 @@ export default defineComponent({
     const allFieldsName = computed(() => {
       return store.state.zoConfig.all_fields_name;
     });
-    //here we are setting the active tab based on the user defined schema
-    //1. if there is UDS then it should be schemaFields
-    //2. if there is no UDS then it should be allFields
-    const activeTab = ref(
-      hasUserDefinedSchema.value ? "schemaFields" : "allFields",
-    );
+    //here we are setting the active tab to always start with allFields
+    //All Fields should be the primary tab as it shows the main schema
+    //UDS fields are secondary/optional configuration
+    const activeTab = ref("allFields");
 
     const tabs = computed(() => [
-      {
-        value: "schemaFields",
-        label: `User Defined Schema (${indexData.value.defined_schema_fields.length})`,
-        disabled: !hasUserDefinedSchema.value,
-        hide: !hasUserDefinedSchema.value,
-      },
       {
         value: "allFields",
         label: `${computedSchemaFieldsName.value} (${indexData.value.schema.length})`,
         disabled: false,
         hide: false,
+      },
+      {
+        value: "schemaFields",
+        label: `User Defined Schema (${indexData.value.defined_schema_fields.length})`,
+        disabled: !hasUserDefinedSchema.value,
+        hide: !hasUserDefinedSchema.value,
       },
     ]);
     const mainTabs = computed(() => [
@@ -1199,16 +1197,9 @@ export default defineComponent({
     const showStoreOriginalDataToggle = computed(() => {
       return modelValue.stream_type !== "traces";
     });
-    //here we added a watcher to
-    //1. if user defined schema is enabled then we need to show the schema fields tab and also need to make sure that it would be the active tab
-    //2. if user defined schema is disabled then we need to show the all fields tab and also need to make sure that it would be the active tab
-    watch(hasUserDefinedSchema, (newVal) => {
-      if (newVal) {
-        activeTab.value = "schemaFields";
-      } else {
-        activeTab.value = "allFields";
-      }
-    });
+    // Removed automatic tab switching watcher
+    // All Fields should always be the primary/default tab
+    // Users can manually switch to UDS tab if needed
 
     const isSchemaUDSEnabled = computed(() => {
       return store.state.zoConfig.user_defined_schemas_enabled;

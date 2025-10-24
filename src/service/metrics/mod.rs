@@ -22,6 +22,7 @@ use datafusion::arrow::datatypes::Schema;
 pub mod json;
 pub mod otlp;
 pub mod prom;
+pub mod uds;
 
 const EXCLUDE_LABELS: [&str; 7] = [
     VALUE_LABEL,

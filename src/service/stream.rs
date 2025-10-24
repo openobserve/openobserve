@@ -367,11 +367,15 @@ pub async fn save_stream_settings(
             )));
     }
 
-    // only allow setting user defined schema for logs stream
-    if stream_type != StreamType::Logs && !settings.defined_schema_fields.is_empty() {
+    // only allow setting user defined schema for logs, metrics, and traces streams
+    if !matches!(
+        stream_type,
+        StreamType::Logs | StreamType::Metrics | StreamType::Traces
+    ) && !settings.defined_schema_fields.is_empty()
+    {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
-            "only logs stream can have user defined schema",
+            "only logs, metrics, and traces streams can have user defined schema",
         )));
     }
 
