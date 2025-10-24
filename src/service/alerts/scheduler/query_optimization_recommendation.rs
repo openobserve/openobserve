@@ -13,11 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#![cfg(feature = "enterprise")]
-
 use std::{pin::Pin, sync::Arc};
 
-use config::{META_ORG_ID, get_config, meta::stream::StreamType};
+use config::{META_ORG_ID, get_config, meta::stream::StreamType, spawn_pausable_job};
 use o2_enterprise::enterprise::recommendations::{
     meta::{OptimiserRecommendation, Stream},
     service::{QueryRecommendationEngine, QueryRecommendationService},
@@ -32,9 +30,9 @@ use crate::{
 };
 
 #[derive(Clone)]
-struct OptimizerContext;
+pub struct QueryOptimizerContext;
 
-impl QueryRecommendationEngine for OptimizerContext {
+impl QueryRecommendationEngine for QueryOptimizerContext {
     fn get_all_org_ids(
         &self,
         limit: Option<i64>,
@@ -79,7 +77,7 @@ impl QueryRecommendationEngine for OptimizerContext {
         recommendations: Vec<OptimiserRecommendation>,
     ) -> Pin<Box<dyn Future<Output = Result<IngestionResponse, anyhow::Error>> + Send>> {
         Box::pin(async move {
-            let ingester = Ingester::default();
+            let ingester = Ingester {};
             let request = IngestionRequest {
                 org_id: META_ORG_ID.to_string(),
                 stream_type: StreamType::Logs.to_string(),
@@ -95,30 +93,37 @@ impl QueryRecommendationEngine for OptimizerContext {
             Ok(ingester
                 .ingest(tonic::Request::new(request))
                 .await?
-                .into_inner()
-                .into())
+                .into_inner())
         })
     }
 }
 
 pub async fn run() {
     let cfg = get_config();
+    let query_recommendation_analysis_interval = cfg.limit.query_recommendation_analysis_interval;
     let query_recommendation_service = QueryRecommendationService {
-        ctx: Arc::new(OptimizerContext),
+        ctx: Arc::new(QueryOptimizerContext),
         query_recommendation_analysis_interval: cfg.limit.query_recommendation_analysis_interval,
         query_recommendation_duration: cfg.limit.query_recommendation_duration,
         query_recommendation_top_k: cfg.limit.query_recommendation_top_k,
     };
-    let _ = query_recommendation_service
-        .run()
-        .await
-        .inspect_err(|e| {
-            log::error!(
-                "Recommendation service stopped with an error: Error={:?}",
-                e
-            );
-        })
-        .inspect(|_| {
-            log::warn!("Recommendation service quietly ended without an error!");
-        });
+
+    spawn_pausable_job!(
+        "Query Optimization Recommendations",
+        query_recommendation_analysis_interval,
+        {
+            let _ = query_recommendation_service
+                .run()
+                .await
+                .inspect_err(|e| {
+                    log::error!(
+                        "Recommendation service stopped with an error: Error={:?}",
+                        e
+                    );
+                })
+                .inspect(|_| {
+                    log::warn!("Recommendation service quietly ended without an error!");
+                });
+        }
+    );
 }

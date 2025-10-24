@@ -385,7 +385,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         #[cfg(feature = "enterprise")]
         license_server_url,
         #[cfg(feature = "enterprise")]
-        ingestion_quota_used
+        ingestion_quota_used,
     }))
 }
 
@@ -524,8 +524,6 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
     drop(r);
     let r = STREAM_SCHEMAS_LATEST.read().await;
     for (key, schema) in r.iter() {
-        stream_num += 1;
-        stream_schema_num += 1;
         mem_size += std::mem::size_of::<String>() + key.len();
         mem_size += schema.size();
     }
@@ -866,7 +864,7 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     let conf = get_config();
 
     #[cfg(feature = "enterprise")]
-    let auth_str = extract_auth_str(&req);
+    let auth_str = extract_auth_str(&req).await;
     // Only get the user email from the auth_str, no need to check for permissions and others
     #[cfg(feature = "enterprise")]
     let user_email = get_user_email_from_auth_str(&auth_str).await;
