@@ -64,7 +64,7 @@ pub async fn get_enrichment_table_data(
 
     #[cfg(feature = "enterprise")]
     let regions = {
-        use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
         let config = get_o2_config();
         let enrichment_table_region = config.super_cluster.enrichment_table_get_region.clone();
         if _apply_primary_region_if_specified
