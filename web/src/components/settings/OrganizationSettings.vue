@@ -16,9 +16,8 @@
         color="input-border"
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
-        outlined
         stack-label
-        filled
+        borderless
         dense
         :rules="[
           (val: string) =>
@@ -45,8 +44,7 @@
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
-        filled
+        borderless
         dense
         :rules="[
           (val: string) =>
