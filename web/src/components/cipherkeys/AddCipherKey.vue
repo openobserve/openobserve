@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="addCipherKeyFormRef"
       @submit="onSubmit"
     >
-    <div style="height: calc(100vh - 234px); overflow: auto">
+    <div style="height: calc(100vh - 180px); overflow: auto">
       <div class="row">
         <div class="col-4 o2-input flex q-mx-md q-mt-md">
           <q-input
@@ -159,7 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-step>
       </q-stepper>
     </div>
-      <div class="flex justify-end q-px-md q-py-md full-width card-container"
+    <div class="tw-mx-2">
+            <div class="flex justify-end q-px-md q-py-md full-width card-container"
       style="position: sticky; bottom: 0px; z-index: 2"
       :style="{
         'box-shadow':
@@ -187,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
         />
       </div>
+    </div>
     </q-form>
     <ConfirmDialog
       v-model="dialog.show"

@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     </div>
     </div>
-    <div style="min-height: calc(100% - (39px + 55px + 43px + 5px))">
+    <div style="min-height: calc(100% - (39px + 55px + 43px + 6px))">
       <GroupUsers
         v-show="activeTab === 'users'"
         :groupUsers="groupDetails.users"

@@ -15,10 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <div class="o2-input">
-      <div class="row items-center no-wrap q-mx-md q-my-sm">
-        <div class="flex items-center">
+ <q-page class="q-pa-none o2-custom-bg" style="height: calc(100vh - 48px); min-height: inherit" >
+      <div class="row items-center no-wrap card-container q-px-md tw-mb-[0.675rem]">
+        <div class="flex items-center tw-h-[60px]">
           <div
             class="flex justify-center items-center q-mr-md cursor-pointer"
             style="
@@ -42,8 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <q-separator />
-      <div class="row q-col-gutter-sm q-px-md q-mt-md q-mb-xs">
+      <div class="card-container tw-h-full tw-py-2">
+        <div>
+       <div class="row q-col-gutter-sm q-px-md q-mt-sm q-mb-xs">
         <div v-if="isAlerts" class="col-12 q-pb-md">
          <div class="app-tabs-container tw-h-[36px] q-mr-sm tw-w-fit">
           <app-tabs
@@ -302,6 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         flat
         @click="saveDestination"
       />
+    </div>
     </div>
   </q-page>
 </template>

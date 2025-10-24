@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
-      <div style="min-height: calc(100% - (39px + 55px + 48px))">
+      <div style="min-height: calc(100% - (39px + 55px + 49px))">
         <GroupUsers
           data-test="edit-role-users-section"
           v-show="activeTab === 'users'"
