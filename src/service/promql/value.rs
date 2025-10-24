@@ -845,7 +845,10 @@ mod tests {
 
         // Same labels should produce same signature (deterministic)
         assert_eq!(sig_all, signature(&labels));
-        assert_eq!(sig_without_ac, signature_without_labels(&labels, &["a", "c"]));
+        assert_eq!(
+            sig_without_ac,
+            signature_without_labels(&labels, &["a", "c"])
+        );
     }
 
     #[test]
