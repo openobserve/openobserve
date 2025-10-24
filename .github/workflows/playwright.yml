@@ -161,7 +161,7 @@ jobs:
                 "logsquickmode.spec.js",
                 "pagination.spec.js",
                 # "unflattened.spec.js",
-                # "logstable.spec.js",
+                "logstable.spec.js",
               ]
           # - testfolder: "Logs-Queries"
           #   browser: "chrome"
