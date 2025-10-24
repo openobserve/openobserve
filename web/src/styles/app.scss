@@ -571,14 +571,12 @@ body {
       right: 0;
       z-index: 1;
       width: 100px ;
-    box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
+      box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
     }
   }
   .q-table{
     thead{
-    tr {
-      background: var(--o2-table-header-bg) !important;
-    }
+            background: var(--o2-table-header-bg) !important;
       th:last-child.actions-column{
         position: sticky;
         right: 0;
