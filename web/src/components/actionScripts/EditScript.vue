@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     
       <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
-        <div class="card-container tw-h-[calc(100vh-159px)] tw-overflow-auto">
+        <div class="card-container tw-h-[calc(100vh-192px)] tw-overflow-auto">
           <div ref="addAlertFormRef" class="q-px-lg q-pb-md" style="width: 1024px">
             <q-form
               class="create-report-form"
@@ -530,16 +530,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div
-        class="flex justify-end q-px-md full-width tw-py-3"
+      <div class="tw-mx-2">
+              <div
+        class="flex justify-end q-px-md full-width tw-py-3 card-container"
         style="position: sticky; bottom: 0px; z-index: 2"
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        :style="{
-          'box-shadow':
-            store.state.theme === 'dark'
-              ? 'rgb(45 45 45) 0px -4px 7px 0px'
-              : 'rgb(240 240 240) 0px -4px 7px 0px',
-        }"
       >
         <q-btn
           data-test="add-action-script-cancel-btn"
@@ -558,13 +552,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="saveActionScript"
         />
       </div>
-    </div>
-    
-    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
-      <div class="card-container">
-        
       </div>
     </div>
+  
   <ConfirmDialog
     v-model="dialog.show"
     :title="dialog.title"

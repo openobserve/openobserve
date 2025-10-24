@@ -14,9 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <div class="row items-center no-wrap q-mx-md q-my-sm">
-      <div class="flex items-center">
+  <q-page class="q-pa-none o2-custom-bg" style="height: calc(100vh - 48px); min-height: inherit" >
+     <div class="row items-center no-wrap card-container q-px-md tw-mb-[0.675rem]">
+         <div class="flex items-center tw-h-[60px]">
         <div
           class="flex justify-center items-center q-mr-md cursor-pointer"
           style="
@@ -41,15 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-separator style="width: 100%" />
-
     <q-splitter
       v-model="splitterModel"
       unit="%"
       style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
-        <div class="row q-pa-md">
+        <div class="row q-pa-md card-container tw-h-full">
           <div class="col-12 q-pb-sm q-pt-sm o2-input">
             <q-input
               data-test="add-template-name-input"
@@ -143,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="q-px-sm q-pt-sm">
+        <div class="q-px-sm tw-ml-[0.625rem] q-pt-sm tw-h-full tw-overflow-auto card-container">
           <div class="text-bold q-py-sm q-px-xs text-subtitle2">
             {{ t("alert_templates.variable_guide_header") }}
           </div>
