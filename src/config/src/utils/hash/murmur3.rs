@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Cursor;
+use std::{hash::Hasher, io::Cursor};
 
 use murmur3::murmur3_x64_128;
 
@@ -23,6 +23,10 @@ pub struct Mr3 {}
 
 pub fn new() -> Mr3 {
     Mr3 {}
+}
+
+pub fn new_hasher() -> impl Hasher {
+    ahash::AHasher::default()
 }
 
 impl Sum64 for Mr3 {

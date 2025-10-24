@@ -263,7 +263,7 @@ impl Engine {
                         .iter()
                         .map(|v| RangeValue {
                             labels: v.labels.to_owned(),
-                            samples: vec![v.sample.clone()],
+                            samples: vec![v.sample],
                             exemplars: None,
                             time_window: time_window.clone(),
                         })
@@ -271,7 +271,7 @@ impl Engine {
                     Value::Instant(v) => {
                         vec![RangeValue {
                             labels: v.labels.to_owned(),
-                            samples: vec![v.sample.clone()],
+                            samples: vec![v.sample],
                             exemplars: None,
                             time_window,
                         }]
@@ -496,13 +496,19 @@ impl Engine {
             let end_index = metric
                 .samples
                 .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
-            let samples = metric.samples[start_index..end_index]
-                .iter()
-                .map(|v| Sample {
-                    timestamp: v.timestamp + offset_modifier,
-                    value: v.value,
-                })
-                .collect::<Vec<_>>();
+            let samples = if offset_modifier == 0 {
+                metric.samples[start_index..end_index].to_vec()
+            } else {
+                let slice = &metric.samples[start_index..end_index];
+                let mut samples = Vec::with_capacity(slice.len());
+                for &sample in slice {
+                    samples.push(Sample {
+                        timestamp: sample.timestamp + offset_modifier,
+                        value: sample.value,
+                    });
+                }
+                samples
+            };
             let exemplars = if self.ctx.query_exemplars {
                 metric.exemplars.clone()
             } else {

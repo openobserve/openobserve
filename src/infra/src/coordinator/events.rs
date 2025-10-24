@@ -94,9 +94,10 @@ pub async fn init() -> Result<()> {
                     for (prefix, tx) in r.iter() {
                         if event.key.starts_with(prefix) {
                             log::debug!(
-                                "[COORDINATOR::EVENTS] sending event to watcher: {:?}:{}",
+                                "[COORDINATOR::EVENTS] sending event to watcher: {:?}:{}, start_dt: {:?}",
                                 event.action,
-                                event.key
+                                event.key,
+                                event.start_dt
                             );
                             if let Err(e) = tx.send(event.clone().into()).await {
                                 log::error!(
@@ -122,16 +123,25 @@ pub async fn watch(prefix: &str) -> Result<Arc<mpsc::Receiver<crate::db::Event>>
 
 async fn create_stream() -> Result<()> {
     log::info!("[COORDINATOR::EVENTS] creating coordinator stream");
-    let max_age = config::get_config().nats.event_max_age; // seconds
+    let cfg = config::get_config();
+    let max_age = cfg.nats.event_max_age; // seconds
     let max_age_secs = std::time::Duration::from_secs(std::cmp::max(1, max_age));
-    let queue = queue::get_queue().await;
-    queue
-        .create_with_max_age(COORDINATOR_STREAM, max_age_secs)
-        .await
+    let storage = if cfg.nats.event_storage.to_lowercase() == "memory" {
+        queue::StorageType::Memory
+    } else {
+        queue::StorageType::File
+    };
+    let q = queue::get_queue().await;
+    let config = queue::QueueConfigBuilder::new()
+        .max_age(max_age_secs)
+        .retention_policy(queue::RetentionPolicy::Limits)
+        .storage_type(storage)
+        .build();
+    q.create_with_config(COORDINATOR_STREAM, config).await
 }
 
 async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
-    let queue = queue::get_queue().await;
+    let q = queue::get_queue().await;
     let mut reconnect = false;
     loop {
         if config::cluster::is_offline() {
@@ -147,7 +157,7 @@ async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
             "[COORDINATOR::EVENTS] subscribing to coordinator topic with deliver policy: {:?}",
             deliver_policy
         );
-        let mut receiver: Arc<mpsc::Receiver<queue::Message>> = match queue
+        let mut receiver: Arc<mpsc::Receiver<queue::Message>> = match q
             .consume(COORDINATOR_STREAM, Some(deliver_policy))
             .await
         {
@@ -209,11 +219,8 @@ async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
 async fn publish(event: CoordinatorEvent) -> Result<()> {
     let payload = json::to_vec(&event)
         .map_err(|e| Error::Message(format!("Failed to serialize coordinator event: {e}")))?;
-    let queue = queue::get_queue().await;
-    if let Err(e) = queue
-        .publish(COORDINATOR_STREAM, Bytes::from(payload))
-        .await
-    {
+    let q = queue::get_queue().await;
+    if let Err(e) = q.publish(COORDINATOR_STREAM, Bytes::from(payload)).await {
         log::error!("[COORDINATOR::EVENTS] failed to publish coordinator event: {e}");
         return Err(e);
     }
@@ -237,7 +244,9 @@ pub async fn put_event(key: &str, start_dt: Option<i64>, value: Option<Bytes>) -
 }
 
 pub async fn delete_event(key: &str, start_dt: Option<i64>) -> Result<()> {
-    log::debug!("[COORDINATOR::EVENTS] publishing delete event for key: {key}");
+    log::debug!(
+        "[COORDINATOR::EVENTS] publishing delete event for key: {key}, start_dt: {start_dt:?}"
+    );
     if let Err(e) = publish(CoordinatorEvent::Meta(MetaEvent {
         action: MetaAction::Delete,
         key: key.to_string(),

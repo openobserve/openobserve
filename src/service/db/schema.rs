@@ -300,7 +300,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let key_columns = ev.key.split('/').collect::<Vec<&str>>();
-                let (ev_key, ev_start_dt) = if key_columns.len() > 5 {
+                let (ev_key, mut ev_start_dt) = if key_columns.len() > 5 {
                     (
                         key_columns[..5].join("/"),
                         key_columns[5].parse::<i64>().unwrap_or(0),
@@ -308,6 +308,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 } else {
                     (ev.key.to_string(), ev.start_dt.unwrap_or_default())
                 };
+                if ev_start_dt == 0 && ev.start_dt.is_some() {
+                    ev_start_dt = ev.start_dt.unwrap();
+                }
 
                 let item_key = ev_key.strip_prefix(key).unwrap();
                 let r = STREAM_SCHEMAS.read().await;
@@ -424,8 +427,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let stream_name = columns[2];
                 let start_dt = match columns.get(3) {
                     Some(start_dt) => start_dt.parse::<i64>().unwrap_or_default(),
-                    None => 0,
+                    None => ev.start_dt.unwrap_or_default(),
                 };
+                log::warn!(
+                    "[Schema:watch] Deleting schema cache for {org_id}/{stream_type}/{stream_name} with start_dt {start_dt}",
+                );
                 if start_dt > 0 {
                     // delete only one version
                     continue;
