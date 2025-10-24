@@ -1405,4 +1405,25 @@
   }
 }
 
+
+/* ============================================================================
+   SPLITTER ICON COLLAPSE/EXPAND BUTTONS
+   Specific styles for collapse/expand icons in splitter separators
+   ============================================================================ */
+
+.logs-splitter-icon-collapse {
+  position: absolute !important;
+  top: 14px !important;
+  left: 14px !important;
+  z-index: 100 !important;
+}
+
+.logs-splitter-icon-expand {
+  position: absolute !important;
+  top: 14px !important;
+  left: -2px !important;
+  z-index: 100 !important;
+}
+
+
 /************************* JSONPreview.vue *************************/
