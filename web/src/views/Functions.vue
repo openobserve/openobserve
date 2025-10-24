@@ -82,17 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #separator>
           <q-btn
             data-test="logs-search-field-list-collapse-btn"
-            icon="drag_indicator"
+            :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
             :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+            :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
+            color="primary"
+            size="sm"
             dense
-            flat
-            :class="[
-              'splitter-section-collapse-btn',
-              showSidebar
-                ? 'splitter-section-collapse-btn--visible'
-                : 'splitter-section-collapse-btn--hidden',
-            ]"
-            
+            round
             @click="collapseSidebar"
           />
         </template>

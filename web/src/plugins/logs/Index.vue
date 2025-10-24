@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'Collapse Fields'
                       : 'Open Fields'
                   "
-                  :class="searchObj.meta.showFields ? 'splitter-icon-expand' : 'splitter-icon-collapse'"
+                  :class="searchObj.meta.showFields ? 'logs-splitter-icon-expand' : 'logs-splitter-icon-collapse'"
                   color="primary"
                   size="sm"
                   dense

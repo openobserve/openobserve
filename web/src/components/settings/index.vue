@@ -185,18 +185,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #separator>
           <q-btn
             data-test="logs-search-field-list-collapse-btn-management"
-            icon="drag_indicator"
+            :icon="showManagementTabs ? 'chevron_left' : 'chevron_right'"
             :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
+            :class="showManagementTabs ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
+            color="primary"
+            size="sm"
             dense
-            flat
-            :class="[
-                'splitter-section-collapse-btn',
-                showManagementTabs
-                  ? 'splitter-section-collapse-btn--visible'
-                  : 'splitter-section-collapse-btn--hidden',
-              ]"
+            round
             @click="controlManagementTabs"
-              />
+          />
       </template>
 
       <template v-slot:after>
