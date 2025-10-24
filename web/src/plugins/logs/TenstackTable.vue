@@ -285,7 +285,7 @@ class="q-mr-xs" />
               <json-preview
                 :value="tableRows[virtualRow.index - 1] as any"
                 show-copy-button
-                class="tw-py-1"
+                class="tw-py-[0.375rem]"
                 mode="expanded"
                 :highlight-query="highlightQuery"
                 @copy="copyLogToClipboard"
