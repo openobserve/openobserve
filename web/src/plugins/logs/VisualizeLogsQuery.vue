@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row" style="height: 100%">
       <div class="tw-pl-[0.625rem]" style="overflow-y: auto;">
       <div
-        class="col scroll card-container"
+        class="col scroll card-container tw-mr-[0.625rem]"
         style="
           overflow-y: auto;
           height: 100%;
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; height: 100%"
         >
           <template #before>
-            <div class="tw-w-full tw-h-full tw-pr-[0.625rem]">
+            <div class="tw-w-full tw-h-full">
             <div class="col scroll card-container" style="height: 100%; overflow-y: auto">
               <div class="column" style="height: 100%">
                 <div class="col-auto q-pa-sm">
@@ -105,12 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div
-              class="row card-container"
+              class="row card-container tw-ml-[0.625rem]"
               :style="{
                 height: '100%',
                 width: dashboardPanelData.layout.showFieldList
                   ? '100%'
-                  : 'calc(100% - 50px)',
+                  : 'calc(100% - 58px)',
               }"
             >
               <div class="col" style="height: 100%">

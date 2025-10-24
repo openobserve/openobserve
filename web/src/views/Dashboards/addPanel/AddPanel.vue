@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row" style="height: calc(100vh - 110px); overflow-y: auto">
       <div class="tw-pl-[0.625rem]">
       <div
-        class="col scroll card-container"
+        class="col scroll card-container tw-mr-[0.625rem]"
         style="
           overflow-y: auto;
           height: 100%;
