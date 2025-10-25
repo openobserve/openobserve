@@ -3519,7 +3519,8 @@ mod tests {
         assert_ne!(meta_table_stats.start_time, 0);
 
         // Check get_enrichment_table function, it should return same data
-        let data = openobserve::service::enrichment::get_enrichment_table(org_id, table_name).await;
+        let data =
+            openobserve::service::enrichment::get_enrichment_table(org_id, table_name, false).await;
         assert!(data.is_ok());
         let data = data.unwrap();
         assert!(data.len() == 2);
