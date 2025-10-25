@@ -44,6 +44,7 @@ use crate::service::{
 };
 
 pub mod alert;
+pub mod deduplication;
 pub mod derived_streams;
 pub mod destinations;
 pub mod scheduler;
