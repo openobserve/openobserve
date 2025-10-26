@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{post, web, HttpResponse};
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
-
+use actix_web::{HttpResponse, post, web};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::log_patterns::{ExtractionRequest, PatternExtractor};
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
@@ -100,6 +99,7 @@ pub async fn extract_patterns(
                 max_child: 100,
                 max_clusters: Some(1000),
                 min_cluster_size: cfg.min_cluster_size.unwrap_or(10),
+                masking_mode: o2_enterprise::enterprise::log_patterns::MaskingMode::Auto,
             }
         } else {
             Default::default()
@@ -115,15 +115,24 @@ pub async fn extract_patterns(
         match PatternExtractor::extract_patterns(extraction_request) {
             Ok(response) => Ok(MetaHttpResponse::json(response)),
             Err(e) => {
-                log::error!("[PATTERNS] Failed to extract patterns for stream {}/{}: {}", org_id, stream_name, e);
-                Ok(MetaHttpResponse::internal_error(format!("Pattern extraction failed: {}", e)))
+                log::error!(
+                    "[PATTERNS] Failed to extract patterns for stream {}/{}: {}",
+                    org_id,
+                    stream_name,
+                    e
+                );
+                Ok(MetaHttpResponse::internal_error(format!(
+                    "Pattern extraction failed: {e}"
+                )))
             }
         }
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        Ok(MetaHttpResponse::forbidden("Pattern extraction is an enterprise feature"))
+        Ok(MetaHttpResponse::forbidden(
+            "Pattern extraction is an enterprise feature",
+        ))
     }
 }
 

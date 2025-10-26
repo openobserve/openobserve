@@ -79,6 +79,7 @@ pub async fn process_search_stream_request(
     fallback_order_by_col: Option<String>,
     _audit_ctx: Option<AuditContext>,
     is_multi_stream_search: bool,
+    extract_patterns: bool,
 ) {
     log::debug!(
         "[HTTP2_STREAM trace_id {trace_id}] Received HTTP/2 stream request for org_id: {org_id}",
@@ -86,6 +87,18 @@ pub async fn process_search_stream_request(
 
     #[cfg(feature = "enterprise")]
     let audit_enabled = get_o2_config().common.audit_enabled && _audit_ctx.is_some();
+    // Initialize pattern accumulator if pattern extraction is requested
+    #[cfg(feature = "enterprise")]
+    let pattern_accumulator = if extract_patterns {
+        log::info!("[HTTP2_STREAM trace_id {trace_id}] Pattern extraction enabled");
+        Some(
+            o2_enterprise::enterprise::log_patterns::PatternAccumulator::new(
+                o2_enterprise::enterprise::log_patterns::PatternExtractionConfig::default(),
+            ),
+        )
+    } else {
+        None
+    };
 
     // Send a progress: 0 event as an indicator of search initiation
     if sender
@@ -534,6 +547,83 @@ pub async fn process_search_stream_request(
                 },
             })
             .await;
+        }
+    }
+
+    // Extract patterns if requested (enterprise feature)
+    #[cfg(feature = "enterprise")]
+    if let Some(mut accumulator) = pattern_accumulator {
+        log::info!(
+            "[HTTP2_STREAM trace_id {trace_id}] Extracting patterns from {} accumulated results",
+            accumulated_results.len()
+        );
+
+        // Convert accumulated_results to hits for pattern extraction
+        for result in &accumulated_results {
+            let response = match result {
+                SearchResultType::Search(r) => r,
+                SearchResultType::Cached(r) => r,
+            };
+            accumulator.add_hits(&response.hits);
+        }
+
+        let stats = accumulator.stats();
+        log::info!(
+            "[HTTP2_STREAM trace_id {trace_id}] Pattern accumulator stats: {} logs accumulated from {} total (sampled: {})",
+            stats.accumulated_logs,
+            stats.total_logs_seen,
+            stats.was_sampled
+        );
+
+        // Extract patterns if we have logs
+        if stats.accumulated_logs > 0 {
+            match o2_enterprise::enterprise::log_patterns::extract_patterns_from_stream(
+                accumulator,
+                all_streams.clone(),
+                o2_enterprise::enterprise::log_patterns::PatternExtractionConfig::default(),
+            )
+            .await
+            {
+                Ok(patterns_response) => {
+                    // Convert to JSON and send
+                    match config::utils::json::to_value(&patterns_response) {
+                        Ok(patterns_json) => {
+                            log::info!(
+                                "[HTTP2_STREAM trace_id {trace_id}] Sending {} patterns",
+                                patterns_response.patterns.len()
+                            );
+                            if sender
+                                .send(Ok(config::meta::search::StreamResponses::PatternExtractionResult {
+                                    patterns: patterns_json,
+                                }))
+                                .await
+                                .is_err()
+                            {
+                                log::warn!(
+                                    "[HTTP2_STREAM trace_id {trace_id}] Sender closed, could not send pattern results"
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[HTTP2_STREAM trace_id {trace_id}] Failed to serialize patterns: {}",
+                                e
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::error!(
+                        "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction failed: {} (continuing with search results)",
+                        e
+                    );
+                    // Non-fatal: search results were already sent
+                }
+            }
+        } else {
+            log::info!(
+                "[HTTP2_STREAM trace_id {trace_id}] No logs accumulated for pattern extraction"
+            );
         }
     }
 
