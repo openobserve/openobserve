@@ -15,8 +15,8 @@
 
 //! Adds alert deduplication columns and creates alert_dedup_state table
 //!
-//! **ENTERPRISE FEATURE**: This migration only runs when compiled with the `enterprise` feature.
-//! Alert deduplication is an enterprise-only feature.
+//! Note: These columns exist in all builds but the deduplication logic
+//! is only available in the enterprise edition. The columns default to disabled.
 
 use sea_orm_migration::prelude::*;
 

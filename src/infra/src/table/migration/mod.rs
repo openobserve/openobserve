@@ -69,7 +69,6 @@ mod m20250801_000001_create_system_prompts_table;
 mod m20250822_093713_add_updated_at_for_file_list_table;
 mod m20250923_000001_update_enrichment_table_data_size;
 mod m20250930_000001_create_pipeline_last_errors_table;
-#[cfg(feature = "enterprise")]
 mod m20251024_000001_add_alert_deduplication;
 
 pub struct Migrator;
@@ -129,7 +128,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20250822_093713_add_updated_at_for_file_list_table::Migration),
             Box::new(m20250923_000001_update_enrichment_table_data_size::Migration),
             Box::new(m20250930_000001_create_pipeline_last_errors_table::Migration),
-            #[cfg(feature = "enterprise")]
             Box::new(m20251024_000001_add_alert_deduplication::Migration),
         ]
     }
