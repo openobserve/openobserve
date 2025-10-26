@@ -670,11 +670,7 @@ fn update_mutable_fields(
             dedup.time_window_minutes = None;
 
             let dedup_config_json = serde_json::to_value(dedup)?;
-            (
-                dedup_enabled,
-                time_window,
-                Some(dedup_config_json),
-            )
+            (dedup_enabled, time_window, Some(dedup_config_json))
         } else {
             (false, None, None)
         };

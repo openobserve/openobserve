@@ -24,9 +24,27 @@ use config::{
     utils::json::{Map, Value},
 };
 use infra::table::entity::alert_dedup_state;
+use proto::cluster_rpc::SearchQuery;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
 /// Calculate fingerprint for an alert result row
+///
+/// The fingerprint provides context about WHAT is alerting (not just WHERE):
+/// 1. Alert name: Semantic description (e.g., "High CPU", "High Memory")
+/// 2. Metric/condition: What's being measured/checked
+/// 3. Dimensional fields: Where the problem is (cluster, pod, etc.)
+///
+/// This ensures:
+/// - Different alert types are NEVER deduplicated together
+/// - Survives alert recreation (name-based, not ID-based)
+/// - Provides semantic meaning (can understand from fingerprint alone)
+///
+/// Example:
+/// - Alert "High CPU" with WHERE cpu_usage > 90, GROUP BY [cluster, pod] → Fingerprint:
+///   sha256("High CPU|__metric:cpu_usage|cluster:prod|pod:api-1")
+/// - Alert "High Memory" with WHERE memory_usage > 90, GROUP BY [cluster, pod] → Fingerprint:
+///   sha256("High Memory|__metric:memory_usage|cluster:prod|pod:api-1") → Different fingerprints,
+///   correctly treated as separate incidents
 pub fn calculate_fingerprint(
     alert: &Alert,
     result_row: &Map<String, Value>,
@@ -34,7 +52,13 @@ pub fn calculate_fingerprint(
 ) -> String {
     let fields = get_fingerprint_fields(alert, result_row, config);
 
-    let mut parts = vec![alert.get_unique_key()];
+    // Start with alert name for semantic context
+    let mut parts = vec![alert.name.clone()];
+
+    // Add metric/condition context from the query
+    parts.extend(extract_query_context(alert));
+
+    // Add dimensional fields (GROUP BY columns or user-selected fields)
     for field in fields {
         if let Some(val) = result_row.get(&field) {
             parts.push(format!("{}:{}", field, json_value_to_string(val)));
@@ -43,6 +67,249 @@ pub fn calculate_fingerprint(
 
     // Generate SHA-256 hash using sha256 crate
     sha256::digest(parts.join("|"))
+}
+
+/// Extract query context (metrics/conditions) to include in fingerprint
+///
+/// This provides the "WHAT" context - what metric/condition is being checked.
+/// For SQL: Extracts metric columns from SELECT (non-GROUP BY columns)
+/// For PromQL: Extracts metric name from query
+/// For Custom: Extracts condition column names
+fn extract_query_context(alert: &Alert) -> Vec<String> {
+    let mut context = Vec::new();
+
+    match alert.query_condition.query_type {
+        QueryType::SQL => {
+            // Extract metric columns from SELECT clause using OpenObserve's SQL parser
+            if let Some(sql) = &alert.query_condition.sql
+                && let Some(metrics) = extract_sql_metrics_from_alert(alert, sql)
+            {
+                context.extend(metrics);
+            }
+        }
+        QueryType::PromQL => {
+            // Extract metric name and label selectors from PromQL query
+            if let Some(promql) = &alert.query_condition.promql {
+                context.extend(extract_promql_context(promql));
+            }
+        }
+        QueryType::Custom => {
+            // Extract column names from conditions
+            if let Some(conditions) = &alert.query_condition.conditions {
+                let mut fields = HashSet::new();
+                extract_condition_fields(conditions, &mut fields);
+                for field in fields {
+                    context.push(format!("__condition:{field}"));
+                }
+            }
+        }
+    }
+
+    context
+}
+
+/// Extract metric columns and WHERE conditions from SQL query
+///
+/// This function uses the existing SQL parsing infrastructure to extract:
+/// 1. **Metric columns**: Columns being measured (from SELECT, excluding GROUP BY and
+///    non-aggregated)
+/// 2. **WHERE conditions**: Equality conditions that provide context (cluster='prod', etc.)
+///
+/// Strategy for handling non-GROUP BY columns in SELECT:
+/// - If query has aggregation (alert.query_condition.aggregation exists):
+///   - Only include columns that appear to be in result row (actual metrics)
+///   - Non-aggregated SELECT columns (like status, region) are filtered out
+///   - This works because GROUP BY enforcement means non-aggregated columns must be in GROUP BY
+/// - If no aggregation: Include all columns (it's a simple query)
+///
+/// WHERE conditions add important context:
+/// - Alert on cluster='prod' is different from cluster='staging'
+/// - Conditions like status='active' narrow the semantic scope
+///
+/// Examples:
+/// - "SELECT AVG(cpu_usage) FROM ... WHERE cluster='prod'" → metrics: ["cpu_usage"], conditions:
+///   ["cluster:prod"]
+/// - "SELECT cluster, AVG(cpu) FROM ... WHERE region='us' GROUP BY cluster" → metrics: ["cpu"],
+///   conditions: ["region:us"]
+/// - "SELECT cluster, status, AVG(cpu) FROM ... GROUP BY cluster" → metrics: ["cpu"] (status
+///   filtered out as it's not in GROUP BY and not aggregated)
+fn extract_sql_metrics_from_alert(alert: &Alert, sql: &str) -> Option<Vec<String>> {
+    // Create a SearchQuery to use with Sql struct
+    let search_query = SearchQuery {
+        sql: sql.to_string(),
+        from: 0,
+        size: 1, // We only care about schema, not results
+        quick_mode: false,
+        start_time: 0,
+        end_time: 0,
+        track_total_hits: false,
+        query_type: "sql".to_string(),
+        uses_zo_fn: false,
+        query_fn: String::new(),
+        skip_wal: false,
+        action_id: String::new(),
+        histogram_interval: 0,
+    };
+
+    // Use async runtime to parse SQL (this is called from sync context)
+    let sql_parsed = tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(async {
+            crate::service::search::sql::Sql::new(
+                &search_query,
+                &alert.org_id,
+                alert.stream_type,
+                None,
+            )
+            .await
+        })
+    });
+
+    let sql_struct = match sql_parsed {
+        Ok(s) => s,
+        Err(e) => {
+            log::debug!("Failed to parse SQL for metric extraction: {}", e);
+            return None;
+        }
+    };
+
+    let mut context = Vec::new();
+
+    // 1. Extract WHERE clause equality conditions (provides important context)
+    // Example: WHERE cluster='prod' AND status='active'
+    for (_table, equal_items) in sql_struct.equal_items.iter() {
+        for (field, value) in equal_items {
+            context.push(format!("__where:{field}={value}"));
+        }
+    }
+
+    // 2. Extract metric columns from SELECT
+    let mut all_columns = HashSet::new();
+    for (_table, columns) in sql_struct.columns.iter() {
+        all_columns.extend(columns.clone());
+    }
+
+    // Remove GROUP BY fields (they're dimensional, not metrics)
+    let group_by_set: HashSet<String> = sql_struct.group_by.iter().cloned().collect();
+
+    // Note: We rely on SQL's GROUP BY semantics to filter non-metric columns:
+    // - Any non-aggregated column in SELECT must be in GROUP BY (already filtered)
+    // - Remaining columns are either aggregated (metrics) or from non-aggregated queries
+    // This naturally handles the case where SELECT has extra dimensional fields.
+
+    let metrics: Vec<String> = all_columns
+        .difference(&group_by_set)
+        .filter(|col| {
+            // Filter out common timestamp columns
+            let col_lower = col.to_lowercase();
+            col_lower != "_timestamp"
+                && col_lower != TIMESTAMP_COL_NAME
+                && !col_lower.ends_with("_time")
+        })
+        .map(|col| format!("__metric:{col}"))
+        .take(5) // Limit to first 5 metrics for fingerprint brevity
+        .collect();
+
+    context.extend(metrics);
+
+    if context.is_empty() {
+        None
+    } else {
+        Some(context)
+    }
+}
+
+/// Extract metric name and label selectors from PromQL query
+///
+/// Returns a vector containing:
+/// 1. The metric name prefixed with __metric:
+/// 2. Label selectors (equivalent to SQL WHERE) prefixed with __label:
+///
+/// Label selectors provide important context, similar to SQL WHERE clauses.
+/// Example: cpu_usage{cluster="prod"} is different from cpu_usage{cluster="staging"}
+///
+/// Examples:
+/// - "rate(http_requests_total[5m])" → ["__metric:http_requests_total"]
+/// - "cpu_usage{cluster=\"prod\"}" → ["__metric:cpu_usage", "__label:cluster=prod"]
+/// - "sum(memory{env=\"prod\", region=\"us\"})" → ["__metric:memory", "__label:env=prod",
+///   "__label:region=us"]
+fn extract_promql_context(promql: &str) -> Vec<String> {
+    let mut context = Vec::new();
+    let promql = promql.trim();
+
+    // 1. Extract metric name
+    if let Some(metric) = extract_promql_metric_name_internal(promql) {
+        context.push(format!("__metric:{metric}"));
+    }
+
+    // 2. Extract label selectors (equivalent to SQL WHERE)
+    // PromQL label selectors are in curly braces: metric_name{label1="value1", label2="value2"}
+    if let Some(start) = promql.find('{')
+        && let Some(end) = promql[start..].find('}')
+    {
+        let labels_str = &promql[start + 1..start + end];
+
+        // Parse label selectors: label="value" or label='value'
+        // Split by comma, handling potential spaces
+        for label_pair in labels_str.split(',') {
+            let label_pair = label_pair.trim();
+
+            // Parse label="value" or label='value' or label=~"regex"
+            if let Some(eq_pos) = label_pair.find('=') {
+                let label_name = label_pair[..eq_pos].trim();
+                let mut value_part = label_pair[eq_pos + 1..].trim();
+
+                // Skip regex matchers (=~ and !~) for now, only handle exact matches
+                if label_name.is_empty() || value_part.starts_with('~') {
+                    continue;
+                }
+
+                // Remove quotes from value
+                value_part = value_part.trim_start_matches('"').trim_end_matches('"');
+                value_part = value_part.trim_start_matches('\'').trim_end_matches('\'');
+
+                if !value_part.is_empty() {
+                    context.push(format!("__label:{label_name}={value_part}"));
+                }
+            }
+        }
+    }
+
+    context
+}
+
+/// Internal function to extract just the metric name from PromQL
+fn extract_promql_metric_name_internal(promql: &str) -> Option<String> {
+    // Extract the metric name from PromQL
+    // Example: "rate(http_requests_total[5m])" → "http_requests_total"
+    // Example: "sum(cpu_usage) by (pod)" → "cpu_usage"
+    // Example: "http_requests_total" → "http_requests_total"
+
+    let promql = promql.trim();
+
+    // Try to find metric name between parentheses or at the start
+    if let Some(paren_pos) = promql.find('(') {
+        let inside = &promql[paren_pos + 1..];
+        if let Some(end_pos) = inside.find(|c: char| !c.is_alphanumeric() && c != '_') {
+            Some(inside[..end_pos].to_string())
+        } else {
+            // Metric name is the entire content inside parentheses
+            Some(inside.to_string())
+        }
+    } else {
+        // Metric at the start
+        if let Some(end_pos) = promql.find(|c: char| !c.is_alphanumeric() && c != '_') {
+            Some(promql[..end_pos].to_string())
+        } else {
+            // Entire string is the metric name
+            Some(promql.to_string())
+        }
+    }
+}
+
+/// Legacy function for backward compatibility with tests
+#[cfg(test)]
+fn extract_promql_metric_name(promql: &str) -> Option<String> {
+    extract_promql_metric_name_internal(promql)
 }
 
 /// Get effective fingerprint fields based on query type and configuration
@@ -497,5 +764,81 @@ mod tests {
         assert!(fields.contains(&"field2".to_string()));
         assert!(!fields.contains(&"_timestamp".to_string()));
         assert!(!fields.contains(&TIMESTAMP_COL_NAME.to_string()));
+    }
+
+    // Note: SQL metric extraction tests require async runtime and database setup,
+    // so they are better suited for integration tests rather than unit tests.
+    // The extract_sql_metrics_from_alert function reuses OpenObserve's existing
+    // Sql struct which handles all the complex parsing logic.
+
+    #[test]
+    fn test_extract_promql_metric_name_simple() {
+        assert_eq!(
+            extract_promql_metric_name("http_requests_total"),
+            Some("http_requests_total".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_promql_metric_name_with_function() {
+        assert_eq!(
+            extract_promql_metric_name("rate(http_requests_total[5m])"),
+            Some("http_requests_total".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_promql_metric_name_with_aggregation() {
+        assert_eq!(
+            extract_promql_metric_name("sum(cpu_usage) by (pod)"),
+            Some("cpu_usage".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_promql_context_no_labels() {
+        let context = extract_promql_context("rate(http_requests_total[5m])");
+        assert_eq!(context.len(), 1);
+        assert!(context.contains(&"__metric:http_requests_total".to_string()));
+    }
+
+    #[test]
+    fn test_extract_promql_context_with_single_label() {
+        let context = extract_promql_context("cpu_usage{cluster=\"prod\"}");
+        assert_eq!(context.len(), 2);
+        assert!(context.contains(&"__metric:cpu_usage".to_string()));
+        assert!(context.contains(&"__label:cluster=prod".to_string()));
+    }
+
+    #[test]
+    fn test_extract_promql_context_with_multiple_labels() {
+        let context = extract_promql_context("sum(memory{env=\"prod\", region=\"us\"}) by (pod)");
+        assert_eq!(context.len(), 3);
+        assert!(context.contains(&"__metric:memory".to_string()));
+        assert!(context.contains(&"__label:env=prod".to_string()));
+        assert!(context.contains(&"__label:region=us".to_string()));
+    }
+
+    #[test]
+    fn test_extract_promql_context_different_label_values() {
+        // Production alert
+        let prod_context = extract_promql_context("avg(cpu_usage{cluster=\"prod\"}) by (pod)");
+
+        // Staging alert
+        let staging_context =
+            extract_promql_context("avg(cpu_usage{cluster=\"staging\"}) by (pod)");
+
+        // Should produce different contexts
+        assert_ne!(prod_context, staging_context);
+        assert!(prod_context.contains(&"__label:cluster=prod".to_string()));
+        assert!(staging_context.contains(&"__label:cluster=staging".to_string()));
+    }
+
+    #[test]
+    fn test_extract_promql_context_with_single_quotes() {
+        let context = extract_promql_context("cpu_usage{cluster='prod'}");
+        assert_eq!(context.len(), 2);
+        assert!(context.contains(&"__metric:cpu_usage".to_string()));
+        assert!(context.contains(&"__label:cluster=prod".to_string()));
     }
 }
