@@ -142,7 +142,8 @@ async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
     service::alerts::scheduler::run().await
 }
 
-/// Cleanup old alert deduplication state records
+/// Cleanup old alert deduplication state records (enterprise-only feature)
+#[cfg(feature = "enterprise")]
 async fn cleanup_alert_dedup_state() -> Result<(), anyhow::Error> {
     log::debug!("[ALERT DEDUP CLEANUP] Starting cleanup of old deduplication state");
 
@@ -175,4 +176,11 @@ async fn cleanup_alert_dedup_state() -> Result<(), anyhow::Error> {
             Err(anyhow::anyhow!("Cleanup failed: {}", e))
         }
     }
+}
+
+/// OSS version: no-op cleanup since deduplication is enterprise-only
+#[cfg(not(feature = "enterprise"))]
+async fn cleanup_alert_dedup_state() -> Result<(), anyhow::Error> {
+    // Deduplication is enterprise-only, nothing to clean up
+    Ok(())
 }

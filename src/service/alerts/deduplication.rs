@@ -14,16 +14,28 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Alert deduplication logic
+//!
+//! **Note**: This module is kept for backward compatibility and internal use.
+//! The actual deduplication implementation is in the enterprise crate.
+//! For using deduplication, use the `deduplication_trait` module instead.
 
+#[cfg(not(feature = "enterprise"))]
 use std::collections::HashSet;
 
+#[allow(unused_imports)]
 use chrono::Utc;
+
+#[cfg(not(feature = "enterprise"))]
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::alerts::{ConditionList, QueryType, alert::Alert, deduplication::DeduplicationConfig},
+    meta::alerts::{ConditionList, QueryType},
+};
+use config::{
+    meta::alerts::{alert::Alert, deduplication::DeduplicationConfig},
     utils::json::{Map, Value},
 };
 use infra::table::entity::alert_dedup_state;
+#[cfg(not(feature = "enterprise"))]
 use proto::cluster_rpc::SearchQuery;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
@@ -46,6 +58,28 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, Qu
 ///   sha256("High Memory|__metric:memory_usage|cluster:prod|pod:api-1") → Different fingerprints,
 ///   correctly treated as separate incidents
 pub fn calculate_fingerprint(
+    alert: &Alert,
+    result_row: &Map<String, Value>,
+    config: &DeduplicationConfig,
+) -> String {
+    // Use enterprise implementation if available
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::alerts::dedup_logic::calculate_fingerprint(
+            alert, result_row, config,
+        )
+    }
+
+    // OSS fallback implementation
+    #[cfg(not(feature = "enterprise"))]
+    {
+        calculate_fingerprint_oss(alert, result_row, config)
+    }
+}
+
+/// OSS implementation of calculate_fingerprint
+#[cfg(not(feature = "enterprise"))]
+fn calculate_fingerprint_oss(
     alert: &Alert,
     result_row: &Map<String, Value>,
     config: &DeduplicationConfig,
@@ -75,7 +109,21 @@ pub fn calculate_fingerprint(
 /// For SQL: Extracts metric columns from SELECT (non-GROUP BY columns)
 /// For PromQL: Extracts metric name from query
 /// For Custom: Extracts condition column names
+#[cfg(not(feature = "enterprise"))]
 fn extract_query_context(alert: &Alert) -> Vec<String> {
+    extract_query_context_oss(alert)
+}
+
+/// Extract query context (enterprise version)
+#[cfg(feature = "enterprise")]
+#[allow(dead_code)]
+fn extract_query_context(alert: &Alert) -> Vec<String> {
+    o2_enterprise::enterprise::alerts::dedup_logic::extract_query_context(alert)
+}
+
+/// OSS implementation of extract_query_context
+#[cfg(not(feature = "enterprise"))]
+fn extract_query_context_oss(alert: &Alert) -> Vec<String> {
     let mut context = Vec::new();
 
     match alert.query_condition.query_type {
@@ -133,6 +181,7 @@ fn extract_query_context(alert: &Alert) -> Vec<String> {
 ///   conditions: ["region:us"]
 /// - "SELECT cluster, status, AVG(cpu) FROM ... GROUP BY cluster" → metrics: ["cpu"] (status
 ///   filtered out as it's not in GROUP BY and not aggregated)
+#[cfg(not(feature = "enterprise"))]
 fn extract_sql_metrics_from_alert(alert: &Alert, sql: &str) -> Option<Vec<String>> {
     // Create a SearchQuery to use with Sql struct
     let search_query = SearchQuery {
@@ -232,6 +281,7 @@ fn extract_sql_metrics_from_alert(alert: &Alert, sql: &str) -> Option<Vec<String
 /// - "cpu_usage{cluster=\"prod\"}" → ["__metric:cpu_usage", "__label:cluster=prod"]
 /// - "sum(memory{env=\"prod\", region=\"us\"})" → ["__metric:memory", "__label:env=prod",
 ///   "__label:region=us"]
+#[cfg(not(feature = "enterprise"))]
 fn extract_promql_context(promql: &str) -> Vec<String> {
     let mut context = Vec::new();
     let promql = promql.trim();
@@ -278,6 +328,7 @@ fn extract_promql_context(promql: &str) -> Vec<String> {
 }
 
 /// Internal function to extract just the metric name from PromQL
+#[cfg(not(feature = "enterprise"))]
 fn extract_promql_metric_name_internal(promql: &str) -> Option<String> {
     // Extract the metric name from PromQL
     // Example: "rate(http_requests_total[5m])" → "http_requests_total"
@@ -313,7 +364,31 @@ fn extract_promql_metric_name(promql: &str) -> Option<String> {
 }
 
 /// Get effective fingerprint fields based on query type and configuration
+#[cfg(not(feature = "enterprise"))]
 fn get_fingerprint_fields(
+    alert: &Alert,
+    result_row: &Map<String, Value>,
+    config: &DeduplicationConfig,
+) -> Vec<String> {
+    get_fingerprint_fields_oss(alert, result_row, config)
+}
+
+/// Get effective fingerprint fields based on query type and configuration (enterprise version)
+#[cfg(feature = "enterprise")]
+#[allow(dead_code)]
+fn get_fingerprint_fields(
+    alert: &Alert,
+    result_row: &Map<String, Value>,
+    config: &DeduplicationConfig,
+) -> Vec<String> {
+    o2_enterprise::enterprise::alerts::dedup_logic::get_fingerprint_fields(
+        alert, result_row, config,
+    )
+}
+
+/// OSS implementation of get_fingerprint_fields
+#[cfg(not(feature = "enterprise"))]
+fn get_fingerprint_fields_oss(
     alert: &Alert,
     result_row: &Map<String, Value>,
     config: &DeduplicationConfig,
@@ -342,6 +417,7 @@ fn get_fingerprint_fields(
 }
 
 /// Extract fields from Custom query conditions
+#[cfg(not(feature = "enterprise"))]
 fn extract_custom_query_fields(alert: &Alert, result_row: &Map<String, Value>) -> Vec<String> {
     if let Some(conditions) = &alert.query_condition.conditions {
         let mut fields = HashSet::new();
@@ -364,6 +440,7 @@ fn extract_custom_query_fields(alert: &Alert, result_row: &Map<String, Value>) -
 }
 
 /// Recursively extract field names from condition tree
+#[cfg(not(feature = "enterprise"))]
 fn extract_condition_fields(conditions: &ConditionList, fields: &mut HashSet<String>) {
     match conditions {
         ConditionList::EndCondition(condition) => {
@@ -391,6 +468,7 @@ fn extract_condition_fields(conditions: &ConditionList, fields: &mut HashSet<Str
 }
 
 /// Extract label fields from PromQL result (exclude _timestamp and value)
+#[cfg(not(feature = "enterprise"))]
 fn extract_promql_label_fields(result_row: &Map<String, Value>) -> Vec<String> {
     result_row
         .keys()
@@ -400,6 +478,7 @@ fn extract_promql_label_fields(result_row: &Map<String, Value>) -> Vec<String> {
 }
 
 /// Extract all fields except timestamp
+#[cfg(not(feature = "enterprise"))]
 fn extract_all_non_timestamp_fields(result_row: &Map<String, Value>) -> Vec<String> {
     result_row
         .keys()
@@ -409,6 +488,7 @@ fn extract_all_non_timestamp_fields(result_row: &Map<String, Value>) -> Vec<Stri
 }
 
 /// Convert JSON value to string for hashing
+#[cfg(not(feature = "enterprise"))]
 fn json_value_to_string(value: &Value) -> String {
     match value {
         Value::Null => "null".to_string(),
@@ -445,6 +525,9 @@ pub async fn save_dedup_state(
     db: &DatabaseConnection,
     params: DedupStateParams<'_>,
 ) -> Result<alert_dedup_state::Model, sea_orm::DbErr> {
+    #[cfg(feature = "enterprise")]
+    let now = o2_enterprise::enterprise::alerts::dedup_logic::current_timestamp_micros();
+    #[cfg(not(feature = "enterprise"))]
     let now = Utc::now().timestamp_micros();
 
     // Try to find existing record
@@ -473,28 +556,52 @@ pub async fn save_dedup_state(
 
 /// Check if dedup state is within time window
 pub fn is_within_window(state: &alert_dedup_state::Model, time_window_minutes: i64) -> bool {
-    let now = Utc::now().timestamp_micros();
-    let window_micros = time_window_minutes * 60 * 1_000_000;
-    now - state.last_seen_at <= window_micros
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::alerts::dedup_logic::is_within_time_window(
+            state.last_seen_at,
+            time_window_minutes,
+        )
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let now = Utc::now().timestamp_micros();
+        let window_micros = time_window_minutes * 60 * 1_000_000;
+        now - state.last_seen_at <= window_micros
+    }
 }
 
 /// Cleanup old deduplication state records
+///
+/// **Note**: Deduplication is an enterprise-only feature. In OSS builds, this function
+/// returns 0 immediately without doing anything.
 pub async fn cleanup_expired_state(
     db: &DatabaseConnection,
     org_id: Option<&str>,
     older_than_minutes: i64,
 ) -> Result<u64, sea_orm::DbErr> {
-    let cutoff_time = Utc::now().timestamp_micros() - (older_than_minutes * 60 * 1_000_000);
-
-    let mut query = alert_dedup_state::Entity::delete_many()
-        .filter(alert_dedup_state::Column::LastSeenAt.lt(cutoff_time));
-
-    if let Some(org) = org_id {
-        query = query.filter(alert_dedup_state::Column::OrgId.eq(org));
+    // Deduplication is enterprise-only feature
+    #[cfg(not(feature = "enterprise"))]
+    {
+        return Ok(0);
     }
 
-    let result = query.exec(db).await?;
-    Ok(result.rows_affected)
+    #[cfg(feature = "enterprise")]
+    {
+        let cutoff_time =
+            o2_enterprise::enterprise::alerts::dedup_logic::current_timestamp_micros()
+                - (older_than_minutes * 60 * 1_000_000);
+
+        let mut query = alert_dedup_state::Entity::delete_many()
+            .filter(alert_dedup_state::Column::LastSeenAt.lt(cutoff_time));
+
+        if let Some(org) = org_id {
+            query = query.filter(alert_dedup_state::Column::OrgId.eq(org));
+        }
+
+        let result = query.exec(db).await?;
+        Ok(result.rows_affected)
+    }
 }
 
 /// Apply deduplication to alert result rows before sending notifications
@@ -502,25 +609,50 @@ pub async fn cleanup_expired_state(
 /// This is the main entry point for deduplication logic in the alert execution flow.
 /// It processes each result row, calculates fingerprints, checks for duplicates,
 /// and returns only the rows that should trigger notifications.
+///
+/// **Note**: Deduplication is an enterprise-only feature. In OSS builds, this function
+/// always returns all rows unchanged.
 pub async fn apply_deduplication(
     db: &DatabaseConnection,
     alert: &Alert,
     result_rows: Vec<Map<String, Value>>,
 ) -> Result<Vec<Map<String, Value>>, sea_orm::DbErr> {
-    // Check if deduplication is enabled
-    let dedup_config = match &alert.deduplication {
-        Some(config) if config.enabled => config,
-        _ => return Ok(result_rows), // Deduplication disabled, return all rows
-    };
+    // Deduplication is enterprise-only feature
+    #[cfg(not(feature = "enterprise"))]
+    {
+        return Ok(result_rows);
+    }
 
-    let now = Utc::now().timestamp_micros();
+    #[cfg(feature = "enterprise")]
+    {
+        // Check if deduplication is enabled
+        let dedup_config = match &alert.deduplication {
+            Some(config) if config.enabled => config,
+            _ => return Ok(result_rows), // Deduplication disabled, return all rows
+        };
+
+        apply_deduplication_enterprise(db, alert, result_rows, dedup_config).await
+    }
+}
+
+/// Enterprise implementation of apply_deduplication
+#[cfg(feature = "enterprise")]
+async fn apply_deduplication_enterprise(
+    db: &DatabaseConnection,
+    alert: &Alert,
+    result_rows: Vec<Map<String, Value>>,
+    dedup_config: &DeduplicationConfig,
+) -> Result<Vec<Map<String, Value>>, sea_orm::DbErr> {
+    let now = o2_enterprise::enterprise::alerts::dedup_logic::current_timestamp_micros();
     let alert_id = alert.get_unique_key();
     let org_id = &alert.org_id;
 
-    // Determine effective time window
-    let time_window_minutes = dedup_config
-        .time_window_minutes
-        .unwrap_or_else(|| alert.trigger_condition.frequency * 2);
+    // Determine effective time window using enterprise logic
+    let time_window_minutes =
+        o2_enterprise::enterprise::alerts::dedup_logic::get_effective_time_window(
+            dedup_config,
+            alert.trigger_condition.frequency,
+        );
 
     let mut deduplicated_rows = Vec::new();
 

@@ -605,7 +605,8 @@ async fn handle_alert_triggers(
 
     // send notification
     if let Some(data) = trigger_results.data {
-        // Apply deduplication if enabled
+        // Apply deduplication if enabled (enterprise-only feature)
+        #[cfg(feature = "enterprise")]
         let data = if let Some(db) = ORM_CLIENT.get() {
             match crate::service::alerts::deduplication::apply_deduplication(
                 db,
@@ -652,6 +653,10 @@ async fn handle_alert_triggers(
             );
             data
         };
+
+        // OSS version: no deduplication, use data as-is
+        #[cfg(not(feature = "enterprise"))]
+        let data = data;
 
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only

@@ -89,6 +89,19 @@ pub enum SendStrategy {
     All,
 }
 
+impl std::str::FromStr for SendStrategy {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "first_with_count" => Ok(Self::FirstWithCount),
+            "summary" => Ok(Self::Summary),
+            "all" => Ok(Self::All),
+            _ => Ok(Self::default()),
+        }
+    }
+}
+
 fn default_max_group_size() -> usize {
     100
 }

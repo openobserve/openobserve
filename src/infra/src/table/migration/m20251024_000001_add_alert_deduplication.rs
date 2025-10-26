@@ -14,6 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Adds alert deduplication columns and creates alert_dedup_state table
+//!
+//! **ENTERPRISE FEATURE**: This migration only runs when compiled with the `enterprise` feature.
+//! Alert deduplication is an enterprise-only feature.
 
 use sea_orm_migration::prelude::*;
 

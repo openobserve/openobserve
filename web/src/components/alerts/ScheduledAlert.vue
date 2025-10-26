@@ -1116,8 +1116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
 
-  <!-- Deduplication section (fourth section) -->
-  <div class="tw-w-full tw-mt-2">
+  <!-- Deduplication section (fourth section) - Enterprise only -->
+  <div v-if="config.isEnterprise == 'true'" class="tw-w-full tw-mt-2">
     <DeduplicationConfig
       v-model="alertData.deduplication"
       :available-fields="props.columns"
