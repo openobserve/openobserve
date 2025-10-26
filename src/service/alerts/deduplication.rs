@@ -663,7 +663,7 @@ async fn apply_deduplication_enterprise(
             Some(existing_state) => {
                 if is_within_window(&existing_state, time_window_minutes) {
                     // Within window - update occurrence count but don't send
-                    let _ = save_dedup_state(
+                    if let Err(e) = save_dedup_state(
                         db,
                         DedupStateParams {
                             fingerprint: &fingerprint,
@@ -675,7 +675,9 @@ async fn apply_deduplication_enterprise(
                             notification_sent: true,
                         },
                     )
-                    .await;
+                    .await {
+                        log::warn!("Failed to update dedup state for fingerprint {}: {}", fingerprint, e);
+                    }
                     false
                 } else {
                     // Outside window - treat as new alert
