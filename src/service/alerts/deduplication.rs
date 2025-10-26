@@ -64,9 +64,7 @@ pub fn calculate_fingerprint(
     // Use enterprise implementation if available
     #[cfg(feature = "enterprise")]
     {
-        o2_enterprise::enterprise::alerts::dedup::calculate_fingerprint(
-            alert, result_row, config,
-        )
+        o2_enterprise::enterprise::alerts::dedup::calculate_fingerprint(alert, result_row, config)
     }
 
     // OSS fallback implementation
@@ -357,7 +355,7 @@ fn extract_promql_metric_name_internal(promql: &str) -> Option<String> {
 }
 
 /// Legacy function for backward compatibility with tests
-#[cfg(test)]
+#[cfg(all(test, not(feature = "enterprise")))]
 fn extract_promql_metric_name(promql: &str) -> Option<String> {
     extract_promql_metric_name_internal(promql)
 }
@@ -380,9 +378,7 @@ fn get_fingerprint_fields(
     result_row: &Map<String, Value>,
     config: &DeduplicationConfig,
 ) -> Vec<String> {
-    o2_enterprise::enterprise::alerts::dedup::get_fingerprint_fields(
-        alert, result_row, config,
-    )
+    o2_enterprise::enterprise::alerts::dedup::get_fingerprint_fields(alert, result_row, config)
 }
 
 /// OSS implementation of get_fingerprint_fields
@@ -587,9 +583,8 @@ pub async fn cleanup_expired_state(
 
     #[cfg(feature = "enterprise")]
     {
-        let cutoff_time =
-            o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros()
-                - (older_than_minutes * 60 * 1_000_000);
+        let cutoff_time = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros()
+            - (older_than_minutes * 60 * 1_000_000);
 
         let mut query = alert_dedup_state::Entity::delete_many()
             .filter(alert_dedup_state::Column::LastSeenAt.lt(cutoff_time));
@@ -647,11 +642,10 @@ async fn apply_deduplication_enterprise(
     let org_id = &alert.org_id;
 
     // Determine effective time window using enterprise logic
-    let time_window_minutes =
-        o2_enterprise::enterprise::alerts::dedup::get_effective_time_window(
-            dedup_config,
-            alert.trigger_condition.frequency,
-        );
+    let time_window_minutes = o2_enterprise::enterprise::alerts::dedup::get_effective_time_window(
+        dedup_config,
+        alert.trigger_condition.frequency,
+    );
 
     let mut deduplicated_rows = Vec::new();
 
@@ -815,6 +809,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "enterprise"))]
     fn test_extract_condition_fields() {
         let conditions = ConditionList::AndNode {
             and: vec![
@@ -842,6 +837,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "enterprise"))]
     fn test_extract_promql_label_fields() {
         let mut result_row = Map::new();
         result_row.insert("job".to_string(), Value::String("api".to_string()));
@@ -859,6 +855,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "enterprise"))]
     fn test_json_value_to_string() {
         assert_eq!(json_value_to_string(&Value::Null), "null");
         assert_eq!(json_value_to_string(&Value::Bool(true)), "true");
@@ -892,6 +889,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "enterprise"))]
     fn test_extract_all_non_timestamp_fields() {
         let mut row = Map::new();
         row.insert("field1".to_string(), Value::String("value1".to_string()));
@@ -917,6 +915,7 @@ mod tests {
     // Sql struct which handles all the complex parsing logic.
 
     #[test]
+    #[cfg(not(feature = "enterprise"))]
     fn test_extract_promql_metric_name_simple() {
         assert_eq!(
             extract_promql_metric_name("http_requests_total"),
@@ -925,6 +924,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "enterprise"))]
     fn test_extract_promql_metric_name_with_function() {
         assert_eq!(
             extract_promql_metric_name("rate(http_requests_total[5m])"),
@@ -933,6 +933,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "enterprise"))]
     fn test_extract_promql_metric_name_with_aggregation() {
         assert_eq!(
             extract_promql_metric_name("sum(cpu_usage) by (pod)"),
@@ -941,6 +942,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "enterprise"))]
     fn test_extract_promql_context_no_labels() {
         let context = extract_promql_context("rate(http_requests_total[5m])");
         assert_eq!(context.len(), 1);
@@ -948,6 +950,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "enterprise"))]
     fn test_extract_promql_context_with_single_label() {
         let context = extract_promql_context("cpu_usage{cluster=\"prod\"}");
         assert_eq!(context.len(), 2);
@@ -956,6 +959,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "enterprise"))]
     fn test_extract_promql_context_with_multiple_labels() {
         let context = extract_promql_context("sum(memory{env=\"prod\", region=\"us\"}) by (pod)");
         assert_eq!(context.len(), 3);
@@ -965,6 +969,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "enterprise"))]
     fn test_extract_promql_context_different_label_values() {
         // Production alert
         let prod_context = extract_promql_context("avg(cpu_usage{cluster=\"prod\"}) by (pod)");
@@ -980,6 +985,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "enterprise"))]
     fn test_extract_promql_context_with_single_quotes() {
         let context = extract_promql_context("cpu_usage{cluster='prod'}");
         assert_eq!(context.len(), 2);
