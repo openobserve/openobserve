@@ -24,7 +24,6 @@ use std::collections::HashSet;
 
 #[allow(unused_imports)]
 use chrono::Utc;
-
 #[cfg(not(feature = "enterprise"))]
 use config::{
     TIMESTAMP_COL_NAME,

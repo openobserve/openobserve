@@ -654,10 +654,6 @@ async fn handle_alert_triggers(
             data
         };
 
-        // OSS version: no deduplication, use data as-is
-        #[cfg(not(feature = "enterprise"))]
-        let data = data;
-
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
         // use the main start_time (now - period) and end_time (now) for the alert evaluation.
