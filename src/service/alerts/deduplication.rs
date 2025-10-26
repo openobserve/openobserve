@@ -692,7 +692,7 @@ async fn apply_deduplication_enterprise(
 
         if should_send {
             // Save new dedup state
-            let _ = save_dedup_state(
+            if let Err(e) = save_dedup_state(
                 db,
                 DedupStateParams {
                     fingerprint: &fingerprint,
@@ -704,7 +704,9 @@ async fn apply_deduplication_enterprise(
                     notification_sent: true,
                 },
             )
-            .await;
+            .await {
+                log::error!("Failed to save dedup state for fingerprint {}: {}", fingerprint, e);
+            }
 
             deduplicated_rows.push(row);
         }
