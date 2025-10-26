@@ -96,6 +96,18 @@ pub async fn run() -> Result<(), anyhow::Error> {
             }
         }
     );
+
+    // Alert deduplication state cleanup job
+    spawn_pausable_job!(
+        "alert_dedup_cleanup",
+        3600, // Run every hour
+        {
+            if let Err(e) = cleanup_alert_dedup_state().await {
+                log::error!("[ALERT DEDUP CLEANUP] Error cleaning up deduplication state: {e}");
+            }
+        }
+    );
+
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "search_job_delete_by_retention",
@@ -128,4 +140,47 @@ pub async fn run() -> Result<(), anyhow::Error> {
 /// Runs the schedule jobs
 async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
     service::alerts::scheduler::run().await
+}
+
+/// Cleanup old alert deduplication state records (enterprise-only feature)
+#[cfg(feature = "enterprise")]
+async fn cleanup_alert_dedup_state() -> Result<(), anyhow::Error> {
+    log::debug!("[ALERT DEDUP CLEANUP] Starting cleanup of old deduplication state");
+
+    // Get database connection
+    let db = match infra::db::ORM_CLIENT.get() {
+        Some(db) => db,
+        None => {
+            log::warn!("[ALERT DEDUP CLEANUP] ORM client not available, skipping cleanup");
+            return Ok(());
+        }
+    };
+
+    // Default cleanup: Remove records older than 24 hours
+    // This is conservative - most alerts have shorter time windows
+    let older_than_minutes = 24 * 60; // 24 hours
+
+    match service::alerts::deduplication::cleanup_expired_state(db, None, older_than_minutes).await
+    {
+        Ok(deleted_count) => {
+            if deleted_count > 0 {
+                log::info!(
+                    "[ALERT DEDUP CLEANUP] Cleaned up {} expired deduplication state records",
+                    deleted_count
+                );
+            }
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("[ALERT DEDUP CLEANUP] Error during cleanup: {}", e);
+            Err(anyhow::anyhow!("Cleanup failed: {}", e))
+        }
+    }
+}
+
+/// OSS version: no-op cleanup since deduplication is enterprise-only
+#[cfg(not(feature = "enterprise"))]
+async fn cleanup_alert_dedup_state() -> Result<(), anyhow::Error> {
+    // Deduplication is enterprise-only, nothing to clean up
+    Ok(())
 }
