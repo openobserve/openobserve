@@ -64,7 +64,7 @@ pub fn calculate_fingerprint(
     // Use enterprise implementation if available
     #[cfg(feature = "enterprise")]
     {
-        o2_enterprise::enterprise::alerts::dedup_logic::calculate_fingerprint(
+        o2_enterprise::enterprise::alerts::dedup::calculate_fingerprint(
             alert, result_row, config,
         )
     }
@@ -117,7 +117,7 @@ fn extract_query_context(alert: &Alert) -> Vec<String> {
 #[cfg(feature = "enterprise")]
 #[allow(dead_code)]
 fn extract_query_context(alert: &Alert) -> Vec<String> {
-    o2_enterprise::enterprise::alerts::dedup_logic::extract_query_context(alert)
+    o2_enterprise::enterprise::alerts::dedup::extract_query_context(alert)
 }
 
 /// OSS implementation of extract_query_context
@@ -380,7 +380,7 @@ fn get_fingerprint_fields(
     result_row: &Map<String, Value>,
     config: &DeduplicationConfig,
 ) -> Vec<String> {
-    o2_enterprise::enterprise::alerts::dedup_logic::get_fingerprint_fields(
+    o2_enterprise::enterprise::alerts::dedup::get_fingerprint_fields(
         alert, result_row, config,
     )
 }
@@ -525,7 +525,7 @@ pub async fn save_dedup_state(
     params: DedupStateParams<'_>,
 ) -> Result<alert_dedup_state::Model, sea_orm::DbErr> {
     #[cfg(feature = "enterprise")]
-    let now = o2_enterprise::enterprise::alerts::dedup_logic::current_timestamp_micros();
+    let now = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros();
     #[cfg(not(feature = "enterprise"))]
     let now = Utc::now().timestamp_micros();
 
@@ -557,7 +557,7 @@ pub async fn save_dedup_state(
 pub fn is_within_window(state: &alert_dedup_state::Model, time_window_minutes: i64) -> bool {
     #[cfg(feature = "enterprise")]
     {
-        o2_enterprise::enterprise::alerts::dedup_logic::is_within_time_window(
+        o2_enterprise::enterprise::alerts::dedup::is_within_time_window(
             state.last_seen_at,
             time_window_minutes,
         )
@@ -588,7 +588,7 @@ pub async fn cleanup_expired_state(
     #[cfg(feature = "enterprise")]
     {
         let cutoff_time =
-            o2_enterprise::enterprise::alerts::dedup_logic::current_timestamp_micros()
+            o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros()
                 - (older_than_minutes * 60 * 1_000_000);
 
         let mut query = alert_dedup_state::Entity::delete_many()
@@ -642,13 +642,13 @@ async fn apply_deduplication_enterprise(
     result_rows: Vec<Map<String, Value>>,
     dedup_config: &DeduplicationConfig,
 ) -> Result<Vec<Map<String, Value>>, sea_orm::DbErr> {
-    let now = o2_enterprise::enterprise::alerts::dedup_logic::current_timestamp_micros();
+    let now = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros();
     let alert_id = alert.get_unique_key();
     let org_id = &alert.org_id;
 
     // Determine effective time window using enterprise logic
     let time_window_minutes =
-        o2_enterprise::enterprise::alerts::dedup_logic::get_effective_time_window(
+        o2_enterprise::enterprise::alerts::dedup::get_effective_time_window(
             dedup_config,
             alert.trigger_condition.frequency,
         );
@@ -675,8 +675,13 @@ async fn apply_deduplication_enterprise(
                             notification_sent: true,
                         },
                     )
-                    .await {
-                        log::warn!("Failed to update dedup state for fingerprint {}: {}", fingerprint, e);
+                    .await
+                    {
+                        log::warn!(
+                            "Failed to update dedup state for fingerprint {}: {}",
+                            fingerprint,
+                            e
+                        );
                     }
                     false
                 } else {
@@ -704,8 +709,13 @@ async fn apply_deduplication_enterprise(
                     notification_sent: true,
                 },
             )
-            .await {
-                log::error!("Failed to save dedup state for fingerprint {}: {}", fingerprint, e);
+            .await
+            {
+                log::error!(
+                    "Failed to save dedup state for fingerprint {}: {}",
+                    fingerprint,
+                    e
+                );
             }
 
             deduplicated_rows.push(row);
