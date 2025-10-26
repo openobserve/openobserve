@@ -61,8 +61,47 @@ impl MigrationTrait for Migration {
 async fn add_dedup_columns(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     let db_backend = manager.get_database_backend();
 
-    if matches!(db_backend, sea_orm::DbBackend::MySql) {
+    if matches!(db_backend, sea_orm::DbBackend::Sqlite) {
+        // SQLite doesn't support multiple ALTER operations in one statement
+        // Add each column separately
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alerts::Table)
+                    .add_column_if_not_exists(
+                        ColumnDef::new(Alerts::DedupEnabled)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alerts::Table)
+                    .add_column_if_not_exists(
+                        ColumnDef::new(Alerts::DedupTimeWindowMinutes)
+                            .integer()
+                            .null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alerts::Table)
+                    .add_column_if_not_exists(ColumnDef::new(Alerts::DedupConfig).json().null())
+                    .to_owned(),
+            )
+            .await?;
+    } else if matches!(db_backend, sea_orm::DbBackend::MySql) {
         // MySQL doesn't support IF NOT EXISTS in ALTER TABLE
+        // But it supports multiple column additions
         manager
             .alter_table(
                 Table::alter()
@@ -83,7 +122,7 @@ async fn add_dedup_columns(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
             )
             .await?;
     } else {
-        // PostgreSQL and SQLite support IF NOT EXISTS
+        // PostgreSQL supports both IF NOT EXISTS and multiple columns
         manager
             .alter_table(
                 Table::alter()
