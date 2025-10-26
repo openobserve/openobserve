@@ -458,7 +458,8 @@ mod super_cluster {
         folder_id: &str,
         alert: Alert,
     ) -> Result<(), infra::errors::Error> {
-        if get_o2_config().super_cluster.enabled {
+        let config = get_o2_config();
+        if config.super_cluster.enabled && !config.common.local_mode {
             // let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
             // let value = json::to_vec(&alert)?.into();
             log::debug!("Sending super cluster alert creation event: {alert:?}");
@@ -479,7 +480,8 @@ mod super_cluster {
         folder_id: Option<&str>,
         alert: Alert,
     ) -> Result<(), infra::errors::Error> {
-        if get_o2_config().super_cluster.enabled {
+        let config = get_o2_config();
+        if config.super_cluster.enabled && !config.common.local_mode {
             // let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
             // let value = json::to_vec(&alert)?.into();
             log::debug!("Sending super cluster alert update event: {alert:?}");
@@ -502,7 +504,8 @@ mod super_cluster {
         alert_name: &str,
         alert_id: Ksuid,
     ) -> Result<(), infra::errors::Error> {
-        if get_o2_config().super_cluster.enabled {
+        let config = get_o2_config();
+        if config.super_cluster.enabled && !config.common.local_mode {
             let key = alert_key(org, stream_type, stream_name, alert_name);
             log::debug!("Sending super cluster alert delete event: {key:?}");
             // o2_enterprise::enterprise::super_cluster::queue::delete(&key, false, true, None)
@@ -518,7 +521,8 @@ mod super_cluster {
     /// Sends event to the super cluster queue indicating that all alert have
     /// been deleted from the database.
     pub async fn _emit_delete_all_event() -> Result<(), infra::errors::Error> {
-        if get_o2_config().super_cluster.enabled {
+        let config = get_o2_config();
+        if config.super_cluster.enabled && !config.common.local_mode {
             o2_enterprise::enterprise::super_cluster::queue::delete("/alerts/", true, false, None)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;
