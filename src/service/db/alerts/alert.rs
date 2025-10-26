@@ -446,7 +446,10 @@ pub fn scheduler_key(alert_id: Option<Ksuid>) -> String {
 /// Helper functions for sending events to the super cluster queue.
 #[cfg(feature = "enterprise")]
 mod super_cluster {
-    use config::{get_config, meta::{alerts::alert::Alert, stream::StreamType}};
+    use config::{
+        get_config,
+        meta::{alerts::alert::Alert, stream::StreamType},
+    };
     use infra::errors::Error;
     use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
     use svix_ksuid::Ksuid;
