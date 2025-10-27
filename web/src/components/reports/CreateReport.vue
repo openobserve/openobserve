@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
     <div data-test="add-report-section" class="full-width create-report-page">
-      <div class="row items-center no-wrap card-container tw-py-[0.675rem] tw-h-[48px] tw-px-[0.675rem] tw-mb-[0.675rem] ">
+      <div class="row items-center no-wrap card-container tw-py-[0.675rem] tw-h-[64px] tw-px-[0.675rem] tw-mb-[0.675rem] ">
         <div class="flex items-center">
           <div
             data-test="add-report-back-btn"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div class="flex card-container tw-mb-[0.675rem]" style="height: calc(100vh - 176px); overflow: auto">
+      <div class="flex card-container tw-mb-[0.675rem]" style="height: calc(100vh - 192px); overflow: auto">
         <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="width: 1024px">
           <q-form
             class="create-report-form"
@@ -107,6 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-toggle
                 data-test="report-cached-toggle-btn"
                 v-model="isCachedReport"
+                size="lg"
+                class="q-pl-0 o2-toggle-button-lg tw-h-[36px] tw-ml-1"
                 :label="t('reports.cachedReport')"
               />
               <q-icon
@@ -785,7 +787,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
       <div
         class="flex justify-end q-px-md full-width tw-py-3 card-container"
-        style="position: sticky; bottom: 0px; z-index: 2"
+        style="position: sticky; bottom: 0.375rem; z-index: 2"
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         :style="{
           'box-shadow':
