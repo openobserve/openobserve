@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
-          <q-tr :props="props">
+          <q-tr :props="props" class="hover:!tw-bg-[var(--o2-hover-accent)]">
             <q-td
               :props="props"
               class="field_list"
@@ -77,31 +77,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
-                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'hover:tw-bg-zinc-700'
-                    : 'hover:tw-bg-zinc-200'
-                "
+                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm hover:!tw-bg-[var(--o2-hover-accent)]"
                 :title="props.row.label || props.row.name"
               >
                 <div class="field_label ellipsis" style="font-size: 14px">
                   {{ props.row.label || props.row.name }}
                 </div>
                 <div
-                  class="field_overlay"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tw-bg-zinc-700'
-                      : 'tw-bg-zinc-200'
-                  "
+                  class="field_overlay hover:!tw-bg-[var(--o2-hover-accent)]"
                 >
                   <q-btn
                     :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
                     size="0.4rem"
-                    class="q-mr-sm"
+                    class="q-mr-sm !tw-text-[var(--o2-text-primary)]"
                     @click.stop="addToFilter(`${props.row.name}=''`)"
                     round
                   />
@@ -367,7 +357,7 @@ export default defineComponent({
 
     &.selected {
       .field_overlay {
-        background-color: rgba(89, 96, 178, 0.3);
+        background-color: var(--o2-hover-accent);
 
         .field_icons {
           opacity: 0;
