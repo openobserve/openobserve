@@ -1130,11 +1130,15 @@ class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 t
     </div>
 
   <!-- Deduplication section (fourth section) - Enterprise only -->
-  <div v-if="config.isEnterprise == 'true'" class="tw-w-full tw-mt-2">
-    <DeduplicationConfig
-      v-model="alertData.deduplication"
-      :available-fields="props.columns"
-    />
+   <div v-if="config.isEnterprise == 'true'" class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
+    <div class="tw-w-full flex tw-justify-center tw-items-center card-container">
+      <div class="tw-w-full">
+        <DeduplicationConfig
+          v-model="alertData.deduplication"
+          :available-fields="props.columns"
+        />
+      </div>
+    </div>
   </div>
 
    <!-- used for showing sql editor and vrl editor in modal -->
