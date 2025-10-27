@@ -89,15 +89,62 @@ pub async fn process_search_stream_request(
     let audit_enabled = get_o2_config().common.audit_enabled && _audit_ctx.is_some();
     // Initialize pattern accumulator if pattern extraction is requested
     #[cfg(feature = "enterprise")]
-    let pattern_accumulator = if extract_patterns {
+    let (pattern_accumulator, pattern_config) = if extract_patterns {
         log::info!("[HTTP2_STREAM trace_id {trace_id}] Pattern extraction enabled");
-        Some(
-            o2_enterprise::enterprise::log_patterns::PatternAccumulator::new(
-                o2_enterprise::enterprise::log_patterns::PatternExtractionConfig::default(),
-            ),
+
+        // Get FTS fields from stream settings for all streams being searched
+        let mut all_fts_fields = Vec::new();
+        for stream_name in &stream_names {
+            if let Ok(schema) = infra::schema::get(&org_id, stream_name, stream_type).await {
+                let stream_settings = infra::schema::unwrap_stream_settings(&schema);
+                let fts_fields = infra::schema::get_stream_setting_fts_fields(&stream_settings);
+                all_fts_fields.extend(fts_fields);
+            }
+        }
+
+        // Deduplicate FTS fields
+        all_fts_fields.sort();
+        all_fts_fields.dedup();
+
+        log::info!(
+            "[HTTP2_STREAM trace_id {trace_id}] Using FTS fields for pattern extraction: {:?}",
+            all_fts_fields
+        );
+
+        // Get configuration from O2 config and OpenObserve config
+        let o2_config = get_o2_config();
+        let zo_config = config::get_config();
+
+        // Use O2 config value if set, otherwise fall back to OpenObserve's query_default_limit
+        let max_logs = if o2_config.log_patterns.max_logs_for_extraction > 0 {
+            o2_config.log_patterns.max_logs_for_extraction
+        } else {
+            zo_config.limit.query_default_limit as usize
+        };
+
+        log::info!(
+            "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction config: max_logs={}, min_cluster={}, threshold={}, min_field_len={}",
+            max_logs,
+            o2_config.log_patterns.min_cluster_size,
+            o2_config.log_patterns.similarity_threshold,
+            o2_config.log_patterns.min_field_length
+        );
+
+        // Create config with stream-specific FTS fields and O2 config values
+        let config = o2_enterprise::enterprise::log_patterns::PatternExtractionConfig {
+            max_logs_for_extraction: max_logs,
+            min_cluster_size: o2_config.log_patterns.min_cluster_size,
+            similarity_threshold: o2_config.log_patterns.similarity_threshold,
+            min_field_length: o2_config.log_patterns.min_field_length,
+            fts_fields: all_fts_fields,
+        };
+
+        (
+            Some(o2_enterprise::enterprise::log_patterns::PatternAccumulator::new(config.clone())),
+            Some(config),
         )
     } else {
-        None
+        (None, None)
     };
 
     // Send a progress: 0 event as an indicator of search initiation
@@ -118,7 +165,12 @@ pub async fn process_search_stream_request(
     let started_at = chrono::Utc::now().timestamp_micros();
     let mut start = Instant::now();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
-    let use_cache = req.use_cache;
+    // Disable caching when pattern extraction is requested since patterns are generated
+    // dynamically from search results and cannot be cached
+    let use_cache = req.use_cache && !extract_patterns;
+    if extract_patterns && req.use_cache {
+        log::info!("[HTTP2_STREAM trace_id {trace_id}] Disabling cache for pattern extraction");
+    }
     let start_time = req.query.start_time;
     let end_time = req.query.end_time;
     let all_streams = stream_names.join(",");
@@ -580,7 +632,7 @@ pub async fn process_search_stream_request(
             match o2_enterprise::enterprise::log_patterns::extract_patterns_from_stream(
                 accumulator,
                 all_streams.clone(),
-                o2_enterprise::enterprise::log_patterns::PatternExtractionConfig::default(),
+                pattern_config.unwrap(),
             )
             .await
             {
