@@ -46,7 +46,11 @@ use crate::{
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
 pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
 
-pub async fn get_enrichment_table_data(org_id: &str, name: &str) -> Result<Values, anyhow::Error> {
+pub async fn get_enrichment_table_data(
+    org_id: &str,
+    name: &str,
+    _apply_primary_region_if_specified: bool,
+) -> Result<Values, anyhow::Error> {
     let start_time = get_start_time(org_id, name).await;
     let end_time = now_micros();
 
@@ -57,6 +61,23 @@ pub async fn get_enrichment_table_data(org_id: &str, name: &str) -> Result<Value
         size: QUERY_WITH_NO_LIMIT, // -1 means no limit, enrichment table should not be limited
         ..Default::default()
     };
+
+    #[cfg(feature = "enterprise")]
+    let regions = {
+        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+        let config = get_o2_config();
+        let enrichment_table_region = config.super_cluster.enrichment_table_get_region.clone();
+        if _apply_primary_region_if_specified
+            && config.super_cluster.enabled
+            && !enrichment_table_region.is_empty()
+        {
+            vec![enrichment_table_region]
+        } else {
+            vec![]
+        }
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let regions = vec![];
 
     let search_query: proto::cluster_rpc::SearchQuery = query.clone().into();
     let trace_id = ider::generate_trace_id();
@@ -99,7 +120,7 @@ pub async fn get_enrichment_table_data(org_id: &str, name: &str) -> Result<Value
     }
 
     let result =
-        search_cluster::search_inner(request, search_query, vec![], vec![], false, None).await;
+        search_cluster::search_inner(request, search_query, regions, vec![], true, None).await;
 
     #[cfg(feature = "enterprise")]
     {
@@ -455,16 +476,24 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = keys[0];
                 let stream_name = keys[2];
 
-                let data = match super::super::enrichment::get_enrichment_table(org_id, stream_name)
-                    .await
+                let data = match super::super::enrichment::get_enrichment_table(
+                    org_id,
+                    stream_name,
+                    false,
+                )
+                .await
                 {
                     Ok(data) => data,
                     Err(e) => {
                         log::error!(
                             "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, trying again: {e}"
                         );
-                        match super::super::enrichment::get_enrichment_table(org_id, stream_name)
-                            .await
+                        match super::super::enrichment::get_enrichment_table(
+                            org_id,
+                            stream_name,
+                            false,
+                        )
+                        .await
                         {
                             Ok(data) => data,
                             Err(e) => {
@@ -599,7 +628,7 @@ mod tests {
     async fn test_get_enrichment_table_data() {
         // This will fail in test environment due to missing dependencies,
         // but tests the function structure
-        let result = get_enrichment_table_data("test_org", "test_table").await;
+        let result = get_enrichment_table_data("test_org", "test_table", false).await;
         assert!(result.is_err());
     }
 
