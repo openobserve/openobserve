@@ -10,6 +10,7 @@ body {
   background: -webkit-linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));  /* Chrome 10-25, Safari 5.1-6 */
   background: linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg)); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
   overflow: hidden;
+  color: var(--o2-text-primary);
 
   // background: -webkit-linear-gradient(
   //   to bottom right,
@@ -1241,6 +1242,10 @@ body {
     background-color: var(--o2-tab-bg) !important;
     color: var(--o2-primary-btn-bg) !important;
   }
+}
+
+.q-list--dark, .q-item--dark {
+  color: var(--o2-text-primary);
 }
 
 
