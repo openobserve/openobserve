@@ -468,7 +468,7 @@ size="xs" /> No field found in
                                 searchObj.data.stream.selectedStream.length ==
                                 props.row.streams.length
                               "
-                              class="flex row"
+                              class="flex row tw-ml-[0.125rem]"
                               :class="
                                 store.state.theme === 'dark'
                                   ? 'text-white'
@@ -476,7 +476,7 @@ size="xs" /> No field found in
                               "
                             >
                               <q-btn
-                                class="q-mr-xs"
+                                class="tw-mr-[0.125rem] !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
                                 size="6px"
                                 @click="
                                   addSearchTerm(
@@ -487,13 +487,16 @@ size="xs" /> No field found in
                                 "
                                 title="Include Term"
                                 round
+                                outline
                                 :data-test="`log-search-subfield-list-equal-${props.row.name}-field-btn`"
                               >
-                                <q-icon>
-                                  <EqualIcon></EqualIcon>
-                                </q-icon>
+                                <Equal
+                                  :size="16"
+                                  class="!tw-text-[var(--o2-text-primary)]"
+                                />
                               </q-btn>
                               <q-btn
+                                class="!tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
                                 size="6px"
                                 @click="
                                   addSearchTerm(
@@ -504,11 +507,13 @@ size="xs" /> No field found in
                                 "
                                 title="Exclude Term"
                                 round
+                                outline
                                 :data-test="`log-search-subfield-list-not-equal-${props.row.name}-field-btn`"
                               >
-                                <q-icon>
-                                  <NotEqualIcon></NotEqualIcon>
-                                </q-icon>
+                                <EqualNot
+                                  :size="16"
+                                  class="!tw-text-[var(--o2-text-primary)]"
+                                />
                               </q-btn>
                             </div>
                           </q-item>
@@ -811,6 +816,7 @@ import { useSearchBar } from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
+import { Equal, EqualNot } from "lucide-vue-next";
 
 interface Filter {
   fieldName: string;
@@ -819,7 +825,7 @@ interface Filter {
 }
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
-  components: { EqualIcon, NotEqualIcon },
+  components: { EqualIcon, NotEqualIcon, Equal, EqualNot },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {
