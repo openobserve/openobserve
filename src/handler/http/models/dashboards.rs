@@ -58,6 +58,7 @@ impl<'de> Deserialize<'de> for DashboardRequestBody {
             3 => Self::V3(v3::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
             4 => Self::V4(v4::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
             5 => Self::V5(v5::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
+            6 => Self::V6(v6::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
             _ => {
                 return Err(serde::de::Error::custom(format!(
                     "unsupported version: {version}"
