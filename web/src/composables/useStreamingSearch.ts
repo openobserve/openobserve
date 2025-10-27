@@ -212,8 +212,8 @@ const useHttpStreaming = () => {
       if (meta?.fallback_order_by_col)
         url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
       if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
-      // Only add patterns parameter for actual log searches, not histogram queries
-      if (meta?.showPatterns && !meta?.is_ui_histogram) url += `&patterns=true`;
+      // Only add patterns parameter when in patterns view, not for histogram queries
+      if (meta?.logsVisualizeToggle === 'patterns' && !meta?.is_ui_histogram) url += `&patterns=true`;
     } else if (type === "values") {
       const fieldsString = meta?.fields.join(",");
       url = `/_values_stream`;
@@ -263,7 +263,6 @@ const useHttpStreaming = () => {
               onData(eventTraceId, 'search_response_hits', data);
               break;
             case 'pattern_extraction_result':
-              console.log("[PATTERNS SSE] Received pattern_extraction_result event, data:", data);
               onData(eventTraceId, 'pattern_extraction_result', data);
               break;
             case 'progress':

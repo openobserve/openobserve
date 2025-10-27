@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection full-width"
-            v-show="searchObj.meta.logsVisualizeToggle == 'logs'"
+            v-show="searchObj.meta.logsVisualizeToggle != 'visualize'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -889,11 +889,8 @@ export default defineComponent({
           router.currentRoute.value.query.logs_visualize_toggle;
       }
 
-      if (!isLogsTab()) {
-        await setupLogsTab();
-      } else {
-        await setupLogsTab();
-      }
+      // Always setup logs tab on mount
+      await setupLogsTab();
     }
 
     // Helper function to check if the current tab is "logs"

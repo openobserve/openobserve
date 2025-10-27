@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'selected'
                     : ''
                 "
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm btn-height-32"
+                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline tw-rounded-none q-px-sm btn-height-32"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disable="isVisualizeDisabled"
                 no-caps
@@ -63,6 +63,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-tooltip>
                 <q-tooltip v-else>
                   {{ t("search.visualize") }}
+                </q-tooltip>
+              </q-btn>
+            </div>
+            <div>
+              <q-btn
+                data-test="logs-patterns-toggle"
+                :class="
+                  searchObj.meta.logsVisualizeToggle === 'patterns'
+                    ? 'selected'
+                    : ''
+                "
+                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm btn-height-32"
+                @click="onLogsVisualizeToggleUpdate('patterns')"
+                no-caps
+                size="sm"
+                icon="pattern"
+              >
+                <q-tooltip>
+                  {{ t("search.showPatternsLabel") }}
                 </q-tooltip>
               </q-btn>
             </div>
@@ -3679,6 +3698,7 @@ export default defineComponent({
       ) {
         // cancel all the visualize queries
         cancelVisualizeQueries();
+
         if (
           searchObj.meta.logsVisualizeDirtyFlag === true ||
           !Object.hasOwn(searchObj.data?.queryResults, "hits") ||
