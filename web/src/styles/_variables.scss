@@ -235,7 +235,8 @@ $o2-dark-teal-900: #9BDDD6;
   // --o2-bg-light: #f7f9fb;
   // --o2-bg-dark: #0d1117;
 
-$theme-color: #3F7994;
+// $theme-color: #136dfb;
+$theme-color: #137bfb;
 $dark-theme-color: #112027;
 
 $theme-mode: white;
@@ -321,6 +322,8 @@ $actions-column-box-shawdow-dark: rgba(125, 125, 125, 0.694);
   --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, white);
 
   --o2-actions-column-shawdow: #{$actions-column-box-shawdow};
+
+  --q-primary: #{$theme-color};
 }
 
 // Semantic Colors - Dark Mode
@@ -332,15 +335,15 @@ $actions-column-box-shawdow-dark: rgba(125, 125, 125, 0.694);
   --o2-muted-background: #{$o2-dark-gray-1100};    // Muted background
   
   // Text Colors
-  --o2-text-primary: #{$o2-dark-gray-300};    // Main text in dark mode
-  --o2-text-secondary: #{$o2-dark-gray-700};  // Secondary text
+  --o2-text-primary: #D3D3D3;    // Main text in dark mode
+  --o2-text-secondary: #D3D3D3;  // Secondary text
   --o2-text-muted: #{$o2-dark-gray-900};      // Muted text
   
   // Component Colors
   --o2-card-background: #{$o2-dark-gray-1300}; // Card background
-  --o2-card-text: #{$o2-dark-gray-300};        // Card text
+  --o2-card-text: #D3D3D3;        // Card text
   --o2-popover-background: #{$o2-dark-gray-1300}; // Popover background
-  --o2-popover-text: #{$o2-dark-gray-300};     // Popover text
+  --o2-popover-text: #D3D3D3;     // Popover text
   
   // Borders & Dividers
   --o2-border: #{$o2-dark-gray-800};         // Standard borders
