@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #before>
           <div class="tw-w-full tw-h-full ">
             <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
-                    <div class="app-tabs-container tw-h-[36px] tw-w-fit">
+              <div class="app-tabs-container tw-h-[36px] tw-w-fit">
               <app-tabs
                 data-test="destination-import-tabs"
                 class="tabs-selection-container"
@@ -123,7 +123,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div style="width: 100%" class="q-mb-md tw-px-2">
                   <q-file
                     v-model="jsonFiles"
-                    filled
                     bottom-slots
                     :label="t('dashboard.dropFileMsg')"
                     accept=".json"
