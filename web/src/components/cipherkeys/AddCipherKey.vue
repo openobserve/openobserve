@@ -160,14 +160,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-stepper>
     </div>
     <div class="tw-mx-2">
-            <div class="flex justify-end q-px-md q-py-md full-width card-container"
+            <div class="flex justify-end q-px-sm q-py-lg full-width"
       style="position: sticky; bottom: 0px; z-index: 2"
-      :style="{
-        'box-shadow':
-          store.state.theme === 'dark'
-            ? 'rgb(45 45 45) 0px -4px 7px 0px'
-            : 'rgb(240 240 240) 0px -4px 7px 0px',
-      }">
+      >
         <q-btn
           data-test="add-cipher-key-cancel-btn"
           class="q-mr-md o2-secondary-button tw-h-[36px]"
