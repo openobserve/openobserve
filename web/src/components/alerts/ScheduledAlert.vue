@@ -1116,6 +1116,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
 
+  <!-- Deduplication section (fourth section) - Enterprise only -->
+  <div v-if="config.isEnterprise == 'true'" class="tw-w-full tw-mt-2">
+    <DeduplicationConfig
+      v-model="alertData.deduplication"
+      :available-fields="props.columns"
+    />
+  </div>
+
    <!-- used for showing sql editor and vrl editor in modal -->
   <q-dialog
     v-model="viewSqlEditor"
@@ -1591,13 +1599,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
     </div>
-    <div  class="q-ml-sm " v-if="store.state.isAiChatEnabled " style="width: 24.5vw; max-width: 100%; min-width: 75px;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-      <O2AIChat :header-height="48" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" style="height: calc(100vh - 0px) !important;" />
-    </div>
 
   </div>
 
   </q-dialog>
+
+  <div  class="q-ml-sm " v-if="store.state.isAiChatEnabled " style="width: 24.5vw; max-width: 100%; min-width: 75px;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+    <O2AIChat :header-height="48" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" style="height: calc(100vh - 0px) !important;" />
+  </div>
 
 
 
@@ -1632,6 +1641,7 @@ import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import searchService from "@/services/search";
 
 import AlertsContainer from "./AlertsContainer.vue";
+import DeduplicationConfig from "./DeduplicationConfig.vue";
 import useQuery from "@/composables/useQuery";
 import { debounce, pick } from "lodash-es";
 import config from "@/aws-exports";

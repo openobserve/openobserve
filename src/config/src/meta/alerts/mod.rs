@@ -29,6 +29,7 @@ use crate::{
 };
 
 pub mod alert;
+pub mod deduplication;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]

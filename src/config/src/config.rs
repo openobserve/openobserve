@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 10;
+pub const DB_SCHEMA_VERSION: u64 = 11;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1798,6 +1798,12 @@ pub struct Nats {
         default = 2048
     )]
     pub queue_max_size: i64,
+    #[env_config(
+        name = "ZO_NATS_EVENT_STORAGE",
+        help = "Set the storage type for the event stream, default is: memory, other value is: file",
+        default = "memory"
+    )]
+    pub event_storage: String,
     #[env_config(
         name = "ZO_NATS_V211_SUPPORT",
         help = "Support NATS v2.11.x",
