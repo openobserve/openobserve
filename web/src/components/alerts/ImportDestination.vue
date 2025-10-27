@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <div class="flex">
 
-    <div class="flex" style="width: calc(100% - 1px)">
+    <div class="flex" style="width: calc(100vw - 1px)">
       <q-splitter
         class="logs-search-splitter"
         no-scroll
@@ -1181,20 +1181,20 @@ export default defineComponent({
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(71vh - 27px) !important; /* Total editor height */
+    height: calc(100vh - 276px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .editor-container-json {
   .monaco-editor {
-    height: calc(66vh - 23px) !important; /* Total editor height */
+    height: calc(100vh - 315px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .monaco-editor {
-  height: calc(60vh - 14px) !important; /* Total editor height */
+  height: calc(100vh - 14px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none; /* Remove resize behavior */
   border: 1px solid var(--o2-border-color);
