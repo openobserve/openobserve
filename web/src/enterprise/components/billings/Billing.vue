@@ -32,10 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             map-options
             icon="schedule"
             @update:model-value="(value: any) => selectUsageDate()"
-            class="q-pa-none q-ma-none tw-h-[40px] "
+            class="q-pa-none q-mx-none tw-h-[40px] q-mt-xs"
           >
           <template v-slot:prepend>
-            <q-icon name="schedule" size="xs" class="tw-mr-2" @click.stop.prevent />
+            <q-icon name="schedule" size="xs" class="tw-mr-2 tw-mt-1" @click.stop.prevent />
           </template>
           </q-select>
         </div>
@@ -53,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="logs-splitter-smooth tw-overflow-hidden"
     >
       <template v-slot:before>
-        <div class="tw-w-full tw-px-[0.625rem] tw-pb-[0.625rem] ">
-          <div class="o2-container-navbarheight card-container">
+        <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] ">
+          <div class="card-container tw-h-[calc(100vh-118px)]">
         <q-tabs
           v-model="billingtab"
           indicator-color="transparent"
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             content-class="tab_content"
           />
         </q-tabs>
-        <q-btn
+        <!-- <q-btn
               data-test="logs-search-field-list-collapse-btn"
               :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
               :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
@@ -111,20 +111,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               round
               @click="collapseSidebar"
-            />
+            /> -->
           </div>
         </div>
 
       </template>
 
       <template v-slot:after>
-                <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
-          <div
-            class="o2-container-navbarheight card-container"
-          >
+        <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+          <div class="card-container tw-h-[calc(100vh-118px)]">
             <router-view title=""> </router-view>
           </div>
-          </div>
+        </div>
       </template>
     </q-splitter>
   </q-page>
