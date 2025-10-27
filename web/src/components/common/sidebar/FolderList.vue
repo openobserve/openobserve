@@ -426,7 +426,7 @@ export default defineComponent({
         }
 
         &--active {
-          background-color: var(--o2-theme-color);
+          background-color: var(--o2-primary-btn-bg);
           color: white;
         }
       }
