@@ -51,7 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             style="max-width: 150px; max-height: 31px"
           />
-          <div v-if="store.state.zoConfig.custom_hide_self_logo == false" class="logo-container">
+          <div
+            v-if="store.state.zoConfig.custom_hide_self_logo == false"
+            class="logo-container"
+          >
             <!-- Animated Favicon (shows first, rotates once) -->
             <img
               v-show="showFavicon"
@@ -60,13 +63,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goToHome"
             />
             <!-- Favicon + Text Logo (slides in after favicon rotation) -->
-            <div v-show="!showFavicon" class="logo-with-text" @click="goToHome">
+            <div v-show="!showFavicon" class="logo-with-text"
+@click="goToHome">
               <img
                 class="favicon-static"
                 :src="getImageURL('images/common/openobserve_favicon.png')"
               />
               <span class="logo-text">
-                <span v-for="(char, index) in logoText" :key="index" class="logo-char" :style="{ animationDelay: `${index * 0.15}s` }">{{ char }}</span>
+                <span
+                  v-for="(char, index) in logoText"
+                  :key="index"
+                  class="logo-char"
+                  :style="{ animationDelay: `${index * 0.15}s` }"
+                  >{{ char }}</span
+                >
               </span>
             </div>
           </div>
@@ -80,13 +90,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="goToHome"
           />
           <!-- Favicon + Text Logo (slides in after favicon rotation) -->
-          <div v-show="!showFavicon" class="logo-with-text" @click="goToHome">
+          <div v-show="!showFavicon" class="logo-with-text"
+@click="goToHome">
             <img
               class="favicon-static"
               :src="getImageURL('images/common/openobserve_favicon.png')"
             />
             <span class="logo-text">
-              <span v-for="(char, index) in logoText" :key="index" class="logo-char" :style="{ animationDelay: `${index * 0.15}s` }">{{ char }}</span>
+              <span
+                v-for="(char, index) in logoText"
+                :key="index"
+                class="logo-char"
+                :style="{ animationDelay: `${index * 0.15}s` }"
+                >{{ char }}</span
+              >
             </span>
           </div>
         </div>
@@ -102,7 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning" size="xs"
+class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -208,8 +226,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             props.row.identifier === userClickedOrg?.identifier,
                         }"
                       >
-                        {{ props.row.label.length > 30 ? props.row.label.substring(0, 30) + '... | ' + props.row.identifier : props.row.label + ' | ' + props.row.identifier }}
-                        <q-tooltip v-if="props.row.label.length > 30" anchor="bottom middle" self="top start">
+                        {{
+                          props.row.label.length > 30
+                            ? props.row.label.substring(0, 30) +
+                              "... | " +
+                              props.row.identifier
+                            : props.row.label + " | " + props.row.identifier
+                        }}
+                        <q-tooltip
+                          v-if="props.row.label.length > 30"
+                          anchor="bottom middle"
+                          self="top start"
+                        >
                           {{ props.row.label }}
                         </q-tooltip>
                       </div>
@@ -241,19 +269,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="row items-center no-wrap">
               <q-icon
-                ><component :is="slackIcon" size="32px" class="header-icon"
+                ><component :is="slackIcon"
+size="32px" class="header-icon"
               /></q-icon>
             </div>
             <q-tooltip anchor="top middle" self="bottom middle">
               {{ t("menu.slack") }}
             </q-tooltip>
           </q-btn>
-          <q-btn round flat dense :ripple="false" data-test="menu-link-help-item">
+          <q-btn
+            round
+            flat
+            dense
+            :ripple="false"
+            data-test="menu-link-help-item"
+          >
             <div class="row items-center no-wrap">
-              <q-icon
-                name="help_outline"
-                class="header-icon"
-              ></q-icon>
+              <q-icon name="help_outline" class="header-icon"></q-icon>
               <q-tooltip anchor="top middle" self="bottom middle">
                 {{ t("menu.help") }}
               </q-tooltip>
@@ -313,10 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="router.push({ name: 'settings' })"
           >
             <div class="row items-center no-wrap">
-              <q-icon
-                :name="outlinedSettings"
-                class="header-icon"
-              ></q-icon>
+              <q-icon :name="outlinedSettings" class="header-icon"></q-icon>
             </div>
             <q-tooltip anchor="top middle" self="bottom middle">
               {{ t("menu.settings") }}
@@ -371,7 +400,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-separator />
                 <q-item clickable>
                   <q-item-section avatar>
-                    <q-icon size="xs" name="language" class="padding-none" />
+                    <q-icon size="xs" name="language"
+class="padding-none" />
                   </q-item-section>
                   <q-item-section>
                     <q-item-label class="tw-max-w-[150px]">{{
@@ -441,7 +471,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="signout"
                 >
                   <q-item-section avatar>
-                    <q-icon size="xs" name="exit_to_app" class="padding-none" />
+                    <q-icon size="xs" name="exit_to_app"
+class="padding-none" />
                   </q-item-section>
                   <q-item-section>
                     <q-item-label>{{ t("menu.signOut") }}</q-item-label>
@@ -507,7 +538,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <q-dialog v-model="showGetStarted" maximized full-height>
+    <q-dialog v-model="showGetStarted" maximized
+full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
   </q-layout>
@@ -595,7 +627,22 @@ import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
-import { Home, Search, BarChart3, GitBranch, Layout, FileText,AlertTriangle, TvMinimal, Database, Users, ShieldUser, Code, FileBarChart, Settings } from 'lucide-vue-next';
+import {
+  Home,
+  Search,
+  BarChart3,
+  GitBranch,
+  Layout,
+  FileText,
+  AlertTriangle,
+  TvMinimal,
+  Database,
+  Users,
+  ShieldUser,
+  Code,
+  FileBarChart,
+  Settings,
+} from "lucide-vue-next";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -700,7 +747,9 @@ export default defineComponent({
       const toBeSearched = searchQuery.value.toLowerCase().trim();
       return orgOptions.value.filter((org: any) => {
         const labelMatch = org.label?.toLowerCase().includes(toBeSearched);
-        const identifierMatch = org.identifier?.toLowerCase().includes(toBeSearched);
+        const identifierMatch = org.identifier
+          ?.toLowerCase()
+          .includes(toBeSearched);
         return labelMatch || identifierMatch;
       });
     });
@@ -1560,7 +1609,9 @@ export default defineComponent({
   }
 
   .logo-text {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+      Arial, sans-serif;
     font-style: normal;
     font-weight: 600;
     font-size: 20px;
@@ -1572,7 +1623,7 @@ export default defineComponent({
 
     // Dark theme text color
     body.body--dark & {
-      color: #ffffff;
+      color: var(--o2-text-primary);
     }
 
     // Light theme text color
@@ -1602,7 +1653,7 @@ export default defineComponent({
   }
 }
 
-.q-drawer{
+.q-drawer {
   border-radius: 0.625rem;
 }
 
@@ -1667,7 +1718,6 @@ export default defineComponent({
 .o2-bg-color {
   // background-color: rgba(89, 96, 178, 0.08);
   background: transparent;
-
 }
 
 .q-list {
@@ -1919,11 +1969,11 @@ body.ai-chat-open {
 }
 .dark-mode-chat-container {
   border-left: 1.5px solid #232323ff;
-  box-shadow: -0.0rem 0.1rem 0.3rem var(--hover-shadow)
+  box-shadow: -0rem 0.1rem 0.3rem var(--hover-shadow);
 }
 .light-mode-chat-container {
   border-left: 1.5px solid #f7f7f7;
-  box-shadow: -0.0rem 0.1rem 0.3rem var(--hover-shadow)
+  box-shadow: -0rem 0.1rem 0.3rem var(--hover-shadow);
 }
 
 .ai-btn-active {
@@ -2009,7 +2059,11 @@ body.ai-chat-open {
 
       // Hover effect only on the div
       &:hover {
-        background: color-mix(in srgb, var(--o2-theme-color) 5%, var(--o2-theme-mode) 90%) !important;
+        background: color-mix(
+          in srgb,
+          var(--o2-theme-color) 5%,
+          var(--o2-theme-mode) 90%
+        ) !important;
       }
 
       // Active/selected state
@@ -2025,7 +2079,7 @@ body.ai-chat-open {
     }
   }
 }
-.q-drawer{
+.q-drawer {
   margin-bottom: 0.4rem;
 }
 </style>
