@@ -63,7 +63,6 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     let mut stream_summary = StreamSummary::default();
     let mut has_trigger_stream = false;
     for stream in streams.iter() {
-        println!("Stream: {stream:?}");
         if stream.name == usage::TRIGGERS_USAGE_STREAM {
             has_trigger_stream = true;
         }
