@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tabs>
 
       <!-- Logs Tab Content -->
-      <div v-show="!searchObj.meta.showPatterns || activeTab === 'logs'">
+      <div v-if="!searchObj.meta.showPatterns || activeTab === 'logs'">
         <tenstack-table
         ref="searchTableRef"
         :columns="getColumns || []"
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Patterns Tab Content -->
-      <div v-show="searchObj.meta.showPatterns && activeTab === 'patterns'" style="height: calc(100vh - 250px); display: flex; flex-direction: column;" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
+      <div v-if="searchObj.meta.showPatterns && activeTab === 'patterns'" style="height: calc(100vh - 250px); display: flex; flex-direction: column;" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
         <!-- Statistics Bar -->
         <div v-if="searchObj.data.patterns?.statistics" class="q-pa-md" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-grey-2'" style="border-bottom: 1px solid; flex-shrink: 0;" :style="{ borderColor: store.state.theme === 'dark' ? '#3a3a3a' : '#e0e0e0' }">
           <div class="row q-col-gutter-md">
@@ -334,12 +334,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-avatar>
                     </div>
                     <div class="col">
-                      <div class="text-body2" :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'">{{ pattern.description }}</div>
-                      <div class="text-caption q-mt-xs" :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-6'">
-                        <span class="text-weight-bold text-primary">{{ pattern.frequency.toLocaleString() }}</span> occurrences
-                        <span class="q-mx-xs">•</span>
-                        <span class="text-weight-bold text-primary">{{ pattern.percentage.toFixed(2) }}%</span> of total
-                        <span v-if="pattern.is_anomaly" class="text-negative text-weight-bold q-ml-sm">⚠️ ANOMALY</span>
+                      <div class="text-body2" :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'" style="word-break: break-word; white-space: normal;">{{ pattern.description }}</div>
+                      <div class="text-body1 q-mt-sm" :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'">
+                        <span class="text-weight-bold text-primary" style="font-size: 16px;">{{ pattern.frequency.toLocaleString() }}</span>
+                        <span class="text-weight-medium"> occurrences</span>
+                        <span class="q-mx-sm">•</span>
+                        <span class="text-weight-bold text-primary" style="font-size: 16px;">{{ pattern.percentage.toFixed(2) }}%</span>
+                        <span class="text-weight-medium"> of total</span>
+                        <span v-if="pattern.is_anomaly" class="text-negative text-weight-bold q-ml-sm" style="font-size: 16px;">⚠️ ANOMALY</span>
                       </div>
                     </div>
                   </div>
@@ -719,7 +721,7 @@ export default defineComponent({
         size: 500,
         meta: {
           closable: false,
-          showWrap: false,
+          showWrap: true,
         },
       },
       {
