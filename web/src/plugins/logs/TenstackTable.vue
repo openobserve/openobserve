@@ -83,9 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :class="[
                 'resizer',
-                store.state.theme === 'dark'
-                  ? 'tw-bg-zinc-800'
-                  : 'tw-bg-zinc-300',
+                'tw-bg-[var(--o2-border-color)]',
                 header.column.getIsResizing() ? 'isResizing' : '',
               ]"
               :style="{}"
@@ -164,8 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.7"
           >
             <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs" name="warning"
-class="q-mr-xs" />
+              <q-icon size="xs"
+name="warning" class="q-mr-xs" />
               {{ errMsg }}
             </div>
           </td>
