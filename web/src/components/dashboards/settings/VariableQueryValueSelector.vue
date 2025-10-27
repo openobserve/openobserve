@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-select
       style="min-width: 150px"
       dense
+      borderless
+      hide-bottom-space
       v-model="selectedValue"
       :display-value="displayValue"
       :label="variableItem?.label || variableItem?.name"
@@ -31,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       use-input
       stack-label
       @filter="filterOptions"
-      class="textbox col no-case"
+      class="textbox col no-case o2-custom-select-dashboard"
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-query-value-selector"
       :multiple="variableItem.multiSelect"
@@ -42,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onUpdateValue"
       @keydown="handleKeydown"
       ref="selectRef"
-     borderless hide-bottom-space>
+     >
       <template v-slot:no-option>
         <template v-if="filterText">
           <q-item clickable @click="handleCustomValue(filterText)">
