@@ -172,12 +172,26 @@ export function parseQueryPlanTree(planText: string): OperatorNode {
     const depth = getDepth(line);
     const trimmed = line.trim();
 
-    // Skip empty lines or lines that don't look like operators
-    if (!trimmed || !trimmed.includes(':')) continue;
+    // Skip empty lines
+    if (!trimmed) continue;
 
-    // Extract operator name (before first colon)
-    const colonIndex = trimmed.indexOf(':');
-    const name = trimmed.substring(0, colonIndex).trim();
+    let name: string;
+
+    if (trimmed.includes(':')) {
+      // Has colon: extract name from before first colon
+      const colonIndex = trimmed.indexOf(':');
+      name = trimmed.substring(0, colonIndex).trim();
+    } else {
+      // No colon: check if it looks like an operator
+      // Common patterns: CoalescePartitionsExec, RemoteExec, SortExec, ProjectionExec, etc.
+      // Operators typically end with: Exec, Plan, Scan, Join, Relation, Source, Sink
+      if (/(?:Exec|Plan|Scan|Join|Relation|Source|Sink)$/i.test(trimmed)) {
+        name = trimmed;
+      } else {
+        // Doesn't look like an operator, skip it
+        continue;
+      }
+    }
 
     const node: OperatorNode = {
       name,
@@ -264,6 +278,27 @@ export function calculateSummaryMetrics(planText: string): SummaryMetrics {
     totalRows: metrics.totalRows.toLocaleString(),
     peakMemory: formatMemory(metrics.maxMemory),
   };
+}
+
+/**
+ * Find RemoteExec or RemoteScanExec node in the operator tree
+ * Used for nesting Phase 1 plans under Phase 0 Remote*Exec in EXPLAIN ANALYZE
+ */
+export function findRemoteExecNode(node: OperatorNode): OperatorNode | null {
+  // Check if current node is RemoteExec, RemoteScanExec, or any Remote*Exec variant
+  if (/Remote\w*Exec/i.test(node.name)) {
+    return node;
+  }
+
+  // Recursively search children
+  for (const child of node.children) {
+    const found = findRemoteExecNode(child);
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
 }
 
 /**

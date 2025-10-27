@@ -15,116 +15,165 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="showDialog" @hide="onClose">
-    <q-card class="query-plan-dialog" style="width: 900px; max-width: 90vw; max-height: 85vh">
-      <q-card-section class="row items-center q-pb-none">
+  <q-dialog v-model="showDialog" @hide="onClose" maximized>
+    <q-card class="query-plan-dialog full-height">
+      <q-card-section class="row items-center q-pb-sm q-pt-sm">
         <div class="text-h6">{{ t("search.queryPlan") }}</div>
         <q-space />
-        <q-btn
-          v-if="!isAnalyzing && !showAnalyzeResults"
-          icon="analytics"
-          color="primary"
-          :label="t('search.analyze')"
-          flat
-          no-caps
-          class="q-mr-sm"
-          @click="runAnalyze"
-          :loading="loading"
-        >
-          <q-tooltip>{{ t("search.analyzeTooltip") }}</q-tooltip>
+        <q-btn icon="close" flat round dense @click="onClose">
+          <q-tooltip>Close (ESC)</q-tooltip>
         </q-btn>
-        <q-btn icon="close" flat round dense @click="onClose" />
       </q-card-section>
 
-      <q-card-section class="q-pt-sm query-plan-content">
-        <div v-if="loading" class="flex flex-center q-pa-xl">
-          <q-spinner-dots color="primary" size="50px" />
-          <div class="q-ml-md">
-            {{ isAnalyzing ? t("search.runningAnalyze") : t("search.loadingPlan") }}
-          </div>
-        </div>
+      <q-separator />
 
-        <div v-else-if="error" class="error-container">
-          <q-banner class="bg-negative text-white">
-            <template v-slot:avatar>
-              <q-icon name="error" />
-            </template>
-            {{ error }}
-          </q-banner>
-        </div>
-
-        <!-- EXPLAIN ANALYZE view (no tabs, just metrics + tree) -->
-        <div v-else-if="showAnalyzeResults" class="plan-container">
-          <!-- Metrics Summary Card -->
-          <MetricsSummaryCard
-            v-if="summaryMetrics"
-            :metrics="summaryMetrics"
-            class="q-mb-md"
-          />
-
-          <!-- Execution Plan Tree -->
-          <q-card flat bordered class="plan-card">
-            <q-card-section class="q-pa-none">
-              <div class="plan-scroll-area">
-                <QueryPlanTree
-                  v-if="planTree"
-                  :tree="planTree"
-                  :is-analyze="true"
-                />
-                <div v-else class="q-pa-md text-grey-6">
-                  {{ t("search.noAnalyzePlanFound") }}
+      <q-card-section class="query-plan-content full-height q-pa-none">
+        <q-splitter
+          v-model="splitterPosition"
+          class="full-height"
+        >
+          <!-- Left Pane: SQL Query -->
+          <template #before>
+            <div class="sql-query-pane full-height">
+              <div
+                class="pane-header q-pa-sm row items-center"
+                :class="store.state.theme === 'dark' ? 'pane-header-dark' : 'pane-header-light'"
+              >
+                <q-icon name="code" size="20px" class="q-mr-sm" />
+                <div class="text-subtitle1 text-weight-medium">SQL Query</div>
+              </div>
+              <q-separator />
+              <div
+                class="sql-query-content q-pa-md"
+                :class="store.state.theme === 'dark' ? 'sql-query-content-dark' : 'sql-query-content-light'"
+              >
+                <div class="sql-query-wrapper">
+                  <pre class="sql-query-text">{{ sqlQuery }}</pre>
                 </div>
               </div>
-            </q-card-section>
-          </q-card>
-        </div>
+            </div>
+          </template>
 
-        <!-- EXPLAIN view (tabs for logical/physical) -->
-        <div v-else class="plan-container">
-          <q-card flat bordered class="plan-card">
-            <q-tabs
-              v-model="activeTab"
-              dense
-              class="text-grey"
-              active-color="primary"
-              indicator-color="primary"
-              align="left"
-            >
-              <q-tab name="logical" :label="t('search.logicalPlan')" />
-              <q-tab name="physical" :label="t('search.physicalPlan')" />
-            </q-tabs>
+          <!-- Right Pane: Explain/Analyze Results -->
+          <template #after>
+            <div class="explain-results-pane full-height">
+              <div
+                class="pane-header q-pa-sm row items-center"
+                :class="store.state.theme === 'dark' ? 'pane-header-dark' : 'pane-header-light'"
+              >
+                <div class="text-subtitle1 text-weight-medium">
+                  {{ showAnalyzeResults ? t("search.analyzeResults") : t("search.explainResults") }}
+                </div>
+                <q-space />
+                <q-btn
+                  v-if="!isAnalyzing && !showAnalyzeResults"
+                  icon="analytics"
+                  color="primary"
+                  :label="t('search.analyze')"
+                  flat
+                  no-caps
+                  size="sm"
+                  @click="runAnalyze"
+                  :loading="loading"
+                >
+                  <q-tooltip>{{ t("search.analyzeTooltip") }}</q-tooltip>
+                </q-btn>
+              </div>
+              <q-separator />
 
-            <q-separator />
-
-            <q-tab-panels v-model="activeTab" animated>
-              <q-tab-panel name="logical" class="q-pa-none">
-                <div class="plan-scroll-area">
-                  <QueryPlanTree
-                    v-if="logicalPlanTree"
-                    :tree="logicalPlanTree"
-                    :is-analyze="false"
-                  />
-                  <div v-else class="q-pa-md text-grey-6">
-                    {{ t("search.noLogicalPlan") }}
+              <div v-if="loading" class="flex flex-center q-pa-xl full-height">
+                <div class="text-center">
+                  <q-spinner-dots color="primary" size="50px" />
+                  <div class="q-mt-md">
+                    {{ isAnalyzing ? t("search.runningAnalyze") : t("search.loadingPlan") }}
                   </div>
                 </div>
-              </q-tab-panel>
+              </div>
 
-              <q-tab-panel name="physical" class="q-pa-none">
-                <div class="plan-scroll-area">
-                  <QueryPlanTree
-                    v-if="physicalPlanTree"
-                    :tree="physicalPlanTree"
-                    :is-analyze="false"
-                  />
-                  <div v-else class="q-pa-md text-grey-6">
-                    {{ t("search.noPhysicalPlan") }}
-                  </div>
-                </div>
-              </q-tab-panel>
-            </q-tab-panels>
-          </q-card>
-        </div>
+              <div v-else-if="error" class="q-pa-md">
+                <q-banner class="bg-negative text-white">
+                  <template v-slot:avatar>
+                    <q-icon name="error" />
+                  </template>
+                  {{ error }}
+                </q-banner>
+              </div>
+
+              <!-- EXPLAIN ANALYZE view -->
+              <div v-else-if="showAnalyzeResults" class="plan-container q-pa-md">
+                <!-- Metrics Summary Card -->
+                <MetricsSummaryCard
+                  v-if="summaryMetrics"
+                  :metrics="summaryMetrics"
+                  class="q-mb-md"
+                />
+
+                <!-- Execution Plan Tree -->
+                <q-card flat bordered class="plan-card">
+                  <q-card-section class="q-pa-none">
+                    <div class="plan-scroll-area">
+                      <QueryPlanTree
+                        v-if="planTree"
+                        :tree="planTree"
+                        :is-analyze="true"
+                      />
+                      <div v-else class="q-pa-md text-grey-6">
+                        {{ t("search.noAnalyzePlanFound") }}
+                      </div>
+                    </div>
+                  </q-card-section>
+                </q-card>
+              </div>
+
+              <!-- EXPLAIN view (tabs for logical/physical) -->
+              <div v-else class="plan-container q-pa-md">
+                <q-card flat bordered class="plan-card">
+                  <q-tabs
+                    v-model="activeTab"
+                    dense
+                    class="text-grey"
+                    active-color="primary"
+                    indicator-color="primary"
+                    align="left"
+                  >
+                    <q-tab name="logical" :label="t('search.logicalPlan')" />
+                    <q-tab name="physical" :label="t('search.physicalPlan')" />
+                  </q-tabs>
+
+                  <q-separator />
+
+                  <q-tab-panels v-model="activeTab" animated>
+                    <q-tab-panel name="logical" class="q-pa-none">
+                      <div class="plan-scroll-area">
+                        <QueryPlanTree
+                          v-if="logicalPlanTree"
+                          :tree="logicalPlanTree"
+                          :is-analyze="false"
+                        />
+                        <div v-else class="q-pa-md text-grey-6">
+                          {{ t("search.noLogicalPlan") }}
+                        </div>
+                      </div>
+                    </q-tab-panel>
+
+                    <q-tab-panel name="physical" class="q-pa-none">
+                      <div class="plan-scroll-area">
+                        <QueryPlanTree
+                          v-if="physicalPlanTree"
+                          :tree="physicalPlanTree"
+                          :is-analyze="false"
+                        />
+                        <div v-else class="q-pa-md text-grey-6">
+                          {{ t("search.noPhysicalPlan") }}
+                        </div>
+                      </div>
+                    </q-tab-panel>
+                  </q-tab-panels>
+                </q-card>
+              </div>
+            </div>
+          </template>
+        </q-splitter>
       </q-card-section>
     </q-card>
   </q-dialog>
@@ -141,6 +190,7 @@ import { generateTraceContext } from "@/utils/zincutils";
 import {
   parseQueryPlanTree,
   calculateSummaryMetrics,
+  findRemoteExecNode,
   type OperatorNode,
   type SummaryMetrics,
 } from "@/utils/queryPlanParser";
@@ -175,13 +225,20 @@ export default defineComponent({
     const logicalPlan = ref("");
     const physicalPlan = ref("");
     const analyzePlan = ref("");
+    const analyzePlanTreeOverride = ref<OperatorNode | null>(null); // For hierarchical phase nesting
     const activeTab = ref("logical");
     const isAnalyzing = ref(false);
     const showAnalyzeResults = ref(false);
+    const splitterPosition = ref(50); // Split at 50%
 
     const showDialog = computed({
       get: () => props.modelValue,
       set: (val) => emit("update:modelValue", val),
+    });
+
+    // Get SQL query from searchObj
+    const sqlQuery = computed(() => {
+      return props.searchObj?.data?.query || "";
     });
 
     // Parse plans into tree structures
@@ -196,6 +253,11 @@ export default defineComponent({
     });
 
     const planTree = computed<OperatorNode | null>(() => {
+      // Use override tree if available (for hierarchical phase nesting)
+      if (analyzePlanTreeOverride.value) {
+        return analyzePlanTreeOverride.value;
+      }
+      // Otherwise parse from text
       if (!analyzePlan.value) return null;
       return parseQueryPlanTree(analyzePlan.value);
     });
@@ -213,21 +275,73 @@ export default defineComponent({
       logicalPlan.value = "";
       physicalPlan.value = "";
       analyzePlan.value = "";
+      analyzePlanTreeOverride.value = null;
 
       if (!responseData || !responseData.hits) {
         return;
       }
 
       if (isAnalyze) {
-        // For EXPLAIN ANALYZE: phase is numeric, combine all phases into single plan
-        const allPlans = responseData.hits
-          .sort((a: any, b: any) => (a.phase || 0) - (b.phase || 0))
-          .map((hit: any) => hit.plan || "")
-          .filter((plan: string) => plan.trim() !== "")
-          .join("\n\n");
+        // For EXPLAIN ANALYZE: phase is numeric
+        // Phase 0: RemoteExec (coordinator)
+        // Phase 1+: Actual execution plans from workers
+        // We need to nest Phase 1+ plans as children of Phase 0 RemoteExec
 
-        if (allPlans) {
-          analyzePlan.value = allPlans.trim();
+        // Separate phases
+        const phase0Hits = responseData.hits.filter((hit: any) => hit.phase === 0);
+        const phase1Hits = responseData.hits.filter((hit: any) => hit.phase === 1);
+
+        if (phase0Hits.length > 0 && phase1Hits.length > 0) {
+          // Parse phase 0
+          const phase0Plan = phase0Hits
+            .map((hit: any) => hit.plan || "")
+            .filter((plan: string) => plan.trim() !== "")
+            .join("\n");
+
+          // Parse Phase 0 into tree
+          const phase0Tree = parseQueryPlanTree(phase0Plan);
+
+          // Find RemoteExec or RemoteScanExec in phase 0
+          const remoteExec = findRemoteExecNode(phase0Tree);
+
+          if (remoteExec) {
+            // Parse each Phase 1 hit separately (one per partition)
+            // Each partition may have its own execution tree
+            const phase1Children: OperatorNode[] = [];
+
+            for (const hit of phase1Hits) {
+              const plan = hit.plan || "";
+              if (plan.trim()) {
+                const partitionTree = parseQueryPlanTree(plan);
+                // Add all top-level operators from this partition as children
+                if (partitionTree.children.length > 0) {
+                  phase1Children.push(...partitionTree.children);
+                }
+              }
+            }
+
+            // Attach all Phase 1 children to RemoteScanExec
+            if (phase1Children.length > 0) {
+              remoteExec.children = phase1Children;
+            }
+          }
+
+          // Store the merged hierarchy
+          // Set both the text (for metrics calculation) and the tree (for display)
+          analyzePlan.value = phase0Plan.trim();
+          analyzePlanTreeOverride.value = phase0Tree;
+        } else {
+          // Fallback: combine all phases if structure is unexpected
+          const allPlans = responseData.hits
+            .sort((a: any, b: any) => (a.phase || 0) - (b.phase || 0))
+            .map((hit: any) => hit.plan || "")
+            .filter((plan: string) => plan.trim() !== "")
+            .join("\n\n");
+
+          if (allPlans) {
+            analyzePlan.value = allPlans.trim();
+            analyzePlanTreeOverride.value = null; // Use default parsing
+          }
         }
       } else {
         // For EXPLAIN: plan_type is string
@@ -423,11 +537,30 @@ export default defineComponent({
       emit("update:modelValue", false);
     };
 
+    // ESC key handler
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && showDialog.value) {
+        onClose();
+      }
+    };
+
     watch(
       () => props.modelValue,
       (newVal) => {
         if (newVal && props.searchObj) {
           fetchExplainPlan();
+        }
+      }
+    );
+
+    // Add ESC key listener when dialog opens
+    watch(
+      () => showDialog.value,
+      (isOpen) => {
+        if (isOpen) {
+          document.addEventListener("keydown", handleEscKey);
+        } else {
+          document.removeEventListener("keydown", handleEscKey);
         }
       }
     );
@@ -438,6 +571,8 @@ export default defineComponent({
       showDialog,
       loading,
       error,
+      sqlQuery,
+      splitterPosition,
       logicalPlanTree,
       physicalPlanTree,
       planTree,
@@ -445,6 +580,11 @@ export default defineComponent({
       activeTab,
       isAnalyzing,
       showAnalyzeResults,
+      showVerbose,
+      hasVerboseData,
+      verboseLogicalPlan,
+      verbosePhysicalPlan,
+      verboseAnalyzePlan,
       runAnalyze,
       onClose,
     };
@@ -458,38 +598,131 @@ export default defineComponent({
   flex-direction: column;
 
   .query-plan-content {
-    max-height: calc(85vh - 120px);
-    overflow-y: auto;
-  }
-
-  .plan-container {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .plan-card {
     flex: 1;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
 
-    .q-tabs {
-      flex-shrink: 0;
-    }
-
-    .q-tab-panels {
-      flex: 1;
+    .sql-query-pane,
+    .explain-results-pane {
+      display: flex;
+      flex-direction: column;
       overflow: hidden;
+
+      .pane-header {
+        flex-shrink: 0;
+      }
+
+      .pane-header-light {
+        background-color: #f5f5f5;
+      }
+
+      .pane-header-dark {
+        background-color: #181a1b;
+      }
+
+      .sql-query-content {
+        flex: 1;
+        overflow-y: auto;
+
+        .sql-query-wrapper {
+          border-radius: 4px;
+          padding: 12px;
+          min-height: 100%;
+        }
+
+        .sql-query-text {
+          font-family: monospace;
+          font-size: 12px;
+          line-height: 1.6;
+          margin: 0;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+      }
+
+      .sql-query-content-light {
+        background-color: #f8f9fa;
+        color: #1d1d1d;
+
+        .sql-query-wrapper {
+          background-color: #ffffff;
+          border: 1px solid #e0e0e0;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+      }
+
+      .sql-query-content-dark {
+        background-color: #121212;
+        color: #e0e0e0;
+
+        .sql-query-wrapper {
+          background-color: #1e1e1e;
+          border: 1px solid #3d3d3d;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+      }
+    }
+
+    .explain-results-pane {
+      .plan-container {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .plan-card {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+
+        .q-tabs {
+          flex-shrink: 0;
+        }
+
+        .q-tab-panels {
+          flex: 1;
+          overflow: hidden;
+        }
+      }
+
+      .plan-scroll-area {
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
+      }
     }
   }
+}
 
-  .plan-scroll-area {
-    max-height: 500px;
-    overflow-y: auto;
-  }
+// Verbose output styling
+.verbose-output-container {
+  display: flex;
+  flex-direction: column;
+}
 
-  .error-container {
-    padding: 16px;
+.verbose-output {
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+  padding: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+  border-radius: 4px;
+
+  // Light mode
+  background-color: #f5f5f5;
+  color: #1d1d1d;
+  border: 1px solid #e0e0e0;
+}
+
+// Dark mode for verbose output
+body.body--dark {
+  .verbose-output {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+    border-color: #3d3d3d;
   }
 }
 </style>

@@ -28,14 +28,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-if="node.children.length > 0"
         class="expand-icon"
-        @click="toggleExpanded"
+        @click="toggleChildrenExpanded"
       >
-        {{ expanded ? '▼' : '▶' }}
+        {{ childrenExpanded ? '▼' : '▶' }}
       </span>
       <span v-else class="expand-icon-spacer"></span>
 
       <!-- Operator name -->
       <span class="operator-name">{{ node.name }}</span>
+
+      <!-- Inline details (clickable to expand if truncated) -->
+      <span
+        v-if="inlineDetails"
+        class="inline-details"
+        :class="{ truncated: !detailsExpanded && hasLongDetails, clickable: hasLongDetails }"
+        @click="hasLongDetails ? toggleDetailsExpanded() : null"
+      >
+        : {{ inlineDetails }}
+      </span>
+
+      <!-- Separator between details and metrics -->
+      <span v-if="inlineDetails && (isAnalyze && hasMetrics)" class="separator">·</span>
 
       <!-- Metrics (for ANALYZE mode) -->
       <span v-if="isAnalyze && hasMetrics" class="metrics-inline">
@@ -47,25 +60,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="schedule" size="12px" />
           {{ node.metrics.elapsed_compute }}
         </span>
-        <span v-if="node.metrics.memory" class="metric-badge">
-          <q-icon name="memory" size="12px" />
-          {{ node.metrics.memory }}
-        </span>
       </span>
     </div>
 
-    <!-- Additional details (collapsed by default if projection is long) -->
-    <div v-if="expanded && nodeDetails" class="node-details">
+    <!-- Expanded full details (shown when details are expanded) -->
+    <div v-if="detailsExpanded && hasLongDetails" class="node-details">
       <span class="tree-indent">{{ childPrefix }}  </span>
-      <CollapsibleProjection
-        v-if="hasProjection"
-        :fields-text="nodeDetails"
-      />
-      <span v-else>{{ nodeDetails }}</span>
+      <span>{{ inlineDetails }}</span>
     </div>
 
     <!-- Children -->
-    <div v-if="expanded && node.children.length > 0" class="children">
+    <div v-if="childrenExpanded && node.children.length > 0" class="children">
       <QueryPlanNode
         v-for="(child, index) in node.children"
         :key="index"
@@ -81,13 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, PropType, ref, computed } from "vue";
 import { OperatorNode } from "@/utils/queryPlanParser";
-import CollapsibleProjection from "./CollapsibleProjection.vue";
 
 export default defineComponent({
   name: "QueryPlanNode",
-  components: {
-    CollapsibleProjection,
-  },
   props: {
     node: {
       type: Object as PropType<OperatorNode>,
@@ -107,7 +108,8 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const expanded = ref(true);
+    const childrenExpanded = ref(true);
+    const detailsExpanded = ref(false);
 
     const connector = computed(() => {
       return props.isLast ? '└─' : '├─';
@@ -121,35 +123,45 @@ export default defineComponent({
     const hasMetrics = computed(() => {
       return props.isAnalyze && (
         props.node.metrics.output_rows !== undefined ||
-        props.node.metrics.elapsed_compute !== undefined ||
-        props.node.metrics.memory !== undefined
+        props.node.metrics.elapsed_compute !== undefined
       );
     });
 
-    const nodeDetails = computed(() => {
-      // Extract details after the operator name and colon
-      const colonIndex = props.node.fullText.indexOf(':');
+    /**
+     * Get inline details - everything after the colon, excluding metrics
+     */
+    const parseInlineDetails = (fullText: string): string => {
+      const colonIndex = fullText.indexOf(':');
       if (colonIndex === -1) return '';
 
-      const details = props.node.fullText.substring(colonIndex + 1).trim();
+      let details = fullText.substring(colonIndex + 1).trim();
 
-      // Remove metrics section if in analyze mode (we show them inline)
+      // Remove metrics section if in analyze mode (we show them separately)
       if (props.isAnalyze && details.includes('metrics=')) {
         const metricsIndex = details.indexOf(', metrics=');
         if (metricsIndex !== -1) {
-          return details.substring(0, metricsIndex);
+          details = details.substring(0, metricsIndex).trim();
         }
       }
 
       return details;
+    };
+
+    const inlineDetails = computed(() => {
+      return parseInlineDetails(props.node.fullText);
     });
 
-    const hasProjection = computed(() => {
-      return /Projection.*:\s*\[/i.test(nodeDetails.value);
+    const hasLongDetails = computed(() => {
+      // Consider details "long" if they exceed reasonable single-line length
+      return inlineDetails.value.length > 80;
     });
 
-    const toggleExpanded = () => {
-      expanded.value = !expanded.value;
+    const toggleChildrenExpanded = () => {
+      childrenExpanded.value = !childrenExpanded.value;
+    };
+
+    const toggleDetailsExpanded = () => {
+      detailsExpanded.value = !detailsExpanded.value;
     };
 
     const formatNumber = (num: number): string => {
@@ -157,13 +169,15 @@ export default defineComponent({
     };
 
     return {
-      expanded,
+      childrenExpanded,
+      detailsExpanded,
       connector,
       childPrefix,
       hasMetrics,
-      nodeDetails,
-      hasProjection,
-      toggleExpanded,
+      inlineDetails,
+      hasLongDetails,
+      toggleChildrenExpanded,
+      toggleDetailsExpanded,
       formatNumber,
     };
   },
@@ -218,10 +232,40 @@ export default defineComponent({
       padding-left: 4px;
     }
 
+    .inline-details {
+      color: rgba(0, 0, 0, 0.7);
+      font-weight: 400;
+      font-size: 12px;
+      font-style: italic;
+      padding-left: 0;
+
+      &.clickable {
+        cursor: pointer;
+
+        &:hover {
+          color: rgba(0, 0, 0, 0.9);
+        }
+      }
+
+      &.truncated {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 600px;
+      }
+    }
+
+    .separator {
+      color: rgba(0, 0, 0, 0.4);
+      padding: 0 8px;
+      font-weight: 400;
+      user-select: none;
+    }
+
     .metrics-inline {
       display: flex;
       gap: 8px;
-      margin-left: 12px;
+      margin-left: 0;
 
       .metric-badge {
         display: inline-flex;
@@ -244,7 +288,9 @@ export default defineComponent({
     padding-bottom: 2px;
     color: rgba(0, 0, 0, 0.7);
     font-size: 12px;
+    font-style: italic;
     white-space: pre-wrap;
+    word-break: break-word;
 
     .tree-indent {
       color: rgba(0, 0, 0, 0.3);
@@ -274,6 +320,19 @@ export default defineComponent({
         color: rgba(255, 255, 255, 0.87);
       }
 
+      .inline-details {
+        color: rgba(255, 255, 255, 0.7);
+        font-style: italic;
+
+        &.clickable:hover {
+          color: rgba(255, 255, 255, 0.9);
+        }
+      }
+
+      .separator {
+        color: rgba(255, 255, 255, 0.4);
+      }
+
       .metrics-inline {
         .metric-badge {
           background-color: rgba(var(--q-primary-rgb), 0.2);
@@ -283,6 +342,7 @@ export default defineComponent({
 
     .node-details {
       color: rgba(255, 255, 255, 0.7);
+      font-style: italic;
 
       .tree-indent {
         color: rgba(255, 255, 255, 0.3);
