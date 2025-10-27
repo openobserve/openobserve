@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="html-editor" style="width: 100%; height: 100%; overflow: auto">
+  <div class="html-editor card-container" style="width: 100%; height: 100%; overflow: auto">
     <div style="width: 100%; height: 100%">
       <q-splitter
         v-model="splitterModel"

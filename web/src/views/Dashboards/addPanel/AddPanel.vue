@@ -410,46 +410,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="col column"
         style="width: 100%; height: 100%; flex: 1"
       >
-        <VariablesValueSelector
-          :variablesConfig="currentDashboardData.data?.variables"
-          :showDynamicFilters="
-            currentDashboardData.data?.variables?.showDynamicFilters
-          "
-          :selectedTimeDate="dashboardPanelData.meta.dateTime"
-          @variablesData="variablesDataUpdated"
-          :initialVariableValues="initialVariableValues"
-          class="q-mb-sm"
-        />
-        <CustomHTMLEditor
-          v-model="dashboardPanelData.data.htmlContent"
-          style="width: 100%; height: 100%"
-          class="col"
-          :initialVariableValues="updatedVariablesData"
-        />
-        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <VariablesValueSelector
+            :variablesConfig="currentDashboardData.data?.variables"
+            :showDynamicFilters="
+              currentDashboardData.data?.variables?.showDynamicFilters
+            "
+            :selectedTimeDate="dashboardPanelData.meta.dateTime"
+            @variablesData="variablesDataUpdated"
+            :initialVariableValues="initialVariableValues"
+            class="q-mb-sm"
+          />
+          <CustomHTMLEditor
+            v-model="dashboardPanelData.data.htmlContent"
+            style="width: 100%; height: 100%"
+            class="col"
+            :initialVariableValues="updatedVariablesData"
+          />
+          <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        </div>
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'markdown'"
         class="col column"
         style="width: 100%; height: 100%; flex: 1"
       >
-        <VariablesValueSelector
-          :variablesConfig="currentDashboardData.data?.variables"
-          :showDynamicFilters="
-            currentDashboardData.data?.variables?.showDynamicFilters
-          "
-          :selectedTimeDate="dashboardPanelData.meta.dateTime"
-          @variablesData="variablesDataUpdated"
-          :initialVariableValues="initialVariableValues"
-          class="q-mb-sm"
-        />
-        <CustomMarkdownEditor
-          v-model="dashboardPanelData.data.markdownContent"
-          style="width: 100%; height: 100%"
-          class="col"
-          :initialVariableValues="updatedVariablesData"
-        />
-        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <VariablesValueSelector
+            :variablesConfig="currentDashboardData.data?.variables"
+            :showDynamicFilters="
+              currentDashboardData.data?.variables?.showDynamicFilters
+            "
+            :selectedTimeDate="dashboardPanelData.meta.dateTime"
+            @variablesData="variablesDataUpdated"
+            :initialVariableValues="initialVariableValues"
+            class="q-mb-sm"
+          />
+          <CustomMarkdownEditor
+            v-model="dashboardPanelData.data.markdownContent"
+            style="width: 100%; height: 100%"
+            class="col"
+            :initialVariableValues="updatedVariablesData"
+          />
+          <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        </div>
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'custom_chart'"
@@ -479,8 +483,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         >
           <template #before>
+            <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
             <div
-              class="col scroll"
+              class="col scroll card-container"
               style="height: calc(100vh - 99px); overflow-y: auto"
             >
               <div
@@ -496,6 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <FieldList :editMode="editMode" />
                 </div>
               </div>
+            </div>
             </div>
           </template>
           <template #separator>
@@ -516,7 +522,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div
-              class="row"
+              class="row card-container"
               style="height: calc(100vh - 99px); overflow-y: auto"
             >
               <div class="col scroll" style="height: 100%">
