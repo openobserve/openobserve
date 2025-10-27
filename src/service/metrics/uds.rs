@@ -86,10 +86,7 @@ pub fn refactor_metric_map(
     let cfg = get_config();
     let mut new_map =
         Map::with_capacity(defined_schema_fields.len() + CORE_METRIC_FIELDS.len() + 2);
-    let mut non_schema_labels = Vec::with_capacity(1024); // 1KB initial capacity
-
-    let mut has_elements = false;
-    non_schema_labels.write_all(b"{").unwrap();
+    let mut non_schema_labels = Map::new();
 
     for (key, value) in original_map {
         // Always include core metric fields
@@ -100,30 +97,17 @@ pub fn refactor_metric_map(
         else if defined_schema_fields.contains(&key) {
             new_map.insert(key, value);
         }
-        // Serialize non-schema fields to _all column
+        // Collect non-schema fields for _all column
         else {
-            if has_elements {
-                non_schema_labels.write_all(b",").unwrap();
-            } else {
-                has_elements = true;
-            }
-            non_schema_labels.write_all(b"\"").unwrap();
-            non_schema_labels.write_all(key.as_bytes()).unwrap();
-            non_schema_labels.write_all(b"\":\"").unwrap();
-            non_schema_labels
-                .write_all(pickup_string_value(&value).as_bytes())
-                .unwrap();
-            non_schema_labels.write_all(b"\"").unwrap();
+            non_schema_labels.insert(key, value);
         }
     }
 
-    non_schema_labels.write_all(b"}").unwrap();
-
     // Add _all column if there are non-schema labels
-    if has_elements {
+    if !non_schema_labels.is_empty() {
         new_map.insert(
             cfg.common.column_all.to_string(),
-            Value::String(String::from_utf8(non_schema_labels).unwrap()),
+            Value::Object(non_schema_labels),
         );
     }
 
@@ -159,18 +143,6 @@ pub fn recalculate_metric_hash(
     map.insert(HASH_LABEL.to_string(), Value::String(new_hash.to_string()));
 
     map
-}
-
-/// Helper function to convert a JSON value to string representation
-/// Handles different value types appropriately for serialization
-fn pickup_string_value(value: &Value) -> String {
-    match value {
-        Value::String(s) => s.clone(),
-        Value::Number(n) => n.to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Null => "null".to_string(),
-        _ => serde_json::to_string(value).unwrap_or_else(|_| "{}".to_string()),
-    }
 }
 
 #[cfg(test)]

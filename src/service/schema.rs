@@ -344,6 +344,14 @@ pub(crate) async fn handle_diff_schema(
     let mut stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
     let mut defined_schema_fields = stream_setting.defined_schema_fields.clone();
 
+    log::info!(
+        "[UDS DEBUG] Checking auto-enable for {}/{}, stream_type={:?}, field_count={}",
+        org_id,
+        stream_name,
+        stream_type,
+        final_schema.fields().len()
+    );
+
     // Automatically enable User-defined schema when
     // 1. allow_user_defined_schemas is enabled
     // 2. log/metrics/traces ingestion
@@ -360,20 +368,40 @@ pub(crate) async fn handle_diff_schema(
                 && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds,
             cfg.limit.schema_max_fields_to_enable_uds,
         ),
-        StreamType::Metrics => (
-            cfg.common.allow_user_defined_schemas
-                && cfg.limit.schema_max_fields_to_enable_uds_metrics > 0
-                && defined_schema_fields.is_empty()
-                && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds_metrics,
-            cfg.limit.schema_max_fields_to_enable_uds_metrics,
-        ),
-        StreamType::Traces => (
-            cfg.common.allow_user_defined_schemas
-                && cfg.limit.schema_max_fields_to_enable_uds_traces > 0
-                && defined_schema_fields.is_empty()
-                && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds_traces,
-            cfg.limit.schema_max_fields_to_enable_uds_traces,
-        ),
+        StreamType::Metrics => {
+            log::debug!(
+                "[UDS] Metrics auto-enable check: allow_uds={}, threshold={}, field_count={}, defined_fields_empty={}",
+                cfg.common.allow_user_defined_schemas,
+                cfg.limit.schema_max_fields_to_enable_uds_metrics,
+                final_schema.fields().len(),
+                defined_schema_fields.is_empty()
+            );
+            (
+                cfg.common.allow_user_defined_schemas
+                    && cfg.limit.schema_max_fields_to_enable_uds_metrics > 0
+                    && defined_schema_fields.is_empty()
+                    && final_schema.fields().len()
+                        > cfg.limit.schema_max_fields_to_enable_uds_metrics,
+                cfg.limit.schema_max_fields_to_enable_uds_metrics,
+            )
+        }
+        StreamType::Traces => {
+            log::debug!(
+                "[UDS] Traces auto-enable check: allow_uds={}, threshold={}, field_count={}, defined_fields_empty={}",
+                cfg.common.allow_user_defined_schemas,
+                cfg.limit.schema_max_fields_to_enable_uds_traces,
+                final_schema.fields().len(),
+                defined_schema_fields.is_empty()
+            );
+            (
+                cfg.common.allow_user_defined_schemas
+                    && cfg.limit.schema_max_fields_to_enable_uds_traces > 0
+                    && defined_schema_fields.is_empty()
+                    && final_schema.fields().len()
+                        > cfg.limit.schema_max_fields_to_enable_uds_traces,
+                cfg.limit.schema_max_fields_to_enable_uds_traces,
+            )
+        }
         _ => (false, 0),
     };
 
@@ -507,16 +535,17 @@ pub(crate) async fn handle_diff_schema(
                 };
 
                 // Add semantic convention attributes (HTTP, DB, RPC)
+                // Note: OTLP normalizes dots to underscores, so we use underscored names
                 const SEMANTIC_ATTRS: &[&str] = &[
-                    "http.method",
-                    "http.status_code",
-                    "http.target",
-                    "http.route",
-                    "db.system",
-                    "db.statement",
-                    "db.name",
-                    "rpc.method",
-                    "rpc.service",
+                    "http_method",
+                    "http_status_code",
+                    "http_target",
+                    "http_route",
+                    "db_system",
+                    "db_statement",
+                    "db_name",
+                    "rpc_method",
+                    "rpc_service",
                 ];
                 for attr in SEMANTIC_ATTRS {
                     if final_schema.field_with_name(attr).is_ok()

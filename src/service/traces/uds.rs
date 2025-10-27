@@ -144,29 +144,30 @@ pub fn select_important_trace_attributes(
     let mut selected = StdHashSet::new();
 
     // Define semantic convention prefixes in priority order
+    // Note: OTLP normalizes dots to underscores during ingestion, so we use underscored names
     let semantic_prefixes = [
         // HTTP attributes (highest priority - most common)
         vec![
-            "http.method",
-            "http.status_code",
-            "http.target",
-            "http.route",
-            "http.url",
+            "http_method",
+            "http_status_code",
+            "http_target",
+            "http_route",
+            "http_url",
         ],
         // Database attributes
-        vec!["db.system", "db.statement", "db.name", "db.operation"],
+        vec!["db_system", "db_statement", "db_name", "db_operation"],
         // RPC attributes
-        vec!["rpc.method", "rpc.service", "rpc.system"],
+        vec!["rpc_method", "rpc_service", "rpc_system"],
         // Messaging attributes
         vec![
-            "messaging.system",
-            "messaging.destination",
-            "messaging.operation",
+            "messaging_system",
+            "messaging_destination",
+            "messaging_operation",
         ],
         // Network attributes
-        vec!["net.peer.name", "net.peer.ip", "net.peer.port"],
+        vec!["net_peer_name", "net_peer_ip", "net_peer_port"],
         // Error tracking
-        vec!["error", "error.type", "error.message", "exception.type"],
+        vec!["error", "error_type", "error_message", "exception_type"],
     ];
 
     // Add semantic convention attributes if they exist in any span
@@ -339,16 +340,16 @@ mod tests {
         let spans = vec![
             serde_json::from_value::<Map<String, Value>>(json!({
                 "trace_id": "1",
-                "http.method": "GET",
-                "http.status_code": 200,
-                "http.target": "/api/users",
+                "http_method": "GET",
+                "http_status_code": 200,
+                "http_target": "/api/users",
                 "custom_attr": "value1"
             }))
             .unwrap(),
             serde_json::from_value::<Map<String, Value>>(json!({
                 "trace_id": "2",
-                "http.method": "POST",
-                "http.status_code": 201,
+                "http_method": "POST",
+                "http_status_code": 201,
                 "custom_attr": "value2"
             }))
             .unwrap(),
@@ -357,9 +358,9 @@ mod tests {
         let selected = select_important_trace_attributes(&spans, 5);
 
         // Should select HTTP semantic convention attributes
-        assert!(selected.contains("http.method"));
-        assert!(selected.contains("http.status_code"));
-        assert!(selected.contains("http.target"));
+        assert!(selected.contains("http_method"));
+        assert!(selected.contains("http_status_code"));
+        assert!(selected.contains("http_target"));
     }
 
     #[test]
