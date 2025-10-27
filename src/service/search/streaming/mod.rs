@@ -582,6 +582,8 @@ pub async fn process_search_stream_request(
     #[cfg(feature = "enterprise")]
     {
         if audit_enabled {
+        if get_o2_config().common.audit_enabled && _audit_ctx.is_some() {
+            let audit_ctx = _audit_ctx.as_ref().unwrap();
             // Using spawn to handle the async call
             audit(AuditMessage {
                 user_email: user_id,
@@ -589,10 +591,10 @@ pub async fn process_search_stream_request(
                 _timestamp: chrono::Utc::now().timestamp(),
                 protocol: Protocol::Http,
                 response_meta: ResponseMeta {
-                    http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
-                    http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
-                    http_query_params: _audit_ctx.as_ref().unwrap().query_params.to_string(),
-                    http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
+                    http_method: audit_ctx.method.to_string(),
+                    http_path: audit_ctx.path.to_string(),
+                    http_query_params: audit_ctx.query_params.to_string(),
+                    http_body: audit_ctx.body.to_string(),
                     http_response_code: 200,
                     error_msg: None,
                     trace_id: Some(trace_id.to_string()),
