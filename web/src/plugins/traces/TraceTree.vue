@@ -29,140 +29,140 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @mouseover="() => (spanHoveredIndex = index)"
         @mouseout="() => (spanHoveredIndex = -1)"
       >
-      <div :style="{ width: leftWidth + 'px' }">
-        <div
-          :style="{
-            height: '100%',
-            margin: `0 0 0 ${
-              span.hasChildSpans
-                ? span.style.left
-                : parseInt(span.style.left) +
-                  spanDimensions.collapseWidth +
-                  'px'
-            }`,
-          }"
-          class="flex items-start justify-start ellipsis"
-          :title="span.operationName"
-        >
+        <div :style="{ width: leftWidth + 'px' }" class="tw-pl-[0.375rem]">
           <div
-            class="flex no-wrap q-pt-sm full-width relative-position operation-name-container"
-            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-            :data-test="`trace-tree-span-operation-name-container-${span.spanId}`"
-          >
-            <div
-              class="absolute view-logs-container"
-              :class="spanHoveredIndex === index ? 'show' : ''"
-              :data-test="`trace-tree-span-view-logs-container-${span.spanId}`"
-            >
-              <q-btn
-                class="q-mx-xs view-span-logs"
-                :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-                size="0.625rem"
-                icon="search"
-                dense
-                no-caps
-                :title="t('traces.viewLogs')"
-                @click.stop="viewSpanLogs(span)"
-                :data-test="`trace-tree-span-view-logs-btn-${span.spanId}`"
-              >
-                <!-- <span class="text view-logs-btn-text">View Logs</span> -->
-              </q-btn>
-            </div>
-            <div
-              v-if="span.hasChildSpans"
-              class="span-count-box cursor-pointer"
-              :ref="el => setBadgeRef(span.spanId, el)"
-              :style="{
-                borderColor: span.style.color,
-                color: span.style.color,
-              }"
-              @click.stop="toggleSpanCollapse(span.spanId)"
-              :data-test="`trace-tree-span-badge-collapse-btn-${span.spanId}`"
-              :title="`Click to ${collapseMapping[span.spanId] ? 'expand' : 'collapse'}`"
-            >
-              {{ getChildCount(span) }}
-            </div>
-
-            <div
-              v-else
-              class="span-leaf-dot"
-              :ref="el => setBadgeRef(span.spanId, el)"
-              :style="{
-                backgroundColor: span.style.color,
-              }"
-            ></div>
-
-            <div
-              class="ellipsis q-pl-xs cursor-pointer span-name-section"
-              @click="selectSpan(span.spanId)"
-              :data-test="`trace-tree-span-select-btn-${span.spanId}`"
-            >
-              <q-icon
-                v-if="span.spanStatus === 'ERROR'"
-                name="error"
-                class="text-red-6 q-mr-xs"
-                title="Error Span"
-                :data-test="`trace-tree-span-error-icon-${span.spanId}`"
-              />
-              <span
-                class="text-subtitle2 text-bold q-mr-sm"
-                :class="{
-                  highlighted: isHighlighted(span.spanId),
-                  'tw-text-gray-900':
-                    store.state.theme === 'dark' && isHighlighted(span.spanId),
-                  'current-match': currentSelectedValue === span.spanId, // Current match class
-                }"
-                :data-test="`trace-tree-span-service-name-${span.spanId}`"
-              >
-                {{ span.serviceName }}
-              </span>
-              <span
-                class="text-body2"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-grey-5'
-                    : 'text-blue-grey-9'
-                "
-                :data-test="`trace-tree-span-operation-name-${span.spanId}`"
-                >{{ span.operationName }}</span
-              >
-            </div>
-          </div>
-          <div
-            class="span-background-wrapper"
             :style="{
-              backgroundColor: span.style.backgroundColor,
-              height: `calc(100% - 1.875rem)`,
-              borderLeft: `0.1875rem solid ${span.style.color}`,
-              marginLeft: span.hasChildSpans ? '0.875rem' : '0',
-              width: '100%',
-              position: 'relative',
+              height: '100%',
+              margin: `0 0 0 ${
+                span.hasChildSpans
+                  ? span.style.left
+                  : parseInt(span.style.left) +
+                    spanDimensions.collapseWidth +
+                    'px'
+              }`,
             }"
-            :data-test="`trace-tree-span-background-${span.spanId}`"
+            class="flex items-start justify-start ellipsis"
+            :title="span.operationName"
           >
+            <div
+              class="flex no-wrap q-pt-sm full-width relative-position operation-name-container"
+              :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+              :data-test="`trace-tree-span-operation-name-container-${span.spanId}`"
+            >
+              <div
+                class="absolute view-logs-container"
+                :class="spanHoveredIndex === index ? 'show' : ''"
+                :data-test="`trace-tree-span-view-logs-container-${span.spanId}`"
+              >
+                <q-btn
+                  class="q-mx-xs view-span-logs"
+                  :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+                  size="0.625rem"
+                  icon="search"
+                  dense
+                  no-caps
+                  :title="t('traces.viewLogs')"
+                  @click.stop="viewSpanLogs(span)"
+                  :data-test="`trace-tree-span-view-logs-btn-${span.spanId}`"
+                >
+                  <!-- <span class="text view-logs-btn-text">View Logs</span> -->
+                </q-btn>
+              </div>
+              <div
+                v-if="span.hasChildSpans"
+                class="span-count-box cursor-pointer"
+                :ref="(el) => setBadgeRef(span.spanId, el)"
+                :style="{
+                  borderColor: span.style.color,
+                  color: span.style.color,
+                }"
+                @click.stop="toggleSpanCollapse(span.spanId)"
+                :data-test="`trace-tree-span-badge-collapse-btn-${span.spanId}`"
+                :title="`Click to ${collapseMapping[span.spanId] ? 'expand' : 'collapse'}`"
+              >
+                {{ getChildCount(span) }}
+              </div>
+
+              <div
+                v-else
+                class="span-leaf-dot"
+                :ref="(el) => setBadgeRef(span.spanId, el)"
+                :style="{
+                  backgroundColor: span.style.color,
+                }"
+              ></div>
+
+              <div
+                class="ellipsis q-pl-xs cursor-pointer span-name-section"
+                @click="selectSpan(span.spanId)"
+                :data-test="`trace-tree-span-select-btn-${span.spanId}`"
+              >
+                <q-icon
+                  v-if="span.spanStatus === 'ERROR'"
+                  name="error"
+                  class="text-red-6 q-mr-xs"
+                  title="Error Span"
+                  :data-test="`trace-tree-span-error-icon-${span.spanId}`"
+                />
+                <span
+                  class="text-subtitle2 text-bold q-mr-sm"
+                  :class="{
+                    highlighted: isHighlighted(span.spanId),
+                    'tw-text-gray-900':
+                      store.state.theme === 'dark' &&
+                      isHighlighted(span.spanId),
+                    'current-match': currentSelectedValue === span.spanId, // Current match class
+                  }"
+                  :data-test="`trace-tree-span-service-name-${span.spanId}`"
+                >
+                  {{ span.serviceName }}
+                </span>
+                <span
+                  class="text-body2"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'text-grey-5'
+                      : 'text-blue-grey-9'
+                  "
+                  :data-test="`trace-tree-span-operation-name-${span.spanId}`"
+                  >{{ span.operationName }}</span
+                >
+              </div>
+            </div>
+            <div
+              class="span-background-wrapper"
+              :style="{
+                backgroundColor: span.style.backgroundColor,
+                height: `calc(100% - 1.875rem)`,
+                borderLeft: `0.1875rem solid ${span.style.color}`,
+                marginLeft: span.hasChildSpans ? '0.875rem' : '0',
+                width: '100%',
+                position: 'relative',
+              }"
+              :data-test="`trace-tree-span-background-${span.spanId}`"
+            ></div>
           </div>
         </div>
-      </div>
-      <div :style="{ width: `calc(100% - ${leftWidth}px)` }">
-        <span-block
-          :span="span"
-          :depth="depth"
-          :baseTracePosition="baseTracePosition"
-          :styleObj="{
-            position: 'absolute',
-            top: span.style.top,
-            left: span.style.left,
-            height: '3.75rem',
-          }"
-          :spanDimensions="spanDimensions"
-          :isCollapsed="collapseMapping[span.spanId]"
-          :spanData="spanMap[span.spanId]"
-          :class="spanHoveredIndex === index ? 'span-block-highlight' : ''"
-          @toggle-collapse="toggleSpanCollapse"
-          @select-span="selectSpan"
-          @view-logs="viewSpanLogs(span)"
-        />
-      </div>
+        <div :style="{ width: `calc(100% - ${leftWidth}px)` }">
+          <span-block
+            :span="span"
+            :depth="depth"
+            :baseTracePosition="baseTracePosition"
+            :styleObj="{
+              position: 'absolute',
+              top: span.style.top,
+              left: span.style.left,
+              height: '3.75rem',
+            }"
+            :spanDimensions="spanDimensions"
+            :isCollapsed="collapseMapping[span.spanId]"
+            :spanData="spanMap[span.spanId]"
+            :class="spanHoveredIndex === index ? 'span-block-highlight' : ''"
+            @toggle-collapse="toggleSpanCollapse"
+            @select-span="selectSpan"
+            @view-logs="viewSpanLogs(span)"
+          />
+        </div>
       </div>
     </template>
 
@@ -210,7 +210,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, ref, watch, computed, onMounted } from "vue";
+import {
+  defineComponent,
+  nextTick,
+  ref,
+  watch,
+  computed,
+  onMounted,
+} from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
@@ -313,7 +320,11 @@ export default defineComponent({
     };
 
     const getChildrenHeight = (span: any): number => {
-      if (!span.spans || !Array.isArray(span.spans) || !props.collapseMapping[span.spanId]) {
+      if (
+        !span.spans ||
+        !Array.isArray(span.spans) ||
+        !props.collapseMapping[span.spanId]
+      ) {
         return 0;
       }
 
@@ -321,7 +332,11 @@ export default defineComponent({
         let count = 0;
         children.forEach((child: any) => {
           count++;
-          if (child.spans && child.spans.length > 0 && props.collapseMapping[child.spanId]) {
+          if (
+            child.spans &&
+            child.spans.length > 0 &&
+            props.collapseMapping[child.spanId]
+          ) {
             count += countVisibleChildren(child.spans);
           }
         });
@@ -343,7 +358,8 @@ export default defineComponent({
             if (!parentBadge) return;
 
             const parentRect = parentBadge.getBoundingClientRect();
-            const parentX = parentRect.left - containerRect.left + parentRect.width / 2;
+            const parentX =
+              parentRect.left - containerRect.left + parentRect.width / 2;
             const parentY = parentRect.bottom - containerRect.top;
 
             const children = getDirectChildren(span);
@@ -355,7 +371,8 @@ export default defineComponent({
               if (childBadge) {
                 const childRect = childBadge.getBoundingClientRect();
                 const childX = childRect.left - containerRect.left;
-                const childY = childRect.top - containerRect.top + childRect.height / 2;
+                const childY =
+                  childRect.top - containerRect.top + childRect.height / 2;
 
                 childPositions.push({
                   x: childX,
@@ -504,7 +521,7 @@ export default defineComponent({
           }, 0);
         });
       },
-      { deep: true }
+      { deep: true },
     );
 
     onMounted(() => {
@@ -611,7 +628,7 @@ export default defineComponent({
 
   &.span-row-highlight {
     &::before {
-      content: '';
+      content: "";
       position: absolute;
       left: 0;
       right: 0;
