@@ -643,7 +643,7 @@ body {
     background-color: var(--o2-tab-bg) !important;
   }
   .o2-tab.active:hover{
-    background-color: $primary !important;
+    background-color: var(--o2-primary-btn-bg) !important;
   }
 }
 

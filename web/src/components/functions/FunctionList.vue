@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :filter="filterQuery"
               style="width: 100%"
               :style="hasVisibleRows
-                  ? 'width: 100%; height: calc(100vh - 127x)' 
+                  ? 'width: 100%; height: calc(100vh - 130px)' 
                   : 'width: 100%'"
               class="o2-quasar-table o2-quasar-table-header-sticky "
             >
