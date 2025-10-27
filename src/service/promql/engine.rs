@@ -1328,7 +1328,7 @@ async fn selector_load_data_from_datafusion(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] load series took: {:?}",
+        "[trace_id: {trace_id}] load hashing and series took: {:?}",
         start_time.elapsed()
     );
 
@@ -1358,11 +1358,6 @@ async fn load_samples_from_datafusion(
         .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?
         .execute_stream_partitioned()
         .await?;
-
-    log::info!(
-        "[trace_id: {trace_id}] load samples from datafusion took: {:?}",
-        start_time.elapsed()
-    );
 
     let mut tasks = Vec::new();
     for mut stream in streams {
@@ -1444,7 +1439,7 @@ async fn load_samples_from_datafusion(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] group batches took: {:?}",
+        "[trace_id: {trace_id}] load samples from datafusion took: {:?}",
         start_time.elapsed()
     );
 
@@ -1463,11 +1458,6 @@ async fn load_exemplars_from_datafusion(
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
         .execute_stream_partitioned()
         .await?;
-
-    log::info!(
-        "[trace_id: {trace_id}] load exemplars from datafusion took: {:?}",
-        start_time.elapsed()
-    );
 
     let mut tasks = Vec::new();
     for mut stream in streams {
@@ -1573,7 +1563,7 @@ async fn load_exemplars_from_datafusion(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] group batches took: {:?}",
+        "[trace_id: {trace_id}] load exemplars from datafusion took: {:?}",
         start_time.elapsed()
     );
 
