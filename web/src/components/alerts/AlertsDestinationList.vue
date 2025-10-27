@@ -340,14 +340,14 @@ export default defineComponent({
     const getActions = async () => {
       const dismiss = q.notify({
         spinner: true,
-        message: "Please wait while loading actions...",
+        message: "Please wait while loading alert destination...",
       });
       if (store.state.organizationData.actions.length == 0) {
         await getAllActions()
           .catch(() => {
             q.notify({
               type: "negative",
-              message: "Error while loading actions.",
+              message: "Error while loading alert destination.",
             });
           })
           .finally(() => dismiss());

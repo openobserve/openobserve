@@ -1200,7 +1200,7 @@
     "allUsersAllowedMessage": "All users with email addresses ending in {domain} will be allowed to login.",
     "emailPlaceholder": "e.g. user{domain}",
     "addEmail": "Add Email",
-    "saveChanges": "Save Changes",
+    "saveChanges": "Save",
     "invalidDomain": "Please enter a valid domain name",
     "invalidEmail": "Please enter a valid email address for this domain",
     "domainAlreadyExists": "This domain has already been added",
