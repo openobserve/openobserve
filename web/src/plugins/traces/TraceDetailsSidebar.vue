@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       :title="span.operation_name"
-      :style="{ width: 'calc(100% - 22px)' }"
+      :style="{ width: 'calc(100% - 24px)' }"
       class="q-pb-none ellipsis flex justify-between"
       data-test="trace-details-sidebar-header-operation-name"
     >
@@ -156,7 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-separator style="width: 100%" />
   <q-tab-panels v-model="activeTab" class="span_details_tab-panels">
     <q-tab-panel name="tags">
-      <table class="q-my-sm" data-test="trace-details-sidebar-tags-table">
+      <table
+        class="q-my-sm !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+        data-test="trace-details-sidebar-tags-table"
+      >
         <tbody>
           <template v-for="(val, key) in tags" :key="key">
             <tr :data-test="`trace-details-sidebar-tags-${key}`">
@@ -177,7 +180,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </table>
     </q-tab-panel>
     <q-tab-panel name="process">
-      <table class="q-my-sm" data-test="trace-details-sidebar-process-table">
+      <table
+        class="q-my-sm !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+        data-test="trace-details-sidebar-process-table"
+      >
         <tbody>
           <template v-for="(val, key) in processes" :key="key">
             <tr :data-test="`trace-details-sidebar-process-${key}`">
@@ -376,10 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>Stacktrace: </span>
                   <div
                     class="q-px-sm q-mt-xs"
-                    style="
-                      border: 1px solid #c1c1c1;
-                      border-radius: 4px;
-                    "
+                    style="border: 1px solid #c1c1c1; border-radius: 4px"
                   >
                     <pre
                       style="font-size: 12px; text-wrap: wrap"
@@ -1055,7 +1058,7 @@ export default defineComponent({
 
 .span_details_tab-panels {
   .q-tab-panel {
-    padding: 8px 0 8px 8px;
+    padding: 8px 8px 8px 8px;
   }
 }
 
@@ -1082,8 +1085,8 @@ export default defineComponent({
 .body--dark {
   .span_details_tab-panels {
     table {
-      background: rgba(255, 255, 255, 0.05);
-      border: 0.125rem solid rgba(255, 255, 255, 0.3);
+      // background: rgba(255, 255, 255, 0.05);
+      // border: 0.125rem solid rgba(255, 255, 255, 0.3);
     }
 
     th,
@@ -1098,8 +1101,8 @@ export default defineComponent({
 .body--light {
   .span_details_tab-panels {
     table {
-      background: rgba(240, 240, 245, 0.8);
-      border: 0.125rem solid rgba(100, 100, 120, 0.5);
+      // background: rgba(240, 240, 245, 0.8);
+      // border: 0.125rem solid rgba(100, 100, 120, 0.5);
     }
 
     th,
