@@ -605,6 +605,55 @@ async fn handle_alert_triggers(
 
     // send notification
     if let Some(data) = trigger_results.data {
+        // Apply deduplication if enabled (enterprise-only feature)
+        #[cfg(feature = "enterprise")]
+        let data = if let Some(db) = ORM_CLIENT.get() {
+            match crate::service::alerts::deduplication::apply_deduplication(
+                db,
+                &alert,
+                data.clone(),
+            )
+            .await
+            {
+                Ok(deduplicated_data) => {
+                    if deduplicated_data.is_empty() {
+                        log::debug!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
+                            &new_trigger.org,
+                            &new_trigger.module_key
+                        );
+                        // All results were deduplicated, skip notification
+                        // Still update the trigger timing
+                        trigger_data.period_end_time = if should_store_last_end_time {
+                            Some(trigger_results.end_time)
+                        } else {
+                            None
+                        };
+                        new_trigger.data = json::to_string(&trigger_data).unwrap();
+                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                        publish_triggers_usage(trigger_data_stream).await;
+                        return Ok(());
+                    }
+                    deduplicated_data
+                }
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error applying deduplication for org: {}, module_key: {}: {}",
+                        &new_trigger.org,
+                        &new_trigger.module_key,
+                        e
+                    );
+                    // On error, continue with original data to avoid missing alerts
+                    data
+                }
+            }
+        } else {
+            log::warn!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Could not connect to ORM for deduplication, continuing without it"
+            );
+            data
+        };
+
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
         // use the main start_time (now - period) and end_time (now) for the alert evaluation.
