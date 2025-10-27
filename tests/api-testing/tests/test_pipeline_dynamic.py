@@ -394,10 +394,10 @@ def test_pipeline_dynamic_template_substitution(create_session, base_url, source
         ("e2e_automate7", "logs_{kubernetes_namespace_name}_{kubernetes_container_name}_multi", "kubernetes_namespace_name", "monitoring", "logs_monitoring_prometheus_multi", 200),
         
         # Test pod name field substitution - using direct data like our successful manual test
-        ("e2e_automate8", "debug_pod_{kubernetes_pod_name}_test", "kubernetes_pod_name", "prometheus-k8s", "debug_pod_prometheus-k8s-1_test", 200),
+        ("e2e_automate8", "debug_pod_{kubernetes_pod_name}_test", "kubernetes_pod_name", "prometheus-k8s", "debug_pod_prometheus_k8s_1_test", 200),
         
         # Test complex nested templates
-        ("e2e_automate9", "data_{kubernetes_namespace_name}_v1_{kubernetes_container_name}", "kubernetes_namespace_name", "zinc-cp1", "data_zinc-cp1_v1_prometheus", 200),
+        ("e2e_automate9", "data_{kubernetes_namespace_name}_v1_{kubernetes_container_name}", "kubernetes_namespace_name", "zinc-cp1", "data_zinc_cp1_v1_prometheus", 200),
     ]
 )
 def test_pipeline_complex_templates(create_session, base_url, source_stream, destination_template, condition_field, condition_value, expected_destination, expected_status):
