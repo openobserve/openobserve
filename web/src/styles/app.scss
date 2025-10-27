@@ -154,6 +154,15 @@ body {
   height: 2.25rem !important;
 }
 
+
+.o2-secondary-button {
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
 .q-tabs {
   &--vertical {
     .q-tab {
@@ -1289,4 +1298,82 @@ body {
   &:hover .q-field__control {
     border-color: var(--border-color-hover) !important;
   }
+}
+
+
+
+.o2-management-header{
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
+  padding: 1rem 1.5rem;
+}
+
+
+//============================================================================
+//   Monaco Editor Styling Start
+//============================================================================ 
+
+  .monaco-editor {
+    outline-width: 0px;
+    outline-style: none;
+  }
+
+  .empty-query .monaco-editor-background {
+    background-image: url("../assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
+  }
+
+  .empty-function .monaco-editor-background {
+    background-image: url("../assets/images/common/vrl-function.png");
+    background-repeat: no-repeat;
+    background-size: 170px;
+  }
+
+  
+//============================================================================
+//     Monaco Editor Styling End
+//============================================================================ 
+  
+.o2-custom-select-dashboard{
+  min-height: 3rem !important;
+
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    min-height: 3rem !important;
+    max-height: 3rem !important;
+    height: 3rem !important;
+  }
+
+
+  .q-field__append {
+    align-items: center;
+    height: 3rem !important;
+  }
+
+}
+
+.dashboard-chart-border{
+  border: 0.03rem solid var(--o2-border-color);
+}
+
+.o2-custom-table-header-bg{
+  background: var(--o2-table-header-bg);
+}
+
+
+.splitter-icon-collapse {
+  position: absolute !important;
+  top: 14px !important;
+  left: 0px !important;
+  z-index: 100 !important;
+}
+
+.splitter-icon-expand {
+  position: absolute !important;
+  top: 14px !important;
+  left: 16px;
+  z-index: 100 !important;
 }
