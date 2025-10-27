@@ -707,8 +707,8 @@ export class AlertsPage {
         await this.commonActions.scrollAndFindOption(destinationName, 'template');
         await this.page.waitForLoadState('networkidle');
         //here we are expanding the multi window section as because it is not expanded by default
+        // Click on the Multi Window container to expand it
         await this.page.getByText('Multi WindowSet relative alerting system based on SQL query').click();
-        await this.page.getByText('keyboard_arrow_down').click();
         // Add time range
         await this.page.locator('[data-test="multi-time-range-alerts-add-btn"]').click();
         await this.page.locator('[data-test="date-time-btn"]').click();

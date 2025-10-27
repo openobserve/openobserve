@@ -17,7 +17,7 @@ pub mod requests;
 pub mod responses;
 
 use config::meta::{
-    alerts::{self as meta_alerts, default_align_time},
+    alerts::{self as meta_alerts, deduplication::DeduplicationConfig, default_align_time},
     search as meta_search, stream as meta_stream,
     triggers::Trigger,
 };
@@ -95,6 +95,10 @@ pub struct Alert {
     #[serde(default)]
     #[schema(read_only)]
     pub last_edited_by: Option<String>,
+
+    /// Optional deduplication configuration
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deduplication: Option<DeduplicationConfig>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -307,6 +311,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             owner: alert.owner,
             updated_at: alert.updated_at.map(|t| t.timestamp()),
             last_edited_by: alert.last_edited_by,
+            deduplication: alert.deduplication,
         }
     }
 }
@@ -479,6 +484,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.enabled = value.enabled;
         alert.tz_offset = value.tz_offset;
         alert.owner = value.owner;
+        alert.deduplication = value.deduplication;
 
         alert
     }

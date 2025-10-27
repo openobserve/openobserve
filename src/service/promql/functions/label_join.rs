@@ -56,7 +56,7 @@ pub(crate) fn label_join(
             }));
             InstantValue {
                 labels: new_labels,
-                sample: instant.sample.clone(),
+                sample: instant.sample,
             }
         })
         .collect();
