@@ -352,7 +352,7 @@ $actions-column-box-shawdow-dark: rgba(125, 125, 125, 0.694);
   // Interactive Elements
   --o2-primary-color: #{$o2-dark-iris-1000};  // Primary actions
   --o2-primary-foreground: #{$o2-dark-gray-100}; // Text on primary
-  --o2-hover-accent: color-mix(in srgb, #{$theme-color} 50%, black);   // Hover accents
+  --o2-hover-accent: color-mix(in srgb, #{$theme-color} 45%, rgb(0, 0, 0));   // Hover accents
   --o2-destructive-foreground: #{$o2-dark-gray-100}; // Destructive text
   --o2-focus-ring: #{$o2-dark-iris-600};      // Focus indicators
   --o2-hover-shadow: rgba(0, 0, 0, 0.6);
