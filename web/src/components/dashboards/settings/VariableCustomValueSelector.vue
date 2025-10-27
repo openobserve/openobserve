@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       use-input
       stack-label
       @filter="fieldsFilterFn"
-      class="textbox col no-case"
+      class="textbox col no-case o2-custom-select-dashboard"
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-custom-value-selector"
       :multiple="variableItem.multiSelect"
