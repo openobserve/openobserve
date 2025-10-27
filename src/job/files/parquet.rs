@@ -93,6 +93,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     // prepare files
+    let mut drain_backoff_ms = 50u64; // Start with 50ms backoff
     loop {
         // Check if we're in draining mode - if so, skip sleep and process immediately
         let is_draining = ingester::is_draining();
@@ -127,8 +128,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 log::info!("[INGESTER:JOB] Draining complete, all files uploaded to S3");
                 break;
             } else {
-                // Small sleep to avoid tight loop, but keep it fast
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                // Backoff to avoid tight loop while draining
+                tokio::time::sleep(tokio::time::Duration::from_millis(drain_backoff_ms)).await;
+                // Exponential backoff up to 1 second
+                drain_backoff_ms = (drain_backoff_ms * 2).min(1000);
             }
         }
     }
@@ -136,35 +139,57 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Check if there are any pending parquet files to upload or files being processed
-async fn check_has_pending_files() -> bool {
-    let cfg = get_config();
-    let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
-    let pattern = wal_dir.join("files/");
-
-    // Check if there are any parquet files in the WAL directory
-    match tokio::fs::read_dir(&pattern).await {
-        Ok(mut entries) => {
-            while let Ok(Some(entry)) = entries.next_entry().await {
-                if let Ok(metadata) = entry.metadata().await {
-                    if metadata.is_file() {
-                        if let Some(ext) = entry.path().extension() {
-                            if ext == "parquet" {
+/// Recursively check a directory for parquet files
+fn has_parquet_files_in_dir(
+    dir: &Path,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send + '_>> {
+    Box::pin(async move {
+        match tokio::fs::read_dir(dir).await {
+            Ok(mut entries) => {
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    if let Ok(metadata) = entry.metadata().await {
+                        if metadata.is_file() {
+                            if let Some(ext) = entry.path().extension()
+                                && ext == "parquet"
+                            {
+                                return true;
+                            }
+                        } else if metadata.is_dir() {
+                            // Recursively check subdirectories
+                            if has_parquet_files_in_dir(&entry.path()).await {
                                 return true;
                             }
                         }
-                    } else if metadata.is_dir() {
-                        // Recursively check subdirectories for parquet files
-                        // For simplicity, we'll just assume there might be files
-                        return true;
                     }
                 }
             }
+            Err(_) => {
+                // Directory doesn't exist or can't be read
+                return false;
+            }
         }
-        Err(_) => {
-            // Directory doesn't exist or can't be read, assume no files
+        false
+    })
+}
+
+/// Check if there are any pending parquet files to upload or files being processed
+async fn check_has_pending_files() -> bool {
+    let cfg = get_config();
+    let wal_dir = match Path::new(&cfg.common.data_wal_dir).canonicalize() {
+        Ok(p) => p,
+        Err(e) => {
+            log::warn!(
+                "[INGESTER:JOB] Unable to canonicalize WAL dir '{}': {e}",
+                cfg.common.data_wal_dir
+            );
             return false;
         }
+    };
+    let pattern = wal_dir.join("files/");
+
+    // Check if there are any parquet files in the WAL directory
+    if has_parquet_files_in_dir(&pattern).await {
+        return true;
     }
 
     // Also check if there are files being processed

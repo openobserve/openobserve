@@ -926,10 +926,14 @@ async fn enable_node(
         return Ok(MetaHttpResponse::not_found("node not found"));
     };
 
-    let enable = query
-        .get("value")
-        .and_then(|v| v.parse::<bool>().ok())
-        .unwrap_or_default();
+    let enable = match query.get("value").and_then(|v| v.parse::<bool>().ok()) {
+        Some(v) => v,
+        None => {
+            return Ok(MetaHttpResponse::bad_request(
+                "invalid or missing 'value' query parameter (expected true or false)",
+            ));
+        }
+    };
     node.scheduled = enable;
     if !node.scheduled {
         log::info!("[NODE] Disabling node, initiating graceful drain");
