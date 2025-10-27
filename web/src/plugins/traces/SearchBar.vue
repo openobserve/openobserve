@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             flat
             :title="t('search.runQuery')"
-            class="search-button bg-primary tw-min-h-[2rem]"
+            class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
             @click="searchData"
             :disable="isLoading"
             >{{ t("search.runQuery") }}</q-btn
