@@ -861,13 +861,16 @@
 
         .q-focus-helper{
           opacity: 1;
+          background: none !important;
 
-          ::before{
-            opacity: 1;
+          &:before{
+            opacity: 1 !important;
+            background: none !important;
           }
 
-          ::after{
-            opacity: 1;
+          &:after{
+            opacity: 1 !important;
+            background: none !important;
           }
         }
       }
