@@ -1111,7 +1111,29 @@
     "webhook": "Web Hook",
     "email": "Email",
     "action": "Action",
-    "all": "All"
+    "all": "All",
+    "deduplication": {
+      "title": "Alert Deduplication",
+      "subtitle": "Prevent duplicate alerts by configuring fingerprint-based deduplication.",
+      "enable": "Enable Deduplication",
+      "fingerprintFields": "Fingerprint Fields",
+      "fingerprintFieldsHint": "Select fields to use for deduplication. Leave empty for auto-detection based on query type.",
+      "fingerprintFieldsTooltip": "Fields used to create unique fingerprints for alert deduplication. Fingerprints include alert name + metric/condition + selected fields, ensuring different alert types (e.g., High CPU vs High Memory) are never deduplicated together, even if they monitor the same entities. Leave empty for auto-detection: SQL queries use WHERE clause columns + GROUP BY columns, PromQL uses metric name + label dimensions, Custom queries use condition fields.",
+      "timeWindow": "Time Window (minutes)",
+      "timeWindowHint": "How long to track alert fingerprints. Leave empty to use alert period.",
+      "timeWindowTooltip": "Duration to track and deduplicate alert fingerprints. If an alert with the same fingerprint occurs within this window, it will be suppressed. Leave empty to use the alert evaluation period.",
+      "advancedGrouping": "Advanced Grouping Options",
+      "enableGrouping": "Enable Grouping",
+      "maxGroupSize": "Max Group Size",
+      "maxGroupSizeTooltip": "Maximum number of deduplicated alerts to group together before sending a notification. Prevents overwhelming notifications when many similar alerts fire simultaneously.",
+      "sendStrategy": "Send Strategy",
+      "sendStrategyTooltip": "How to send grouped alerts:<br/>• First with count: Send first alert with total count<br/>• Summary: Send aggregated summary<br/>• All: Send all alerts in one notification",
+      "sendStrategyFirstWithCount": "First with count",
+      "sendStrategySummary": "Summary",
+      "sendStrategyAll": "All",
+      "groupWaitTime": "Group Wait Time (seconds)",
+      "groupWaitTimeTooltip": "Time to wait and collect similar alerts before sending a grouped notification. Allows batching of alerts that occur in quick succession."
+    }
   },
   "alert_templates": {
     "header": "Templates",

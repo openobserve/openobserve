@@ -72,39 +72,30 @@ impl From<queue::RetentionPolicy> for jetstream::stream::RetentionPolicy {
     }
 }
 
+impl From<queue::StorageType> for jetstream::stream::StorageType {
+    fn from(storage_type: queue::StorageType) -> Self {
+        match storage_type {
+            queue::StorageType::File => jetstream::stream::StorageType::File,
+            queue::StorageType::Memory => jetstream::stream::StorageType::Memory,
+        }
+    }
+}
+
 #[async_trait]
 impl super::Queue for NatsQueue {
     async fn create(&self, topic: &str) -> Result<()> {
-        self.create_with_retention_policy(topic, queue::RetentionPolicy::Limits)
+        self.create_with_config(topic, super::QueueConfigBuilder::new().build())
             .await
     }
 
-    async fn create_with_retention_policy(
-        &self,
-        topic: &str,
-        retention_policy: queue::RetentionPolicy,
-    ) -> Result<()> {
-        let max_age = config::get_config().nats.queue_max_age; // days
-        let max_age_secs = std::time::Duration::from_secs(max(1, max_age) * 24 * 60 * 60);
-        self.create_with_retention_policy_and_max_age(topic, retention_policy, max_age_secs)
-            .await
-    }
-
-    async fn create_with_max_age(&self, topic: &str, max_age: std::time::Duration) -> Result<()> {
-        self.create_with_retention_policy_and_max_age(
-            topic,
-            queue::RetentionPolicy::Limits,
-            max_age,
-        )
-        .await
-    }
-
-    async fn create_with_retention_policy_and_max_age(
-        &self,
-        topic: &str,
-        retention_policy: queue::RetentionPolicy,
-        max_age: std::time::Duration,
-    ) -> Result<()> {
+    async fn create_with_config(&self, topic: &str, config: super::QueueConfig) -> Result<()> {
+        let max_age = match config.max_age {
+            Some(dur) => dur,
+            None => {
+                let max_age = config::get_config().nats.queue_max_age; // days
+                std::time::Duration::from_secs(max(1, max_age) * 24 * 60 * 60) // seconds
+            }
+        };
         let cfg = config::get_config();
         let client = get_nats_client().await.clone();
         let jetstream = jetstream::new(client);
@@ -112,10 +103,11 @@ impl super::Queue for NatsQueue {
         let config = jetstream::stream::Config {
             name: topic_name.to_string(),
             subjects: vec![topic_name.to_string(), format!("{}.*", topic_name)],
-            retention: retention_policy.into(),
-            max_age,
+            retention: config.retention_policy.into(),
+            storage: config.storage_type.into(),
             num_replicas: cfg.nats.replicas,
             max_bytes: cfg.nats.queue_max_size,
+            max_age,
             ..Default::default()
         };
         _ = jetstream.get_or_create_stream(config).await?;

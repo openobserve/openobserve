@@ -10,6 +10,7 @@ flamegraph.html
 /examples/
 /target/
 /bin/
+/docs/
 
 # data
 /tmp/
