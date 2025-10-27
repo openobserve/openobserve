@@ -449,50 +449,6 @@ def test_export_dashboard(create_session, base_url):
     session.delete(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
 
 
-# def test_move_dashboard_to_another_folder(create_session, base_url):
-#     """Test moving a dashboard from one folder to another"""
-#     session = create_session
-
-#     # Create destination folder first
-#     folder_url = f"{base_url}api/v2/{ORG_ID}/folders/dashboards"
-#     folder_data = {
-#         "name": "test_folder_move",
-#         "description": "Test folder for moving dashboards"
-#     }
-#     folder_resp = session.post(folder_url, json=folder_data)
-#     # Folder may already exist, so accept 200 or 409
-#     assert folder_resp.status_code in [200, 201, 409], f"Create folder failed: {folder_resp.status_code}"
-
-#     # Create a dashboard in default folder
-#     create_url = f"{base_url}api/{ORG_ID}/dashboards"
-#     dashboard_data = {
-#         "title": "Dashboard to Move",
-#         "description": "Test dashboard movement",
-#         "folder_id": "default"
-#     }
-
-#     create_resp = session.post(create_url, json=dashboard_data)
-#     assert create_resp.status_code in [200, 201]
-#     dashboard_id = create_resp.json()["v5"]["dashboardId"]
-
-#     # Move dashboard to the new folder
-#     move_url = f"{base_url}api/{ORG_ID}/folders/dashboards/{dashboard_id}"
-#     move_data = {
-#         "from": "default",
-#         "to": "test_folder_move"
-#     }
-
-#     move_resp = session.put(move_url, json=move_data)
-#     assert move_resp.status_code == 200, f"Move dashboard failed: {move_resp.status_code} {move_resp.text}"
-
-#     # Verify dashboard is in the new folder
-#     get_resp = session.get(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
-#     assert get_resp.status_code == 200
-
-#     # Clean up
-#     session.delete(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
-
-
 def test_move_multiple_dashboards_batch(create_session, base_url):
     """Test batch moving multiple dashboards to another folder"""
     session = create_session
