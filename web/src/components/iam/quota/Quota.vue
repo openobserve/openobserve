@@ -494,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="cancelChanges"
         />
         <q-btn
-          label="Save Changes"
+          label="Save"
           class="o2-primary-button no-border tw-h-[36px]"
           :disable="Object.keys(changedValues).length === 0"
           no-caps

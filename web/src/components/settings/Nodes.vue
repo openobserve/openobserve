@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="q-pa-none">
-    <q-separator class="separator" />
+  <q-page>
     <q-splitter
       v-model="splitterModel"
       :limits="[0, 250]"
@@ -34,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  @click="clearAll()">{{t("nodes.clear_all")}}</a></div>
             </span>
           </div>
-          <q-separator class="q-mt-sm q-px-none q-mx-none" />
 
           <div>
             <q-list>
@@ -381,9 +379,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <q-btn 
               :label="t('nodes.applyFilter')" 
-              class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm o2-secondary-button tw-h-[36px]" 
+              class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm o2-primary-button tw-h-[36px]" 
               flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="applyFilter()"
             >
             </q-btn>
@@ -400,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :filter="filterQuery"
           :filter-method="filterData"
           :loading="loading"
-          class="nodes-list-table"
+          class="nodes-list-table tw-border-l tw-border-solid tw-border-gray-1200 tw-rounded-none"
           dense
           style="width: 100%; height: calc(100vh - 40px); overflow-y: auto;"
         >
@@ -426,10 +423,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-icon name="search" class="o2-search-input-icon" />
                   </template>
                 </q-input>
-                <q-btn :label="t('common.refresh')" class="text-bold text-capitalize no-border o2-primary-button"
-                 style="height: 40px; width: 90px;" 
-                 :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-                 @click="getData(true)">
+                <q-btn 
+                  :label="t('common.refresh')" 
+                  class="o2-secondary-button tw-h-[36px]"
+                  padding="sm lg"
+                  no-caps
+                  flat
+                  @click="getData(true)">
                 </q-btn>
               </div>
 
