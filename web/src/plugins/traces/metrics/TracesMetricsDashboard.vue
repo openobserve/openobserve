@@ -82,7 +82,10 @@ class="tw-mx-1 tw-text-red-500" />
     </div>
 
     <!-- Charts Section -->
-    <div class="charts-container" v-show="searchObj.meta.showHistogram">
+    <div
+      class="charts-container !tw-pt-[0.25rem]"
+      v-show="searchObj.meta.showHistogram"
+    >
       <RenderDashboardCharts
         v-if="show"
         ref="dashboardChartsRef"
@@ -444,6 +447,16 @@ defineExpose({
 
     &:hover {
       color: #0d447a;
+    }
+  }
+}
+
+.traces-metrics-dashboard {
+  :deep(.card-container) {
+    box-shadow: none;
+
+    :first-child {
+      padding: 0 0.0625rem !important;
     }
   }
 }
