@@ -303,7 +303,7 @@ pub async fn handle_cache_responses_and_deltas(
         }
 
         // Stop if reached the requested result size
-        if req_size != -1 && curr_res_size >= req_size {
+        if req_size != -1 && req_size != 0 && curr_res_size >= req_size {
             log::info!(
                 "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size: {req_size}, stopping search",
             );
