@@ -230,7 +230,24 @@ color="warning" size="xs"></q-icon> Error while
           />
         </h6>
       </div>
-      <tenstack-table
+
+      <!-- Tabs for Logs/Patterns -->
+      <q-tabs
+        v-if="searchObj.meta.showPatterns"
+        v-model="activeTab"
+        dense
+        class="text-grey"
+        active-color="primary"
+        indicator-color="primary"
+        align="left"
+      >
+        <q-tab name="logs" label="Logs" />
+        <q-tab name="patterns" label="Patterns" />
+      </q-tabs>
+
+      <!-- Logs Tab Content -->
+      <div v-show="!searchObj.meta.showPatterns || activeTab === 'logs'">
+        <tenstack-table
         ref="searchTableRef"
         :columns="getColumns || []"
         :rows="searchObj.data.queryResults?.hits || []"
@@ -267,6 +284,149 @@ color="warning" size="xs"></q-icon> Error while
         @send-to-ai-chat="sendToAiChat"
         @view-trace="redirectToTraces"
       />
+      </div>
+
+      <!-- Patterns Tab Content -->
+      <div v-show="searchObj.meta.showPatterns && activeTab === 'patterns'" style="height: calc(100vh - 250px); display: flex; flex-direction: column;" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
+        <!-- Statistics Bar -->
+        <div v-if="searchObj.data.patterns?.statistics" class="q-pa-md" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-grey-2'" style="border-bottom: 1px solid; flex-shrink: 0;" :style="{ borderColor: store.state.theme === 'dark' ? '#3a3a3a' : '#e0e0e0' }">
+          <div class="row q-col-gutter-md">
+            <div class="col-3">
+              <q-card flat :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'">
+                <q-card-section class="q-pa-md">
+                  <div class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">Total Logs</div>
+                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">{{ (searchObj.data.patterns.statistics.total_logs_analyzed || 0).toLocaleString() }}</div>
+                </q-card-section>
+              </q-card>
+            </div>
+            <div class="col-3">
+              <q-card flat :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'">
+                <q-card-section class="q-pa-md">
+                  <div class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">Patterns Found</div>
+                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">{{ searchObj.data.patterns.statistics.total_patterns_found || 0 }}</div>
+                </q-card-section>
+              </q-card>
+            </div>
+            <div class="col-3">
+              <q-card flat :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'">
+                <q-card-section class="q-pa-md">
+                  <div class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">Coverage</div>
+                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">{{ (searchObj.data.patterns.statistics.coverage_percentage || 0).toFixed(1) }}%</div>
+                </q-card-section>
+              </q-card>
+            </div>
+            <div class="col-3">
+              <q-card flat :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'">
+                <q-card-section class="q-pa-md">
+                  <div class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">Processing Time</div>
+                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">{{ searchObj.data.patterns.statistics.extraction_time_ms || 0 }}ms</div>
+                </q-card-section>
+              </q-card>
+            </div>
+          </div>
+        </div>
+
+        <!-- Patterns List -->
+        <div v-if="searchObj.data.patterns?.patterns?.length > 0" class="q-pa-md" style="flex: 1; overflow-y: auto;">
+          <div class="row q-col-gutter-md">
+            <div
+              v-for="(pattern, index) in searchObj.data.patterns.patterns"
+              :key="pattern.pattern_id"
+              class="col-12"
+            >
+              <q-card flat bordered :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'">
+                <!-- Header with Rank and Stats -->
+                <q-card-section class="q-pa-md" :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-1'">
+                  <div class="row items-center q-col-gutter-md">
+                    <div class="col-auto">
+                      <q-avatar size="40px" color="primary" text-color="white" class="text-weight-bold">
+                        {{ index + 1 }}
+                      </q-avatar>
+                    </div>
+                    <div class="col">
+                      <div class="text-body2" :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'">{{ pattern.description }}</div>
+                      <div class="text-caption q-mt-xs" :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-6'">
+                        <span class="text-weight-bold text-primary">{{ pattern.frequency.toLocaleString() }}</span> occurrences
+                        <span class="q-mx-xs">•</span>
+                        <span class="text-weight-bold text-primary">{{ pattern.percentage.toFixed(2) }}%</span> of total
+                        <span v-if="pattern.is_anomaly" class="text-negative text-weight-bold q-ml-sm">⚠️ ANOMALY</span>
+                      </div>
+                    </div>
+                  </div>
+                </q-card-section>
+
+                <q-separator />
+
+                <!-- Template Display -->
+                <q-card-section class="q-pa-md">
+                  <div class="text-caption text-uppercase text-weight-medium q-mb-sm" :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-7'">Pattern Template</div>
+                  <div class="q-pa-md" :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'" style="font-family: 'Monaco', 'Menlo', 'Courier New', monospace; font-size: 13px; line-height: 1.6; border-radius: 4px; border-left: 3px solid; word-break: break-all; white-space: pre-wrap; border-color: var(--q-primary);">{{ pattern.template }}</div>
+                </q-card-section>
+
+                <!-- Variables Section -->
+                <q-card-section v-if="pattern.variables && pattern.variables.length > 0" class="q-pa-md q-pt-none">
+                  <div class="text-caption text-uppercase text-weight-medium q-mb-sm" :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-7'">Variables ({{ pattern.variables.length }})</div>
+                  <div class="row q-col-gutter-xs">
+                    <div
+                      v-for="variable in pattern.variables.slice(0, 10)"
+                      :key="variable.index"
+                      class="col-auto"
+                    >
+                      <q-chip dense :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-3'">
+                        <span class="text-weight-bold text-primary text-caption">{{ variable.name || 'var_' + variable.index }}</span>
+                        <span class="text-caption q-mx-xs" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">•</span>
+                        <span class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-7'">{{ variable.var_type || 'unknown' }}</span>
+                      </q-chip>
+                    </div>
+                    <div v-if="pattern.variables.length > 10" class="col-auto">
+                      <q-chip dense :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-3'">
+                        <span class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">+{{ pattern.variables.length - 10 }} more</span>
+                      </q-chip>
+                    </div>
+                  </div>
+                </q-card-section>
+
+                <q-separator />
+
+                <!-- Example Logs -->
+                <q-card-section class="q-pa-md">
+                  <div class="text-caption text-uppercase text-weight-medium q-mb-sm" :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-7'">Example Logs</div>
+                  <div
+                    v-for="(example, exIdx) in pattern.examples.slice(0, 2)"
+                    :key="exIdx"
+                    class="q-pa-sm q-mb-sm"
+                    :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-1'"
+                    style="font-family: 'Monaco', 'Menlo', 'Courier New', monospace; font-size: 11px; line-height: 1.5; border-radius: 4px; word-break: break-all; white-space: pre-wrap; border-left: 2px solid;"
+                    :style="{ borderColor: store.state.theme === 'dark' ? '#3a3a3a' : '#e0e0e0' }"
+                  >{{ example.log_message }}</div>
+                  <div v-if="pattern.examples.length > 2" class="text-caption text-center q-mt-sm" :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-7'">
+                    +{{ pattern.examples.length - 2 }} more examples
+                  </div>
+                </q-card-section>
+              </q-card>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="searchObj.loading" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <q-spinner-hourglass color="primary" size="50px" />
+          <div class="q-mt-md text-body2" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">Extracting patterns from logs...</div>
+        </div>
+
+        <div v-else style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center;">
+          <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;">📊</div>
+          <div class="text-h6 q-mb-sm" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">No patterns found</div>
+          <div class="text-body2" :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-8'" style="max-width: 500px;">
+            <div v-if="searchObj.data.patterns?.statistics?.total_logs_analyzed">
+              Only {{ searchObj.data.patterns.statistics.total_logs_analyzed }} logs were analyzed.
+            </div>
+            <div class="q-mt-sm">
+              Try increasing the time range or selecting a different stream with more log data.
+              <br/>Pattern extraction works best with at least 1000+ logs.
+            </div>
+          </div>
+        </div>
+      </div>
 
       <q-dialog
         data-test="logs-search-result-detail-dialog"
@@ -543,8 +703,63 @@ export default defineComponent({
 
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
+    const activeTab = ref("logs");
 
     const searchTableRef: any = ref(null);
+
+    const patternsColumns = [
+      {
+        accessorKey: "pattern_id",
+        header: "#",
+        id: "index",
+        size: 60,
+        cell: (info: any) => info.row.index + 1,
+        meta: {
+          closable: false,
+          showWrap: false,
+        },
+      },
+      {
+        accessorKey: "template",
+        header: "Pattern Template",
+        id: "template",
+        cell: (info: any) => info.getValue(),
+        size: 500,
+        meta: {
+          closable: false,
+          showWrap: false,
+        },
+      },
+      {
+        accessorKey: "frequency",
+        header: "Count",
+        id: "frequency",
+        size: 100,
+        cell: (info: any) => `${info.getValue()} (${info.row.original.percentage.toFixed(1)}%)`,
+        meta: {
+          closable: false,
+          showWrap: false,
+        },
+      },
+      {
+        accessorKey: "examples",
+        header: "Example Log",
+        id: "example",
+        size: 400,
+        cell: (info: any) => {
+          const examples = info.getValue();
+          if (examples && examples.length > 0) {
+            const msg = examples[0].log_message;
+            return msg.length > 200 ? msg.substring(0, 200) + '...' : msg;
+          }
+          return '';
+        },
+        meta: {
+          closable: false,
+          showWrap: false,
+        },
+      },
+    ];
 
     const plotChart: any = ref({});
 
@@ -555,6 +770,18 @@ export default defineComponent({
     onUpdated(() => {
       pageNumberInput.value = searchObj.data.resultGrid.currentPage;
     });
+
+    // Watch for patterns toggle and switch to patterns tab when enabled
+    watch(
+      () => searchObj.meta.showPatterns,
+      (newVal) => {
+        if (newVal) {
+          activeTab.value = "patterns";
+        } else {
+          activeTab.value = "logs";
+        }
+      }
+    );
     const columnSizes = ref({});
 
     const reDrawChart = () => {
@@ -799,6 +1026,8 @@ export default defineComponent({
       resetPlotChart,
       columnSizes,
       selectedStreamFullTextSearchKeys,
+      activeTab,
+      patternsColumns,
     };
   },
   computed: {

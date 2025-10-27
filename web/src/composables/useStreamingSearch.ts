@@ -51,7 +51,7 @@ const streamConnections = ref<Record<string, ReadableStreamDefaultReader<Uint8Ar
 const abortControllers = ref<Record<string, AbortController>>({});
 const errorOccurred = ref(false);
 
-type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end';
+type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end' | 'pattern_extraction_result';
 
 const useHttpStreaming = () => {
   const onData = (traceId: string, type: StreamResponseType | 'end', response: any) => {
@@ -212,6 +212,8 @@ const useHttpStreaming = () => {
       if (meta?.fallback_order_by_col)
         url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
       if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
+      // Only add patterns parameter for actual log searches, not histogram queries
+      if (meta?.showPatterns && !meta?.is_ui_histogram) url += `&patterns=true`;
     } else if (type === "values") {
       const fieldsString = meta?.fields.join(",");
       url = `/_values_stream`;
@@ -259,6 +261,10 @@ const useHttpStreaming = () => {
               break;
             case 'search_response_hits':
               onData(eventTraceId, 'search_response_hits', data);
+              break;
+            case 'pattern_extraction_result':
+              console.log("[PATTERNS SSE] Received pattern_extraction_result event, data:", data);
+              onData(eventTraceId, 'pattern_extraction_result', data);
               break;
             case 'progress':
               onData(eventTraceId, 'progress', data);
@@ -494,9 +500,17 @@ const useHttpStreaming = () => {
     }
   }
 
+  const convertToPatternResult = (type: string, data: any) => {
+    return {
+      type: "pattern_extraction_result",
+      content: data,
+    }
+  }
+
   const wsMapper = {
     'search_response_metadata': convertToWsResponse,
     'search_response_hits': convertToWsResponse,
+    'pattern_extraction_result': convertToPatternResult,
     'progress': convertToWsEventProgress,
     'error': convertToWsError,
     'end': convertToWsEnd,

@@ -109,6 +109,7 @@
     "showQueryLabel": "Editors",
     "showFieldLabel": "Fields",
     "showHistogramLabel": "Histogram",
+    "showPatternsLabel": "Patterns",
     "sqlModeLabel": "SQL Mode",
     "quickModeLabel": "Quick Mode",
     "toggleFunctionLabel": "Function",
