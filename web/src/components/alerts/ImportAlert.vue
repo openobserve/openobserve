@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-<div class="card-container tw-w-full tw-mb-[0.625rem] tw-mr-2 tw-mx-2">
+  <div class="card-container tw-w-full tw-mb-[0.625rem] tw-mr-2 tw-mx-2">
     <div class="flex tw-py-3 tw-px-4 items-center no-wrap tw-h-[68px]">
       <div class="col">
         <div class="flex">
@@ -37,13 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('function.cancel')"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="router.back()"
           data-test="alert-import-cancel-btn"
         />
         <q-btn
           class="o2-primary-button no-border tw-h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           :label="t('dashboard.import')"
           type="submit"
           padding="sm xl"
