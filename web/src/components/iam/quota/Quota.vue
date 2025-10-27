@@ -55,28 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :rules="[(val: any) => !!val || 'Field is required!']"
               >
               </q-select>
-              <div class="quota-tabs">
-                <q-tabs
+              <div class="app-tabs-container tw-h-[36px] tw-w-fit">
+                <app-tabs
                   data-test="quota-tabs"
-                  :model-value="activeTab"
-                  no-caps
-                  outside-arrows
-                  size="sm"
-                  mobile-arrows
-                  class="bg-white text-primary"
-                  @update:model-value="updateActiveTab"
-                >
-                  <q-tab
-                    data-test="quota-api-limit-tab"
-                    name="api-limits"
-                    :label="t('quota.api-limits')"
-                  />
-                  <q-tab
-                    data-test="quota-role-limit-tab"
-                    name="role-limits"
-                    :label="t('quota.role-limits')"
-                  />
-                </q-tabs>
+                  class="tabs-selection-container"
+                  :tabs="tabs"
+                  v-model:active-tab="activeTab"
+                  @update:active-tab="updateActiveTab"
+                />
               </div>
             </div>
             <div class="flex items-center" v-if="selectedOrganization">
@@ -148,30 +134,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="selectedOrganization"
-              class="quota-tabs float-right q-ml-auto"
+              class="app-tabs-container tw-h-[36px] tw-w-fit float-right q-ml-auto"
             >
-              <q-tabs
+              <app-tabs
                 data-test="table-json-type-selection-tabs"
-                :model-value="activeType"
-                no-caps
-                outside-arrows
-                size="sm"
-                mobile-arrows
-                class="bg-white text-primary"
-                @update:model-value="updateActiveType"
-              >
-                <q-tab
-                  data-test="table-json-type-selection-tab"
-                  name="table"
-                  :label="t('quota.table')"
-                />
-                <q-tab
-                  :disable="activeTab == 'role-limits' && !expandedRow"
-                  data-test="table-json-type-selection-tab"
-                  name="json"
-                  :label="t('quota.json')"
-                />
-              </q-tabs>
+                class="tabs-selection-container"
+                :tabs="typeTabs"
+                v-model:active-tab="activeType"
+                @update:active-tab="updateActiveType"
+              />
             </div>
           </div>
         </div>
@@ -657,6 +628,17 @@ export default defineComponent({
       {
         label: "Role Limits",
         value: "role-limits",
+      },
+    ]);
+    const typeTabs = computed(() => [
+      {
+        label: "Table",
+        value: "table",
+      },
+      {
+        label: "JSON",
+        value: "json",
+        disabled: activeTab.value === "role-limits" && !expandedRow.value,
       },
     ]);
     const apiLimitsColumns: any = [
@@ -1575,6 +1557,7 @@ export default defineComponent({
       activeTab,
       updateActiveTab,
       tabs,
+      typeTabs,
       editTable,
       searchQuery,
       resultTotal,
@@ -1669,27 +1652,6 @@ export default defineComponent({
   input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
-  }
-  .quota-tabs {
-    border: 1px solid $primary;
-    width: 200px;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-  .quota-tabs {
-    .q-tab--active {
-      background-color: $primary;
-      color: $white;
-    }
-
-    .q-tab__indicator {
-      display: none;
-    }
-
-    .q-tab {
-      height: 30px;
-      min-height: 30px;
-    }
   }
   .title-height {
     height: 40px;
