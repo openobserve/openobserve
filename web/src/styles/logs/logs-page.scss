@@ -855,10 +855,20 @@
   &.theme-dark {
     .field_list {
       &:hover {
-        box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
-
         .field_overlay {
           background-color: var(--o2-hover-accent);
+        }
+
+        .q-focus-helper{
+          opacity: 1;
+
+          ::before{
+            opacity: 1;
+          }
+
+          ::after{
+            opacity: 1;
+          }
         }
       }
     }
@@ -1004,11 +1014,7 @@
 
       .field_list {
         &.selected {
-          background-color: rgba(89, 96, 178, 0.3);
-
-          .field_overlay {
-            // background-color: #ffffff;
-          }
+          background-color: var(--o2-hover-accent);
         }
       }
     }
