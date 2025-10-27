@@ -14,8 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="q-mx-sm q-mt-md">
-    <div class="card-container flex q-mx-md items-center no-wrap tw-py-3 tw-px-4">
+  <div class="q-mx-sm">
+    <div class="card-container tw-mb-[0.625rem] ">
+      <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]">
       <div class="col">
         <div class="flex">
           <q-btn
@@ -32,9 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex justify-center">
         <q-btn
-          outline
-          padding="sm"
-          class="q-mr-md"
+          class="q-mr-md o2-secondary-button"
           no-caps
           :label="t('dashboard.communityDashboard')"
           @click="goToCommunityDashboards"
@@ -42,55 +41,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ></q-btn>
         <q-btn
           v-close-popup
-          class="text-bold q-mr-md"
+          class="text-bold q-mr-md o2-secondary-button"
           :label="t('function.cancel')"
-          text-color="light-text"
-          padding="sm xl"
           no-caps
           @click="goBack()"
         />
         <q-btn
           :disable="!!isLoading"
-          class="text-bold no-border"
+          class="text-bold o2-primary-button"
           :label="t('dashboard.import')"
-          color="secondary"
           type="submit"
-          padding="sm xl"
           no-caps
           @click="importDashboard"
         />
       </div>
     </div>
-    <q-separator class="q-my-sm" />
+    </div>
     <div class="flex">
-      <div
-        class="card-container dashboard-import-type-tabs flex items-center justify-center q-mx-md"
-      >
-        <app-tabs
-          data-test="dashboard-import-type-tabs"
-          class="q-mr-md"
-          :tabs="tabs"
-          v-model:active-tab="activeTab"
-          @update:active-tab="updateActiveTab"
-        />
-      </div>
 
       <div class="flex">
         <q-splitter
           no-scroll
           v-model="splitterModel"
           :limits="[40, 80]"
-          style="width: calc(95vw - 20px); height: 100%"
+          style="width: calc(100vw - 100px); height: 100%"
         >
           <template #before>
+          <div class="tw-w-full tw-h-full ">
+            <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
+              <div class="app-tabs-container tw-h-[36px] tw-w-fit">
+            <app-tabs
+                data-test="dashboard-import-type-tabs"
+                class="tabs-selection-container"
+                :tabs="tabs"
+                v-model:active-tab="activeTab"
+                @update:active-tab="updateActiveTab"
+              />
+              </div>
+              </div>
             <div
               v-if="activeTab == 'import_json_url'"
-              class="editor-container-url"
+              class="editor-container-url card-container tw-py-1"
             >
-              <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
+              <q-form class="tw-mx-2 q-mt-md tw-pb-2" @submit="onSubmit">
                 <div
                   style="width: calc(100% - 10px)"
-                  class="q-mb-md flex full-width editor-form"
+                  class="flex full-width"
                 >
                   <div
                     data-test="dashboard-import-url-input"
@@ -100,8 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-input
                       v-model="url"
                       :label="t('dashboard.addURL')"
-                      color="input-border"
-                      bg-color="input-bg"
+                       style="padding: 10px;"
                       stack-label
                       label-slot
                       :loading="isLoading == ImportType.URL"
@@ -123,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-import-url-editor"
                   ref="queryEditorFileRef"
                   editor-id="dashboards-query-editor-file"
-                  class="monaco-editor"
+                  class="monaco-editor tw-mx-2"
                   :debounceTime="300"
                   v-model:query="jsonStr"
                   language="json"
@@ -139,12 +134,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="activeTab == 'import_json_file'"
-              class="dashboard-import-json-container"
+              class="dashboard-import-json-container card-container tw-py-1"
             >
-              <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
+              <q-form class="tw-mx-2 q-mt-md tw-pb-2" @submit="onSubmit">
                 <div
                   style="width: calc(100% - 10px)"
-                  class="card-container tw-py-3 tw-px-4 q-mb-md flex full-width editor-form"
+                  class="flex full-width"
                 >
                   <div
                     data-test="dashboard-import-file-input"
@@ -153,11 +148,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <q-file
                       v-model="jsonFiles"
-                      
                       bottom-slots
                       :label="t('dashboard.dropFileMsg')"
                       accept=".json"
                       multiple
+                      filled
                       :disable="!!isLoading"
                     >
                       <template v-slot:prepend>
@@ -200,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-import-json-file-editor"
                   ref="queryEditorJsonRef"
                   editor-id="dashboards-query-editor-json"
-                  class="monaco-editor"
+                  class="monaco-editor tw-mx-2"
                   :debounceTime="300"
                   v-model:query="jsonStr"
                   language="json"
@@ -216,20 +211,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div></div>
               </q-form>
             </div>
+            </div>
           </template>
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              style="width: 100%; height: 100%"
-              class="card-container tw-py-3 tw-px-4 tw-mt-4"
+              style="width: calc(100% - 10px); height: 100%"
+              class="card-container tw-ml-[0.625rem] tw-h-full"
             >
-              <div class="text-center text-h6">Error Validations</div>
+              <div  class="text-center text-h6 tw-py-2">Error Validations</div>
               <q-separator class="q-mt-md" />
               <div
                 class="error-section"
                 v-if="dashboardErrorsToDisplay.length > 0"
               >
-                <div class="error-list">
+                <div class="error-reporter-container">
                   <!-- Iterate through the outer array -->
 
                   <!-- Iterate through each inner array (the individual error message) -->
@@ -911,14 +907,14 @@ export default defineComponent({
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(71vh - 14px) !important; /* Total editor height */
+    height: calc(100vh - 292px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .dashboard-import-json-container {
   .monaco-editor {
-    height: calc(71vh - 20px) !important; /* Total editor height */
+    height: calc(100vh - 300px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
@@ -929,7 +925,7 @@ export default defineComponent({
   resize: none; /* Remove resize behavior */
 }
 .error-report-container {
-  height: calc(78vh - 8px) !important; /* Total editor height */
+  height: calc(100vh - 8px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none;
 }
