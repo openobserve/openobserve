@@ -190,6 +190,7 @@ mod tests {
             ts_column: "timestamp".to_string(),
             histogram_interval: 100,
             is_descending: false,
+            is_histogram_non_ts_order: false,
         };
 
         assert_eq!(request.q_start_time, 1000);
