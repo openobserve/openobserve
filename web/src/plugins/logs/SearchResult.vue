@@ -569,7 +569,12 @@ export default defineComponent({
         // && plotChart.value?.reDraw
       ) {
         searchObj.data.histogram.chartParams["itemStyle"] = {
-          color: store.state.theme == "dark" ? "#3F7994" : "#3F7994",
+          color:
+            store.state.theme == "dark"
+              ? "#3F7994"
+              : getComputedStyle(document.documentElement)
+                  .getPropertyValue("--o2-theme-color")
+                  .trim(),
         };
         //format data in form of echarts options
         plotChart.value = convertLogData(
