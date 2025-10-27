@@ -15,152 +15,154 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="aboutPage card-container tw-mx-2 tw-my-3">
-    <div class="tw-w-full">
-      <!-- Hero Section -->
-      <div class="hero-section">
-        <div class="tw-flex tw-flex-col md:tw-flex-row tw-items-center tw-justify-between tw-gap-8">
-          <div class="tw-flex-1">
-            <img
-              :src="
-                store.state.theme == 'dark'
-                  ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-                  : getImageURL('images/common/openobserve_latest_light_2.svg')
-              "
-              class="logo"
-              width="220"
-            />
-            <p class="tagline tw-mt-4">{{ t("about.logoMsg") }}</p>
-            <div class="tw-flex tw-gap-3 tw-mt-6">
-              <div class="version-badge" :class="store.state.theme === 'dark' ? 'version-badge-dark' : 'version-badge-light'">
-                <span>{{ store.state.zoConfig.version }}</span>
+  <q-page class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] aboutPage">
+    <div class="card-container tw-px-4 tw-py-4 tw-h-[calc(100vh-48px)]">
+      <div class="tw-w-full">
+        <!-- Hero Section -->
+        <div class="hero-section">
+          <div class="tw-flex tw-flex-col md:tw-flex-row tw-items-center tw-justify-between tw-gap-8">
+            <div class="tw-flex-1">
+              <img
+                :src="
+                  store.state.theme == 'dark'
+                    ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                    : getImageURL('images/common/openobserve_latest_light_2.svg')
+                "
+                class="logo"
+                width="220"
+              />
+              <p class="tagline tw-mt-4">{{ t("about.logoMsg") }}</p>
+              <div class="tw-flex tw-gap-3 tw-mt-6">
+                <div class="version-badge" :class="store.state.theme === 'dark' ? 'version-badge-dark' : 'version-badge-light'">
+                  <span>{{ store.state.zoConfig.version }}</span>
+                </div>
+                <div class="build-badge tw-capitalize" :class="store.state.theme === 'dark' ? 'build-badge-dark' : 'build-badge-light'">
+                  <q-icon name="workspaces" size="20px" />
+                  <span>{{ store.state.zoConfig.build_type }}</span>
+                </div>
               </div>
-              <div class="build-badge tw-capitalize" :class="store.state.theme === 'dark' ? 'build-badge-dark' : 'build-badge-light'">
-                <q-icon name="workspaces" size="20px" />
-                <span>{{ store.state.zoConfig.build_type }}</span>
+            </div>
+            <div class="stats-grid">
+              <div class="stat-card stat-card-commit" :class="store.state.theme === 'dark' ? 'stat-card-commit-dark' : 'stat-card-commit-light'">
+                <q-icon name="code" size="32px" class="stat-icon" />
+                <div class="stat-label">Commit</div>
+                <div class="stat-value tw-font-mono">{{ store.state.zoConfig.commit_hash }}</div>
+              </div>
+              <div class="stat-card stat-card-built" :class="store.state.theme === 'dark' ? 'stat-card-built-dark' : 'stat-card-built-light'">
+                <q-icon name="event" size="32px" class="stat-icon" />
+                <div class="stat-label">Built</div>
+                <div class="stat-value">{{ formatDate(store.state.zoConfig.build_date) }}</div>
               </div>
             </div>
-          </div>
-          <div class="stats-grid">
-            <div class="stat-card stat-card-commit" :class="store.state.theme === 'dark' ? 'stat-card-commit-dark' : 'stat-card-commit-light'">
-              <q-icon name="code" size="32px" class="stat-icon" />
-              <div class="stat-label">Commit</div>
-              <div class="stat-value tw-font-mono">{{ store.state.zoConfig.commit_hash }}</div>
-            </div>
-            <div class="stat-card stat-card-built" :class="store.state.theme === 'dark' ? 'stat-card-built-dark' : 'stat-card-built-light'">
-              <q-icon name="event" size="32px" class="stat-icon" />
-              <div class="stat-label">Built</div>
-              <div class="stat-value">{{ formatDate(store.state.zoConfig.build_date) }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Features Grid -->
-      <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-        <!-- Open Source Libraries -->
-        <div class=" feature-card">
-          <div class="tw-mb-4" style="min-height: 120px;">
-            <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
-              <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                <q-icon name="code" size="24px" />
-              </div>
-              <h3 class="feature-title">Open Source Libraries</h3>
-            </div>
-            <p class="feature-text">
-              Built on the shoulders of giants. OpenObserve depends on many amazing open source libraries.
-            </p>
-          </div>
-          <div class="tw-flex tw-flex-wrap tw-gap-2">
-            <a
-              href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml"
-              target="_blank"
-              class="link-badge"
-            >
-              <q-icon name="settings" size="16px" class="tw-mr-1" />
-              Cargo.toml
-            </a>
-            <a
-              href="https://github.com/openobserve/openobserve/blob/main/web/package.json"
-              target="_blank"
-              class="link-badge"
-            >
-              <Package :size="16" class="tw-mr-1" />
-              package.json
-            </a>
-            <a href="https://npmjs.com" target="_blank" class="link-badge">
-              <q-icon name="javascript" size="16px" class="tw-mr-1" />
-              npmjs.com
-            </a>
-            <a href="https://crates.io" target="_blank" class="link-badge">
-              <q-icon name="inventory_2" size="16px" class="tw-mr-1" />
-              crates.io
-            </a>
           </div>
         </div>
 
-        <!-- License Info -->
-        <div
-          v-if="store.state.zoConfig.build_type == 'opensource' || (store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false')"
-          class=" feature-card license-feature"
-        >
-          <div class="tw-mb-4">
-            <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
-              <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                <q-icon name="shield" size="24px" />
+        <!-- Features Grid -->
+        <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+          <!-- Open Source Libraries -->
+          <div class=" feature-card">
+            <div class="tw-mb-4" style="min-height: 120px;">
+              <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
+                <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
+                  <q-icon name="code" size="24px" />
+                </div>
+                <h3 class="feature-title">Open Source Libraries</h3>
               </div>
-              <h3 class="feature-title">License Information</h3>
+              <p class="feature-text">
+                Built on the shoulders of giants. OpenObserve depends on many amazing open source libraries.
+              </p>
             </div>
-            <p v-if="store.state.zoConfig.build_type == 'opensource'" class="feature-text">
-              You are using the <strong>open source version</strong> under the
+            <div class="tw-flex tw-flex-wrap tw-gap-2">
               <a
-                href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
+                href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml"
                 target="_blank"
-                class="inline-link"
-              >GNU Affero General Public License (AGPL)</a>.
-            </p>
-            <p v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" class="feature-text">
-              You are using the <strong>Enterprise version</strong> governed by the
+                class="link-badge"
+              >
+                <q-icon name="settings" size="16px" class="tw-mr-1" />
+                Cargo.toml
+              </a>
               <a
-                href="https://openobserve.ai/enterprise-license/"
+                href="https://github.com/openobserve/openobserve/blob/main/web/package.json"
                 target="_blank"
-                class="inline-link"
-              >enterprise license agreement</a>.
-            </p>
-          </div>
-          <div class="tw-mt-4 tw-p-3 tw-rounded tw-bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw-bg-blue-400' : 'tw-bg-blue-500'">
-            <p class="tw-text-sm tw-mb-0">
-              <q-icon name="info" size="16px" class="tw-mr-1" />
-              By using OpenObserve, you agree to comply with the applicable license terms.
-            </p>
-          </div>
-        </div>
-
-        <!-- Community Card (if no license card) -->
-        <div
-          v-else
-          class=" feature-card"
-        >
-          <div class="tw-mb-4" style="min-height: 120px;">
-            <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
-              <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                <q-icon name="groups" size="24px" />
-              </div>
-              <h3 class="feature-title">Community</h3>
+                class="link-badge"
+              >
+                <Package :size="16" class="tw-mr-1" />
+                package.json
+              </a>
+              <a href="https://npmjs.com" target="_blank" class="link-badge">
+                <q-icon name="javascript" size="16px" class="tw-mr-1" />
+                npmjs.com
+              </a>
+              <a href="https://crates.io" target="_blank" class="link-badge">
+                <q-icon name="inventory_2" size="16px" class="tw-mr-1" />
+                crates.io
+              </a>
             </div>
-            <p class="feature-text">
-              Join our vibrant community of developers and users building the future of observability.
-            </p>
           </div>
-          <div class="tw-flex tw-flex-wrap tw-gap-2">
-            <a href="https://github.com/openobserve/openobserve" target="_blank" class="link-badge">
-              <q-icon name="code" size="16px" class="tw-mr-1" />
-              GitHub
-            </a>
-            <a href="https://openobserve.ai" target="_blank" class="link-badge">
-              <q-icon name="language" size="16px" class="tw-mr-1" />
-              Website
-            </a>
+
+          <!-- License Info -->
+          <div
+            v-if="store.state.zoConfig.build_type == 'opensource' || (store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false')"
+            class=" feature-card license-feature"
+          >
+            <div class="tw-mb-4">
+              <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
+                <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
+                  <q-icon name="shield" size="24px" />
+                </div>
+                <h3 class="feature-title">License Information</h3>
+              </div>
+              <p v-if="store.state.zoConfig.build_type == 'opensource'" class="feature-text">
+                You are using the <strong>open source version</strong> under the
+                <a
+                  href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
+                  target="_blank"
+                  class="inline-link"
+                >GNU Affero General Public License (AGPL)</a>.
+              </p>
+              <p v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" class="feature-text">
+                You are using the <strong>Enterprise version</strong> governed by the
+                <a
+                  href="https://openobserve.ai/enterprise-license/"
+                  target="_blank"
+                  class="inline-link"
+                >enterprise license agreement</a>.
+              </p>
+            </div>
+            <div class="tw-mt-4 tw-p-3 tw-rounded tw-bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw-bg-blue-400' : 'tw-bg-blue-500'">
+              <p class="tw-text-sm tw-mb-0">
+                <q-icon name="info" size="16px" class="tw-mr-1" />
+                By using OpenObserve, you agree to comply with the applicable license terms.
+              </p>
+            </div>
+          </div>
+
+          <!-- Community Card (if no license card) -->
+          <div
+            v-else
+            class=" feature-card"
+          >
+            <div class="tw-mb-4" style="min-height: 120px;">
+              <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
+                <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
+                  <q-icon name="groups" size="24px" />
+                </div>
+                <h3 class="feature-title">Community</h3>
+              </div>
+              <p class="feature-text">
+                Join our vibrant community of developers and users building the future of observability.
+              </p>
+            </div>
+            <div class="tw-flex tw-flex-wrap tw-gap-2">
+              <a href="https://github.com/openobserve/openobserve" target="_blank" class="link-badge">
+                <q-icon name="code" size="16px" class="tw-mr-1" />
+                GitHub
+              </a>
+              <a href="https://openobserve.ai" target="_blank" class="link-badge">
+                <q-icon name="language" size="16px" class="tw-mr-1" />
+                Website
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -209,9 +211,6 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .aboutPage {
-  padding: 1.5rem;
-  min-height: 100vh;
-
   // Hero Section
   .hero-section {
     padding: 2rem;
@@ -451,8 +450,6 @@ export default defineComponent({
 
   // Responsive
   @media (max-width: 768px) {
-    padding: 1rem;
-
     .hero-section {
       padding: 1.5rem;
 
