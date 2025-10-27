@@ -1457,7 +1457,7 @@ export default defineComponent({
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(100vh - 294px) !important; /* Total editor height */
+    height: calc(100vh - 290px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
     padding-top: 12px;
@@ -1466,7 +1466,7 @@ export default defineComponent({
 
 .editor-container-json {
   .monaco-editor {
-    height: calc(100vh - 318px) !important; /* Total editor height */
+    height: calc(100vh - 314px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
     padding-top: 12px;

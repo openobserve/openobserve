@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="logs-search-splitter"
         no-scroll
         v-model="splitterModel"
-        style="width: calc(98vw - 12px); height: 100%"
+        style="width: calc(100vw - 100px); height: 100%"
       >
         <template #before>
         <div class="tw-w-full tw-h-full ">
@@ -1710,20 +1710,21 @@ export default defineComponent({
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(71vh - 27px) !important; /* Total editor height */
+    height: calc(100vh - 275px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
+    padding-top: 12px;
   }
 }
 .editor-container-json {
   .monaco-editor {
-    height: calc(67vh - 32px) !important; /* Total editor height */
+    height: calc(100vh - 314px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .monaco-editor {
-  height: calc(81vh - 16px) !important; /* Total editor height */
+  height: calc(100vh - 16px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none; /* Remove resize behavior */
   border: 1px solid var(--o2-border-color);
@@ -1732,7 +1733,7 @@ export default defineComponent({
 
 }
 .error-report-container {
-  height: calc(79vh - 10px) !important; /* Total editor height */
+  height: calc(100vh - 192px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none;
 }
