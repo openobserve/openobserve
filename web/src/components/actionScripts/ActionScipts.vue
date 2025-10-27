@@ -436,25 +436,6 @@ export default defineComponent({
     const activeTab: any = ref("alerts");
     const destinations = ref([0]);
     const templates = ref([0]);
-    // TEMPORARY DUMMY DATA FOR TESTING - REMOVE AFTER TESTING
-    const generateDummyData = () => {
-      const dummyActions = [];
-      for (let i = 1; i <= 30; i++) {
-        dummyActions.push({
-          id: `action_${i}`,
-          name: `Action Script ${i}`,
-          uuid: getUUID(),
-          created_by: i % 3 === 0 ? 'admin@example.com' : i % 2 === 0 ? 'user@example.com' : 'developer@example.com',
-          created_at: Date.now() - (i * 86400000), // i days ago
-          last_run_at: i % 2 === 0 ? Date.now() - (i * 3600000) : null, // i hours ago for even numbers
-          last_successful_at: i % 3 === 0 ? Date.now() - (i * 7200000) : null, // i*2 hours ago for multiples of 3
-          status: i % 4 === 0 ? 'failed' : i % 3 === 0 ? 'running' : 'success',
-          execution_details_type: i % 3 === 0 ? 'repeat' : i % 2 === 0 ? 'service' : 'once',
-          sql: `SELECT * FROM logs WHERE level='error' LIMIT ${i * 10}`
-        });
-      }
-      return dummyActions;
-    };
 
     const getActionScripts = () => {
       const dismiss = $q.notify({
@@ -462,22 +443,25 @@ export default defineComponent({
         message: "Please wait while loading actions...",
       });
 
-      // TEMPORARY: Using dummy data instead of API call
-      const dummyData = generateDummyData();
-      var counter = 1;
-      resultTotal.value = dummyData.length;
-      alerts.value = dummyData;
-
-      actionsScriptRows.value = alerts.value.map((data: any) => {
+      getAllActions()
+        .then(() => {
+          var counter = 1;
+          resultTotal.value = store.state.organizationData.actions.length;
+          alerts.value = store.state.organizationData.actions.map(
+            (alert: any) => {
+              return {
+                ...alert,
+                uuid: getUUID(),
+              };
+            },
+          );
+          actionsScriptRows.value = alerts.value.map((data: any) => {
             if (data.execution_details_type === "repeat")
               data.execution_details_type = "Cron Job";
-
             if (data.execution_details_type === "service")
               data.execution_details_type = "Real Time";
-
             if (data.execution_details_type === "once")
               data.execution_details_type = "Once";
-
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.id,
@@ -497,82 +481,29 @@ export default defineComponent({
               execution_details_type: data.execution_details_type,
             };
           });
-      actionsScriptRows.value.forEach((alert: ActionScriptList) => {
-        alertStateLoadingMap.value[alert.uuid as string] = false;
-      });
-      if (router.currentRoute.value.query.action == "add") {
-        showAddUpdateFn({ row: undefined });
-      }
-      if (router.currentRoute.value.query.action == "update") {
-        const alertName = router.currentRoute.value.query.id as string;
-        showAddUpdateFn({
-          row: getAlertByName(alertName),
+          actionsScriptRows.value.forEach((alert: ActionScriptList) => {
+            alertStateLoadingMap.value[alert.uuid as string] = false;
+          });
+          if (router.currentRoute.value.query.action == "add") {
+            showAddUpdateFn({ row: undefined });
+          }
+          if (router.currentRoute.value.query.action == "update") {
+            const alertName = router.currentRoute.value.query.id as string;
+            showAddUpdateFn({
+              row: getAlertByName(alertName),
+            });
+          }
+          dismiss();
+        })
+        .catch((e) => {
+          console.error(e);
+          dismiss();
+          $q.notify({
+            type: "negative",
+            message: "Error while pulling Actions.",
+            timeout: 2000,
+          });
         });
-      }
-      dismiss();
-
-      // COMMENTED OUT FOR TESTING - RESTORE AFTER TESTING
-      // getAllActions()
-      //   .then(() => {
-      //     var counter = 1;
-      //     resultTotal.value = store.state.organizationData.actions.length;
-      //     alerts.value = store.state.organizationData.actions.map(
-      //       (alert: any) => {
-      //         return {
-      //           ...alert,
-      //           uuid: getUUID(),
-      //         };
-      //       },
-      //     );
-      //     actionsScriptRows.value = alerts.value.map((data: any) => {
-      //       if (data.execution_details_type === "repeat")
-      //         data.execution_details_type = "Cron Job";
-      //       if (data.execution_details_type === "service")
-      //         data.execution_details_type = "Real Time";
-      //       if (data.execution_details_type === "once")
-      //         data.execution_details_type = "Once";
-      //       return {
-      //         "#": counter <= 9 ? `0${counter++}` : counter++,
-      //         id: data.id,
-      //         name: data.name,
-      //         uuid: data.uuid,
-      //         created_by: data.created_by,
-      //         created_at: data.created_at
-      //           ? convertUnixToQuasarFormat(data.created_at)
-      //           : "-",
-      //         last_run_at: data.last_run_at
-      //           ? convertUnixToQuasarFormat(data.last_run_at)
-      //           : "-",
-      //         last_successful_at: data.last_successful_at
-      //           ? convertUnixToQuasarFormat(data.last_successful_at)
-      //           : "-",
-      //         status: data.status,
-      //         execution_details_type: data.execution_details_type,
-      //       };
-      //     });
-      //     actionsScriptRows.value.forEach((alert: ActionScriptList) => {
-      //       alertStateLoadingMap.value[alert.uuid as string] = false;
-      //     });
-      //     if (router.currentRoute.value.query.action == "add") {
-      //       showAddUpdateFn({ row: undefined });
-      //     }
-      //     if (router.currentRoute.value.query.action == "update") {
-      //       const alertName = router.currentRoute.value.query.id as string;
-      //       showAddUpdateFn({
-      //         row: getAlertByName(alertName),
-      //       });
-      //     }
-      //     dismiss();
-      //   })
-      //   .catch((e) => {
-      //     console.error(e);
-      //     dismiss();
-      //     $q.notify({
-      //       type: "negative",
-      //       message: "Error while pulling Actions.",
-      //       timeout: 2000,
-      //     });
-      //   });
     };
 
     const getAlertByName = (id: string) => {
