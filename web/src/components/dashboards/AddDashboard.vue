@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="dashboardData.name"
           :label="t('dashboard.name') + ' *'"
-          class="q-py-md showLabelOnTop"
+          class="showLabelOnTop"
           data-test="add-dashboard-name"
           stack-label
           hide-bottom-space
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.typeDesc')"
           borderless
           hide-bottom-space
-          class="q-py-md showLabelOnTop"
+          class="showLabelOnTop"
           stack-label
           dense
           data-test="add-dashboard-description"
