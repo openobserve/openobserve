@@ -72,10 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             v-else
-            class="tw-text-xs tw-font-bold no-border"
+            class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
             data-test="metrics-apply"
             padding="sm"
-            color="secondary"
             no-caps
             :label="t('metrics.runQuery')"
             @click="runQuery"
@@ -275,11 +274,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               <q-btn
                                 size="md"
-                                class="no-border"
+                                class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
                                 no-caps
                                 dense
                                 style="padding: 2px 4px; z-index: 1"
-                                color="primary"
                                 @click="addToDashboard"
                                 title="Add To Dashboard"
                                 >Add To Dashboard</q-btn
