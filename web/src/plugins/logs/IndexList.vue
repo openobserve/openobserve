@@ -694,7 +694,7 @@ style="opacity: 0.7">
                 <!-- First page button -->
                 <q-btn
                   data-test="logs-page-fields-list-pagination-firstpage-button"
-                  icon="skip_previous"
+                  icon="fast_rewind"
                   color="primary"
                   flat
                   :disable="scope.isFirstPage"
@@ -728,7 +728,7 @@ style="opacity: 0.7">
                 <!-- Last page button -->
                 <q-btn
                   data-test="logs-page-fields-list-pagination-lastpage-button"
-                  icon="skip_next"
+                  icon="fast_forward"
                   color="primary"
                   flat
                   :disable="scope.isLastPage"
