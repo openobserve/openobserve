@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <q-btn-group
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="q-pa-none float-left q-mr-xs transform-selector element-box-shadow el-border"
+    class="q-pa-none float-left q-mr-xs tw-h-[32px] transform-selector element-box-shadow el-border"
   >
     <div>
       <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">{{
