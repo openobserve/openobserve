@@ -699,7 +699,7 @@
     .field-list-pagination {
       display: flex;
       align-items: center;
-      gap: 0.25rem; // 4px - better spacing
+      gap: 0.125rem; // 4px - better spacing
 
       .pagination-nav-btn {
         padding: 0 !important;
@@ -741,7 +741,7 @@
         font-weight: 500;
         line-height: 1;
         color: var(--o2-text-primary) !important;
-        border-radius: 0.375rem !important; // 4px - rounded border
+        border-radius: 0.25rem !important; // 4px - rounded border
         overflow: visible !important;
 
         .q-btn__content {
@@ -845,7 +845,7 @@
     .field-list-pagination {
       .q-btn {
         color: var(--o2-text-primary) !important;
-        border-radius: 0.375rem !important;
+        border-radius: 0.25rem !important;
       }
     }
 
@@ -1276,7 +1276,6 @@
 
     .q-btn {
       color: var(--o2-text-primary) !important;
-      border-radius: 0.375rem !important;
     }
   }
 }
