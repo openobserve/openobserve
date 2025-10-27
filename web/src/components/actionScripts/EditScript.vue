@@ -532,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="tw-mx-2">
               <div
-        class="flex justify-end q-px-md full-width tw-py-3 card-container"
+        class="flex justify-end q-px-md full-width tw-py-[0.625rem] card-container"
         style="position: sticky; bottom: 0px; z-index: 2"
       >
         <q-btn

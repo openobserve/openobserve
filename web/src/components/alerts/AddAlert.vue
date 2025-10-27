@@ -394,27 +394,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
     </div>
-    <div class="flex justify-end items-center tw-mt-2 tw-mx-2 card-container q-px-lg" :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: sticky; bottom: 0; height: 70px !important; z-index: 100; width: 100%;">
-      <q-btn
-        data-test="add-alert-cancel-btn"
-        v-close-popup="true"
-        class="q-mr-md o2-secondary-button tw-h-[36px]"
-        :label="t('alerts.cancel')"
-        no-caps
-        flat
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-        @click="$emit('cancel:hideform')"
-      />
-      <q-btn
-        data-test="add-alert-submit-btn"
-        class="o2-primary-button no-border tw-h-[36px]"
-        :label="t('alerts.save')"
-        type="submit"
-        no-caps
-        flat
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        @click="onSubmit"
-      />
+    <div class="tw-mx-2">
+      <div
+          class="flex justify-end q-px-md full-width tw-py-3 card-container"
+          style="position: sticky; bottom: 0px; z-index: 2"
+        >
+        <q-btn
+          data-test="add-alert-cancel-btn"
+          v-close-popup="true"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
+          :label="t('alerts.cancel')"
+          no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          @click="$emit('cancel:hideform')"
+        />
+        <q-btn
+          data-test="add-alert-submit-btn"
+          class="o2-primary-button no-border tw-h-[36px]"
+          :label="t('alerts.save')"
+          type="submit"
+          no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          @click="onSubmit"
+        />
+      </div>
     </div>
 
   </div>
