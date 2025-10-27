@@ -1490,7 +1490,7 @@ pub fn check_search_allowed(org_id: &str, stream: Option<&str>) -> Result<(), Er
         // this is installation level limit for all orgs combined
         if !o2_enterprise::enterprise::license::search_allowed() {
             Err(Error::Message(
-                "This installation has exceeded its data ingestion limit".to_string(),
+                "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.".to_string(),
             ))
         } else {
             Ok(())

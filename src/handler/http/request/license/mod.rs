@@ -20,7 +20,9 @@ use o2_enterprise::enterprise::license::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::service::db::license;
+use crate::{
+    common::utils::auth::UserEmail, handler::http::extractors::Headers, service::db::license,
+};
 
 #[derive(Serialize, Deserialize)]
 struct LicenseResponse {
@@ -37,8 +39,52 @@ struct SaveLicenseRequest {
     key: String,
 }
 
+async fn check_license_permission(user_id: &str, method: &str) -> Result<(), anyhow::Error> {
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    use crate::{
+        common::utils::auth::{AuthExtractor, is_root_user},
+        service::users::get_user,
+    };
+
+    if !is_root_user(user_id) {
+        let user = match get_user(Some("_meta"), user_id).await {
+            Some(v) => v,
+            None => return Err(anyhow::anyhow!("Unauthorized access to license")),
+        };
+        if !crate::handler::http::auth::validator::check_permissions(
+            user_id,
+            AuthExtractor {
+                auth: "".to_string(),
+                method: method.to_string(),
+                o2_type: format!(
+                    "{}:_all__meta",
+                    OFGA_MODELS
+                        .get("license")
+                        .map_or("license", |model| model.key),
+                ),
+                org_id: "_meta".to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+            },
+            user.role,
+            user.is_external,
+        )
+        .await
+        {
+            return Err(anyhow::anyhow!("Unauthorized Access to license"));
+        }
+    }
+    Ok(())
+}
+
 #[get("/license")]
-pub async fn get_license_info() -> HttpResponse {
+pub async fn get_license_info(Headers(user_email): Headers<UserEmail>) -> HttpResponse {
+    let email = user_email.user_id;
+    if let Err(_) = check_license_permission(&email, "GET").await {
+        return HttpResponse::Forbidden().json("Unauthorized Access to license");
+    }
+
     let (key, license) = match get_license().await {
         Some((k, l)) => (Some(k), Some(l)),
         None => (None, None),
@@ -55,7 +101,15 @@ pub async fn get_license_info() -> HttpResponse {
 }
 
 #[post("/license")]
-pub async fn store_license(body: web::Bytes) -> HttpResponse {
+pub async fn store_license(
+    body: web::Bytes,
+    Headers(user_email): Headers<UserEmail>,
+) -> HttpResponse {
+    let email = user_email.user_id;
+    if let Err(_) = check_license_permission(&email, "PUT").await {
+        return HttpResponse::Forbidden().json("Unauthorized Access to license");
+    }
+
     let req: SaveLicenseRequest = match serde_json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => {
