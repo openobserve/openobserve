@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
-    <div class="card-container tw-mb-[0.625rem]">
+    <div class="card-container tw-mb-[0.8rem]">
       <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-pl-4 tw-pr-2 tw-h-[68px]">
           <FunctionsToolbar
             v-model:name="formData.name"
@@ -32,93 +32,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
       </div>
     </div>
-  </div>
-  <div class="tw-flex">
+  
+    <div class="tw-flex">
 
 
-    <div
-      class="tw-flex tw-overflow-auto tw-pr-2 tw-pb-4"
-      :style="{
-        width: store.state.isAiChatEnabled && !isAddFunctionComponent ? '75%' : '100%',
-      }"
-    >
-      <q-splitter
-        v-model="splitterModel"
-        :limits="[30, Infinity]"
-        class="tw-overflow-hidden tw-w-full"
-        reverse
+      <div
+        class="tw-flex tw-overflow-auto "
+        :style="{
+          width: store.state.isAiChatEnabled && !isAddFunctionComponent ? '75%' : '100%',
+        }"
       >
-        <template v-slot:before>
-          <div class="tw-pr-2">
-            <q-form id="addFunctionForm" ref="addJSTransformForm">
-              <div class="add-function-name-input q-pb-sm o2-input">
-                <FullViewContainer
-                  name="function"
-                  v-model:is-expanded="expandState.functions"
-                  :label="t('function.jsfunction') + '*'"
-                  class="tw-mt-1"
-                />
-                <div
-                  v-show="expandState.functions"
-                  class="tw-border-[1px] tw-border-gray-200"
-                >
-                  <query-editor
-                    data-test="logs-vrl-function-editor"
-                    ref="editorRef"
-                    editor-id="add-function-editor"
-                    class="monaco-editor"
-                    :style="{ height: `calc(100vh - (160px + ${heightOffset}px))` }"
-                    v-model:query="formData.function"
-                    language="vrl"
+        <q-splitter
+          v-model="splitterModel"
+          :limits="[30, Infinity]"
+          class="tw-overflow-hidden tw-w-full"
+          reverse
+        >
+          <template v-slot:before>
+            <div class="q-px-md q-pt-sm q-pb-md tw-h-max card-container tw-h-[calc(100vh-128px)]">
+              <q-form id="addFunctionForm" ref="addJSTransformForm">
+                <div class="add-function-name-input q-pb-sm o2-input">
+                  <FullViewContainer
+                    name="function"
+                    v-model:is-expanded="expandState.functions"
+                    :label="t('function.jsfunction') + '*'"
+                    class="tw-mt-1"
                   />
-                </div>
-                <div class="text-subtitle2">
-                  <div v-if="vrlFunctionError">
-                    <FullViewContainer
-                      name="function"
-                      v-model:is-expanded="expandState.functionError"
-                      :label="t('function.errorDetails')"
-                      labelClass="tw-text-red-600"
+                  <div
+                    v-show="expandState.functions"
+                    class="tw-border-[1px] tw-border-gray-200"
+                  >
+                    <query-editor
+                      data-test="logs-vrl-function-editor"
+                      ref="editorRef"
+                      editor-id="add-function-editor"
+                      class="monaco-editor"
+                      :style="{ height: `calc(100vh - (180px + ${heightOffset}px))` }"
+                      v-model:query="formData.function"
+                      language="vrl"
                     />
-                    <div
-                      v-if="expandState.functionError"
-                      class="q-px-sm q-pb-sm"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'bg-grey-10'
-                          : 'bg-grey-2'
-                      "
-                    >
-                      <pre class="q-my-none" style="white-space: pre-wrap">{{
-                        vrlFunctionError
-                      }}</pre>
+                  </div>
+                  <div class="text-subtitle2">
+                    <div v-if="vrlFunctionError">
+                      <FullViewContainer
+                        name="function"
+                        v-model:is-expanded="expandState.functionError"
+                        :label="t('function.errorDetails')"
+                        labelClass="tw-text-red-600"
+                      />
+                      <div
+                        v-if="expandState.functionError"
+                        class="q-px-sm q-pb-sm"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'bg-grey-10'
+                            : 'bg-grey-2'
+                        "
+                      >
+                        <pre class="q-my-none" style="white-space: pre-wrap">{{
+                          vrlFunctionError
+                        }}</pre>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </q-form>
-          </div>
-        </template>
-        <template v-slot:after>
-          <div class="q-px-md q-pt-sm q-pb-md tw-h-max q-ml-sm card-container">
-            <TestFunction
-              ref="testFunctionRef"
-              :vrlFunction="formData"
-              @function-error="handleFunctionError"
-              :heightOffset="heightOffset"
-              @sendToAiChat="sendToAiChat"
-            />
-          </div>
-        </template>
-      </q-splitter>
+              </q-form>
+            </div>
+          </template>
+          <template v-slot:after>
+            <div class="q-px-md q-pt-sm q-pb-md tw-h-max q-ml-sm card-container">
+              <TestFunction
+                ref="testFunctionRef"
+                :vrlFunction="formData"
+                @function-error="handleFunctionError"
+                :heightOffset="heightOffset"
+                @sendToAiChat="sendToAiChat"
+              />
+            </div>
+          </template>
+        </q-splitter>
+      </div>
+      <div v-if="store.state.isAiChatEnabled && !isAddFunctionComponent" style="width: 25%; max-width: 100%; min-width: 75px;   " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+        <O2AIChat :style="{
+          height: `calc(100vh - (112px + ${heightOffset}px))`
+        }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
+      </div>
     </div>
-    <div v-if="store.state.isAiChatEnabled && !isAddFunctionComponent" style="width: 25%; max-width: 100%; min-width: 75px;   " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-      <O2AIChat :style="{
-        height: `calc(100vh - (112px + ${heightOffset}px))`
-      }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
-    </div>
-  </div>
-  
+  </div>  
   <confirm-dialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
