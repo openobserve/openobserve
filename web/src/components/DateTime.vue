@@ -321,8 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-separator class="q-my-sm" />
           <q-btn
             data-test="date-time-apply-btn"
-            class="no-border q-py-xs"
-            color="secondary"
+            class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
             no-caps
             size="sm"
             @click="saveDate(null)"
