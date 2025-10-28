@@ -33,7 +33,7 @@
           />
       </template>
       <template v-slot:after>
-        <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+        <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
           <div class="o2-container-navbarheight">
             <RouterView />
           </div>
