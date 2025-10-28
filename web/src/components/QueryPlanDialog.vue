@@ -549,6 +549,19 @@ export default defineComponent({
       (newVal) => {
         if (newVal && props.searchObj) {
           fetchExplainPlan();
+          // Reset to logical tab when opening
+          activeTab.value = "logical";
+        }
+      }
+    );
+
+    // Reset activeTab when switching between EXPLAIN and ANALYZE
+    watch(
+      () => showAnalyzeResults.value,
+      (isAnalyze) => {
+        if (!isAnalyze) {
+          // Switching back to EXPLAIN - reset to logical tab
+          activeTab.value = "logical";
         }
       }
     );
@@ -580,11 +593,6 @@ export default defineComponent({
       activeTab,
       isAnalyzing,
       showAnalyzeResults,
-      showVerbose,
-      hasVerboseData,
-      verboseLogicalPlan,
-      verbosePhysicalPlan,
-      verboseAnalyzePlan,
       runAnalyze,
       onClose,
     };
