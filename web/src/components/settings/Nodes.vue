@@ -414,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-input
                   v-model="filterQuery"
                   dense
-                  class="q-ml-none q-mb-xs q-mr-md o2-search-input"
+                  class="q-ml-none q-mb-xs q-mr-sm o2-search-input"
                   borderless
                   style="width: 400px;"
                   :placeholder="t('nodes.search')"
@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn 
                   :label="t('common.refresh')" 
                   class="o2-secondary-button tw-h-[36px]"
-                  padding="sm lg"
+                  padding="sm"
                   no-caps
                   flat
                   @click="getData(true)">

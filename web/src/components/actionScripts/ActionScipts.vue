@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-input>
                 <q-btn
                   data-test="action-list-add-btn"
-                  class="q-ml-md o2-primary-button tw-h-[36px]"
+                  class="q-ml-sm o2-primary-button tw-h-[36px]"
                   flat
                   no-caps
                   :label="t(`actions.add`)"

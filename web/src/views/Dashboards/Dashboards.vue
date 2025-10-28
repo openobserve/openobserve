@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="searchAcrossFolders"
                   label="All Folders"
                   size="lg"
-                  class="tw-mr-3 tw-h-[36px] o2-toggle-button-lg"
+                  class="q-ml-sm tw-h-[36px] o2-toggle-button-lg"
                   :class="
                     store.state.theme === 'dark'
                       ? 'o2-toggle-button-lg-dark'
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-tooltip>
               </div>
               <q-btn
-                class="q-ml-md o2-secondary-button tw-h-[36px]"
+                class="q-ml-sm o2-secondary-button tw-h-[36px]"
                 :class="
                   store.state.theme === 'dark'
                     ? 'o2-secondary-button-dark'
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <!-- add dashboard button -->
               <q-btn
-                class="q-ml-md o2-primary-button tw-h-[36px]"
+                class="q-ml-sm o2-primary-button tw-h-[36px]"
                 :class="
                   store.state.theme === 'dark'
                     ? 'o2-primary-button-dark'

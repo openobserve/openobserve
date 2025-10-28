@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
-        <div class="row q-pa-md card-container tw-h-full">
+        <div class="q-pa-md card-container tw-h-full">
           <div class="col-12 q-pb-sm q-pt-sm o2-input">
             <q-input
               data-test="add-template-name-input"
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
           </div>
-          <div class="col-12 flex justify-start">
+          <div class="flex justify-end q-px-lg q-py-lg full-width tw-absolute tw-bottom-0">
             <q-btn
               v-close-popup
               class="q-mr-md o2-secondary-button tw-h-[36px]"

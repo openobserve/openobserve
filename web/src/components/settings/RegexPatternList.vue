@@ -18,7 +18,7 @@
                 </template>
               </q-input>
           <q-btn
-            class="o2-secondary-button q-ml-md tw-h-[36px]"
+            class="o2-secondary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`regex_patterns.import`)"
@@ -27,7 +27,7 @@
           />
           <q-btn
             data-test="regex-pattern-list-add-pattern-btn"
-            class="o2-primary-button q-ml-md tw-h-[36px]"
+            class="o2-primary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`regex_patterns.create_pattern`)"
