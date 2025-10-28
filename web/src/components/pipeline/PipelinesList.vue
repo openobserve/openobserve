@@ -124,6 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       unelevated
                       size="sm"
                       :color="props.row.enabled ? 'negative' : 'positive'"
+                      :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
                       round
                       flat
                       :title="
@@ -131,8 +132,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       @click.stop="togglePipeline(props.row)"
                     >
-                      <Pause size="1rem" v-if="props.row.enabled"></Pause>
-                      <Play size="1rem" v-else></Play>
                     </q-btn>
                     <q-btn
                       :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
@@ -141,10 +140,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       round
                       flat
+                      icon="edit"
                       :title="t('pipeline.edit')"
                       @click.stop="editPipeline(props.row)"
                     >
-                    <Pencil size="1rem" />
                   </q-btn>
                     <q-btn
                       :data-test="`pipeline-list-${props.row.name}-export-pipeline`"
@@ -153,10 +152,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       round
                       flat
+                      icon="download"
                       :title="t('pipeline.export')"
                       @click.stop="exportPipeline(props.row)"
                     >
-                    <ArrowDownToLine size="1rem" />
                   </q-btn>
                     <q-btn
                       :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
@@ -165,10 +164,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       round
                       flat
+                      :icon="outlinedDelete"
                       :title="t('pipeline.delete')"
                       @click.stop="openDeleteDialog(props.row)"
                     >
-                    <Trash size="1rem" />
                   </q-btn>
                     <q-btn
                       :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
@@ -177,9 +176,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       round
                       flat
+                      :icon="outlinedVisibility"
                       :title="t('pipeline.view')"
                     >
-                    <Eye size="1rem" />
                       <q-tooltip position="bottom">
                         <PipelineView :pipeline="props.row" />
                       </q-tooltip>
@@ -195,9 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         round
                         flat
+                         icon="error"
                         @click.stop="showErrorDialog(props.row)"
                       >
-                      <Info size="1rem" />
                         <q-tooltip>
                           Last error: {{ new Date(props.row.last_error.last_error_timestamp / 1000).toLocaleString() }}
                         </q-tooltip>
@@ -473,7 +472,6 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
 import PipelineView from "./PipelineView.vue";
 import ResumePipelineDialog from "../ResumePipelineDialog.vue";
-import { Play, Pause, Pencil, Download, Trash, View,  Info, Eye , ArrowDownToLine } from 'lucide-vue-next';
 
 import { filter, update } from "lodash-es";
 

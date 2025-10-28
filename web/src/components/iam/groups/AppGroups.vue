@@ -72,18 +72,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template  v-slot:actions="slotProps: any">
           <div class="tw-flex tw-items-center tw-gap-2 tw-justify-center">
-            <Pencil
+            <q-btn
               :data-test="`iam-groups-edit-${slotProps.column.row.group_name}-role-icon`"
-              class="o2-actions-icons cursor-pointer"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              icon="edit"
               :title="t('common.edit')"
               @click="editGroup(slotProps.column.row)"
-            />
-            <Trash
+            >
+            </q-btn>
+            <q-btn
               :data-test="`iam-groups-delete-${slotProps.column.row.group_name}-role-icon`"
-              class="o2-actions-icons cursor-pointer"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :icon="outlinedDelete"
               :title="t('common.delete')"
               @click="showConfirmDialog(slotProps.column.row)"
-            />
+            >
+            </q-btn>
           </div>
         </template>
       </app-table>
@@ -121,7 +133,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import { Pencil, Trash } from "lucide-vue-next";
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 const showAddGroup = ref(false);
 

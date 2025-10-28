@@ -88,10 +88,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   round
                   flat
+                  icon="edit"
                   :title="t('alerts.edit')"
                   @click="showAddUpdateFn(props)"
                 >
-                <Pencil size="1rem" />
               </q-btn>
                 <q-btn
                   :data-test="`alert-list-${props.row.name}-delete-alert`"
@@ -99,11 +99,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   unelevated
                   size="sm"
                   round
+                  :icon="outlinedDelete"
                   flat
                   :title="t('alerts.delete')"
                   @click="showDeleteDialogFn(props)"
                 >
-                <Trash size="1rem" />
               </q-btn>
               </q-td>
             </template>
@@ -289,7 +289,6 @@ import {
 import actions from "@/services/action_scripts";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
-import { Pencil, Trash } from "lucide-vue-next";
 
 interface ActionScriptList {
   "#": string | number; // If this represents a serial number or row index
@@ -315,8 +314,6 @@ export default defineComponent({
     ),
     NoData,
     ConfirmDialog,
-    Trash,
-    Pencil
   },
   emits: [
     "updated:fields",

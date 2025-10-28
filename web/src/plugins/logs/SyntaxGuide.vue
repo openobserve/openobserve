@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       !store.state.isAiChatEnabled ? 'syntax-guide-button' : '',
       store.state.theme == 'dark' && !sqlmode ? 'syntax-guide-button-dark' : ''
     ]"
+    icon="help"
   >
-  <MessageCircleQuestionMark size="1rem" />
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <q-card flat v-if="!sqlmode">
         <q-card-section class="syntax-guide-title">
@@ -212,7 +212,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { MessageCircleQuestionMark } from "lucide-vue-next";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -226,7 +225,6 @@ export default defineComponent({
     },
   },
   components:{
-    MessageCircleQuestionMark,
   },
   setup() {
     const { t } = useI18n();

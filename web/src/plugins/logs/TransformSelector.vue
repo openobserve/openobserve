@@ -134,10 +134,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-btn
       data-test="logs-search-bar-save-transform-btn"
       class=" save-transform-btn q-px-sm"
+      icon="save"
       :disable="searchObj.data.transformType !== 'function' || searchObj.meta.logsVisualizeToggle === 'visualize'"
       @click="fnSavedFunctionDialog"
+
     >
-    <Save size="1rem"/>
       <q-tooltip class="tw-text-[12px]" :offset="[0, 6]">
         {{
           searchObj.data.transformType === "action"
@@ -157,7 +158,6 @@ import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
-import { Save } from "lucide-vue-next";
 
 const props = defineProps<{
   functionOptions: { name: string; function: string }[];

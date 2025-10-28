@@ -71,36 +71,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     padding="sm"
                     unelevated
                     size="sm"
+                    icon="edit"
                     round
                     flat
                     :title="t('function.updateTitle')"
                     @click="showAddUpdateFn(props)"
                   >
-                  <Pencil size="1rem" />
                 </q-btn>
                   <q-btn
                     padding="sm"
                     unelevated
                     size="sm"
+                    :icon="outlinedDelete"
                     round
                     flat
                     :title="t('function.delete')"
                     @click="showDeleteDialogFn(props)"
                   >
-                  <Trash size="1rem"
-                   />
-
                 </q-btn>
                   <q-btn
                     padding="sm"
                     unelevated
                     size="sm"
+                    :icon="outlinedAccountTree"
                     round
                     flat
                     :title="'Associated Pipelines'"
                     @click="getAssociatedPipelines(props)"
                   >
-                  <Network size="1rem" />
                 </q-btn>
                 </q-td>
               </template>
@@ -240,7 +238,6 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import useLogs from "@/composables/useLogs";
 import { useReo } from "@/services/reodotdev_analytics";
-import { Pencil, Trash, Network } from "lucide-vue-next";
 
 export default defineComponent({
   name: "functionList",
@@ -249,9 +246,6 @@ export default defineComponent({
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),
     NoData,
     ConfirmDialog,
-    Pencil,
-    Trash,
-    Network
   },
   emits: [
     "updated:fields",
