@@ -1364,17 +1364,23 @@ body {
 
 
 .splitter-icon-collapse {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
   position: absolute !important;
-  top: 14px !important;
-  left: 0px !important;
+  top: 26px !important;
+  left: -4px !important;
   z-index: 100 !important;
+  border-radius: 0.325rem;
 }
 
 .splitter-icon-expand {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
   position: absolute !important;
-  top: 14px !important;
-  left: 16px;
+  top: 26px !important;
+  left: 12px !important;
   z-index: 100 !important;
+  border-radius: 0.325rem;
 }
 
 .feature-card {
@@ -1389,5 +1395,13 @@ body {
   &:hover {
     transform: translateY(-3px);
     box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  }
+}
+
+.actions-column {
+  .q-btn {
+    &:hover {
+      background-color: var(--o2-tab-bg) !important;
+    }
   }
 }

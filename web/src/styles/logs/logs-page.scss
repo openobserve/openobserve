@@ -1442,17 +1442,23 @@
    ============================================================================ */
 
 .logs-splitter-icon-collapse {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
   position: absolute !important;
-  top: 14px !important;
-  left: 14px !important;
+  top: 26px !important;
+  left: 10px !important;
   z-index: 100 !important;
+  border-radius: 0.325rem;
 }
 
 .logs-splitter-icon-expand {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
   position: absolute !important;
-  top: 14px !important;
+  top: 26px !important;
   left: -2px !important;
   z-index: 100 !important;
+  border-radius: 0.325rem;
 }
 
 

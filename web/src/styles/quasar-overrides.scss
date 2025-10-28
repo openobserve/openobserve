@@ -415,7 +415,7 @@ body.desktop .q-hoverable:hover > .q-focus-helper{
 }
 
 .q-btn .q-icon, .q-btn .q-spinner {
-  font-size: 1rem;
+  font-size: 1.3rem;
 }
 
 .q-list,
@@ -494,8 +494,16 @@ body.desktop .q-hoverable:hover > .q-focus-helper{
   font-weight: bolder;
 }
 
-.q-table th {
-  font-weight: bold;
+.q-table {
+  th {
+    font-weight: bold;
+  }
+
+  thead {
+    tr {
+      height: 35px;
+    }
+  }
 }
 
 .q-date__calendar-item > div,
