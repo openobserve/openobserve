@@ -102,13 +102,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   unelevated
                   size="sm"
                   :color="props.row.enabled ? 'negative' : 'positive'"
+                  :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
                   round
                   flat
                   :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
                   @click="toggleReportState(props.row)"
                 >
-                <Pause size="1rem" v-if="props.row.enabled"/>
-                <Play size="1rem" v-else />
               </q-btn>
                 <q-btn
                   :data-test="`report-list-${props.row.name}-edit-report`"
@@ -117,10 +116,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   round
                   flat
+                  icon="edit"
                   :title="t('alerts.edit')"
                   @click="editReport(props.row)"
                 >
-                <Pencil size="1rem" />
               </q-btn>
                 <q-btn
                   :data-test="`report-list-${props.row.name}-delete-report`"
@@ -129,10 +128,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   round
                   flat
+                  :icon="outlinedDelete"
                   :title="t('alerts.delete')"
                   @click="confirmDeleteReport(props.row)"
                 >
-                <Trash size="1rem" />
               </q-btn>
               </q-td>
             </template>
@@ -211,7 +210,6 @@ import reports from "@/services/reports";
 import { cloneDeep } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import { Trash, Pencil, Pause, Play } from "lucide-vue-next";
 
 const reportsTableRows: Ref<any[]> = ref([]);
 

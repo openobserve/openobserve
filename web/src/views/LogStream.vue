@@ -121,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   round
                   flat
                   @click="exploreStream(props)"
+                  icon="search"
                 >
-                <Search size="1rem" />
               </q-btn>
                 <q-btn
                   :title="t('logStream.schemaHeader')"
@@ -132,8 +132,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   round
                   flat
                   @click="listSchema(props)"
+                  icon="list_alt"
                 >
-                <TableProperties size="1rem" />
               </q-btn>
                 <q-btn
                   :title="t('logStream.delete')"
@@ -143,8 +143,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   round
                   flat
                   @click="confirmDeleteAction(props)"
+                  :icon="outlinedDelete"
                 >
-                <Trash size="1rem" />
               </q-btn>
               </q-td>
             </template>
@@ -357,10 +357,9 @@ import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import { Trash, TableProperties, Search } from "lucide-vue-next";
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, AddStream, AppTabs, Trash, TableProperties, Search },
+  components: { QTablePagination, SchemaIndex, NoData, AddStream, AppTabs, },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();

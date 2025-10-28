@@ -77,10 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     round
                     flat
                     @click="exploreEnrichmentTable(props)"
+                    icon="search"
                   >
-                  <Search size="1rem" />
                 </q-btn>
                   <q-btn
+                    icon="list_alt"
                     :title="t('logStream.schemaHeader')"
                     padding="sm"
                     unelevated
@@ -89,29 +90,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     @click="listSchema(props)"
                   >
-                   <TableProperties size="1rem" />
                 </q-btn>
                   <q-btn
                     padding="sm"
                     unelevated
                     size="sm"
+                    icon="edit"
                     round
                     flat
                     :title="t('function.enrichmentTables')"
                     @click="showAddUpdateFn(props)"
                   >
-                  <Pencil size="1rem" />
                 </q-btn>
                   <q-btn
                     padding="sm"
                     unelevated
                     size="sm"
                     round
+                    :icon="outlinedDelete"
                     flat
                     :title="t('function.delete')"
                     @click="showDeleteDialogFn(props)"
                   >
-                  <Trash size="1rem" />
                 </q-btn>
                 </q-td>
               </template>
@@ -209,7 +209,6 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import { Pencil, PencilOff, Search, TableProperties, Trash} from "lucide-vue-next";
 
 export default defineComponent({
   name: "EnrichmentTableList",
@@ -219,10 +218,6 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     EnrichmentSchema,
-    Pencil,
-    Search,
-    TableProperties, 
-    Trash
   },
   emits: [
     "updated:fields",

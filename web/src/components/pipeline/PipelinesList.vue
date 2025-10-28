@@ -612,7 +612,6 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
 import PipelineView from "./PipelineView.vue";
 import ResumePipelineDialog from "../ResumePipelineDialog.vue";
-import { Play, Pause, Pencil, Download, Trash, View,  Info, Eye , ArrowDownToLine } from 'lucide-vue-next';
 
 import { filter, update } from "lodash-es";
 

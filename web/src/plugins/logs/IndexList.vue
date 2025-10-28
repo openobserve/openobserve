@@ -490,10 +490,9 @@ size="xs" /> No field found in
                                 outline
                                 :data-test="`log-search-subfield-list-equal-${props.row.name}-field-btn`"
                               >
-                                <Equal
-                                  :size="16"
-                                  class="!tw-text-[var(--o2-text-primary)]"
-                                />
+                                 <q-icon>
+                                  <EqualIcon></EqualIcon>
+                                </q-icon>
                               </q-btn>
                               <q-btn
                                 class="!tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
@@ -509,11 +508,10 @@ size="xs" /> No field found in
                                 round
                                 outline
                                 :data-test="`log-search-subfield-list-not-equal-${props.row.name}-field-btn`"
-                              >
-                                <EqualNot
-                                  :size="16"
-                                  class="!tw-text-[var(--o2-text-primary)]"
-                                />
+                              > 
+                              <q-icon>
+                                  <NotEqualIcon></NotEqualIcon>
+                                </q-icon>
                               </q-btn>
                             </div>
                           </q-item>
@@ -813,7 +811,6 @@ import { useSearchBar } from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
-import { Equal, EqualNot } from "lucide-vue-next";
 
 interface Filter {
   fieldName: string;
@@ -822,7 +819,7 @@ interface Filter {
 }
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
-  components: { EqualIcon, NotEqualIcon, Equal, EqualNot },
+  components: { },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {

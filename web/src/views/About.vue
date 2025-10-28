@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 target="_blank"
                 class="link-badge"
               >
-                <Package :size="16" class="tw-mr-1" />
+              <q-icon name="backpack" class="tw-mr-1" />
                 package.json
               </a>
               <a href="https://npmjs.com" target="_blank" class="link-badge">
@@ -176,12 +176,10 @@ import { useStore } from "vuex";
 import { getImageURL } from "../utils/zincutils";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
-import { Package } from "lucide-vue-next";
 
 export default defineComponent({
   name: "PageAbout",
   components: {
-    Package,
   },
   setup() {
     const store = useStore();
