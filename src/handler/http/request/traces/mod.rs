@@ -393,9 +393,27 @@ pub async fn get_latest_traces(
     let mut traces_data: HashMap<String, TraceResponseItem> =
         HashMap::with_capacity(resp_search.hits.len());
     for item in resp_search.hits {
-        let trace_id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
-        let trace_start_time = json::get_int_value(item.get("trace_start_time").unwrap());
-        let trace_end_time = json::get_int_value(item.get("trace_end_time").unwrap());
+        // Safely extract trace_id - it should always be present as a core field
+        let trace_id = match item.get("trace_id").and_then(|v| v.as_str()) {
+            Some(id) => id.to_string(),
+            None => {
+                log::error!(
+                    "Missing trace_id in search result - this indicates a UDS schema bug. Item: {:?}",
+                    item
+                );
+                continue; // Skip this item rather than panicking
+            }
+        };
+
+        // Safely extract trace start/end times
+        let trace_start_time = item
+            .get("trace_start_time")
+            .map(|v| json::get_int_value(v))
+            .unwrap_or(0);
+        let trace_end_time = item
+            .get("trace_end_time")
+            .map(|v| json::get_int_value(v))
+            .unwrap_or(0);
         // trace time is nanosecond, need to compare with microsecond
         if trace_start_time / 1000 < start_time {
             start_time = trace_start_time / 1000;

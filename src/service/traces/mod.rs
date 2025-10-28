@@ -762,11 +762,10 @@ async fn write_traces(
         .await
         .unwrap_or_default();
 
-    // Get UDS configuration
+    // Get UDS configuration BEFORE processing records (matching logs pattern)
     let uds_fields = if !stream_settings.defined_schema_fields.is_empty() {
         let mut fields =
             std::collections::HashSet::from_iter(stream_settings.defined_schema_fields.clone());
-        // Ensure timestamp is always included
         if !fields.contains(TIMESTAMP_COL_NAME) {
             fields.insert(TIMESTAMP_COL_NAME.to_string());
         }
@@ -812,19 +811,25 @@ async fn write_traces(
     let mut evaluated_alerts = HashSet::new();
     // End get stream alert
 
-    // Start check for schema
-    // Apply UDS filtering to all spans BEFORE schema inference
-    let mut filtered_json_data = Vec::with_capacity(json_data.len());
-    if let Some(ref defined_fields) = uds_fields {
-        for (timestamp, record_val) in json_data {
-            let filtered =
-                crate::service::traces::uds::refactor_span_attributes(record_val, defined_fields);
-            filtered_json_data.push((timestamp, filtered));
-        }
-    } else {
-        filtered_json_data = json_data;
-    }
+    // Apply UDS filtering BEFORE schema check (matching logs pattern)
+    // This ensures schema is created only with UDS fields + core fields
+    let filtered_json_data: Vec<(i64, json::Map<String, json::Value>)> =
+        if let Some(ref defined_fields) = uds_fields {
+            json_data
+                .into_iter()
+                .map(|(timestamp, record_val)| {
+                    let filtered = crate::service::traces::uds::refactor_span_attributes(
+                        record_val,
+                        defined_fields,
+                    );
+                    (timestamp, filtered)
+                })
+                .collect()
+        } else {
+            json_data
+        };
 
+    // Check for schema on filtered records (matching logs pattern)
     let min_timestamp = filtered_json_data.iter().map(|(ts, _)| ts).min().unwrap();
     let _ = check_for_schema(
         org_id,

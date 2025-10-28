@@ -22,10 +22,15 @@ use config::{
 
 /// Core trace fields that are ALWAYS included regardless of UDS configuration
 /// These fields are essential for trace functionality and cannot be excluded
+///
+/// NOTE: The `reference` HashMap is flattened during serialization, so fields like
+/// `parent_span_id` become `reference.parent_span_id` (with dot notation)
 const CORE_TRACE_FIELDS: &[&str] = &[
     "trace_id",
     "span_id",
-    "parent_span_id",
+    "reference.parent_span_id",  // Flattened from reference HashMap
+    "reference.parent_trace_id", // Flattened from reference HashMap
+    "reference.ref_type",        // Flattened from reference HashMap
     "_timestamp",
     "start_time",
     "end_time",
@@ -37,7 +42,6 @@ const CORE_TRACE_FIELDS: &[&str] = &[
     "flags",
     "events",
     "links",
-    "reference",
 ];
 
 /// Refactors span attributes by filtering them based on user-defined schema configuration.
@@ -106,10 +110,19 @@ pub fn refactor_span_attributes(
     }
 
     // Add _all column if there are non-schema attributes
+    // IMPORTANT: _all must be a JSON string, not an object, to match Parquet schema
+    // (DataType::Utf8)
     if !non_schema_attrs.is_empty() {
+        let all_values_json = serde_json::to_string(&non_schema_attrs).unwrap_or_else(|e| {
+            log::error!(
+                "[UDS] Failed to serialize non-schema attributes to JSON: {}",
+                e
+            );
+            "{}".to_string()
+        });
         new_map.insert(
             cfg.common.column_all.to_string(),
-            Value::Object(non_schema_attrs),
+            Value::String(all_values_json),
         );
     }
 
@@ -257,9 +270,9 @@ mod tests {
 
         // Non-UDS attributes should be in _all
         assert!(result.contains_key("_all"));
-        let all_value = result.get("_all").unwrap().as_object().unwrap();
-        assert!(all_value.contains_key("user_id"));
-        assert!(all_value.contains_key("debug_flag"));
+        let all_value = result.get("_all").unwrap().as_str().unwrap();
+        assert!(all_value.contains("user_id"));
+        assert!(all_value.contains("debug_flag"));
     }
 
     #[test]
@@ -284,9 +297,9 @@ mod tests {
 
         // Non-core attributes should be in _all
         assert!(result.contains_key("_all"));
-        let all_value = result.get("_all").unwrap().as_object().unwrap();
-        assert!(all_value.contains_key("http_method"));
-        assert!(all_value.contains_key("custom_attr"));
+        let all_value = result.get("_all").unwrap().as_str().unwrap();
+        assert!(all_value.contains("http_method"));
+        assert!(all_value.contains("custom_attr"));
     }
 
     #[test]

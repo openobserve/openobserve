@@ -29,7 +29,7 @@ use config::{
     metrics,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt, time::now_micros},
 };
-use datafusion::arrow::datatypes::{Field, Schema};
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use hashbrown::HashSet;
 use infra::schema::{
     STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
@@ -138,6 +138,7 @@ pub async fn check_for_schema(
                     need_original,
                     index_original_data,
                     index_all_values,
+                    stream_type,
                 );
                 stream_schema_map.insert(stream_name.to_string(), schema);
             }
@@ -344,20 +345,43 @@ pub(crate) async fn handle_diff_schema(
     let mut stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
     let mut defined_schema_fields = stream_setting.defined_schema_fields.clone();
 
+    // Helper function to check if a field is a core system field
+    // Core fields should NOT count toward the UDS threshold
+    // These are fields that OpenObserve adds or requires for functionality
+    let is_core_system_field = |field_name: &str| {
+        // Fields with double underscores are system fields
+        field_name.starts_with("__") ||
+        // Timestamp field is always required
+        field_name == TIMESTAMP_COL_NAME ||
+        field_name == ID_COL_NAME ||
+        field_name == ORIGINAL_DATA_COL_NAME ||
+        field_name == ALL_VALUES_COL_NAME ||
+        field_name == cfg.common.column_all.as_str()
+    };
+
+    // Count only non-core fields for UDS threshold check
+    let non_core_field_count = final_schema
+        .fields()
+        .iter()
+        .filter(|f| !is_core_system_field(f.name()))
+        .count();
+
     log::info!(
-        "[UDS DEBUG] Checking auto-enable for {}/{}, stream_type={:?}, field_count={}",
+        "[UDS DEBUG] Checking auto-enable for {}/{}, stream_type={:?}, total_fields={}, non_core_fields={}",
         org_id,
         stream_name,
         stream_type,
-        final_schema.fields().len()
+        final_schema.fields().len(),
+        non_core_field_count
     );
 
     // Automatically enable User-defined schema when
     // 1. allow_user_defined_schemas is enabled
     // 2. log/metrics/traces ingestion
     // 3. user defined schema is not already enabled
-    // 4. final schema fields count exceeds the respective threshold
-    // user-defined schema does not include _timestamp or _all columns
+    // 4. NON-CORE schema fields count exceeds the respective threshold
+    // Core fields (with __ prefix or _timestamp) are always included and don't count toward
+    // threshold
 
     // Check which threshold to use based on stream type
     let (should_enable_uds, uds_max_fields) = match stream_type {
@@ -365,40 +389,45 @@ pub(crate) async fn handle_diff_schema(
             cfg.common.allow_user_defined_schemas
                 && cfg.limit.schema_max_fields_to_enable_uds > 0
                 && defined_schema_fields.is_empty()
-                && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds,
+                && non_core_field_count > cfg.limit.schema_max_fields_to_enable_uds,
             cfg.limit.schema_max_fields_to_enable_uds,
         ),
         StreamType::Metrics => {
-            log::debug!(
-                "[UDS] Metrics auto-enable check: allow_uds={}, threshold={}, field_count={}, defined_fields_empty={}",
-                cfg.common.allow_user_defined_schemas,
+            let allow_uds = cfg.common.allow_user_defined_schemas;
+            let threshold_set = cfg.limit.schema_max_fields_to_enable_uds_metrics > 0;
+            let fields_empty = defined_schema_fields.is_empty();
+            let exceeds_threshold =
+                non_core_field_count > cfg.limit.schema_max_fields_to_enable_uds_metrics;
+
+            log::info!(
+                "[UDS METRICS AUTO-ENABLE CHECK] allow_uds={}, threshold={}>0={}, non_core_field_count={}, threshold_value={}, exceeds={}, fields_empty={}, will_enable={}",
+                allow_uds,
                 cfg.limit.schema_max_fields_to_enable_uds_metrics,
-                final_schema.fields().len(),
-                defined_schema_fields.is_empty()
+                threshold_set,
+                non_core_field_count,
+                cfg.limit.schema_max_fields_to_enable_uds_metrics,
+                exceeds_threshold,
+                fields_empty,
+                allow_uds && threshold_set && fields_empty && exceeds_threshold
             );
             (
-                cfg.common.allow_user_defined_schemas
-                    && cfg.limit.schema_max_fields_to_enable_uds_metrics > 0
-                    && defined_schema_fields.is_empty()
-                    && final_schema.fields().len()
-                        > cfg.limit.schema_max_fields_to_enable_uds_metrics,
+                allow_uds && threshold_set && fields_empty && exceeds_threshold,
                 cfg.limit.schema_max_fields_to_enable_uds_metrics,
             )
         }
         StreamType::Traces => {
             log::debug!(
-                "[UDS] Traces auto-enable check: allow_uds={}, threshold={}, field_count={}, defined_fields_empty={}",
+                "[UDS] Traces auto-enable check: allow_uds={}, threshold={}, non_core_field_count={}, defined_fields_empty={}",
                 cfg.common.allow_user_defined_schemas,
                 cfg.limit.schema_max_fields_to_enable_uds_traces,
-                final_schema.fields().len(),
+                non_core_field_count,
                 defined_schema_fields.is_empty()
             );
             (
                 cfg.common.allow_user_defined_schemas
                     && cfg.limit.schema_max_fields_to_enable_uds_traces > 0
                     && defined_schema_fields.is_empty()
-                    && final_schema.fields().len()
-                        > cfg.limit.schema_max_fields_to_enable_uds_traces,
+                    && non_core_field_count > cfg.limit.schema_max_fields_to_enable_uds_traces,
                 cfg.limit.schema_max_fields_to_enable_uds_traces,
             )
         }
@@ -406,11 +435,25 @@ pub(crate) async fn handle_diff_schema(
     };
 
     if should_enable_uds {
+        log::info!(
+            "[UDS AUTO-ENABLE] Enabling UDS for {}/{}/{}, total_fields={}, non_core_fields={}, max_fields={}",
+            org_id,
+            stream_type,
+            stream_name,
+            final_schema.fields().len(),
+            non_core_field_count,
+            uds_max_fields
+        );
+
         let mut uds_fields = HashSet::with_capacity(uds_max_fields);
 
         // Helper to check if a field should be skipped
+        // Core system fields should NOT be added to the UDS field list
+        // They are always included regardless of UDS configuration
         let should_skip_common = |field_name: &str| {
-            field_name == TIMESTAMP_COL_NAME
+            // Fields with double underscores are system fields (e.g., __name__, __type__, __hash__)
+            field_name.starts_with("__")
+                || field_name == TIMESTAMP_COL_NAME
                 || field_name == ID_COL_NAME
                 || field_name == ORIGINAL_DATA_COL_NAME
                 || field_name == ALL_VALUES_COL_NAME
@@ -588,9 +631,34 @@ pub(crate) async fn handle_diff_schema(
 
         defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
         stream_setting.defined_schema_fields = defined_schema_fields.clone();
+
+        // CRITICAL: Add _all to full_text_search_keys when UDS is enabled
+        // This allows queries on non-UDS fields to search inside the _all JSON column
+        let cfg = get_config();
+        if !stream_setting
+            .full_text_search_keys
+            .contains(&cfg.common.column_all)
+        {
+            stream_setting
+                .full_text_search_keys
+                .push(cfg.common.column_all.clone());
+            log::info!(
+                "[UDS AUTO-ENABLE] Added _all to full_text_search_keys for {}/{}/{}",
+                org_id,
+                stream_type,
+                stream_name
+            );
+        }
+
         final_schema.metadata.insert(
             "settings".to_string(),
             json::to_string(&stream_setting).unwrap(),
+        );
+
+        log::info!(
+            "[UDS AUTO-ENABLE] Selected {} fields for UDS: {:?}",
+            defined_schema_fields.len(),
+            defined_schema_fields.iter().take(10).collect::<Vec<_>>()
         );
 
         // save the new settings
@@ -603,6 +671,13 @@ pub(crate) async fn handle_diff_schema(
         .await
         {
             log::error!("save_stream_settings [{org_id}/{stream_type}/{stream_name}] error: {e}");
+        } else {
+            log::info!(
+                "[UDS AUTO-ENABLE] Successfully saved UDS settings for {}/{}/{}",
+                org_id,
+                stream_type,
+                stream_name
+            );
         }
     }
 
@@ -633,6 +708,7 @@ pub(crate) async fn handle_diff_schema(
         need_original,
         index_original_data,
         index_all_values,
+        stream_type,
     );
     stream_schema_map.insert(stream_name.to_string(), final_schema);
 
@@ -651,16 +727,18 @@ pub(crate) async fn handle_diff_schema(
     }))
 }
 
-// if defined_schema_fields is not empty, and schema fields greater than defined_schema_fields + 10,
-// then we will use defined_schema_fields
+// Apply user-defined schema filtering regardless of field count
+// This ensures UDS works even with small schemas (2-3 fields)
 pub fn generate_schema_for_defined_schema_fields(
     schema: &SchemaCache,
     fields: &[String],
     need_original: bool,
     index_original_data: bool,
     index_all_values: bool,
+    stream_type: StreamType,
 ) -> SchemaCache {
-    if fields.is_empty() || schema.fields_map().len() < fields.len() + 10 {
+    // Only skip if no UDS fields are defined
+    if fields.is_empty() {
         return schema.clone();
     }
 
@@ -670,30 +748,143 @@ pub fn generate_schema_for_defined_schema_fields(
     let original_col = ORIGINAL_DATA_COL_NAME.to_string();
     let all_values_col = ALL_VALUES_COL_NAME.to_string();
 
-    let mut fields: HashSet<&String> = fields.iter().collect();
-    if !fields.contains(&timestamp_col) {
-        fields.insert(&timestamp_col);
-    }
-    if !fields.contains(&cfg.common.column_all) {
-        fields.insert(&cfg.common.column_all);
-    }
-    if need_original || index_original_data {
-        if !fields.contains(&o2_id_col) {
-            fields.insert(&o2_id_col);
-        }
-        if !fields.contains(&original_col) {
-            fields.insert(&original_col);
-        }
-    }
-    if index_all_values && !fields.contains(&all_values_col) {
-        fields.insert(&all_values_col);
+    // Convert to Vec of owned Strings so we can add core fields
+    let mut all_fields: Vec<String> = fields.to_vec();
+
+    // Always include timestamp
+    if !all_fields.contains(&timestamp_col) {
+        all_fields.push(timestamp_col.clone());
     }
 
-    let mut new_fields = Vec::with_capacity(fields.len());
-    for field in fields {
+    // Always include _all column for UDS
+    if !all_fields.contains(&cfg.common.column_all) {
+        all_fields.push(cfg.common.column_all.to_string());
+    }
+
+    // Add core fields based on stream type
+    // These fields are ALWAYS required for the stream to function correctly
+    // We add them unconditionally - they'll be created with default types if missing from schema
+    match stream_type {
+        StreamType::Traces => {
+            // Core trace fields from CORE_TRACE_FIELDS in traces/uds.rs
+            // Note: These must match the CORE_TRACE_FIELDS constant in src/service/traces/uds.rs
+            let core_trace_fields = [
+                "trace_id",
+                "span_id",
+                "reference.parent_span_id",
+                "reference.parent_trace_id",
+                "reference.ref_type",
+                "start_time",
+                "end_time",
+                "duration",
+                "service_name",
+                "operation_name",
+                "span_kind",
+                "span_status",
+                "flags",
+                "events",
+                "links",
+            ];
+            for core_field in &core_trace_fields {
+                if !all_fields.contains(&core_field.to_string()) {
+                    all_fields.push(core_field.to_string());
+                }
+            }
+        }
+        StreamType::Metrics => {
+            // Core metric fields from CORE_METRIC_FIELDS in metrics/uds.rs
+            let core_metric_fields = [
+                "__name__",
+                "__type__",
+                "__hash__",
+                "value",
+                "le",
+                "quantile",
+                "exemplars",
+            ];
+            for core_field in &core_metric_fields {
+                if !all_fields.contains(&core_field.to_string()) {
+                    all_fields.push(core_field.to_string());
+                }
+            }
+        }
+        _ => {
+            // For logs and other types, no special core fields needed beyond timestamp
+        }
+    }
+
+    if need_original || index_original_data {
+        if !all_fields.contains(&o2_id_col) {
+            all_fields.push(o2_id_col.clone());
+        }
+        if !all_fields.contains(&original_col) {
+            all_fields.push(original_col.clone());
+        }
+    }
+    if index_all_values && !all_fields.contains(&all_values_col) {
+        all_fields.push(all_values_col.clone());
+    }
+
+    let mut new_fields = Vec::with_capacity(all_fields.len());
+    let mut missing_core_fields = Vec::new();
+
+    for field in &all_fields {
         if let Some(f) = schema.fields_map().get(field) {
             new_fields.push(schema.schema().fields()[*f].clone());
+        } else {
+            // Field requested but not in current schema
+            // Check if this is a missing core field that we should add with default type
+            let field_name = field.as_str();
+            let is_core_field_missing = match stream_type {
+                StreamType::Traces => {
+                    matches!(
+                        field_name,
+                        "trace_id"
+                            | "span_id"
+                            | "reference.parent_span_id"
+                            | "reference.parent_trace_id"
+                            | "reference.ref_type"
+                            | "start_time"
+                            | "end_time"
+                            | "duration"
+                            | "service_name"
+                            | "operation_name"
+                            | "span_kind"
+                            | "span_status"
+                            | "flags"
+                            | "events"
+                            | "links"
+                    )
+                }
+                StreamType::Metrics => {
+                    matches!(
+                        field_name,
+                        "__name__"
+                            | "__type__"
+                            | "__hash__"
+                            | "value"
+                            | "le"
+                            | "quantile"
+                            | "exemplars"
+                    )
+                }
+                _ => false,
+            };
+
+            if is_core_field_missing {
+                // Add missing core field with string type (most common/safe default)
+                missing_core_fields.push(field.clone());
+                new_fields.push(Field::new(field, DataType::Utf8, true).into());
+            }
         }
+    }
+
+    if !missing_core_fields.is_empty() {
+        log::warn!(
+            "Added {} missing core fields to schema (stream_type: {})",
+            missing_core_fields.len(),
+            stream_type
+        );
     }
 
     // sort the fields by name to make sure the order is consistent
@@ -714,6 +905,34 @@ pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bo
         .map(|s| s.defined_schema_fields)
         .unwrap_or_default();
 
+    // Define core fields for each stream type
+    let trace_core_fields = [
+        "trace_id",
+        "span_id",
+        "reference.parent_span_id",
+        "reference.parent_trace_id",
+        "reference.ref_type",
+        "start_time",
+        "end_time",
+        "duration",
+        "service_name",
+        "operation_name",
+        "span_kind",
+        "span_status",
+        "flags",
+        "events",
+        "links",
+    ];
+    let metric_core_fields = [
+        "__name__",
+        "__type__",
+        "__hash__",
+        "value",
+        "le",
+        "quantile",
+        "exemplars",
+    ];
+
     for item in inferred_schema.fields.iter() {
         let item_name = item.name();
         let item_data_type = item.data_type();
@@ -721,10 +940,36 @@ pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bo
         match schema.fields_map().get(item_name) {
             None => {
                 is_schema_changed = true;
+                log::info!("[SCHEMA DEBUG] New field detected: {}", item_name);
             }
             Some(idx) => {
+                // When UDS is enabled, skip fields that are not in the UDS list
+                // BUT: Never skip core fields - they must always be checked
                 if !defined_schema_fields.is_empty() && !defined_schema_fields.contains(item_name) {
-                    continue;
+                    // Check if this is a core field that should never be skipped
+                    let cfg = get_config();
+                    let is_trace_core = trace_core_fields.contains(&item_name.as_str());
+                    let is_metric_core = metric_core_fields.contains(&item_name.as_str());
+                    let is_generic_core = item_name == "_timestamp"
+                        || item_name == cfg.common.column_all.as_str()
+                        || item_name == ID_COL_NAME
+                        || item_name == ORIGINAL_DATA_COL_NAME
+                        || item_name == ALL_VALUES_COL_NAME;
+
+                    let is_core_field = is_trace_core || is_metric_core || is_generic_core;
+
+                    if !is_core_field {
+                        log::debug!("[SCHEMA DEBUG] Skipping non-UDS field: {}", item_name);
+                        continue;
+                    }
+
+                    log::info!(
+                        "[SCHEMA DEBUG] NOT skipping core field: {} (trace={}, metric={}, generic={})",
+                        item_name,
+                        is_trace_core,
+                        is_metric_core,
+                        is_generic_core
+                    );
                 }
                 let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
                 if existing_field.data_type() != item_data_type {

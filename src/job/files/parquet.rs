@@ -707,6 +707,7 @@ async fn merge_files(
             need_original,
             index_original_data,
             index_all_values,
+            stream_type,
         );
         latest_schema.schema().clone()
     } else {

@@ -35,7 +35,6 @@ use config::{
         time::now_micros,
     },
 };
-use hashbrown::HashSet;
 use infra::schema::{SchemaCache, unwrap_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -434,12 +433,21 @@ pub async fn handle_otlp_request(
             .get(&local_metric_name)
             .and_then(|opt| opt.as_ref());
 
+        // Collect records with UDS filtering applied BEFORE schema check (matching logs pattern)
+        let mut filtered_records = Vec::with_capacity(json_data.len());
+
         for mut rec in json_data {
             // get json object
             let val_map: &mut serde_json::Map<String, serde_json::Value> =
                 rec.as_object_mut().unwrap();
 
-            // Apply UDS filtering if configured
+            let timestamp = val_map
+                .get(TIMESTAMP_COL_NAME)
+                .and_then(|ts| ts.as_i64())
+                .unwrap_or(Utc::now().timestamp_micros());
+
+            // Apply UDS filtering BEFORE schema check (matching logs pattern)
+            // This ensures schema is created only with UDS fields + core fields
             if let Some(defined_fields) = uds_fields {
                 let filtered = crate::service::metrics::uds::refactor_metric_map(
                     val_map.clone(),
@@ -451,46 +459,31 @@ pub async fn handle_otlp_request(
                 *val_map = filtered_with_hash;
             }
 
-            let timestamp = val_map
-                .get(TIMESTAMP_COL_NAME)
-                .and_then(|ts| ts.as_i64())
-                .unwrap_or(Utc::now().timestamp_micros());
+            filtered_records.push((timestamp, val_map.clone()));
+        }
 
-            let value_str = json::to_string(&val_map).unwrap();
-
-            // check for schema evolution
-            let schema_fields = match metric_schema_map.get(&local_metric_name) {
-                Some(schema) => schema
-                    .schema()
-                    .fields()
-                    .iter()
-                    .map(|f| f.name())
-                    .collect::<HashSet<_>>(),
-                None => HashSet::default(),
-            };
-            let mut need_schema_check = !schema_evolved.contains_key(&local_metric_name);
-            for key in val_map.keys() {
-                if !schema_fields.contains(&key) {
-                    need_schema_check = true;
-                    break;
-                }
-            }
-            drop(schema_fields);
-            if need_schema_check
-                && check_for_schema(
-                    org_id,
-                    &local_metric_name,
-                    StreamType::Metrics,
-                    &mut metric_schema_map,
-                    vec![val_map],
-                    timestamp,
-                    false, // is_derived is false for metrics
-                )
-                .await
-                .is_ok()
+        // Check for schema evolution on filtered records (matching logs pattern)
+        if !schema_evolved.contains_key(&local_metric_name) {
+            let min_timestamp = filtered_records.iter().map(|(ts, _)| ts).min().unwrap();
+            if check_for_schema(
+                org_id,
+                &local_metric_name,
+                StreamType::Metrics,
+                &mut metric_schema_map,
+                filtered_records.iter().map(|(_, v)| v).collect(),
+                *min_timestamp,
+                false, // is_derived is false for metrics
+            )
+            .await
+            .is_ok()
             {
                 schema_evolved.insert(local_metric_name.to_owned(), true);
             }
+        }
+
+        // Process filtered records
+        for (timestamp, val_map) in filtered_records {
+            let value_str = json::to_string(&val_map).unwrap();
 
             let buf = metric_data_map
                 .entry(local_metric_name.to_owned())
@@ -508,7 +501,7 @@ pub async fn handle_otlp_request(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
-                val_map,
+                &val_map,
                 Some(&schema_key),
             );
             let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
@@ -532,7 +525,7 @@ pub async fn handle_otlp_request(
                     let alert_end_time = now_micros();
                     for alert in alerts {
                         if let Ok(Some(data)) = alert
-                            .evaluate(Some(val_map), (None, alert_end_time), None)
+                            .evaluate(Some(&val_map), (None, alert_end_time), None)
                             .await
                             .map(|res| res.data)
                         {
