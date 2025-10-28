@@ -245,4 +245,8 @@ const updateActiveTab = (tab: string) => {
 :deep(.q-splitter__before) {
   overflow: visible;
 }
+
+.splitter-icon-collapse {
+    left: 4px !important;
+}
 </style>
