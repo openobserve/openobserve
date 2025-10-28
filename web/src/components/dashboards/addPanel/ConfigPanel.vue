@@ -1346,6 +1346,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="dashboardPanelData.data.config.show_gridlines"
         label="Show Gridlines"
         data-test="dashboard-config-show-gridlines"
+        class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+        size="lg"
+        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
       />
 
       <div class="space"></div>
