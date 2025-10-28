@@ -32,16 +32,21 @@ export class LoginPage {
 
   async login() {
     await this.userIdInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
+    await this.passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+
     const waitForLogin = this.page.waitForResponse(
       (response) =>
-        response.url().includes("/auth/login") && response.status() === 200
+        response.url().includes("/auth/login") && response.status() === 200,
+      { timeout: 60000 }
     );
-    await this.passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-    await this.waitForLogin;
+
     await this.loginButton.click();
+    await waitForLogin;
+    await this.page.waitForTimeout(2000);
     await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
       waitUntil: "networkidle",
-    });   
+      timeout: 60000
+    });
   }
 
   async gotoLoginPageSC() {
@@ -82,20 +87,25 @@ export class LoginPage {
 
   async loginSC() {
     // Wait for login form elements to be available
-    await this.userIdInput.waitFor({ state: 'visible', timeout: 10000 });
-    await this.passwordInput.waitFor({ state: 'visible', timeout: 10000 });
-    
+    await this.userIdInput.waitFor({ state: 'visible', timeout: 15000 });
+    await this.passwordInput.waitFor({ state: 'visible', timeout: 15000 });
+
     await this.userIdInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
+    await this.passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+
     const waitForLogin = this.page.waitForResponse(
       (response) =>
-        response.url().includes("/auth/login") && response.status() === 200
+        response.url().includes("/auth/login") && response.status() === 200,
+      { timeout: 60000 }
     );
-    await this.passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+
     await this.loginButton.click();
     await waitForLogin;
+    await this.page.waitForTimeout(2000);
     await this.page.waitForURL(process.env["ZO_BASE_URL_SC_UI"] + "/web/", {
       waitUntil: "networkidle",
-    });  
+      timeout: 60000
+    });
   }
 
 

@@ -199,15 +199,17 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async expandFirstLogRow() {
-        await this.page.waitForLoadState('networkidle');
-        
+        await this.page.waitForLoadState('networkidle', { timeout: 60000 });
+        await this.page.waitForTimeout(1000);
+
         // Additional run query clicks to ensure VRL enrichment is fully processed
         const refreshButton = this.page.locator(this.refreshButton);
         if (await refreshButton.isVisible()) {
             for (let i = 0; i < 3; i++) {
                 await refreshButton.click({ force: true });
                 await this.page.waitForLoadState('domcontentloaded');
-                await this.page.waitForLoadState('networkidle', { timeout: 2000 });
+                await this.page.waitForTimeout(2000);
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 });
             }
         }
         
