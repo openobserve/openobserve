@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export const CURRENT_DASHBOARD_SCHEMA_VERSION = 6;
+export const CURRENT_DASHBOARD_SCHEMA_VERSION = 7;
 
 const convertPanelSchemaVersion = (data: any) => {
   if (!data || (typeof data === "object" && Object.keys(data).length === 0)) {
@@ -281,6 +281,59 @@ export function convertDashboardSchemaVersion(data: any) {
 
       // update the version
       data.version = 6;
+    }
+
+    case 6: {
+      // need to traverse all panels
+      // for each panel
+      //   for each query
+      //      for each fields [x, y, z, breakdown, latitude, longitude, weight, source, target, value] Make sure that some of fields is not array
+      //          add type: "build"
+      //          field.column will go inside args array : {type: "field", value: field.column}
+      data.tabs.forEach((tabItem: any) => {
+        tabItem.panels.forEach((panelItem: any) => {
+          panelItem.queries.forEach((queryItem: any) => {
+            const {
+              x,
+              y,
+              z,
+              breakdown,
+              latitude,
+              longitude,
+              weight,
+              source,
+              target,
+              value,
+            } = queryItem.fields;
+
+            // Migrate all fields
+            [
+              x,
+              y,
+              z,
+              breakdown,
+              latitude,
+              longitude,
+              weight,
+              source,
+              target,
+              value,
+            ].forEach((field: any) => {
+              migrateFields(field, queryItem.customQuery, migrateV5FieldsToV6);
+            });
+
+            // Migrate the filters
+            // all column which is currently string will be converted to object with streamAlias and field
+            // make sure that conditions can be array based on filterType
+            queryItem.fields.filter = migrateFilterConditions(
+              queryItem.fields.filter,
+            );
+          });
+        });
+      });
+
+      // update the version
+      data.version = 7;
     }
   }
 
