@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="flex justify-center items-baseline">
+    <div class="flex justify-center items-start">
       <!-- select new folder -->
       <q-select
         v-model="selectedFolder"
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         behavior="menu"
         borderless
         dense
-        class="showLabelOnTop no-case tw-mr-1"
+        class="showLabelOnTop no-case tw-mr-1 tw-mt-[1px]"
         style="width: calc(100% - 44px)"
         :disable="disableDropdown"
       >
@@ -38,22 +38,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-select>
 
       <q-btn
-        class="q-mb-md text-bold add-folder-btn"
-        :class="store.state.theme === 'dark' ? 'add-folder-btn-dark' : 'add-folder-btn-light'"
+        class="q-mb-md add-folder-btn"
         :data-test="`${type}-folder-move-new-add`"
-        label="+"
-        text-color="light-text"
         style="width: 40px;"
         :style="computedStyle"
-
         no-caps
+        dense
         @click="
           () => {
             showAddFolderDialog = true;
           }
         "
+        title="Add Folder"
         :disable="disableDropdown"
-      />
+      >
+        <q-icon name="add" size="xs" />
+      </q-btn>
     </div>
     <!-- add folder -->
     <q-dialog
@@ -139,7 +139,8 @@ import { getFoldersListByType } from "@/utils/commons";
       };
 
       const computedStyle = computed (() => {
-        return props.style ? props.style : 'height: 42px';
+        const baseStyle = props.style ? props.style : 'height: 42px';
+        return `${baseStyle}; margin-top: 32px`;
       });
 
       onActivated(async () => {
@@ -174,3 +175,21 @@ import { getFoldersListByType } from "@/utils/commons";
     },
   });
   </script>
+
+<style lang="scss">
+.add-folder-btn{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  border-radius: 4px !important;
+  padding: 0px 12px !important;
+  min-width: auto !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
+  }
+  
+}
+</style>
