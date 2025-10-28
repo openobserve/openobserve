@@ -189,7 +189,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
             if super::ingestion::ingest_reporting_data(triggers.clone(), trigger_stream)
                 .await
                 .is_err()
-                && &cfg.common.usage_reporting_mode != "both"
+                && &cfg.common.usage_reporting_mode != "dual"
                 && !enqueued_on_failure
             {
                 // Only enqueue once on first failure , this brings risk that it may be duplicated

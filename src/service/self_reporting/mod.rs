@@ -45,6 +45,14 @@ mod queues;
 pub mod search;
 
 pub async fn run() {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let cfg = get_config();
+        if !cfg.common.usage_enabled {
+            return;
+        }
+    }
+
     // Force initialization usage queue
     let (usage_start_sender, usage_start_receiver) = oneshot::channel();
     if let Err(e) = queues::USAGE_QUEUE.start(usage_start_sender).await {
@@ -89,6 +97,11 @@ pub async fn report_request_usage_stats(
         metrics::INGEST_BYTES
             .with_label_values(&[org_id, stream_type.as_str()])
             .inc_by((stats.size * SIZE_IN_MB) as u64);
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    if !get_config().common.usage_enabled {
+        return;
     }
 
     let now = DateTime::from_timestamp_micros(timestamp).unwrap();
@@ -186,6 +199,14 @@ pub async fn report_request_usage_stats(
 }
 
 async fn publish_usage(usages: Vec<UsageData>) {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let cfg = get_config();
+        if !cfg.common.usage_enabled {
+            return;
+        }
+    }
+
     for usage in usages {
         if let Err(e) = queues::USAGE_QUEUE
             .enqueue(ReportingData::Usage(Box::new(usage)))
@@ -199,6 +220,14 @@ async fn publish_usage(usages: Vec<UsageData>) {
 }
 
 pub async fn publish_triggers_usage(trigger: TriggerData) {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let cfg = get_config();
+        if !cfg.common.usage_enabled {
+            return;
+        }
+    }
+
     match queues::USAGE_QUEUE
         .enqueue(ReportingData::Trigger(Box::new(trigger)))
         .await
@@ -215,6 +244,14 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
 }
 
 pub async fn publish_error(error_data: ErrorData) {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let cfg = get_config();
+        if !cfg.common.usage_enabled {
+            return;
+        }
+    }
+
     // Queue error for batch processing (includes DB upsert and _meta stream ingestion)
     match queues::ERROR_QUEUE
         .enqueue(ReportingData::Error(Box::new(error_data)))
@@ -237,8 +274,14 @@ pub async fn flush() {
     flush_audit().await;
 
     let cfg = get_config();
+
+    #[cfg(feature = "enterprise")]
+    let usage_enabled = true;
+    #[cfg(not(feature = "enterprise"))]
+    let usage_enabled = cfg.common.usage_enabled;
+
     // only ingester and querier nodes report usage
-    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() {
+    if !usage_enabled || (!LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier()) {
         return;
     }
 

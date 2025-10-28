@@ -58,9 +58,11 @@ async fn enforce_usage_stream_retention() {
         META_ORG_ID,
         meta::{self_reporting::usage::USAGE_STREAM, stream::StreamType},
     };
-    if let Some(s) = infra::schema::get_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs).await
+    if let Some(mut s) =
+        infra::schema::get_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs).await
         && s.data_retention < 32
     {
+        s.data_retention = 32;
         crate::service::stream::save_stream_settings(
             META_ORG_ID,
             USAGE_STREAM,
