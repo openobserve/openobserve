@@ -530,7 +530,9 @@
     "edit": "Edit",
     "delete": "Delete",
     "view": "View",
-    "delay": "Delay"
+    "delay": "Delay",
+    "history": "Pipeline History",
+    "searchHistory": "Enter Pipeline Name"
   },
   "function": {
     "header": "Functions",
