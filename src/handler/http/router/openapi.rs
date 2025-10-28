@@ -161,6 +161,7 @@ use crate::{common::meta, handler::http::request};
         request::pipeline::update_pipeline,
         request::pipeline::enable_pipeline,
         request::pipeline::enable_pipeline_bulk,
+        request::pipelines::history::get_pipeline_history,
         request::dashboards::reports::create_report,
         request::dashboards::reports::update_report,
         request::dashboards::reports::list_reports,
