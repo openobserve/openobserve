@@ -39,7 +39,7 @@ pub async fn ingest(req: cluster_rpc::IngestionRequest) -> Result<cluster_rpc::I
     // set ingestion timeout
     let mut request = tonic::Request::new(req);
     request.set_timeout(std::time::Duration::from_secs(
-        cfg.limit.query_ingester_timeout,
+        cfg.limit.grpc_ingest_timeout,
     ));
 
     client = client
