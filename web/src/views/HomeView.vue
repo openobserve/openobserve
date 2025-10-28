@@ -13,7 +13,6 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
-
 <template>
   <q-page class="tw-px-[0.625rem]" style="overflow-y: auto; min-height: inherit; height: calc(100vh - 40px);" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
     <div v-if="!no_data_ingest && !isLoadingSummary" class="tw-w-full tw-h-full tw-px-[0.625rem] tw-py-[0.625rem] card-container" style="display: flex; flex-direction: column; ">
@@ -21,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          <div>
           <TrialPeriod></TrialPeriod>
          </div>
-        <div class="streams-container"
+        <div class="feature-card"
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
         role="region"
         aria-label="Streams overview section"
@@ -208,13 +207,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="functions-dashboards-column">
 
           <div class="tile-wrapper">
-            <div class="functions-tile-content rounded-borders text-center column justify-between"
+            <div class="feature-card rounded-borders text-center column justify-between"
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
               role="article"
               aria-label="Functions count statistics">
               <div class="column justify-between">
                 <div class="row justify-between tw-items-center">
-                  <div class="row tw-items-center tw-gap-2">
+                  <div class="row tw-items-center tw-gap-5">
                     <div class="tile-icon icon-bg-orange" aria-hidden="true">
                       <img :src="functionsIcon" alt="" />
                     </div>
@@ -242,13 +241,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Tile 2 -->
           <div class="tile-wrapper">
-            <div class="dashboards-tile-content rounded-borders text-center column justify-between"
+            <div class="feature-card rounded-borders text-center column justify-between"
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
               role="article"
               aria-label="Dashboards count statistics">
               <div class="column justify-between">
                 <div class="row justify-between tw-items-center">
-                  <div class="row tw-items-center tw-gap-2">
+                  <div class="row tw-items-center tw-gap-1">
                     <div class="tile-icon icon-bg-orange" aria-hidden="true">
                       <img :src="dashboardsIcon" alt="" />
                     </div>
@@ -275,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
                   <!-- Chart 1 -->
-          <div class="chart-container first-chart-container rounded-borders tw-p-4"
+          <div class="feature-card first-chart-container rounded-borders tw-p-4"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           role="region"
           aria-label="Alerts overview section"
@@ -320,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="chart-container second-chart-container rounded-borders tw-p-4"
+          <div class="feature-card second-chart-container rounded-borders tw-p-4"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           role="region"
           aria-label="Pipelines overview section"
@@ -1006,7 +1005,7 @@ export default defineComponent({
 .dark-stream-container,
 .light-stream-container {
   background: var(--tile-bg);
-  border: 1px solid var(--tile-border);
+  border: 0.0625rem solid var(--o2-border-color);
 }
 .view-button-light {
   cursor: pointer;
@@ -1077,8 +1076,10 @@ export default defineComponent({
 }
 
 .tile {
-  animation: fadeInUp 0.5s ease-out backwards;
-  contain: layout style paint;
+  border-radius: 0.325rem;
+  border: 0.0625rem solid var(--o2-border-color);
+  // animation: fadeInUp 0.5s ease-out backwards;
+  // contain: layout style paint;
 }
 
 // Stagger animation for tiles
@@ -1105,38 +1106,38 @@ export default defineComponent({
   cursor: pointer;
 
   &:hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 8px 24px var(--hover-shadow);
+    // transform: translateY(-4px) scale(1.02);
+    // box-shadow: 0 8px 24px var(--hover-shadow);
   }
 }
 
-.dashboards-tile-content,
-.functions-tile-content {
-  @include tile-base;
-  animation: fadeInUp 0.5s ease-out backwards;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
+// .dashboards-tile-content,
+// .functions-tile-content {
+//   @include tile-base;
+//   animation: fadeInUp 0.5s ease-out backwards;
+//   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+//   cursor: pointer;
 
-  &:hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 8px 24px var(--hover-shadow);
-  }
-}
+//   &:hover {
+//     transform: translateY(-4px) scale(1.02);
+//     // box-shadow: 0 8px 24px var(--hover-shadow);
+//   }
+// }
 
-.functions-tile-content {
-  animation-delay: 250ms;
-}
+// .functions-tile-content {
+//   animation-delay: 250ms;
+// }
 
-.dashboards-tile-content {
-  animation-delay: 300ms;
-}
+// .dashboards-tile-content {
+//   animation-delay: 300ms;
+// }
 
-.dark-tile-content,
-.light-tile-content {
-  background: var(--tile-bg);
-  border: 1px solid var(--tile-border);
-  color: var(--text-primary);
-}
+// .dark-tile-content,
+// .light-tile-content {
+//   background: var(--tile-bg);
+//   border: 1px solid var(--tile-border);
+//   color: var(--text-primary);
+// }
 .section-header {
   font-size: 20px;
   font-weight: 600;
@@ -1182,19 +1183,19 @@ export default defineComponent({
   font-weight: 600;
   line-height: 32px;
 }
-.chart-container {
-  @include container-base;
-  display: flex;
-  flex-direction: column;
-  contain: layout style;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
+// .chart-container {
+//   @include container-base;
+//   display: flex;
+//   flex-direction: column;
+//   contain: layout style;
+//   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+//   cursor: pointer;
 
-  &:hover {
-    transform: translateY(-4px) scale(1.01);
-    box-shadow: 0 12px 32px var(--hover-shadow);
-  }
-}
+//   &:hover {
+//     transform: translateY(-4px) scale(1.01);
+//     box-shadow: 0 12px 32px var(--hover-shadow);
+//   }
+// }
 
 // Layout for charts section
 .charts-main-container {
@@ -1234,34 +1235,34 @@ export default defineComponent({
   min-width: 0;
 }
 
-.functions-tile-content,
-.dashboards-tile-content {
-  width: 100%;
-  flex: 1;
-  min-width: 0;
+// .functions-tile-content,
+// .dashboards-tile-content {
+//   width: 100%;
+//   flex: 1;
+//   min-width: 0;
 
-  // Only apply to the outer row (title + button), not the inner row (icon + title text)
-  > .column > .row.justify-between {
-    flex-wrap: nowrap;
-  }
-}
+//   // Only apply to the outer row (title + button), not the inner row (icon + title text)
+//   > .column > .row.justify-between {
+//     flex-wrap: nowrap;
+//   }
+// }
 
-.first-chart-container {
-  border-left: 3px solid var(--accent-orange);
-  animation-delay: 350ms;
-}
+// .first-chart-container {
+//   border-left: 3px solid var(--accent-orange);
+//   animation-delay: 350ms;
+// }
 
-.second-chart-container {
-  border-left: 3px solid var(--accent-purple);
-  animation-delay: 400ms;
-}
+// .second-chart-container {
+//   border-left: 3px solid var(--accent-purple);
+//   animation-delay: 400ms;
+// }
 
-.chart-container-light,
-.chart-container-dark {
-  border: 1px solid var(--tile-border);
-  background: var(--tile-bg);
-  position: relative;
-}
+// .chart-container-light,
+// .chart-container-dark {
+//   border: 1px solid var(--tile-border);
+//   background: var(--tile-bg);
+//   position: relative;
+// }
 
 // Chart loading shimmer animation
 @keyframes shimmer {
@@ -1390,8 +1391,9 @@ export default defineComponent({
 .dashboards-tile-content,
 .chart-container,
 .streams-container {
+
   // &:hover {
-    box-shadow: 0 4px 12px var(--hover-shadow);
+    // box-shadow: 0 4px 12px var(--hover-shadow);
   // }
 }
 

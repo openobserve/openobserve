@@ -1389,3 +1389,18 @@ body {
   left: 16px;
   z-index: 100 !important;
 }
+
+.feature-card {
+  @extend .el-border-radius;
+  padding: 1rem;
+  transition: all 0.3s ease;
+  position: relative;
+  border: 1px solid;
+  background: var(--tile-bg);
+  border: 0.0625rem solid var(--o2-border-color);
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  }
+}
