@@ -548,6 +548,16 @@ pub async fn get_uds_and_original_data_streams(
             infra::schema::get_settings(&stream.org_id, &stream.stream_name, stream.stream_type)
                 .await
                 .unwrap_or_default();
+
+        log::info!(
+            "[UDS DEBUG get_uds] Stream: {}/{}/{}, UDS field count: {}, fts_keys: {:?}",
+            stream.org_id,
+            stream.stream_type,
+            stream.stream_name,
+            stream_settings.defined_schema_fields.len(),
+            stream_settings.full_text_search_keys
+        );
+
         streams_need_original.insert(
             stream.stream_name.to_string(),
             stream_settings.store_original_data || stream_settings.index_original_data,
@@ -562,8 +572,19 @@ pub async fn get_uds_and_original_data_streams(
             if !fields.contains(TIMESTAMP_COL_NAME) {
                 fields.insert(TIMESTAMP_COL_NAME.to_string());
             }
+            log::info!(
+                "[UDS DEBUG get_uds] Loaded {} UDS fields for {}/{}",
+                fields.len(),
+                stream.stream_type,
+                stream.stream_name
+            );
             user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
         } else {
+            log::info!(
+                "[UDS DEBUG get_uds] NO UDS fields found for {}/{}",
+                stream.stream_type,
+                stream.stream_name
+            );
             user_defined_schema_map.insert(stream.stream_name.to_string(), None);
         }
     }

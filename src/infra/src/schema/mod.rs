@@ -246,8 +246,15 @@ pub async fn get_settings(
 
     // Try to get from read lock first
     if let Some(settings) = get_stream_settings_atomic(&key) {
+        log::info!(
+            "[UDS CACHE] ✓ Found in atomic cache: {}, UDS fields: {}",
+            key,
+            settings.defined_schema_fields.len()
+        );
         return Some(settings);
     }
+
+    log::info!("[UDS CACHE] ✗ NOT in atomic cache: {}, reading DB", key);
 
     // Get from DB without holding any locks
     let settings = get(org_id, stream_name, stream_type)
@@ -258,13 +265,20 @@ pub async fn get_settings(
 
     // Only acquire write lock if we have settings to update
     if let Some(ref s) = settings {
+        log::info!(
+            "[UDS CACHE] ✓ Found in DB: {}, UDS fields: {}, caching now",
+            key,
+            s.defined_schema_fields.len()
+        );
         // Check cache again before updating as another thread might updated while we reading DB
         let mut w = STREAM_SETTINGS.write().await;
         if !w.contains_key(&key) {
-            w.insert(key, s.clone());
+            w.insert(key.clone(), s.clone());
         }
         set_stream_settings_atomic(w.clone());
         drop(w);
+    } else {
+        log::info!("[UDS CACHE] ✗ NOT found in DB: {}", key);
     }
 
     settings

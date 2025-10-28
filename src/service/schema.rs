@@ -678,6 +678,28 @@ pub(crate) async fn handle_diff_schema(
                 stream_type,
                 stream_name
             );
+
+            // CRITICAL FIX: Immediately update settings cache after successful save
+            // This ensures next request sees UDS settings without cache propagation delay
+            log::info!(
+                "[UDS CACHE WRITE] About to update cache for key: {}, UDS fields: {}",
+                cache_key,
+                stream_setting.defined_schema_fields.len()
+            );
+            let mut w = STREAM_SETTINGS.write().await;
+            w.insert(cache_key.clone(), stream_setting.clone());
+            infra::schema::set_stream_settings_atomic(w.clone());
+            log::info!(
+                "[UDS CACHE WRITE] ✓ Updated atomic cache, total cached streams: {}",
+                w.len()
+            );
+            drop(w);
+            log::info!(
+                "[UDS AUTO-ENABLE] Updated settings cache immediately for {}/{}/{}",
+                org_id,
+                stream_type,
+                stream_name
+            );
         }
     }
 
@@ -696,10 +718,16 @@ pub(crate) async fn handle_diff_schema(
             LOCAL_NODE_ID.load(Ordering::Relaxed),
         ));
     }
-    let mut w = STREAM_SETTINGS.write().await;
-    w.insert(cache_key.clone(), stream_setting);
-    infra::schema::set_stream_settings_atomic(w.clone());
-    drop(w);
+
+    // Only update cache if UDS was NOT just enabled (to avoid overwriting with stale
+    // stream_setting) If UDS was enabled, cache was already updated inside the auto-enable
+    // block above
+    if !should_enable_uds {
+        let mut w = STREAM_SETTINGS.write().await;
+        w.insert(cache_key.clone(), stream_setting);
+        infra::schema::set_stream_settings_atomic(w.clone());
+        drop(w);
+    }
 
     // update thread cache
     let final_schema = generate_schema_for_defined_schema_fields(
