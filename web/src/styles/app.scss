@@ -633,8 +633,7 @@ body {
   border-radius: none;
   .o2-tab{
     border-radius: 4px;
-    height: 30px;
-    margin: 0 2px;
+    height: 32px;
     padding: 4px 12px;
     border-bottom: none;
     width: auto;
@@ -660,8 +659,8 @@ body {
 //any non theme related styling should be done here inside the o2-table-checkbox class
 .o2-table-checkbox{
   .q-checkbox__bg{
-    width: 16px !important;
-    height: 16px !important;
+    width: 13px !important;
+    height: 13px !important;
   }
 }
 
