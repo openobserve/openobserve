@@ -167,7 +167,7 @@ pub async fn get_alert_history(
     // The key field contains the alert name in the format "alert_name/alert_id"
     if let Some(ref alert_name) = query.alert_name {
         // We need to filter where key starts with the alert name
-        sql.push_str(&format!(" AND key LIKE '{}/%'", alert_name));
+        sql.push_str(&format!(" AND key LIKE '{}/%'", alert_name.replace("'", "''")));
     } else if !alert_names.is_empty() {
         // Filter by all alerts in the organization
         let alert_filter = alert_names
