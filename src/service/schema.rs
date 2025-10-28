@@ -278,16 +278,17 @@ pub(crate) async fn handle_diff_schema(
     let schema_for_merge_base = if is_new {
         // Helper to check if field is core
         let is_core_field = |field_name: &str| {
-            field_name.starts_with("__") ||
-            field_name == TIMESTAMP_COL_NAME ||
-            field_name == ID_COL_NAME ||
-            field_name == ORIGINAL_DATA_COL_NAME ||
-            field_name == ALL_VALUES_COL_NAME ||
-            field_name == cfg.common.column_all.as_str()
+            field_name.starts_with("__")
+                || field_name == TIMESTAMP_COL_NAME
+                || field_name == ID_COL_NAME
+                || field_name == ORIGINAL_DATA_COL_NAME
+                || field_name == ALL_VALUES_COL_NAME
+                || field_name == cfg.common.column_all.as_str()
         };
 
         // Count non-core fields
-        let non_core_count = inferred_schema.fields()
+        let non_core_count = inferred_schema
+            .fields()
             .iter()
             .filter(|f| !is_core_field(f.name()))
             .count();
@@ -352,8 +353,15 @@ pub(crate) async fn handle_diff_schema(
             }
 
             // Add _all field for overflow
-            if !filtered_fields.iter().any(|f| f.name() == cfg.common.column_all.as_str()) {
-                filtered_fields.push(Arc::new(Field::new(cfg.common.column_all.as_str(), DataType::Utf8, true)));
+            if !filtered_fields
+                .iter()
+                .any(|f| f.name() == cfg.common.column_all.as_str())
+            {
+                filtered_fields.push(Arc::new(Field::new(
+                    cfg.common.column_all.as_str(),
+                    DataType::Utf8,
+                    true,
+                )));
             }
 
             log::info!(
@@ -497,11 +505,14 @@ pub(crate) async fn handle_diff_schema(
     // Check which threshold to use based on stream type
     // Skip this check if we already pre-enabled UDS
     let (should_enable_uds, uds_max_fields) = if pre_enabled_uds {
-        (true, if stream_type == StreamType::Metrics {
-            cfg.limit.schema_max_fields_to_enable_uds_metrics
-        } else {
-            cfg.limit.schema_max_fields_to_enable_uds_traces
-        })
+        (
+            true,
+            if stream_type == StreamType::Metrics {
+                cfg.limit.schema_max_fields_to_enable_uds_metrics
+            } else {
+                cfg.limit.schema_max_fields_to_enable_uds_traces
+            },
+        )
     } else {
         match stream_type {
             StreamType::Logs => (
@@ -755,7 +766,8 @@ pub(crate) async fn handle_diff_schema(
         // NOTE: We don't add _all to full_text_search_keys here because:
         // 1. _all field doesn't exist in schema yet
         // 2. save_stream_settings() will fail validation
-        // 3. _all will be added to fts_keys automatically when the field is created during ingestion
+        // 3. _all will be added to fts_keys automatically when the field is created during
+        //    ingestion
 
         final_schema.metadata.insert(
             "settings".to_string(),
