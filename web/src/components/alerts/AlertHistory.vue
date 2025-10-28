@@ -53,20 +53,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-history-date-picker"
           />
         </div>
-        <q-input
-          v-model="searchQuery"
+        <q-select
+          v-model="selectedAlert"
           dense
           borderless
-          :placeholder="t('alerts.searchHistory') || 'Search alert history...'"
-          data-test="alert-history-search-input"
+          use-input
+          hide-selected
+          fill-input
+          input-debounce="0"
+          :options="filteredAlertOptions"
+          @filter="filterAlertOptions"
+          @input-value="setSearchQuery"
+          @update:model-value="onAlertSelected"
+          :placeholder="
+            t('alerts.searchHistory') || 'Select or search alert...'
+          "
+          data-test="alert-history-search-select"
           class="o2-search-input q-mr-md"
+          style="min-width: 250px"
           :class="
             store.state.theme === 'dark'
               ? 'o2-search-input-dark'
               : 'o2-search-input-light'
           "
+          clearable
+          @clear="clearSearch"
         >
-          <template #prepend>
+          <template v-slot:prepend>
             <q-icon
               class="o2-search-input-icon"
               :class="
@@ -77,7 +90,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="search"
             />
           </template>
-        </q-input>
+          <template v-slot:no-option>
+            <q-item>
+              <q-item-section class="text-grey">
+                No alerts found
+              </q-item-section>
+            </q-item>
+          </template>
+        </q-select>
+        <q-btn
+          icon="search"
+          flat
+          round
+          @click="manualSearch"
+          data-test="alert-history-manual-search-btn"
+          :disable="loading"
+          class="q-mr-md"
+        >
+          <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
+        </q-btn>
         <q-btn
           icon="refresh"
           flat
@@ -210,118 +241,223 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Details Dialog -->
-    <q-dialog v-model="detailsDialog" maximized>
-      <q-card class="full-width">
-        <q-card-section class="row items-center q-pb-none">
+    <q-dialog v-model="detailsDialog" position="standard">
+      <q-card
+        style="width: 700px; max-width: 80vw; max-height: 90vh"
+        class="alert-details-dialog"
+      >
+        <q-card-section class="row items-center q-pb-xs bg-primary text-white">
           <div class="text-h6">Alert Execution Details</div>
           <q-space />
-          <q-btn icon="close" flat round dense @click="detailsDialog = false" />
+          <q-btn icon="close" flat round dense v-close-popup />
         </q-card-section>
 
-        <q-card-section v-if="selectedRow">
-          <div class="q-gutter-md">
-            <div class="row q-col-gutter-md">
-              <div class="col-md-6">
-                <div class="text-subtitle2 q-mb-xs">Alert Name</div>
-                <div>{{ selectedRow.alert_name }}</div>
-              </div>
-              <div class="col-md-6">
-                <div class="text-subtitle2 q-mb-xs">Status</div>
-                <q-chip
-                  :color="getStatusColor(selectedRow.status)"
-                  text-color="white"
-                  size="sm"
-                  dense
-                >
-                  {{ selectedRow.status }}
-                </q-chip>
-              </div>
-            </div>
+        <q-separator />
 
-            <div class="row q-col-gutter-md">
-              <div class="col-md-6">
-                <div class="text-subtitle2 q-mb-xs">Timestamp</div>
-                <div>{{ formatDate(selectedRow.timestamp) }}</div>
-              </div>
-              <div class="col-md-6">
-                <div class="text-subtitle2 q-mb-xs">Duration</div>
-                <div>
-                  {{
-                    formatDuration(
-                      selectedRow.end_time - selectedRow.start_time,
-                    )
-                  }}
+        <q-card-section
+          class="scroll"
+          style="max-height: 70vh"
+          v-if="selectedRow"
+        >
+          <div class="q-gutter-sm">
+            <!-- Basic Information -->
+            <div class="detail-section">
+              <div class="row q-col-gutter-md">
+                <div class="col-6">
+                  <div class="text-caption text-grey-7 q-mb-xs">Alert Name</div>
+                  <div class="text-body2 text-weight-medium">
+                    {{ selectedRow.alert_name }}
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="text-caption text-grey-7 q-mb-xs">Status</div>
+                  <q-chip
+                    :color="getStatusColor(selectedRow.status)"
+                    text-color="white"
+                    size="sm"
+                    dense
+                    square
+                  >
+                    {{ selectedRow.status }}
+                  </q-chip>
                 </div>
               </div>
             </div>
 
-            <div class="row q-col-gutter-md">
-              <div class="col-md-6">
-                <div class="text-subtitle2 q-mb-xs">Type</div>
-                <div>
-                  {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
+            <q-separator class="q-my-sm" />
+
+            <!-- Time Information -->
+            <div class="detail-section">
+              <div class="row q-col-gutter-md">
+                <div class="col-6">
+                  <div class="text-caption text-grey-7 q-mb-xs">Timestamp</div>
+                  <div class="text-body2">
+                    {{ formatDate(selectedRow.timestamp) }}
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="text-caption text-grey-7 q-mb-xs">Duration</div>
+                  <div class="text-body2">
+                    {{
+                      formatDuration(
+                        selectedRow.end_time - selectedRow.start_time,
+                      )
+                    }}
+                  </div>
                 </div>
               </div>
-              <div class="col-md-6">
-                <div class="text-subtitle2 q-mb-xs">Silenced</div>
-                <div>{{ selectedRow.is_silenced ? "Yes" : "No" }}</div>
+            </div>
+
+            <q-separator class="q-my-sm" />
+
+            <!-- Alert Configuration -->
+            <div class="detail-section">
+              <div class="row q-col-gutter-md">
+                <div class="col-6">
+                  <div class="text-caption text-grey-7 q-mb-xs">Type</div>
+                  <div class="text-body2">
+                    <q-icon
+                      :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
+                      class="q-mr-xs"
+                      size="xs"
+                    />
+                    {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="text-caption text-grey-7 q-mb-xs">Silenced</div>
+                  <div class="text-body2">
+                    <q-icon
+                      v-if="selectedRow.is_silenced"
+                      name="volume_off"
+                      color="warning"
+                      size="xs"
+                      class="q-mr-xs"
+                    />
+                    <q-icon
+                      v-else
+                      name="volume_up"
+                      color="positive"
+                      size="xs"
+                      class="q-mr-xs"
+                    />
+                    {{ selectedRow.is_silenced ? "Yes" : "No" }}
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div v-if="selectedRow.retries > 0" class="row q-col-gutter-md">
-              <div class="col-12">
-                <div class="text-subtitle2 q-mb-xs">Retries</div>
-                <div>{{ selectedRow.retries }}</div>
-              </div>
-            </div>
-
-            <div
-              v-if="selectedRow.evaluation_took_in_secs"
-              class="row q-col-gutter-md"
+            <!-- Performance Metrics (if available) -->
+            <template
+              v-if="
+                selectedRow.evaluation_took_in_secs ||
+                selectedRow.query_took ||
+                selectedRow.retries > 0
+              "
             >
-              <div class="col-md-6">
-                <div class="text-subtitle2 q-mb-xs">Evaluation Time</div>
-                <div>{{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s</div>
+              <q-separator class="q-my-sm" />
+              <div class="detail-section">
+                <div class="row q-col-gutter-md">
+                  <div v-if="selectedRow.evaluation_took_in_secs" class="col-4">
+                    <div class="text-caption text-grey-7 q-mb-xs">
+                      Evaluation Time
+                    </div>
+                    <div class="text-body2">
+                      {{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s
+                    </div>
+                  </div>
+                  <div v-if="selectedRow.query_took" class="col-4">
+                    <div class="text-caption text-grey-7 q-mb-xs">
+                      Query Time
+                    </div>
+                    <div class="text-body2">
+                      {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
+                    </div>
+                  </div>
+                  <div v-if="selectedRow.retries > 0" class="col-4">
+                    <div class="text-caption text-grey-7 q-mb-xs">Retries</div>
+                    <div class="text-body2">{{ selectedRow.retries }}</div>
+                  </div>
+                </div>
               </div>
-              <div v-if="selectedRow.query_took" class="col-md-6">
-                <div class="text-subtitle2 q-mb-xs">Query Time</div>
-                <div>{{ (selectedRow.query_took / 1000).toFixed(2) }}ms</div>
-              </div>
-            </div>
+            </template>
 
-            <div v-if="selectedRow.source_node" class="row q-col-gutter-md">
-              <div class="col-12">
-                <div class="text-subtitle2 q-mb-xs">Source Node</div>
-                <div>{{ selectedRow.source_node }}</div>
+            <!-- Source Node (if available) -->
+            <template v-if="selectedRow.source_node">
+              <q-separator class="q-my-sm" />
+              <div class="detail-section">
+                <div class="text-caption text-grey-7 q-mb-xs">Source Node</div>
+                <div class="text-body2 text-mono">
+                  {{ selectedRow.source_node }}
+                </div>
               </div>
-            </div>
+            </template>
 
-            <div v-if="selectedRow.error" class="row q-col-gutter-md">
-              <div class="col-12">
-                <div class="text-subtitle2 q-mb-xs">Error</div>
-                <q-card flat bordered class="q-pa-sm bg-negative-1">
-                  <pre style="white-space: pre-wrap; word-break: break-word">{{
-                    selectedRow.error
-                  }}</pre>
+            <!-- Error Details (if available) -->
+            <template v-if="selectedRow.error">
+              <q-separator class="q-my-sm" />
+              <div class="detail-section">
+                <div class="text-caption text-grey-7 q-mb-xs">
+                  <q-icon
+                    name="error"
+                    color="negative"
+                    size="xs"
+                    class="q-mr-xs"
+                  />
+                  Error Details
+                </div>
+                <q-card flat bordered class="q-pa-sm bg-negative-1 q-mt-xs">
+                  <pre
+                    class="text-body2"
+                    style="
+                      white-space: pre-wrap;
+                      word-break: break-word;
+                      margin: 0;
+                      font-family: &quot;Courier New&quot;, monospace;
+                      font-size: 12px;
+                    "
+                    >{{ selectedRow.error }}</pre
+                  >
                 </q-card>
               </div>
-            </div>
+            </template>
 
-            <div
-              v-if="selectedRow.success_response"
-              class="row q-col-gutter-md"
-            >
-              <div class="col-12">
-                <div class="text-subtitle2 q-mb-xs">Response</div>
-                <q-card flat bordered class="q-pa-sm">
-                  <pre style="white-space: pre-wrap; word-break: break-word">{{
-                    selectedRow.success_response
-                  }}</pre>
+            <!-- Success Response (if available) -->
+            <template v-if="selectedRow.success_response">
+              <q-separator class="q-my-sm" />
+              <div class="detail-section">
+                <div class="text-caption text-grey-7 q-mb-xs">
+                  <q-icon
+                    name="check_circle"
+                    color="positive"
+                    size="xs"
+                    class="q-mr-xs"
+                  />
+                  Response
+                </div>
+                <q-card flat bordered class="q-pa-sm bg-positive-1 q-mt-xs">
+                  <pre
+                    class="text-body2"
+                    style="
+                      white-space: pre-wrap;
+                      word-break: break-word;
+                      margin: 0;
+                      font-family: &quot;Courier New&quot;, monospace;
+                      font-size: 12px;
+                    "
+                    >{{ selectedRow.success_response }}</pre
+                  >
                 </q-card>
               </div>
-            </div>
+            </template>
           </div>
         </q-card-section>
+
+        <q-separator />
+
+        <q-card-actions align="right" class="q-pa-md">
+          <q-btn flat label="Close" color="primary" v-close-popup />
+        </q-card-actions>
       </q-card>
     </q-dialog>
 
@@ -351,7 +487,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useQuasar, date, debounce } from "quasar";
+import { useQuasar, date } from "quasar";
 import DateTimePicker from "@/components/DateTimePicker.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
@@ -365,6 +501,9 @@ const $q = useQuasar();
 const loading = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
+const selectedAlert = ref<string | null>(null);
+const allAlerts = ref<any[]>([]);
+const filteredAlertOptions = ref<string[]>([]);
 const pagination = ref({
   page: 1,
   rowsPerPage: 20,
@@ -463,6 +602,62 @@ const filteredRows = computed(() => {
 });
 
 // Methods
+const fetchAlertsList = async () => {
+  try {
+    const org = store.state.selectedOrganization.identifier;
+
+    // Fetch all alerts for the organization
+    const res = await alertsService.listByFolderId(
+      1,
+      1000,
+      "name",
+      false,
+      "",
+      org,
+      "", // all folders
+      "", // no query filter
+    );
+
+    if (res.data && res.data.list) {
+      // Extract alert names and sort them
+      allAlerts.value = res.data.list.map((alert: any) => alert.name).sort();
+      filteredAlertOptions.value = [...allAlerts.value];
+    }
+  } catch (error: any) {
+    console.error("Error fetching alerts list:", error);
+    // Silently fail - user can still type alert names manually
+  }
+};
+
+const filterAlertOptions = (val: string, update: any) => {
+  update(() => {
+    const needle = val.toLowerCase();
+    filteredAlertOptions.value = allAlerts.value.filter((v) =>
+      v.toLowerCase().includes(needle),
+    );
+  });
+};
+
+const setSearchQuery = (val: string) => {
+  searchQuery.value = val;
+};
+
+const onAlertSelected = (val: string | null) => {
+  if (val) {
+    searchQuery.value = val;
+  }
+};
+
+const clearSearch = () => {
+  searchQuery.value = "";
+  selectedAlert.value = null;
+};
+
+const manualSearch = () => {
+  pagination.value.page = 1;
+  fetchAlertHistory();
+};
+
 const fetchAlertHistory = async () => {
   loading.value = true;
   try {
@@ -605,29 +800,26 @@ const goBack = () => {
   router.push({ name: "alertList" });
 };
 
-// Debounced search
-const debouncedSearch = debounce(() => {
-  pagination.value.page = 1;
-  fetchAlertHistory();
-}, 500);
-
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
+  // Fetch alerts list for dropdown
+  await fetchAlertsList();
+  // Fetch initial alert history
   fetchAlertHistory();
 });
 
 // Watch for organization change
 watch(
   () => store.state.selectedOrganization.identifier,
-  () => {
+  async () => {
+    // Re-fetch alerts list when organization changes
+    await fetchAlertsList();
+    // Reset search
+    clearSearch();
+    // Fetch history for new organization
     fetchAlertHistory();
   },
 );
-
-// Watch for search query changes
-watch(searchQuery, () => {
-  debouncedSearch();
-});
 </script>
 
 <style scoped lang="scss">
@@ -637,6 +829,52 @@ watch(searchQuery, () => {
 
     td {
       vertical-align: middle;
+    }
+  }
+}
+
+.alert-details-dialog {
+  :deep(.q-dialog__inner) {
+    padding: 24px;
+  }
+
+  .detail-section {
+    padding: 4px 0;
+  }
+
+  .text-mono {
+    font-family: "Courier New", monospace;
+    font-size: 13px;
+  }
+
+  .bg-negative-1 {
+    background-color: rgba(255, 0, 0, 0.05);
+  }
+
+  .bg-positive-1 {
+    background-color: rgba(0, 128, 0, 0.05);
+  }
+
+  pre {
+    max-height: 200px;
+    overflow-y: auto;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: #555;
     }
   }
 }
