@@ -26,6 +26,8 @@ use hashbrown::HashMap;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
+#[cfg(feature = "cloud")]
+use crate::service::ingestion::check_ingestion_allowed;
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -90,6 +92,20 @@ async fn handle_req(
     };
 
     let org_id = org_id.into_inner();
+
+    #[cfg(feature = "cloud")]
+    match check_ingestion_allowed(&org_id, StreamType::Traces, None).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
+    }
+
     let content_type = req
         .headers()
         .get("Content-Type")
