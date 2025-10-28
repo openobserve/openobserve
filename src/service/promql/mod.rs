@@ -70,7 +70,7 @@ pub struct MetricsQueryRequest {
     pub end: i64,
     pub step: i64,
     pub query_exemplars: bool,
-    pub no_cache: Option<bool>,
+    pub use_cache: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]

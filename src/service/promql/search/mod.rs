@@ -97,16 +97,16 @@ async fn search_in_cluster(
         query_exemplars,
     } = req.query.as_ref().unwrap();
 
-    // cache disabled if result cache is disabled or no_cache is true or start == end or step == 0
+    // cache disabled if result cache is disabled or use_cache is true or start == end or step == 0
     let cache_disabled =
-        !cfg.common.metrics_cache_enabled || req.no_cache || start == end || step == 0;
+        !cfg.common.metrics_cache_enabled || !req.use_cache || start == end || step == 0;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step, cache_disabled);
 
     log::info!(
-        "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, time_range: [{},{}), step: {}, query: {}",
+        "[trace_id {trace_id}] promql->search->start: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}",
         req.org_id,
-        cache_disabled,
+        !cache_disabled,
         start,
         end,
         step,
@@ -352,7 +352,9 @@ async fn search_in_cluster(
     .await;
 
     // cache the result
-    if !cache_disabled
+    // if the query with cache_disabled, we should update the exist cache
+    let update_cache = !cache_disabled;
+    if cfg.common.metrics_cache_enabled
         && let Some(matrix) = values.get_ref_matrix_values()
         && let Err(err) = cache::set(
             trace_id,
@@ -362,6 +364,7 @@ async fn search_in_cluster(
             end,
             step,
             matrix.to_vec(),
+            update_cache,
         )
         .await
     {

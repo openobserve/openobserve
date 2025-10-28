@@ -333,7 +333,7 @@ mod enterprise_tests {
     }
 
     #[test]
-    fn test_calculate_record_batches_deltas_no_cache() {
+    fn test_calculate_record_batches_deltas_without_cache() {
         // Test case: No cache, entire query range should be a delta
         let cache_result = vec![];
         let query_start_time = 10_000_000;
