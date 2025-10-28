@@ -91,6 +91,9 @@ export default class DashboardPanelConfigs {
       '[data-test="dashboard-addpanel-config-type-select-0"]'
     );
     this.sidebarScrollContainer = page.locator('.sidebar-content.scroll');
+    this.connectNullValuesToggle = page.locator(
+      '[data-test="dashboard-config-connect-null-values"]'
+    );
   }
   /// Open the config panel
   async openConfigPanel() {
@@ -367,5 +370,31 @@ export default class DashboardPanelConfigs {
     await this.gaugeMax.click();
     await this.gaugeMax.fill(max);
   }
-  
+
+  // Get connect null values toggle state
+  async getConnectNullValuesState() {
+    await this.connectNullValuesToggle.waitFor({ state: "visible", timeout: 10000 });
+
+    // Check aria-checked attribute - this is the most reliable indicator
+    let ariaChecked = await this.connectNullValuesToggle.getAttribute("aria-checked");
+    if (ariaChecked === null) {
+      ariaChecked = await this.connectNullValuesToggle.getAttribute("aria-pressed");
+    }
+
+    return ariaChecked === "true";
+  }
+
+  // Verify connect null values toggle state
+  async verifyConnectNullValuesToggle(expectedState = true) {
+    const isChecked = await this.getConnectNullValuesState();
+
+    if (expectedState !== isChecked) {
+      throw new Error(
+        `Expected connect null values to be ${expectedState} but actual state is ${isChecked}`
+      );
+    }
+
+    return isChecked;
+  }
+
 }
