@@ -47,10 +47,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex q-ml-auto items-center">
         <div class="q-mr-md">
-          <DateTimePicker
-            v-model="dateTime"
-            @update:model-value="onDateChange"
+          <DateTime
+            ref="dateTimeRef"
+            auto-apply
+            :default-type="dateTimeType"
+            :default-absolute-time="{
+              startTime: absoluteTime.startTime,
+              endTime: absoluteTime.endTime,
+            }"
+            :default-relative-time="relativeTime"
             data-test="alert-history-date-picker"
+            @on:date-change="updateDateTime"
           />
         </div>
         <q-select
@@ -488,7 +495,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
-import DateTimePicker from "@/components/DateTimePicker.vue";
+import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 
@@ -511,15 +518,23 @@ const pagination = ref({
 });
 const rowsPerPageOptions = [10, 20, 50, 100];
 
-// Date time picker - default to last 15 minutes
-const now = new Date();
-const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
-const dateTime = ref({
-  startTime: fifteenMinutesAgo.toISOString(),
-  endTime: now.toISOString(),
-  selectedDate: "custom",
-  selectedTime: "15m",
-  valueType: "relative",
+// Date time - default to last 15 minutes (relative)
+const dateTimeRef = ref<any>(null);
+const dateTimeType = ref("relative");
+const relativeTime = ref("15m");
+const now = Date.now();
+const fifteenMinutesAgo = now - 15 * 60 * 1000;
+const absoluteTime = ref({
+  startTime: fifteenMinutesAgo * 1000, // Convert to microseconds
+  endTime: now * 1000, // Convert to microseconds
+});
+
+// Internal datetime values for API calls
+const dateTimeValues = ref({
+  startTime: fifteenMinutesAgo * 1000,
+  endTime: now * 1000,
+  type: "relative",
+  relativeTimePeriod: "15m",
 });
 
 // Dialogs
@@ -663,9 +678,9 @@ const fetchAlertHistory = async () => {
   try {
     const org = store.state.selectedOrganization.identifier;
 
-    // Convert dates to microseconds
-    const startTime = new Date(dateTime.value.startTime).getTime() * 1000;
-    const endTime = new Date(dateTime.value.endTime).getTime() * 1000;
+    // Use the stored datetime values (already in microseconds)
+    const startTime = dateTimeValues.value.startTime;
+    const endTime = dateTimeValues.value.endTime;
 
     const query: any = {
       start_time: startTime.toString(),
@@ -725,7 +740,28 @@ const fetchAlertHistory = async () => {
   }
 };
 
-const onDateChange = () => {
+const updateDateTime = (value: any) => {
+  // Store the datetime values for API calls
+  dateTimeValues.value = {
+    startTime: value.startTime,
+    endTime: value.endTime,
+    type: value.relativeTimePeriod ? "relative" : "absolute",
+    relativeTimePeriod: value.relativeTimePeriod || "",
+  };
+
+  // Update the component state
+  if (value.relativeTimePeriod) {
+    dateTimeType.value = "relative";
+    relativeTime.value = value.relativeTimePeriod;
+  } else {
+    dateTimeType.value = "absolute";
+    absoluteTime.value = {
+      startTime: value.startTime,
+      endTime: value.endTime,
+    };
+  }
+
+  // Reset pagination and fetch new data
   pagination.value.page = 1;
   fetchAlertHistory();
 };
