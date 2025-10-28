@@ -1,10 +1,11 @@
 import pytest
-import os
 import time
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 ORG_ID = "default"
-USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL", "root@example.com")
 
 
 @pytest.mark.parametrize("with_auth", [False, True])
@@ -94,7 +95,6 @@ def test_dashboard_search_stream_query(create_session, base_url):
 
     # If stream not found, skip this test
     if resp.status_code == 400 and "not found" in resp.text.lower():
-        import pytest
         pytest.skip("No data stream available for testing - skipping search stream query test")
 
     assert resp.status_code == 200, f"Search stream query failed: {resp.status_code} {resp.text}"
@@ -127,7 +127,7 @@ def test_dashboard_search_stream_query(create_session, base_url):
                     if "results" in result:
                         results = result["results"]
                         assert isinstance(results, dict), "results should be a dictionary"
-                        print(f"Found results with keys: {results.keys()}")
+                        logger.info(f"Found results with keys: {results.keys()}")
 
                         # Validate common fields
                         if "took" in results:
@@ -135,15 +135,15 @@ def test_dashboard_search_stream_query(create_session, base_url):
 
                         if "hits" in results:
                             assert isinstance(results["hits"], list), "hits should be a list"
-                            print(f"Query returned {len(results['hits'])} hits")
+                            logger.info(f"Query returned {len(results['hits'])} hits")
 
                     break  # Found and validated data
                 except json.JSONDecodeError as e:
-                    print(f"Failed to parse JSON from SSE data: {e}")
+                    logger.warning(f"Failed to parse JSON from SSE data: {e}")
                     continue
 
     assert data_found, "Should find at least one valid data event in SSE response"
-    print(f"✅ Search stream query completed successfully with SSE format")
+    logger.info("Search stream query completed successfully with SSE format")
 
 
 def test_create_dashboard(create_session, base_url):
