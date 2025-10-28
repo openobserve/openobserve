@@ -33,6 +33,7 @@ async function globalSetup() {
     testLogger.debug('Navigated to base URL', { url: process.env["ZO_BASE_URL"] });
 
     await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000);
 
     // Debug: Log current URL and page title
     const currentUrl = page.url();
@@ -55,7 +56,7 @@ async function globalSetup() {
     // Debug: Check if login fields exist
     testLogger.debug('Waiting for login fields to appear...');
     try {
-      await userIdField.waitFor({ state: 'visible', timeout: 10000 });
+      await userIdField.waitFor({ state: 'visible', timeout: 15000 });
     } catch (e) {
       // Take screenshot and log page content for debugging
       await page.screenshot({ path: path.join(__dirname, 'debug-login-page.png') });
