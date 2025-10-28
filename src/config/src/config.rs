@@ -1324,8 +1324,6 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
-    #[env_config(name = "ZO_METRICS_MAX_SERIES_PER_QUERY", default = 30000)]
-    pub metrics_max_series_per_query: usize,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
@@ -2365,9 +2363,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check for metrics limit
-    if cfg.limit.metrics_max_series_per_query == 0 {
-        cfg.limit.metrics_max_series_per_query = 30_000;
-    }
     if cfg.limit.metrics_max_points_per_series == 0 {
         cfg.limit.metrics_max_points_per_series = 30_000;
     }

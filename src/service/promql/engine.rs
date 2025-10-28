@@ -28,7 +28,7 @@ use datafusion::{
         datatypes::{DataType, Schema},
     },
     error::{DataFusionError, Result},
-    functions_aggregate::min_max::max,
+    functions_aggregate::min_max::min,
     prelude::{DataFrame, SessionContext, col, lit},
 };
 use futures::{TryStreamExt, future::try_join_all};
@@ -48,8 +48,7 @@ use super::{
     utils::{apply_label_selector, apply_matchers},
 };
 use crate::service::promql::{
-    DEFAULT_MAX_SERIES_PER_QUERY, aggregations, binaries, functions, micros,
-    rewrite::remove_filter_all, value::*,
+    aggregations, binaries, functions, micros, rewrite::remove_filter_all, value::*,
 };
 
 pub struct Engine {
@@ -1122,7 +1121,6 @@ async fn selector_load_data_from_datafusion(
     label_selector: &Option<HashSet<String>>,
     query_exemplars: bool,
 ) -> Result<HashMap<HashLabelValue, RangeValue>> {
-    let cfg = config::get_config();
     let table_name = selector.name.as_ref().unwrap();
     let mut df_group = match ctx.table(table_name).await {
         Ok(v) => v.filter(
@@ -1168,22 +1166,14 @@ async fn selector_load_data_from_datafusion(
         })
         .collect::<Vec<_>>();
 
-    let max_series = if cfg.limit.metrics_max_series_per_query > 0 {
-        cfg.limit.metrics_max_series_per_query
-    } else {
-        DEFAULT_MAX_SERIES_PER_QUERY
-    };
-
     // get hash & timestamp
     let start_time = std::time::Instant::now();
     let sub_batch = df_group
         .clone()
         .aggregate(
             vec![col(HASH_LABEL)],
-            vec![max(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
+            vec![min(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
         )?
-        .sort(vec![col(HASH_LABEL).sort(true, true)])?
-        .limit(0, Some(max_series))?
         .collect()
         .await?;
 
