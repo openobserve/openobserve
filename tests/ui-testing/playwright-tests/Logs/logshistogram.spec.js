@@ -60,9 +60,17 @@ test.describe("Logs Histogram testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
-    await pm.logsPage.selectStream("e2e_automate"); 
-    
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+    await pm.logsPage.selectStream("e2e_automate");
+    await page.waitForTimeout(1000);
+
+    // Wait for initial search to complete
+    const allsearch = page.waitForResponse("**/api/default/_search**", { timeout: 60000 });
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await allsearch;
+    await page.waitForTimeout(1000);
+
     testLogger.info('Histogram test setup completed');
   });
 
@@ -90,16 +98,26 @@ test.describe("Logs Histogram testcases", () => {
     await pm.logsPage.clearAndFillQueryEditor("match_all('invalid')");
     await pm.logsPage.setDateTimeFilter();
     await pm.logsPage.waitForTimeout(1000);
+
+    // Wait for search response before checking for error
+    const searchResponse = page.waitForResponse("**/api/default/_search**", { timeout: 60000 });
     await pm.logsPage.clickRefresh();
-    await pm.logsPage.waitForTimeout(3000);
+    await searchResponse;
+    await pm.logsPage.waitForTimeout(2000);
+
     await pm.logsPage.clickErrorMessage();
     await pm.logsPage.clickResetFilters();
 
     // Type SQL query and verify no results
     await pm.logsPage.clearAndFillQueryEditor("SELECT count(*) FROM 'e2e_automate' where code > 500");
     await pm.logsPage.waitForTimeout(1000);
+
+    // Wait for search response before checking for no data
+    const sqlSearchResponse = page.waitForResponse("**/api/default/_search**", { timeout: 60000 });
     await pm.logsPage.clickRefresh();
-    await pm.logsPage.waitForTimeout(3000);
+    await sqlSearchResponse;
+    await pm.logsPage.waitForTimeout(2000);
+
     await pm.logsPage.clickNoDataFound();
     await pm.logsPage.clickResultDetail();
 
