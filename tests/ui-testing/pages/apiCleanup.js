@@ -796,6 +796,58 @@ class APICleanup {
      * Clean up all streams starting with "sanitylogstream_"
      * Deletes streams like sanitylogstream_61hj, sanitylogstream_abc123, etc.
      */
+    /**
+     * Check if a stream name should be cleaned up
+     * Cleans up streams matching these patterns:
+     * 1. Starts with "sanitylogstream_"
+     * 2. Matches test patterns: test1, test2, test3, etc.
+     * 3. stress_test followed by numbers
+     * 4. Random 8-9 character lowercase strings (from pipeline dynamic tests)
+     *    - BUT excludes known production/important streams
+     */
+    shouldCleanupStream(streamName) {
+        // Pattern 1: sanitylogstream_*
+        if (streamName.startsWith('sanitylogstream_')) {
+            return true;
+        }
+
+        // Pattern 2: test1, test2, test3, etc.
+        if (/^test\d+$/.test(streamName)) {
+            return true;
+        }
+
+        // Pattern 3: stress_test*
+        if (streamName.startsWith('stress_test')) {
+            return true;
+        }
+
+        // Pattern 4: Random 8-9 char lowercase strings
+        // First check if it matches the basic pattern
+        if (!/^[a-z]{8,9}$/.test(streamName)) {
+            return false;
+        }
+
+        // Whitelist of known important streams to never delete
+        const protectedStreams = [
+            'default', 'sensitive', 'important', 'critical',
+            'production', 'staging', 'automation'
+        ];
+
+        // Don't delete if it's in the protected list
+        if (protectedStreams.includes(streamName)) {
+            return false;
+        }
+
+        // Don't delete if it contains common meaningful patterns
+        const meaningfulPatterns = ['prod', 'test', 'auto', 'log', 'metric', 'trace'];
+        if (meaningfulPatterns.some(pattern => streamName.includes(pattern))) {
+            return false;
+        }
+
+        // If it's 8-9 random lowercase chars and not protected, delete it
+        return true;
+    }
+
     async cleanupStreams() {
         testLogger.info('Starting streams cleanup');
 
@@ -804,9 +856,9 @@ class APICleanup {
             const streams = await this.fetchStreams();
             testLogger.info('Fetched streams', { total: streams.length });
 
-            // Filter streams starting with "sanitylogstream_"
-            const matchingStreams = streams.filter(s => s.name.startsWith('sanitylogstream_'));
-            testLogger.info('Found streams matching cleanup pattern', { count: matchingStreams.length });
+            // Filter streams matching cleanup patterns
+            const matchingStreams = streams.filter(s => this.shouldCleanupStream(s.name));
+            testLogger.info('Found streams matching cleanup patterns', { count: matchingStreams.length });
 
             if (matchingStreams.length === 0) {
                 testLogger.info('No streams to clean up');
