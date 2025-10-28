@@ -841,6 +841,217 @@ class APICleanup {
     }
 
     /**
+     * Fetch all service accounts
+     * @returns {Promise<Array>} Array of service account objects
+     */
+    async fetchServiceAccounts() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/service_accounts`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch service accounts', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.data || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch service accounts', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single service account
+     * @param {string} email - The service account email
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteServiceAccount(email) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/service_accounts/${email}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete service account', { email, status: response.status });
+                return { code: response.status, message: 'Failed to delete service account' };
+            }
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            testLogger.error('Failed to delete service account', { email, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all service accounts matching pattern "email*@gmail.com"
+     * Deletes service accounts with emails starting with "email" and ending with "@gmail.com"
+     */
+    async cleanupServiceAccounts() {
+        testLogger.info('Starting service accounts cleanup');
+
+        try {
+            // Fetch all service accounts
+            const serviceAccounts = await this.fetchServiceAccounts();
+            testLogger.info('Fetched service accounts', { total: serviceAccounts.length });
+
+            // Filter service accounts matching pattern: starts with "email" and ends with "@gmail.com"
+            const pattern = /^email.*@gmail\.com$/;
+            const matchingAccounts = serviceAccounts.filter(sa => pattern.test(sa.email));
+            testLogger.info('Found service accounts matching cleanup pattern', { count: matchingAccounts.length });
+
+            if (matchingAccounts.length === 0) {
+                testLogger.info('No service accounts to clean up');
+                return;
+            }
+
+            // Delete each service account
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const account of matchingAccounts) {
+                const result = await this.deleteServiceAccount(account.email);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted service account', { email: account.email });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete service account', { email: account.email, result });
+                }
+            }
+
+            testLogger.info('Service accounts cleanup completed', {
+                total: matchingAccounts.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Service accounts cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Fetch all users
+     * @returns {Promise<Array>} Array of user objects
+     */
+    async fetchUsers() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/users`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch users', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.data || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch users', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single user
+     * @param {string} email - The user email
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteUser(email) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/users/${email}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete user', { email, status: response.status });
+                return { code: response.status, message: 'Failed to delete user' };
+            }
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            testLogger.error('Failed to delete user', { email, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all users matching patterns "email*@gmail.com" and "duplicate*@gmail.com"
+     * Deletes users with emails starting with "email" or "duplicate" and ending with "@gmail.com"
+     */
+    async cleanupUsers() {
+        testLogger.info('Starting users cleanup');
+
+        try {
+            // Fetch all users
+            const users = await this.fetchUsers();
+            testLogger.info('Fetched users', { total: users.length });
+
+            // Filter users matching patterns: starts with "email" or "duplicate" and ends with "@gmail.com"
+            const emailPattern = /^email.*@gmail\.com$/;
+            const duplicatePattern = /^duplicate.*@gmail\.com$/;
+            const matchingUsers = users.filter(user =>
+                emailPattern.test(user.email) || duplicatePattern.test(user.email)
+            );
+            testLogger.info('Found users matching cleanup patterns', { count: matchingUsers.length });
+
+            if (matchingUsers.length === 0) {
+                testLogger.info('No users to clean up');
+                return;
+            }
+
+            // Delete each user
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const user of matchingUsers) {
+                const result = await this.deleteUser(user.email);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted user', { email: user.email });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete user', { email: user.email, result });
+                }
+            }
+
+            testLogger.info('Users cleanup completed', {
+                total: matchingUsers.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Users cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
      * Complete cascade cleanup: Alert -> Folder -> Destination -> Template
      * Only deletes resources linked to destinations matching the prefix
      * @param {string} prefix - Prefix to match destination names (e.g., 'auto_playwright')

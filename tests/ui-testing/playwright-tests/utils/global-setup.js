@@ -73,9 +73,9 @@ async function globalSetup() {
     
     await signInButton.waitFor({ state: 'visible' });
     await signInButton.click();
-    
+
     testLogger.debug('Login credentials submitted');
-    
+
     // Wait for login to complete - look for navigation or success indicators
     await page.waitForLoadState('networkidle', { timeout: 15000 });
     

@@ -42,6 +42,12 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up all streams starting with "sanitylogstream_"
     await pm.apiCleanup.cleanupStreams();
 
+    // Clean up all service accounts matching pattern "email*@gmail.com"
+    await pm.apiCleanup.cleanupServiceAccounts();
+
+    // Clean up all users matching patterns "email*@gmail.com" and "duplicate*@gmail.com"
+    await pm.apiCleanup.cleanupUsers();
+
     testLogger.info('Pre-test cleanup completed successfully');
   });
 });
