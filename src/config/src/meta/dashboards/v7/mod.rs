@@ -52,7 +52,7 @@ pub struct Dashboard {
 
 impl From<Dashboard> for super::Dashboard {
     fn from(value: Dashboard) -> Self {
-        let version: i32 = 6;
+        let version: i32 = 7;
 
         let mut hasher = std::hash::DefaultHasher::new();
         hasher.write_i32(version);
@@ -66,7 +66,8 @@ impl From<Dashboard> for super::Dashboard {
             v3: None,
             v4: None,
             v5: None,
-            v6: Some(value),
+            v6: None,
+            v7: Some(value),
             version,
             hash,
             updated_at,
