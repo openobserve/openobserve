@@ -90,10 +90,10 @@
                   size="sm"
                   round
                   flat
+                  icon="download"
                   title="Export Regex Pattern"
                   @click.stop="exportRegexPattern(props.row)"
                 >
-                  <Download class="o2-actions-icons" />
                 </q-btn>
                 <q-btn
                   :data-test="`regex-pattern-list-${props.row.id}-update-regex-pattern`"
@@ -102,10 +102,10 @@
                   size="sm"
                   round
                   flat
+                  icon="edit"
                   :title="t('regex_patterns.edit')"
                   @click.stop="editRegexPattern(props.row)"
                 >
-                  <Pencil class="o2-actions-icons" />
                 </q-btn>
                 <q-btn
                   :data-test="`regex-pattern-list-${props.row.id}-delete-regex-pattern`"
@@ -114,10 +114,10 @@
                   size="sm"
                   round
                   flat
+                  :icon="outlinedDelete"
                   :title="t('regex_patterns.delete')"
                   @click.stop="confirmDeleteRegexPattern(props.row)"
                 >
-                  <Trash class="o2-actions-icons" />
                 </q-btn>
               </div>
             </template>
@@ -175,7 +175,7 @@
     import ImportRegexPattern from "./ImportRegexPattern.vue";
     import config from "@/aws-exports";
     import NoData from "@/components/shared/grid/NoData.vue";
-    import { Download, Pencil, Trash } from "lucide-vue-next";
+    import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
     export default defineComponent({
         name: "RegexPatternList",
@@ -186,9 +186,6 @@
             AddRegexPattern,
             ImportRegexPattern,
             NoData,
-            Download,
-            Pencil,
-            Trash,
         },
     setup() {
 
@@ -478,7 +475,8 @@
         exportRegexPattern,
         closeAddRegexPatternDialog,
         visibleRows,
-        hasVisibleRows
+        hasVisibleRows,
+        outlinedDelete
     }
     }
 })

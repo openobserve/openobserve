@@ -107,9 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 round
                 flat
                 title="Export Destination"
+                icon="download"
                 @click.stop="exportDestination(props.row)"
               >
-                <Download class="o2-actions-icons" />
               </q-btn>
               <q-btn
                 :data-test="`alert-destination-list-${props.row.name}-update-destination`"
@@ -118,10 +118,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 round
                 flat
+                icon="edit"
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(props.row)"
               >
-                <Pencil class="o2-actions-icons" />
               </q-btn>
               <q-btn
                 :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
@@ -130,10 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 round
                 flat
+                :icon="outlinedDelete"
                 :title="t('alert_destinations.delete')"
                 @click="conformDeleteDestination(props.row)"
               >
-                <Trash class="o2-actions-icons" />
               </q-btn>
             </div>
           </q-td>
@@ -222,7 +222,7 @@ import type { Template } from "@/ts/interfaces/index";
 import ImportDestination from "./ImportDestination.vue";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
-import { Download, Pencil, Trash } from "lucide-vue-next";
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 interface ConformDelete {
   visible: boolean;
@@ -236,9 +236,6 @@ export default defineComponent({
     ConfirmDialog,
     QTablePagination,
     ImportDestination,
-    Download,
-    Pencil,
-    Trash,
   },
   setup() {
     const qTable = ref();
@@ -595,6 +592,7 @@ export default defineComponent({
       selectedPerPage,
       visibleRows,
       hasVisibleRows,
+      outlinedDelete
     };
   },
 });
