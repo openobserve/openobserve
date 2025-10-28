@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ props.row[col.field] ?  props.row[col.field] + " Mins" : "--" }}
                       </template>
                       <template v-else-if="col.name === 'frequency'">
-                        {{ props.row[col.field] ? props.row[col.field] + (props.row?.frequency_type == "cron" ? "" : "Mins") : "--" }}
+                        {{ props.row[col.field] ? props.row[col.field] + (props.row?.frequency_type == "cron" ? "" : " Mins") : "--" }}
                       </template>
                       <template v-else-if="col.name === 'folder_name'">
                         <div
