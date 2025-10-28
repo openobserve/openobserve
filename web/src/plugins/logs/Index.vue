@@ -893,7 +893,7 @@ export default defineComponent({
           searchObj.loading = true; // Set loading state for UI
 
           try {
-            const queryReq = getQueryReq(false);
+            const queryReq = getQueryReq(false, false);
             if (!queryReq) {
               console.log('[Index] No query request available');
               searchObj.loading = false;

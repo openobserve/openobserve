@@ -75,19 +75,25 @@ export const useSearchStream = () => {
 
   const { fetchQueryDataWithHttpStream } = useStreamingSearch();
 
-  const getQueryReq = (isPagination: boolean) => {
-    if (!isPagination) {
+  const getQueryReq = (
+    isPagination: boolean,
+    shouldResetData: boolean = true,
+  ) => {
+    if (!isPagination && shouldResetData) {
       resetQueryData();
       searchObj.data.queryResults = {};
     }
 
     // reset searchAggData
-    searchAggData.total = 0;
-    searchAggData.hasAggregation = false;
+    if (shouldResetData) {
+      searchAggData.total = 0;
+      searchAggData.hasAggregation = false;
 
-    searchObj.meta.showDetailTab = false;
-    searchObj.meta.searchApplied = true;
-    searchObj.data.functionError = "";
+      searchObj.meta.showDetailTab = false;
+      searchObj.meta.searchApplied = true;
+      searchObj.data.functionError = "";
+    }
+
     if (
       !searchObj.data.stream.streamLists?.length ||
       searchObj.data.stream.selectedStream.length == 0
