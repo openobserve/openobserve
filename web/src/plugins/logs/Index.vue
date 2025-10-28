@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <div class="relative-position tw-h-full tw-px-[0.625rem]">
+                <div class="relative-position tw-h-full tw-pl-[0.625rem]">
                   <index-list
                     v-show="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
