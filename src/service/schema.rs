@@ -272,6 +272,106 @@ pub(crate) async fn handle_diff_schema(
         );
     }
 
+    // Check if we should pre-enable UDS for first batch (NEW STREAM ONLY)
+    let mut pre_enabled_uds = false;
+    let mut uds_fields_to_save = HashSet::new();
+    let schema_for_merge_base = if is_new {
+        // Helper to check if field is core
+        let is_core_field = |field_name: &str| {
+            field_name.starts_with("__") ||
+            field_name == TIMESTAMP_COL_NAME ||
+            field_name == ID_COL_NAME ||
+            field_name == ORIGINAL_DATA_COL_NAME ||
+            field_name == ALL_VALUES_COL_NAME ||
+            field_name == cfg.common.column_all.as_str()
+        };
+
+        // Count non-core fields
+        let non_core_count = inferred_schema.fields()
+            .iter()
+            .filter(|f| !is_core_field(f.name()))
+            .count();
+
+        // Check thresholds based on stream type
+        let (should_pre_enable, max_fields) = match stream_type {
+            StreamType::Metrics => (
+                cfg.common.allow_user_defined_schemas
+                    && cfg.limit.schema_max_fields_to_enable_uds_metrics > 0
+                    && non_core_count > cfg.limit.schema_max_fields_to_enable_uds_metrics,
+                cfg.limit.schema_max_fields_to_enable_uds_metrics,
+            ),
+            StreamType::Traces => (
+                cfg.common.allow_user_defined_schemas
+                    && cfg.limit.schema_max_fields_to_enable_uds_traces > 0
+                    && non_core_count > cfg.limit.schema_max_fields_to_enable_uds_traces,
+                cfg.limit.schema_max_fields_to_enable_uds_traces,
+            ),
+            _ => (false, 0),
+        };
+
+        if should_pre_enable {
+            log::info!(
+                "[UDS PRE-ENABLE] Pre-enabling UDS for NEW stream {}/{}/{}, non_core_fields={}, threshold={}",
+                org_id,
+                stream_type,
+                stream_name,
+                non_core_count,
+                max_fields
+            );
+            pre_enabled_uds = true;
+
+            // Select which fields to keep in UDS
+            let mut selected_fields = HashSet::with_capacity(max_fields);
+
+            // Add all core fields first (they don't count toward limit)
+            let mut core_fields = vec![];
+            let mut non_core_fields = vec![];
+
+            for field in inferred_schema.fields() {
+                if is_core_field(field.name()) {
+                    core_fields.push(field.clone());
+                } else {
+                    non_core_fields.push(field.clone());
+                }
+            }
+
+            // Select first max_fields non-core fields for UDS
+            for (i, field) in non_core_fields.iter().enumerate() {
+                if i < max_fields {
+                    selected_fields.insert(field.name().to_string());
+                    uds_fields_to_save.insert(field.name().to_string());
+                }
+            }
+
+            // Build filtered schema with core + selected fields + _all
+            let mut filtered_fields = core_fields;
+            for field in &non_core_fields {
+                if selected_fields.contains(field.name()) {
+                    filtered_fields.push(field.clone());
+                }
+            }
+
+            // Add _all field for overflow
+            if !filtered_fields.iter().any(|f| f.name() == cfg.common.column_all.as_str()) {
+                filtered_fields.push(Arc::new(Field::new(cfg.common.column_all.as_str(), DataType::Utf8, true)));
+            }
+
+            log::info!(
+                "[UDS PRE-ENABLE] Filtered schema: {} fields (from {}), UDS fields: {}",
+                filtered_fields.len(),
+                inferred_schema.fields().len(),
+                uds_fields_to_save.len()
+            );
+
+            // Use filtered schema for merge
+            Schema::new(filtered_fields)
+        } else {
+            inferred_schema.clone()
+        }
+    } else {
+        inferred_schema.clone()
+    };
+
     let mut retries = 0;
     let mut err: Option<anyhow::Error> = None;
     let mut ret: Option<_> = None;
@@ -280,9 +380,9 @@ pub(crate) async fn handle_diff_schema(
         let schema_for_merge = if is_derived {
             let mut metadata = HashMap::with_capacity(1);
             metadata.insert("is_derived".to_string(), "true".to_string());
-            &inferred_schema.clone().with_metadata(metadata)
+            &schema_for_merge_base.clone().with_metadata(metadata)
         } else {
-            inferred_schema
+            &schema_for_merge_base
         };
         match db::schema::merge(
             org_id,
@@ -345,6 +445,16 @@ pub(crate) async fn handle_diff_schema(
     let mut stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
     let mut defined_schema_fields = stream_setting.defined_schema_fields.clone();
 
+    // If we pre-enabled UDS, use those fields
+    if pre_enabled_uds && !uds_fields_to_save.is_empty() {
+        log::info!(
+            "[UDS PRE-ENABLE] Using pre-selected UDS fields: {} fields",
+            uds_fields_to_save.len()
+        );
+        defined_schema_fields = uds_fields_to_save.into_iter().collect();
+        // Set the flag to trigger save later
+    }
+
     // Helper function to check if a field is a core system field
     // Core fields should NOT count toward the UDS threshold
     // These are fields that OpenObserve adds or requires for functionality
@@ -367,12 +477,13 @@ pub(crate) async fn handle_diff_schema(
         .count();
 
     log::info!(
-        "[UDS DEBUG] Checking auto-enable for {}/{}, stream_type={:?}, total_fields={}, non_core_fields={}",
+        "[UDS DEBUG] Checking auto-enable for {}/{}, stream_type={:?}, total_fields={}, non_core_fields={}, pre_enabled={}",
         org_id,
         stream_name,
         stream_type,
         final_schema.fields().len(),
-        non_core_field_count
+        non_core_field_count,
+        pre_enabled_uds
     );
 
     // Automatically enable User-defined schema when
@@ -384,54 +495,63 @@ pub(crate) async fn handle_diff_schema(
     // threshold
 
     // Check which threshold to use based on stream type
-    let (should_enable_uds, uds_max_fields) = match stream_type {
-        StreamType::Logs => (
-            cfg.common.allow_user_defined_schemas
-                && cfg.limit.schema_max_fields_to_enable_uds > 0
-                && defined_schema_fields.is_empty()
-                && non_core_field_count > cfg.limit.schema_max_fields_to_enable_uds,
-            cfg.limit.schema_max_fields_to_enable_uds,
-        ),
-        StreamType::Metrics => {
-            let allow_uds = cfg.common.allow_user_defined_schemas;
-            let threshold_set = cfg.limit.schema_max_fields_to_enable_uds_metrics > 0;
-            let fields_empty = defined_schema_fields.is_empty();
-            let exceeds_threshold =
-                non_core_field_count > cfg.limit.schema_max_fields_to_enable_uds_metrics;
-
-            log::info!(
-                "[UDS METRICS AUTO-ENABLE CHECK] allow_uds={}, threshold={}>0={}, non_core_field_count={}, threshold_value={}, exceeds={}, fields_empty={}, will_enable={}",
-                allow_uds,
-                cfg.limit.schema_max_fields_to_enable_uds_metrics,
-                threshold_set,
-                non_core_field_count,
-                cfg.limit.schema_max_fields_to_enable_uds_metrics,
-                exceeds_threshold,
-                fields_empty,
-                allow_uds && threshold_set && fields_empty && exceeds_threshold
-            );
-            (
-                allow_uds && threshold_set && fields_empty && exceeds_threshold,
-                cfg.limit.schema_max_fields_to_enable_uds_metrics,
-            )
-        }
-        StreamType::Traces => {
-            log::debug!(
-                "[UDS] Traces auto-enable check: allow_uds={}, threshold={}, non_core_field_count={}, defined_fields_empty={}",
-                cfg.common.allow_user_defined_schemas,
-                cfg.limit.schema_max_fields_to_enable_uds_traces,
-                non_core_field_count,
-                defined_schema_fields.is_empty()
-            );
-            (
+    // Skip this check if we already pre-enabled UDS
+    let (should_enable_uds, uds_max_fields) = if pre_enabled_uds {
+        (true, if stream_type == StreamType::Metrics {
+            cfg.limit.schema_max_fields_to_enable_uds_metrics
+        } else {
+            cfg.limit.schema_max_fields_to_enable_uds_traces
+        })
+    } else {
+        match stream_type {
+            StreamType::Logs => (
                 cfg.common.allow_user_defined_schemas
-                    && cfg.limit.schema_max_fields_to_enable_uds_traces > 0
+                    && cfg.limit.schema_max_fields_to_enable_uds > 0
                     && defined_schema_fields.is_empty()
-                    && non_core_field_count > cfg.limit.schema_max_fields_to_enable_uds_traces,
-                cfg.limit.schema_max_fields_to_enable_uds_traces,
-            )
+                    && non_core_field_count > cfg.limit.schema_max_fields_to_enable_uds,
+                cfg.limit.schema_max_fields_to_enable_uds,
+            ),
+            StreamType::Metrics => {
+                let allow_uds = cfg.common.allow_user_defined_schemas;
+                let threshold_set = cfg.limit.schema_max_fields_to_enable_uds_metrics > 0;
+                let fields_empty = defined_schema_fields.is_empty();
+                let exceeds_threshold =
+                    non_core_field_count > cfg.limit.schema_max_fields_to_enable_uds_metrics;
+
+                log::info!(
+                    "[UDS METRICS AUTO-ENABLE CHECK] allow_uds={}, threshold={}>0={}, non_core_field_count={}, threshold_value={}, exceeds={}, fields_empty={}, will_enable={}",
+                    allow_uds,
+                    cfg.limit.schema_max_fields_to_enable_uds_metrics,
+                    threshold_set,
+                    non_core_field_count,
+                    cfg.limit.schema_max_fields_to_enable_uds_metrics,
+                    exceeds_threshold,
+                    fields_empty,
+                    allow_uds && threshold_set && fields_empty && exceeds_threshold
+                );
+                (
+                    allow_uds && threshold_set && fields_empty && exceeds_threshold,
+                    cfg.limit.schema_max_fields_to_enable_uds_metrics,
+                )
+            }
+            StreamType::Traces => {
+                log::debug!(
+                    "[UDS] Traces auto-enable check: allow_uds={}, threshold={}, non_core_field_count={}, defined_fields_empty={}",
+                    cfg.common.allow_user_defined_schemas,
+                    cfg.limit.schema_max_fields_to_enable_uds_traces,
+                    non_core_field_count,
+                    defined_schema_fields.is_empty()
+                );
+                (
+                    cfg.common.allow_user_defined_schemas
+                        && cfg.limit.schema_max_fields_to_enable_uds_traces > 0
+                        && defined_schema_fields.is_empty()
+                        && non_core_field_count > cfg.limit.schema_max_fields_to_enable_uds_traces,
+                    cfg.limit.schema_max_fields_to_enable_uds_traces,
+                )
+            }
+            _ => (false, 0),
         }
-        _ => (false, 0),
     };
 
     if should_enable_uds {
@@ -632,23 +752,10 @@ pub(crate) async fn handle_diff_schema(
         defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
         stream_setting.defined_schema_fields = defined_schema_fields.clone();
 
-        // CRITICAL: Add _all to full_text_search_keys when UDS is enabled
-        // This allows queries on non-UDS fields to search inside the _all JSON column
-        let cfg = get_config();
-        if !stream_setting
-            .full_text_search_keys
-            .contains(&cfg.common.column_all)
-        {
-            stream_setting
-                .full_text_search_keys
-                .push(cfg.common.column_all.clone());
-            log::info!(
-                "[UDS AUTO-ENABLE] Added _all to full_text_search_keys for {}/{}/{}",
-                org_id,
-                stream_type,
-                stream_name
-            );
-        }
+        // NOTE: We don't add _all to full_text_search_keys here because:
+        // 1. _all field doesn't exist in schema yet
+        // 2. save_stream_settings() will fail validation
+        // 3. _all will be added to fts_keys automatically when the field is created during ingestion
 
         final_schema.metadata.insert(
             "settings".to_string(),
@@ -719,15 +826,14 @@ pub(crate) async fn handle_diff_schema(
         ));
     }
 
-    // Only update cache if UDS was NOT just enabled (to avoid overwriting with stale
-    // stream_setting) If UDS was enabled, cache was already updated inside the auto-enable
-    // block above
-    if !should_enable_uds {
-        let mut w = STREAM_SETTINGS.write().await;
-        w.insert(cache_key.clone(), stream_setting);
-        infra::schema::set_stream_settings_atomic(w.clone());
-        drop(w);
-    }
+    // REMOVED: Problematic cache update that overwrites good UDS settings with stale data
+    // This code was inserting stream_setting which was loaded at line 345 from final_schema
+    // metadata. If UDS was enabled in a previous request, this stream_setting doesn't have
+    // those UDS fields (DB lag), so we were overwriting good cache with empty settings.
+    // Cache updates should ONLY happen:
+    // 1. Inside the auto-enable block above (when we have authoritative UDS data)
+    // 2. In get_settings() when reading fresh data from DB
+    // DO NOT update cache here with potentially stale stream_setting!
 
     // update thread cache
     let final_schema = generate_schema_for_defined_schema_fields(
