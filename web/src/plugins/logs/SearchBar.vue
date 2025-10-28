@@ -761,7 +761,7 @@ class="toolbar-icon" />
                       "
                     >
                       <q-icon name="grid_on" size="14px"
-class="q-pr-sm" />
+class="q-pr-sm q-pt-xs" />
                       <q-item-section>
                         <q-item-label
                           class="tw-flex tw-items-center tw-gap-2 q-mr-md"
@@ -780,7 +780,7 @@ class="q-pr-sm" />
                       "
                     >
                       <q-icon name="data_object" size="14px"
-class="q-pr-sm" />
+class="q-pr-sm q-pt-xs" />
                       <q-item-section>
                         <q-item-label
                           class="tw-flex tw-items-center tw-gap-2 q-mr-md"

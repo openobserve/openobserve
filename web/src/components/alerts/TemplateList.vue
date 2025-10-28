@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
           <q-btn
-            class="o2-secondary-button q-ml-md tw-h-[36px]"
+            class="o2-secondary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`dashboard.import`)"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             data-test="template-list-add-btn"
-            class="o2-primary-button q-ml-md tw-h-[36px]"
+            class="o2-primary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`alert_templates.add`)"

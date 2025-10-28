@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-input>
           <q-btn
             data-test="pipeline-destination-list-add-btn"
-            class="o2-primary-button q-ml-md tw-h-[36px]"
+            class="o2-primary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`alert_destinations.add`)"

@@ -171,15 +171,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Action Buttons -->
-    <div class="row q-gutter-md">
+    <div class="flex justify-end q-px-lg q-py-lg full-width tw-absolute tw-bottom-0">
       <q-btn
         :label="t('common.cancel')"
-        class="no-border o2-secondary-button"
+        class="q-mr-md o2-secondary-button tw-h-[36px]"
         @click="resetForm"
       />
       <q-btn
         :label="t('settings.saveChanges')"
-        class="no-border o2-primary-button"
+        class="o2-primary-button no-border tw-h-[36px] q-mr-md"
         unelevated
         @click="saveChanges"
         :loading="saving"

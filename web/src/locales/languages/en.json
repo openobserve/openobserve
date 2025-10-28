@@ -1303,7 +1303,7 @@
     "status": "Status",
     "cancelQuery": "Cancel Query",
     "queryRange": "Query Range",
-    "refreshQuery": "Refresh Query",
+    "refreshQuery": "Refresh",
     "queryType": "Query Type",
     "numOfQueries": "Number of Queries",
     "totalDuration": "Total Exec. Duration",
