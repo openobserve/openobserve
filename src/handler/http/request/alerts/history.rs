@@ -163,16 +163,35 @@ pub async fn get_alert_history(
         TRIGGERS_USAGE_STREAM, org_id, start_time, end_time
     );
 
+// Helper function to escape alert names for SQL LIKE patterns
+fn escape_like(input: &str) -> String {
+    let mut escaped = String::with_capacity(input.len());
+    for c in input.chars() {
+        match c {
+            '\\' => escaped.push_str(r"\\"),
+            '%' => escaped.push_str(r"\%"),
+            '_' => escaped.push_str(r"\_"),
+            '\'' => escaped.push_str("''"),
+            _ => escaped.push(c),
+        }
+    }
+    escaped
+}
+
     // Add alert name filter if provided
     // The key field contains the alert name in the format "alert_name/alert_id"
     if let Some(ref alert_name) = query.alert_name {
         // We need to filter where key starts with the alert name
-        sql.push_str(&format!(" AND key LIKE '{}/%'", alert_name.replace("'", "''")));
+        let escaped_name = escape_like(alert_name);
+        sql.push_str(&format!(" AND key LIKE '{}\\/%' ESCAPE '\\'", escaped_name));
     } else if !alert_names.is_empty() {
         // Filter by all alerts in the organization
         let alert_filter = alert_names
             .iter()
-            .map(|name| format!("key LIKE '{}/%'", name))
+            .map(|name| {
+                let escaped_name = escape_like(name);
+                format!("key LIKE '{}\\/%' ESCAPE '\\'", escaped_name)
+            })
             .collect::<Vec<_>>()
             .join(" OR ");
         sql.push_str(&format!(" AND ({})", alert_filter));
