@@ -24,7 +24,6 @@ use config::{
     },
     utils::time::now_micros,
 };
-use infra::scheduler::TRIGGERS_KEY;
 use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
@@ -120,7 +119,7 @@ pub async fn get_alert_history(
 
     // Set default pagination values
     let from = query.from.unwrap_or(0).max(0);
-    let size = query.size.unwrap_or(100).min(1000).max(1);
+    let size = query.size.unwrap_or(100).clamp(1, 1000);
 
     // Set default time range (last 7 days if not specified)
     let end_time = query.end_time.unwrap_or_else(now_micros);
@@ -138,18 +137,17 @@ pub async fn get_alert_history(
         Ok(names) => names,
         Err(e) => {
             log::error!("Failed to get alert names for org {}: {}", org_id, e);
-            return MetaHttpResponse::internal_error(format!("Failed to get alert names: {}", e));
+            return MetaHttpResponse::internal_error(format!("Failed to get alert names: {e}"));
         }
     };
 
     // If alert_name filter is provided, validate it exists
-    if let Some(ref alert_name) = query.alert_name {
-        if !alert_names.contains(alert_name) {
-            return MetaHttpResponse::not_found(format!(
-                "Alert '{}' not found in organization",
-                alert_name
-            ));
-        }
+    if let Some(ref alert_name) = query.alert_name
+        && !alert_names.contains(alert_name)
+    {
+        return MetaHttpResponse::not_found(format!(
+            "Alert '{alert_name}' not found in organization"
+        ));
     }
 
     // Build SQL query for the _meta organization's triggers stream
@@ -158,43 +156,39 @@ pub async fn get_alert_history(
          start_time, end_time, retries, \
          delay_in_secs, evaluation_took_in_secs, \
          source_node, query_took \
-         FROM \"{}\" \
-         WHERE module = 'alert' AND org = '{}' AND _timestamp >= {} AND _timestamp <= {}",
-        TRIGGERS_USAGE_STREAM, org_id, start_time, end_time
+         FROM \"{TRIGGERS_USAGE_STREAM}\" \
+         WHERE module = 'alert' AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
 
-// Helper function to escape alert names for SQL LIKE patterns
-fn escape_like(input: &str) -> String {
-    let mut escaped = String::with_capacity(input.len());
-    for c in input.chars() {
-        match c {
-            '\\' => escaped.push_str(r"\\"),
-            '%' => escaped.push_str(r"\%"),
-            '_' => escaped.push_str(r"\_"),
-            '\'' => escaped.push_str("''"),
-            _ => escaped.push(c),
+    // Helper function to escape alert names for SQL LIKE patterns
+    fn escape_like(input: &str) -> String {
+        let mut escaped = String::with_capacity(input.len());
+        for c in input.chars() {
+            match c {
+                '\\' => escaped.push_str(r"\\"),
+                '%' => escaped.push_str(r"\%"),
+                '_' => escaped.push_str(r"\_"),
+                '\'' => escaped.push_str("''"),
+                _ => escaped.push(c),
+            }
         }
+        escaped
     }
-    escaped
-}
 
     // Add alert name filter if provided
     // The key field contains the alert name in the format "alert_name/alert_id"
     if let Some(ref alert_name) = query.alert_name {
         // We need to filter where key starts with the alert name
         let escaped_name = escape_like(alert_name);
-        sql.push_str(&format!(" AND key LIKE '{}\\/%' ESCAPE '\\'", escaped_name));
+        sql.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
     } else if !alert_names.is_empty() {
         // Filter by all alerts in the organization
         let alert_filter = alert_names
             .iter()
-            .map(|name| {
-                let escaped_name = escape_like(name);
-                format!("key LIKE '{}\\/%' ESCAPE '\\'", escaped_name)
-            })
+            .map(|name| format!("key LIKE '{}/%'", name.replace("'", "''")))
             .collect::<Vec<_>>()
             .join(" OR ");
-        sql.push_str(&format!(" AND ({})", alert_filter));
+        sql.push_str(&format!(" AND ({alert_filter})"));
     } else {
         // No alerts in the organization, return empty result
         return MetaHttpResponse::json(AlertHistoryResponse {
@@ -207,8 +201,7 @@ fn escape_like(input: &str) -> String {
 
     // Add ordering and pagination
     sql.push_str(&format!(
-        " ORDER BY _timestamp DESC LIMIT {} OFFSET {}",
-        size, from
+        " ORDER BY _timestamp DESC LIMIT {size} OFFSET {from}"
     ));
 
     // Create search request for _meta organization
@@ -246,8 +239,7 @@ fn escape_like(input: &str) -> String {
         Err(e) => {
             log::error!("Failed to search alert history: {}", e);
             return MetaHttpResponse::internal_error(format!(
-                "Failed to search alert history: {}",
-                e
+                "Failed to search alert history: {e}"
             ));
         }
     };

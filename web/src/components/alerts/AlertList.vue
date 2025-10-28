@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         no-caps
         flat
-        :label="t(`alerts.history`) || 'Alert History'"
+        :label="t(`alerts.history`)"
         @click="goToAlertHistory"
         data-test="alert-history-btn"
         icon="history"

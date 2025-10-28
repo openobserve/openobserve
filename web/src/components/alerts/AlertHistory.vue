@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-table__title tw-font-[600]"
           data-test="alerts-history-title"
         >
-          {{ t("alerts.history") || "Alert History" }}
+          {{ t(`alerts.history`) }}
         </div>
       </div>
       <div class="flex q-ml-auto items-center">
@@ -72,9 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @filter="filterAlertOptions"
           @input-value="setSearchQuery"
           @update:model-value="onAlertSelected"
-          :placeholder="
-            t('alerts.searchHistory') || 'Select or search alert...'
-          "
+          :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
           data-test="alert-history-search-select"
           class="o2-search-input q-mr-md"
           style="min-width: 250px"
@@ -697,13 +695,7 @@ const fetchAlertHistory = async () => {
       query.alert_name = searchQuery.value.trim();
     }
 
-    console.log("Fetching alert history with query:", query);
-    console.log("Organization:", org);
-    console.log("API URL:", `/api/${org}/alerts/history`);
-
     const response = await alertsService.getHistory(org, query);
-
-    console.log("Alert history response:", response);
 
     if (response.data) {
       // Handle the response data
@@ -718,11 +710,8 @@ const fetchAlertHistory = async () => {
       // Update pagination total
       pagination.value.rowsNumber = historyData.total || 0;
 
-      console.log("Processed rows:", rows.value);
-      console.log("Total records:", pagination.value.rowsNumber);
-
       if (rows.value.length === 0) {
-        console.log("No alert history found for the selected time range");
+        console.warn("No alert history found for the selected time range");
       }
     }
   } catch (error: any) {
