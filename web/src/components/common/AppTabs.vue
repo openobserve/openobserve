@@ -75,7 +75,8 @@ const changeTab = (tab: Tab) => {
 .o2-tabs {
   .o2-tab {
     border-bottom: 2px solid transparent;
-    width: 140px;
+    width: auto;
+    min-width: 80px;
     white-space: nowrap;
   }
   .active {
