@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <SelectFolderDropDown
                       :disableDropdown="beingUpdated"
                       :type="'alerts'"
-                      :style="'height: 32px'"
+                      :style="'height: 36px;'"
                       @folder-selected="updateActiveFolderId"
                       :activeFolderId="activeFolderId"
                   />
