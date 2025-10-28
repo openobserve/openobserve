@@ -352,8 +352,6 @@ async fn search_in_cluster(
     .await;
 
     // cache the result
-    // if the query with cache_disabled, we should update the exist cache
-    let update_cache = !cache_disabled;
     if cfg.common.metrics_cache_enabled
         && let Some(matrix) = values.get_ref_matrix_values()
         && let Err(err) = cache::set(
@@ -364,7 +362,7 @@ async fn search_in_cluster(
             end,
             step,
             matrix.to_vec(),
-            update_cache,
+            cache_disabled, // if the query with cache_disabled, we should update the exist cache
         )
         .await
     {
