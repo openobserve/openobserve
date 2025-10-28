@@ -64,7 +64,7 @@ def test_dashboard_search_stream_query(create_session, base_url):
     # Skip test if no data stream exists
     # This test requires a pre-existing stream with data
     # Get current time for query range (last 15 minutes for recent data)
-    end_time = int(time.time() * 1000000)  # microseconds
+    end_time = int(time.time() * 1000000)  
     start_time = end_time - (15 * 60 * 1000000)  # 15 minutes ago
 
     # Build the search stream URL with query parameters
