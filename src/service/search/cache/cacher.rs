@@ -32,7 +32,10 @@ use crate::{
         CacheQueryRequest, CachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
     },
     service::search::{
-        cache::{MultiCachedQueryResponse, result_utils::get_ts_value},
+        cache::{
+            MultiCachedQueryResponse,
+            result_utils::{get_ts_value, has_non_timestamp_ordering, is_timestamp_field},
+        },
         sql::{
             RE_HISTOGRAM, RE_SELECT_FROM, Sql,
             visitor::histogram_interval::generate_histogram_interval,
@@ -114,10 +117,16 @@ pub async fn check_cache(
         };
     }
 
+    // Check if query contains histogram function
+    let is_histogram_query = sql.histogram_interval.is_some();
+
     // skip the count queries & queries first order by is not _timestamp field
+    // Exception: Allow histogram queries even if ORDER BY is not on timestamp,
+    // because histogram is plotted based on timestamp
     if req.query.track_total_hits
         || (!order_by.is_empty()
             && order_by.first().as_ref().unwrap().0 != TIMESTAMP_COL_NAME
+            && !is_histogram_query
             && (result_ts_col.is_none()
                 || (result_ts_col.is_some()
                     && result_ts_col.as_ref().unwrap() != &order_by.first().as_ref().unwrap().0)))
@@ -176,16 +185,35 @@ pub async fn check_cache(
     let mut is_descending = true;
 
     if !order_by.is_empty() {
+        // For histogram queries, if ORDER BY is not on the histogram/timestamp column,
+        // we should still cache based on the histogram's inherent time ordering
+        // Check if any order_by field matches the result_ts_col
+        let mut found_ts_order = false;
         for (field, order) in &order_by {
-            if field.eq(&result_ts_col) || field.replace("\"", "").eq(&result_ts_col) {
+            if is_timestamp_field(field, &result_ts_col) {
                 is_descending = order == &OrderBy::Desc;
+                found_ts_order = true;
                 break;
             }
+        }
+
+        // For histogram queries ordered by non-timestamp columns (e.g., ORDER BY count),
+        // use ascending as default
+        if !found_ts_order && is_histogram_query {
+            is_descending = false;
         }
     }
     if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
     }
+
+    // Determine if this is a histogram query with non-timestamp ORDER BY.
+    // These queries need special handling because results may not be time-ordered,
+    // requiring us to scan all hits to find the actual time range.
+    let is_histogram_non_ts_order = is_histogram_query
+        && !order_by.is_empty()
+        && has_non_timestamp_ordering(&order_by, &result_ts_col);
+
     let mut multi_resp = MultiCachedQueryResponse {
         trace_id: trace_id.to_string(),
         is_aggregate,
@@ -214,6 +242,7 @@ pub async fn check_cache(
                 ts_column: result_ts_col.clone(),
                 histogram_interval,
                 is_descending,
+                is_histogram_non_ts_order,
             },
         )
         .await;
@@ -290,6 +319,7 @@ pub async fn check_cache(
                 ts_column: result_ts_col.clone(),
                 histogram_interval,
                 is_descending,
+                is_histogram_non_ts_order,
             },
             None,
         )
@@ -590,7 +620,7 @@ pub fn get_ts_col_order_by(
 
     if !order_by.is_empty() && !result_ts_col.is_empty() {
         for (field, order) in order_by {
-            if field.eq(&result_ts_col) || field.replace("\"", "").eq(&result_ts_col) {
+            if is_timestamp_field(field, &result_ts_col) {
                 is_descending = order == &OrderBy::Desc;
                 break;
             }

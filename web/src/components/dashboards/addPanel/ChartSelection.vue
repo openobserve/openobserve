@@ -39,9 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               item.id != 'metric' &&
               item.id != 'gauge' &&
               item.id != 'html' &&
-              item.id != 'markdown') ||
-            (allowedchartstype && 
-              allowedchartstype.length > 0 && 
+              item.id != 'markdown' &&
+              item.id != 'custom_chart') ||
+            (allowedchartstype &&
+              allowedchartstype.length > 0 &&
               !allowedchartstype.includes(item.id))
           "
           :key="index"
