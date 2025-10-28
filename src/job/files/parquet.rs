@@ -974,7 +974,7 @@ async fn extract_patterns_from_parquet(
     // Extract patterns directly using XDrain (no in-memory accumulation needed)
     let extraction_start = std::time::Instant::now();
     let patterns =
-        o2_enterprise::enterprise::log_patterns::extract_patterns_from_logs(&log_messages)
+        o2_enterprise::enterprise::log_patterns::extract_patterns_from_logs(&log_messages, fts_fields)
             .map_err(|e| anyhow::anyhow!("Pattern extraction failed: {}", e))?;
     let extraction_duration = extraction_start.elapsed();
 
