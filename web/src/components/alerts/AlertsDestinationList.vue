@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
           <q-btn
-            class="o2-secondary-button q-ml-md tw-h-[36px]"
+            class="o2-secondary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`dashboard.import`)"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             data-test="alert-destination-list-add-alert-btn"
-            class="o2-primary-button q-ml-md tw-h-[36px]"
+            class="o2-primary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :disable="!templates.length"
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #bottom="scope">
           <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-sm">
                   {{ resultTotal }} {{ t('alert_destinations.header') }}
                 </div>
           <QTablePagination

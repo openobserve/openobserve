@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
     </div>
-    <div class="flex justify-start q-ml-md ">
+    <div class="flex justify-end q-px-lg q-py-lg full-width tw-absolute tw-bottom-0">
       <q-btn
         data-test="add-destination-cancel-btn"
         v-close-popup="true"

@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div
             style="border: 1px solid #cacaca; padding: 2px; border-radius: 4px"
-            class="q-mr-md query-management-tabs"
+            class="q-mr-sm query-management-tabs"
             data-test="running-queries-query-type-tabs"
           >
             <template v-for="visual in runningQueryTypes" :key="visual.value">
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             emit-value
             filled
             :options="searchFieldOptions"
-            class="q-pa-none tw-w-[140px] q-mr-md"
+            class="q-pa-none tw-w-[140px] q-mr-sm"
             data-test="running-queries-search-fields-select"
             @update:model-value="filterQuery = ''"
           ></q-select>
@@ -92,12 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <q-btn
             data-test="running-queries-refresh-btn"
-            class="q-ml-md text-bold no-border o2-primary-button tw-h-[36px]"
+            class="q-ml-sm text-bold no-border o2-secondary-button tw-h-[36px]"
             :class="store.state.theme == 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            padding="sm lg"
+            padding="sm"
             flat
             no-caps
-            icon="refresh"
             :label="t(`queries.refreshQuery`)"
             @click="refreshData"
           />
