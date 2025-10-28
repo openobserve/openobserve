@@ -88,8 +88,7 @@ pub async fn extract_patterns(
                     e
                 );
                 return Ok(MetaHttpResponse::bad_request(format!(
-                    "Invalid request body: {}",
-                    e
+                    "Invalid request body: {e}"
                 )));
             }
         };
@@ -118,8 +117,7 @@ pub async fn extract_patterns(
                     e
                 );
                 return Ok(MetaHttpResponse::bad_request(format!(
-                    "Invalid SQL query: {}",
-                    e
+                    "Invalid SQL query: {e}"
                 )));
             }
         };

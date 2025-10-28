@@ -584,6 +584,9 @@ pub async fn process_search_stream_request(
         if audit_enabled {
         if get_o2_config().common.audit_enabled && _audit_ctx.is_some() {
             let audit_ctx = _audit_ctx.as_ref().unwrap();
+        if get_o2_config().common.audit_enabled
+            && let Some(audit_ctx) = _audit_ctx.as_ref()
+        {
             // Using spawn to handle the async call
             audit(AuditMessage {
                 user_email: user_id,

@@ -3713,6 +3713,32 @@ export default defineComponent({
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }
       } else if (
+        value == "logs" &&
+        searchObj.meta.logsVisualizeToggle == "patterns"
+      ) {
+        // Switching from patterns to logs - check if we need to fetch logs
+        const hasLogs = searchObj.data?.queryResults?.hits &&
+                        searchObj.data.queryResults.hits.length > 0;
+
+        console.log('[SearchBar] Switching patterns → logs, hasLogs:', hasLogs);
+
+        if (!hasLogs) {
+          // No logs data - fetch them
+          console.log('[SearchBar] Fetching logs data');
+          searchObj.loading = true;
+          searchObj.meta.refreshHistogram = true;
+          getQueryData();
+        } else {
+          // Logs exist - just switch the view
+          console.log('[SearchBar] Reusing existing logs data');
+        }
+      } else if (
+        value == "patterns" &&
+        (searchObj.meta.logsVisualizeToggle == "logs" || searchObj.meta.logsVisualizeToggle == "visualize")
+      ) {
+        // Switching to patterns mode - this will be handled by a separate watcher in Index.vue
+        console.log('[SearchBar] Switching to patterns mode');
+      } else if (
         value == "visualize" &&
         searchObj.meta.logsVisualizeToggle == "logs"
       ) {
