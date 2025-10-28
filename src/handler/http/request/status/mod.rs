@@ -230,6 +230,7 @@ pub async fn schedulez() -> Result<HttpResponse, Error> {
 
 #[get("")]
 pub async fn zo_config() -> Result<HttpResponse, Error> {
+    let cfg = get_config();
     #[cfg(feature = "enterprise")]
     let o2cfg = get_o2_config();
     #[cfg(feature = "enterprise")]
@@ -316,7 +317,6 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let usage_enabled = cfg.common.usage_enabled;
 
-    let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: config::VERSION.to_string(),
         instance: get_instance_id(),

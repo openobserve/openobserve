@@ -20,14 +20,14 @@ use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 use config::{
-    META_ORG_ID, TIMESTAMP_COL_NAME,
+    TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
         cluster::RoleGroup,
         function::RESULT_ARRAY,
         search::{self},
-        self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
+        self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, TableReferenceExt, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
@@ -57,6 +57,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::sql::visitor::group_by::get_group_by_fields,
+    config::META_ORG_ID,
+    config::meta::self_reporting::usage::USAGE_STREAM,
     config::utils::sql::is_simple_aggregate_query,
     infra::client::grpc::make_grpc_search_client,
     o2_enterprise::enterprise::{
@@ -1480,11 +1482,11 @@ pub fn generate_search_schema_diff(
 }
 
 #[inline]
-pub fn check_search_allowed(org_id: &str, stream: Option<&str>) -> Result<(), Error> {
+pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), Error> {
     #[cfg(feature = "enterprise")]
     {
         // for meta org usage and audit stream, we should always allow search
-        if org_id == META_ORG_ID && stream == Some(USAGE_STREAM) || stream == Some("audit") {
+        if _org_id == META_ORG_ID && _stream == Some(USAGE_STREAM) || _stream == Some("audit") {
             return Ok(());
         }
         // this is installation level limit for all orgs combined

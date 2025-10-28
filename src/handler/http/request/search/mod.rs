@@ -1445,22 +1445,23 @@ pub async fn search_partition(
         return Ok(MetaHttpResponse::bad_request(e));
     }
 
-    let stream_names = match resolve_stream_names(&req.sql) {
-        Ok(v) => v.clone(),
-        Err(e) => {
-            return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
-        }
-    };
-
     #[cfg(feature = "enterprise")]
-    for stream in stream_names.iter() {
-        if crate::service::search::check_search_allowed(&org_id, Some(stream)).is_err() {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    "installation has exceeded the ingestion limit".to_string(),
-                )),
-            );
+    {
+        let stream_names = match resolve_stream_names(&req.sql) {
+            Ok(v) => v.clone(),
+            Err(e) => {
+                return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
+            }
+        };
+        for stream in stream_names.iter() {
+            if crate::service::search::check_search_allowed(&org_id, Some(stream)).is_err() {
+                return Ok(
+                    HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                        StatusCode::TOO_MANY_REQUESTS,
+                        "installation has exceeded the ingestion limit".to_string(),
+                    )),
+                );
+            }
         }
     }
 
