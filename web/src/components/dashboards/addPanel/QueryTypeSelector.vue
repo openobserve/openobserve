@@ -126,7 +126,12 @@ export default defineComponent({
 
       ignoreSelectedButtonTypeUpdate.value = true;
       if (dashboardPanelData.data.type == "custom_chart") {
-        selectedButtonType.value = "custom-sql";
+        // For custom_chart, check the actual query type instead of assuming custom-sql
+        if (dashboardPanelData.data.queryType == "promql") {
+          selectedButtonType.value = "promql";
+        } else {
+          selectedButtonType.value = "custom-sql";
+        }
         ignoreSelectedButtonTypeUpdate.value = false;
         return;
       } else if (
@@ -272,7 +277,10 @@ export default defineComponent({
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].query = "";
-          dashboardPanelData.data.type = "line";
+          // Only set default chart type if not already custom_chart
+          if (dashboardPanelData.data.type !== "custom_chart") {
+            dashboardPanelData.data.type = "line";
+          }
         } else {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
