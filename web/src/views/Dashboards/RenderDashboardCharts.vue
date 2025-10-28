@@ -526,8 +526,8 @@ export default defineComponent({
       // Initialize GridStack with optimal configuration
       gridStackInstance = GridStack.init(
         {
-          column: 48, // 48-column grid for fine-grained positioning
-          cellHeight: "34px", // Base cell height
+          column: 192, // 192-column grid for fine-grained positioning
+          cellHeight: "17px", // Base cell height
           margin: 2, // Minimal margin between panels
           draggable: {
             enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable dragging unless view-only or saving
@@ -666,9 +666,9 @@ export default defineComponent({
       } else if (position == "y") {
         return panelData?.layout?.y || 0;
       } else if (position == "w") {
-        return panelData?.layout?.w || 12;
+        return panelData?.layout?.w || 96;
       } else if (position == "h") {
-        return panelData?.layout?.h || 8;
+        return panelData?.layout?.h || 18;
       } else if (position == "i") {
         return panelData?.layout?.i || panelData.id;
       }
@@ -685,7 +685,7 @@ export default defineComponent({
         case "pie":
         case "scatter":
         case "table":
-          return 4; // 4 grid units minimum height
+          return 8; // 8 grid units minimum height
 
         default:
           break;
@@ -702,7 +702,7 @@ export default defineComponent({
         case "pie":
         case "scatter":
         case "table":
-          return 3; // 3 grid units minimum width
+          return 12; // 12 grid units minimum width
 
         default:
           break;
