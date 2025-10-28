@@ -234,7 +234,7 @@ export default defineComponent({
       align-items: center;
       gap: 0.5rem;
       padding: 0.625rem 1.25rem;
-      border-radius: 8px;
+      border-radius: 0.375rem;
       font-weight: 600;
       font-size: 0.9375rem;
       transition: all 0.3s ease;
@@ -279,7 +279,7 @@ export default defineComponent({
         transition: all 0.3s ease;
         position: relative;
         overflow: hidden;
-        border-radius: 12px;
+        border-radius: 0.375rem;
         border: 1.5px solid;
 
         &:hover {
@@ -349,12 +349,12 @@ export default defineComponent({
   }
 
   // Feature Cards
-  .feature-card {
+  .feature-card1 {
     padding: 2rem;
     transition: all 0.3s ease;
     position: relative;
     border: 1px solid;
-    border-radius: 12px;
+    border-radius: 0.375rem;
 
     &:hover {
       transform: translateY(-3px);
@@ -368,7 +368,7 @@ export default defineComponent({
     .icon-wrapper {
       width: 56px;
       height: 56px;
-      border-radius: 14px;
+      border-radius: 0.375rem;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -403,7 +403,7 @@ export default defineComponent({
       display: inline-flex;
       align-items: center;
       padding: 0.625rem 1.125rem;
-      border-radius: 10px;
+      border-radius: 0.375rem;
       background: rgba(33, 150, 243, 0.08);
       color: var(--q-primary);
       text-decoration: none;
