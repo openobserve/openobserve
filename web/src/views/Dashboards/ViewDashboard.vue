@@ -72,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
+              style="border: 1px solid #d5d5d5; border-radius: 6px"
               class="dashboard-icons q-px-sm hideOnPrintMode"
               size="sm"
               no-caps
