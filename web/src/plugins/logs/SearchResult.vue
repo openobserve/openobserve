@@ -1175,6 +1175,19 @@ export default defineComponent({
       }
     });
 
+    // Debug watcher for patterns state
+    watch(
+      () => patternsState.value.patterns,
+      (newPatterns) => {
+        console.log('[SearchResult] Patterns state changed:', {
+          hasPatterns: !!newPatterns,
+          patternCount: newPatterns?.patterns?.length || 0,
+          statistics: newPatterns?.statistics,
+        });
+      },
+      { deep: true }
+    );
+
     const selectedStreamFullTextSearchKeys = computed(() => {
       const defaultFTSKeys = store?.state?.zoConfig?.default_fts_keys || [];
       const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields
