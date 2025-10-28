@@ -79,10 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
+              icon="download"
               @click.stop="exportTemplate(props.row)"
               data-test="destination-export"
             >
-              <Download class="o2-actions-icons" />
             </q-btn>
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-update-template`"
@@ -92,10 +92,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
+              icon="edit"
               :title="t('alert_templates.edit')"
               @click="editTemplate(props.row)"
             >
-              <Pencil class="o2-actions-icons" />
             </q-btn>
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-delete-template`"
@@ -105,10 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
+              :icon="outlinedDelete"
               :title="t('alert_templates.delete')"
               @click="conformDeleteDestination(props.row)"
             >
-              <Trash class="o2-actions-icons" />
             </q-btn>
           </q-td>
         </template>
@@ -177,7 +177,6 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportTemplate from "./ImportTemplate.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import { Download, Pencil, Trash } from "lucide-vue-next";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),

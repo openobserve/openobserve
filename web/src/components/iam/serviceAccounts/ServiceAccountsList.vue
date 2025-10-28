@@ -120,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   data-test="service-accounts-refresh"
                   :title="t('serviceAccounts.refresh')"
+                  icon="refresh"
                   class="q-ml-xs"
                   padding="sm"
                   unelevated
@@ -129,11 +130,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="cursor: pointer !important"
                   @click="confirmRefreshAction(props.row)"
                 >
-                  <RotateCw class="o2-actions-icons" />
                 </q-btn>
                 <q-btn
                   data-test="service-accounts-edit"
                   :title="t('serviceAccounts.update')"
+                  icon="edit"
                   class="q-ml-xs"
                   padding="sm"
                   unelevated
@@ -143,12 +144,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="addRoutePush(props)"
                   style="cursor: pointer !important"
                 >
-                  <Pencil class="o2-actions-icons" />
                 </q-btn>
                 <q-btn
                   data-test="service-accounts-delete"
                   :title="t('serviceAccounts.delete')"
                   class="q-ml-xs"
+                  :icon="outlinedDelete"
                   padding="sm"
                   unelevated
                   size="sm"
@@ -157,7 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="cursor: pointer !important"
                   @click="confirmDeleteAction(props)"
                 >
-                  <Trash class="o2-actions-icons" />
                 </q-btn>
 
               </q-td>
@@ -345,10 +345,9 @@ import { computed, nextTick } from "vue";
 import { getRoles } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
-import { Trash, Pencil, RotateCw } from "lucide-vue-next";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { QTablePagination,  NoData,AddServiceAccount, Trash, Pencil, RotateCw },
+  components: { QTablePagination,  NoData,AddServiceAccount, },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();

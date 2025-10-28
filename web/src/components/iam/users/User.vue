@@ -94,11 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 round
                 flat
+                :icon="outlinedDelete"
                 @click="confirmDeleteAction(props)"
                 style="cursor: pointer !important"
                 :data-test="`delete-basic-user-${props.row.email}`"
               >
-              <Trash class="o2-actions-icons" />
               </q-btn>
               <q-btn
                 v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
@@ -108,11 +108,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 round
                 flat
+                icon="edit"
                 @click="addRoutePush(props)"
                 style="cursor: pointer !important"
                 :data-test="`edit-basic-user-${props.row.email}`"
               >
-              <Pencil class="o2-actions-icons" />
             </q-btn>
             </q-td>
           </template>
@@ -218,7 +218,6 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles } from "@/services/iam";
-import { Pencil, Trash } from "lucide-vue-next";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -228,8 +227,6 @@ export default defineComponent({
     NoData,
     AddUser,
     MemberInvitation,
-    Trash,
-    Pencil,
   },
   emits: [
     "updated:fields",

@@ -391,10 +391,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   round
                   flat
+                  icon="folder_open"
                   @click.stop="showMoveDashboardPanel(props.row)"
                   data-test="dashboard-move-to-another-folder"
                 >
-                <FolderInput size="1rem" />
               </q-btn>
                 <q-btn
                   v-if="props.row.actions == 'true'"
@@ -404,12 +404,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   round
                   flat
+                  icon="content_copy"
                   @click.stop="
                     duplicateDashboard(props.row.id, props.row.folder_id)
                   "
                   data-test="dashboard-duplicate"
                 >
-                <Copy size="1rem" />
               </q-btn>
                 <q-btn
                   v-if="props.row.actions == 'true'"
@@ -418,11 +418,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   unelevated
                   size="sm"
                   round
+                  :icon="outlinedDelete"
                   data-test="dashboard-delete"
                   flat
                   @click.stop="showDeleteDialogFn(props)"
                 >
-                <Trash size="1rem" />
               </q-btn>
               </q-td>
             </template>
@@ -591,7 +591,7 @@ import { filter, forIn } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
 import { useReo } from "@/services/reodotdev_analytics";
-import { Trash, Copy, FolderInput } from "lucide-vue-next";
+
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
 });
@@ -609,9 +609,6 @@ export default defineComponent({
     ConfirmDialog,
     AddFolder,
     MoveDashboardToAnotherFolder,
-    Trash, 
-    Copy,
-    FolderInput
   },
   setup() {
     const store = useStore();
