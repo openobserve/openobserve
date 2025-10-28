@@ -15,22 +15,22 @@
 
 /// usize indicates the number of parts to skip based on their actual paths.
 const QUERIER_ROUTES: [(&str, usize); 24] = [
-    ("config", 0),                            // /config
-    ("summary", 2),                           // /api/{org_id}/summary
-    ("organizations", 1),                     // /api/organizations
-    ("settings", 2),                          // /api/{org_id}/settings/...
-    ("schema", 3),                            // /api/{org_id}/streams/{stream_name}/schema
-    ("streams", 2),                           // /api/{org_id}/streams/...
-    ("traces/latest", 3),                     // /api/{org_id}/{stream_name}/traces/latest
-    ("clusters", 1),                          // /api/clusters
-    ("query_manager", 2),                     // /api/{org_id}/query_manager/...
-    ("_search", 2),                           // /api/{org_id}/_search
-    ("_search_stream", 2),                    // /api/{org_id}/_search_stream
-    ("_values_stream", 2),                    // /api/{org_id}/_values_stream
-    ("_around", 3),                           // /api/{org_id}/{stream_name}/_around
-    ("_values", 3),                           // /api/{org_id}/{stream_name}/_values
-    ("patterns/extract", 3),                  /* /api/{org_id}/streams/{stream_name}/patterns/
-                                               * extract */
+    ("config", 0),         // /config
+    ("summary", 2),        // /api/{org_id}/summary
+    ("organizations", 1),  // /api/organizations
+    ("settings", 2),       // /api/{org_id}/settings/...
+    ("schema", 3),         // /api/{org_id}/streams/{stream_name}/schema
+    ("streams", 2),        // /api/{org_id}/streams/...
+    ("traces/latest", 3),  // /api/{org_id}/{stream_name}/traces/latest
+    ("clusters", 1),       // /api/clusters
+    ("query_manager", 2),  // /api/{org_id}/query_manager/...
+    ("_search", 2),        // /api/{org_id}/_search
+    ("_search_stream", 2), // /api/{org_id}/_search_stream
+    ("_values_stream", 2), // /api/{org_id}/_values_stream
+    ("_around", 3),        // /api/{org_id}/{stream_name}/_around
+    ("_values", 3),        // /api/{org_id}/{stream_name}/_values
+    ("patterns/extract", 3), /* /api/{org_id}/streams/{stream_name}/patterns/
+                            * extract */
     ("functions?page_num=", 2),               // /api/{org_id}/functions
     ("prometheus/api/v1/series", 2),          // /api/{org_id}/prometheus/api/v1/series
     ("prometheus/api/v1/query", 2),           // /api/{org_id}/prometheus/api/v1/query

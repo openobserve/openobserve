@@ -59,14 +59,10 @@ pub async fn ingest_patterns(
         pattern_stream_name
     );
 
-    // Convert to NDJSON bytes for ingestion
-    let mut ndjson = String::new();
-    for pattern in patterns {
-        let json_value = json::Value::Object(pattern);
-        ndjson.push_str(&json::to_string(&json_value)?);
-        ndjson.push('\n');
-    }
-    let bytes = bytes::Bytes::from(ndjson);
+    // Convert to JSON array for ingestion
+    let json_array: Vec<json::Value> = patterns.into_iter().map(json::Value::Object).collect();
+    let json_string = json::to_string(&json_array)?;
+    let bytes = bytes::Bytes::from(json_string);
 
     // Use direct log ingestion (we're on ingester nodes)
     let req = IngestionRequest::JSON(&bytes);
