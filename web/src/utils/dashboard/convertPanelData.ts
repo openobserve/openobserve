@@ -126,7 +126,7 @@ export const convertPanelData = async (
       const hasData =
         panelSchema?.queryType === "promql"
           ? data.length > 0 && data[0].result.length > 0
-          : data.length > 0 && data[0]?.length > 0;
+          : data.length > 0 && data[0].length > 0;
 
       if (hasData) {
         const result = await runJavaScriptCode(panelSchema, data);
