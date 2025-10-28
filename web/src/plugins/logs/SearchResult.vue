@@ -265,13 +265,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Patterns View -->
       <div v-if="searchObj.meta.logsVisualizeToggle === 'patterns'" style="height: calc(100vh - 250px); display: flex; flex-direction: column;" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
         <!-- Statistics Bar -->
-        <div v-if="searchObj.data.patterns?.statistics" class="q-pa-md" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-grey-2'" style="border-bottom: 1px solid; flex-shrink: 0;" :style="{ borderColor: store.state.theme === 'dark' ? '#3a3a3a' : '#e0e0e0' }">
+        <div v-if="patternsState?.patterns?.statistics" class="q-pa-md" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-grey-2'" style="border-bottom: 1px solid; flex-shrink: 0;" :style="{ borderColor: store.state.theme === 'dark' ? '#3a3a3a' : '#e0e0e0' }">
           <div class="row q-col-gutter-md">
             <div class="col-3">
               <q-card flat :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'">
                 <q-card-section class="q-pa-md">
                   <div class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">Total Logs</div>
-                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">{{ (searchObj.data.patterns.statistics.total_logs_analyzed || 0).toLocaleString() }}</div>
+                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">{{ (patternsState?.patterns?.statistics?.total_logs_analyzed || 0).toLocaleString() }}</div>
                 </q-card-section>
               </q-card>
             </div>
@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-card flat :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'">
                 <q-card-section class="q-pa-md">
                   <div class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">Patterns Found</div>
-                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">{{ searchObj.data.patterns.statistics.total_patterns_found || 0 }}</div>
+                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">{{ patternsState?.patterns?.statistics?.total_patterns_found || 0 }}</div>
                 </q-card-section>
               </q-card>
             </div>
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-card flat :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'">
                 <q-card-section class="q-pa-md">
                   <div class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">Coverage</div>
-                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">{{ (searchObj.data.patterns.statistics.coverage_percentage || 0).toFixed(1) }}%</div>
+                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">{{ (patternsState?.patterns?.statistics?.coverage_percentage || 0).toFixed(1) }}%</div>
                 </q-card-section>
               </q-card>
             </div>
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-card flat :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'">
                 <q-card-section class="q-pa-md">
                   <div class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">Processing Time</div>
-                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">{{ searchObj.data.patterns.statistics.extraction_time_ms || 0 }}ms</div>
+                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">{{ patternsState?.patterns?.statistics?.extraction_time_ms || 0 }}ms</div>
                 </q-card-section>
               </q-card>
             </div>
@@ -303,9 +303,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Patterns List with Virtual Scroll for Performance -->
-        <div v-if="searchObj.data.patterns?.patterns?.length > 0" style="flex: 1; overflow: hidden;">
+        <div v-if="patternsState?.patterns?.patterns?.length > 0" style="flex: 1; overflow: hidden;">
           <q-virtual-scroll
-            :items="searchObj.data.patterns.patterns"
+            :items="patternsState?.patterns?.patterns"
             virtual-scroll-slice-size="5"
             v-slot="{ item: pattern, index }"
             style="height: 100%;"
@@ -387,8 +387,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;">📊</div>
           <div class="text-h6 q-mb-sm" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">No patterns found</div>
           <div class="text-body2" :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-8'" style="max-width: 31.25rem;">
-            <div v-if="searchObj.data.patterns?.statistics?.total_logs_analyzed">
-              Only {{ searchObj.data.patterns.statistics.total_logs_analyzed }} logs were analyzed.
+            <div v-if="patternsState?.patterns?.statistics?.total_logs_analyzed">
+              Only {{ patternsState?.patterns?.statistics?.total_logs_analyzed }} logs were analyzed.
             </div>
             <div class="q-mt-sm">
               Try increasing the time range or selecting a different stream with more log data.
@@ -460,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="col">
                 <div class="text-h6">Pattern Details</div>
                 <div class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
-                  Pattern {{ (selectedPattern as any).index + 1 }} of {{ searchObj.data.patterns?.patterns?.length || 0 }}
+                  Pattern {{ (selectedPattern as any).index + 1 }} of {{ patternsState?.patterns?.patterns?.length || 0 }}
                 </div>
               </div>
               <div class="col-auto">
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-right="chevron_right"
                   label="Next"
                   @click="navigatePatternDetail(true, false)"
-                  :disable="(selectedPattern as any).index >= (searchObj.data.patterns?.patterns?.length || 0) - 1"
+                  :disable="(selectedPattern as any).index >= (patternsState?.patterns?.patterns?.length || 0) - 1"
                   :class="store.state.theme === 'dark' ? 'text-grey-5 border-grey-5' : 'text-grey-7 border-grey-7'"
                   class="q-mr-sm"
                 />
@@ -594,6 +594,7 @@ import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
 import {useSearchStream} from "@/composables/useLogs/useSearchStream";
+import usePatterns from "@/composables/useLogs/usePatterns";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
@@ -804,6 +805,9 @@ export default defineComponent({
 
     const { searchObj } = searchState();
 
+    // Use separate patterns state (completely isolated from logs)
+    const { patternsState } = usePatterns();
+
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
     const selectedPattern = ref(null);
@@ -915,7 +919,7 @@ export default defineComponent({
       if (!selectedPattern.value) return;
 
       const currentIndex = (selectedPattern.value as any).index;
-      const totalPatterns = searchObj.data.patterns?.patterns?.length || 0;
+      const totalPatterns = patternsState.value.patterns?.patterns?.length || 0;
 
       let newIndex = currentIndex;
       if (next && currentIndex < totalPatterns - 1) {
@@ -924,8 +928,8 @@ export default defineComponent({
         newIndex = currentIndex - 1;
       }
 
-      if (newIndex !== currentIndex && searchObj.data.patterns?.patterns) {
-        const newPattern = searchObj.data.patterns.patterns[newIndex];
+      if (newIndex !== currentIndex && patternsState.value.patterns?.patterns) {
+        const newPattern = patternsState.value.patterns.patterns[newIndex];
         selectedPattern.value = { pattern: newPattern, index: newIndex };
       }
     };
@@ -1177,6 +1181,7 @@ export default defineComponent({
       store,
       plotChart,
       searchObj,
+      patternsState,
       updatedLocalLogFilterField,
       byString,
       searchTableRef,

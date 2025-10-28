@@ -392,6 +392,7 @@ import queryService from "@/services/search";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import usePatterns from "@/composables/useLogs/usePatterns";
 import {
   getVisualizationConfig,
   encodeVisualizationConfig,
@@ -605,6 +606,10 @@ export default defineComponent({
       buildSearch,
       initializeSearchConnection,
     } = useSearchStream();
+
+    // Initialize patterns composable (completely separate from logs)
+    const { extractPatterns, patternsState } = usePatterns();
+
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
@@ -844,6 +849,49 @@ export default defineComponent({
         console.log(e);
       }
     };
+
+    // Watch for patterns mode switch - completely separate from logs flow
+    watch(
+      () => searchObj.meta.logsVisualizeToggle,
+      async (newMode, oldMode) => {
+        if (newMode === 'patterns') {
+          console.log('[Index] Switched to patterns mode - fetching patterns');
+          searchObj.loading = true; // Set loading state for UI
+
+          try {
+            const queryReq = getQueryReq(false);
+            if (!queryReq) {
+              console.log('[Index] No query request available');
+              searchObj.loading = false;
+              return;
+            }
+
+            const streamName = searchObj.data.stream.selectedStream[0];
+            if (!streamName) {
+              console.log('[Index] No stream selected');
+              searchObj.loading = false;
+              return;
+            }
+
+            await extractPatterns(
+              searchObj.organizationIdentifier,
+              streamName,
+              queryReq
+            );
+
+            searchObj.loading = false; // Clear loading state after patterns fetched
+            console.log('[Index] Patterns fetched successfully');
+          } catch (error) {
+            console.error('[Index] Error fetching patterns:', error);
+            searchObj.loading = false;
+            showErrorNotification('Error extracting patterns. Please try again.');
+          }
+        } else if (oldMode === 'patterns') {
+          console.log('[Index] Switched from patterns to', newMode);
+          // No need to clear patterns - they can be cached
+        }
+      }
+    );
 
     // Main method for handling before mount logic
     async function handleBeforeMount() {

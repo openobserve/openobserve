@@ -251,6 +251,23 @@ pub static INGEST_WAL_LOCK_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// pattern extraction timing metrics (enterprise feature)
+pub static PATTERN_EXTRACTION_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "pattern_extraction_time_seconds",
+            "Pattern extraction time in seconds",
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["organization", "phase"], // phase: read_parquet, extraction, ingestion, total
+    )
+    .expect("Metric created")
+});
+
 // querier memory cache stats
 pub static QUERY_MEMORY_CACHE_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -1167,6 +1184,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_WAL_LOCK_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PATTERN_EXTRACTION_TIME.clone()))
         .expect("Metric registered");
 
     // querier stats
