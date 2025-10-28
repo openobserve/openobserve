@@ -1292,7 +1292,7 @@ pub struct Limit {
     pub file_download_enable_priority_queue: bool,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
-    #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 0)]
+    #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 600)]
     // default equal to query_timeout
     pub query_ingester_timeout: u64,
     #[env_config(name = "ZO_QUERY_DEFAULT_LIMIT", default = 1000)]
