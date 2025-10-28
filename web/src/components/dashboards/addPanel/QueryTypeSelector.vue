@@ -273,12 +273,12 @@ export default defineComponent({
           ].customQuery = true;
           dashboardPanelData.data.queryType = "promql";
 
-          // set some defaults for the promql query
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].query = "";
-          // Only set default chart type if not already custom_chart
+          // For custom charts, preserve the existing query
+          // Only clear the query for non-custom charts when switching to promql
           if (dashboardPanelData.data.type !== "custom_chart") {
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].query = "";
             dashboardPanelData.data.type = "line";
           }
         } else {
