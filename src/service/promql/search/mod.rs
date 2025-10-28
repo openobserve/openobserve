@@ -97,7 +97,7 @@ async fn search_in_cluster(
         query_exemplars,
     } = req.query.as_ref().unwrap();
 
-    // cache disabled if result cache is disabled or use_cache is true or start == end or step == 0
+    // cache disabled if result cache is disabled or use_cache is false or start == end or step == 0
     let cache_disabled =
         !cfg.common.metrics_cache_enabled || !req.use_cache || start == end || step == 0;
     // adjust start and end time
