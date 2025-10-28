@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-          <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+          <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
             <div class="tw-h-full card-container">
           <!-- add dashboard table -->
           <q-table

@@ -66,17 +66,19 @@ body {
 // }
 
 .q-splitter--vertical {
-  .q-splitter__separator {
-    width: 0; // 10px
+  >.q-splitter__separator {
+    width: 0.625rem; // 10px
     z-index: 999 !important;
-    height: 100%;
+    height: 100vh;
+    background: transparent;
   }
 }
 
 .q-splitter--horizontal {
-  .q-splitter__separator {
+  >.q-splitter__separator {
     height: 0; // 10px
     z-index: 99;
+    background: transparent;
   }
 }
 
@@ -1368,7 +1370,7 @@ body {
   min-width: 0.3rem !important;
   position: absolute !important;
   top: 26px !important;
-  left: -4px !important;
+  left: 4px !important;
   z-index: 100 !important;
   border-radius: 0.325rem;
 }
@@ -1378,7 +1380,7 @@ body {
   min-width: 0.3rem !important;
   position: absolute !important;
   top: 26px !important;
-  left: 12px !important;
+  left: 10px !important;
   z-index: 100 !important;
   border-radius: 0.325rem;
 }
