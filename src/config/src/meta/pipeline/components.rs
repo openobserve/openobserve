@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::meta::{
-    alerts::{QueryCondition, TriggerCondition},
-    stream::{RemoteStreamParams, RoutingCondition, StreamParams, StreamType},
+    alerts::{ConditionList, QueryCondition, TriggerCondition},
+    stream::{RemoteStreamParams, StreamParams, StreamType},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -167,7 +167,7 @@ pub struct FunctionParams {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct ConditionParams {
-    pub conditions: Vec<RoutingCondition>,
+    pub condition: ConditionList,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]

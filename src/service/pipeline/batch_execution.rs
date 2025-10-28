@@ -31,6 +31,8 @@ use config::{
         schema::format_stream_name,
     },
 };
+
+use crate::service::alerts::ConditionExt;
 use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
@@ -652,9 +654,9 @@ async fn process_node(
                 }
                 // only send to children when passing all condition evaluations
                 if condition_params
-                    .conditions
-                    .iter()
-                    .all(|cond| cond.evaluate(record.as_object().unwrap()))
+                    .condition
+                    .evaluate(record.as_object().unwrap())
+                    .await
                 {
                     send_to_children(
                         &mut child_senders,
