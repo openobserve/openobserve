@@ -240,7 +240,13 @@ class SchemaLoadPage {
             }
             
             // Click on the stream name directly
-            await this.page.getByText(streamName, { exact: false }).first().click();
+            await this.page.waitForTimeout(1000);
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+            // Wait for the stream to be visible in the dropdown
+            const streamLocator = this.page.getByText(streamName, { exact: false }).first();
+            await streamLocator.waitFor({ state: 'visible', timeout: 15000 });
+            await streamLocator.click();
             await this.page.waitForLoadState('networkidle', { timeout: 30000 });
             
             // Step 3: Basic verification - refresh and verify search functionality works

@@ -64,10 +64,14 @@ test.describe("Schema testcases", () => {
 
         // Navigate to logs page with VRL editor enabled
         await pm.logsPage.navigateToLogs(process.env["ORGNAME"]);
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-        const allsearch = page.waitForResponse(`**/api/${process.env["ORGNAME"]}/_search**`);
-        await pm.logsPage.selectStream(testStreamName); 
+        await pm.logsPage.selectStream(testStreamName);
+        await page.waitForTimeout(1000);
+
+        const allsearch = page.waitForResponse(`**/api/${process.env["ORGNAME"]}/_search**`, { timeout: 60000 });
         await pm.schemaPage.applyQuery();
+        await allsearch;
         
         // Start of actual test - simplified schema workflow
         await pm.schemaPage.completeStreamSettingsSchemaWorkflow(testStreamName);

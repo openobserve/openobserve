@@ -256,7 +256,13 @@ export class LogsPage {
 
     async selectStream(stream) {
         await this.page.locator(this.indexDropDown).click();
-        await this.page.getByText(stream, { exact: true }).first().click();
+        await this.page.waitForTimeout(1000);
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+        // Wait for the stream to be visible in the dropdown
+        const streamLocator = this.page.getByText(stream, { exact: true }).first();
+        await streamLocator.waitFor({ state: 'visible', timeout: 15000 });
+        await streamLocator.click();
     }
 
     async selectIndexStreamOld(streamName) {
