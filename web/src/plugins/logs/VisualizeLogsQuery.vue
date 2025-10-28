@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div class="tw-pr-[0.625rem]" style="height: 100%; width: 100%">
+  <div style="height: 100%; width: 100%">
     <div class="row" style="height: 100%">
       <div class="tw-pl-[0.625rem]" style="overflow-y: auto;">
       <div
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div
-              class="row card-container tw-ml-[0.625rem]"
+              class="row card-container"
               :style="{
                 height: '100%',
                 width: dashboardPanelData.layout.showFieldList

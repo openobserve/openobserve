@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     </div>
-    <div class="tw-pr-[0.625rem]">
+    <div>
     <div class="row" style="height: calc(100vh - 110px); overflow-y: auto">
       <div class="tw-pl-[0.625rem]">
       <div
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         >
           <template #before>
-            <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+            <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
             <div
               v-if="dashboardPanelData.layout.showFieldList"
               class="col scroll card-container"
@@ -226,6 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               dense
               round
+              :class="dashboardPanelData.layout.showFieldList ? 'splitter-icon-expand' : 'splitter-icon-collapse'"
               style="top: 14px; z-index: 100"
               @click.stop="collapseFieldList"
             />
@@ -1939,7 +1940,6 @@ export default defineComponent({
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  margin-right: 0.625rem;
 }
 
 .field-list-collapsed-icon {

@@ -44,7 +44,7 @@ style="min-height: auto">
           class="tw-h-full"
         >
           <template #before>
-            <div class="tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+            <div class="tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
               <index-list
                 v-show="searchObj.meta.showFields"
                 ref="indexListRef"
@@ -74,7 +74,6 @@ style="min-height: auto">
           <template #after>
             <div
               class="tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]"
-              :class="searchObj.meta.showFields ? '' : 'tw-pl-[0.625rem]'"
             >
               <div class="card-container tw-h-full">
                 <div
