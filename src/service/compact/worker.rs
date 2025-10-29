@@ -129,6 +129,14 @@ impl JobScheduler {
                                     e
                                 );
                             }
+                            // release locked stream
+                            let key = format!(
+                                "{}/{}/{}",
+                                job.org_id,
+                                job.stream_type.as_str(),
+                                job.stream_name
+                            );
+                            crate::service::db::compact::stream::clear_running(&key);
                         }
                     }
                 }
