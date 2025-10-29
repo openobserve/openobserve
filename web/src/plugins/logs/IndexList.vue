@@ -552,7 +552,7 @@ style="opacity: 0.7">
           </q-tr>
         </template>
         <template v-slot:pagination="scope">
-          <div class="tw-pt-[0.375rem] tw-flex tw-justify-between tw-w-full">
+          <div class="tw-pt-[0.375rem] tw-justify-between tw-w-full" :class="showUserDefinedSchemaToggle || searchObj.meta.quickMode ? 'tw-flex' : ''">
             <div v-if="showUserDefinedSchemaToggle">
               <q-btn-toggle
                 no-caps
