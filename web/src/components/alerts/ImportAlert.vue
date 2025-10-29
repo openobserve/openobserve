@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="editor-container-url card-container tw-py-1"
           >
             <q-form class="tw-mx-2 tw-pb-2" @submit="onSubmit">
-              <div style="width: calc(100% - 10px)" class="flex">
+              <div class="flex tw-mt-[0.725rem]">
                 <div style="width: calc(69%)" class="q-pr-sm">
                   <q-input
                     data-test="alert-import-url-input"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     stack-label
                     borderless
                     label-slot
-                    style="padding: 10px;"
+                    style="padding: 10px 0px;"
                   />
                 </div>
 
@@ -1442,7 +1442,7 @@ export default defineComponent({
 
 .alert-folder-dropdown {
   :deep(.q-field--labeled.showLabelOnTop) {
-    padding-top: 12px; /* Example override */
+    padding-top: 10px; /* Example override */
   }
 }
 
