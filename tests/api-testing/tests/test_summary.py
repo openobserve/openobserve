@@ -337,12 +337,17 @@ def base_url_sc():
     return ZO_BASE_URL_SC
 
 @pytest.mark.order(2)
-def test_summary(create_session, base_url_sc, org_id):
+def test_summary(create_session, base_url_sc, base_url, org_id):
     """Run an E2E test for summary mode."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)  # Add this line
-    url_sc = base_url_sc
-    print("URL for super cluster:", url_sc) 
+
+    # Use super cluster URL if available, otherwise fallback to base_url
+    url_sc = base_url_sc if base_url_sc and base_url_sc != "None" else base_url
+    print("URL for testing:", url_sc)
+    if base_url_sc is None or base_url_sc == "None":
+        print("Note: Using base_url as fallback (super cluster URL not configured)")
+
     time.sleep(5)  # Increase this time if necessary
     res_summary_sc = session.get(f"{url_sc}api/{org_id}/summary")
     print("Summary SC response:", res_summary_sc.content)  # Add this for debugging
@@ -430,47 +435,47 @@ def test_summary(create_session, base_url_sc, org_id):
         alert_id = alert.get("alert_id")
         assert alert_id, f"Alert ID is missing for alert: {alert}"
         print(f"Extracted alert_id: {alert_id}")
-    # Validate the alert existence first
+        # Validate the alert existence first
         resp_check_alert = session.get(f"{url_sc}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
         print(f"Alert {alert_id} exists and is retrievable.")
-    # Proceed to delete the alert
+        # Proceed to delete the alert
         resp_delete_alertnew = session.delete(f"{url_sc}api/v2/{org_id}/alerts/{alert_id}")
         print(f"Deleted Alert Response: {resp_delete_alertnew.text}")
         assert resp_delete_alertnew.status_code == 200, f"Failed to delete alert {alert_id}"
         print(f"Successfully deleted alert {alert_id}")
 
-    # Proceed to delete the function
-        resp_delete_function = session.delete(
-            f"{url_sc}api/{org_id}/functions/pytestfunction"
-        )
-        assert (
+    # Proceed to delete the function (OUTSIDE the alert loop)
+    resp_delete_function = session.delete(
+        f"{url_sc}api/{org_id}/functions/pytestfunction"
+    )
+    assert (
         resp_delete_function.status_code == 200
-        ), f"Deleting this function, but got {resp_delete_function.status_code} {resp_delete_function.content}"
-        print(f"Function deleted successfully")
+    ), f"Deleting this function, but got {resp_delete_function.status_code} {resp_delete_function.content}"
+    print(f"Function deleted successfully")
 
-    # Proceed to delete the dashboard
-        resp_get_alldashboards = session.get(f"{url_sc}api/{org_id}/dashboards")
-        assert resp_get_alldashboards.status_code == 200, f"Expected status code 200 but got {resp_get_alldashboards.status_code}"
+    # Proceed to delete the dashboard (OUTSIDE the alert loop)
+    resp_get_alldashboards = session.get(f"{url_sc}api/{org_id}/dashboards")
+    assert resp_get_alldashboards.status_code == 200, f"Expected status code 200 but got {resp_get_alldashboards.status_code}"
     # Parse the response JSON
-        dashboards_response = resp_get_alldashboards.json()
-        print(f"Dashboard list response: {dashboards_response}")
+    dashboards_response = resp_get_alldashboards.json()
+    print(f"Dashboard list response: {dashboards_response}")
     # Extract the dashboard ID
-        dashboard_id = dashboards_response['dashboards'][0]['v5']['dashboardId']  # Corrected line
-        print(f"Extracted Dashboard ID: {dashboard_id}")
+    dashboard_id = dashboards_response['dashboards'][0]['v6']['dashboardId']  # Corrected line
+    print(f"Extracted Dashboard ID: {dashboard_id}")
     # Now you can delete the dashboard using the extracted ID
-        resp_delete_dashboard = session.delete(
+    resp_delete_dashboard = session.delete(
         f"{url_sc}api/{org_id}/dashboards/{dashboard_id}"
-        )
+    )
     # Assert that the deletion was successful
-        assert resp_delete_dashboard.status_code == 200, f"Failed to delete dashboard, status code: {resp_delete_dashboard.status_code}"
-        print(f"Successfully deleted dashboard with ID: {dashboard_id}")
+    assert resp_delete_dashboard.status_code == 200, f"Failed to delete dashboard, status code: {resp_delete_dashboard.status_code}"
+    print(f"Successfully deleted dashboard with ID: {dashboard_id}")
 
-    # Proceed to delete the stream
-        resp_delete_stream= session.delete(f"{url_sc}api/{org_id}/streams/{stream_name}?type=logs")
-        print(f"Deleted Stream Response: {resp_delete_stream.text}")
-        assert resp_delete_stream.status_code == 200, f"Failed to delete  {stream_name}"
-        print(f"Successfully deleted stream {stream_name}")
+    # Proceed to delete the stream (OUTSIDE the alert loop)
+    resp_delete_stream= session.delete(f"{url_sc}api/{org_id}/streams/{stream_name}?type=logs")
+    print(f"Deleted Stream Response: {resp_delete_stream.text}")
+    assert resp_delete_stream.status_code == 200, f"Failed to delete  {stream_name}"
+    print(f"Successfully deleted stream {stream_name}")
 
 @pytest.mark.order(3)
 def test_summary_validate(create_session, base_url, org_id):
