@@ -34,7 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-bold no-border q-ml-md o2-secondary-button tw-h-[36px]"
               no-caps
               no-outline
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
               flat
               label="Show Dependencies"
               @click="showVariablesDependenciesGraphPopUp = true"
@@ -42,7 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <q-btn
               class="text-bold no-border q-ml-md o2-primary-button tw-h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-primary-button-dark'
+                  : 'o2-primary-button-light'
+              "
               flat
               :label="t(`dashboard.newVariable`)"
               @click="addVariables"
