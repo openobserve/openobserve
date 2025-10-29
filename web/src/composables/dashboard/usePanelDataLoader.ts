@@ -1367,7 +1367,7 @@ export const usePanelDataLoader = (
               // Initialize data and resultMetaData arrays for this query index
               // This is necessary before the streaming response handlers try to access them
               state.data[panelQueryIndex] = [];
-              state.resultMetaData[panelQueryIndex] = {};
+              state.resultMetaData[panelQueryIndex] = [];
 
               // Use HTTP2/streaming for all dashboard queries
               await getDataThroughStreaming(
