@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   round
                   flat
-                  icon="folder_open"
+                  :icon="outlinedDriveFileMove"
                   @click.stop="showMoveDashboardPanel(props.row)"
                   data-test="dashboard-move-to-another-folder"
                 >
