@@ -59,6 +59,10 @@ body {
   display: inline-flex;
   background-color: var(--o2-header-menu-bg);
   position: relative;
+
+  .q-btn .q-icon, .q-btn .q-spinner {
+    font-size: 1.3rem;
+  }
 }
 
 // .element-box-shadow {
