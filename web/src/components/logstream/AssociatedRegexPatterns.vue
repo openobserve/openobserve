@@ -358,23 +358,18 @@
               class="q-mr-md o2-secondary-button tw-h-[36px] no-border"
               padding="sm md"
               no-caps
-              style="border: 1px solid #E6E6E6;"
               data-test="associated-regex-patterns-cancel-btn"
             />
             <q-btn
               data-test="associated-regex-patterns-update-btn"
               label="Update Changes"
-              class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
+              class="q-pa-none o2-primary-button tw-h-[34px] element-box-shadow"
               padding="sm xl"
               type="submit"
               no-caps
               dense
               flat
               @click="updateRegexPattern"
-              :style="{
-                'background-color': isFormDirty ? '#5ca380' : '#aeaeae',
-                'color': isFormDirty ? '#ffffff' : '#000000'
-              }"
               :disabled="!isFormDirty"
             />
           </div>
