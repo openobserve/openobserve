@@ -377,6 +377,7 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
 
   --o2-primary-btn-bg: #{$theme-color};
   --o2-primary-btn-text: #{$o2-gray-100};
+  --q-primary: #{$theme-color};
 
   --o2-toggle-track-bg: #{$theme-color};
   --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
