@@ -1319,6 +1319,22 @@ export default defineComponent({
 
 .dashboard-icons {
   height: 30px;
+
+  :deep(.date-time-button) {
+    height: 30px;
+    min-height: 30px;
+  }
+
+  :deep(.q-btn-dropdown) {
+    height: 30px;
+    min-height: 30px;
+    padding: 0 8px;
+
+    .q-btn__content {
+      line-height: normal;
+      align-items: center;
+    }
+  }
 }
 
 .folder-name {
