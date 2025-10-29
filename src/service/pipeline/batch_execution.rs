@@ -31,8 +31,6 @@ use config::{
         schema::format_stream_name,
     },
 };
-
-use crate::service::alerts::ConditionExt;
 use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
@@ -47,6 +45,7 @@ use tokio::{
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
+        alerts::ConditionExt,
         ingestion::{apply_vrl_fn, compile_vrl_function},
         self_reporting::publish_error,
     },

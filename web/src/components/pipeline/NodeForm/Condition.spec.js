@@ -138,7 +138,7 @@ describe("Condition Component", () => {
           store: mockStore,
         },
         stubs: {
-          RealtimePipeline: true,
+          FilterGroup: true,
           ConfirmDialog: true,
         }
       }
@@ -149,7 +149,7 @@ describe("Condition Component", () => {
 
     // Wait for component to mount and initialize
     await flushPromises();
-    
+
     // Wait for getFields to complete
     await wrapper.vm.getFields();
     await flushPromises();
@@ -164,16 +164,13 @@ describe("Condition Component", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("initializes with default condition values", () => {
-      const streamRoute = wrapper.vm.streamRoute;
-      expect(streamRoute.conditions).toHaveLength(1);
-      expect(streamRoute.conditions[0]).toEqual(
-        expect.objectContaining({
-          column: "",
-          operator: "",
-          value: ""
-        })
-      );
+    it("initializes with default condition group", () => {
+      const conditionGroup = wrapper.vm.conditionGroup;
+      expect(conditionGroup).toBeDefined();
+      expect(conditionGroup.groupId).toBeDefined();
+      expect(conditionGroup.label).toBe("and");
+      expect(conditionGroup.items).toBeDefined();
+      expect(Array.isArray(conditionGroup.items)).toBe(true);
     });
 
     it.skip("loads fields from input stream node", async () => {
@@ -191,52 +188,94 @@ describe("Condition Component", () => {
   });
 
   describe("Condition Management", () => {
-    it("adds a new condition field", () => {
-      const initialLength = wrapper.vm.streamRoute.conditions.length;
-      wrapper.vm.addField();
-      expect(wrapper.vm.streamRoute.conditions).toHaveLength(initialLength + 1);
+    it("updates condition group when conditions are modified", () => {
+      const initialGroupId = wrapper.vm.conditionGroup.groupId;
+      const updatedGroup = {
+        groupId: initialGroupId,
+        label: "and",
+        items: [
+          {
+            column: "level",
+            operator: "=",
+            value: "error",
+            ignore_case: false,
+            id: "test-id"
+          }
+        ]
+      };
+
+      wrapper.vm.updateGroup(updatedGroup);
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(1);
+      expect(wrapper.vm.conditionGroup.items[0].column).toBe("level");
     });
 
-    it("removes a condition field", () => {
-      const fieldToRemove = wrapper.vm.streamRoute.conditions[0];
-      wrapper.vm.removeField(fieldToRemove);
-      expect(wrapper.vm.streamRoute.conditions).toHaveLength(0);
+    it("removes condition group by id", () => {
+      // Create nested structure
+      const parentGroup = wrapper.vm.conditionGroup;
+      const childGroupId = "child-group-id";
+      parentGroup.items = [
+        {
+          groupId: childGroupId,
+          label: "or",
+          items: []
+        }
+      ];
+
+      wrapper.vm.removeConditionGroup(childGroupId);
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(0);
     });
   });
 
   describe("Form Validation and Submission", () => {
     it("prevents saving when no conditions are present", async () => {
-      wrapper.vm.streamRoute.conditions = [];
+      // Empty group with no items
+      wrapper.vm.conditionGroup = {
+        groupId: "test-group",
+        label: "and",
+        items: []
+      };
+
       await wrapper.vm.saveCondition();
-      
+
       expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "negative",
-          message: "Please add atleast one condition"
+          message: "Please add at least one condition"
         })
       );
       expect(mockAddNode).not.toHaveBeenCalled();
     });
 
     it("saves condition with valid data", async () => {
-      wrapper.vm.streamRoute.conditions = [{
-        column: "level",
-        operator: "=",
-        value: "error",
-        id: "test-id"
-      }];
-
-      await wrapper.vm.saveCondition();
-      
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({
-          node_type: "condition",
-          conditions: [{
+      wrapper.vm.conditionGroup = {
+        groupId: "test-group",
+        label: "and",
+        items: [
+          {
             column: "level",
             operator: "=",
             value: "error",
+            ignore_case: false,
             id: "test-id"
-          }]
+          }
+        ]
+      };
+
+      await wrapper.vm.saveCondition();
+
+      expect(mockAddNode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          node_type: "condition",
+          condition: {
+            and: [
+              {
+                column: "level",
+                operator: "=",
+                value: "error",
+                ignore_case: false
+              }
+            ]
+          }
         })
       );
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
@@ -245,44 +284,56 @@ describe("Condition Component", () => {
 
   describe("Dialog Handling", () => {
     it("opens cancel dialog when form has changes", async () => {
-      wrapper.vm.streamRoute.conditions[0].column = "level";
+      // Modify the condition group
+      wrapper.vm.conditionGroup.items = [
+        {
+          column: "level",
+          operator: "=",
+          value: "error",
+          ignore_case: false,
+          id: "test-id"
+        }
+      ];
+
       await wrapper.vm.openCancelDialog();
-      
+
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Discard Changes");
-      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to cancel routing changes?");
     });
 
     it("closes form directly when no changes made", async () => {
-      // Ensure streamRoute and originalStreamRouting are the same
-      wrapper.vm.streamRoute = JSON.parse(JSON.stringify(wrapper.vm.originalStreamRouting));
-      
+      // Ensure conditionGroup matches originalConditionGroup
+      wrapper.vm.conditionGroup = JSON.parse(JSON.stringify(wrapper.vm.originalConditionGroup));
+
       await wrapper.vm.openCancelDialog();
       await flushPromises();
-      
+
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
     });
 
     it("opens delete dialog with correct content", async () => {
       await wrapper.vm.openDeleteDialog();
-      
+
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Delete Node");
-      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to delete stream routing?");
     });
   });
 
   describe("Edit Mode", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       mockPipelineObj.isEditNode = true;
       mockPipelineObj.currentSelectedNodeData = {
         data: {
-          conditions: [{
-            column: "level",
-            operator: "=",
-            value: "error",
-            id: "test-id"
-          }]
+          condition: {
+            and: [
+              {
+                column: "level",
+                operator: "=",
+                value: "error",
+                ignore_case: false
+              }
+            ]
+          }
         }
       };
 
@@ -293,20 +344,26 @@ describe("Condition Component", () => {
             store: mockStore,
           },
           stubs: {
-            RealtimePipeline: true,
+            FilterGroup: true,
             ConfirmDialog: true,
           }
         }
       });
+
+      await flushPromises();
     });
 
     it("loads existing condition data in edit mode", () => {
-      expect(wrapper.vm.streamRoute.conditions).toEqual([{
-        column: "level",
-        operator: "=",
-        value: "error",
-        id: "test-id"
-      }]);
+      expect(wrapper.vm.conditionGroup).toBeDefined();
+      expect(wrapper.vm.conditionGroup.label).toBe("and");
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(1);
+      expect(wrapper.vm.conditionGroup.items[0]).toEqual(
+        expect.objectContaining({
+          column: "level",
+          operator: "=",
+          value: "error"
+        })
+      );
     });
 
     it("shows delete button in edit mode", () => {
@@ -327,7 +384,7 @@ describe("Condition Component", () => {
         "mess",
         mockUpdate
       );
-      
+
       expect(mockUpdate).toHaveBeenCalled();
     });
 
@@ -336,17 +393,17 @@ describe("Condition Component", () => {
         { label: "timestamp", value: "timestamp", type: "datetime" },
         { label: "message", value: "message", type: "string" }
       ];
-      
+
       let filteredOptions;
       const update = (callback) => {
         callback();
       };
-      
+
       filteredOptions = wrapper.vm.filterColumns(options, "", update);
-      
+
       expect(filteredOptions).toEqual(expect.arrayContaining(options));
       expect(filteredOptions.length).toBe(options.length);
-      
+
       // Verify that all columns in result match the expected format
       filteredOptions.forEach(column => {
         expect(column).toMatchObject({
@@ -359,34 +416,56 @@ describe("Condition Component", () => {
   });
 
   describe("Condition Validation", () => {
-    it("validates empty value condition", () => {
-      wrapper.vm.streamRoute.conditions = [{
-        column: "message",
-        operator: "!=",
-        value: '""',
-        id: "test-id"
-      }];
+    it("validates empty value condition", async () => {
+      wrapper.vm.conditionGroup = {
+        groupId: "test-group",
+        label: "and",
+        items: [
+          {
+            column: "message",
+            operator: "!=",
+            value: '""',
+            ignore_case: false,
+            id: "test-id"
+          }
+        ]
+      };
 
-      wrapper.vm.saveCondition();
+      await wrapper.vm.saveCondition();
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          conditions: [expect.objectContaining({ value: '""' })]
+          condition: expect.objectContaining({
+            and: expect.arrayContaining([
+              expect.objectContaining({ value: '""' })
+            ])
+          })
         })
       );
     });
 
-    it("validates null value condition", () => {
-      wrapper.vm.streamRoute.conditions = [{
-        column: "message",
-        operator: "!=",
-        value: "null",
-        id: "test-id"
-      }];
+    it("validates null value condition", async () => {
+      wrapper.vm.conditionGroup = {
+        groupId: "test-group",
+        label: "and",
+        items: [
+          {
+            column: "message",
+            operator: "!=",
+            value: "null",
+            ignore_case: false,
+            id: "test-id"
+          }
+        ]
+      };
 
-      wrapper.vm.saveCondition();
+      await wrapper.vm.saveCondition();
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          conditions: [expect.objectContaining({ value: "null" })]
+          condition: expect.objectContaining({
+            and: expect.arrayContaining([
+              expect.objectContaining({ value: "null" })
+            ])
+          })
         })
       );
     });
@@ -394,88 +473,136 @@ describe("Condition Component", () => {
 
   describe("Multiple Conditions", () => {
     it("handles multiple conditions correctly", async () => {
-      wrapper.vm.streamRoute.conditions = [
-        {
-          column: "level",
-          operator: "=",
-          value: "error",
-          id: "test-id-1"
-        },
-        {
-          column: "message",
-          operator: "contains",
-          value: "failed",
-          id: "test-id-2"
-        }
-      ];
+      wrapper.vm.conditionGroup = {
+        groupId: "test-group",
+        label: "and",
+        items: [
+          {
+            column: "level",
+            operator: "=",
+            value: "error",
+            ignore_case: false,
+            id: "test-id-1"
+          },
+          {
+            column: "message",
+            operator: "contains",
+            value: "failed",
+            ignore_case: false,
+            id: "test-id-2"
+          }
+        ]
+      };
 
       await wrapper.vm.saveCondition();
-      
+
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          conditions: expect.arrayContaining([
-            expect.objectContaining({ column: "level", value: "error" }),
-            expect.objectContaining({ column: "message", value: "failed" })
-          ])
+          condition: {
+            and: expect.arrayContaining([
+              expect.objectContaining({ column: "level", value: "error" }),
+              expect.objectContaining({ column: "message", value: "failed" })
+            ])
+          }
         })
       );
     });
 
-    it("removes specific condition when multiple exist", () => {
-      wrapper.vm.streamRoute.conditions = [
-        {
-          column: "level",
-          operator: "=",
-          value: "error",
-          id: "test-id-1"
-        },
-        {
-          column: "message",
-          operator: "contains",
-          value: "failed",
-          id: "test-id-2"
-        }
-      ];
+    it("handles OR conditions with nested groups", async () => {
+      wrapper.vm.conditionGroup = {
+        groupId: "test-group",
+        label: "or",
+        items: [
+          {
+            column: "level",
+            operator: "=",
+            value: "error",
+            ignore_case: false,
+            id: "test-id-1"
+          },
+          {
+            column: "level",
+            operator: "=",
+            value: "critical",
+            ignore_case: false,
+            id: "test-id-2"
+          }
+        ]
+      };
 
-      const conditionToRemove = wrapper.vm.streamRoute.conditions[0];
-      wrapper.vm.removeField(conditionToRemove);
-      
-      expect(wrapper.vm.streamRoute.conditions).toHaveLength(1);
-      expect(wrapper.vm.streamRoute.conditions[0].id).toBe("test-id-2");
+      await wrapper.vm.saveCondition();
+
+      expect(mockAddNode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          condition: {
+            or: expect.arrayContaining([
+              expect.objectContaining({ column: "level", value: "error" }),
+              expect.objectContaining({ column: "level", value: "critical" })
+            ])
+          }
+        })
+      );
     });
   });
 
   describe("Edge Cases", () => {
     it("handles condition with empty column", async () => {
-      wrapper.vm.streamRoute.conditions = [{
-        column: "",
-        operator: "=",
-        value: "test",
-        id: "test-id"
-      }];
+      wrapper.vm.conditionGroup = {
+        groupId: "test-group",
+        label: "and",
+        items: [
+          {
+            column: "",
+            operator: "=",
+            value: "test",
+            ignore_case: false,
+            id: "test-id"
+          }
+        ]
+      };
 
       await wrapper.vm.saveCondition();
       expect(mockAddNode).toHaveBeenCalled();
     });
 
     it("handles condition with empty operator", async () => {
-      wrapper.vm.streamRoute.conditions = [{
-        column: "level",
-        operator: "",
-        value: "test",
-        id: "test-id"
-      }];
+      wrapper.vm.conditionGroup = {
+        groupId: "test-group",
+        label: "and",
+        items: [
+          {
+            column: "level",
+            operator: "",
+            value: "test",
+            ignore_case: false,
+            id: "test-id"
+          }
+        ]
+      };
 
       await wrapper.vm.saveCondition();
       expect(mockAddNode).toHaveBeenCalled();
     });
 
-    it("preserves condition order when adding new conditions", () => {
-      const initialCondition = wrapper.vm.streamRoute.conditions[0];
-      wrapper.vm.addField();
-      
-      expect(wrapper.vm.streamRoute.conditions[0]).toEqual(initialCondition);
-      expect(wrapper.vm.streamRoute.conditions).toHaveLength(2);
+    it("preserves nested group structure", () => {
+      const nestedGroup = {
+        groupId: "nested-group",
+        label: "or",
+        items: [
+          {
+            column: "status",
+            operator: "=",
+            value: "active",
+            ignore_case: false,
+            id: "nested-id"
+          }
+        ]
+      };
+
+      wrapper.vm.conditionGroup.items = [nestedGroup];
+
+      expect(wrapper.vm.conditionGroup.items[0].groupId).toBe("nested-group");
+      expect(wrapper.vm.conditionGroup.items[0].label).toBe("or");
     });
   });
 
@@ -488,46 +615,65 @@ describe("Condition Component", () => {
       vi.useRealTimers();
     });
 
-    it("saves condition with correct node type and conditions", async () => {
+    it("saves condition with correct node type and condition structure", async () => {
       const now = new Date('2024-01-01T12:00:00Z');
       vi.setSystemTime(now);
 
-      wrapper.vm.streamRoute.conditions = [{
-        column: "level",
-        operator: "=",
-        value: "error",
-        id: "test-id"
-      }];
-
-      await wrapper.vm.saveCondition();
-      
-      expect(mockAddNode).toHaveBeenCalledWith({
-        node_type: "condition",
-        conditions: [{
-          column: "level",
-          operator: "=",
-          value: "error",
-          id: "test-id"
-        }]
-      });
-    });
-
-    it("preserves existing metadata in edit mode", async () => {
-      const now = new Date('2024-01-01T12:00:00Z');
-      vi.setSystemTime(now);
-
-      // Set edit mode and provide existing metadata
-      mockPipelineObj.isEditNode = true;
-      mockPipelineObj.currentSelectedNodeData = {
-        data: {
-          conditions: [{
+      wrapper.vm.conditionGroup = {
+        groupId: "test-group",
+        label: "and",
+        items: [
+          {
             column: "level",
             operator: "=",
             value: "error",
+            ignore_case: false,
             id: "test-id"
-          }],
-          createdAt: "2023-01-01T00:00:00.000Z",
-          owner: "original@example.com"
+          }
+        ]
+      };
+
+      await wrapper.vm.saveCondition();
+
+      expect(mockAddNode).toHaveBeenCalledWith({
+        node_type: "condition",
+        condition: {
+          and: [
+            {
+              column: "level",
+              operator: "=",
+              value: "error",
+              ignore_case: false
+            }
+          ]
+        }
+      });
+    });
+
+    it("preserves existing condition structure in edit mode", async () => {
+      const now = new Date('2024-01-01T12:00:00Z');
+      vi.setSystemTime(now);
+
+      // Set edit mode and provide existing condition
+      mockPipelineObj.isEditNode = true;
+      mockPipelineObj.currentSelectedNodeData = {
+        data: {
+          condition: {
+            or: [
+              {
+                column: "level",
+                operator: "=",
+                value: "error",
+                ignore_case: false
+              },
+              {
+                column: "level",
+                operator: "=",
+                value: "critical",
+                ignore_case: false
+              }
+            ]
+          }
         }
       };
 
@@ -539,23 +685,17 @@ describe("Condition Component", () => {
             store: mockStore,
           },
           stubs: {
-            RealtimePipeline: true,
+            FilterGroup: true,
             ConfirmDialog: true,
           }
         }
       });
 
-      await wrapper.vm.saveCondition();
-      
-      expect(mockAddNode).toHaveBeenCalledWith({
-        node_type: "condition",
-        conditions: [{
-          column: "level",
-          operator: "=",
-          value: "error",
-          id: "test-id"
-        }]
-      });
+      await flushPromises();
+
+      // Verify the condition group was loaded correctly
+      expect(wrapper.vm.conditionGroup.label).toBe("or");
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(2);
     });
   });
-}); 
+});

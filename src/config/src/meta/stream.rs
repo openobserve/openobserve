@@ -1167,7 +1167,6 @@ pub struct PartitioningDetails {
     pub partition_time_level: Option<PartitionTimeLevel>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EnrichmentTableMetaStreamStats {
     pub start_time: i64,
