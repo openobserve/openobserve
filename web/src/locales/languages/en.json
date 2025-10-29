@@ -504,7 +504,7 @@
     "extendedEndDate": "End Date",
     "regexPatterns": "SDR",
     "envQuickModeMsg": "Environment quick mode field",
-    "sdr":"Sensitive Data Redaction"
+    "sdr": "Sensitive Data Redaction"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -570,7 +570,7 @@
     "streamRouting": "Stream Routing",
     "testFunction": "Test Function",
     "errorDetails": "Error",
-    "function_definition":"Function Definition"
+    "function_definition": "Function Definition"
   },
   "confirmDialog": {
     "cancel": "Cancel",
@@ -1087,6 +1087,8 @@
     "email": "Email",
     "action": "Action",
     "all": "All",
+    "history": "Alert History",
+    "searcHistory": "Enter Alert Name",
     "deduplication": {
       "title": "Alert Deduplication",
       "subtitle": "Prevent duplicate alerts by configuring fingerprint-based deduplication.",
@@ -1374,7 +1376,7 @@
     "searchRegion": "Search Region"
   },
   "regex_patterns": {
-    "title":"Sensitive Data Redaction",
+    "title": "Sensitive Data Redaction",
     "header": "Regex Patterns",
     "create_pattern": "Add Pattern",
     "search": "Search Pattern",
@@ -1387,8 +1389,8 @@
     "edit": "Edit",
     "delete": "Delete",
     "create_regex_pattern": "Create Pattern",
-    "create_close":"Create and Close",
-    "cancel":"Cancel",
+    "create_close": "Create and Close",
+    "cancel": "Cancel",
     "edit_regex_pattern": "Edit Pattern",
     "update_close": "Update and Close",
     "description": "Description",

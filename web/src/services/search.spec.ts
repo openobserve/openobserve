@@ -445,7 +445,7 @@ describe("Search Service", () => {
       await search.metrics_query_range(params);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/prometheus/api/v1/query_range?start=1609459200&end=1609545600&step=5m&query=up"
+        "/api/test-org/prometheus/api/v1/query_range?use_cache=true&start=1609459200&end=1609545600&step=5m&query=up"
       );
     });
 
@@ -468,7 +468,7 @@ describe("Search Service", () => {
       await search.metrics_query_range(params);
 
       const expectedUrl = 
-        "/api/test-org/prometheus/api/v1/query_range?start=1609459200&end=1609545600&step=1m&query=cpu_usage%7Binstance%3D'server1'%7D" +
+        "/api/test-org/prometheus/api/v1/query_range?use_cache=true&start=1609459200&end=1609545600&step=1m&query=cpu_usage%7Binstance%3D'server1'%7D" +
         "&dashboard_id=dash-123" +
         "&folder_id=folder-456" +
         "&panel_id=panel-789" +
