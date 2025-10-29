@@ -90,17 +90,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           ref="closeBtn"
           v-close-popup="true"
-          class="q-mb-md text-bold"
+          class="o2-secondary-button tw-h-[36px]"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          flat
           :label="t('dashboard.cancel')"
-          text-color="light-text"
-          padding="sm md"
-          no-caps
           data-test="panel-layout-settings-cancel"
         />
         <q-btn
           :label="t('dashboard.save')"
-          class="q-mb-md text-bold no-border q-ml-md"
-          color="secondary"
+          class="o2-primary-button tw-h-[36px] q-ml-md"
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           padding="sm xl"
           type="submit"
           no-caps
