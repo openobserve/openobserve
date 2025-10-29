@@ -73,12 +73,9 @@ use crate::{
             user::{AuthTokens, AuthTokensExt},
         },
     },
-    service::{
-        db,
-        search::{
-            datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
-            grpc::tantivy_result_cache,
-        },
+    service::search::{
+        datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
+        grpc::tantivy_result_cache,
     },
 };
 
@@ -394,11 +391,6 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         json::json!({"num":file_list_num,"max_id": file_list_max_id}),
     );
 
-    let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();
-    stats.insert(
-        "COMPACT",
-        json::json!({"file_list_offset": last_file_list_offset}),
-    );
     stats.insert(
         "DATAFUSION",
         json::json!({"file_stat_cache": {
@@ -561,7 +553,8 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             match token_ver {
                 Ok(res) => {
                     // check for service accounts , do not to allow login
-                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
+                    if let Some(db_user) =
+                        crate::service::db::user::get_user_by_email(&res.0.user_email).await
                         && db_user
                             .organizations
                             .iter()
