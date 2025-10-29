@@ -1367,4 +1367,12 @@ export default defineComponent({
     background-color: var(--o2-hover-accent) !important;
   }
 }
+
+.el-border {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
+}
 </style>
