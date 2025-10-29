@@ -322,8 +322,8 @@
 
 
               <!-- remove or add pattern button  -->
-               <div class="tw-mb-4" :class="store.state.theme === 'dark' ? 'add-remove-pattern-button-dark' : 'add-remove-pattern-button-light'">
-                <q-btn @click="handleAddOrRemovePattern" no-caps class="q-mr-md o2-secondary-button tw-h-[36px]">
+               <div class="tw-mb-4">
+                <q-btn @click="handleAddOrRemovePattern" borderless no-caps class="q-mr-md o2-secondary-button tw-h-[36px] no-border">
                   <span>
                     {{ checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'Remove Pattern' : 'Add Pattern' }}
                   </span> 
@@ -355,7 +355,7 @@
             <q-btn
               v-close-popup="true"
               label="Cancel"
-              class="q-my-sm text-bold q-mr-md"
+              class="q-mr-md o2-secondary-button tw-h-[36px] no-border"
               padding="sm md"
               no-caps
               style="border: 1px solid #E6E6E6;"

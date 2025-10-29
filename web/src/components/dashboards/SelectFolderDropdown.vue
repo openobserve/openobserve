@@ -119,7 +119,7 @@ export default defineComponent({
     };
 
     const computedStyle = computed(() => {
-      return 'height: 36px; margin-top: 32px';
+      return 'height: 35px; margin-top: 13px';
     });
 
     onActivated(() => {
