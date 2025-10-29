@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
           data-test="dashboard-general-setting-name"
-         borderless hide-bottom-space
+          borderless
+          hide-bottom-space
         />
         <span>&nbsp;</span>
         <q-input
@@ -41,8 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           stack-label
           dense
           data-test="dashboard-general-setting-description"
-         borderless hide-bottom-space/>
-        <div v-if="dateTimeValue" data-test="dashboard-general-setting-datetime-picker">
+          borderless
+          hide-bottom-space
+        />
+        <div
+          v-if="dateTimeValue"
+          data-test="dashboard-general-setting-datetime-picker"
+        >
           <label>Default Duration</label>
           <DateTimePickerDashboard
             v-show="store.state.printMode === false"
@@ -58,14 +64,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardData.showDynamicFilters"
           label="Show Dynamic Filters"
           data-test="dashboard-general-setting-dynamic-filter"
-        ></q-toggle>
+          class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        />
         <div class="flex justify-center q-mt-lg">
           <q-btn
             ref="closeBtn"
             v-close-popup="true"
             :label="t('dashboard.cancel')"
             class="o2-secondary-button tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             flat
             data-test="dashboard-general-setting-cancel-btn"
           />
@@ -73,7 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disable="dashboardData.title.trim() === ''"
             :label="t('dashboard.save')"
             class="o2-primary-button tw-h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             flat
             type="submit"
             :loading="saveDashboardApi.isLoading.value"
@@ -136,7 +157,7 @@ export default defineComponent({
       const data = await getDashboard(
         store,
         route.query.dashboard,
-        route.query.folder ?? "default"
+        route.query.folder ?? "default",
       );
 
       dashboardData.title = data.title;
@@ -163,9 +184,9 @@ export default defineComponent({
             await getDashboard(
               store,
               route.query.dashboard,
-              route.query.folder ?? "default"
-            )
-          )
+              route.query.folder ?? "default",
+            ),
+          ),
         );
 
         // update the values
@@ -194,7 +215,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           route.query.dashboard,
           data,
-          route?.query?.folder ?? "default"
+          route?.query?.folder ?? "default",
         );
 
         showPositiveNotification("Dashboard updated successfully.");
@@ -205,7 +226,7 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Dashboard updation failed"
+              "Dashboard updation failed",
           );
         } else {
           showErrorNotification(error?.message ?? "Dashboard updation failed", {
@@ -224,8 +245,8 @@ export default defineComponent({
         saveDashboardApi.execute().catch((err: any) => {
           showErrorNotification(
             JSON.stringify(
-              err.response.data["error"] || "Dashboard creation failed."
-            )
+              err.response.data["error"] || "Dashboard creation failed.",
+            ),
           );
         });
       });
