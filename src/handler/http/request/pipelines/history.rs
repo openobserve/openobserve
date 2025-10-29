@@ -157,7 +157,7 @@ pub async fn get_pipeline_history(
          delay_in_secs, evaluation_took_in_secs, \
          source_node, query_took \
          FROM \"{TRIGGERS_USAGE_STREAM}\" \
-         WHERE module = 'derived_stream' AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+         WHERE (module in ('derived_stream', 'pipeline')) AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
 
     // Helper function to escape pipeline names for SQL LIKE patterns
@@ -185,7 +185,7 @@ pub async fn get_pipeline_history(
         // Filter by all pipelines in the organization
         let pipeline_filter = pipeline_names
             .iter()
-            .map(|name| format!("key LIKE '{}/%'", name.replace("'", "''")))
+            .map(|name| format!("key LIKE '%{}%'", name.replace("'", "''")))
             .collect::<Vec<_>>()
             .join(" OR ");
         sql.push_str(&format!(" AND ({pipeline_filter})"));
