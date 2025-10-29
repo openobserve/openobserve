@@ -69,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- {{ searchObj.data.histogram.errorMsg }} -->
-            <q-icon name="info" color="warning"
-size="sm"> </q-icon>
+            <q-icon name="info"
+color="warning" size="sm"> </q-icon>
             <q-tooltip position="top" class="tw-text-sm tw-font-semi-bold">
               {{ searchObj.data.histogram.errorMsg }}
             </q-tooltip>
@@ -160,8 +160,8 @@ size="sm"> </q-icon>
         >
           <h3 class="text-center">
             <span class="histogram-empty__message">
-              <q-icon name="warning" color="warning"
-size="xs"></q-icon> No data
+              <q-icon name="warning"
+color="warning" size="xs"></q-icon> No data
               found for histogram.</span
             >
           </h3>
@@ -174,7 +174,8 @@ size="xs"></q-icon> No data
           "
         >
           <h3 class="text-center">
-            <span class="histogram-empty__message" style="color: transparent"
+            <span class="histogram-empty__message"
+style="color: transparent"
               >.</span
             >
           </h3>
@@ -202,8 +203,8 @@ size="xs"></q-icon> No data
             searchObj.data.histogram.errorCode != -1
           "
         >
-          <q-icon name="warning" color="warning"
-size="xs"></q-icon> Error while
+          <q-icon name="warning"
+color="warning" size="xs"></q-icon> Error while
           fetching histogram data.
           <q-btn
             @click="toggleErrorDetails"
@@ -562,11 +563,6 @@ export default defineComponent({
         searchObj.data.histogram.xData.length > 0
         // && plotChart.value?.reDraw
       ) {
-        searchObj.data.histogram.chartParams["itemStyle"] = {
-          color: getComputedStyle(document.documentElement)
-            .getPropertyValue("--o2-theme-color")
-            .trim(),
-        };
         //format data in form of echarts options
         plotChart.value = convertLogData(
           searchObj.data.histogram.xData,
