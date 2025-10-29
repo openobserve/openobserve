@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="tw-px-[0.625rem]" style="overflow-y: auto; min-height: inherit; height: calc(100vh - 40px);" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
+  <q-page class="tw-px-[0.625rem] q-pt-xs" style="overflow-y: auto; min-height: inherit; height: calc(100vh - 40px);" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
     <div v-if="!no_data_ingest && !isLoadingSummary" class="tw-w-full tw-h-full tw-px-[0.625rem] tw-py-[0.625rem] card-container" style="display: flex; flex-direction: column; ">
         <!-- 1st section -->
          <div>

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="height: calc(100vh - 40px); overflow-y: auto" class="scroll">
-    <div class="row tw-px-[0.625rem] tw-mb-[0.625rem]" style="height: 48px; overflow-y: auto">
+    <div class="row tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs" style="height: 48px; overflow-y: auto">
     <div class="card-container tw-w-full tw-h-full tw-flex" >
       <div class="flex items-center col">
         <div

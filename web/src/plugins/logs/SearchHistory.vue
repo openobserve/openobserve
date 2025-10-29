@@ -1,6 +1,6 @@
 <template>
   <div
-  class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] "
+  class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs"
   >
    <div class="">
     <div class="flex tw-justify-between tw-items-center tw-h-[68px] card-container tw-mb-[0.625rem]">

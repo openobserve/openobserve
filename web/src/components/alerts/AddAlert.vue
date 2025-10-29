@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width q-mx-lg"  >
+  <div class="full-width q-mx-lg q-pt-xs">
     <div class="row items-center no-wrap card-container tw-mx-[0.625rem]  tw-mb-[0.625rem]">
       <div class="flex items-center justify-between tw-w-full card-container tw-h-[68px] tw-px-2 tw-py-3">
         <div class="flex items-center">

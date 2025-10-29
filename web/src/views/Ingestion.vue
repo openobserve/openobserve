@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-page class="ingestionPage">
-    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
       <div class=" card-container">
         <div class="q-px-md q-pt-md full-width">
           <span class="text-h6 q-mr-auto"> {{ t("ingestion.header") }}</span>
