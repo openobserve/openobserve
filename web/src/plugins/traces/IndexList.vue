@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-cy="index-dropdown"
       input-debounce="0"
       behavior="menu"
-      filled
       borderless
       dense
       use-input
@@ -107,7 +106,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="log-search-index-list-field-search-input"
             v-model="searchObj.data.stream.filterField"
             data-cy="index-field-search-input"
-            filled
             borderless
             dense
             clearable
