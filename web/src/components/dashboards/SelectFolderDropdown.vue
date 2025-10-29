@@ -36,8 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-select>
 
-    <q-btn
-      class="q-mb-md text-bold"
+    <q-btn 
+      class="q-mb-md text-bold el-border"
       data-test="dashboard-folder-move-new-add"
       label="+"
       text-color="light-text"
