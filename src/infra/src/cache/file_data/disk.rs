@@ -15,7 +15,7 @@
 
 use std::{
     cmp::{max, min},
-    fmt, fs,
+    fmt,
     ops::Range,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -210,9 +210,8 @@ impl FileData {
     ) -> Result<(), anyhow::Error> {
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "[CacheType:{}] File disk cache is full, can't cache extra {} bytes",
+                "[CacheType:{}] File disk cache is full, can't cache extra {data_size} bytes",
                 self.file_type,
-                data_size
             );
             // cache is full, need release some space
             let need_release_size = min(
@@ -223,17 +222,22 @@ impl FileData {
         }
 
         // rename tmp file to real file
+        let file_ops_start = std::time::Instant::now();
         let file_path = self.get_file_path(file);
-        fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
-        fs::rename(tmp_file, &file_path).map_err(|e| {
+        tokio::fs::create_dir_all(Path::new(&file_path).parent().unwrap()).await?;
+        tokio::fs::rename(tmp_file, &file_path).await.map_err(|e| {
             anyhow::anyhow!(
-                "[CacheType:{}] File disk cache rename tmp file {} to real file {} error: {}",
+                "[CacheType:{}] File disk cache rename tmp file {tmp_file} to real file {file_path} error: {e}",
                 self.file_type,
-                tmp_file,
-                file_path,
-                e
             )
         })?;
+        let file_ops_took = file_ops_start.elapsed().as_millis() as usize;
+        if file_ops_took > 100 {
+            log::info!(
+                "[CacheType:{}] File disk cache rename file {file_path} took: {file_ops_took} ms",
+                self.file_type,
+            );
+        }
 
         // set size
         self.set_size(file, data_size).await
@@ -296,7 +300,7 @@ impl FileData {
                 self.file_type,
                 key
             );
-            if let Err(e) = fs::remove_file(&file_path) {
+            if let Err(e) = tokio::fs::remove_file(&file_path).await {
                 log::error!(
                     "[CacheType:{}] File disk cache gc remove file: {}, error: {}",
                     self.file_type,
@@ -351,9 +355,8 @@ impl FileData {
             drop(r);
         }
         log::info!(
-            "[CacheType:{}] File disk cache gc done, released {} bytes, took={}",
+            "[CacheType:{}] File disk cache gc done, released {release_size} bytes, took: {} ms",
             self.file_type,
-            release_size,
             start.elapsed().as_millis()
         );
 
@@ -362,9 +365,8 @@ impl FileData {
 
     async fn remove(&mut self, file: &str) -> Result<(), anyhow::Error> {
         log::debug!(
-            "[CacheType:{}] File disk cache remove file {}",
+            "[CacheType:{}] File disk cache remove file {file}",
             self.file_type,
-            file
         );
 
         let Some((key, data_size)) = self.data.remove_key(file) else {
@@ -374,12 +376,10 @@ impl FileData {
 
         // delete file from local disk
         let file_path = self.get_file_path(key.as_str());
-        if let Err(e) = fs::remove_file(&file_path) {
+        if let Err(e) = tokio::fs::remove_file(&file_path).await {
             log::error!(
-                "[CacheType:{}] File disk cache remove file: {}, error: {}",
+                "[CacheType:{}] File disk cache remove file: {file_path}, error: {e}",
                 self.file_type,
-                file_path,
-                e
             );
         }
 
@@ -529,7 +529,7 @@ pub async fn exist(file: &str) -> bool {
     };
     let get_lock_took = start.elapsed().as_millis() as usize;
     if get_lock_took > 100 {
-        log::info!("disk->cache: check file {file} exist get lock took: {get_lock_took} ms",);
+        log::info!("disk->cache: check file {file} exist get lock took: {get_lock_took} ms");
     }
     // file not exist, we can fast return
     if !files.exist(file).await {
@@ -539,7 +539,7 @@ pub async fn exist(file: &str) -> bool {
 
     let exist_took = start.elapsed().as_millis() as usize;
     if exist_took > 100 {
-        log::info!("disk->cache: check file {file} exist took: {exist_took} ms",);
+        log::info!("disk->cache: check file {file} exist took: {exist_took} ms");
     }
 
     // check if the file is really exist
@@ -551,7 +551,7 @@ pub async fn exist(file: &str) -> bool {
     _ = remove(file).await;
     let remove_took = start.elapsed().as_millis() as usize;
     if remove_took > 100 {
-        log::info!("disk->cache: check file {file} exist remove took: {remove_took} ms",);
+        log::info!("disk->cache: check file {file} exist remove took: {remove_took} ms");
     }
 
     // finally return false
@@ -569,6 +569,7 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
     let (file, tmp_file) = write_tmp_file(file, data).await?;
 
     // hash the file name and get the bucket index
+    let start = std::time::Instant::now();
     let idx = get_bucket_idx(&file);
 
     // get all the files from the bucket
@@ -581,9 +582,15 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
     } else {
         RESULT_FILES[idx].write().await
     };
+
+    let get_lock_took = start.elapsed().as_millis() as usize;
+    if get_lock_took > 100 {
+        log::info!("disk->cache: set file {file} get lock took: {get_lock_took} ms");
+    }
+
     if files.exist(&file).await {
         // remove the tmp file
-        if let Err(e) = std::fs::remove_file(&tmp_file) {
+        if let Err(e) = tokio::fs::remove_file(&tmp_file).await {
             log::warn!(
                 "[CacheType:{}] File disk cache remove tmp file {} error: {}",
                 files.file_type,
@@ -593,7 +600,14 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         }
         return Ok(());
     }
-    files.set(&file, &tmp_file, data_size).await
+    let ret = files.set(&file, &tmp_file, data_size).await;
+
+    let set_took = start.elapsed().as_millis() as usize;
+    if set_took > 100 {
+        log::info!("disk->cache: set file {file} took: {set_took} ms");
+    }
+
+    ret
 }
 
 #[inline]

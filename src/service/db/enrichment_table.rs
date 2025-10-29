@@ -94,7 +94,7 @@ pub async fn get_enrichment_table_data(
             Ok(res.hits)
         }
         Err(err) => {
-            log::error!("get enrichment table {org_id}/{name} data error: {err}",);
+            log::error!("get enrichment table {org_id}/{name} data error: {err}");
             Err(anyhow::anyhow!(
                 "get enrichment table {org_id}/{name} error: {err}"
             ))
