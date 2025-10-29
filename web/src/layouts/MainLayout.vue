@@ -1544,6 +1544,9 @@ export default defineComponent({
 }
 
 .printMode {
+  body {
+    overflow: auto !important;
+  }
   .q-header {
     display: none;
   }
