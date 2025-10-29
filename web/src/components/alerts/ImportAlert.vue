@@ -15,42 +15,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="card-container tw-w-full tw-mb-[0.625rem] tw-mr-2 tw-mx-2">
-    <div class="flex tw-py-3 tw-px-4 items-center no-wrap tw-h-[68px]">
-      <div class="col">
-        <div class="flex">
-          <q-btn
-            no-caps
-            padding="xs"
-            outline
-            @click="router.back()"
-            icon="arrow_back_ios_new"
-            data-test="alert-import-back-btn"
-          />
-          <div class="tw-font-[600] tw-text-[20px] q-ml-md">Import Alert</div>
+  <div class="tw-w-full tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs">
+    <div class="card-container">
+      <div class="flex tw-py-3 tw-px-4 items-center no-wrap tw-h-[68px]">
+        <div class="col">
+          <div class="flex">
+            <q-btn
+              no-caps
+              padding="xs"
+              outline
+              @click="router.back()"
+              icon="arrow_back_ios_new"
+              data-test="alert-import-back-btn"
+            />
+            <div class="tw-font-[600] tw-text-[20px] q-ml-md">Import Alert</div>
+          </div>
         </div>
-      </div>
-      <div class="flex justify-center">
-        <q-btn
-          v-close-popup
-          class="q-mr-md o2-secondary-button tw-h-[36px]"
-          :label="t('function.cancel')"
-          no-caps
-          flat
-          @click="router.back()"
-          data-test="alert-import-cancel-btn"
-        />
-        <q-btn
-          class="o2-primary-button no-border tw-h-[36px]"
-          :label="t('dashboard.import')"
-          type="submit"
-          padding="sm xl"
-          no-caps
-          @click="importJson"
-          :loading="isAlertImporting"
-          :disable="isAlertImporting"
-          data-test="alert-import-json-btn"
-        />
+        <div class="flex justify-center">
+          <q-btn
+            v-close-popup
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
+            :label="t('function.cancel')"
+            no-caps
+            flat
+            @click="router.back()"
+            data-test="alert-import-cancel-btn"
+          />
+          <q-btn
+            class="o2-primary-button no-border tw-h-[36px]"
+            :label="t('dashboard.import')"
+            type="submit"
+            padding="sm xl"
+            no-caps
+            @click="importJson"
+            :loading="isAlertImporting"
+            :disable="isAlertImporting"
+            data-test="alert-import-json-btn"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -61,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="logs-search-splitter"
         no-scroll
         v-model="splitterModel"
-        style="width: calc(100vw - 100px); height: 100%"
+        style="width: calc(100vw - 100px);"
       >
       
         <template #before>
@@ -81,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="activeTab == 'import_json_url'"
             class="editor-container-url card-container tw-py-1"
           >
-            <q-form class="tw-mx-2 q-mt-md tw-pb-2" @submit="onSubmit">
+            <q-form class="tw-mx-2 tw-pb-2" @submit="onSubmit">
               <div style="width: calc(100% - 10px)" class="flex">
                 <div style="width: calc(69%)" class="q-pr-sm">
                   <q-input
@@ -189,8 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div
             data-test="alert-import-output-editor"
-            style="width: calc(100% - 10px); height: 100%"
-            class="card-container tw-ml-[0.625rem] tw-h-full"
+            class="card-container tw-mb-[0.625rem] tw-h-[calc(100vh-130px)]"
           >
             <div
               v-if="alertErrorsToDisplay.length > 0"

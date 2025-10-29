@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div :style="{ height: 'calc(100vh - 41px)', overflow: 'hidden' }">
     <template v-if="isLoading.length">
       <div
-        class="q-pb-lg flex items-center justify-center text-center"
+        class="q-pb-lg flex items-center justify-center text-center q-pt-xs"
         style="height: calc(100vh - 190px)"
       >
         <div>
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
+      <div class="tw-pb-[0.625rem] tw-px-[0.625rem] q-pt-xs">
         <AppTabs
           :show="showTabs"
           :tabs="tabs"
@@ -65,29 +65,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </router-view>
     </template>
     <template v-else>
-      <div class="q-pa-lg tw-mx-[0.625rem] enable-rum card-container">
-        <div class="q-pb-lg">
-          <div class="text-left text-h6 text-bold q-pb-md">
-            {{ t("rum.aboutRUMTitle") }}
+      <div class="q-pt-xs">
+        <div class="q-pa-lg tw-mx-[0.625rem] enable-rum card-container">
+          <div class="q-pb-lg">
+            <div class="text-left text-h6 text-bold q-pb-md">
+              {{ t("rum.aboutRUMTitle") }}
+            </div>
+            <div class="text-subtitle1">
+              {{ t("rum.aboutRUMMessage") }}
+            </div>
+            <div>
+              <div></div>
+            </div>
           </div>
-          <div class="text-subtitle1">
-            {{ t("rum.aboutRUMMessage") }}
-          </div>
-          <div>
-            <div></div>
-          </div>
+          <q-btn
+            class="o2-primary-button tw-h-[36px]"
+            flat
+            no-caps
+            :title="t('rum.getStartedTitle')"
+            @click="getStarted"
+          >
+            {{ t("rum.getStartedLabel") }}
+            <q-icon name="arrow_forward" size="20px"
+  class="q-ml-xs" />
+          </q-btn>
         </div>
-        <q-btn
-          class="o2-primary-button tw-h-[36px]"
-          flat
-          no-caps
-          :title="t('rum.getStartedTitle')"
-          @click="getStarted"
-        >
-          {{ t("rum.getStartedLabel") }}
-          <q-icon name="arrow_forward" size="20px"
-class="q-ml-xs" />
-        </q-btn>
       </div>
     </template>
   </div>

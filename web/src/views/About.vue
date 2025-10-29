@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] aboutPage">
+  <q-page class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] aboutPage q-pt-xs">
     <div class="card-container tw-px-4 tw-py-4 tw-h-[calc(100vh-48px)]">
       <div class="tw-w-full">
         <!-- Hero Section -->

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw-overflow-hidden logs-splitter-smooth"
       >
         <template v-slot:before>
-          <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
+          <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
             <div v-if="showSidebar" class="card-container tw-h-[calc(100vh-47px)]">
               <q-tabs
                 v-model="activeTab"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :functionAssociatedStreams="functionAssociatedStreams"
             @get:functionAssociatedStreams="getFunctionAssociatedStreams"
             @get:templates="getTemplates" -->
-            <div >
+            <div class=" q-pt-xs">
               <RouterView v-slot="{ Component }">
                 <component :is="Component" @sendToAiChat="sendToAiChat" />
               </RouterView>

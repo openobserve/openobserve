@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="add-action-script-section">
-    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
       <div class="card-container">
         <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-pl-4 tw-pr-2 tw-h-[68px]">
         

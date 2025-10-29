@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :key="store.state.selectedOrganization.identifier"
   >
     <!-- searchBar at top -->
-     <div class="tw-w-full tw-px-[0.625rem] tw-mb-[0.625rem]">
+     <div class="tw-w-full tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs">
       <div class="card-container">
         <div class="flex justify-between full-width tw-py-3 tw-px-4 items-center">
             <div class="q-table__title">{{ t("dashboard.header") }}</div>

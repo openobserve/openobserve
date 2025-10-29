@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="action-scripts-list-page">
-    <div v-if="!showAddActionScriptDialog" class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+    <div v-if="!showAddActionScriptDialog" class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
       <div class="card-container tw-mb-[0.625rem]">
         <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-w-full tw-h-[68px]">
           <div class="tw-font-[600] tw-text-[20px]" data-test="alerts-list-title">
