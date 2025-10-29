@@ -30,20 +30,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
-      <q-form ref="routeFormRef" @submit="saveCondition">
+      <q-form ref="routeFormRef" @submit.prevent="saveCondition">
         <div
           class="q-pt-sm showLabelOnTop text-bold text-h7"
           data-test="add-condition-query-input-title"
         >
         <div>
   </div>
-          <realtime-pipeline
-            :columns="filteredColumns"
-            :conditions="streamRoute.conditions"
-            @field:add="addField"
-            @field:remove="removeField"
-            :enableNewValueMode="true" 
-          />
+          <!-- Wrapper for FilterGroup with pipeline-specific styling -->
+          <div class="pipeline-filter-group-wrapper" @submit.stop.prevent>
+            <FilterGroup
+              v-if="conditionGroup && conditionGroup.items"
+              :key="filterGroupKey"
+              :stream-fields="filteredColumns"
+              :group="conditionGroup"
+              :depth="0"
+              @add-condition="(updatedGroup) => { console.log('add-condition event received'); updateGroup(updatedGroup); }"
+              @add-group="(updatedGroup) => { console.log('add-group event received'); updateGroup(updatedGroup); }"
+              @remove-group="(groupId) => { console.log('remove-group event received'); removeConditionGroup(groupId); }"
+              @input:update="(name, field) => { console.log('input:update event received'); onInputUpdate(name, field); }"
+            />
+            <div v-else class="q-pa-md text-grey-7">
+              Loading conditions...
+            </div>
+          </div>
           <q-card class="note-container " >
 
           <q-card-section class="q-pa-sm ">
@@ -86,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-secondary-button tw-h-[36px] q-mr-md"
             color="negative"
             flat
+            type="button"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
             @click="openDeleteDialog"
@@ -98,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-secondary-button tw-h-[36px]"
             :label="t('alerts.cancel')"
             flat
+            type="button"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
             @click="openCancelDialog"
@@ -134,7 +146,7 @@ import {
   watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import RealtimePipeline from "./RealtimePipeline.vue";
+import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import {
   getTimezoneOffset,
   getUUID,
@@ -149,24 +161,33 @@ import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import {
+  transformFEToBE,
+  retransformBEToFE,
+} from "@/utils/alerts/alertDataTransforms";
 
 
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
 );
 
-interface RouteCondition {
+interface FilterCondition {
   column: string;
   operator: string;
   value: any;
+  ignore_case: boolean;
   id: string;
 }
 
+interface ConditionGroup {
+  groupId: string;
+  label: 'and' | 'or';
+  items: (FilterCondition | ConditionGroup)[];
+}
+
 interface StreamRoute {
-  conditions: RouteCondition[];
   name: string;
   query_condition: any | null;
-
 }
 
 const { t } = useI18n();
@@ -227,13 +248,12 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const getDefaultStreamRoute  : any = () => {
+const getDefaultStreamRoute: any = () => {
   if (pipelineObj.isEditNode) {
     return pipelineObj.currentSelectedNodeData.data;
   }
   return {
     name: "",
-    conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
     destination: {
       org_id: "",
       stream_name: "",
@@ -264,16 +284,54 @@ const getDefaultStreamRoute  : any = () => {
   };
 };
 
+// Initialize condition group - convert from backend format if editing
+const getDefaultConditionGroup = (): ConditionGroup => {
+  if (pipelineObj.isEditNode && pipelineObj.currentSelectedNodeData?.data?.condition) {
+    try {
+      // Convert backend ConditionList format to FilterGroup format
+      const converted = retransformBEToFE(pipelineObj.currentSelectedNodeData.data.condition);
+      if (converted) {
+        return converted;
+      }
+    } catch (error) {
+      console.error("Error converting condition to group format:", error);
+    }
+  }
+  // Default empty group
+  return {
+    groupId: getUUID(),
+    label: 'and',
+    items: [{
+      column: '',
+      operator: '=',
+      value: '',
+      ignore_case: true,
+      id: getUUID(),
+    }]
+  };
+};
+
 onBeforeMount(async () => {
   await importSqlParser();
 });
 
 onMounted(async () => {
   await importSqlParser();
-  getFields();
-    if(pipelineObj.userSelectedNode){   
-      pipelineObj.userSelectedNode = {};
+
+  // Add a small delay to ensure pipeline is loaded
+  setTimeout(async () => {
+    await getFields();
+
+    // If still no fields, provide fallback empty array
+    if (!filteredColumns.value || filteredColumns.value.length === 0) {
+      console.warn("No fields found, using empty array");
+      filteredColumns.value = [];
     }
+  }, 100);
+
+  if(pipelineObj.userSelectedNode){
+    pipelineObj.userSelectedNode = {};
+  }
 });
 
 const importSqlParser = async () => {
@@ -284,9 +342,36 @@ const importSqlParser = async () => {
 
 const streamTypes = ["logs", "enrichment_tables"];
 
-const streamRoute:  Ref<StreamRoute> = ref (getDefaultStreamRoute());
+const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
-const originalStreamRouting:  Ref<StreamRoute> = ref(getDefaultStreamRoute());
+const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
+
+const conditionGroup: Ref<ConditionGroup> = ref(getDefaultConditionGroup());
+
+const originalConditionGroup: Ref<ConditionGroup> = ref(getDefaultConditionGroup());
+
+// Debug: log the initial condition group and columns
+console.log("Initial conditionGroup:", conditionGroup.value);
+console.log("Initial filteredColumns:", filteredColumns.value);
+
+// Watch for filteredColumns changes
+watch(filteredColumns, (newVal) => {
+  console.log("filteredColumns updated:", newVal);
+}, { deep: true });
+
+// Watch for conditionGroup changes
+watch(conditionGroup, (newVal) => {
+  console.log("conditionGroup updated:", JSON.parse(JSON.stringify(newVal)));
+}, { deep: true });
+
+// Simple incrementing key to force re-render when needed
+const filterGroupKey = ref(0);
+
+// Watch for label changes specifically to force re-render
+watch(() => conditionGroup.value.label, () => {
+  console.log("Label changed, incrementing key to force re-render");
+  filterGroupKey.value++;
+});
 
 const filterColumns = (options: any[], val: String, update: Function) => {
   let filteredOptions: any[] = [];
@@ -333,24 +418,37 @@ const updateStreamFields = async (streamName : any, streamType : any) => {
 
 const getFields = async () => {
   try {
-    // find input node
-    const inputStreamNode : any = pipelineObj.currentSelectedPipeline.nodes.find(
+    console.log("getFields: Starting to fetch fields");
+    console.log("getFields: currentSelectedPipeline", pipelineObj.currentSelectedPipeline);
+
+    // find input node - check all nodes
+    const allNodes = pipelineObj.currentSelectedPipeline?.nodes || [];
+    console.log("getFields: All nodes", allNodes);
+
+    const inputStreamNode : any = allNodes.find(
       (node: any) => node.io_type === "input" && node.data.node_type === "stream",
     );
 
-
-    const inputQueryNode :any = pipelineObj.currentSelectedPipeline.nodes.find(
+    const inputQueryNode :any = allNodes.find(
       (node: any) => node.io_type === "input" && node.data.node_type === "query",
     );
-    if (inputStreamNode ) {
-      updateStreamFields(
+
+    // Also check for stream nodes that are not input but have stream data
+    const anyStreamNode: any = allNodes.find(
+      (node: any) => node.data?.node_type === "stream" && node.data?.stream_name
+    );
+
+    if (inputStreamNode) {
+      console.log("getFields: Found inputStreamNode", inputStreamNode);
+      await updateStreamFields(
         inputStreamNode.data?.stream_name.value || inputStreamNode.data?.stream_name,
         inputStreamNode.data?.stream_type,
       );
-    } else {
+    } else if (inputQueryNode) {
+      console.log("getFields: Found inputQueryNode", inputQueryNode);
       const filteredQuery: any = inputQueryNode?.data?.query_condition.sql
         .split("\n")
-        .filter((line: string) => line.length > 0 && !line.trim().startsWith("--")) // Only process non-empty lines
+        .filter((line: string) => line.length > 0 && !line.trim().startsWith("--"))
         .join("\n");
         if(filteredQuery){
           const parsedSql = parser.astify(filteredQuery);
@@ -361,26 +459,104 @@ const getFields = async () => {
             }
           }
         }
-      
+    } else if (anyStreamNode) {
+      console.log("getFields: Found anyStreamNode", anyStreamNode);
+      await updateStreamFields(
+        anyStreamNode.data?.stream_name.value || anyStreamNode.data?.stream_name,
+        anyStreamNode.data?.stream_type,
+      );
+    } else {
+      console.error("getFields: No input node found, allNodes:", allNodes);
+      // Set empty array so FilterCondition at least shows
+      filteredColumns.value = [];
     }
+    console.log("getFields: After fetch, filteredColumns =", filteredColumns.value);
   } catch (e) {
-    console.error(e);
+    console.error("getFields: Error", e);
   }
 };
 
-const addField = () => {
-    streamRoute.value.conditions.push({
-      column: "",
-      operator: "",
-      value: "",
-      id: getUUID(),
-    });
+// Group management functions
+const updateGroup = (updatedGroup: any) => {
+  console.log("updateGroup called with:", updatedGroup);
+  console.log("updateGroup - groupId:", updatedGroup.groupId);
+  console.log("updateGroup - label:", updatedGroup.label);
+  console.log("updateGroup - items count:", updatedGroup.items?.length);
+  console.log("Current conditionGroup before update - items count:", conditionGroup.value.items?.length);
+
+  // If the updated group has the same groupId as the root, replace entirely
+  if (updatedGroup.groupId === conditionGroup.value.groupId) {
+    console.log("Updating root group");
+    conditionGroup.value = updatedGroup;
+  } else {
+    // Otherwise, it's a nested group - find and update it recursively
+    console.log("Updating nested group with id:", updatedGroup.groupId);
+    const updateNestedGroup = (group: any, updated: any): boolean => {
+      if (!group.items || !Array.isArray(group.items)) return false;
+
+      for (let i = 0; i < group.items.length; i++) {
+        const item = group.items[i];
+        // Check if this item is a group and has the matching groupId
+        if (item.groupId && item.groupId === updated.groupId) {
+          console.log("Found matching nested group at index", i);
+          group.items[i] = updated;
+          return true;
+        }
+        // Recursively check nested groups
+        if (item.groupId && item.items) {
+          if (updateNestedGroup(item, updated)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    // Create a copy to trigger reactivity
+    const updatedRoot = JSON.parse(JSON.stringify(conditionGroup.value));
+    if (updateNestedGroup(updatedRoot, updatedGroup)) {
+      conditionGroup.value = updatedRoot;
+      console.log("Nested group updated successfully");
+    } else {
+      console.error("Could not find nested group to update");
+    }
+  }
+
+  console.log("conditionGroup after update - items count:", conditionGroup.value.items?.length);
+  console.log("conditionGroup after update - full:", conditionGroup.value);
 };
 
-const removeField = (field: any) => {
-    streamRoute.value.conditions = streamRoute.value.conditions.filter(
-      (_field: any) => _field.id !== field.id,
-    );
+const removeConditionGroup = (targetGroupId: string) => {
+  console.log("removeConditionGroup called for groupId:", targetGroupId);
+
+  if (!conditionGroup.value?.items || !Array.isArray(conditionGroup.value.items)) {
+    console.error("conditionGroup.value.items is not an array");
+    return;
+  }
+
+  const filterEmptyGroups = (items: any[]): any[] => {
+    return items.filter((item: any) => {
+      if (item.groupId === targetGroupId) {
+        return false;
+      }
+
+      if (item.items && Array.isArray(item.items)) {
+        item.items = filterEmptyGroups(item.items);
+        return item.items.length > 0;
+      }
+
+      return true;
+    });
+  };
+
+  conditionGroup.value.items = filterEmptyGroups(conditionGroup.value.items);
+  console.log("conditionGroup after removing group:", JSON.parse(JSON.stringify(conditionGroup.value)));
+};
+
+const onInputUpdate = (name: string, field: any) => {
+  console.log("onInputUpdate called with:", name, field);
+  // Handle input updates from FilterCondition component
+  // This is called when individual condition fields are modified
 };
 
 const closeDialog = () => {
@@ -390,40 +566,113 @@ const closeDialog = () => {
 };
 
 const openCancelDialog = () => {
-  if (
-    JSON.stringify(originalStreamRouting.value) ===
-    JSON.stringify(streamRoute.value)
-  ) {
+  try {
+    console.log("openCancelDialog: Checking for changes");
+
+    // Try to safely compare, fallback to just closing if comparison fails
+    try {
+      if (
+        JSON.stringify(originalConditionGroup.value) ===
+        JSON.stringify(conditionGroup.value)
+      ) {
+        console.log("openCancelDialog: No changes detected, closing directly");
+        closeDialog();
+        return;
+      }
+    } catch (e) {
+      console.error("openCancelDialog: Error comparing groups", e);
+      // If comparison fails, just show the dialog
+    }
+
+    console.log("openCancelDialog: Changes detected, showing confirmation dialog");
+    dialog.value.show = true;
+    dialog.value.title = "Discard Changes";
+    dialog.value.message = "Are you sure you want to cancel condition changes?";
+    dialog.value.okCallback = closeDialog;
+  } catch (e) {
+    console.error("openCancelDialog: Unexpected error", e);
+    // Force close if there's any error
     closeDialog();
-    return;
   }
-
-  dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel routing changes?";
-  dialog.value.okCallback = closeDialog;
-
-
 };
 
 // TODO OK : Add check for duplicate routing name
 const saveCondition = async () => {
-  let payload = getConditionPayload();
-  if(payload.conditions.length === 0){
+  try {
+    console.log("saveCondition: Starting save");
+    console.log("saveCondition: pipelineObj.currentSelectedNodeData", pipelineObj.currentSelectedNodeData);
+    console.log("saveCondition: pipelineObj.isEditNode", pipelineObj.isEditNode);
+
+    // Check if there are any valid conditions
+    const hasValidConditions = conditionGroup.value.items.some((item: any) => {
+      if (item.groupId && item.items) return true; // It's a nested group
+      return item.column && item.operator; // It's a condition with required fields
+    });
+
+    if (!hasValidConditions) {
+      q.notify({
+        type: "negative",
+        message: "Please add at least one condition",
+        timeout: 3000,
+      });
+      return;
+    }
+
+    // Transform FilterGroup format to backend ConditionList format
+    const backendCondition = transformFEToBE(conditionGroup.value);
+
+    console.log("saveCondition: backendCondition", backendCondition);
+
+    let conditionData = {
+      node_type: "condition",
+      condition: backendCondition, // Send as 'condition' (singular) with ConditionList format
+    };
+
+    console.log("saveCondition: conditionData to add", conditionData);
+    console.log("saveCondition: Calling addNode with", conditionData);
+
+    // Ensure currentSelectedNodeData has proper structure before adding
+    if (!pipelineObj.currentSelectedNodeData.position) {
+      console.error("saveCondition: No position set on currentSelectedNodeData!");
+      pipelineObj.currentSelectedNodeData.position = { x: 250, y: 250 }; // Default position
+    }
+
+    if (!pipelineObj.currentSelectedNodeData.id) {
+      console.error("saveCondition: No id set on currentSelectedNodeData!");
+    }
+
+    // Fix userClickedNode if it's an object instead of string ID
+    if (pipelineObj.userClickedNode && typeof pipelineObj.userClickedNode === 'object') {
+      console.warn("saveCondition: userClickedNode is an object, extracting ID");
+      if (pipelineObj.userClickedNode.id) {
+        pipelineObj.userClickedNode = pipelineObj.userClickedNode.id;
+      } else {
+        console.error("saveCondition: userClickedNode has no id, clearing it");
+        pipelineObj.userClickedNode = null;
+      }
+    }
+
+    console.log("saveCondition: Fixed userClickedNode =", pipelineObj.userClickedNode);
+
+    addNode(conditionData);
+
+    console.log("saveCondition: After addNode, nodes =", pipelineObj.currentSelectedPipeline?.nodes);
+
+    // Log the newly added node specifically
+    const addedNode = pipelineObj.currentSelectedPipeline?.nodes[pipelineObj.currentSelectedPipeline?.nodes.length - 1];
+    console.log("saveCondition: Newly added node", addedNode);
+
+    emit("cancel:hideform");
+  } catch (error) {
+    console.error("saveCondition: Error occurred", error);
     q.notify({
       type: "negative",
-      message: "Please add atleast one condition",
-      timeout: 3000,
+      message: "Error saving condition: " + (error as Error).message,
+      timeout: 5000,
     });
-    return;
+    // Still close the form on error
+    emit("cancel:hideform");
   }
-  let conditionData = {
-    node_type: "condition",
-    conditions: payload.conditions,
-  };
-  addNode(conditionData);
-
-  emit("cancel:hideform");
 };
 
 const openDeleteDialog = () => {
@@ -453,29 +702,6 @@ const deleteRoute = () => {
   deletePipelineNode(pipelineObj.currentSelectedNodeID);
 
   emit("cancel:hideform");
-};
-
-const getConditionPayload = () => {
-  let payload = JSON.parse(JSON.stringify(streamRoute.value));
-
-  payload = {
-    name: payload.name,
-    conditions: payload.conditions,
-    is_real_time: payload.is_real_time,
-  };
-
-  if (isUpdating.value) {
-    payload.updatedAt = new Date().toISOString();
-    payload.lastEditedBy = store.state.userInfo.email;
-  } else {
-    payload.createdAt = new Date().toISOString();
-    payload.owner = store.state.userInfo.email;
-    payload.lastTriggeredAt = new Date().getTime();
-    payload.lastEditedBy = store.state.userInfo.email;
-    payload.updatedAt = new Date().toISOString();
-  }
-
-  return payload;
 };
 
 const validateSqlQuery = () => {
@@ -513,8 +739,7 @@ const validateSqlQuery = () => {
         resolve("");
       });
   });
-};
-</script>
+};</script>
 
 <style scoped>
 .stream-routing-title {
@@ -575,6 +800,73 @@ const validateSqlQuery = () => {
   flex-direction: column;
   align-items: start;
   justify-content: space-between;
+}
+
+/* Pipeline-specific FilterGroup styling for narrow sidepanel */
+.pipeline-filter-group-wrapper {
+  max-width: 100%;
+  overflow-x: visible !important;
+}
+
+/* Override FilterGroup styles for pipeline context */
+.pipeline-filter-group-wrapper :deep(.group-container) {
+  white-space: normal !important;
+  overflow-x: visible !important;
+  max-width: 100%;
+}
+
+/* Make condition rows wrap and fit in narrow space */
+.pipeline-filter-group-wrapper :deep(.tw-whitespace-nowrap) {
+  white-space: normal !important;
+}
+
+/* Reduce margins for nested groups in pipeline */
+.pipeline-filter-group-wrapper :deep([style*="margin-left"]) {
+  margin-left: 10px !important;
+}
+
+/* Make condition inputs more compact */
+.pipeline-filter-group-wrapper :deep(.tw-flex-no-wrap) {
+  flex-wrap: wrap !important;
+  gap: 0.25rem;
+}
+
+/* Ensure conditions fit width */
+.pipeline-filter-group-wrapper :deep(.conditions-input) {
+  min-width: 120px !important;
+  max-width: 200px;
+}
+
+/* Make FilterGroup responsive for sidepanel */
+.pipeline-filter-group-wrapper :deep(.xl\\:tw-w-fit) {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Ensure group borders don't overflow */
+.pipeline-filter-group-wrapper :deep(.group-border) {
+  max-width: calc(100% - 20px);
+}
+
+/* Ensure buttons are clickable and prevent form submission */
+.pipeline-filter-group-wrapper :deep(.q-btn) {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 1;
+}
+
+/* Prevent FilterGroup buttons from triggering form submit */
+.pipeline-filter-group-wrapper :deep(.q-btn:not([type="submit"])) {
+  /* This is already handled by buttons not having type="submit" */
+}
+
+/* Ensure FilterGroup container doesn't interfere with clicks */
+.pipeline-filter-group-wrapper :deep(.group-container) {
+  pointer-events: auto;
+}
+
+.pipeline-filter-group-wrapper :deep(.q-tabs) {
+  pointer-events: auto;
 }
 
 </style>

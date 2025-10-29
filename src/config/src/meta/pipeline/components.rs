@@ -269,21 +269,60 @@ mod tests {
 
     #[test]
     fn test_condition_node_serialization() {
+        // Test new format with ConditionList
         let payload = json::json!({
-            "node_type": "condition",  // required
-            "conditions": [            // required
+            "node_type": "condition",
+            "condition": {
+                "column": "body",
+                "operator": ">=",
+                "value": {
+                    "key": "value"
+                },
+                "ignore_case": false
+            }
+        });
+
+        let node_data = json::from_value::<NodeData>(payload);
+        assert!(node_data.is_ok());
+
+        // Test backward compatibility with legacy array format
+        let legacy_payload = json::json!({
+            "node_type": "condition",
+            "condition": [
               {
                 "column": "body",
                 "operator": ">=",
                 "value": {
                     "key": "value"
                 },
-                "ignore_case": false    // optional
+                "ignore_case": false
               }
             ]
         });
 
-        let node_data = json::from_value::<NodeData>(payload);
-        assert!(node_data.is_ok());
+        let legacy_node_data = json::from_value::<NodeData>(legacy_payload);
+        assert!(legacy_node_data.is_ok());
+
+        // Test OR logic
+        let or_payload = json::json!({
+            "node_type": "condition",
+            "condition": {
+                "or": [
+                    {
+                        "column": "level",
+                        "operator": "=",
+                        "value": "error"
+                    },
+                    {
+                        "column": "level",
+                        "operator": "=",
+                        "value": "critical"
+                    }
+                ]
+            }
+        });
+
+        let or_node_data = json::from_value::<NodeData>(or_payload);
+        assert!(or_node_data.is_ok());
     }
 }
