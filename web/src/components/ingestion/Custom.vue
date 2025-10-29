@@ -19,11 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-splitter
     v-model="splitterModel"
     unit="px"
-    class="tw-h-[calc(100vh-165px)]"
+    class="tw-h-[calc(100vh-140px)]"
   >
     <template v-slot:before>
       <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
-        <div class="card-container tw-h-[calc(100vh-165px)]">
+        <div class="card-container tw-h-[calc(100vh-140px)]">
           <q-tabs
             v-model="tabs"
             indicator-color="transparent"

@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tabs>
       </div>
     </div>
-    <div class="tw-h-[calc(100vh-165px)] tw-overflow-hidden">
+    <div class="tw-h-[calc(100vh-140px)] tw-overflow-hidden">
       <router-view
         :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"

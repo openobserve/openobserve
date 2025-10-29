@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
           <div class="card-container tw-mb-[0.625rem]">
             <div class="flex tw-h-[calc(100vh-50px)]">
-              <div v-if="showManagementTabs">
+              <div class="full-width" v-if="showManagementTabs">
                 <q-tabs
                   class="management-tabs"
                   v-model="settingsTab"
