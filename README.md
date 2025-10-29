@@ -2,7 +2,7 @@
   <a href="https://openobserve.ai"><img src="https://openobserve.ai/img/logo/o2-logo-readme.svg" alt="OpenObserve"></a>
 </p>
 <p align="center">
-    <em>🚀 10x easier, 🚀 140x lower storage cost, 🚀 high performance, 🚀 petabyte scale - Elasticsearch/Splunk/Datadog alternative for 🚀 (logs, metrics, traces).</em>
+    <em> Modern Observability 🚀 10x easier, 🚀 140x lower storage cost, 🚀 high performance, 🚀 petabyte scale - Elasticsearch/Splunk/Datadog alternative for 🚀 (logs, metrics, traces, frontend monitoring + more).</em>
 </p>
 <p align="center">
 <a href="https://github.com/openobserve/openobserve" target="_blank">
@@ -22,13 +22,18 @@
 </a>
 </p>
 
-OpenObserve (O2 for short) is a cloud-native observability platform built specifically for logs, metrics, traces, analytics, RUM (Real User Monitoring - Performance, Errors, Session Replay) designed to work at petabyte scale.
+OpenObserve (O2 for short) is a single binary, petabyte-scale observability platform built specifically for logs, metrics, traces, analytics, frontend monitoring and more.
 
-It is straightforward and easy to operate, in contrast to Elasticsearch, which requires understanding and tuning numerous settings. Get OpenObserve up and running in under 2 minutes.
+<h2>Why OpenObserve?</h2>
 
-OpenObserve serves as a seamless replacement for Elasticsearch for users who ingest data using APIs and perform searches. OpenObserve comes with its own user interface, eliminating the need for separate installation.
+<h3>1. Simplicity</h3>
+It is straightforward and easy to operate, compared to other observability tools, that require understanding and tuning numerous settings. Get OpenObserve up and running on a single node in under 2 minutes. 
 
-You can reduce your log storage costs by ~140x compared to Elasticsearch by using OpenObserve. Below, we present the results from pushing logs from our production Kubernetes cluster to both Elasticsearch and OpenObserve using Fluent Bit.
+<h3>2. Cost Efficiency</h3>
+You can reduce your log storage costs by ~140x compared to Elasticsearch by using OpenObserve.
+
+<h3>3. Single Binary Platform</h3>
+Consolidate metrics, logs, and traces on one single, efficient platform. OpenObserve comes with its own UI, eliminating the need for multiple installations. 
 
 ![OpenObserve Vs Elasticsearch](./screenshots/zo_vs_es.png)
 
@@ -36,9 +41,9 @@ You can reduce your log storage costs by ~140x compared to Elasticsearch by usin
 
 [![OpenObserve Introduction](./screenshots/o2_intro.webp)](https://www.youtube.com/watch?v=4VwuC1tpRP4)
 
-## 🌟 Features:
+## 🌟 Capabilities:
 
-- **Logs, Metrics, Traces**: Comprehensive support for various data types.
+- **Logs, Metrics, Traces**: Comprehensive support for key telemetry signals.
 - **OpenTelemetry Support**: Full compatibility with OTLP for logs, metrics, and traces.
 - **Real User Monitoring (RUM)**: Includes performance tracking, error logging, and session replay.
 - **Dashboards, Reports, Alerts**: Features over 18 different chart types for comprehensive data visualization for on-the-fly analysis and reporting along with alerting.
@@ -69,58 +74,232 @@ docker run -d \
       public.ecr.aws/zinclabs/openobserve:latest
 ```
 
-### 🐙 Docker Compose:
-```yaml
-services:
-  openobserve:
-    image: public.ecr.aws/zinclabs/openobserve:latest
-    restart: unless-stopped
-    environment:
-      ZO_ROOT_USER_EMAIL: "root@example.com"
-      ZO_ROOT_USER_PASSWORD: "Complexpass#123"
-    ports:
-      - "5080:5080"
-    volumes:
-      - data:/data
-volumes:
-  data:
-```
 
 For other ways to quickly install OpenObserve or use OpenObserve cloud, check [quickstart documentation](https://openobserve.ai/docs/quickstart).
 
 For installing OpenObserve in HA mode, check [HA deployment documentation](https://openobserve.ai/docs/ha_deployment/).
+<h3>Comparison</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Category</th>
+      <th>Open Source</th>
+      <th><a href="https://openobserve.ai/downloads/">Enterprise Edition</a></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="3"><strong>LICENSES & COST</strong></td>
+    </tr>
+    <tr>
+      <td>License Type</td>
+      <td>AGPL-3.0</td>
+      <td>End User License Agreement</td>
+    </tr>
+    <tr>
+      <td>Cost</td>
+      <td>Free without limits</td>
+      <td>*Free up to 200 GB/day ingestion</td>
+    </tr>
+    <tr>
+      <td colspan="3"><strong>CORE CAPABILITIES</strong></td>
+    </tr>
+    <tr>
+      <td>Metrics</td>
+      <td>✅ Full support</td>
+      <td>✅ Full support</td>
+    </tr>
+    <tr>
+      <td>Logs</td>
+      <td>✅ Full support</td>
+      <td>✅ Full support</td>
+    </tr>
+    <tr>
+      <td>Traces</td>
+      <td>✅ Full support</td>
+      <td>✅ Full support</td>
+    </tr>
+    <tr>
+      <td>Real User Monitoring (RUM)</td>
+      <td>✅ Full support</td>
+      <td>✅ Full support</td>
+    </tr>
+    <tr>
+      <td>Data Pipelines</td>
+      <td>Available, limited functionality</td>
+      <td>✅Full support including remote destinations</td>
+    </tr>
+    <tr>
+      <td>Actions</td>
+      <td>❌ Not available</td>
+      <td>✅ Full support</td>
+    </tr>
+    <tr>
+      <td>Dashboards</td>
+      <td>✅ Full support, 18+ chart types</td>
+      <td>✅ Full support, 18+ chart types</td>
+    </tr>
+    <tr>
+      <td>Alerts</td>
+      <td>✅ Full support</td>
+      <td>✅ Full support</td>
+    </tr>
+    <tr>
+      <td>Federated Search / Super Cluster</td>
+      <td>❌ Not available</td>
+      <td>✅ Full support</td>
+    </tr>
+    <tr>
+      <td>Query Management</td>
+      <td>❌ Not available</td>
+      <td>✅ Full support</td>
+    </tr>
+    <tr>
+      <td>Workload Management (QoS)</td>
+      <td>❌ Not available</td>
+      <td>✅ Full support</td>
+    </tr>
+    <tr>
+      <td>Quotas & Rate Limiting</td>
+      <td>Basic</td>
+      <td>✅ Full support</td>
+    </tr>
+    <tr>
+      <td colspan="3"><strong>SECURITY CAPABILITIES</strong></td>
+    </tr>
+    <tr>
+      <td>TLS Encryption</td>
+      <td>✅ TLS 1.2+</td>
+      <td>✅ TLS 1.2+</td>
+    </tr>
+    <tr>
+      <td>Storage Encryption</td>
+      <td>✅ Via cloud provider KMS</td>
+      <td>✅ Via cloud provider KMS</td>
+    </tr>
+    <tr>
+      <td>Basic Authentication</td>
+      <td>✅ Email + password</td>
+      <td>✅ Email + password</td>
+    </tr>
+    <tr>
+      <td>Single Sign-On (SSO)</td>
+      <td>❌ Not available</td>
+      <td>✅ OIDC, SAML 2.0, Okta, Azure Entra, LDAP/AD, GitHub, GitLab, Google, Keycloak + <strong>more</strong></td>
+    </tr>
+    <tr>
+      <td>Cipher Keys (Advanced Encryption)</td>
+      <td>❌ Not available</td>
+      <td>✅ AES-256 SIV, Google Tink KeySet, Akeyless integration</td>
+    </tr>
+    <tr>
+      <td>HIPAA Compliance Support</td>
+      <td>❌ Self-managed</td>
+      <td>✅ Yes (requires addendum)</td>
+    </tr>
+    <tr>
+      <td>PCI-DSS Compliance Support</td>
+      <td>❌ Self-managed</td>
+      <td>✅ Yes (requires addendum)</td>
+    </tr>
+    <tr>
+      <td>Audit Trail</td>
+      <td>❌ Basic logging only</td>
+      <td>✅ Comprehensive 365-day immutable logs</td>
+    </tr>
+    <tr>
+      <td colspan="3"><strong>USER MANAGEMENT & AUTHENTICATION</strong></td>
+    </tr>
+    <tr>
+      <td>Root User Account</td>
+      <td>✅ Created at startup</td>
+      <td>✅ Created at startup</td>
+    </tr>
+    <tr>
+      <td>Multiple Users</td>
+      <td>Yes, including system roles: Admin, Editor, User, and Viewer</td>
+      <td>✅ With role-based permissions</td>
+    </tr>
+    <tr>
+      <td>Role-Based Access Control (RBAC)</td>
+      <td>❌ All users have full access</td>
+      <td>✅ Admin, Editor, Viewer, User, Root, Custom roles</td>
+    </tr>
+    <tr>
+      <td>Custom Roles</td>
+      <td>❌ Not available</td>
+      <td>✅ Granular permission management</td>
+    </tr>
+    <tr>
+      <td>User Groups</td>
+      <td>❌ Not available</td>
+      <td>✅ Collective permission management</td>
+    </tr>
+    <tr>
+      <td>Service Accounts</td>
+      <td>Full access only</td>
+      <td>✅ Role-based token authentication</td>
+    </tr>
+    <tr>
+      <td>Multi-Tenancy</td>
+      <td>Organizations and streams</td>
+      <td>Organizations and streams with quotas</td>
+    </tr>
+    <tr>
+      <td colspan="3"><strong>DATA RETENTION & STORAGE</strong></td>
+    </tr>
+    <tr>
+      <td>Default Retention</td>
+      <td>User-configurable</td>
+      <td>User-configurable</td>
+    </tr>
+    <tr>
+      <td>Storage Format</td>
+      <td>Parquet</td>
+      <td>Parquet</td>
+    </tr>
+    <tr>
+      <td>Metadata Storage</td>
+      <td>SQLite (single node), PostgreSQL (HA)</td>
+      <td>SQLite (single node), PostgreSQL(HA)</td>
+    </tr>
+    <tr>
+      <td>Backup & Recovery</td>
+      <td>Customer-managed</td>
+      <td>Customer-managed</td>
+    </tr>
+    <tr>
+      <td colspan="3"><strong>SUPPORT & SLAs</strong></td>
+    </tr>
+    <tr>
+      <td>Support Type</td>
+      <td>Community</td>
+      <td>Priority</td>
+    </tr>
+    <tr>
+      <td>Response Time Guarantees</td>
+      <td>Best-effort</td>
+      <td>✅ Yes, w/ contract</td>
+    </tr>
+    <tr>
+      <td>SLA Guarantees</td>
+      <td>❌ None</td>
+      <td>✅ Yes, w/ contract</td>
+    </tr>
+    <tr>
+      <td>Support Channels</td>
+      <td>Slack community</td>
+      <td>Dedicated</td>
+    </tr>
+    <tr>
+      <td>Update Requirements</td>
+      <td>Self-managed</td>
+      <td>Critical security updates within 90 days w/ contract</td>
+    </tr>
+  </tbody>
+</table>
 
-<!-- ## Enterprise Vs Open source Vs Cloud edition
-
-OpenObserve is available in three different editions:
-
-
-| Feature | Open Source (Self hosted) | Enterprise (Self hosted) | Cloud |
-| --- | --- | --- | --- | 
-| Logs | ✅ | ✅ | ✅ |
-| Metrics | ✅ | ✅ | ✅ |
-| Traces | ✅ | ✅ | ✅ |
-| RUM | ✅ | ✅ | ✅ |
-| Alerts | ✅ | ✅ | ✅ |
-| Dashboards | ✅ | ✅ | ✅ |
-| Reports | ✅ | ✅ | ✅ |
-| VRL functions | ✅ | ✅ | ✅ |
-| Pipelines | ✅ | ✅ | ✅ |
-| High Availability | ✅ | ✅ | ✅ |
-| Multitenancy (Organizations) | ✅ | ✅ | ✅ |
-| Dynamic schema and schema evolution | ✅ | ✅ | ✅ |
-| Advanced multilingual GUI | ✅ | ✅ | ✅ |
-| Single Sign On | ❌ | ✅ | ✅ |
-| Role Based Access Control (RBAC) | ❌ | ✅ | ✅ |
-| Federated search / Super cluster | ❌ | ✅ | ❌ |
-| Query management | ❌ | ✅ | ❌ |
-| Workload management (QoS) | ❌ | ✅ | ❌ |
-| Audit trail | ❌ | ✅ | ❌ |
-| Ability to influence roadmap | ❌ | ✅ | ✅ on enterprise plan |
-| License | AGPL | Enterprise | Cloud |
-| Support | Community | Enterprise | Cloud |
-| Cost | Free | If self hosted, free for up to 200 GB/Day data ingested <br> Paid thereafter  | Free 200 GB/Month data ingested <br> Paid thereafter | -->
-
+<p><em>* Registration required at 100 GB/day</em></p>
 
 ## 📷 Screenshots
 
@@ -181,15 +360,6 @@ Function
 ![Function](./screenshots/function.png)
 
 
-### IAM
-
-SSO (Single Sign On)
-![SSO](./screenshots/sso.png)
-
-RBAC (Role Based Access Control)
-![RBAC](./screenshots/iam_rbac.png)
-
-
 ### SBOM
 
 Software Bill of Materials for OpenObserve
@@ -241,6 +411,36 @@ OpenObserve is licensed under the AGPL-3.0 license. For more details, see the [L
 [![Slack](./screenshots/slack.png)](https://short.openobserve.ai/community)
 
 Easiest way to get support is to join the [Slack channel](https://short.openobserve.ai/community).
+<!-- ## Enterprise Vs Open source Vs Cloud edition
+
+OpenObserve is available in three different editions:
+
+
+| Feature | Open Source (Self hosted) | Enterprise (Self hosted) | Cloud |
+| --- | --- | --- | --- | 
+| Logs | ✅ | ✅ | ✅ |
+| Metrics | ✅ | ✅ | ✅ |
+| Traces | ✅ | ✅ | ✅ |
+| RUM | ✅ | ✅ | ✅ |
+| Alerts | ✅ | ✅ | ✅ |
+| Dashboards | ✅ | ✅ | ✅ |
+| Reports | ✅ | ✅ | ✅ |
+| VRL functions | ✅ | ✅ | ✅ |
+| Pipelines | ✅ | ✅ | ✅ |
+| High Availability | ✅ | ✅ | ✅ |
+| Multitenancy (Organizations) | ✅ | ✅ | ✅ |
+| Dynamic schema and schema evolution | ✅ | ✅ | ✅ |
+| Advanced multilingual GUI | ✅ | ✅ | ✅ |
+| Single Sign On | ❌ | ✅ | ✅ |
+| Role Based Access Control (RBAC) | ❌ | ✅ | ✅ |
+| Federated search / Super cluster | ❌ | ✅ | ❌ |
+| Query management | ❌ | ✅ | ❌ |
+| Workload management (QoS) | ❌ | ✅ | ❌ |
+| Audit trail | ❌ | ✅ | ❌ |
+| Ability to influence roadmap | ❌ | ✅ | ✅ on enterprise plan |
+| License | AGPL | Enterprise | Cloud |
+| Support | Community | Enterprise | Cloud |
+| Cost | Free | If self hosted, free for up to 200 GB/Day data ingested <br> Paid thereafter  | Free 200 GB/Month data ingested <br> Paid thereafter | -->
 
 ### 📱 Join OpenObserve community on WeChat
 
