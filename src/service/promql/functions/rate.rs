@@ -15,10 +15,24 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::value::{ExtrapolationKind, RangeValue, Value, extrapolated_rate};
+use crate::service::promql::value::{
+    EvalContext, ExtrapolationKind, RangeValue, Value, extrapolated_rate,
+};
 
 pub(crate) fn rate(data: Value) -> Result<Value> {
     super::eval_idelta(data, "rate", exec, false)
+}
+
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn rate_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!("[PromQL Timing] rate_range() started",);
+    let result = super::eval_idelta_range(data, "rate", exec, eval_ctx);
+    log::info!(
+        "[PromQL Timing] rate_range() execution took: {:?}",
+        start.elapsed()
+    );
+    result
 }
 
 fn exec(series: RangeValue) -> Option<f64> {

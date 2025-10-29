@@ -22,7 +22,7 @@ use rayon::prelude::*;
 
 use crate::service::promql::{
     Engine,
-    value::{InstantValue, Label, Labels, LabelsExt, Sample, Value},
+    value::{EvalContext, InstantValue, Label, Labels, LabelsExt, RangeValue, Sample, Value},
 };
 
 mod avg;
@@ -48,7 +48,7 @@ pub(crate) use min::min;
 pub(crate) use quantile::quantile;
 pub(crate) use stddev::stddev;
 pub(crate) use stdvar::stdvar;
-pub(crate) use sum::sum;
+pub(crate) use sum::{sum, sum_range};
 pub(crate) use topk::topk;
 
 #[derive(Debug, Clone, Default)]
@@ -199,6 +199,206 @@ pub(crate) fn eval_arithmetic(
         }
     }
     Ok(Some(score_values))
+}
+
+/// Range version of eval_arithmetic that processes Matrix input for range queries
+pub(crate) fn eval_arithmetic_range(
+    param: &Option<LabelModifier>,
+    data: Value,
+    f_name: &str,
+    f_handler: fn(total: f64, val: f64) -> f64,
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!("[PromQL Timing] eval_arithmetic_range({}) started", f_name);
+
+    // Handle Matrix input for range queries
+    let matrix = match data {
+        Value::Matrix(m) => {
+            log::info!(
+                "[PromQL Timing] eval_arithmetic_range({}) processing {} series",
+                f_name,
+                m.len()
+            );
+            m
+        }
+        Value::Vector(v) if eval_ctx.is_instant() => {
+            // For instant queries with Vector input, convert to instant values
+            log::info!(
+                "[PromQL Timing] eval_arithmetic_range({}) converting instant query with {} values",
+                f_name,
+                v.len()
+            );
+            let score_values = eval_arithmetic(param, Value::Vector(v), f_name, f_handler)?;
+            if score_values.is_none() {
+                return Ok(Value::None);
+            }
+            return Ok(Value::Vector(score_to_instant_value(
+                eval_ctx.start,
+                score_values,
+            )));
+        }
+        Value::None => return Ok(Value::None),
+        _ => {
+            return Err(DataFusionError::Plan(format!(
+                "[{f_name}] function only accept vector or matrix values"
+            )));
+        }
+    };
+
+    if matrix.is_empty() {
+        return Ok(Value::None);
+    }
+
+    // Use the eval timestamps from the context to ensure consistent alignment
+    let eval_timestamps = eval_ctx.timestamps();
+
+    if eval_timestamps.is_empty() {
+        return Ok(Value::None);
+    }
+
+    log::info!(
+        "[PromQL Timing] eval_arithmetic_range({}) processing {} time points",
+        f_name,
+        eval_timestamps.len()
+    );
+
+    // For each eval timestamp, aggregate across all series
+    // Parallelize processing using query_thread_num
+    let cfg = config::get_config();
+    let thread_num = cfg.limit.query_thread_num;
+    let chunk_size = (eval_timestamps.len() / thread_num).max(1);
+    log::info!(
+        "[PromQL Timing] eval_arithmetic_range({}) using {} threads with chunk_size {}",
+        f_name,
+        thread_num,
+        chunk_size
+    );
+
+    let start1 = std::time::Instant::now();
+
+    // Step 1: Compute label hash for each series once based on param
+    // This avoids recomputing the hash for every timestamp
+    let series_label_hashes: Vec<(u64, Labels)> = matrix
+        .iter()
+        .map(|rv| {
+            let grouped_labels = match param {
+                Some(LabelModifier::Include(labels)) => {
+                    labels_to_include(&labels.labels, rv.labels.clone())
+                }
+                Some(LabelModifier::Exclude(labels)) => {
+                    labels_to_exclude(&labels.labels, rv.labels.clone())
+                }
+                None => Labels::default(),
+            };
+            let hash = grouped_labels.signature();
+            (hash, grouped_labels)
+        })
+        .collect();
+
+    log::info!(
+        "[PromQL Timing] eval_arithmetic_range({}) computed label hashes in {:?}",
+        f_name,
+        start1.elapsed()
+    );
+
+    let start2 = std::time::Instant::now();
+
+    // Step 2: Group series indices by their label hash
+    // Build index: label_hash -> Vec<series_idx>
+    let mut groups: HashMap<u64, Vec<usize>> = HashMap::new();
+    for (series_idx, (hash, _)) in series_label_hashes.iter().enumerate() {
+        groups.entry(*hash).or_default().push(series_idx);
+    }
+
+    log::info!(
+        "[PromQL Timing] eval_arithmetic_range({}) built {} groups in {:?}",
+        f_name,
+        groups.len(),
+        start2.elapsed()
+    );
+
+    let start3 = std::time::Instant::now();
+
+    // Step 3: Process each group in parallel
+    // For each group, aggregate all samples across timestamps
+    let results: Vec<(u64, Labels, Vec<Sample>)> = groups
+        .par_iter()
+        .map(|(hash, series_indices)| {
+            // Get the labels for this group (from the first series in the group)
+            let labels = series_label_hashes[series_indices[0]].1.clone();
+
+            // Build a map: timestamp -> accumulated value
+            let mut timestamp_values: HashMap<i64, (f64, usize)> = HashMap::new();
+
+            // Aggregate samples from all series in this group
+            for &series_idx in series_indices {
+                for sample in &matrix[series_idx].samples {
+                    // Only include timestamps that are in eval_timestamps
+                    if eval_timestamps.binary_search(&sample.timestamp).is_ok() {
+                        let entry = timestamp_values.entry(sample.timestamp).or_insert((0.0, 0));
+                        entry.0 = f_handler(entry.0, sample.value);
+                        entry.1 += 1;
+                    }
+                }
+            }
+
+            // Convert to sorted samples
+            let mut samples: Vec<Sample> = timestamp_values
+                .into_iter()
+                .map(|(ts, (value, _))| Sample::new(ts, value))
+                .collect();
+
+            // Sort by timestamp to maintain order
+            samples.sort_by_key(|s| s.timestamp);
+
+            (*hash, labels, samples)
+        })
+        .collect();
+
+    log::info!(
+        "[PromQL Timing] eval_arithmetic_range({}) parallel aggregation took: {:?}",
+        f_name,
+        start3.elapsed()
+    );
+
+    let start4 = std::time::Instant::now();
+
+    // Step 4: Convert results to final format
+    let mut result_by_labels: HashMap<u64, (Labels, Vec<Sample>)> = HashMap::new();
+    for (hash, labels, samples) in results {
+        if !samples.is_empty() {
+            result_by_labels.insert(hash, (labels, samples));
+        }
+    }
+
+    log::info!(
+        "[PromQL Timing] eval_arithmetic_range({}) final conversion took: {:?}",
+        f_name,
+        start4.elapsed()
+    );
+
+    if result_by_labels.is_empty() {
+        return Ok(Value::None);
+    }
+
+    let result_matrix: Vec<RangeValue> = result_by_labels
+        .into_values()
+        .map(|(labels, samples)| RangeValue {
+            labels,
+            samples,
+            exemplars: None,
+            time_window: None,
+        })
+        .collect();
+
+    log::info!(
+        "[PromQL Timing] eval_arithmetic_range({}) completed in {:?}, produced {} series",
+        f_name,
+        start.elapsed(),
+        result_matrix.len()
+    );
+    Ok(Value::Matrix(result_matrix))
 }
 
 pub async fn eval_top(

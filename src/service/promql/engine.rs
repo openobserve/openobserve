@@ -28,7 +28,7 @@ use datafusion::{
         datatypes::{DataType, Schema},
     },
     error::{DataFusionError, Result},
-    functions_aggregate::min_max::max,
+    functions_aggregate::min_max::min,
     prelude::{DataFrame, SessionContext, col, lit},
 };
 use futures::{TryStreamExt, future::try_join_all};
@@ -55,6 +55,8 @@ pub struct Engine {
     ctx: Arc<PromqlContext>,
     /// The time boundaries for the evaluation.
     time: i64,
+    /// Evaluation context for range queries (optional)
+    eval_ctx: Option<EvalContext>,
     /// Filters to include certain columns
     col_filters: Option<HashSet<String>>,
     result_type: Option<String>,
@@ -66,6 +68,24 @@ impl Engine {
         Self {
             ctx,
             time,
+            eval_ctx: None,
+            col_filters: Some(HashSet::new()),
+            result_type: None,
+            trace_id: trace_id.to_string(),
+        }
+    }
+
+    /// Create a new engine with evaluation context for range queries
+    pub fn new_with_context(
+        trace_id: &str,
+        ctx: Arc<PromqlContext>,
+        eval_ctx: EvalContext,
+    ) -> Self {
+        let time = eval_ctx.start;
+        Self {
+            ctx,
+            time,
+            eval_ctx: Some(eval_ctx),
             col_filters: Some(HashSet::new()),
             result_type: None,
             trace_id: trace_id.to_string(),
@@ -450,76 +470,13 @@ impl Engine {
             selector.name = Some(name);
         }
 
-        let data_cache_key = &selector.to_string();
-        let cache_exists = {
-            self.ctx
-                .data_cache
-                .read()
-                .await
-                .contains_key(data_cache_key)
-        };
-        if !cache_exists {
-            self.selector_load_data(&selector, Some(range)).await?;
-        }
-        let metrics_cache = self.ctx.data_cache.read().await;
-        let metrics_cache = match metrics_cache.get(data_cache_key) {
-            Some(v) => match v.get_ref_matrix_values() {
-                Some(v) => v,
-                None => return Ok(vec![]),
-            },
+        let data = self
+            .selector_load_data_owned(&selector, Some(range))
+            .await?;
+        let values = match data.get_range_values() {
+            Some(v) => v,
             None => return Ok(vec![]),
         };
-
-        // Evaluation timestamp --- end of the time window.
-        let eval_ts = self.time;
-        // Start of the time window.
-        let start = eval_ts - micros(range); // e.g. [5m]
-        let mut offset_modifier = 0;
-        if let Some(offset) = selector.offset {
-            match offset {
-                Offset::Pos(offset) => {
-                    offset_modifier = micros(offset);
-                }
-                Offset::Neg(offset) => {
-                    offset_modifier = -micros(offset);
-                }
-            }
-        };
-
-        let mut values = Vec::with_capacity(metrics_cache.len());
-        for metric in metrics_cache {
-            // use binary search to find the start and end index
-            let start_index = metric
-                .samples
-                .partition_point(|v| v.timestamp + offset_modifier < start);
-            let end_index = metric
-                .samples
-                .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
-            let samples = if offset_modifier == 0 {
-                metric.samples[start_index..end_index].to_vec()
-            } else {
-                let slice = &metric.samples[start_index..end_index];
-                let mut samples = Vec::with_capacity(slice.len());
-                for &sample in slice {
-                    samples.push(Sample {
-                        timestamp: sample.timestamp + offset_modifier,
-                        value: sample.value,
-                    });
-                }
-                samples
-            };
-            let exemplars = if self.ctx.query_exemplars {
-                metric.exemplars.clone()
-            } else {
-                None
-            };
-            values.push(RangeValue {
-                labels: metric.labels.clone(),
-                samples,
-                exemplars,
-                time_window: Some(TimeWindow::new(eval_ts, range)),
-            });
-        }
 
         Ok(values)
     }
@@ -583,6 +540,48 @@ impl Engine {
             .insert(data_cache_key.clone(), values);
         data_loaded.insert(data_cache_key);
         Ok(())
+    }
+
+    #[tracing::instrument(name = "promql:engine:load_data_owned", skip_all)]
+    async fn selector_load_data_owned(
+        &mut self,
+        selector: &VectorSelector,
+        range: Option<Duration>,
+    ) -> Result<Value> {
+        let metrics = match self.selector_load_data_inner(selector, range).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "[trace_id: {}] [PromQL] Failed to load data for stream, error: {e:?}",
+                    self.trace_id
+                );
+                return Err(e);
+            }
+        };
+
+        // no data, return immediately
+        if metrics.is_empty() {
+            return Ok(Value::None);
+        }
+
+        // cache data
+        let mut metric_values = metrics.into_values().collect::<Vec<_>>();
+        metric_values.par_iter_mut().for_each(|metric| {
+            metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            if self.ctx.query_exemplars && metric.exemplars.is_some() {
+                metric
+                    .exemplars
+                    .as_mut()
+                    .unwrap()
+                    .sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            }
+        });
+        let values = if metric_values.is_empty() {
+            Value::None
+        } else {
+            Value::Matrix(metric_values)
+        };
+        Ok(values)
     }
 
     #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
@@ -711,7 +710,14 @@ impl Engine {
         let input = self.exec_expr(expr).await?;
 
         Ok(match op.id() {
-            token::T_SUM => aggregations::sum(sample_time, modifier, input)?,
+            token::T_SUM => {
+                // Use range version if we have an eval context
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    aggregations::sum_range(modifier, input, eval_ctx)?
+                } else {
+                    aggregations::sum(sample_time, modifier, input)?
+                }
+            }
             token::T_AVG => aggregations::avg(sample_time, modifier, input)?,
             token::T_COUNT => aggregations::count(sample_time, modifier, input)?,
             token::T_MIN => aggregations::min(sample_time, modifier, input)?,
@@ -947,8 +953,14 @@ impl Engine {
                         }
                     }
                 };
-                let sample_time = self.time;
-                functions::histogram_quantile(sample_time, phi, input)?
+
+                // Use range version if we have an eval context
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::histogram_quantile_range(phi, input, eval_ctx)?
+                } else {
+                    let sample_time = self.time;
+                    functions::histogram_quantile(sample_time, phi, input)?
+                }
             }
             Func::HistogramSum => {
                 return Err(DataFusionError::NotImplemented(format!(
@@ -1057,7 +1069,14 @@ impl Engine {
                 let input = self.call_expr_second_arg(args).await?;
                 functions::quantile_over_time(self.time, phi_quantile, input)?
             }
-            Func::Rate => functions::rate(input)?,
+            Func::Rate => {
+                // Use range version if we have an eval context
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::rate_range(input, eval_ctx)?
+                } else {
+                    functions::rate(input)?
+                }
+            }
             Func::Resets => functions::resets(input)?,
             Func::Round => functions::round(input)?,
             Func::Scalar => match input {
@@ -1176,7 +1195,7 @@ async fn selector_load_data_from_datafusion(
         .clone()
         .aggregate(
             vec![col(HASH_LABEL)],
-            vec![max(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
+            vec![min(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
         )?
         .collect()
         .await?;

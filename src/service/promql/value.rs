@@ -378,6 +378,49 @@ impl TimeWindow {
     }
 }
 
+/// Context for evaluating PromQL expressions across multiple timestamps
+#[derive(Debug, Clone)]
+pub struct EvalContext {
+    /// Start time in microseconds
+    pub start: i64,
+    /// End time in microseconds
+    pub end: i64,
+    /// Step interval in microseconds
+    pub step: i64,
+}
+
+impl EvalContext {
+    pub fn new(start: i64, end: i64, step: i64) -> Self {
+        Self { start, end, step }
+    }
+
+    /// Create a single-point context for instant queries
+    pub fn instant(timestamp: i64) -> Self {
+        Self {
+            start: timestamp,
+            end: timestamp,
+            step: 0,
+        }
+    }
+
+    /// Returns true if this is an instant query (single timestamp)
+    pub fn is_instant(&self) -> bool {
+        self.start == self.end
+    }
+
+    /// Get all evaluation timestamps
+    pub fn timestamps(&self) -> Vec<i64> {
+        if self.is_instant() {
+            vec![self.start]
+        } else {
+            let nr_steps = (self.end - self.start + self.step - 1) / self.step;
+            (0..nr_steps)
+                .map(|i| self.start + (self.step * i))
+                .collect()
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct RangeValue {
     pub labels: Labels,
@@ -685,6 +728,13 @@ pub enum Value {
 
 impl Value {
     pub(crate) fn get_ref_matrix_values(&self) -> Option<&Vec<RangeValue>> {
+        match self {
+            Value::Matrix(values) => Some(values),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn get_range_values(self) -> Option<Vec<RangeValue>> {
         match self {
             Value::Matrix(values) => Some(values),
             _ => None,

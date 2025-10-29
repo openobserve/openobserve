@@ -21,7 +21,8 @@ use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 
 use crate::service::promql::value::{
-    InstantValue, Labels, LabelsExt, Sample, Value, signature_without_labels,
+    EvalContext, InstantValue, Labels, LabelsExt, RangeValue, Sample, Value,
+    signature_without_labels,
 };
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
@@ -97,6 +98,139 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
         .collect();
 
     Ok(Value::Vector(values))
+}
+
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn histogram_quantile_range(
+    phi: f64,
+    data: Value,
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!(
+        "[PromQL Timing] histogram_quantile_range() started with phi={}, {} timestamps",
+        phi,
+        eval_ctx.timestamps().len()
+    );
+
+    // Handle matrix input for range queries
+    let in_matrix = match data {
+        Value::Matrix(m) => {
+            log::info!(
+                "[PromQL Timing] histogram_quantile_range() processing {} series",
+                m.len()
+            );
+            m
+        }
+        Value::Vector(v) => {
+            // For instant queries, convert to the original function
+            log::info!(
+                "[PromQL Timing] histogram_quantile_range() converting vector to instant query"
+            );
+            let sample_time = eval_ctx.start;
+            return histogram_quantile(sample_time, phi, Value::Vector(v));
+        }
+        Value::None => {
+            log::info!("[PromQL Timing] histogram_quantile_range() received None input");
+            return Ok(Value::None);
+        }
+        _ => {
+            return Err(DataFusionError::Plan(
+                "histogram_quantile: vector or matrix argument expected".to_owned(),
+            ));
+        }
+    };
+
+    // For instant queries, use the original implementation
+    if eval_ctx.is_instant() {
+        let in_vec: Vec<InstantValue> = in_matrix
+            .into_iter()
+            .flat_map(|rv| {
+                rv.samples
+                    .into_iter()
+                    .map(move |s| InstantValue {
+                        labels: rv.labels.clone(),
+                        sample: s,
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        return histogram_quantile(eval_ctx.start, phi, Value::Vector(in_vec));
+    }
+
+    // For range queries, compute all timestamps at once
+    let timestamps = eval_ctx.timestamps();
+
+    // Group metrics by their signature (without bucket label)
+    let mut metrics_by_sig: HashMap<u64, Vec<RangeValue>> = HashMap::default();
+
+    for rv in in_matrix {
+        // Verify this metric has a bucket label
+        if rv.labels.get_value(BUCKET_LABEL).parse::<f64>().is_err() {
+            continue;
+        }
+
+        let sig = signature_without_labels(&rv.labels, &[HASH_LABEL, NAME_LABEL, BUCKET_LABEL]);
+        metrics_by_sig.entry(sig).or_default().push(rv);
+    }
+
+    let mut range_values = Vec::new();
+
+    for (_sig, bucket_series) in metrics_by_sig {
+        // Get the labels (without bucket label) from the first series
+        let mut base_labels = bucket_series[0].labels.clone();
+        base_labels
+            .retain(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL);
+
+        let mut samples = Vec::with_capacity(timestamps.len());
+
+        // For each timestamp, compute histogram_quantile
+        for &eval_ts in &timestamps {
+            let mut buckets = Vec::new();
+
+            // Collect bucket values at this timestamp
+            for bucket_rv in &bucket_series {
+                let upper_bound: f64 = match bucket_rv.labels.get_value(BUCKET_LABEL).parse() {
+                    Ok(u) => u,
+                    Err(_) => continue,
+                };
+
+                // Find the sample closest to eval_ts
+                if let Some(sample) = bucket_rv
+                    .samples
+                    .iter()
+                    .find(|s| s.timestamp == eval_ts)
+                    .or_else(|| bucket_rv.samples.first())
+                {
+                    buckets.push(Bucket {
+                        upper_bound,
+                        count: sample.value,
+                    });
+                }
+            }
+
+            if !buckets.is_empty() {
+                let quantile_value = bucket_quantile(phi, buckets);
+                samples.push(Sample::new(eval_ts, quantile_value));
+            }
+        }
+
+        if !samples.is_empty() {
+            range_values.push(RangeValue {
+                labels: base_labels,
+                samples,
+                exemplars: None,
+                time_window: None,
+            });
+        }
+    }
+
+    log::info!(
+        "[PromQL Timing] histogram_quantile_range() total execution took: {:?}, produced {} series",
+        start.elapsed(),
+        range_values.len()
+    );
+    Ok(Value::Matrix(range_values))
 }
 
 // cf. https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L76

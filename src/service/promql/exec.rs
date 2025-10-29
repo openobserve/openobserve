@@ -111,6 +111,41 @@ impl PromqlContext {
 
         // Range query
         // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
+
+        // Try the optimized path first - use a single engine with eval context
+        let eval_ctx = EvalContext::new(self.start, self.end, self.interval);
+        let mut engine = Engine::new_with_context(trace_id, ctx.clone(), eval_ctx.clone());
+
+        match engine.exec(&expr).await {
+            Ok((Value::Matrix(matrix), result_type_exec)) => {
+                // Optimized path succeeded - we got all results in one go
+                if result_type_exec.is_some() {
+                    result_type = result_type_exec;
+                }
+                let mut value = Value::Matrix(matrix);
+                value.sort();
+                return Ok((value, result_type, *self.scan_stats.read().await));
+            }
+            Ok((Value::None, _)) => {
+                return Ok((Value::None, result_type, *self.scan_stats.read().await));
+            }
+            Err(e) => {
+                log::warn!(
+                    "PromQL optimized range query execution failed, falling back to per-timestamp execution: {e}"
+                );
+                // Optimized path didn't work, fall back to the original per-timestamp approach
+                // This happens for queries that don't support the optimized path yet
+            }
+            _ => {
+                log::warn!(
+                    "PromQL optimized range query execution returned unexpected result, falling back to per-timestamp execution"
+                );
+            }
+        }
+
+        println!("\nFalling back to per-timestamp execution for PromQL query\n");
+
+        // Fallback: Original per-timestamp approach
         let mut instant_vectors = Vec::new();
         let mut string_literals = Vec::new();
         let mut tasks = Vec::new();
