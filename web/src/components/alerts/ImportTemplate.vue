@@ -168,8 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="template-import-output-editor"
-              style="width: calc(100% - 10px); height: 100%"
-             class="card-container tw-ml-[0.625rem] tw-h-full"
+              style="height: 100%"
+             class="card-container tw-h-full"
             >
               <div
                 v-if="templateErrorsToDisplay.length > 0"
