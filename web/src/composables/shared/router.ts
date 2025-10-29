@@ -342,6 +342,17 @@ const useRoutes = () => {
       },
     },
     {
+      path: "alerts/history",
+      name: "alertHistory",
+      component: () => import("@/components/alerts/AlertHistory.vue"),
+      meta: {
+        title: "Alert History",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "short/:id",
       name: "shortUrl",
       component: ShortUrl,
