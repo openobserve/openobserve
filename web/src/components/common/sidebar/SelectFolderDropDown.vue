@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         behavior="menu"
         borderless
         dense
-        class="showLabelOnTop no-case tw-mr-1 tw-mt-[1px]"
+        class="showLabelOnTop no-case tw-mr-1"
         style="width: calc(100% - 44px)"
         :disable="disableDropdown"
       >
@@ -139,8 +139,8 @@ import { getFoldersListByType } from "@/utils/commons";
       };
 
       const computedStyle = computed (() => {
-        const baseStyle = props.style ? props.style : 'height: 42px';
-        return `${baseStyle}; margin-top: 32px`;
+        const baseStyle = props.style ? props.style : 'height: 35px';
+        return `${baseStyle}; margin-top: 13px`;
       });
 
       onActivated(async () => {
