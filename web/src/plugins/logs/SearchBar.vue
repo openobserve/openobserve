@@ -918,7 +918,7 @@ class="q-pr-sm q-pt-xs" />
               @trigger="$emit('onAutoIntervalTrigger')"
             />
             <q-btn-group
-              class="no-outline q-pa-none no-border q-mr-xs element-box-shadow"
+              class="q-pa-none q-mr-xs element-box-shadow el-border"
               v-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -933,23 +933,16 @@ class="q-pr-sm q-pt-xs" />
               >
                 <q-input
                   ref="reginFilterRef"
-                  filled
-                  flat
+                  borderless
                   dense
+                  clearable
+                  class="!tw-mb-[0.375rem] indexlist-search-input q-mx-sm q-mt-sm"
                   v-model="regionFilter"
                   :label="t('search.regionFilterMsg')"
                 >
-                  <template v-slot:append>
-                    <q-icon
-                      v-if="regionFilter !== ''"
-                      name="clear"
-                      class="cursor-pointer"
-                      @click="resetRegionFilter"
-                    />
-                  </template>
                 </q-input>
                 <q-tree
-                  class="col-12 col-sm-6"
+                  class="col-12 col-sm-6 q-mx-sm q-mb-sm"
                   :nodes="store.state.regionInfo"
                   node-key="label"
                   :filter="regionFilter"
