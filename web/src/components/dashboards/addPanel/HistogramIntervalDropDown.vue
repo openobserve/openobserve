@@ -8,6 +8,7 @@
     borderless
     data-test="histogram-interval-dropdown"
     dense
+    class="o2-custom-select-dashboard"
     @update:model-value="$emit('update:modelValue', $event)"
     :display-value="`${
         histogramIntervalModel.label ?? 'Auto'

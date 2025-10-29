@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label="Select Tab"
           v-model="selectedMoveTabId"
           :options="moveTabOptions"
-          class="select-container  o2-custom-select-dashboard"
+          class="select-container o2-custom-select-dashboard"
           data-test="dashboard-tab-move-select"
          borderless hide-bottom-space>
           <!-- template when on options -->
