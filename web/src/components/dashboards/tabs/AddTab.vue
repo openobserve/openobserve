@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
+    <q-card-section class="q-px-md q-py-md tw-h-[64px]">
       <div class="row items-center no-wrap">
         <div class="col">
           <div
@@ -46,13 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
     <q-separator />
-    <q-card-section class="q-w-md q-mx-lg">
+    <q-card-section class="q-w-md">
       <q-form ref="addTabForm" @submit.stop="onSubmit.execute">
         <q-input
           v-model="tabData.name"
           label="Name*"
-          color="input-border"
-          bg-color="input-bg"
           class="q-py-md showLabelOnTop"
           stack-label
           borderless hide-bottom-space
@@ -62,13 +60,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-add-tab-name"
         />
 
-        <div class="flex justify-center q-mt-lg">
+        <div class="flex justify-start">
           <q-btn
             v-close-popup="true"
-            class="q-mb-md text-bold"
+            class="o2-secondary-button tw-h-[36px]"
             :label="t('dashboard.cancel')"
             text-color="light-text"
-            padding="sm md"
             no-caps
             data-test="dashboard-add-cancel"
           />
@@ -76,11 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disable="tabData.name.trim() === ''"
             :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+            class="o2-primary-button q-ml-md tw-h-[36px]"
             type="submit"
             no-caps
+            borderless
             data-test="dashboard-add-tab-submit"
           />
         </div>
