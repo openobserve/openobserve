@@ -28,7 +28,7 @@ use datafusion::{
         datatypes::{DataType, Schema},
     },
     error::{DataFusionError, Result},
-    functions_aggregate::min_max::min,
+    functions_aggregate::min_max::max,
     prelude::{DataFrame, SessionContext, col, lit},
 };
 use futures::{TryStreamExt, future::try_join_all};
@@ -1195,7 +1195,7 @@ async fn selector_load_data_from_datafusion(
         .clone()
         .aggregate(
             vec![col(HASH_LABEL)],
-            vec![min(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
+            vec![max(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
         )?
         .collect()
         .await?;
