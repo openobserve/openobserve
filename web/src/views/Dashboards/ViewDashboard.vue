@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outline
               icon="arrow_back_ios_new"
               data-test="dashboard-back-btn"
-              class="hideOnPrintMode"
+              class="hideOnPrintMode el-border"
             />
             <span
               class="q-table__title folder-name tw-px-2 tw-cursor-pointer tw-transition-all tw-rounded-sm tw-ml-2"
@@ -72,8 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
-              style="border: 1px solid #d5d5d5; border-radius: 6px"
-              class="dashboard-icons q-px-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="add"
@@ -138,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-else
               :outline="isVariablesChanged ? false : true"
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="refresh"
@@ -159,13 +158,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <ExportDashboard
               v-if="!isFullscreen"
-              class="hideOnPrintMode"
+              class="hideOnPrintMode el-border"
               :dashboardId="currentDashboardData.data?.dashboardId"
             />
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="share"
@@ -177,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="settings"
@@ -188,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
             <q-btn
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
+              class="dashboard-icons q-px-sm q-ml-sm el-border"
               size="sm"
               no-caps
               :icon="store.state.printMode === true ? 'close' : 'print'"
@@ -202,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <q-btn
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               :icon="
@@ -219,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               :icon="outlinedDescription"
@@ -232,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="code"
