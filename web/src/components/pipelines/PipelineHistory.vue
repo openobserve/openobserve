@@ -757,12 +757,11 @@ const updateDateTime = (value: any) => {
 };
 
 const onRequest = (props: any) => {
-  const { page, rowsPerPage, sortBy, descending } = props.pagination;
-
-  pagination.value.page = page;
-  pagination.value.rowsPerPage = rowsPerPage;
-  pagination.value.sortBy = sortBy;
-  pagination.value.descending = descending;
+  // The pagination component passes the updated pagination object
+  pagination.value = {
+    ...pagination.value,
+    ...props.pagination,
+  };
 
   fetchPipelineHistory();
 };
@@ -823,7 +822,7 @@ const showErrorDialog = (error: string) => {
 };
 
 const goBack = () => {
-  router.push({ name: "pipelineList" });
+  router.push({ name: "pipelines" });
 };
 
 // Lifecycle
