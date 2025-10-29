@@ -37,7 +37,7 @@
         map-options
         borderless
         dense
-        class="tw-flex-1"
+        class="tw-flex-1 o2-custom-select-dashboard"
        hide-bottom-space/>
       <div class="tw-flex items-center" style="width: 60%; gap: 10px">
         <q-select
@@ -52,6 +52,7 @@
           map-options
           borderless
           dense
+          class="o2-custom-select-dashboard"
           @update:model-value="onConfigTypeChange(index)"
          hide-bottom-space/>
 
@@ -72,7 +73,7 @@
             map-options
             borderless
             dense
-            class="tw-flex-1"
+            class="tw-flex-1 o2-custom-select-dashboard"
            hide-bottom-space/>
           <q-input
             v-if="overrideConfig.config[0].value.unit === 'custom'"
