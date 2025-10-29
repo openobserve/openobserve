@@ -435,7 +435,9 @@ impl FileData {
 pub async fn init() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // clean the tmp dir
-    _ = std::fs::remove_dir_all(&cfg.common.data_tmp_dir);
+    if let Err(e) = std::fs::remove_dir_all(&cfg.common.data_tmp_dir) {
+        log::warn!("clean tmp dir error: {}", e);
+    }
     std::fs::create_dir_all(&cfg.common.data_tmp_dir).expect("create tmp dir success");
 
     for file in FILES.iter() {
@@ -454,7 +456,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
         let root_dir = FILES[0].read().await.root_dir.clone();
-        let root_dir = Path::new(&root_dir).canonicalize().unwrap();
+        let root_dir = tokio::fs::canonicalize(&root_dir).await.unwrap();
         if let Err(e) = load(&root_dir, &root_dir).await {
             log::error!("load disk cache error: {e}");
         }
@@ -514,6 +516,7 @@ pub async fn exist(file: &str) -> bool {
     if !get_config().disk_cache.enabled {
         return false;
     }
+    let start = std::time::Instant::now();
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
         FILES[idx].read().await
@@ -524,11 +527,20 @@ pub async fn exist(file: &str) -> bool {
     } else {
         RESULT_FILES[idx].read().await
     };
+    let get_lock_took = start.elapsed().as_millis() as usize;
+    if get_lock_took > 100 {
+        log::info!("disk->cache: check file {file} exist get lock took: {get_lock_took} ms",);
+    }
     // file not exist, we can fast return
     if !files.exist(file).await {
         return false;
     }
     drop(files);
+
+    let exist_took = start.elapsed().as_millis() as usize;
+    if exist_took > 100 {
+        log::info!("disk->cache: check file {file} exist took: {exist_took} ms",);
+    }
 
     // check if the file is really exist
     if get_size(file).await.is_some() {
@@ -537,6 +549,10 @@ pub async fn exist(file: &str) -> bool {
 
     // file is not exist, need remove it from cache index
     _ = remove(file).await;
+    let remove_took = start.elapsed().as_millis() as usize;
+    if remove_took > 100 {
+        log::info!("disk->cache: check file {file} exist remove took: {remove_took} ms",);
+    }
 
     // finally return false
     false
@@ -633,7 +649,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
             Err(e) => return Err(e.into()),
             Ok(None) => break,
             Ok(Some(f)) => {
-                let fp = match f.path().canonicalize() {
+                let fp = match tokio::fs::canonicalize(f.path()).await {
                     Ok(p) => p,
                     Err(e) => {
                         log::error!("canonicalize file path error: {e}");
@@ -995,7 +1011,7 @@ async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), any
             e
         ));
     }
-    let tmp_path = Path::new(&tmp_path).canonicalize().unwrap();
+    let tmp_path = tokio::fs::canonicalize(&tmp_path).await.unwrap();
     let tmp_file = tmp_path.join(format!("{}.tmp", config::ider::generate()));
     let tmp_file = tmp_file.to_str().unwrap();
     if let Err(e) = config::utils::async_file::put_file_contents(tmp_file, &data).await {
