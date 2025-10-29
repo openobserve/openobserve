@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             placeholder="Search Folder"
             style="width: 100%;"
             clearable
-            class="o2-search-input tw-mx-1 q-px-xs"
+            class="tw-mx-2 q-px-xs"
             :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
           >
             <template #prepend>
