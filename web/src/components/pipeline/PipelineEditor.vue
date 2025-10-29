@@ -17,23 +17,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw-w-full tw-h-full tw-pr-[0.625rem]">
     <div class="card-container tw-h-[calc(100vh-50px)]">
-      <div class="flex justify-between items-center q-py-sm q-px-sm">
+      <div class="flex justify-between items-start q-py-sm q-px-sm">
         <div class="flex items-center tw-pl-3">
           <div class="text-h6" v-if="pipelineObj.isEditPipeline == true">
             {{ pipelineObj.currentSelectedPipeline.name }}
           </div>
           <div class="text-h6" v-if="pipelineObj.isEditPipeline == false">
             <q-input
+              ref="pipelineNameInputRef"
               v-model="pipelineObj.currentSelectedPipeline.name"
-              :label="t('pipeline.pipelineName')"
-              filled
+              :placeholder="t('pipeline.pipelineName')"
+              borderless
               dense
+              hide-bottom-space
               class="tw-w-[300px]"
+              :error="pipelineNameError"
+              :error-message="pipelineNameErrorMessage"
             />
           </div>
         </div>
 
-        <div class="flex justify-end">
+        <div class="flex justify-end items-center">
           <!-- this is normal secondary button but only icon is there without label -->
             <q-btn
               class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw-h-[36px] o2-secondary-button tw-min-w-0"
@@ -443,6 +447,22 @@ const validationErrors = ref<string[]>([]);
 
 const { track } = useReo();
 
+// Pipeline name input validation
+const pipelineNameInputRef = ref(null);
+const pipelineNameError = ref(false);
+const pipelineNameErrorMessage = ref("");
+
+// Clear error when user starts typing in pipeline name
+watch(
+  () => pipelineObj.currentSelectedPipeline.name,
+  (newValue) => {
+    if (newValue && newValue.trim() !== "") {
+      pipelineNameError.value = false;
+      pipelineNameErrorMessage.value = "";
+    }
+  }
+);
+
 // Watch for dialog changes to track node drops
 watch(
   () => pipelineObj.dialog.show,
@@ -450,7 +470,7 @@ watch(
     // Track when dialog opens (node is dropped)
     if (newShow && !oldShow && pipelineObj.dialog.name) {
       let buttonName = "";
-      
+
       if (pipelineObj.dialog.name === "stream") {
         // Check if it's input or output stream from the current selected node data
         const ioType = pipelineObj.currentSelectedNodeData?.type;
@@ -464,13 +484,13 @@ watch(
       } else {
         const nodeTypeMap: { [key: string]: string } = {
           query: "Add Query Node",
-          condition: "Add Condition Node", 
+          condition: "Add Condition Node",
           function: "Add Function Node",
           remote_stream: "Add Remote Stream Node"
         };
         buttonName = nodeTypeMap[pipelineObj.dialog.name] || `Add ${pipelineObj.dialog.name}`;
       }
-      
+
       track("Button Click", {
         button: buttonName,
         page: "Pipeline Editor"
@@ -670,6 +690,14 @@ const resetDialog = () => {
 const savePipeline = async () => {
   forceSkipBeforeUnloadListener = true;
   if (pipelineObj.currentSelectedPipeline.name === "") {
+    pipelineNameError.value = true;
+    pipelineNameErrorMessage.value = "Pipeline name is required";
+
+    // Focus the input field
+    if (pipelineNameInputRef.value) {
+      pipelineNameInputRef.value.focus();
+    }
+
     q.notify({
       message: "Pipeline name is required",
       color: "negative",
@@ -678,6 +706,10 @@ const savePipeline = async () => {
     });
     return;
   }
+
+  // Clear error state if name is valid
+  pipelineNameError.value = false;
+  pipelineNameErrorMessage.value = "";
   // Find the input node
   const inputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
     (node: any) =>
