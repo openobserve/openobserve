@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="tw-flex justify-between items-center tw-w-full tw-px-[0.626rem] tw-min-w-0 card-container tw-h-[48px]"
         >
-          <div class="tw-flex tw-flex-1 tw-overflow-hidden ">
+          <div class="tw-flex tw-flex-1 tw-overflow-hidden">
             <q-btn
               v-if="!isFullscreen"
               no-caps
@@ -1342,7 +1342,7 @@ export default defineComponent({
 }
 
 .folder-name {
-  color: $primary !important;
+  color: var(--q-primary) !important;
 }
 
 .folder-name:hover {
