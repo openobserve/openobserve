@@ -382,6 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         map-options
                         :label="t('common.aggregation')"
                         data-test="dashboard-value-item-dropdown"
+                        class="o2-custom-select-dashboard"
                        borderless hide-bottom-space>
                         <template v-slot:append>
                           <q-icon

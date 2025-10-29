@@ -143,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               map-options
                               :label="t('common.aggregation')"
                               data-test="dashboard-x-item-dropdown"
+                              class="o2-custom-select-dashboard"
                              borderless hide-bottom-space>
                               <template v-slot:append>
                                 <q-icon
@@ -408,6 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               map-options
                               :label="t('common.aggregation')"
                               data-test="dashboard-b-item-dropdown"
+                              class="o2-custom-select-dashboard"
                              borderless hide-bottom-space>
                               <template v-slot:append>
                                 <q-icon
@@ -643,6 +645,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           map-options
                           :label="t('common.aggregation')"
                           data-test="dashboard-y-item-dropdown"
+                          class="o2-custom-select-dashboard"
                          borderless hide-bottom-space>
                           <template v-slot:append>
                             <div
@@ -946,6 +949,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             map-options
                             :label="t('common.aggregation')"
                             data-test="dashboard-z-item-dropdown"
+                            class="o2-custom-select-dashboard"
                            borderless hide-bottom-space></q-select>
                         </div>
                         <div

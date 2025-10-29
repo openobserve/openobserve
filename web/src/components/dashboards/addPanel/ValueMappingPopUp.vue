@@ -71,7 +71,7 @@
               behavior="menu"
               borderless
               dense
-              class="q-mb-xs tw-flex-1"
+              class="q-mb-xs tw-flex-1 o2-custom-select-dashboard"
              hide-bottom-space></q-select>
             <div
               v-if="mapping.type === 'value'"
