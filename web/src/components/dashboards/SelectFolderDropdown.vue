@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       borderless
       dense
       class="q-mb-xs showLabelOnTop"
-      style="width: calc(100% - 40px)"
+      style="width: calc(100% - 44px)"
     >
       <template #no-option>
         <q-item>
@@ -37,11 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-select>
 
     <q-btn 
-      class="q-mb-md text-bold el-border"
+      class="q-mb-md text-bold el-border add-folder-btn"
       data-test="dashboard-folder-move-new-add"
       label="+"
       text-color="light-text"
-      style="width: 40px; height: 42px"
+      style="width: 40px; height: 36px; margin-left: 4px;"
       no-caps
       @click="
         () => {
