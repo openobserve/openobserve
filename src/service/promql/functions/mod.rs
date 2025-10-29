@@ -248,12 +248,13 @@ pub(crate) fn eval_idelta_range(
 
     let parallel_start = std::time::Instant::now();
     let results: Vec<Option<RangeValue>> = data
-        .par_chunks(chunk_size)
+        .into_par_iter()
+        .chunks(chunk_size)
         .flat_map(|chunk| {
             chunk
-                .iter()
-                .map(|metric| {
-                    let labels = metric.labels.clone();
+                .into_iter()
+                .map(|mut metric| {
+                    let labels = std::mem::take(&mut metric.labels);
                     // TODO: pass range information to here
                     // let time_window = metric.time_window.as_ref().unwrap();
                     let range = Duration::from_secs(300); // Default 5min range for rate function

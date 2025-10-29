@@ -252,6 +252,7 @@ pub(crate) fn eval_arithmetic_range(
 
     // Use the eval timestamps from the context to ensure consistent alignment
     let eval_timestamps = eval_ctx.timestamps();
+    let eval_timestamps: ahash::HashSet<i64> = eval_timestamps.iter().cloned().collect();
 
     if eval_timestamps.is_empty() {
         return Ok(Value::None);
@@ -335,7 +336,7 @@ pub(crate) fn eval_arithmetic_range(
             for &series_idx in series_indices {
                 for sample in &matrix[series_idx].samples {
                     // Only include timestamps that are in eval_timestamps
-                    if eval_timestamps.binary_search(&sample.timestamp).is_ok() {
+                    if eval_timestamps.contains(&sample.timestamp) {
                         let entry = timestamp_values.entry(sample.timestamp).or_insert((0.0, 0));
                         entry.0 = f_handler(entry.0, sample.value);
                         entry.1 += 1;
