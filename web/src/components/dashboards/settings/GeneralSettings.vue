@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
           data-test="dashboard-general-setting-name"
+         borderless hide-bottom-space
         />
         <span>&nbsp;</span>
         <q-input
@@ -62,21 +63,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             ref="closeBtn"
             v-close-popup="true"
-            class="q-mb-md text-bold"
             :label="t('dashboard.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            no-caps
+            class="o2-secondary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            flat
             data-test="dashboard-general-setting-cancel-btn"
           />
           <q-btn
             :disable="dashboardData.title.trim() === ''"
             :label="t('dashboard.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+            class="o2-primary-button tw-h-[36px] q-ml-md"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            flat
             type="submit"
-            no-caps
             :loading="saveDashboardApi.isLoading.value"
             data-test="dashboard-general-setting-save-btn"
           />
