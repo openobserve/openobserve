@@ -13,10 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod compactor_manual_jobs;
-pub mod downsampling;
-pub mod files;
-pub mod organization;
-pub mod retention;
-pub mod stats;
-pub mod stream;
+use config::RwHashSet;
+use once_cell::sync::Lazy;
+
+static STREAMS: Lazy<RwHashSet<String>> = Lazy::new(Default::default);
+
+pub fn is_running(stream: &str) -> bool {
+    STREAMS.contains(stream)
+}
+
+pub fn set_running(stream: &str) {
+    STREAMS.insert(stream.to_string());
+}
+
+pub fn clear_running(stream: &str) {
+    STREAMS.remove(stream);
+}

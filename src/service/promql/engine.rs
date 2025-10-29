@@ -1319,7 +1319,7 @@ async fn selector_load_data_from_datafusion(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] load series took: {:?}",
+        "[trace_id: {trace_id}] load hashing and series took: {:?}",
         start_time.elapsed()
     );
 

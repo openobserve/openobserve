@@ -1055,6 +1055,7 @@ export const validatePanel = (
       "gauge",
       "html",
       "markdown",
+      "custom_chart",
     ];
     if (!allowedChartTypes.includes(panelData?.data?.type)) {
       errors.push(
