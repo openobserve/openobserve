@@ -1369,21 +1369,25 @@ body {
 //     Monaco Editor Styling End
 //============================================================================ 
   
+
 .o2-custom-select-dashboard{
-  min-height: 3rem !important;
+  min-height: 2.5rem !important;
 
   .q-field__control {
     @extend .el-border;
     @extend .el-border-radius;
-    min-height: 3rem !important;
-    max-height: 3rem !important;
-    height: 3rem !important;
+    min-height: 2.5rem !important;
+    max-height: 2.5rem !important;
+    height: 2.5rem !important;
   }
 
+  .q-field__native, .q-field__input {
+    padding-bottom: 0.25rem !important;
+  }
 
   .q-field__append {
     align-items: center;
-    height: 3rem !important;
+    height: 2.5rem !important;
   }
 
 }
