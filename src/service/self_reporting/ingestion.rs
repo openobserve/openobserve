@@ -101,6 +101,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         report_data.push(usage_data);
     }
 
+    let cfg = get_config();
     #[cfg(not(feature = "enterprise"))]
     let usage_reporting_mode = &cfg.common.usage_reporting_mode;
     #[cfg(feature = "enterprise")]
@@ -114,7 +115,6 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
 
     // Push all the search events
     report_data.append(&mut search_events);
-    let cfg = get_config();
     if usage_reporting_mode != "local"
         && !cfg.common.usage_reporting_url.is_empty()
         && !cfg.common.usage_reporting_creds.is_empty()
