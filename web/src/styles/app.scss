@@ -199,12 +199,14 @@ body {
       justify-content: flex-start;
       padding: 0 0.6rem 0 0.6rem;
       text-transform: capitalize;
+      min-height: 35px;
 
       &:hover{
         background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
       }
 
       &__content.tab_content {
+        padding: 0px;
         .q-tab {
           &__icon + &__label {
             padding-left: 0.875rem;
