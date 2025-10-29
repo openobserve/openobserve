@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label="Select Tab"
           v-model="selectedMoveTabId"
           :options="moveTabOptions"
-          class="select-container"
+          class="select-container  o2-custom-select-dashboard"
           data-test="dashboard-tab-move-select"
          borderless hide-bottom-space>
           <!-- template when on options -->
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-select>
 
         <q-btn
-          class="text-bold"
+          class="text-bold el-border"
           no-caps
           outline
           rounded
@@ -91,8 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-close-popup="true"
             unelevated
-            no-caps
-            class="q-mr-sm"
+            class="o2-secondary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            flat
             @click="onCancel"
             data-test="cancel-button"
           >
@@ -101,9 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-close-popup="true"
             unelevated
-            no-caps
-            class="no-border"
-            color="primary"
+            class="o2-primary-button tw-h-[36px] q-ml-md"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            flat
             @click="onConfirm"
             data-test="confirm-button"
             :disable="selectedMoveTabId === null"
@@ -211,6 +212,7 @@ export default defineComponent({
       isTabEditMode,
       selectedTabIdToEdit,
       refreshRequired,
+      store,
     };
   },
 });
