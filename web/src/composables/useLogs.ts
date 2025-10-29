@@ -284,6 +284,18 @@ const useLogs = () => {
     }
   };
 
+  const loadPatternsData = async () => {
+    try {
+      resetFunctions();
+      await getStreamList();
+      await getFunctions();
+      if (isActionsEnabled.value) await getActions();
+      await extractFields();
+    } catch (e: any) {
+      searchObj.loading = false;
+    }
+  };
+
   const loadJobData = async () => {
     try {
       resetFunctions();
@@ -731,6 +743,7 @@ const useLogs = () => {
     $q,
     clearSearchObj,
     loadVisualizeData,
+    loadPatternsData,
   };
 };
 
