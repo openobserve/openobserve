@@ -464,7 +464,7 @@ class="padding-none" />
       :breakpoint="500"
       role="navigation"
       aria-label="Main navigation"
-      class="card-container"
+      class="card-container q-mt-xs"
     >
       <q-list class="leftNavList">
         <menu-link

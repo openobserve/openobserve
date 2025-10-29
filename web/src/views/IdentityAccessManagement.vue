@@ -7,7 +7,7 @@
       class="tw-overflow-hidden logs-splitter-smooth"
     >
       <template v-slot:before>
-        <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
+        <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
         <div v-if="showSidebar" class="iam-tabs spitter-container card-container o2-container-navbarheight" style="height: calc(100vh - 50px);">
           <route-tabs
             ref="iamRouteTabsRef"
@@ -33,7 +33,7 @@
           />
       </template>
       <template v-slot:after>
-        <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+        <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
           <div class="o2-container-navbarheight">
             <RouterView />
           </div>

@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier" style="min-height: inherit; height: calc(100vh - 108px);" >
+  <q-page :key="store.state.selectedOrganization.identifier" class="tw-h-full">
     <div
       ref="fullscreenDiv"
       :class="`${isFullscreen ? 'fullscreen' : ''}`"
-      class="tw-h-full tw-mx-[0.625rem]"
+      class="tw-mx-[0.625rem] q-pt-xs tw-h-[calc(100vh-105px)]"
     >
       <div
         :class="`${

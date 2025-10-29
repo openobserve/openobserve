@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="height: calc(100vh - 40px); overflow-y: auto" class="scroll">
-    <div class="tw-px-[0.625rem] tw-mb-[0.625rem]">
+    <div class="tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs">
       <div
       class="flex items-center q-pa-sm card-container"
       :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"

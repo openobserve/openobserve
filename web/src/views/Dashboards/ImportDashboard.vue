@@ -14,8 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="q-mx-sm">
-    <div class="card-container tw-mb-[0.625rem] ">
+  <div class="q-mx-sm q-pt-xs">
+    <div class="card-container tw-mb-[0.625rem]">
       <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]">
       <div class="col">
         <div class="flex">
@@ -64,11 +64,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-scroll
           v-model="splitterModel"
           :limits="[40, 80]"
-          style="width: calc(100vw - 100px); height: 100%"
+          style="width: calc(100vw - 100px);"
         >
           <template #before>
           <div class="tw-w-full tw-h-full ">
-            <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
+            <div class="card-container tw-py-[0.625rem] tw-pl-[0.625rem] tw-mb-[0.625rem]">
               <div class="app-tabs-container tw-h-[36px] tw-w-fit">
             <app-tabs
                 data-test="dashboard-import-type-tabs"
@@ -216,8 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              style="width: calc(100% - 10px); height: 100%"
-              class="card-container tw-ml-[0.625rem] tw-h-full"
+              class="card-container tw-mb-[0.625rem] tw-h-[calc(100vh-130px)]"
             >
               <div  class="text-center text-h6 tw-py-2">Error Validations</div>
               <q-separator class="q-mt-md" />

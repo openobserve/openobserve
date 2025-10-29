@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit;" >
+  <q-page class="q-pa-none q-pt-xs" style="min-height: inherit;" >
     <div class="tw-flex tw-justify-between tw-items-center q-pb-md card-container tw-h-[62px] tw-mb-2 tw-ml-2 tw-mr-3 tw-px-3 tw-py-4">
     <div class="head q-table__title ">
       {{ headerBasedOnRoute() }}

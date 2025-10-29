@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="tracePage" id="tracePage"
 style="min-height: auto">
     <div id="tracesSecondLevel">
-      <div class="tw-min-h-[82px] tw-px-[0.625rem] tw-pb-[0.625rem]">
+      <div class="tw-min-h-[82px] tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
         <search-bar
           data-test="logs-search-bar"
           ref="searchBarRef"
