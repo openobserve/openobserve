@@ -35,11 +35,11 @@ export default function usePatterns() {
   const extractPatterns = async (
     org_identifier: string,
     stream_name: string,
-    queryReq: SearchRequestPayload
+    queryReq: SearchRequestPayload,
   ) => {
     // Prevent duplicate calls
     if (patternsState.value.loading) {
-      console.log('[Patterns] Already loading, skipping duplicate call');
+      console.log("[Patterns] Already loading, skipping duplicate call");
       return;
     }
 
@@ -48,7 +48,7 @@ export default function usePatterns() {
       patternsState.value.error = null;
       patternsState.value.lastQuery = queryReq;
 
-      console.log('[Patterns] Extracting patterns for stream:', stream_name);
+      console.log("[Patterns] Extracting patterns for stream:", stream_name);
 
       const response = await patternsService.extractPatterns({
         org_identifier,
@@ -56,21 +56,25 @@ export default function usePatterns() {
         query: queryReq,
       });
 
-      console.log('[Patterns] API Response:', response.data);
+      console.log("[Patterns] API Response:", response.data);
 
       // Transform patterns to match UI expectations
-      const transformedPatterns = response.data.patterns.map((pattern: any) => ({
-        ...pattern,
-        // Add template field (same as description for display)
-        template: pattern.description,
-        // Calculate percentage if not present
-        percentage: pattern.percentage ||
-          (pattern.frequency / response.data.statistics.total_logs_analyzed * 100),
-        // Ensure count is available (same as frequency)
-        count: pattern.frequency,
-        // Ensure sample_logs maps to examples
-        sample_logs: pattern.examples?.map((ex: any) => ex.log || ex) || [],
-      }));
+      const transformedPatterns = response.data.patterns.map(
+        (pattern: any) => ({
+          ...pattern,
+          // Add template field (same as description for display)
+          template: pattern.description,
+          // Calculate percentage if not present
+          percentage:
+            pattern.percentage ||
+            (pattern.frequency / response.data.statistics.total_logs_analyzed) *
+              100,
+          // Ensure count is available (same as frequency)
+          count: pattern.frequency,
+          // Ensure sample_logs maps to examples
+          sample_logs: pattern.examples?.map((ex: any) => ex.log || ex) || [],
+        }),
+      );
 
       // Store transformed patterns
       patternsState.value.patterns = {
@@ -78,12 +82,16 @@ export default function usePatterns() {
         patterns: transformedPatterns,
       };
 
-      console.log('[Patterns] Extraction complete:', transformedPatterns.length, 'patterns found');
-
+      console.log(
+        "[Patterns] Extraction complete:",
+        transformedPatterns.length,
+        "patterns found",
+      );
     } catch (error: any) {
-      console.error('[Patterns] Error extracting patterns:', error);
+      console.error("[Patterns] Error extracting patterns:", error);
       patternsState.value.error =
-        error?.response?.data?.message || 'Error extracting patterns. Please try again.';
+        error?.response?.data?.message ||
+        "Error extracting patterns. Please try again.";
       throw error;
     } finally {
       patternsState.value.loading = false;
@@ -97,7 +105,7 @@ export default function usePatterns() {
     patternsState.value.patterns = null;
     patternsState.value.error = null;
     patternsState.value.lastQuery = null;
-    console.log('[Patterns] Cleared patterns state');
+    console.log("[Patterns] Cleared patterns state");
   };
 
   /**

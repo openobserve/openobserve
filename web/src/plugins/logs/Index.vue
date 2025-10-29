@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @handleRunQueryFn="handleRunQueryFn"
               @on-auto-interval-trigger="onAutoIntervalTrigger"
               @showSearchHistory="showSearchHistoryfn"
+              @extractPatterns="extractPatternsForCurrentQuery"
             />
           </div>
         </template>
@@ -207,6 +208,7 @@ size="md" /> Select
                     </div>
                     <div
                       v-else-if="
+                        searchObj.meta.logsVisualizeToggle === 'logs' &&
                         searchObj.data.queryResults.hasOwnProperty('hits') &&
                         searchObj.data.queryResults.hits.length == 0 &&
                         searchObj.loading == false &&
@@ -248,6 +250,24 @@ size="md" />
                       >
                         <q-icon name="info" color="primary"
 size="md" />
+                        {{ t("search.applySearch") }}
+                      </h6>
+                    </div>
+                    <div
+                      v-else-if="
+                        searchObj.meta.logsVisualizeToggle === 'patterns' &&
+                        patternsState?.patterns?.patterns?.length == 0 &&
+                        searchObj.meta.searchApplied == false &&
+                        searchObj.loading == false
+                      "
+                      class="row tw-justify-center"
+                    >
+                      <h6
+                        data-test="logs-search-error-message"
+                        class="text-center q-ma-none col-10 tw-pt-[2rem]"
+                      >
+                        <q-icon name="info" color="primary"
+    size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
                     </div>
@@ -610,6 +630,7 @@ export default defineComponent({
       clearSearchObj,
       processHttpHistogramResults,
       loadVisualizeData,
+      loadPatternsData,
     } = useLogs();
 
     const {
@@ -884,48 +905,62 @@ export default defineComponent({
       }
     };
 
-    // Watch for patterns mode switch - completely separate from logs flow
-    watch(
-      () => searchObj.meta.logsVisualizeToggle,
-      async (newMode, oldMode) => {
-        if (newMode === 'patterns') {
-          console.log('[Index] Switched to patterns mode - fetching patterns');
-          searchObj.loading = true; // Set loading state for UI
+    /**
+     * Common method to extract patterns
+     * Handles validation, loading states, and error handling
+     */
+    const extractPatternsForCurrentQuery = async () => {
+      console.log("[Index] Extracting patterns for current query");
+      searchObj.meta.resultGrid.showPagination = false;
+      searchObj.loading = true;
 
-          try {
-            const queryReq = getQueryReq(false, false);
-            if (!queryReq) {
-              console.log('[Index] No query request available');
-              searchObj.loading = false;
-              return;
-            }
-
-            const streamName = searchObj.data.stream.selectedStream[0];
-            if (!streamName) {
-              console.log('[Index] No stream selected');
-              searchObj.loading = false;
-              return;
-            }
-
-            await extractPatterns(
-              searchObj.organizationIdentifier,
-              streamName,
-              queryReq
-            );
-
-            searchObj.loading = false; // Clear loading state after patterns fetched
-            console.log('[Index] Patterns fetched successfully');
-          } catch (error) {
-            console.error('[Index] Error fetching patterns:', error);
-            searchObj.loading = false;
-            showErrorNotification('Error extracting patterns. Please try again.');
-          }
-        } else if (oldMode === 'patterns') {
-          console.log('[Index] Switched from patterns to', newMode);
-          // No need to clear patterns - they can be cached
+      try {
+        const queryReq = buildSearch(false, false);
+        if (!queryReq) {
+          console.log("[Index] No query request available");
+          searchObj.loading = false;
+          return;
         }
+
+        const streamName = searchObj.data.stream.selectedStream[0];
+        if (!streamName) {
+          console.log("[Index] No stream selected");
+          searchObj.loading = false;
+          showErrorNotification("Please select a stream to extract patterns");
+          return;
+        }
+
+        await extractPatterns(
+          searchObj.organizationIdentifier,
+          streamName,
+          queryReq,
+        );
+        searchObj.loading = false;
+
+        searchObj.meta.refreshHistogram = true;
+        await getQueryData();
+        refreshHistogramChart();
+        console.log("[Index] Patterns extracted successfully");
+      } catch (error) {
+        console.error("[Index] Error extracting patterns:", error);
+        searchObj.loading = false;
+        showErrorNotification("Error extracting patterns. Please try again.");
       }
-    );
+    };
+
+    // // Watch for patterns mode switch - completely separate from logs flow
+    // watch(
+    //   () => searchObj.meta.logsVisualizeToggle,
+    //   async (newMode, oldMode) => {
+    //     if (newMode === "patterns") {
+    //       console.log("[Index] Switched to patterns mode - fetching patterns");
+    //       await extractPatternsForCurrentQuery();
+    //     } else if (oldMode === "patterns") {
+    //       console.log("[Index] Switched from patterns to", newMode);
+    //       // No need to clear patterns - they can be cached
+    //     }
+    //   },
+    // );
 
     // Main method for handling before mount logic
     async function handleBeforeMount() {
@@ -999,6 +1034,9 @@ export default defineComponent({
 
           if (isLogsTab()) {
             loadLogsData();
+          } else if (searchObj.meta.logsVisualizeToggle === "patterns") {
+            await loadPatternsData();
+            await extractPatternsForCurrentQuery();
           } else {
             loadVisualizeData();
             searchObj.loading = false;
@@ -1969,6 +2007,11 @@ export default defineComponent({
         // Sync visualization config to URL parameters
         updateUrlQueryParams(dashboardPanelData);
       }
+
+      if (searchObj.meta.logsVisualizeToggle == "patterns") {
+        // Extract patterns when user clicks run query in patterns mode
+        await extractPatternsForCurrentQuery();
+      }
     };
 
     const handleChartApiError = (errorMessage: any) => {
@@ -2450,6 +2493,7 @@ export default defineComponent({
       shouldUseHistogramQuery,
       clearSchemaCache,
       getHistogramData,
+      extractPatternsForCurrentQuery,
     };
   },
   computed: {
