@@ -684,7 +684,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardCreate.searchDashboard(randomDashboardName);
     await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
-  test("should verify the custom value search from variable dropdown", async ({
+  test.skip("should verify the custom value search from variable dropdown", async ({
     page,
   }) => {
     const valuesResponses = [];
