@@ -1318,6 +1318,11 @@ export default defineComponent({
 
 .dashboard-icons {
   height: 30px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
 
   :deep(.date-time-button) {
     height: 30px;
@@ -1342,5 +1347,13 @@ export default defineComponent({
 
 .folder-name:hover {
   background-color: $accent !important;
+}
+
+.el-border {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
 }
 </style>
