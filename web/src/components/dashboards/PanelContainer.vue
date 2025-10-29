@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="drag-allow">
       <q-bar
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'transparent'"
         dense
         class="q-px-xs"
         style="border-top-left-radius: 3px; border-top-right-radius: 3px"
