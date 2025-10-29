@@ -319,9 +319,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-toggle
                         data-test="scheduled-pipeline-aggregation-toggle"
                         v-model="_isAggregationEnabled"
-                        size="sm"
+                        size="md"
                         color="primary"
-                        class="text-bold q-pl-0"
+                        class="text-bold q-pl-0 o2-toggle-button-sm tw-h-[36px] tw-ml-1"
                         :disable="tab === 'sql' || tab === 'promql'"
                         @update:model-value="updateAggregation"
                       />
@@ -674,7 +674,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <q-toggle
                               data-test="scheduled-pipeline-cron-toggle-btn"
-                              class="q-mt-sm"
+                              size="md"
+                              color="primary"
+                              class="text-bold q-pl-0 o2-toggle-button-sm tw-h-[36px] tw-ml-1"
                               v-model="triggerData.frequency_type"
                               :true-value="'cron'"
                               :false-value="'minutes'"
