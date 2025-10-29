@@ -744,6 +744,7 @@ const useLogs = () => {
     clearSearchObj,
     loadVisualizeData,
     loadPatternsData,
+    getHistogramTitle,
   };
 };
 

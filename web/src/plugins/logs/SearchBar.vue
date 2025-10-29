@@ -57,8 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
               >
-                <img :src="visualizeIcon"
-alt="Visualize" class="icon-sm" />
+                <img :src="visualizeIcon" alt="Visualize"
+class="icon-sm" />
                 <q-tooltip v-if="isVisualizeDisabled">
                   {{ t("search.enableSqlModeOrSelectSingleStream") }}
                 </q-tooltip>
@@ -106,8 +106,8 @@ alt="Visualize" class="icon-sm" />
             "
           >
           </q-toggle>
-          <img :src="histogramIcon" alt="Histogram"
-class="toolbar-icon" />
+          <img :src="histogramIcon"
+alt="Histogram" class="toolbar-icon" />
           <q-tooltip>
             {{ t("search.showHistogramLabel") }}
           </q-tooltip>
@@ -126,8 +126,8 @@ class="toolbar-icon" />
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="sqlIcon" alt="SQL Mode"
-class="toolbar-icon" />
+            <img :src="sqlIcon"
+alt="SQL Mode" class="toolbar-icon" />
             <q-tooltip v-if="isSqlModeDisabled">
               {{ t("search.sqlModeDisabledForVisualization") }}
             </q-tooltip>
@@ -277,8 +277,8 @@ class="toolbar-icon" />
                       </q-tr>
                     </template>
                     <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list"
-no-hover>
+                      <q-td :props="props"
+class="field_list" no-hover>
                         <q-item
                           class="q-pa-sm saved-view-item"
                           clickable
@@ -665,8 +665,8 @@ no-hover>
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="quickModeIcon" alt="Quick Mode"
-class="toolbar-icon" />
+            <img :src="quickModeIcon"
+alt="Quick Mode" class="toolbar-icon" />
             <q-tooltip>
               {{ t("search.quickModeLabel") }}
             </q-tooltip>
@@ -798,8 +798,8 @@ class="toolbar-icon" />
                         downloadLogs(searchObj.data.queryResults.hits, 'csv')
                       "
                     >
-                      <q-icon name="grid_on" size="14px"
-class="q-pr-sm" />
+                      <q-icon name="grid_on"
+size="14px" class="q-pr-sm" />
                       <q-item-section>
                         <q-item-label
                           class="tw-flex tw-items-center tw-gap-2 q-mr-md"
@@ -817,8 +817,8 @@ class="q-pr-sm" />
                         downloadLogs(searchObj.data.queryResults.hits, 'json')
                       "
                     >
-                      <q-icon name="data_object" size="14px"
-class="q-pr-sm" />
+                      <q-icon name="data_object"
+size="14px" class="q-pr-sm" />
                       <q-item-section>
                         <q-item-label
                           class="tw-flex tw-items-center tw-gap-2 q-mr-md"
@@ -1511,8 +1511,8 @@ class="q-pr-sm" />
           <div>
             <div class="text-left q-mb-xs">
               No of Records:
-              <q-icon name="info" size="17px"
-class="q-ml-xs cursor-pointer">
+              <q-icon name="info"
+size="17px" class="q-ml-xs cursor-pointer">
                 <q-tooltip
                   anchor="center right"
                   self="center left"
@@ -1549,8 +1549,8 @@ class="q-ml-xs cursor-pointer">
             style="opacity: 0.8"
             class="text-left mapping-warning-msg q-mt-md"
           >
-            <q-icon name="warning" color="red"
-class="q-mr-sm" />
+            <q-icon name="warning"
+color="red" class="q-mr-sm" />
             <span>Histogram will be disabled for the schedule job</span>
           </div>
         </q-card-section>
@@ -1853,8 +1853,13 @@ export default defineComponent({
     } = useSearchBar();
     const { loadStreamLists, extractFields } = useStreamFields();
 
-    const { refreshData, handleRunQuery, getJobData, routeToSearchSchedule } =
-      useLogs();
+    const {
+      refreshData,
+      handleRunQuery,
+      getJobData,
+      routeToSearchSchedule,
+      getHistogramTitle,
+    } = useLogs();
 
     const { isStreamExists, isStreamFetched, getStreams } = useStreams();
     const queryEditorRef = ref(null);
@@ -3792,6 +3797,16 @@ export default defineComponent({
       }
       searchObj.meta.logsVisualizeToggle = value;
       updateUrlQueryParams();
+
+      if (searchObj.meta.logsVisualizeToggle === "logs") {
+        const hasLogs =
+          searchObj.data?.queryResults?.hits &&
+          searchObj.data.queryResults.hits.length > 0;
+
+        if (hasLogs) {
+          searchObj.data.histogram.chartParams.title = getHistogramTitle(false);
+        }
+      }
 
       // dispatch resize event
       window.dispatchEvent(new Event("resize"));
