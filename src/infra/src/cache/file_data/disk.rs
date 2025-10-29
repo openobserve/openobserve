@@ -15,7 +15,7 @@
 
 use std::{
     cmp::{max, min},
-    fmt, fs,
+    fmt,
     ops::Range,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
