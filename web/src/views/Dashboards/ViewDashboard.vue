@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page :key="store.state.selectedOrganization.identifier" class="tw-h-full">
     <div
       ref="fullscreenDiv"
-      :class="`${isFullscreen ? 'fullscreen' : ''}`"
-      class="tw-mx-[0.625rem] q-pt-xs tw-h-[calc(100vh-105px)]"
+      :class="{'fullscreen': isFullscreen,
+        'tw-h-[calc(100vh-105px)]': !store.state.printMode
+        }"
+      class="tw-mx-[0.625rem] q-pt-xs"
     >
       <div
         :class="`${
