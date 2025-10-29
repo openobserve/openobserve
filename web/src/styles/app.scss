@@ -1145,6 +1145,12 @@ body {
   .q-splitter__separator {
     transition: none !important;
     z-index: 1 !important; // Lower z-index so scrollbar overlaps it
+
+    .q-btn {
+      .q-icon {
+        font-size: 0.8rem;
+      }
+    }
   }
 }
 
@@ -1393,7 +1399,7 @@ body {
   min-width: 0.3rem !important;
   position: absolute !important;
   top: 26px !important;
-  left: 10px !important;
+  left: 5px !important;
   z-index: 100 !important;
   border-radius: 0.325rem;
 }
