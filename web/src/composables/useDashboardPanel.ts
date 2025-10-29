@@ -2156,7 +2156,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           )})`;
         } else if (condition.operator === "match_all") {
           selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
-        } else if (condition.operator === "str_match") {
+        } else if (
+          condition.operator === "str_match" ||
+          condition.operator === "Contains"
+        ) {
           selectFilter += `str_match(${condition.column}, ${formatValue(
             condition.value,
             condition.column,
