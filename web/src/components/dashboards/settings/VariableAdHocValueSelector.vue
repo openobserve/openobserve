@@ -16,7 +16,7 @@
                 :display-value="adhocVariables[index].operator ? adhocVariables[index].operator : ''"
                 :options="operatorOptions" style="width: auto" class="operator" data-test="dashboard-variable-adhoc-operator-selector"  borderless hide-bottom-space/>
             <q-input v-model="adhocVariables[index].value" placeholder="Enter Value" dense debounce="1000" style="width: 125px" class="" data-test="dashboard-variable-adhoc-value-selector"  borderless hide-bottom-space/>
-            <q-btn class="close" size="xs" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-3'" padding="13px 2px" square flat dense @click="removeField(index)" icon="close" :data-test="`dashboard-variable-adhoc-close-${index}`"/>
+            <q-btn class="close tw-ml-1" size="xs" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-3'" padding="8px 2px" square flat dense @click="removeField(index)" icon="close" :data-test="`dashboard-variable-adhoc-close-${index}`"/>
             <!-- <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div> -->
         </div>
         <q-btn class="text-bold no-border q-ml-xs q-mb-sm hideOnPrintMode" no-caps no-outline rounded padding="xs" @click="addFields" data-test="dashboard-variable-adhoc-add-selector" >
