@@ -317,6 +317,13 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let usage_enabled = cfg.common.usage_enabled;
 
+    // max usage reporting interval can be 10 mins, because we
+    // need relatively recent data for usage calculations
+    #[cfg(feature = "enterprise")]
+    let usage_publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
+    #[cfg(not(feature = "enterprise"))]
+    let usage_publish_interval = cfg.common.usage_publish_interval;
+
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: config::VERSION.to_string(),
         instance: get_instance_id(),
@@ -369,7 +376,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         user_defined_schema_max_fields: cfg.limit.user_defined_schema_max_fields,
         all_fields_name: cfg.common.column_all.to_string(),
         usage_enabled,
-        usage_publish_interval: cfg.common.usage_publish_interval,
+        usage_publish_interval,
         ingestion_url: cfg.common.ingestion_url.to_string(),
         #[cfg(feature = "enterprise")]
         streaming_aggregation_enabled: cfg.common.feature_query_streaming_aggs,

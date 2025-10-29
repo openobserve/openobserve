@@ -961,8 +961,8 @@ pub struct Common {
     #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
-        help = "possible values - 'local', 'dual'"
-    )] // local, both
+        help = "possible values - 'local', 'remote', 'both'"
+    )] // local, remote, both
     pub usage_reporting_mode: String,
     #[env_config(
         name = "ZO_USAGE_REPORTING_URL",
@@ -2490,16 +2490,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.common.default_hec_stream.is_empty() {
         cfg.common.default_hec_stream = "_hec".to_string();
-    }
-
-    if !matches!(cfg.common.usage_reporting_mode.as_str(), "local" | "dual") {
-        cfg.common.usage_reporting_mode = "local".to_string();
-    }
-
-    // max usage reporting interval can be 10 mins, because we
-    // need relatively recent data for usage calculations
-    if cfg.common.usage_publish_interval > 10 * 60 {
-        cfg.common.usage_publish_interval = 10 * 60;
     }
 
     if cfg.common.usage_publish_interval < 1 {

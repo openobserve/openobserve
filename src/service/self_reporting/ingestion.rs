@@ -101,10 +101,21 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         report_data.push(usage_data);
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    let usage_reporting_mode = &cfg.common.usage_reporting_mode;
+    #[cfg(feature = "enterprise")]
+    let usage_reporting_mode = {
+        if cfg.common.usage_reporting_mode == "local" {
+            "local"
+        } else {
+            "both"
+        }
+    };
+
     // Push all the search events
     report_data.append(&mut search_events);
     let cfg = get_config();
-    if &cfg.common.usage_reporting_mode != "local"
+    if usage_reporting_mode != "local"
         && !cfg.common.usage_reporting_url.is_empty()
         && !cfg.common.usage_reporting_creds.is_empty()
     {
@@ -131,33 +142,64 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                             .await
                             .unwrap_or_else(|_| resp_status.to_string())
                     );
+                    if usage_reporting_mode != "both" {
+                        // on error in ingesting usage data, push back the data
+                        let curr_usages = curr_usages.clone();
+                        for usage_data in curr_usages {
+                            if let Err(e) = super::queues::USAGE_QUEUE
+                                .enqueue(ReportingData::Usage(Box::new(usage_data)))
+                                .await
+                            {
+                                log::error!(
+                                    "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                                );
+                            }
+                        }
+                    }
                 }
             }
             Err(e) => {
                 log::error!("[SELF-REPORTING] Error in ingesting usage data to external URL {e:?}");
+                if usage_reporting_mode != "both" {
+                    // on error in ingesting usage data, push back the data
+                    let curr_usages = curr_usages.clone();
+                    for usage_data in curr_usages {
+                        if let Err(e) = super::queues::USAGE_QUEUE
+                            .enqueue(ReportingData::Usage(Box::new(usage_data)))
+                            .await
+                        {
+                            log::error!(
+                                "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                            );
+                        }
+                    }
+                }
             }
         }
     }
 
-    let report_data = report_data
-        .iter()
-        .map(|usage| json::to_value(usage).unwrap())
-        .collect::<Vec<_>>();
-    // report usage data
-    let usage_stream = StreamParams::new(META_ORG_ID, USAGE_STREAM, StreamType::Logs);
-    if ingest_reporting_data(report_data, usage_stream)
-        .await
-        .is_err()
-    {
-        // on error in ingesting usage data, push back the data
-        for usage_data in curr_usages {
-            if let Err(e) = super::queues::USAGE_QUEUE
-                .enqueue(ReportingData::Usage(Box::new(usage_data)))
-                .await
-            {
-                log::error!(
-                    "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
-                );
+    if usage_reporting_mode != "remote" {
+        let report_data = report_data
+            .iter()
+            .map(|usage| json::to_value(usage).unwrap())
+            .collect::<Vec<_>>();
+        // report usage data
+        let usage_stream = StreamParams::new(META_ORG_ID, USAGE_STREAM, StreamType::Logs);
+        if ingest_reporting_data(report_data, usage_stream)
+            .await
+            .is_err()
+            && usage_reporting_mode != "both"
+        {
+            // on error in ingesting usage data, push back the data
+            for usage_data in curr_usages {
+                if let Err(e) = super::queues::USAGE_QUEUE
+                    .enqueue(ReportingData::Usage(Box::new(usage_data)))
+                    .await
+                {
+                    log::error!(
+                        "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                    );
+                }
             }
         }
     }
