@@ -140,7 +140,7 @@ import { getFoldersListByType } from "@/utils/commons";
 
       const computedStyle = computed (() => {
         const baseStyle = props.style ? props.style : 'height: 42px';
-        return `${baseStyle}; margin-top: 10px`;
+        return `${baseStyle}; margin-top: 32px`;
       });
 
       onActivated(async () => {
