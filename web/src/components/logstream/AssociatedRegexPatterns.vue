@@ -323,7 +323,7 @@
 
               <!-- remove or add pattern button  -->
                <div class="tw-mb-4" :class="store.state.theme === 'dark' ? 'add-remove-pattern-button-dark' : 'add-remove-pattern-button-light'">
-                <q-btn @click="handleAddOrRemovePattern" no-caps class="no-border">
+                <q-btn @click="handleAddOrRemovePattern" no-caps class="q-mr-md o2-secondary-button tw-h-[36px]">
                   <span>
                     {{ checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'Remove Pattern' : 'Add Pattern' }}
                   </span> 
@@ -364,10 +364,12 @@
             <q-btn
               data-test="associated-regex-patterns-update-btn"
               label="Update Changes"
-              class="q-my-sm text-bold no-border"
+              class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
               padding="sm xl"
               type="submit"
               no-caps
+              dense
+              flat
               @click="updateRegexPattern"
               :style="{
                 'background-color': isFormDirty ? '#5ca380' : '#aeaeae',

@@ -504,6 +504,12 @@ body.desktop .q-hoverable:hover > .q-focus-helper{
       height: 35px;
     }
   }
+
+   tbody {
+    td:after {
+      background: transparent;
+    }
+  }
 }
 
 .q-date__calendar-item > div,
