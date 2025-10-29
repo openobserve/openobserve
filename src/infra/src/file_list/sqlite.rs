@@ -1267,7 +1267,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
                     .entry(org)
                     .or_default()
                     .entry(stream_type)
-                    .and_modify(|e| *e = counts)
+                    .and_modify(|e| *e += counts)
                     .or_insert(counts);
             }
         }
