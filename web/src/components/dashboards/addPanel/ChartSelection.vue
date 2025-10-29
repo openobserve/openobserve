@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               color="primary"
               :name="item.image"
-              class="q-mx-auto q-mb-sm"
+              class="q-mx-auto q-my-sm"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
             <!-- <q-item-label
