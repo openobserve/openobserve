@@ -922,6 +922,8 @@ export default defineComponent({
   height: calc(81vh - 14px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none; /* Remove resize behavior */
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
 }
 .error-report-container {
   height: calc(100vh - 8px) !important; /* Total editor height */

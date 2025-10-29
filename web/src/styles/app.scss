@@ -1169,6 +1169,10 @@ body {
     transition: none !important;
     z-index: 1 !important; // Lower z-index so scrollbar overlaps it
 
+    &[aria-disabled="true"] {
+      width: 0px;
+    }
+
     .q-btn {
       .q-icon {
         font-size: 0.8rem;

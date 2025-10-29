@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
 
-          <div>
+          <div class="tw-h-[calc(100vh-110px)] tw-overflow-y-auto">
             <q-list>
               <q-expansion-item
                 v-if="regionRows.length > 0 && store.state.zoConfig.super_cluster_enabled"
@@ -62,14 +62,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :filter-method="filterRegionData"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+                        <q-checkbox v-model="scope.selected" size="xs" />
                       </template>
 
                       <template v-slot:body-selection="scope">
                         <q-checkbox 
                           :model-value="scope.selected" 
                           size="xs" 
-                          color="secondary" 
                           @update:model-value="(val, evt) => { 
                             if (Object.hasOwn(scope, 'selected')) {
                               Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
@@ -131,11 +130,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :filter-method="filterClusterData"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+                        <q-checkbox v-model="scope.selected" size="xs" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { 
+                        <q-checkbox :model-value="scope.selected" size="xs" @update:model-value="(val, evt) => { 
                             if (Object.hasOwn(scope, 'selected')) {
                               Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
                             }
@@ -193,11 +192,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-pa-none q-ma-none node-list-filter-table"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+                        <q-checkbox v-model="scope.selected" size="xs" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { 
+                        <q-checkbox :model-value="scope.selected" size="xs" @update:model-value="(val, evt) => { 
                             if (Object.hasOwn(scope, 'selected')) {
                               Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
                             }
@@ -235,11 +234,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'width: 100%'"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+                        <q-checkbox v-model="scope.selected" size="xs" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { 
+                        <q-checkbox :model-value="scope.selected" size="xs" @update:model-value="(val, evt) => { 
                             if (Object.hasOwn(scope, 'selected')) {
                               Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
                             }
@@ -373,17 +372,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-card>
               </q-expansion-item>
 
+              <q-btn 
+                :label="t('nodes.applyFilter')" 
+                class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm o2-primary-button tw-h-[36px]" 
+                flat
+                @click="applyFilter()"
+              >
+              </q-btn>
 
             </q-list>
-          </div>
-          <div>
-            <q-btn 
-              :label="t('nodes.applyFilter')" 
-              class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm o2-primary-button tw-h-[36px]" 
-              flat
-              @click="applyFilter()"
-            >
-            </q-btn>
           </div>
         </div>
       </template>
