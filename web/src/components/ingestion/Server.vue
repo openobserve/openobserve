@@ -172,11 +172,17 @@ export default defineComponent({
       },
     ];
 
+    let filteredTabs = [];
     // create computed property to filter tabs
     const filteredList = computed(() => {
-      return serverTabs.filter((tab) => {
+      if (!tabsFilter.value) {
+        return serverTabs;
+      }
+      filteredTabs = serverTabs.filter((tab) => {
         return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
       });
+
+      return filteredTabs;
     });
 
     return {
