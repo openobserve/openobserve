@@ -774,7 +774,7 @@ body {
     padding-bottom: 4px !important;
   }
   .q-field__append{
-    padding-top: 8px !important;
+    padding-bottom: 4px !important;
   }
 
   .q-icon {
@@ -1369,21 +1369,25 @@ body {
 //     Monaco Editor Styling End
 //============================================================================ 
   
+
 .o2-custom-select-dashboard{
-  min-height: 3rem !important;
+  min-height: 2.5rem !important;
 
   .q-field__control {
     @extend .el-border;
     @extend .el-border-radius;
-    min-height: 3rem !important;
-    max-height: 3rem !important;
-    height: 3rem !important;
+    min-height: 2.5rem !important;
+    max-height: 2.5rem !important;
+    height: 2.5rem !important;
   }
 
+  .q-field__native, .q-field__input {
+    padding-bottom: 0.25rem !important;
+  }
 
   .q-field__append {
     align-items: center;
-    height: 3rem !important;
+    height: 2.5rem !important;
   }
 
 }
@@ -1438,4 +1442,20 @@ body {
       background-color: var(--o2-tab-bg) !important;
     }
   }
+}
+
+.add-folder-btn{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  border-radius: 4px !important;
+  padding: 0px 12px !important;
+  min-width: auto !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
+  }
+  
 }

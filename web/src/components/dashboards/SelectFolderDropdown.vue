@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-center items-baseline">
+  <div class="flex justify-center items-start">
     <!-- select new folder -->
     <q-select
       v-model="selectedFolder"
@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       behavior="menu"
       borderless
       dense
-      class="q-mb-xs showLabelOnTop"
-      style="width: calc(100% - 40px)"
+      class="showLabelOnTop no-case tw-mr-1 tw-mt-[1px]"
+      style="width: calc(100% - 44px)"
     >
       <template #no-option>
         <q-item>
@@ -37,18 +37,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-select>
 
     <q-btn
-      class="q-mb-md text-bold"
+      class="q-mb-md add-folder-btn"
       data-test="dashboard-folder-move-new-add"
-      label="+"
-      text-color="light-text"
-      style="width: 40px; height: 42px"
+      style="width: 40px;"
+      :style="computedStyle"
       no-caps
+      dense
       @click="
         () => {
           showAddFolderDialog = true;
         }
       "
-    />
+    >
+      <q-icon name="add" size="xs" />
+    </q-btn>
   </div>
   <!-- add folder -->
   <q-dialog
@@ -63,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch } from "vue";
+import { defineComponent, onActivated, ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
@@ -116,6 +118,10 @@ export default defineComponent({
       }
     };
 
+    const computedStyle = computed(() => {
+      return 'height: 36px; margin-top: 32px';
+    });
+
     onActivated(() => {
       // refresh selected folder
       selectedFolder.value = getInitialFolderValue();
@@ -142,6 +148,7 @@ export default defineComponent({
       selectedFolder,
       updateFolderList,
       showAddFolderDialog,
+      computedStyle,
     };
   },
 });

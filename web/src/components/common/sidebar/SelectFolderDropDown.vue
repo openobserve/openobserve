@@ -140,7 +140,7 @@ import { getFoldersListByType } from "@/utils/commons";
 
       const computedStyle = computed (() => {
         const baseStyle = props.style ? props.style : 'height: 42px';
-        return `${baseStyle}; margin-top: 10px`;
+        return `${baseStyle}; margin-top: 32px`;
       });
 
       onActivated(async () => {
@@ -175,21 +175,3 @@ import { getFoldersListByType } from "@/utils/commons";
     },
   });
   </script>
-
-<style lang="scss">
-.add-folder-btn{
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  line-height: 16px !important;
-  border-radius: 4px !important;
-  padding: 0px 12px !important;
-  min-width: auto !important;
-  transition: box-shadow 0.3s ease, opacity 0.2s ease;
-  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
-  &:hover {
-    opacity: 0.8;
-    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
-  }
-  
-}
-</style>

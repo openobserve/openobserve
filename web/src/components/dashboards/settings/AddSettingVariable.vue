@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     no-caps
                     icon="add"
                     no-outline
-                    class="q-mt-sm"
+                    class="q-mt-sm el-border"
                     @click="addFilter"
                     data-test="dashboard-add-filter-btn"
                   >
@@ -419,6 +419,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="variableData.multiSelect"
               :label="t('dashboard.multiSelect')"
               data-test="dashboard-query_values-show_multiple_values"
+              class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+              size="lg"
+              :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             />
           </div>
           <!-- default value for multi select variables -->
@@ -540,6 +543,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="variableData.hideOnDashboard"
               :label="t('dashboard.hideOnDashboard')"
               data-test="dashboard-variable-hide_on_dashboard"
+              class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+              size="lg"
+              :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             />
           </div>
 
@@ -549,6 +555,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-toggle
                 v-model="variableData.escapeSingleQuotes"
                 :label="t('dashboard.escapeSingleQuotes')"
+                class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+                size="lg"
+                :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
               />
               <div>
                 <q-icon
@@ -573,19 +582,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="sticky-footer">
         <q-btn
-          class="text-bold"
           :label="t('dashboard.cancel')"
-          text-color="light-text"
-          no-caps
+          class="o2-secondary-button tw-h-[36px]"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          flat
           @click="close"
           data-test="dashboard-variable-cancel-btn"
         />
         <q-btn
           type="submit"
           :loading="saveVariableApiCall.isLoading.value"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          no-caps
+          class="o2-primary-button tw-h-[36px] q-ml-md"
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          flat
           @click="addVariableForm?.submit()"
           data-test="dashboard-variable-save-btn"
           >Save</q-btn
