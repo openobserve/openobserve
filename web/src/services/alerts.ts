@@ -22,10 +22,10 @@ const alerts = {
     sort_by: string,
     desc: boolean,
     name: string,
-    org_identifier: string
+    org_identifier: string,
   ) => {
     return http().get(
-      `/api/${org_identifier}/alerts?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
+      `/api/${org_identifier}/alerts?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`,
     );
   },
   listByFolderId: (
@@ -36,13 +36,13 @@ const alerts = {
     name: string,
     org_identifier: string,
     folder_id?: string,
-    query?: string
+    query?: string,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts?sort_by=${sort_by}&desc=${desc}&name=${name}`;
-    if(folder_id){
+    if (folder_id) {
       url += `&folder=${folder_id}`;
     }
-    if(query){
+    if (query) {
       url += `&alert_name_substring=${query}`;
     }
     return http().get(url);
@@ -51,45 +51,45 @@ const alerts = {
     org_identifier: string,
     stream_name: string,
     stream_type: string,
-    data: any
+    data: any,
   ) => {
     return http().post(
       `/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`,
-      data
+      data,
     );
   },
   update: (
     org_identifier: string,
     stream_name: string,
     stream_type: string,
-    data: any
+    data: any,
   ) => {
     return http().put(
       `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(
-        data.name
+        data.name,
       )}?type=${stream_type}`,
-      data
+      data,
     );
   },
   get_with_name: (
     org_identifier: string,
     stream_name: string,
-    alert_name: string
+    alert_name: string,
   ) => {
     return http().get(
       `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(
-        alert_name
-      )}`
+        alert_name,
+      )}`,
     );
   },
   delete: (
     org_identifier: string,
     stream_name: string,
     alert_name: string,
-    type: string
+    type: string,
   ) => {
     let url = `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(
-      alert_name
+      alert_name,
     )}`;
     if (type != "") {
       url += "?type=" + type;
@@ -101,10 +101,10 @@ const alerts = {
     stream_name: string,
     alert_name: string,
     enable: boolean,
-    stream_type: string
+    stream_type: string,
   ) => {
     const url = `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(
-      alert_name
+      alert_name,
     )}/enable?value=${enable}&type=${stream_type}`;
     return http().put(url);
   },
@@ -113,48 +113,34 @@ const alerts = {
     org_identifier: string,
     stream_name: string,
     alert_name: string,
-    stream_type: string
+    stream_type: string,
   ) => {
     const url = `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(
-      alert_name
+      alert_name,
     )}/preview?type=${stream_type}`;
     return http().get(url);
   },
-  create_by_alert_id: (
-    org_identifier: string,
-    data: any,
-    folder_id?: any
-  ) => {
-      let url = `/api/v2/${org_identifier}/alerts`;
-      if(folder_id){
-        url += `?folder=${folder_id}`;
-      }
-    return http().post(
-      url,
-      data
-    );
-  },
-  update_by_alert_id: (
-    org_identifier: string,
-    data: any,
-    folder_id?: any
-  ) => { 
-    let url = `/api/v2/${org_identifier}/alerts/${data.id}`;
-    if(folder_id){
+  create_by_alert_id: (org_identifier: string, data: any, folder_id?: any) => {
+    let url = `/api/v2/${org_identifier}/alerts`;
+    if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().put(
-      url,
-      data
-    );
+    return http().post(url, data);
+  },
+  update_by_alert_id: (org_identifier: string, data: any, folder_id?: any) => {
+    let url = `/api/v2/${org_identifier}/alerts/${data.id}`;
+    if (folder_id) {
+      url += `?folder=${folder_id}`;
+    }
+    return http().put(url, data);
   },
   delete_by_alert_id: (
     org_identifier: string,
     alert_id: string,
-    folder_id?: any
+    folder_id?: any,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
-    if(folder_id){
+    if (folder_id) {
       url += `?folder=${folder_id}`;
     }
     return http().delete(url);
@@ -163,10 +149,10 @@ const alerts = {
     org_identifier: string,
     alert_id: string,
     enable: boolean,
-    folder_id?: any
+    folder_id?: any,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}/enable?value=${enable}`;
-    if(folder_id){
+    if (folder_id) {
       url += `&folder=${folder_id}`;
     }
     return http().patch(url);
@@ -178,10 +164,10 @@ const alerts = {
   get_by_alert_id: (
     org_identifier: string,
     alert_id: string,
-    folder_id?: any
+    folder_id?: any,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
-    if(folder_id){
+    if (folder_id) {
       url += `?folder=${folder_id}`;
     }
     return http().get(url);
@@ -190,14 +176,23 @@ const alerts = {
   move_to_another_folder: (
     org_identifier: string,
     data: any,
-    folder_id?: any
+    folder_id?: any,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts/move`;
-    if(folder_id){
+    if (folder_id) {
       url += `?folder=${folder_id}`;
     }
     return http().patch(url, data);
-  }
+  },
+  getHistory: (org_identifier: string, query: any) => {
+    const params = new URLSearchParams();
+    if (query.alert_name) params.append("alert_name", query.alert_name);
+    if (query.start_time) params.append("start_time", query.start_time);
+    if (query.end_time) params.append("end_time", query.end_time);
+    params.append("from", query.from || "0");
+    params.append("size", query.size || "100");
+    return http().get(`/api/${org_identifier}/alerts/history?${params}`);
+  },
 };
 
 export default alerts;
