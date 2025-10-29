@@ -300,7 +300,7 @@ impl FileData {
                 self.file_type,
                 key
             );
-            if let Err(e) = fs::remove_file(&file_path) {
+            if let Err(e) = tokio::fs::remove_file(&file_path).await {
                 log::error!(
                     "[CacheType:{}] File disk cache gc remove file: {}, error: {}",
                     self.file_type,
@@ -376,7 +376,7 @@ impl FileData {
 
         // delete file from local disk
         let file_path = self.get_file_path(key.as_str());
-        if let Err(e) = fs::remove_file(&file_path) {
+        if let Err(e) = tokio::fs::remove_file(&file_path).await {
             log::error!(
                 "[CacheType:{}] File disk cache remove file: {file_path}, error: {e}",
                 self.file_type,
@@ -590,7 +590,7 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
 
     if files.exist(&file).await {
         // remove the tmp file
-        if let Err(e) = std::fs::remove_file(&tmp_file) {
+        if let Err(e) = tokio::fs::remove_file(&tmp_file).await {
             log::warn!(
                 "[CacheType:{}] File disk cache remove tmp file {} error: {}",
                 files.file_type,
