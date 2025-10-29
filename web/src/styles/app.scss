@@ -192,6 +192,32 @@ body {
       }
     }
   }
+
+  &--horizontal {
+    .q-tab {
+      border-radius: 0.375rem 0.375rem 0 0;
+      justify-content: flex-start;
+      padding: 0 0.6rem 0 0.6rem;
+      text-transform: capitalize;
+
+      &:hover{
+        background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
+      }
+
+      &__content.tab_content {
+        .q-tab {
+          &__icon + &__label {
+            padding-left: 0.875rem;
+            font-weight: 600;
+          }
+        }
+      }
+      &--active {
+        color: var(--o2-tab-text-color);
+        background-color: var(--o2-tab-bg);
+      }
+    }
+  }
 }
 
 /* ============================================================================

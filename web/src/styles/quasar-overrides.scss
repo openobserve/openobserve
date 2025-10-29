@@ -570,3 +570,9 @@ body.desktop .q-hoverable:hover > .q-focus-helper{
     }
   }
 }
+
+.q-tabs--dense {
+  .q-tab {
+    min-height: 35px;
+  }
+}
