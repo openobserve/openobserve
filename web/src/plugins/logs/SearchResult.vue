@@ -312,15 +312,56 @@ color="warning" size="xs"></q-icon> Error while
                         : 'text-grey-7'
                     "
                   >
-                    Total Logs
+                    Logs Analyzed
                   </div>
-                  <div class="text-h5 text-weight-bold q-mt-xs text-primary">
-                    {{
-                      (
-                        patternsState?.patterns?.statistics
-                          ?.total_logs_analyzed || 0
-                      ).toLocaleString()
-                    }}
+                  <div class="row items-center q-mt-xs q-gutter-xs">
+                    <!-- View Mode -->
+                    <div
+                      v-if="!isEditingScanSize"
+                      class="row items-center no-wrap tw-m-0 tw-pl-1"
+                    >
+                      <div
+                        class="tw-text-[1.5rem] tw-leading-[2rem] text-weight-bold text-primary tw-h-fit tw-pr-1"
+                      >
+                        {{ patternsState.scanSize.toLocaleString() }}
+                      </div>
+                      <q-btn
+                        flat
+                        round
+                        dense
+                        size="xs"
+                        icon="edit"
+                        @click="toggleEditScanSize"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'text-grey-5'
+                            : 'text-grey-7'
+                        "
+                      >
+                        <q-tooltip>Edit scan size</q-tooltip>
+                      </q-btn>
+                    </div>
+
+                    <!-- Edit Mode -->
+                    <div
+                      v-else
+                      class="row items-center no-wrap logs-analyzed-input"
+                      style="gap: 0.25rem"
+                    >
+                      <q-input
+                        v-model.number="patternsState.scanSize"
+                        type="number"
+                        dense
+                        outlined
+                        :min="100"
+                        :max="20000"
+                        class="!tw-text-[1.2rem] text-weight-bold"
+                        style="max-width: 120px"
+                        autofocus
+                        @keyup.escape="isEditingScanSize = false"
+                        @blur="isEditingScanSize = false"
+                      />
+                    </div>
                   </div>
                 </q-card-section>
               </q-card>
@@ -1200,6 +1241,7 @@ export default defineComponent({
     const totalHeight = ref(0);
     const selectedPattern = ref(null);
     const showPatternDetails = ref(false);
+    const isEditingScanSize = ref(false);
 
     const searchTableRef: any = ref(null);
 
@@ -1581,6 +1623,10 @@ export default defineComponent({
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
     });
 
+    const toggleEditScanSize = () => {
+      isEditingScanSize.value = !isEditingScanSize.value;
+    };
+
     return {
       t,
       store,
@@ -1636,6 +1682,8 @@ export default defineComponent({
       navigatePatternDetail,
       addPatternToSearch,
       extractConstantsFromPattern,
+      isEditingScanSize,
+      toggleEditScanSize,
     };
   },
   computed: {
