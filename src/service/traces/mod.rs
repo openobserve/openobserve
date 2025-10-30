@@ -41,7 +41,6 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::Map;
 
-#[cfg(feature = "enterprise")]
 pub mod service_graph;
 
 #[cfg(feature = "cloud")]

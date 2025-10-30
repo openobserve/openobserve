@@ -14,9 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::{HttpResponse, web};
-use config::utils::json;
-use prometheus::{Encoder, TextEncoder};
 use serde::Deserialize;
+#[cfg(feature = "enterprise")]
+use {
+    config::utils::json,
+    prometheus::{Encoder, TextEncoder},
+};
 
 /// Query parameters for service graph API
 #[derive(Debug, Deserialize)]
@@ -26,11 +29,32 @@ pub struct ServiceGraphQuery {
     pub filter: Option<String>,
 }
 
-/// Handler for service graph metrics endpoint (Prometheus format)
-///
-/// Returns Prometheus metrics filtered by org_id.
-/// Metrics are filtered by the `org_id` label to ensure multi-tenant isolation.
+/// GetServiceGraphMetrics
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/service_graph/metrics",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetServiceGraphMetrics",
+    summary = "Get service graph metrics",
+    description = "Retrieves Prometheus-formatted metrics for the service graph. Returns metrics filtered by organization to ensure multi-tenant isolation. Service graph metrics provide insights into service-to-service communication patterns, request rates, and latencies.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "text/plain; version=0.0.4", body = String, example = json!("# HELP traces_service_graph_request_total Total number of requests between services\n# TYPE traces_service_graph_request_total counter\ntraces_service_graph_request_total{client=\"service-a\",org_id=\"default\",server=\"service-b\"} 42\n")),
+        (status = 403, description = "Forbidden - Enterprise feature", content_type = "application/json", body = String),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "service_graph_metrics"}))
+    )
+)]
 #[actix_web::get("/{org_id}/traces/service_graph/metrics")]
+#[cfg(feature = "enterprise")]
 pub async fn get_service_graph_metrics(
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
@@ -71,10 +95,74 @@ pub async fn get_service_graph_metrics(
         .body(buffer))
 }
 
-/// Get service graph store statistics
-///
-/// Returns statistics filtered by org_id to ensure multi-tenant isolation.
+/// GetServiceGraphMetrics
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/service_graph/metrics",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetServiceGraphMetrics",
+    summary = "Get service graph metrics",
+    description = "Retrieves Prometheus-formatted metrics for the service graph. Returns metrics filtered by organization to ensure multi-tenant isolation. Service graph metrics provide insights into service-to-service communication patterns, request rates, and latencies.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "text/plain; version=0.0.4", body = String, example = json!("# HELP traces_service_graph_request_total Total number of requests between services\n# TYPE traces_service_graph_request_total counter\ntraces_service_graph_request_total{client=\"service-a\",org_id=\"default\",server=\"service-b\"} 42\n")),
+        (status = 403, description = "Forbidden - Enterprise feature", content_type = "application/json", body = String),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "service_graph_metrics"}))
+    )
+)]
+#[actix_web::get("/{org_id}/traces/service_graph/metrics")]
+#[cfg(not(feature = "enterprise"))]
+pub async fn get_service_graph_metrics(
+    _org_id: web::Path<String>,
+) -> Result<HttpResponse, actix_web::Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+/// GetServiceGraphStats
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/service_graph/stats",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetServiceGraphStats",
+    summary = "Get service graph store statistics",
+    description = "Retrieves internal statistics about the service graph store for an organization. Returns information about store size, capacity utilization, shard count, and configuration. Useful for monitoring and capacity planning of the service graph storage.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+            "enabled": true,
+            "store_size": 1234,
+            "capacity_utilization_percent": 12.5,
+            "shard_count": 16,
+            "config": {
+                "max_items_per_shard": 10000,
+                "total_capacity": 160000,
+                "wait_duration_ms": 1000
+            }
+        })),
+        (status = 403, description = "Forbidden - Enterprise feature", content_type = "application/json", body = String),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "service_graph_stats"}))
+    )
+)]
 #[actix_web::get("/{org_id}/traces/service_graph/stats")]
+#[cfg(feature = "enterprise")]
 pub async fn get_store_stats(org_id: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
     let store = o2_enterprise::enterprise::service_graph::get_store();
     let org_sizes = store.get_org_sizes();
@@ -97,4 +185,44 @@ pub async fn get_store_stats(org_id: web::Path<String>) -> Result<HttpResponse, 
     });
 
     Ok(HttpResponse::Ok().json(stats))
+}
+
+/// GetServiceGraphStats
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/service_graph/stats",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetServiceGraphStats",
+    summary = "Get service graph store statistics",
+    description = "Retrieves internal statistics about the service graph store for an organization. Returns information about store size, capacity utilization, shard count, and configuration. Useful for monitoring and capacity planning of the service graph storage.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+            "enabled": true,
+            "store_size": 1234,
+            "capacity_utilization_percent": 12.5,
+            "shard_count": 16,
+            "config": {
+                "max_items_per_shard": 10000,
+                "total_capacity": 160000,
+                "wait_duration_ms": 1000
+            }
+        })),
+        (status = 403, description = "Forbidden - Enterprise feature", content_type = "application/json", body = String),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "service_graph_stats"}))
+    )
+)]
+#[actix_web::get("/{org_id}/traces/service_graph/stats")]
+#[cfg(not(feature = "enterprise"))]
+pub async fn get_store_stats(_org_id: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
