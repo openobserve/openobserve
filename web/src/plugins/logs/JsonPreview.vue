@@ -131,7 +131,7 @@ size="lg" color="primary" />
           :name="'img:' + getImageURL('images/common/add_icon.svg')"
           aria-label="Add icon"
         >
-          <q-list>
+          <q-list class="logs-table-list">
             <q-item
               clickable
               v-close-popup
