@@ -53,35 +53,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <img :src="getBtnLogo" class="header-icon ai-icon" />
           </div>
         </q-btn>
-        <div class="flex items-center">
-          <q-tabs
+        <div class="flex items-center app-tabs-container tw-h-[36px] q-mr-sm">
+          <AppTabs
             data-test="scheduled-pipeline-tabs"
-            v-model="tab"
-            no-caps
-            outside-arrows
-            size="sm"
-            mobile-arrows
-            class="bg-white text-primary scheduled-pipeline-tabs q-mr-sm"
-            @update:model-value="updateTab"
-            style="height: 34px !important"
-            :disable="selectedStreamType != 'metrics'"
-          >
-            <q-tab
-              data-test="scheduled-pipeline-sql-tab"
-              name="sql"
-              :label="t('alerts.sql')"
-            />
-            <q-tab
-              data-test="scheduled-pipeline-metrics-tab"
-              name="promql"
-              :disable="selectedStreamType !== 'metrics'"
-              :label="t('alerts.promql')"
-            >
-              <q-tooltip v-if="selectedStreamType !== 'metrics'">
-                Promql is only available for metrics stream type
-              </q-tooltip>
-            </q-tab>
-          </q-tabs>
+            :tabs="tabOptions"
+            v-model:active-tab="tab"
+            class="tabs-selection-container"
+            @update:active-tab="updateTab"
+          />
         </div>
         <DateTime
           style="height: 34px !important; border-radius: 3px"
@@ -1315,6 +1294,7 @@ import useLogs from "@/composables/useLogs";
 
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import useStreams from "@/composables/useStreams";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
@@ -1473,6 +1453,21 @@ const aiChatInputContext = ref("");
 const userDefinedFields = ref<any[]>([]);
 
 const selectedStreamType = ref(props.streamType || "logs");
+
+const tabOptions = computed(() => [
+  {
+    label: t("alerts.sql"),
+    value: "sql",
+  },
+  {
+    label: t("alerts.promql"),
+    value: "promql",
+    disabled: selectedStreamType.value !== "metrics",
+    tooltipLabel: selectedStreamType.value !== "metrics"
+      ? "Promql is only available for metrics stream type"
+      : "",
+  },
+]);
 
 const filteredStreams = ref<any[]>([]);
 const streams = ref([]);
