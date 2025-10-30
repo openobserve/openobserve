@@ -18,7 +18,8 @@ TODO IMPORTANT:
 PICKTHIS UP after recent changes are merged
  -->
 <template>
-  <div class="full-width">
+   <div class="o2-custom-bg" style="height: calc(100vh - 50px);">
+    <div class="card-container tw-mb-[0.625rem] ">
     <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]">
       <div class="col">
         <div class="flex">
@@ -66,21 +67,10 @@ PICKTHIS UP after recent changes are merged
         />
       </div>
     </div>
-
-    <q-separator class="q-my-sm q-mx-md" />
   </div>
   <div class="flex">
-    <div class="report-list-tabs flex items-center justify-center q-mx-md">
-      <app-tabs
-        data-test="regex-pattern-import-tabs"
-        class="q-mr-md"
-        :tabs="tabs"
-        v-model:active-tab="activeTab"
-        @update:active-tab="updateActiveTab"
-      />
-    </div>
 
-    <div class="flex" style="width: 100%">
+    <div class="flex" style="width: calc(100vw - 1px)">
       <q-splitter
         class="logs-search-splitter"
         no-scroll
@@ -91,102 +81,116 @@ PICKTHIS UP after recent changes are merged
         }"
       >
         <template #before>
-          <div
-            v-if="activeTab == 'import_json_url'"
-            class="editor-container-url"
-          >
-            <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: 100%" class="q-mb-md">
-                <q-input
-                  v-model="url"
-                  :label="t('dashboard.addURL')"
-                  color="input-border"
-                  bg-color="input-bg"
-                  stack-label
-                  filled
-                  label-slot
-                  data-test="regex-pattern-import-url-input"
+           <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
+          <div class="app-tabs-container tw-h-[36px] tw-w-fit">
+          <app-tabs
+              data-test="regex-pattern-import-tabs"
+              class="tabs-selection-container"
+              :tabs="tabs"
+              v-model:active-tab="activeTab"
+              @update:active-tab="updateActiveTab"
+          />
+          </div>
+          </div>
+            <div
+              v-if="activeTab == 'import_json_url'"
+              class="editor-container-url card-container tw-py-1"
+            >
+              <q-form class="q-mt-sm tw-pb-2" @submit="onSubmit">
+                <div style="width: 100%" class="q-mb-md">
+                  <q-input
+                    v-model="url"
+                    :label="t('dashboard.addURL')"
+                    color="input-border"
+                    bg-color="input-bg"
+                    class="tw-mx-2"
+                    stack-label
+                    borderless
+                    label-slot
+                    data-test="regex-pattern-import-url-input"
+                  />
+                </div>
+                <query-editor
+                  data-test="regex-pattern-import-sql-editor"
+                  ref="queryEditorRef"
+                  editor-id="regex-pattern-import-query-editor"
+                  class="monaco-editor tw-mx-2"
+                  :debounceTime="300"
+                  v-model:query="jsonStr"
+                  language="json"
+                  :class="
+                    jsonStr == '' && queryEditorPlaceholderFlag
+                      ? 'empty-query'
+                      : ''
+                  "
+                  @focus="queryEditorPlaceholderFlag = false"
+                  @blur="queryEditorPlaceholderFlag = true"
                 />
-              </div>
-              <query-editor
-                data-test="regex-pattern-import-sql-editor"
-                ref="queryEditorRef"
-                editor-id="regex-pattern-import-query-editor"
-                class="monaco-editor"
-                :debounceTime="300"
-                v-model:query="jsonStr"
-                language="json"
-                :class="
-                  jsonStr == '' && queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="queryEditorPlaceholderFlag = true"
-              />
 
-              <div></div>
-            </q-form>
-          </div>
-          <div
-            v-if="activeTab == 'import_json_file'"
-            class="editor-container-json"
-          >
-            <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: 100%" class="q-mb-md">
-                <q-file
-                  v-model="jsonFiles"
-                  filled
-                  bottom-slots
-                  :label="t('dashboard.dropFileMsg')"
-                  accept=".json"
-                  multiple
-                  data-test="regex-pattern-import-file-input"
-                >
-                  <template v-slot:prepend>
-                    <q-icon name="cloud_upload" @click.stop.prevent />
-                  </template>
-                  <template v-slot:append>
-                    <q-icon
-                      name="close"
-                      @click.stop.prevent="jsonFiles = null"
-                      class="cursor-pointer"
-                      data-test="regex-pattern-import-file-close-btn"
-                    />
-                  </template>
-                  <template v-slot:hint> .json files only </template>
-                </q-file>
-              </div>
-              <query-editor
-                data-test="regex-pattern-import-sql-editor"
-                ref="queryEditorRef"
-                editor-id="regex-pattern-import-query-editor"
-                class="monaco-editor"
-                :debounceTime="300"
-                v-model:query="jsonStr"
-                language="json"
-                :class="
-                  jsonStr == '' && queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="queryEditorPlaceholderFlag = true"
-              />
+                <div></div>
+              </q-form>
+            </div>
+            <div
+              v-if="activeTab == 'import_json_file'"
+              class="editor-container-json card-container tw-py-1 "
+            >
+              <q-form class="q-mt-sm tw-pb-2" @submit="onSubmit">
+                <div style="width: 100%" class="q-mb-md">
+                  <q-file
+                    v-model="jsonFiles"
+                    filled
+                    bottom-slots
+                    :label="t('dashboard.dropFileMsg')"
+                    accept=".json"
+                    multiple
+                    data-test="regex-pattern-import-file-input"
+                    class="tw-mx-2"
+                  >
+                    <template v-slot:prepend>
+                      <q-icon name="cloud_upload" @click.stop.prevent />
+                    </template>
+                    <template v-slot:append>
+                      <q-icon
+                        name="close"
+                        @click.stop.prevent="jsonFiles = null"
+                        class="cursor-pointer"
+                        data-test="regex-pattern-import-file-close-btn"
+                      />
+                    </template>
+                    <template v-slot:hint> .json files only </template>
+                  </q-file>
+                </div>
+                <query-editor
+                  data-test="regex-pattern-import-sql-editor"
+                  ref="queryEditorRef"
+                  editor-id="regex-pattern-import-query-editor"
+                  class="monaco-editor tw-mx-2"
+                  :debounceTime="300"
+                  v-model:query="jsonStr"
+                  language="json"
+                  :class="
+                    jsonStr == '' && queryEditorPlaceholderFlag
+                      ? 'empty-query'
+                      : ''
+                  "
+                  @focus="queryEditorPlaceholderFlag = false"
+                  @blur="queryEditorPlaceholderFlag = true"
+                />
 
-              <div></div>
-            </q-form>
-          </div>
+                <div></div>
+              </q-form>
+            </div>
         </template>
 
         <template #after>
           <div
             data-test="regex-pattern-import-output-editor"
-            style="width: 100%; height: 100%"
+            style=" height: 100%"
+            class="card-container tw-h-full"
           >
             <div
               v-if="regexPatternErrorsToDisplay.length > 0"
-              class="text-center text-h6"
+                class="text-center text-h6 tw-py-2"
             >
               Error Validations
             </div>
@@ -312,6 +316,7 @@ PICKTHIS UP after recent changes are merged
       </q-splitter>
     </div>
   </div>
+</div>
 </template>
 
 <script lang="ts">
@@ -700,25 +705,28 @@ export default defineComponent({
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(66vh - 8px) !important; /* Total editor height */
+    height: calc(100vh - 270px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .editor-container-json {
   .monaco-editor {
-    height: calc(65vh - 20px) !important; /* Total editor height */
+   height: calc(100vh - 310px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .monaco-editor {
-  height: calc(60vh - 14px) !important; /* Total editor height */
+height: calc(100vh - 315px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none; /* Remove resize behavior */
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
+  padding-top: 0.3rem;
 }
 .error-report-container {
-  height: calc(70vh - 8px) !important; /* Total editor height */
+  height: calc(100vh - 200px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none;
 }
