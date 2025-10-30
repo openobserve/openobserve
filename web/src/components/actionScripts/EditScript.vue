@@ -225,11 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("actions.frequency") }} *
                     </div>
                     <div
-                      style="
-                        border: 1px solid #d7d7d7;
-                        width: fit-content;
-                        border-radius: 2px;
-                      "
+                      class="q-pa-xs el-border-radius el-border tw-w-fit"
                     >
                       <template v-for="visual in frequencyTabs" :key="visual.value">
                         <q-btn
@@ -262,11 +258,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <template v-if="frequency.type === 'repeat'">
-                      <div class="flex items-center justify-start q-mt-md ">
+                      <div class="flex">
                         <div
                           data-test="add-action-script-cron-input"
                           class="q-mr-sm"
-                          style="padding-top: 0; width: 320px"
+                          style="padding-top: 8px; width: 320px"
                         >
                           <div
                             class="q-mb-xs text-bold text-grey-8"
@@ -323,29 +319,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :readonly="isEditingActionScript"
                           />
                         </div>
-                        <q-select
-                          data-test="add-action-script-timezone-select"
-                          v-model="formData.timezone"
-                          :options="['UTC']"
-                          :label="t('actions.timezone') + ' *'"
-                          :loading="isFetchingServiceAccounts"
-                          :popup-content-style="{ textTransform: 'lowercase' }"
-                          class="showLabelOnTop no-case tw-mb-[2.4rem]"
-                          borderless
-                          stack-label
-                          dense
-                          use-input
-                          hide-selected
-                          fill-input
-                          :input-debounce="400"
-                          behavior="menu"
-                          disable
-                          :rules="[(val: any) => !!val || 'Field is required!']"
-                          style="
-                            min-width: 250px !important;
-                            width: 250px !important;
-                          "
-                        />
+                        <div class="flex">
+                          <q-select
+                            data-test="add-action-script-timezone-select"
+                            v-model="formData.timezone"
+                            :options="['UTC']"
+                            :label="t('actions.timezone') + ' *'"
+                            :loading="isFetchingServiceAccounts"
+                            :popup-content-style="{ textTransform: 'lowercase' }"
+                            class="showLabelOnTop no-case tw-mb-[2.4rem]"
+                            borderless
+                            stack-label
+                            dense
+                            use-input
+                            hide-selected
+                            fill-input
+                            :input-debounce="400"
+                            behavior="menu"
+                            disable
+                            :rules="[(val: any) => !!val || 'Field is required!']"
+                            style="
+                              min-width: 250px !important;
+                              width: 250px !important;
+                            "
+                          />
+                        </div>
                       </div>
                     </template>
                   </div>
