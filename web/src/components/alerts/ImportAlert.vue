@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="editor-container-url card-container tw-py-1"
           >
             <q-form class="tw-mx-2 tw-pb-2" @submit="onSubmit">
-              <div class="flex tw-mt-[0.725rem]">
+              <div class="flex tw-mt-[0.725rem] tw-h-[64px]">
                 <div style="width: calc(69%)" class="q-pr-sm">
                   <q-input
                     data-test="alert-import-url-input"
@@ -98,8 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  style="width: calc(30%)"
-                  class="alert-folder-dropdown"
+                  style="width: calc(30%); position: relative; bottom: 21px;"
                   data-test="alert-folder-dropdown"
                 >
                   <SelectFolderDropDown
@@ -113,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-import-sql-editor"
                 ref="queryEditorRef"
                 editor-id="alert-import-query-editor"
-                class="monaco-editor"
+                class="monaco-editor tw-mx-2"
                 :debounceTime="300"
                 v-model:query="jsonStr"
                 language="json"
@@ -134,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="editor-container-json card-container tw-py-1"
           >
             <q-form class="tw-mx-2 q-mt-md tw-pb-2" @submit="onSubmit">
-              <div style="width: calc(100% - 10px)" class="q-mb-md flex">
+              <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
                 <div style="width: calc(69%)" class="q-pr-sm">
                   <q-file
                     data-test="alert-import-json-file-input"
@@ -158,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-slot:hint> .json files only </template>
                   </q-file>
                 </div>
-                <div style="width: calc(30%)" class="alert-folder-dropdown">
+                <div style="width: calc(30%); position: relative; bottom: 22px;">
                   <SelectFolderDropDown
                     :type="'alerts'"
                     @folder-selected="updateActiveFolderId"
@@ -170,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-import-sql-editor"
                 ref="queryEditorRef"
                 editor-id="alert-import-query-editor"
-                class="monaco-editor"
+                class="monaco-editor tw-mx-2"
                 :debounceTime="300"
                 v-model:query="jsonStr"
                 language="json"
@@ -1456,7 +1455,7 @@ export default defineComponent({
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(100vh - 290px) !important; /* Total editor height */
+    height: calc(100vh - 286px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
     padding-top: 12px;
