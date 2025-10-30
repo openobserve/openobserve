@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-mr-sm pointer"
                     name="'img:' + getImageURL('images/common/add_icon.svg')"
                   >
-                    <q-list data-test="field-list-modal">
+                    <q-list data-test="field-list-modal" class="logs-table-list">
                       <q-item
                         clickable
                         v-close-popup="true"

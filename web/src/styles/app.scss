@@ -65,6 +65,12 @@ body {
   }
 }
 
+.logs-table-list {
+  .q-btn .q-icon, .q-btn .q-spinner {
+    font-size: 0.8rem;
+  }
+}
+
 // .element-box-shadow {
 //   box-shadow: var(--o2-box-shadow);
 // }
