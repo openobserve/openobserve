@@ -34,6 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="changeTab(tab)"
       >
         {{ tab.label }}
+        <q-tooltip v-if="tab.tooltipLabel">
+          {{ tab.tooltipLabel }}
+        </q-tooltip>
       </div>
     </div>
   </div>
@@ -46,6 +49,7 @@ interface Tab {
   style?: Record<string, string>;
   disabled?: boolean;
   title?: string;
+  tooltipLabel?: string;
   hide?: boolean;
 }
 
