@@ -3926,10 +3926,14 @@ export default defineComponent({
         searchObj.config.fnSplitterModel = 100;
       }
     };
+    //so if it is active we need light this is fixed 
+    //if it is inactive we will be having 2 conditions
+    //1. if dark mode show light color
+    //2.if light mode show dark color
     const visualizeIcon = computed(() => {
       return searchObj.meta.logsVisualizeToggle === "visualize"
         ? getImageURL("images/common/visualize_icon_light.svg")
-        : getImageURL("images/common/visualize_icon_dark.svg");
+        : store.state.theme == 'dark' ? getImageURL("images/common/visualize_icon_light.svg") : getImageURL("images/common/visualize_icon_dark.svg");
     });
     const histogramIcon = computed(() => {
       return store.state.theme === "dark"
