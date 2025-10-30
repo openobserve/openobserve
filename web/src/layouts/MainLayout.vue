@@ -464,7 +464,7 @@ class="padding-none" />
       :breakpoint="500"
       role="navigation"
       aria-label="Main navigation"
-      class="card-container q-mt-xs"
+      class="card-container q-mt-xs tw-mb-[0.675rem]"
     >
       <q-list class="leftNavList">
         <menu-link
@@ -1970,6 +1970,6 @@ body.ai-chat-open {
   }
 }
 .q-drawer {
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.675rem;
 }
 </style>
