@@ -775,16 +775,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
 
-                    <div 
+                    <div
                       :class="[
-                        'tw-flex tw-items-center tw-justify-between tw-text-sm',
-                        store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                        'tw-flex tw-items-center tw-justify-between tw-border-b tw-text-sm',
+                        store.state.theme === 'dark' ? 'tw-border-gray-600 tw-text-gray-200' : 'tw-border-gray-200 tw-text-gray-700'
                       ]"
                     >
                       <span>Enable Distinct Values</span>
                       <q-toggle
                         data-test="log-stream-enabled-distinct-values-toggle-btn"
                         v-model="enableDistinctFields"
+                        class="o2-toggle-button-lg"
+                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+                        size="lg"
+                        @click="formDirtyFlag = true"
+                      />
+                    </div>
+
+                    <div
+                      :class="[
+                        'tw-flex tw-items-center tw-justify-between tw-text-sm',
+                        store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                      ]"
+                    >
+                      <span>Enable Log Patterns Extraction</span>
+                      <q-toggle
+                        data-test="log-stream-enabled-patterns-extraction-toggle-btn"
+                        v-model="enableLogPatternsExtraction"
                         class="o2-toggle-button-lg"
                         :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
                         size="lg"
@@ -1072,6 +1089,7 @@ export default defineComponent({
     const dataRetentionDays = ref(0);
     const storeOriginalData = ref(false);
     const enableDistinctFields = ref(false);
+    const enableLogPatternsExtraction = ref(false);
     const maxQueryRange = ref(0);
     const flattenLevel = ref(null);
     const confirmQueryModeChangeDialog = ref(false);
@@ -1396,6 +1414,7 @@ export default defineComponent({
       storeOriginalData.value =
         streamResponse.settings.store_original_data || false;
       enableDistinctFields.value = streamResponse.settings.enable_distinct_fields || false;
+      enableLogPatternsExtraction.value = streamResponse.settings.enable_log_patterns_extraction || false;
       approxPartition.value = streamResponse.settings.approx_partition || false;
 
       if (!streamResponse.schema) {
@@ -1493,6 +1512,7 @@ export default defineComponent({
 
       settings["store_original_data"] = storeOriginalData.value;
       settings["enable_distinct_fields"] = enableDistinctFields.value;
+      settings["enable_log_patterns_extraction"] = enableLogPatternsExtraction.value;
       settings["approx_partition"] = approxPartition.value;
 
       if (flattenLevel.value !== null) {
@@ -2225,6 +2245,7 @@ export default defineComponent({
       dataRetentionDays,
       storeOriginalData,
       enableDistinctFields,
+      enableLogPatternsExtraction,
       approxPartition,
       maxQueryRange,
       flattenLevel,
