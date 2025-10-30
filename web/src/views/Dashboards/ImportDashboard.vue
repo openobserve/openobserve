@@ -104,8 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div
-                    style="width: calc(30%)"
-                    class="dashboard-folder-dropdown"
+                    style="width: calc(30%);position: relative; bottom: 21px;"
                     data-test="dashboard-folder-dropdown"
                   >
                     <select-folder-dropdown
@@ -169,8 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-file>
                   </div>
                   <div
-                    style="width: calc(30%);"
-                    class="dashboard-folder-dropdown"
+                    style="width: calc(30%);position: relative; bottom: 21px;"
                   >
                     <select-folder-dropdown
                       @folder-selected="selectedFolder = $event"
@@ -906,14 +904,14 @@ export default defineComponent({
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(100vh - 292px) !important; /* Total editor height */
+    height: calc(100vh - 310px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .dashboard-import-json-container {
   .monaco-editor {
-    height: calc(100vh - 300px) !important; /* Total editor height */
+    height: calc(100vh - 310px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
