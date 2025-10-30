@@ -1,6 +1,5 @@
 <template>
-    <div :class="[`  tw-px-2 tw-mb-2 tw-border group-border tw-mt-6  `, 
-        store.state.theme === 'dark' ? 'dark-mode' : 'light-mode',
+    <div :class="[`  tw-px-2 tw-mb-2 el-border tw-mt-6 el-border-radius `, 
         store.state.isAiChatEnabled ? `tw-w-full tw-ml-[${depth * 10}px]` : `xl:tw-w-fit tw-ml-[${depth * 20}px]`
     ]"
     :style="{
@@ -278,13 +277,6 @@ defineExpose({
         max-width: 900px;
     }
 
-    .dark-mode .group-border {
-        border: 1px solid #464646;
-    }
-
-    .light-mode .group-border {
-        border-color: #e5e4e4;
-    }
 
     .group-tabs {
       position: relative;
@@ -376,12 +368,13 @@ defineExpose({
     border-radius: none;
     .o2-tab{
       border-radius: 4px;
-      height: 24px;
+      height: 22px;
       padding: 4px 12px;
       border-bottom: none;
       white-space: normal;
       line-height: 1rem;
       font-size: 10px;
+      border-bottom: none !important;
     }
     .o2-tab.active{
       background-color: var(--o2-primary-btn-bg) !important;
