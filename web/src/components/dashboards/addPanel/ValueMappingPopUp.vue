@@ -182,6 +182,7 @@
           outline
           dense
           data-test="dashboard-addpanel-config-value-mapping-add-btn"
+          class="el-border"
         />
         <q-btn
           @click="applyValueMapping"
