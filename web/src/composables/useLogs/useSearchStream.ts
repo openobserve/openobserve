@@ -39,12 +39,23 @@ import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useNotifications from "@/composables/useNotifications";
 
-// Split composables
-import useSearchQuery from "@/composables/useLogs/useSearchQuery";
-import useSearchConnection from "@/composables/useLogs/useSearchConnection";
-import useSearchResponseHandler from "@/composables/useLogs/useSearchResponseHandler";
-import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramManager";
-import useSearchPagination from "@/composables/useLogs/useSearchPagination";
+import useStreamFields from "@/composables/useLogs/useStreamFields";
+import { useHistogram } from "@/composables/useLogs/useHistogram";
+import { patternsState } from "@/composables/useLogs/usePatterns";
+
+import {
+  convertDateToTimestamp,
+  getConsumableRelativeTime,
+} from "@/utils/date";
+
+import config from "@/aws-exports";
+
+import {
+  b64EncodeUnicode,
+  getFunctionErrorMessage,
+  generateTraceContext,
+  addSpacesToOperators,
+} from "@/utils/zincutils";
 
 export const useSearchStream = () => {
   const { showErrorNotification } = useNotifications();
@@ -179,10 +190,10 @@ export const useSearchStream = () => {
     queryReq.query.from =
       (searchObj.data.resultGrid.currentPage - 1) *
       searchObj.meta.resultGrid.rowsPerPage;
-    // Increase size to 2000 when patterns mode is enabled to get more data for pattern extraction
+    // Use configurable scan size when patterns mode is enabled to get data for pattern extraction
     queryReq.query.size =
       searchObj.meta.logsVisualizeToggle === "patterns"
-        ? 2000
+        ? patternsState.value.scanSize
         : searchObj.meta.resultGrid.rowsPerPage;
 
     const parsedSQL: any = fnParsedSQL();
@@ -192,7 +203,7 @@ export const useSearchStream = () => {
     if (searchObj.meta.sqlMode == true) {
       // if query has aggregation or groupby then we need to set size to -1 to get all records
       // issue #5432
-      // BUT: Don't override size when patterns mode is enabled - we need 2000 logs for pattern extraction
+      // BUT: Don't override size when patterns mode is enabled - we need the configured scan size for pattern extraction
       if (
         (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) &&
         searchObj.meta.logsVisualizeToggle !== "patterns"
@@ -200,7 +211,7 @@ export const useSearchStream = () => {
         queryReq.query.size = -1;
       }
 
-      // Don't apply LIMIT from SQL when patterns mode is enabled - we need 2000 logs
+      // Don't apply LIMIT from SQL when patterns mode is enabled - we need the configured scan size for pattern extraction
       if (
         isLimitQuery(parsedSQL) &&
         searchObj.meta.logsVisualizeToggle !== "patterns"

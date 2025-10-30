@@ -2494,6 +2494,7 @@ export default defineComponent({
       clearSchemaCache,
       getHistogramData,
       extractPatternsForCurrentQuery,
+      patternsState,
     };
   },
   computed: {
