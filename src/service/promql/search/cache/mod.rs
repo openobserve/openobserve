@@ -214,6 +214,7 @@ pub async fn get(
     Ok(Some((new_start, resp.series)))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn set(
     trace_id: &str,
     org: &str,
@@ -222,6 +223,7 @@ pub async fn set(
     end: i64,
     step: i64,
     mut range_values: Vec<RangeValue>,
+    update: bool,
 ) -> Result<()> {
     // check time range, if over ZO_MAX_FILE_RETENTION_TIME, return
     let cfg = get_config();
@@ -245,11 +247,12 @@ pub async fn set(
             );
             return Ok(());
         }
-        // check if the cache already converted
-        if index
-            .entries
-            .iter()
-            .any(|entry| entry.start <= start && entry.end >= new_end)
+        // check if the cache already covered
+        if !update
+            && index
+                .entries
+                .iter()
+                .any(|entry| entry.start <= start && entry.end >= new_end)
         {
             return Ok(());
         }
@@ -534,7 +537,7 @@ mod tests {
         let expected_value = range_values.first().unwrap().clone();
 
         // Test setting cache
-        let set_result = set(trace_id, org, query, start, end, step, range_values).await;
+        let set_result = set(trace_id, org, query, start, end, step, range_values, false).await;
         assert!(set_result.is_ok());
 
         // Test getting cache
@@ -576,8 +579,17 @@ mod tests {
                 time_window: None,
             }];
 
-            let set_result =
-                set(trace_id, org, query, start, end, step, range_values.clone()).await;
+            let set_result = set(
+                trace_id,
+                org,
+                query,
+                start,
+                end,
+                step,
+                range_values.clone(),
+                false,
+            )
+            .await;
             assert!(set_result.is_ok());
         }
 

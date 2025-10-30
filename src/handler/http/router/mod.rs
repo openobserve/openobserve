@@ -507,6 +507,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::enable_alert_bulk)
         .service(alerts::trigger_alert)
         .service(alerts::move_alerts)
+        .service(alerts::history::get_alert_history)
         .service(alerts::deprecated::save_alert)
         .service(alerts::deprecated::update_alert)
         .service(alerts::deprecated::get_alert)
@@ -611,7 +612,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(re_pattern::delete)
         .service(re_pattern::test)
         .service(domain_management::get_domain_management_config)
-        .service(domain_management::set_domain_management_config);
+        .service(domain_management::set_domain_management_config)
+        .service(traces::get_service_graph_metrics)
+        .service(traces::get_store_stats);
 
     #[cfg(feature = "cloud")]
     let service = service

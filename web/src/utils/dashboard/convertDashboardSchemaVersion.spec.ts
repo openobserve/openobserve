@@ -29,7 +29,7 @@ describe("convertDashboardSchemaVersion", () => {
 
   // Test 1: Basic functionality - constants
   it("should have correct current schema version", () => {
-    expect(CURRENT_DASHBOARD_SCHEMA_VERSION).toBe(5);
+    expect(CURRENT_DASHBOARD_SCHEMA_VERSION).toBe(6);
   });
 
   // Test 2: Edge cases - null/undefined data
@@ -52,7 +52,7 @@ describe("convertDashboardSchemaVersion", () => {
     };
     
     const result = convertDashboardSchemaVersion(dataWithoutVersion);
-    expect(result.version).toBe(5); // Should be upgraded to version 5 through the switch cases
+    expect(result.version).toBe(6); // Should be upgraded to version 6 through the switch cases
   });
 
   // Test 3: Version 1 conversion tests
@@ -98,16 +98,16 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV1);
-    
-    expect(result.version).toBe(5);
+
+    expect(result.version).toBe(6);
     expect(result).not.toHaveProperty('layouts'); // layouts should be removed
     expect(result).not.toHaveProperty('panels'); // panels should be moved to tabs
     expect(result.tabs).toBeDefined();
     expect(result.tabs[0].panels[0].layout).toEqual({
-      x: 0, // After version 2 conversion: 0 * 4 = 0
-      y: 0,  
-      h: 3,
-      w: 24, // After version 2 conversion: 6 * 4 = 24
+      x: 0, // After version 2 and 5 conversion: 0 * 4 * 4 = 0
+      y: 0,
+      h: 6, // After version 5 conversion: 3 * 2 = 6
+      w: 96, // After version 2 and 5 conversion: 6 * 4 * 4 = 96
       i: "panel-1"
     });
   });
@@ -121,7 +121,7 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV1WithNullLayouts);
-    expect(result.version).toBe(5);
+    expect(result.version).toBe(6);
   });
 
   it("should handle panels with missing fields in convertPanelSchemaVersion", () => {
@@ -149,7 +149,7 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV1WithIncompletePanel);
-    expect(result.version).toBe(5);
+    expect(result.version).toBe(6);
     expect(result.tabs[0].panels.length).toBe(1);
     expect(result.tabs[0].panels[0].queries[0].fields.z).toEqual([]); // Should add z field
     expect(result.tabs[0].panels[0].queries[0].fields.stream_type).toBe("logs"); // Should default to logs
@@ -182,14 +182,14 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV2);
-    
-    expect(result.version).toBe(5);
+
+    expect(result.version).toBe(6);
     expect(result).not.toHaveProperty('panels'); // panels should be moved to tabs
     expect(result.tabs).toBeDefined();
     expect(result.tabs[0].name).toBe("Default");
     expect(result.tabs[0].tabId).toBe("default");
-    expect(result.tabs[0].panels[0].layout.x).toBe(8); // 2 * 4 = 8
-    expect(result.tabs[0].panels[0].layout.w).toBe(12); // 3 * 4 = 12
+    expect(result.tabs[0].panels[0].layout.x).toBe(32); // 2 * 4 * 4 = 32
+    expect(result.tabs[0].panels[0].layout.w).toBe(48); // 3 * 4 * 4 = 48
   });
 
   // Test 5: Version 3 conversion tests - breakdown fields migration
@@ -203,6 +203,13 @@ describe("convertDashboardSchemaVersion", () => {
             {
               id: "panel-1",
               type: "bar", // not table type
+              layout: {
+                x: 0,
+                y: 0,
+                h: 4,
+                w: 12,
+                i: "panel-1"
+              },
               queries: [
                 {
                   fields: {
@@ -218,8 +225,8 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV3);
-    
-    expect(result.version).toBe(5);
+
+    expect(result.version).toBe(6);
     expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual(["field1"]); // only first x field
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual(["field2", "field3"]); // rest moved to breakdown
   });
@@ -234,6 +241,13 @@ describe("convertDashboardSchemaVersion", () => {
             {
               id: "panel-1",
               type: "table", // table type
+              layout: {
+                x: 0,
+                y: 0,
+                h: 4,
+                w: 12,
+                i: "panel-1"
+              },
               queries: [
                 {
                   fields: {
@@ -249,8 +263,8 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV3WithTable);
-    
-    expect(result.version).toBe(5);
+
+    expect(result.version).toBe(6);
     expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual(["field1", "field2", "field3"]); // all x fields preserved for table
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual([]); // breakdown should be empty array
   });
@@ -265,6 +279,13 @@ describe("convertDashboardSchemaVersion", () => {
             {
               id: "panel-1",
               type: "line",
+              layout: {
+                x: 0,
+                y: 0,
+                h: 4,
+                w: 12,
+                i: "panel-1"
+              },
               queries: [
                 {
                   fields: {
@@ -281,8 +302,8 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV3WithExistingBreakdown);
-    
-    expect(result.version).toBe(5);
+
+    expect(result.version).toBe(6);
     expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual(["field1"]); // only first x field
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual(["existing1", "existing2", "field2"]); // existing + moved field
   });
@@ -298,6 +319,13 @@ describe("convertDashboardSchemaVersion", () => {
             {
               id: "panel-1",
               type: "bar",
+              layout: {
+                x: 0,
+                y: 0,
+                h: 4,
+                w: 12,
+                i: "panel-1"
+              },
               queries: [
                 {
                   fields: {
@@ -329,8 +357,8 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV4);
-    
-    expect(result.version).toBe(5);
+
+    expect(result.version).toBe(6);
     expect(result.tabs[0].panels[0].queries[0].fields.filter).toEqual({
       filterType: "group",
       logicalOperator: "AND",
@@ -367,6 +395,13 @@ describe("convertDashboardSchemaVersion", () => {
             {
               id: "panel-1",
               type: "bar",
+              layout: {
+                x: 0,
+                y: 0,
+                h: 4,
+                w: 12,
+                i: "panel-1"
+              },
               queries: [
                 {
                   fields: {
@@ -383,8 +418,8 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV4WithEmptyFilter);
-    
-    expect(result.version).toBe(5);
+
+    expect(result.version).toBe(6);
     expect(result.tabs[0].panels[0].queries[0].fields.filter).toEqual({
       filterType: "group",
       logicalOperator: "AND",
@@ -402,6 +437,13 @@ describe("convertDashboardSchemaVersion", () => {
             {
               id: "panel-1",
               type: "bar",
+              layout: {
+                x: 0,
+                y: 0,
+                h: 4,
+                w: 12,
+                i: "panel-1"
+              },
               queries: [
                 {
                   fields: {
@@ -418,13 +460,13 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV4WithNoFilter);
-    
-    expect(result.version).toBe(5);
+
+    expect(result.version).toBe(6);
     // Should not modify fields that don't have filter property
   });
 
   // Test 7: Already converted versions (should not change)
-  it("should not modify data that is already version 5", () => {
+  it("should not modify data that is already version 5 (should upgrade to 6)", () => {
     const dataV5 = {
       version: 5,
       title: "Test Dashboard",
@@ -434,6 +476,13 @@ describe("convertDashboardSchemaVersion", () => {
             {
               id: "panel-1",
               type: "bar",
+              layout: {
+                x: 2,
+                y: 1,
+                h: 4,
+                w: 12,
+                i: "panel-1"
+              },
               queries: [
                 {
                   fields: {
@@ -454,9 +503,12 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV5);
-    
-    expect(result.version).toBe(5);
-    expect(result).toEqual(dataV5); // Should be unchanged
+
+    expect(result.version).toBe(6);
+    // Layout dimensions should be updated
+    expect(result.tabs[0].panels[0].layout.w).toBe(48); // 12 * 4
+    expect(result.tabs[0].panels[0].layout.x).toBe(8); // 2 * 4
+    expect(result.tabs[0].panels[0].layout.h).toBe(8); // 4 * 2
   });
 
   it("should handle version higher than current schema version", () => {
@@ -483,6 +535,13 @@ describe("convertDashboardSchemaVersion", () => {
             {
               id: "panel-1",
               type: "bar",
+              layout: {
+                x: 0,
+                y: 0,
+                h: 4,
+                w: 12,
+                i: "panel-1"
+              },
               queries: [
                 {
                   fields: {
@@ -498,8 +557,8 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV3WithSingleX);
-    
-    expect(result.version).toBe(5);
+
+    expect(result.version).toBe(6);
     expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual(["field1"]); // unchanged
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual([]); // empty array added
   });
@@ -514,6 +573,13 @@ describe("convertDashboardSchemaVersion", () => {
             {
               id: "panel-1",
               type: "line",
+              layout: {
+                x: 0,
+                y: 0,
+                h: 4,
+                w: 12,
+                i: "panel-1"
+              },
               queries: [
                 {
                   fields: {
@@ -529,8 +595,8 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV3WithNoX);
-    
-    expect(result.version).toBe(5);
+
+    expect(result.version).toBe(6);
     expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual([]); // unchanged
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual([]); // empty array added
   });
