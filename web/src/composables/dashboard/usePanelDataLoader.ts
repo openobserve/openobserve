@@ -824,10 +824,11 @@ export const usePanelDataLoader = (
         timestamps.start_time != "Invalid Date" &&
         timestamps.end_time != "Invalid Date"
       ) {
+        // Convert milliseconds to microseconds for OpenObserve API
         startISOTimestamp = new Date(
           timestamps.start_time.toISOString(),
-        ).getTime();
-        endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
+        ).getTime() * 1000;
+        endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime() * 1000;
       } else {
         return;
       }

@@ -133,6 +133,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         no-caps
         flat
+        label="Insights"
+        @click="goToAlertInsights"
+        data-test="alert-insights-btn"
+        icon="insights"
+      >
+        <q-tooltip>View alert insights and analysis</q-tooltip>
+      </q-btn>
+      <q-btn
+        class="q-ml-md o2-secondary-button tw-h-[36px]"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-secondary-button-dark'
+            : 'o2-secondary-button-light'
+        "
+        no-caps
+        flat
         :label="t(`dashboard.import`)"
         @click="importAlert"
         data-test="alert-import"
@@ -1784,6 +1800,16 @@ export default defineComponent({
         },
       });
     };
+
+    const goToAlertInsights = () => {
+      router.push({
+        name: "alertInsights",
+        params: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     const exportAlert = async (row: any) => {
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id);
@@ -2262,6 +2288,7 @@ export default defineComponent({
       showImportAlertDialog,
       importAlert,
       goToAlertHistory,
+      goToAlertInsights,
       getTemplates,
       exportAlert,
       updateActiveFolderId,

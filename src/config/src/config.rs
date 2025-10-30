@@ -1157,6 +1157,12 @@ pub struct Common {
     pub min_auto_refresh_interval: u32,
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
+    #[env_config(
+        name = "ZO_USAGE_REPORT_TO_OWN_ORG",
+        default = false,
+        help = "Report alert/report triggers to the originating organization in addition to _meta org"
+    )]
+    pub usage_report_to_own_org: bool,
     #[env_config(name = "ZO_FILE_LIST_DUMP_ENABLED", default = false)]
     pub file_list_dump_enabled: bool,
     #[env_config(name = "ZO_FILE_LIST_DUMP_DUAL_WRITE", default = true)]

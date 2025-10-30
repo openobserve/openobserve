@@ -18,6 +18,7 @@
     "condition": "Condition",
     "operator": "Operator",
     "value": "Value",
+    "filters": "Filters",
     "selectFilter": "Select Filter",
     "browser": "Browser",
     "attachments": "Attachments",
@@ -1138,6 +1139,40 @@
       "sendStrategyAll": "All",
       "groupWaitTime": "Group Wait Time (seconds)",
       "groupWaitTimeTooltip": "Time to wait and collect similar alerts before sending a grouped notification. Allows batching of alerts that occur in quick succession."
+    },
+    "insights": {
+      "title": "Alert Insights",
+      "badge": "Interactive Analysis",
+      "tabs": {
+        "overview": "Overview",
+        "frequency": "Frequency & Dedup",
+        "correlation": "Correlation & Grouping",
+        "quality": "Alert Quality"
+      },
+      "filters": {
+        "failedOnly": "Failed Only",
+        "failedOnlyTooltip": "Show only failed alert executions",
+        "silenced": "Silenced",
+        "silencedTooltip": "Show only silenced alerts",
+        "clearAll": "Clear All"
+      },
+      "tip": {
+        "title": "Tip:",
+        "message": "Right-click on charts to create filters. Zoom on timeline to filter by time range. Use toggles to filter by status."
+      },
+      "actions": {
+        "actionsFor": "Actions for:",
+        "configureDedup": "Configure Dedup",
+        "configureDedupTooltip": "Configure deduplication for this alert",
+        "editAlert": "Edit Alert",
+        "editAlertTooltip": "Edit alert configuration",
+        "viewHistory": "View History",
+        "viewHistoryTooltip": "View execution history for this alert"
+      },
+      "loading": {
+        "dashboardConfig": "Loading dashboard configuration...",
+        "refreshing": "Refreshing dashboard..."
+      }
     }
   },
   "alert_templates": {
