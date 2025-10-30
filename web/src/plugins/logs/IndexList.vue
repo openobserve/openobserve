@@ -476,8 +476,9 @@ size="xs" /> No field found in
                               "
                             >
                               <q-btn
-                                class="tw-mr-[0.125rem] !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
-                                size="6px"
+                                class="o2-custom-button-hover tw-ml-[0.25rem] !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                                size="5px"
+                                style="margin-right: 4px;"
                                 @click="
                                   addSearchTerm(
                                     props.row.name,
@@ -487,16 +488,15 @@ size="xs" /> No field found in
                                 "
                                 title="Include Term"
                                 round
-                                outline
                                 :data-test="`log-search-subfield-list-equal-${props.row.name}-field-btn`"
                               >
-                                 <q-icon>
+                                 <q-icon style="height: 8px; width: 8px;">
                                   <EqualIcon></EqualIcon>
                                 </q-icon>
                               </q-btn>
                               <q-btn
-                                class="!tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
-                                size="6px"
+                                class="o2-custom-button-hover !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                                size="5px"
                                 @click="
                                   addSearchTerm(
                                     props.row.name,
@@ -506,10 +506,9 @@ size="xs" /> No field found in
                                 "
                                 title="Exclude Term"
                                 round
-                                outline
                                 :data-test="`log-search-subfield-list-not-equal-${props.row.name}-field-btn`"
-                              > 
-                              <q-icon>
+                              >
+                                 <q-icon style="height: 8px; width: 8px;">
                                   <NotEqualIcon></NotEqualIcon>
                                 </q-icon>
                               </q-btn>
@@ -822,7 +821,7 @@ interface Filter {
 }
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
-  components: { },
+  components: { EqualIcon, NotEqualIcon},
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {
