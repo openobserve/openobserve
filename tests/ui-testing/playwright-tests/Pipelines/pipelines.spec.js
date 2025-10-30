@@ -565,19 +565,23 @@ test.describe("Pipeline testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
     await page.locator("button").filter({ hasText: "edit" }).hover();
     await page.getByRole("img", { name: "Stream", exact: true }).click();
-    await page.getByPlaceholder("Column").click();
-    await page.getByPlaceholder("Column").fill("container_name");
-    await page
-      .getByRole("option", { name: "kubernetes_container_name" })
-      .click();
-    await page
-      .locator(
-        "div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native"
-      )
-      .click();
+    await page.waitForTimeout(1000);
+
+    // FilterGroup UI: Fill column select
+    await page.locator('[data-test="alert-conditions-select-column"]').locator('input').click();
+    await page.locator('[data-test="alert-conditions-select-column"]').locator('input').fill("container_name");
+    await page.waitForTimeout(500);
+    await page.getByRole("option", { name: "kubernetes_container_name" }).click();
+
+    // Select operator
+    await page.locator('[data-test="alert-conditions-operator-select"]').click();
+    await page.waitForTimeout(300);
     await page.getByText("Contains", { exact: true }).click();
-    await page.getByPlaceholder("Value").click();
-    await page.getByPlaceholder("Value").fill("prometheus");
+
+    // Fill value input
+    await page.locator('[data-test="alert-conditions-value-input"]').locator('input').click();
+    await page.locator('[data-test="alert-conditions-value-input"]').locator('input').fill("prometheus");
+
     await pipelinePage.saveCondition();
     await page.waitForTimeout(2000);
     await page.getByText("kubernetes_container_name").hover();
