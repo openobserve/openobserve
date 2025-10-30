@@ -613,7 +613,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(re_pattern::delete)
         .service(re_pattern::test)
         .service(domain_management::get_domain_management_config)
-        .service(domain_management::set_domain_management_config);
+        .service(domain_management::set_domain_management_config)
+        .service(traces::get_service_graph_metrics)
+        .service(traces::get_store_stats);
 
     #[cfg(feature = "cloud")]
     let service = service
