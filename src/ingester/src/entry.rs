@@ -105,6 +105,7 @@ impl Entry {
         stream_type: Arc<str>,
         schema: Arc<Schema>,
     ) -> Result<Arc<RecordBatchEntry>> {
+        log::info!("into batch for stream_type {stream_type}, schema : {schema:?}");
         let batch = convert_json_to_record_batch(&schema, &self.data)
             .inspect_err(|e| {
                 log::error!(

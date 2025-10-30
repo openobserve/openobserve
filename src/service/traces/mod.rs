@@ -864,6 +864,8 @@ async fn write_traces(
     let record_schema = Arc::new(record_schema);
     let schema_key = record_schema.hash_key();
 
+    log::info!("here, record schema for {org_id}/{stream_name} : {record_schema:?}");
+
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
     let mut trace_index_values = Vec::with_capacity(json_data.len());
