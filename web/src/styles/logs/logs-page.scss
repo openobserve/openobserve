@@ -569,14 +569,21 @@
   }
 
   .button-left {
-    border-top-left-radius: 0.375rem; // 6px
-    border-bottom-left-radius: 0.375rem; // 6px
+    border-radius: 0 !important;
+    border-top-left-radius: 0.375rem !important; // 6px
+    border-bottom-left-radius: 0.375rem !important; // 6px
+    color: var(--o2-text-primary);
+  }
+
+  .button-center {
+    border-radius: 0 !important;
     color: var(--o2-text-primary);
   }
 
   .button-right {
-    border-top-right-radius: 0.375rem; // 6px
-    border-bottom-right-radius: 0.375rem; // 6px
+    border-radius: 0 !important;
+    border-top-right-radius: 0.375rem !important; // 6px
+    border-bottom-right-radius: 0.375rem !important; // 6px
     color: var(--o2-text-primary);
   }
   .selected {
