@@ -21,7 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       ref="fullscreenDiv"
       :class="{'fullscreen': isFullscreen,
-        'tw-h-[calc(100vh-105px)]': !store.state.printMode
+        'tw-h-[calc(100vh-105px)]': !store.state.printMode,
+        'print-mode-container': store.state.printMode
         }"
       class="tw-mx-[0.625rem] q-pt-xs"
     >
@@ -1316,6 +1317,11 @@ export default defineComponent({
   left: 0;
   z-index: 10000; /* Ensure it's on top */
   /* Additional styling as needed */
+}
+
+.print-mode-container {
+  height: 100vh !important;
+  overflow-y: auto !important;
 }
 
 .dashboard-icons {
