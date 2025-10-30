@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div class="sql-query-pane full-height">
               <div
-                class="pane-header q-pa-sm row items-center"
+                class="pane-header q-pa-sm tw-px-[1rem] row items-center"
                 :class="store.state.theme === 'dark' ? 'pane-header-dark' : 'pane-header-light'"
               >
                 <q-icon name="code" size="20px" class="q-mr-sm" />
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div class="explain-results-pane full-height">
               <div
-                class="pane-header q-pa-sm row items-center"
+                class="pane-header q-pa-sm tw-px-[1rem]  row items-center"
                 :class="store.state.theme === 'dark' ? 'pane-header-dark' : 'pane-header-light'"
               >
                 <div class="text-subtitle1 text-weight-medium">
@@ -67,10 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-space />
                 <q-btn
                   v-if="!isAnalyzing && !showAnalyzeResults"
-                  icon="analytics"
                   color="primary"
                   :label="t('search.analyze')"
-                  flat
                   no-caps
                   size="sm"
                   @click="runAnalyze"
@@ -135,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     active-color="primary"
                     indicator-color="primary"
                     align="left"
+                    no-caps
                   >
                     <q-tab name="logical" :label="t('search.logicalPlan')" />
                     <q-tab name="physical" :label="t('search.physicalPlan')" />
