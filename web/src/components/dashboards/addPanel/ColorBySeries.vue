@@ -48,6 +48,7 @@
       "
       no-caps
       data-test="dashboard-addpanel-config-colorBySeries-add-btn"
+      class="el-border"
     />
     <q-dialog v-model="showColorBySeriesPopUp">
       <ColorBySeriesPopUp
