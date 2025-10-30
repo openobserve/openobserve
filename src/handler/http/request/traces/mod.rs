@@ -27,8 +27,7 @@ use serde::Serialize;
 use tracing::{Instrument, Span};
 
 // Re-export service graph API handlers
-#[cfg(feature = "enterprise")]
-pub use crate::service::traces::service_graph::{get_service_graph_metrics, get_store_stats};
+pub use crate::service::traces::service_graph::{self, get_service_graph_metrics, get_store_stats};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},

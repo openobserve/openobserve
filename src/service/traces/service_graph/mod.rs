@@ -18,11 +18,9 @@
 //! This module provides API endpoints for the service graph feature.
 //! The core logic is implemented in the enterprise repository.
 
-#[cfg(feature = "enterprise")]
 pub mod api;
 
 // Re-export API handlers for routing
-#[cfg(feature = "enterprise")]
 pub use api::{get_service_graph_metrics, get_store_stats};
 // Re-export enterprise types and functions for internal use
 #[cfg(feature = "enterprise")]
