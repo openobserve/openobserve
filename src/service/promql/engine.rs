@@ -859,11 +859,35 @@ impl Engine {
 
         Ok(match func_name {
             Func::Abs => functions::abs(input)?,
-            Func::Absent => functions::absent(input, self.time)?,
-            Func::AbsentOverTime => functions::absent_over_time(input)?,
-            Func::AvgOverTime => functions::avg_over_time(input)?,
+            Func::Absent => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::absent_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("absent without eval_ctx is not supported yet");
+                }
+            }
+            Func::AbsentOverTime => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::absent_over_time_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("absent_over_time without eval_ctx is not supported yet");
+                }
+            }
+            Func::AvgOverTime => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::avg_over_time_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("avg_over_time without eval_ctx is not supported yet");
+                }
+            }
             Func::Ceil => functions::ceil(input)?,
-            Func::Changes => functions::changes(input)?,
+            Func::Changes => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::changes_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("changes without eval_ctx is not supported yet");
+                }
+            }
             Func::Clamp => {
                 let err =
                     "Invalid args, expected \"clamp(v instant-vector, min scalar, max scalar)\"";
@@ -884,7 +908,11 @@ impl Engine {
                         return Err(DataFusionError::NotImplemented(err.into()));
                     }
                 };
-                functions::clamp(input, min_f, max_f)?
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::clamp_range(input, min_f, max_f, eval_ctx)?
+                } else {
+                    unimplemented!("clamp without eval_ctx is not supported yet");
+                }
             }
             Func::ClampMax => {
                 let err = "Invalid args, expected \"clamp(v instant-vector, max scalar)\"";
@@ -898,7 +926,11 @@ impl Engine {
                         return Err(DataFusionError::NotImplemented(err.into()));
                     }
                 };
-                functions::clamp(input, f64::MIN, max_f)?
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::clamp_range(input, f64::MIN, max_f, eval_ctx)?
+                } else {
+                    unimplemented!("clamp_max without eval_ctx is not supported yet");
+                }
             }
             Func::ClampMin => {
                 let err = "Invalid args, expected \"clamp(v instant-vector, min scalar)\"";
@@ -912,15 +944,37 @@ impl Engine {
                         return Err(DataFusionError::NotImplemented(err.into()));
                     }
                 };
-                functions::clamp(input, min_f, f64::MAX)?
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::clamp_range(input, min_f, f64::MAX, eval_ctx)?
+                } else {
+                    unimplemented!("clamp_min without eval_ctx is not supported yet");
+                }
             }
-            Func::CountOverTime => functions::count_over_time(input)?,
+            Func::CountOverTime => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::count_over_time_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("count_over_time without eval_ctx is not supported yet");
+                }
+            }
             Func::DayOfMonth => functions::day_of_month(input)?,
             Func::DayOfWeek => functions::day_of_week(input)?,
             Func::DayOfYear => functions::day_of_year(input)?,
             Func::DaysInMonth => functions::days_in_month(input)?,
-            Func::Delta => functions::delta(input)?,
-            Func::Deriv => functions::deriv(input)?,
+            Func::Delta => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::delta_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("delta without eval_ctx is not supported yet");
+                }
+            }
+            Func::Deriv => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::deriv_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("deriv without eval_ctx is not supported yet");
+                }
+            }
             Func::Exp => functions::exp(input)?,
             Func::Floor => functions::floor(input)?,
             Func::HistogramCount => {
@@ -979,12 +1033,34 @@ impl Engine {
                 let scaling_factor = self.parse_f64_else_err(&sf, err)?;
                 let trend_factor = self.parse_f64_else_err(&tf, err)?;
 
-                functions::holt_winters(input, scaling_factor, trend_factor)?
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::holt_winters_range(input, scaling_factor, trend_factor, eval_ctx)?
+                } else {
+                    unimplemented!("holt_winters without eval_ctx is not supported yet");
+                }
             }
             Func::Hour => functions::hour(input)?,
-            Func::Idelta => functions::idelta(input)?,
-            Func::Increase => functions::increase(input)?,
-            Func::Irate => functions::irate(input)?,
+            Func::Idelta => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::idelta_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("idelta without eval_ctx is not supported yet");
+                }
+            }
+            Func::Increase => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::increase_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("increase without eval_ctx is not supported yet");
+                }
+            }
+            Func::Irate => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::irate_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("irate without eval_ctx is not supported yet");
+                }
+            }
             Func::LabelJoin => {
                 let err = "Invalid args, expected \"label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)\"";
                 self.ensure_ge_three_args(args, err)?;
@@ -1033,12 +1109,30 @@ impl Engine {
 
                 functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)?
             }
-            Func::LastOverTime => functions::last_over_time(input)?,
+            Func::LastOverTime => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::last_over_time_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("last_over_time without eval_ctx is not supported yet");
+                }
+            }
             Func::Ln => functions::ln(input)?,
             Func::Log10 => functions::log10(input)?,
             Func::Log2 => functions::log2(input)?,
-            Func::MaxOverTime => functions::max_over_time(input)?,
-            Func::MinOverTime => functions::min_over_time(input)?,
+            Func::MaxOverTime => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::max_over_time_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("max_over_time without eval_ctx is not supported yet");
+                }
+            }
+            Func::MinOverTime => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::min_over_time_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("min_over_time without eval_ctx is not supported yet");
+                }
+            }
             Func::Minute => functions::minute(input)?,
             Func::Month => functions::month(input)?,
             Func::PredictLinear => {
@@ -1052,7 +1146,11 @@ impl Engine {
                         "Invalid prediction_steps, f64 expected".into(),
                     ),
                 )?;
-                functions::predict_linear(input, prediction_steps)?
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::predict_linear_range(input, prediction_steps, eval_ctx)?
+                } else {
+                    unimplemented!("predict_linear without eval_ctx is not supported yet");
+                }
             }
             Func::QuantileOverTime => {
                 let err = "Invalid args, expected \"quantile_over_time(scalar, range-vector)\"";
@@ -1067,17 +1165,27 @@ impl Engine {
                     }
                 };
                 let input = self.call_expr_second_arg(args).await?;
-                functions::quantile_over_time(self.time, phi_quantile, input)?
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::quantile_over_time_range(phi_quantile, input, eval_ctx)?
+                } else {
+                    unimplemented!("quantile_over_time without eval_ctx is not supported yet");
+                }
             }
             Func::Rate => {
                 // Use range version if we have an eval context
                 if let Some(ref eval_ctx) = self.eval_ctx {
                     functions::rate_range(input, eval_ctx)?
                 } else {
-                    functions::rate(input)?
+                    unimplemented!("rate without eval_ctx is not supported yet");
                 }
             }
-            Func::Resets => functions::resets(input)?,
+            Func::Resets => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::resets_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("resets without eval_ctx is not supported yet");
+                }
+            }
             Func::Round => functions::round(input)?,
             Func::Scalar => match input {
                 Value::Float(_) => input,
@@ -1099,9 +1207,27 @@ impl Engine {
                 )));
             }
             Func::Sqrt => functions::sqrt(input)?,
-            Func::StddevOverTime => functions::stddev_over_time(input)?,
-            Func::StdvarOverTime => functions::stdvar_over_time(input)?,
-            Func::SumOverTime => functions::sum_over_time(input)?,
+            Func::StddevOverTime => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::stddev_over_time_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("stddev_over_time without eval_ctx is not supported yet");
+                }
+            }
+            Func::StdvarOverTime => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::stdvar_over_time_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("stdvar_over_time without eval_ctx is not supported yet");
+                }
+            }
+            Func::SumOverTime => {
+                if let Some(ref eval_ctx) = self.eval_ctx {
+                    functions::sum_over_time_range(input, eval_ctx)?
+                } else {
+                    unimplemented!("sum_over_time without eval_ctx is not supported yet");
+                }
+            }
             Func::Time => Value::Float((self.time / 1_000_000) as f64),
             Func::Timestamp => match input {
                 Value::Vector(instant_value) => {

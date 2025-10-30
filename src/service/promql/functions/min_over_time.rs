@@ -16,23 +16,51 @@
 use config::utils::sort::sort_float;
 use datafusion::error::Result;
 
-use crate::service::promql::value::{RangeValue, Value};
+use crate::service::promql::{
+    functions::RangeFunc,
+    value::{EvalContext, Labels, RangeValue, Sample, TimeWindow, Value},
+};
 
-pub(crate) fn min_over_time(data: Value) -> Result<Value> {
-    super::eval_idelta(data, "min_over_time", exec, false)
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn min_over_time_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!("[PromQL Timing] min_over_time_range() started");
+    let result = super::eval_range(data, MinOverTimeFunc::new(), eval_ctx);
+    log::info!(
+        "[PromQL Timing] min_over_time_range() execution took: {:?}",
+        start.elapsed()
+    );
+    result
 }
 
-fn exec(data: RangeValue) -> Option<f64> {
-    if data.samples.is_empty() {
-        return None;
+pub struct MinOverTimeFunc;
+
+impl MinOverTimeFunc {
+    pub fn new() -> Self {
+        MinOverTimeFunc {}
     }
-    Some(
-        data.samples
-            .iter()
-            .map(|s| s.value)
-            .min_by(sort_float)
-            .unwrap(),
-    )
+}
+
+impl RangeFunc for MinOverTimeFunc {
+    fn name(&self) -> &'static str {
+        "min_over_time"
+    }
+
+    fn exec_instant(&self, _data: RangeValue) -> Option<f64> {
+        None
+    }
+
+    fn exec_range(
+        &self,
+        _labels: &Labels,
+        samples: &[Sample],
+        _time_win: &Option<TimeWindow>,
+    ) -> Option<f64> {
+        if samples.is_empty() {
+            return None;
+        }
+        Some(samples.iter().map(|s| s.value).min_by(sort_float).unwrap())
+    }
 }
 
 #[cfg(test)]
@@ -41,6 +69,11 @@ mod tests {
 
     use super::*;
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+    // Test helper
+    fn min_over_time_test_helper(data: Value) -> Result<Value> {
+        let eval_ctx = EvalContext::instant(3000);
+        min_over_time_range(data, &eval_ctx)
+    }
 
     #[test]
     fn test_min_over_time_function() {
@@ -63,7 +96,7 @@ mod tests {
         };
 
         let matrix = Value::Matrix(vec![range_value]);
-        let result = min_over_time(matrix).unwrap();
+        let result = min_over_time_test_helper(matrix).unwrap();
 
         // Should return a vector with min value
         match result {

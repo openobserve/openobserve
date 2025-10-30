@@ -15,19 +15,19 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::value::{
-    EvalContext, ExtrapolationKind, RangeValue, Value, extrapolated_rate,
+use crate::service::promql::{
+    functions::RangeFunc,
+    value::{
+        EvalContext, ExtrapolationKind, Labels, RangeValue, Sample, TimeWindow, Value,
+        extrapolated_rate,
+    },
 };
-
-pub(crate) fn rate(data: Value) -> Result<Value> {
-    super::eval_idelta(data, "rate", exec, false)
-}
 
 /// Enhanced version that processes all timestamps at once for range queries
 pub(crate) fn rate_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
-    log::info!("[PromQL Timing] rate_range() started",);
-    let result = super::eval_idelta_range(data, "rate", exec, eval_ctx);
+    log::info!("[PromQL Timing] rate_range() started");
+    let result = super::eval_range(data, RateFunc::new(), eval_ctx);
     log::info!(
         "[PromQL Timing] rate_range() execution took: {:?}",
         start.elapsed()
@@ -35,16 +35,38 @@ pub(crate) fn rate_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     result
 }
 
-fn exec(series: RangeValue) -> Option<f64> {
-    let tw = series
-        .time_window
-        .as_ref()
-        .expect("BUG: `rate` function requires time window");
-    extrapolated_rate(
-        &series.samples,
-        tw.eval_ts,
-        tw.range,
-        tw.offset,
-        ExtrapolationKind::Rate,
-    )
+pub struct RateFunc;
+
+impl RateFunc {
+    pub fn new() -> Self {
+        RateFunc {}
+    }
+}
+
+impl RangeFunc for RateFunc {
+    fn name(&self) -> &'static str {
+        "rate"
+    }
+
+    fn exec_instant(&self, _data: RangeValue) -> Option<f64> {
+        None
+    }
+
+    fn exec_range(
+        &self,
+        _labels: &Labels,
+        samples: &[Sample],
+        time_win: &Option<TimeWindow>,
+    ) -> Option<f64> {
+        let tw = time_win
+            .as_ref()
+            .expect("BUG: `rate` function requires time window");
+        extrapolated_rate(
+            samples,
+            tw.eval_ts,
+            tw.range,
+            tw.offset,
+            ExtrapolationKind::Rate,
+        )
+    }
 }

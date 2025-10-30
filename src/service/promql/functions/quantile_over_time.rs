@@ -13,55 +13,57 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::error::{DataFusionError, Result};
+use datafusion::error::Result;
 
 use crate::service::promql::{
-    aggregations::prepare_vector,
     common::quantile,
-    value::{InstantValue, Sample, Value},
+    functions::RangeFunc,
+    value::{EvalContext, Labels, RangeValue, Sample, TimeWindow, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#quantile_over_time
-pub(crate) fn quantile_over_time(timestamp: i64, phi_quantile: f64, data: Value) -> Result<Value> {
-    eval(data, phi_quantile, timestamp, false)
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn quantile_over_time_range(
+    phi_quantile: f64,
+    data: Value,
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!("[PromQL Timing] quantile_over_time_range() started");
+    let result = super::eval_range(data, QuantileOverTimeFunc::new(phi_quantile), eval_ctx);
+    log::info!(
+        "[PromQL Timing] quantile_over_time_range() execution took: {:?}",
+        start.elapsed()
+    );
+    result
 }
 
-pub(crate) fn eval(
-    data: Value,
+pub struct QuantileOverTimeFunc {
     phi_quantile: f64,
-    timestamp: i64,
-    _keep_name_label: bool,
-) -> Result<Value> {
-    let data = match data {
-        Value::Matrix(v) => v,
-        Value::None => return Ok(Value::None),
-        v => {
-            return Err(DataFusionError::Plan(format!(
-                "quantile_over_time: matrix argument expected, got {:?}",
-                v.get_type()
-            )));
-        }
-    };
+}
 
-    if data.is_empty() {
-        return prepare_vector(timestamp, f64::NAN);
+impl QuantileOverTimeFunc {
+    pub fn new(phi_quantile: f64) -> Self {
+        QuantileOverTimeFunc { phi_quantile }
+    }
+}
+
+impl RangeFunc for QuantileOverTimeFunc {
+    fn name(&self) -> &'static str {
+        "quantile_over_time"
     }
 
-    let mut rate_values = Vec::with_capacity(data.len());
-    for mut metric in data {
-        let labels = std::mem::take(&mut metric.labels);
-        // if !keep_name_label {
-        //     labels = metric.labels.without_metric_name();
-        // };
-
-        let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
-        let input: Vec<f64> = metric.samples.iter().map(|x| x.value).collect();
-        if let Some(value) = quantile(&input, phi_quantile) {
-            rate_values.push(InstantValue {
-                labels,
-                sample: Sample::new(eval_ts, value),
-            });
-        }
+    fn exec_instant(&self, _data: RangeValue) -> Option<f64> {
+        None
     }
-    Ok(Value::Vector(rate_values))
+
+    fn exec_range(
+        &self,
+        _labels: &Labels,
+        samples: &[Sample],
+        _time_win: &Option<TimeWindow>,
+    ) -> Option<f64> {
+        let input: Vec<f64> = samples.iter().map(|x| x.value).collect();
+        quantile(&input, self.phi_quantile)
+    }
 }

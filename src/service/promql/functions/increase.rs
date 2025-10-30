@@ -15,24 +15,60 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::value::{ExtrapolationKind, RangeValue, Value, extrapolated_rate};
+use crate::service::promql::{
+    functions::RangeFunc,
+    value::{
+        EvalContext, ExtrapolationKind, Labels, RangeValue, Sample, TimeWindow, Value,
+        extrapolated_rate,
+    },
+};
 
-pub(crate) fn increase(data: Value) -> Result<Value> {
-    super::eval_idelta(data, "increase", exec, false)
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn increase_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!("[PromQL Timing] increase_range() started");
+    let result = super::eval_range(data, IncreaseFunc::new(), eval_ctx);
+    log::info!(
+        "[PromQL Timing] increase_range() execution took: {:?}",
+        start.elapsed()
+    );
+    result
 }
 
-fn exec(series: RangeValue) -> Option<f64> {
-    let tw = series
-        .time_window
-        .as_ref()
-        .expect("BUG: `increase` function requires time window");
-    extrapolated_rate(
-        &series.samples,
-        tw.eval_ts,
-        tw.range,
-        tw.offset,
-        ExtrapolationKind::Increase,
-    )
+pub struct IncreaseFunc;
+
+impl IncreaseFunc {
+    pub fn new() -> Self {
+        IncreaseFunc {}
+    }
+}
+
+impl RangeFunc for IncreaseFunc {
+    fn name(&self) -> &'static str {
+        "increase"
+    }
+
+    fn exec_instant(&self, _data: RangeValue) -> Option<f64> {
+        None
+    }
+
+    fn exec_range(
+        &self,
+        _labels: &Labels,
+        samples: &[Sample],
+        time_win: &Option<TimeWindow>,
+    ) -> Option<f64> {
+        let tw = time_win
+            .as_ref()
+            .expect("BUG: `increase` function requires time window");
+        extrapolated_rate(
+            samples,
+            tw.eval_ts,
+            tw.range,
+            tw.offset,
+            ExtrapolationKind::Increase,
+        )
+    }
 }
 
 #[cfg(test)]
@@ -41,6 +77,11 @@ mod tests {
 
     use super::*;
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+    // Test helper
+    fn increase_test_helper(data: Value) -> Result<Value> {
+        let eval_ctx = EvalContext::instant(3000);
+        increase_range(data, &eval_ctx)
+    }
 
     #[test]
     fn test_increase_function() {
@@ -59,7 +100,7 @@ mod tests {
         };
 
         let matrix = Value::Matrix(vec![range_value]);
-        let result = increase(matrix).unwrap();
+        let result = increase_test_helper(matrix).unwrap();
 
         // Should return a vector with increase value
         match result {

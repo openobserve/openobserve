@@ -19,8 +19,9 @@ use datafusion::error::{DataFusionError, Result};
 use rayon::prelude::*;
 use strum::EnumString;
 
-use crate::service::promql::value::{
-    ExtrapolationKind, InstantValue, RangeValue, Sample, Value, extrapolated_rate,
+use crate::service::promql::{
+    micros,
+    value::{EvalContext, InstantValue, Labels, RangeValue, Sample, TimeWindow, Value},
 };
 
 mod absent;
@@ -52,32 +53,32 @@ mod sum_over_time;
 mod time_operations;
 mod vector;
 
-pub(crate) use absent::absent;
-pub(crate) use absent_over_time::absent_over_time;
-pub(crate) use avg_over_time::avg_over_time;
-pub(crate) use changes::changes;
-pub(crate) use clamp::clamp;
-pub(crate) use count_over_time::count_over_time;
-pub(crate) use delta::delta;
-pub(crate) use deriv::deriv;
+pub(crate) use absent::absent_range;
+pub(crate) use absent_over_time::absent_over_time_range;
+pub(crate) use avg_over_time::avg_over_time_range;
+pub(crate) use changes::changes_range;
+pub(crate) use clamp::clamp_range;
+pub(crate) use count_over_time::count_over_time_range;
+pub(crate) use delta::delta_range;
+pub(crate) use deriv::deriv_range;
 pub(crate) use histogram::{histogram_quantile, histogram_quantile_range};
-pub(crate) use holt_winters::holt_winters;
-pub(crate) use idelta::idelta;
-pub(crate) use increase::increase;
-pub(crate) use irate::irate;
+pub(crate) use holt_winters::holt_winters_range;
+pub(crate) use idelta::idelta_range;
+pub(crate) use increase::increase_range;
+pub(crate) use irate::irate_range;
 pub(crate) use label_join::label_join;
 pub(crate) use label_replace::label_replace;
-pub(crate) use last_over_time::last_over_time;
+pub(crate) use last_over_time::last_over_time_range;
 pub(crate) use math_operations::*;
-pub(crate) use max_over_time::max_over_time;
-pub(crate) use min_over_time::min_over_time;
-pub(crate) use predict_linear::predict_linear;
-pub(crate) use quantile_over_time::quantile_over_time;
-pub(crate) use rate::{rate, rate_range};
-pub(crate) use resets::resets;
-pub(crate) use stddev_over_time::stddev_over_time;
-pub(crate) use stdvar_over_time::stdvar_over_time;
-pub(crate) use sum_over_time::sum_over_time;
+pub(crate) use max_over_time::max_over_time_range;
+pub(crate) use min_over_time::min_over_time_range;
+pub(crate) use predict_linear::predict_linear_range;
+pub(crate) use quantile_over_time::quantile_over_time_range;
+pub(crate) use rate::rate_range;
+pub(crate) use resets::resets_range;
+pub(crate) use stddev_over_time::stddev_over_time_range;
+pub(crate) use stdvar_over_time::stdvar_over_time_range;
+pub(crate) use sum_over_time::sum_over_time_range;
 pub(crate) use time_operations::*;
 pub(crate) use vector::vector;
 
@@ -141,58 +142,35 @@ pub(crate) enum Func {
     Year,
 }
 
-pub(crate) fn eval_idelta(
-    data: Value,
-    fn_name: &str,
-    fn_handler: fn(RangeValue) -> Option<f64>,
-    _keep_name_label: bool,
-) -> Result<Value> {
-    let data = match data {
-        Value::Matrix(v) => v,
-        Value::None => return Ok(Value::None),
-        v => {
-            return Err(DataFusionError::Plan(format!(
-                "{fn_name}: matrix argument expected but got {}",
-                v.get_type()
-            )));
-        }
-    };
+#[allow(dead_code)]
+pub trait RangeFunc: Sync {
+    fn name(&self) -> &'static str;
 
-    let mut rate_values = Vec::with_capacity(data.len());
-    for mut metric in data {
-        let labels = std::mem::take(&mut metric.labels);
-        // if !keep_name_label {
-        //     labels = labels.without_metric_name()
-        // };
-
-        let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
-        if let Some(value) = fn_handler(metric) {
-            rate_values.push(InstantValue {
-                labels,
-                sample: Sample::new(eval_ts, value),
-            });
-        }
+    fn exec_instant(&self, _data: RangeValue) -> Option<f64> {
+        None
     }
-    Ok(Value::Vector(rate_values))
+
+    fn exec_range(
+        &self,
+        labels: &Labels,
+        samples: &[Sample],
+        time_win: &Option<TimeWindow>,
+    ) -> Option<f64>;
 }
 
 /// Enhanced version that processes all timestamps at once for range queries
-pub(crate) fn eval_idelta_range(
-    data: Value,
-    fn_name: &str,
-    fn_handler: fn(RangeValue) -> Option<f64>,
-    eval_ctx: &crate::service::promql::value::EvalContext,
-) -> Result<Value> {
-    use crate::service::promql::micros;
-
+pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
+where
+    F: RangeFunc,
+{
     let start = std::time::Instant::now();
-    log::info!("[PromQL Timing] eval_idelta_range({}) started", fn_name);
+    log::info!("[PromQL Timing] eval_idelta_range({}) started", func.name());
 
     let data = match data {
         Value::Matrix(v) => {
             log::info!(
                 "[PromQL Timing] eval_idelta_range({}) processing {} series",
-                fn_name,
+                func.name(),
                 v.len()
             );
             v
@@ -200,7 +178,8 @@ pub(crate) fn eval_idelta_range(
         Value::None => return Ok(Value::None),
         v => {
             return Err(DataFusionError::Plan(format!(
-                "{fn_name}: matrix argument expected but got {}",
+                "{}: matrix argument expected but got {}",
+                func.name(),
                 v.get_type()
             )));
         }
@@ -210,13 +189,15 @@ pub(crate) fn eval_idelta_range(
     if eval_ctx.is_instant() {
         log::info!(
             "[PromQL Timing] eval_idelta_range({}) using instant query path",
-            fn_name
+            func.name()
         );
         let mut rate_values = Vec::with_capacity(data.len());
         for mut metric in data {
             let labels = std::mem::take(&mut metric.labels);
-            let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
-            if let Some(value) = fn_handler(metric) {
+            let time_window = metric.time_window.clone();
+            let eval_ts = time_window.as_ref().unwrap().eval_ts;
+            let value = func.exec_range(&labels, &metric.samples, &time_window);
+            if let Some(value) = value {
                 rate_values.push(InstantValue {
                     labels,
                     sample: Sample::new(eval_ts, value),
@@ -232,7 +213,7 @@ pub(crate) fn eval_idelta_range(
 
     log::info!(
         "[PromQL Timing] eval_idelta_range({}) processing {} time points in range query mode",
-        fn_name,
+        func.name(),
         timestamps.len()
     );
 
@@ -241,7 +222,7 @@ pub(crate) fn eval_idelta_range(
     let chunk_size = (data.len() / thread_num).max(1);
     log::info!(
         "[PromQL Timing] eval_idelta_range({}) using {} threads with chunk_size {}",
-        fn_name,
+        func.name(),
         thread_num,
         chunk_size
     );
@@ -280,12 +261,14 @@ pub(crate) fn eval_idelta_range(
                             continue;
                         }
 
-                        if let Some(value) = extrapolated_rate(
+                        if let Some(value) = func.exec_range(
+                            &labels,
                             window_samples,
-                            eval_ts,
-                            range,
-                            Duration::ZERO,
-                            ExtrapolationKind::Rate,
+                            &Some(TimeWindow {
+                                eval_ts,
+                                range,
+                                offset: Duration::ZERO,
+                            }),
                         ) {
                             result_samples.push(Sample::new(eval_ts, value));
                         }
@@ -307,7 +290,7 @@ pub(crate) fn eval_idelta_range(
         .collect();
     log::info!(
         "[PromQL Timing] eval_idelta_range({}) parallel processing took: {:?}",
-        fn_name,
+        func.name(),
         parallel_start.elapsed()
     );
 
@@ -315,7 +298,7 @@ pub(crate) fn eval_idelta_range(
 
     log::info!(
         "[PromQL Timing] eval_idelta_range({}) completed in {:?}, produced {} series",
-        fn_name,
+        func.name(),
         start.elapsed(),
         range_values.len()
     );

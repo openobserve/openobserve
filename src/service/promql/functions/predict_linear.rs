@@ -13,43 +13,60 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::error::{DataFusionError, Result};
+use datafusion::error::Result;
 
 use crate::service::promql::{
     common::linear_regression,
-    value::{InstantValue, Sample, Value},
+    functions::RangeFunc,
+    value::{EvalContext, Labels, RangeValue, Sample, TimeWindow, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#predict_linear
-pub(crate) fn predict_linear(data: Value, duration: f64) -> Result<Value> {
-    exec(data, duration)
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn predict_linear_range(
+    data: Value,
+    duration: f64,
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!("[PromQL Timing] predict_linear_range() started");
+    let result = super::eval_range(data, PredictLinearFunc::new(duration), eval_ctx);
+    log::info!(
+        "[PromQL Timing] predict_linear_range() execution took: {:?}",
+        start.elapsed()
+    );
+    result
 }
 
-fn exec(data: Value, duration: f64) -> Result<Value> {
-    let data = match data {
-        Value::Matrix(v) => v,
-        Value::None => return Ok(Value::None),
-        v => {
-            return Err(DataFusionError::Plan(format!(
-                "predict_linear: matrix argument expected, got {}",
-                v.get_type()
-            )));
-        }
-    };
+pub struct PredictLinearFunc {
+    duration: f64,
+}
 
-    let mut rate_values = Vec::with_capacity(data.len());
-    for mut metric in data {
-        let labels = std::mem::take(&mut metric.labels);
-        let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
-        if let Some((slope, intercept)) = linear_regression(&metric.samples, eval_ts / 1000) {
-            let value = slope * duration + intercept;
-            rate_values.push(InstantValue {
-                labels,
-                sample: Sample::new(eval_ts, value),
-            });
-        }
+impl PredictLinearFunc {
+    pub fn new(duration: f64) -> Self {
+        PredictLinearFunc { duration }
     }
-    Ok(Value::Vector(rate_values))
+}
+
+impl RangeFunc for PredictLinearFunc {
+    fn name(&self) -> &'static str {
+        "predict_linear"
+    }
+
+    fn exec_instant(&self, _data: RangeValue) -> Option<f64> {
+        None
+    }
+
+    fn exec_range(
+        &self,
+        _labels: &Labels,
+        samples: &[Sample],
+        time_win: &Option<TimeWindow>,
+    ) -> Option<f64> {
+        let eval_ts = time_win.as_ref()?.eval_ts;
+        let (slope, intercept) = linear_regression(samples, eval_ts / 1000)?;
+        Some(slope * self.duration + intercept)
+    }
 }
 
 #[cfg(test)]
@@ -58,6 +75,12 @@ mod tests {
 
     use super::*;
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+
+    // Test helper
+    fn predict_linear_test_helper(data: Value, duration: f64) -> Result<Value> {
+        let eval_ctx = EvalContext::instant(3000);
+        predict_linear_range(data, duration, &eval_ctx)
+    }
 
     #[test]
     fn test_predict_linear_function() {
@@ -79,7 +102,7 @@ mod tests {
         };
         let matrix = Value::Matrix(vec![range_value]);
         let duration = 10.0;
-        let result = predict_linear(matrix, duration).unwrap();
+        let result = predict_linear_test_helper(matrix, duration).unwrap();
         match result {
             Value::Vector(v) => {
                 assert_eq!(v.len(), 1);

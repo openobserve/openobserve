@@ -13,39 +13,67 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::error::{DataFusionError, Result};
+use datafusion::error::Result;
 
 use crate::service::promql::{
     common::calculate_trend,
-    value::{InstantValue, Sample, Value},
+    functions::RangeFunc,
+    value::{EvalContext, Labels, RangeValue, Sample, TimeWindow, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#holt_winters
-pub(crate) fn holt_winters(data: Value, scaling_factor: f64, trend_factor: f64) -> Result<Value> {
-    let data = match data {
-        Value::Matrix(v) => v,
-        Value::None => return Ok(Value::None),
-        v => {
-            return Err(DataFusionError::Plan(format!(
-                "holt_winters: matrix argument expected got {}",
-                v.get_type()
-            )));
-        }
-    };
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn holt_winters_range(
+    data: Value,
+    scaling_factor: f64,
+    trend_factor: f64,
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!("[PromQL Timing] holt_winters_range() started");
+    let result = super::eval_range(
+        data,
+        HoltWintersFunc::new(scaling_factor, trend_factor),
+        eval_ctx,
+    );
+    log::info!(
+        "[PromQL Timing] holt_winters_range() execution took: {:?}",
+        start.elapsed()
+    );
+    result
+}
 
-    let mut rate_values = Vec::with_capacity(data.len());
-    for mut metric in data {
-        let labels = std::mem::take(&mut metric.labels);
-        let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
-        if let Some(value) = holt_winters_calculation(&metric.samples, scaling_factor, trend_factor)
-        {
-            rate_values.push(InstantValue {
-                labels,
-                sample: Sample::new(eval_ts, value),
-            });
+pub struct HoltWintersFunc {
+    scaling_factor: f64,
+    trend_factor: f64,
+}
+
+impl HoltWintersFunc {
+    pub fn new(scaling_factor: f64, trend_factor: f64) -> Self {
+        HoltWintersFunc {
+            scaling_factor,
+            trend_factor,
         }
     }
-    Ok(Value::Vector(rate_values))
+}
+
+impl RangeFunc for HoltWintersFunc {
+    fn name(&self) -> &'static str {
+        "holt_winters"
+    }
+
+    fn exec_instant(&self, _data: RangeValue) -> Option<f64> {
+        None
+    }
+
+    fn exec_range(
+        &self,
+        _labels: &Labels,
+        samples: &[Sample],
+        _time_win: &Option<TimeWindow>,
+    ) -> Option<f64> {
+        holt_winters_calculation(samples, self.scaling_factor, self.trend_factor)
+    }
 }
 
 pub fn holt_winters_calculation(
@@ -85,6 +113,16 @@ mod tests {
     use super::*;
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
 
+    // Test helper
+    fn holt_winters_test_helper(
+        data: Value,
+        scaling_factor: f64,
+        trend_factor: f64,
+    ) -> Result<Value> {
+        let eval_ctx = EvalContext::instant(3000);
+        holt_winters_range(data, scaling_factor, trend_factor, &eval_ctx)
+    }
+
     #[test]
     fn test_holt_winters_function() {
         // Create a range value with sample data
@@ -106,7 +144,7 @@ mod tests {
         };
 
         let matrix = Value::Matrix(vec![range_value]);
-        let result = holt_winters(matrix, 0.5, 0.3).unwrap();
+        let result = holt_winters_test_helper(matrix, 0.5, 0.3).unwrap();
 
         // Should return a vector with holt-winters forecast
         match result {

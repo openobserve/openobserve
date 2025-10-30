@@ -13,62 +13,110 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::error::{DataFusionError, Result};
+use datafusion::error::Result;
 
-use crate::service::promql::value::{InstantValue, Sample, Value};
+use crate::service::promql::{
+    functions::RangeFunc,
+    value::{EvalContext, Labels, RangeValue, Sample, TimeWindow, Value},
+};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#clamp
-pub(crate) fn clamp(data: Value, min: f64, max: f64) -> Result<Value> {
-    let vec = match data {
-        Value::Vector(v) => v,
-        Value::None => return Ok(Value::None),
-        _ => {
-            return Err(DataFusionError::Plan(
-                "clamp: InstantValue argument expected".into(),
-            ));
-        }
-    };
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn clamp_range(data: Value, min: f64, max: f64, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!("[PromQL Timing] clamp_range() started");
+    let result = super::eval_range(data, ClampFunc::new(min, max), eval_ctx);
+    log::info!(
+        "[PromQL Timing] clamp_range() execution took: {:?}",
+        start.elapsed()
+    );
+    result
+}
 
-    let out = vec
-        .into_iter()
-        .map(|mut instant| {
-            let value = instant.sample.value.clamp(min, max);
-            InstantValue {
-                labels: std::mem::take(&mut instant.labels),
-                sample: Sample::new(instant.sample.timestamp, value),
-            }
-        })
-        .collect();
-    Ok(Value::Vector(out))
+pub struct ClampFunc {
+    min: f64,
+    max: f64,
+}
+
+impl ClampFunc {
+    pub fn new(min: f64, max: f64) -> Self {
+        ClampFunc { min, max }
+    }
+}
+
+impl RangeFunc for ClampFunc {
+    fn name(&self) -> &'static str {
+        "clamp"
+    }
+
+    fn exec_instant(&self, data: RangeValue) -> Option<f64> {
+        // For instant queries, clamp the last sample value
+        data.samples.last().map(|s| s.value.clamp(self.min, self.max))
+    }
+
+    fn exec_range(
+        &self,
+        _labels: &Labels,
+        samples: &[Sample],
+        _time_win: &Option<TimeWindow>,
+    ) -> Option<f64> {
+        // For range queries, clamp the last sample value
+        samples.last().map(|s| s.value.clamp(self.min, self.max))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::service::promql::value::Labels;
+    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+    use std::time::Duration;
+
+    // Test helper
+    fn clamp_test_helper(data: Value, min: f64, max: f64) -> Result<Value> {
+        let eval_ctx = EvalContext::instant(1000);
+        clamp_range(data, min, max, &eval_ctx)
+    }
 
     #[test]
     fn test_clamp_function() {
         let eval_ts = 1000;
 
-        // Test clamping values within range
-        let instant_values = vec![
-            InstantValue {
+        // Create range values (clamp operates on range vectors in the new pattern)
+        let range_values = vec![
+            RangeValue {
                 labels: Labels::default(),
-                sample: Sample::new(eval_ts, 5.0),
+                samples: vec![Sample::new(eval_ts, 5.0)],
+                exemplars: None,
+                time_window: Some(TimeWindow {
+                    eval_ts,
+                    range: Duration::from_secs(5),
+                    offset: Duration::ZERO,
+                }),
             },
-            InstantValue {
+            RangeValue {
                 labels: Labels::default(),
-                sample: Sample::new(eval_ts, 15.0),
+                samples: vec![Sample::new(eval_ts, 15.0)],
+                exemplars: None,
+                time_window: Some(TimeWindow {
+                    eval_ts,
+                    range: Duration::from_secs(5),
+                    offset: Duration::ZERO,
+                }),
             },
-            InstantValue {
+            RangeValue {
                 labels: Labels::default(),
-                sample: Sample::new(eval_ts, 25.0),
+                samples: vec![Sample::new(eval_ts, 25.0)],
+                exemplars: None,
+                time_window: Some(TimeWindow {
+                    eval_ts,
+                    range: Duration::from_secs(5),
+                    offset: Duration::ZERO,
+                }),
             },
         ];
 
-        let vector = Value::Vector(instant_values);
-        let result = clamp(vector, 10.0, 20.0).unwrap();
+        let matrix = Value::Matrix(range_values);
+        let result = clamp_test_helper(matrix, 10.0, 20.0).unwrap();
 
         match result {
             Value::Vector(v) => {
