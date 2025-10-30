@@ -133,13 +133,13 @@ jobs:
           certutil.exe -hashfile ${{ matrix.file_name }}.zip sha256|head -n 2|tail -n 1 > ${{ matrix.file_name }}.zip.sha256sum
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.file_name }}
           path: target/${{ matrix.arch }}/release-prod/${{ matrix.file_name }}${{ matrix.file_ext }}
 
       - name: Upload checksum of artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.file_name }}.sha256sum
           path: target/${{ matrix.arch }}/release-prod/${{ matrix.file_name }}${{ matrix.file_ext }}.sha256sum
