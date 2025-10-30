@@ -194,7 +194,7 @@ PICKTHIS UP after recent changes are merged
             >
               Error Validations
             </div>
-            <div v-else class="text-center text-h6">Output Messages</div>
+            <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
             <q-separator class="q-mx-md q-mt-md" />
             <div class="error-report-container">
               <!-- Regex Pattern Errors Section -->
