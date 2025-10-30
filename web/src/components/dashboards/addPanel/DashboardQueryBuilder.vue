@@ -784,6 +784,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           flat
                           icon="close"
                           @click="cancelHavingFilter(index, 'y')"
+                          class="el-border"
                         />
                       </div>
                     </div>
