@@ -171,11 +171,11 @@ async fn query(
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
     #[cfg(feature = "enterprise")]
     {
-        if crate::service::search::check_search_allowed(org_id, None).is_err() {
+        if let Err(e) = crate::service::search::check_search_allowed(org_id, None) {
             return Ok(
                 HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
                     http::StatusCode::TOO_MANY_REQUESTS,
-                    "installation has exceeded the ingestion limit".to_string(),
+                    e.to_string(),
                 )),
             );
         }
@@ -474,11 +474,11 @@ async fn query_range(
             service::db::org_users::get_cached_user_org,
         };
 
-        if crate::service::search::check_search_allowed(org_id, None).is_err() {
+        if let Err(e) = crate::service::search::check_search_allowed(org_id, None) {
             return Ok(
                 HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
                     http::StatusCode::TOO_MANY_REQUESTS,
-                    "installation has exceeded the ingestion limit".to_string(),
+                    e.to_string(),
                 )),
             );
         }
@@ -742,11 +742,11 @@ async fn series(
 
     #[cfg(feature = "enterprise")]
     {
-        if crate::service::search::check_search_allowed(org_id, None).is_err() {
+        if let Err(e) = crate::service::search::check_search_allowed(org_id, None) {
             return Ok(
                 HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
                     http::StatusCode::TOO_MANY_REQUESTS,
-                    "installation has exceeded the ingestion limit".to_string(),
+                    e.to_string(),
                 )),
             );
         }

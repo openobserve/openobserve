@@ -223,10 +223,10 @@ pub async fn search_http2_stream(
     };
     #[cfg(feature = "enterprise")]
     for stream in stream_names.iter() {
-        if crate::service::search::check_search_allowed(&org_id, Some(stream)).is_err() {
+        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
             return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
                 actix_web::http::StatusCode::TOO_MANY_REQUESTS,
-                "installation has exceeded the ingestion limit".to_string(),
+                e.to_string(),
             ));
         }
     }
@@ -628,12 +628,12 @@ pub async fn values_http2_stream(
 
     #[cfg(feature = "enterprise")]
     {
-        if crate::service::search::check_search_allowed(&org_id, Some(&values_req.stream_name))
-            .is_err()
+        if let Err(e) =
+            crate::service::search::check_search_allowed(&org_id, Some(&values_req.stream_name))
         {
             return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
                 actix_web::http::StatusCode::TOO_MANY_REQUESTS,
-                "installation has exceeded the ingestion limit".to_string(),
+                e.to_string(),
             ));
         }
     }
