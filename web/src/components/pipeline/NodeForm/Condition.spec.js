@@ -546,7 +546,7 @@ describe("Condition Component", () => {
   });
 
   describe("Edge Cases", () => {
-    it("handles condition with empty column", async () => {
+    it("prevents saving condition with empty column", async () => {
       wrapper.vm.conditionGroup = {
         groupId: "test-group",
         label: "and",
@@ -562,10 +562,17 @@ describe("Condition Component", () => {
       };
 
       await wrapper.vm.saveCondition();
-      expect(mockAddNode).toHaveBeenCalled();
+
+      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: "Please add at least one condition"
+        })
+      );
+      expect(mockAddNode).not.toHaveBeenCalled();
     });
 
-    it("handles condition with empty operator", async () => {
+    it("prevents saving condition with empty operator", async () => {
       wrapper.vm.conditionGroup = {
         groupId: "test-group",
         label: "and",
@@ -581,7 +588,14 @@ describe("Condition Component", () => {
       };
 
       await wrapper.vm.saveCondition();
-      expect(mockAddNode).toHaveBeenCalled();
+
+      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: "Please add at least one condition"
+        })
+      );
+      expect(mockAddNode).not.toHaveBeenCalled();
     });
 
     it("preserves nested group structure", () => {
