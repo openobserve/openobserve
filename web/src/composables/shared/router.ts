@@ -30,6 +30,7 @@ const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
+const ServiceGraph = () => import("@/plugins/traces/ServiceGraph.vue");
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
@@ -158,6 +159,18 @@ const useRoutes = () => {
       component: TraceDetails,
       meta: {
         title: "Trace Details",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "service-graph",
+      name: "serviceGraph",
+      component: ServiceGraph,
+      meta: {
+        keepAlive: true,
+        title: "Service Graph",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
