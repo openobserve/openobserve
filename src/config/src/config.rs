@@ -496,6 +496,7 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub encryption: Encryption,
     pub enrichment_table: EnrichmentTable,
+    pub service_graph: ServiceGraph,
 }
 
 #[derive(EnvConfig, Default)]
@@ -1308,6 +1309,8 @@ pub struct Limit {
     pub file_download_priority_queue_window_secs: i64,
     #[env_config(name = "ZO_FILE_DOWNLOAD_ENABLE_PRIORITY_QUEUE", default = true)]
     pub file_download_enable_priority_queue: bool,
+    #[env_config(name = "ZO_GRPC_INGEST_TIMEOUT", default = 600)]
+    pub grpc_ingest_timeout: u64,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
     #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 0)]
@@ -1342,8 +1345,6 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
-    #[env_config(name = "ZO_METRICS_MAX_SERIES_PER_QUERY", default = 30000)]
-    pub metrics_max_series_per_query: usize,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
@@ -2133,6 +2134,38 @@ pub struct EnrichmentTable {
     pub merge_interval: u64,
 }
 
+/// Service Graph Configuration
+///
+/// Note: Worker count is fixed at 256 (one per shard) for optimal concurrency.
+/// No async channels are used in the current implementation.
+#[derive(EnvConfig, Default)]
+pub struct ServiceGraph {
+    #[env_config(
+        name = "ZO_SGRAPH_ENABLED",
+        default = false,
+        help = "Enable service graph feature"
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_SGRAPH_WAIT_DURATION_MS",
+        default = 10000,
+        help = "Wait duration for span pairing in milliseconds"
+    )]
+    pub wait_duration_ms: u64,
+    #[env_config(
+        name = "ZO_SGRAPH_MAX_ITEMS_PER_SHARD",
+        default = 100000,
+        help = "Maximum items per shard in edge store (256 shards total)"
+    )]
+    pub max_items_per_shard: usize,
+    #[env_config(
+        name = "ZO_SGRAPH_CLEANUP_INTERVAL_MS",
+        default = 2000,
+        help = "Cleanup interval for expired edges in milliseconds"
+    )]
+    pub cleanup_interval_ms: u64,
+}
+
 pub fn init() -> Config {
     if let Err(e) = load_config() {
         log::error!("Failed to load config {e}");
@@ -2383,9 +2416,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check for metrics limit
-    if cfg.limit.metrics_max_series_per_query == 0 {
-        cfg.limit.metrics_max_series_per_query = 30_000;
-    }
     if cfg.limit.metrics_max_points_per_series == 0 {
         cfg.limit.metrics_max_points_per_series = 30_000;
     }

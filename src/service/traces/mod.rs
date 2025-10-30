@@ -43,6 +43,8 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::Map;
 
+pub mod service_graph;
+
 #[cfg(feature = "cloud")]
 use crate::service::stream::get_stream;
 use crate::{
@@ -345,21 +347,64 @@ pub async fn handle_otlp_request(
                 }
                 let local_val = Span {
                     trace_id: trace_id.clone(),
-                    span_id,
+                    span_id: span_id.clone(),
                     span_kind: span.kind.to_string(),
-                    span_status: get_span_status(span.status),
+                    span_status: get_span_status(span.status.clone()),
                     operation_name: span.name.clone(),
                     start_time,
                     end_time,
                     duration: (end_time - start_time) / 1000, // microseconds
-                    reference: span_ref,
+                    reference: span_ref.clone(),
                     service_name: service_name.clone(),
-                    attributes: span_att_map,
+                    attributes: span_att_map.clone(),
                     service: service_att_map.clone(),
                     flags: 1, // TODO add appropriate value
                     events: json::to_string(&events).unwrap(),
                     links: json::to_string(&links).unwrap(),
                 };
+
+                // Process span for service graph if enabled
+                #[cfg(feature = "enterprise")]
+                if cfg.service_graph.enabled {
+                    // Wrap in catch_unwind to prevent panics from crashing trace ingestion
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        log::trace!(
+                            "[ServiceGraph] Processing span: trace_id={}, span_id={}",
+                            trace_id,
+                            span_id
+                        );
+                        let parent_span_id_opt =
+                            span_ref.get(PARENT_SPAN_ID).map(|s| Arc::from(s.as_str()));
+                        // Convert HashMap to json::Map
+                        let mut attrs_map = json::Map::new();
+                        for (k, v) in &span_att_map {
+                            attrs_map.insert(k.clone(), v.clone());
+                        }
+                        let graph_span = service_graph::span_to_graph_span(
+                            Arc::from(trace_id.as_str()),
+                            Arc::from(span_id.as_str()),
+                            parent_span_id_opt,
+                            Arc::from(service_name.as_str()),
+                            &local_val.span_kind,
+                            start_time,
+                            end_time,
+                            &local_val.span_status,
+                            &attrs_map,
+                        );
+                        service_graph::process_span(org_id, graph_span);
+                    }));
+
+                    if let Err(e) = result {
+                        log::error!(
+                            "[ServiceGraph] Panic caught during span processing: {:?}",
+                            e
+                        );
+                        // Increment error metric
+                        service_graph::SERVICE_GRAPH_DROPPED_SPANS
+                            .with_label_values(&[org_id])
+                            .inc();
+                    }
+                }
 
                 let mut value: json::Value = json::to_value(local_val).unwrap();
                 // add timestamp

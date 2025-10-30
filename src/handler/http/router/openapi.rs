@@ -52,6 +52,8 @@ use crate::{common::meta, handler::http::request};
         request::logs::loki::loki_push,
         request::traces::traces_write,
         request::traces::get_latest_traces,
+        crate::service::traces::service_graph::api::get_service_graph_metrics,
+        crate::service::traces::service_graph::api::get_store_stats,
         request::metrics::ingest::json,
         request::promql::remote_write,
         request::promql::query_get,

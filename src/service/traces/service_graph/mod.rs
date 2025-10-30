@@ -13,10 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod compactor_manual_jobs;
-pub mod downsampling;
-pub mod files;
-pub mod organization;
-pub mod retention;
-pub mod stats;
-pub mod stream;
+//! Service Graph Module
+//!
+//! This module provides API endpoints for the service graph feature.
+//! The core logic is implemented in the enterprise repository.
+
+pub mod api;
+
+// Re-export API handlers for routing
+pub use api::{get_service_graph_metrics, get_store_stats};
+// Re-export enterprise types and functions for internal use
+#[cfg(feature = "enterprise")]
+pub use o2_enterprise::enterprise::service_graph::{
+    ConnectionType, SERVICE_GRAPH_DROPPED_SPANS, SpanForGraph, SpanKind, init_background_workers,
+    process_span, shutdown_workers, span_to_graph_span,
+};
