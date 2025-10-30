@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           outline
           padding="xs sm"
-          class="q-mr-sm tw-h-[36px]"
+          class="q-mr-sm tw-h-[36px] el-border"
           no-caps
           label="Dashboard Tutorial"
           @click="showTutorial"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           outline
           padding="sm"
-          class="q-mr-sm tw-h-[36px]"
+          class="q-mr-sm tw-h-[36px] el-border"
           no-caps
           icon="info_outline"
           @click="showViewPanel = true"
