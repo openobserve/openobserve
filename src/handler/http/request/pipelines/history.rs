@@ -212,6 +212,7 @@ pub async fn get_pipeline_history(
             end_time,
             from: 0,
             size,
+            track_total_hits: true,
             ..Default::default()
         },
         regions: vec![],
