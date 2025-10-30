@@ -158,6 +158,7 @@
         outline
         dense
         data-test="dashboard-addpanel-config-color-by-series-add-btn"
+        class="el-border"
       />
       <q-btn
         @click="applycolorBySeries"

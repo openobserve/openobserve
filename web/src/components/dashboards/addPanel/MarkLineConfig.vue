@@ -111,6 +111,7 @@
       @click="addNewMarkLine"
       style="cursor: pointer; padding: 0px 5px"
       label="+ Add"
+      class="el-border"
       no-caps
       data-test="dashboard-addpanel-config-markline-add-btn"
     />
