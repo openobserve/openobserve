@@ -26,6 +26,8 @@ use hashbrown::HashMap;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
+// Re-export service graph API handlers
+pub use crate::service::traces::service_graph::{self, get_service_graph_metrics, get_store_stats};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},

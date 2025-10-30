@@ -52,6 +52,8 @@ const largeDatasetSqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_i
 
 const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1"  FROM "${STREAM_NAME}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC `;
 
+const histogramQueryWithHaving = `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "${STREAM_NAME}"  GROUP BY x_axis_1 HAVING y_axis_1 >= 1000 ORDER BY x_axis_1 ASC`;
+
 // Query without aliases for testing error message
 const queryWithoutAliases = `SELECT count(kubernetes_container_hash), count(kubernetes_container_name), count(kubernetes_host) FROM "${STREAM_NAME}" WHERE kubernetes_namespace_name IS NOT NULL GROUP BY kubernetes_annotations_kubectl_kubernetes_io_default_container`;
 
@@ -719,6 +721,47 @@ test.describe("logs testcases", () => {
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
     await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should show connect null values toggle as true by default when visualizing histogram query with HAVING clause", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    // Step 1: Open logs and enable SQL mode
+    await pm.logsVisualise.openLogs();
+
+    // Step 2: Fill the query editor with histogram query that has HAVING clause
+    await pm.logsVisualise.fillLogsQueryEditor(histogramQueryWithHaving);
+
+    // Step 3: Set relative time
+    await pm.logsVisualise.setRelative("6", "w");
+
+    // Step 4: Apply the query
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Step 5: Open the visualize tab
+    await pm.logsVisualise.openVisualiseTab();
+
+    // Step 6: Wait for chart to render
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Step 7: Open the config panel to access the connect null values toggle
+    const panelConfigs = new DashboardPanelConfigs(page);
+    await panelConfigs.openConfigPanel();
+
+    // Wait for the config panel to be visible
+    await page.waitForTimeout(1000);
+
+    // Step 8: Verify connect null values toggle is true by default
+    const connectNullState = await panelConfigs.verifyConnectNullValuesToggle(true);
+    expect(connectNullState).toBe(true);
+
+    // Step 9: Additional assertion using Playwright's expect for the toggle state
+    const connectNullToggle = page.locator(
+      '[data-test="dashboard-config-connect-null-values"]'
+    );
+    await expect(connectNullToggle).toHaveAttribute("aria-checked", "true");
   });
 
 });

@@ -1639,6 +1639,10 @@ export default defineComponent({
               };
             }
 
+            // by default enable connect nulls to true for visualization
+            // will overwrite if preservedConfig has connect_nulls config
+            dashboardPanelData.data.config.connect_nulls = true;
+
             // Always restore preserved config after field extraction
             if (preservedConfig) {
               dashboardPanelData.data.config = {

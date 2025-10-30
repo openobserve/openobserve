@@ -683,8 +683,8 @@ describe("Commons Utility Functions", () => {
       expect(mockDashboard.tabs[0].panels[0].layout).toEqual({
         x: 0,
         y: 0,
-        w: 24,
-        h: 9,
+        w: 96,
+        h: 18,
         i: 1,
         panelId: "panel-1",
         static: false,

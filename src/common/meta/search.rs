@@ -47,6 +47,11 @@ pub struct CacheQueryRequest {
     pub ts_column: String,
     pub histogram_interval: i64,
     pub is_descending: bool,
+    /// Flag indicating this is a histogram query with non-timestamp column ORDER BY.
+    /// When true, cache file timestamps must be calculated by scanning all hits,
+    /// not just first/last, since results may not be time-ordered.
+    /// Example: SELECT histogram(_timestamp), count(*) ... ORDER BY count DESC
+    pub is_histogram_non_ts_order: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
@@ -185,6 +190,7 @@ mod tests {
             ts_column: "timestamp".to_string(),
             histogram_interval: 100,
             is_descending: false,
+            is_histogram_non_ts_order: false,
         };
 
         assert_eq!(request.q_start_time, 1000);
@@ -333,7 +339,7 @@ mod enterprise_tests {
     }
 
     #[test]
-    fn test_calculate_record_batches_deltas_no_cache() {
+    fn test_calculate_record_batches_deltas_without_cache() {
         // Test case: No cache, entire query range should be a delta
         let cache_result = vec![];
         let query_start_time = 10_000_000;

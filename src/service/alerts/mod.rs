@@ -44,6 +44,8 @@ use crate::service::{
 };
 
 pub mod alert;
+#[cfg(feature = "enterprise")]
+pub mod deduplication;
 pub mod derived_streams;
 pub mod destinations;
 pub mod scheduler;
@@ -176,7 +178,7 @@ impl QueryConditionExt for QueryCondition {
                         (end - start) / promql::MAX_DATA_POINTS,
                     ),
                     query_exemplars: false,
-                    no_cache: None,
+                    use_cache: None,
                 };
                 let resp = match promql::search::search(&trace_id, org_id, &req, "", 0).await {
                     Ok(v) => v,
