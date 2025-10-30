@@ -251,6 +251,10 @@ $dark-body-secondary-bg: rgba(14, 19, 29, 0.4);
 $menu-gradient-start: rgba(89, 155, 174, 0.04);
 $menu-gradient-end: rgba(89, 155, 174, 0.08);
 $menu-border-color: rgba(89, 155, 174, 0.6);
+
+$dark-menu-gradient-start: rgba(89, 155, 174, 0.04);
+$dark-menu-gradient-end: rgba(158, 215, 231, 0.08);
+
 $actions-column-box-shawdow: rgba(0, 0, 0, 0.1);
 $actions-column-box-shawdow-dark: rgba(125, 125, 125, 0.694);
 
@@ -382,14 +386,14 @@ $actions-column-box-shawdow-dark: rgba(125, 125, 125, 0.694);
   --o2-border-color: rgba(255, 255, 255, 0.40);
   --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
 
-  --o2-menu-gradient-start: #{$menu-gradient-start};
-  --o2-menu-gradient-end: #{$menu-gradient-end};
-  --o2-menu-border-color: #{$dark-theme-color};
+  --o2-menu-gradient-start: #{$dark-menu-gradient-start};
+  --o2-menu-gradient-end: #{$theme-color};
+  --o2-menu-border-color: #{$theme-color};
   --o2-menu-color: #{$o2-gray-100};
 
   --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
 
-  --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, #{$dark-theme-color});
+  --o2-tab-bg: color-mix(in srgb, white 20%, var(--o2-theme-color));
   --o2-tab-text-color: #{$o2-gray-100};
 
   --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, #{$dark-theme-color});

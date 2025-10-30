@@ -86,6 +86,8 @@ const changeTab = (tab: Tab) => {
   }
   .active {
     border-bottom: 2px solid var(--o2-theme-color);
+    background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+    color: var(--o2-card-text) !important;
   }
 }
 </style>

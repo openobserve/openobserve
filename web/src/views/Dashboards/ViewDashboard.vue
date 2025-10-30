@@ -1350,11 +1350,12 @@ export default defineComponent({
 }
 
 .folder-name {
-  color: var(--q-primary) !important;
+  color: var(--o2-menu-color) !important;
 }
 
 .folder-name:hover {
-  background-color: $accent !important;
+  border-radius: 0.325rem;
+  background-color: var(--o2-tab-bg) !important;
 }
 
 .el-border {
