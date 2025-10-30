@@ -647,7 +647,7 @@ body {
     background-color: $primary !important;
     color: white !important;
     border: 1px solid #cacaca !important;
-    border-bottom: 1px solid #cacaca !important;
+    // border-bottom: 1px solid #cacaca !important;
   }
   .rum-tab:hover{
     background-color: #373A3B !important;
@@ -660,6 +660,7 @@ body {
 .tabs-selection-container{
   border: none;
   border-radius: none;
+  border-bottom: none !important;
   .o2-tab{
     border-radius: 4px;
     height: 30px;
@@ -668,6 +669,7 @@ body {
     width: auto;
     white-space: normal;
     line-height: 1.5rem;
+    border-bottom: none !important;
   }
   .o2-tab.active{
     background-color: var(--o2-primary-btn-bg) !important;
