@@ -56,12 +56,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disable="isVisualizeDisabled"
                 no-caps
                 size="sm"
+                :icon="outlinedShowChart"
               >
-              <img
+              <!-- <img
                   :src="visualizeIcon"
                   alt="Visualize"
                   class="icon-sm"
-                />
+                /> -->
                 <q-tooltip v-if="isVisualizeDisabled">
                   {{ t("search.enableSqlModeOrSelectSingleStream") }}
                 </q-tooltip>
@@ -1596,6 +1597,7 @@ import {
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
+import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
 
 const defaultValue: any = () => {
   return {
@@ -4068,6 +4070,7 @@ export default defineComponent({
       buildStreamQuery,
       updateActionSelection,
       updateEditorWidth,
+      outlinedShowChart,
     };
   },
   computed: {
