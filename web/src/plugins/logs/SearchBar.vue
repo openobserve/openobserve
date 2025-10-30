@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="search"
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm btn-height-32"
+                class="button button-left tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm btn-height-32"
               >
                 <q-tooltip>
                   {{ t("common.search") }}
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'selected'
                     : ''
                 "
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline tw-rounded-none q-px-sm btn-height-32"
+                class="button button-center tw-flex tw-justify-center tw-items-center no-border no-outline tw-rounded-none q-px-sm btn-height-32"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disable="isVisualizeDisabled"
                 no-caps
