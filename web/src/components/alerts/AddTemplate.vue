@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="q-px-sm tw-ml-[0.625rem] q-pt-sm tw-h-full tw-overflow-auto card-container"
+          class="q-px-sm q-pt-sm tw-h-full tw-overflow-auto card-container"
         >
           <div class="text-bold q-py-sm q-px-xs text-subtitle2">
             {{ t("alert_templates.variable_guide_header") }}

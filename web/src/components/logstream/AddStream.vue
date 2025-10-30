@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-close-popup="true"
           round
           flat
-          icon="close"
+          icon="cancel"
         />
       </div>
     </div>
