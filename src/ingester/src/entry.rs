@@ -105,8 +105,13 @@ impl Entry {
         stream_type: Arc<str>,
         schema: Arc<Schema>,
     ) -> Result<Arc<RecordBatchEntry>> {
-        let batch =
-            convert_json_to_record_batch(&schema, &self.data).context(ArrowJsonEncodeSnafu)?;
+        let batch = convert_json_to_record_batch(&schema, &self.data)
+            .inspect_err(|e| {
+                log::error!(
+                    "error converting json to record batch for stream type {stream_type} : {e:?}"
+                );
+            })
+            .context(ArrowJsonEncodeSnafu)?;
 
         let arrow_size = batch.size();
         Ok(RecordBatchEntry::new(

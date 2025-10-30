@@ -397,7 +397,7 @@ pub async fn write_file(
         });
     if let Err(e) = writer.write_batch(entries, fsync).await {
         log::error!(
-            "ingestion write file for stream {}/{} error: {}",
+            "ingestion write file for stream {}/{} error: {:?}",
             writer.get_key_str(),
             stream_name,
             e
