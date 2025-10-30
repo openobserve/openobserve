@@ -475,7 +475,19 @@ pub async fn save_stream_settings(
     }
 
     let mut metadata = schema.metadata.clone();
-    metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+    let settings_json = json::to_string(&settings).unwrap();
+
+    // DEBUG: Log what we're saving
+    log::info!(
+        "[UDS SAVE] Saving settings for {}/{}/{}, defined_schema_fields count: {}, JSON length: {}",
+        org_id,
+        stream_type,
+        stream_name,
+        settings.defined_schema_fields.len(),
+        settings_json.len()
+    );
+
+    metadata.insert("settings".to_string(), settings_json);
     if !metadata.contains_key("created_at") {
         metadata.insert("created_at".to_string(), now_micros().to_string());
     }

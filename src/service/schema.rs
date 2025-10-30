@@ -276,14 +276,49 @@ pub(crate) async fn handle_diff_schema(
     let mut pre_enabled_uds = false;
     let mut uds_fields_to_save = HashSet::new();
     let schema_for_merge_base = if is_new {
-        // Helper to check if field is core
+        // CRITICAL FIX: Core fields must be stream-type aware!
+        // Traces have different core fields than metrics/logs
         let is_core_field = |field_name: &str| {
-            field_name.starts_with("__")
+            // Common core fields
+            if field_name.starts_with("__")
                 || field_name == TIMESTAMP_COL_NAME
                 || field_name == ID_COL_NAME
                 || field_name == ORIGINAL_DATA_COL_NAME
                 || field_name == ALL_VALUES_COL_NAME
                 || field_name == cfg.common.column_all.as_str()
+            {
+                return true;
+            }
+
+            // Stream-type specific core fields
+            match stream_type {
+                StreamType::Traces => {
+                    // Core trace fields that must ALWAYS be preserved
+                    matches!(
+                        field_name,
+                        "trace_id"
+                            | "span_id"
+                            | "service_name"
+                            | "operation_name"
+                            | "start_time"
+                            | "end_time"
+                            | "duration"
+                            | "span_kind"
+                            | "span_status"
+                            | "flags"
+                            | "events"
+                            | "links"
+                            | "reference.parent_span_id"
+                            | "reference.parent_trace_id"
+                            | "reference.ref_type"
+                    )
+                }
+                StreamType::Metrics => {
+                    // Core metric fields
+                    matches!(field_name, "__name__" | "__type__" | "__hash__" | "value" | "le" | "quantile" | "exemplars")
+                }
+                _ => false,
+            }
         };
 
         // Count non-core fields
@@ -292,6 +327,17 @@ pub(crate) async fn handle_diff_schema(
             .iter()
             .filter(|f| !is_core_field(f.name()))
             .count();
+
+        // DEBUG: Log field classification for traces
+        if stream_type == StreamType::Traces {
+            let core_fields: Vec<_> = inferred_schema.fields().iter().filter(|f| is_core_field(f.name())).map(|f| f.name()).collect();
+            let non_core_fields: Vec<_> = inferred_schema.fields().iter().filter(|f| !is_core_field(f.name())).map(|f| f.name()).collect();
+            log::info!(
+                "[UDS PRE-ENABLE DEBUG] Traces fields - Core: {:?}, Non-core count: {}",
+                core_fields,
+                non_core_count
+            );
+        }
 
         // Check thresholds based on stream type
         let (should_pre_enable, max_fields) = match stream_type {

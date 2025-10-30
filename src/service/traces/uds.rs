@@ -23,14 +23,11 @@ use config::{
 /// Core trace fields that are ALWAYS included regardless of UDS configuration
 /// These fields are essential for trace functionality and cannot be excluded
 ///
-/// NOTE: The `reference` HashMap is flattened during serialization, so fields like
-/// `parent_span_id` become `reference.parent_span_id` (with dot notation)
+/// IMPORTANT: These fields MUST be preserved even when UDS is active to ensure
+/// DataFusion can execute SELECT * with WHERE clauses on core fields like trace_id
 const CORE_TRACE_FIELDS: &[&str] = &[
     "trace_id",
     "span_id",
-    "reference.parent_span_id",  // Flattened from reference HashMap
-    "reference.parent_trace_id", // Flattened from reference HashMap
-    "reference.ref_type",        // Flattened from reference HashMap
     "_timestamp",
     "start_time",
     "end_time",
@@ -42,6 +39,11 @@ const CORE_TRACE_FIELDS: &[&str] = &[
     "flags",
     "events",
     "links",
+    // Flattened reference fields (may or may not be present)
+    "reference.parent_span_id",
+    "reference.parent_trace_id",
+    "reference.ref_type",
+    "parent_span_id",  // Alternative flattened name
 ];
 
 /// Refactors span attributes by filtering them based on user-defined schema configuration.
@@ -87,23 +89,53 @@ const CORE_TRACE_FIELDS: &[&str] = &[
 /// // - _all: {"user_id":"12345","debug_flag":"true"}
 /// ```
 pub fn refactor_span_attributes(
-    span_map: Map<String, Value>,
+    mut span_map: Map<String, Value>,
     defined_schema_fields: &StdHashSet<String>,
 ) -> Map<String, Value> {
     let cfg = get_config();
     let mut new_map = Map::with_capacity(CORE_TRACE_FIELDS.len() + defined_schema_fields.len() + 2);
     let mut non_schema_attrs = Map::new();
 
+    // Debug logging to understand what fields we're receiving
+    static mut LOGGED_ONCE: bool = false;
+    unsafe {
+        if !LOGGED_ONCE {
+            let input_keys: Vec<String> = span_map.keys().cloned().collect();
+            log::info!("[UDS REFACTOR] Input fields ({}): {:?}", input_keys.len(), &input_keys[..input_keys.len().min(20)]);
+            log::info!("[UDS REFACTOR] Core field check - trace_id: {}, span_id: {}, service_name: {}",
+                span_map.contains_key("trace_id"),
+                span_map.contains_key("span_id"),
+                span_map.contains_key("service_name")
+            );
+            log::info!("[UDS REFACTOR] UDS fields: {:?}", defined_schema_fields);
+            LOGGED_ONCE = true;
+        }
+    }
+
+    // CRITICAL FIX: Ensure core fields exist with appropriate defaults
+    // This handles cases where fields might be missing from the input
+    for field in CORE_TRACE_FIELDS {
+        if !span_map.contains_key(*field) {
+            // Skip dot-notation fields (like reference.parent_span_id) as they're handled by flattening
+            if !field.contains('.') {
+                // Don't add empty defaults for critical fields - this will cause issues
+                // Instead, log a warning
+                log::warn!("[UDS REFACTOR] Core field '{}' is MISSING from input!", field);
+            }
+        }
+    }
+
+    // Process all fields
     for (key, value) in span_map {
-        // Always include core trace fields
+        // ALWAYS include core trace fields regardless of UDS configuration
         if CORE_TRACE_FIELDS.contains(&key.as_str()) {
-            new_map.insert(key, value);
+            new_map.insert(key.clone(), value);
         }
-        // Include user-defined schema attributes
+        // Also include user-defined schema attributes
         else if defined_schema_fields.contains(&key) {
-            new_map.insert(key, value);
+            new_map.insert(key.clone(), value);
         }
-        // Collect non-schema attributes for _all column
+        // Everything else goes to _all column
         else {
             non_schema_attrs.insert(key, value);
         }

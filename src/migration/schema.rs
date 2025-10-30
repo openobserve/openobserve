@@ -850,8 +850,10 @@ mod meta {
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Default)]
     pub enum Operator {
         #[serde(rename = "=")]
+        #[default]
         EqualTo,
         #[serde(rename = "!=")]
         NotEqualTo,
@@ -867,11 +869,7 @@ mod meta {
         NotContains,
     }
 
-    impl Default for Operator {
-        fn default() -> Self {
-            Self::EqualTo
-        }
-    }
+    
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub struct Destination {

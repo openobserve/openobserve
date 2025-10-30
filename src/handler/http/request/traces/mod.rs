@@ -408,11 +408,11 @@ pub async fn get_latest_traces(
         // Safely extract trace start/end times
         let trace_start_time = item
             .get("trace_start_time")
-            .map(|v| json::get_int_value(v))
+            .map(json::get_int_value)
             .unwrap_or(0);
         let trace_end_time = item
             .get("trace_end_time")
-            .map(|v| json::get_int_value(v))
+            .map(json::get_int_value)
             .unwrap_or(0);
         // trace time is nanosecond, need to compare with microsecond
         if trace_start_time / 1000 < start_time {

@@ -748,6 +748,40 @@ async fn write_traces(
     json_data: Vec<(i64, json::Map<String, json::Value>)>,
 ) -> Result<RequestStats, Error> {
     let cfg = get_config();
+
+    // Helper function to ensure core trace fields exist in record
+    // This is critical for DataFusion to handle SELECT * with WHERE clauses correctly
+    fn ensure_trace_core_fields(record: &mut json::Map<String, json::Value>) {
+        const TRACE_CORE_FIELDS: &[&str] = &[
+            "trace_id",
+            "span_id",
+            "service_name",
+            "operation_name",
+            "start_time",
+            "end_time",
+            "duration",
+            "span_kind",
+            "span_status",
+            "flags",
+            "events",
+            "links",
+        ];
+
+        for field in TRACE_CORE_FIELDS {
+            if !record.contains_key(*field) {
+                // Add the field with appropriate default value
+                let default_value = match *field {
+                    "trace_id" | "span_id" | "service_name" | "operation_name"
+                    | "span_kind" | "span_status" | "events" | "links" => json::Value::String(String::new()),
+                    "start_time" | "end_time" | "duration" => json::Value::Number(0.into()),
+                    "flags" => json::Value::Number(0.into()),
+                    _ => json::Value::Null,
+                };
+                record.insert(field.to_string(), default_value);
+            }
+        }
+    }
+
     // get schema and stream settings
     let mut traces_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_schema = stream_schema_exists(
@@ -817,7 +851,11 @@ async fn write_traces(
         if let Some(ref defined_fields) = uds_fields {
             json_data
                 .into_iter()
-                .map(|(timestamp, record_val)| {
+                .map(|(timestamp, mut record_val)| {
+                    // IMPORTANT: First ensure core fields exist before filtering
+                    // This is necessary because refactor_span_attributes expects them
+                    ensure_trace_core_fields(&mut record_val);
+
                     let filtered = crate::service::traces::uds::refactor_span_attributes(
                         record_val,
                         defined_fields,
@@ -826,7 +864,16 @@ async fn write_traces(
                 })
                 .collect()
         } else {
+            // IMPORTANT: Even without UDS, we need to ensure core fields are consistently present
+            // This prevents DataFusion schema issues when querying with SELECT *
+            log::info!("[TRACES] Processing first batch - ensuring core fields consistency");
             json_data
+                .into_iter()
+                .map(|(timestamp, mut record_val)| {
+                    ensure_trace_core_fields(&mut record_val);
+                    (timestamp, record_val)
+                })
+                .collect()
         };
 
     // Check for schema on filtered records (matching logs pattern)
@@ -857,6 +904,32 @@ async fn write_traces(
 
     // Start write data
     for (timestamp, record_val) in filtered_json_data {
+        // Debug logging for record structure
+        static mut DEBUG_LOGGED: bool = false;
+        unsafe {
+            if !DEBUG_LOGGED {
+                let keys: Vec<String> = record_val.keys().cloned().collect();
+                log::info!("[TRACES DEBUG] Record before WAL write - keys ({}): {:?}", keys.len(), &keys[..keys.len().min(10)]);
+                log::info!("[TRACES DEBUG] Core fields check - trace_id: {}, span_id: {}, service_name: {}",
+                    record_val.contains_key("trace_id"),
+                    record_val.contains_key("span_id"),
+                    record_val.contains_key("service_name")
+                );
+                if let Some(trace_val) = record_val.get("trace_id") {
+                    log::info!("[TRACES DEBUG] trace_id value type: {:?}, is_null: {}, actual_value: {:?}",
+                        match trace_val {
+                            json::Value::String(s) => format!("String(len={})", s.len()),
+                            json::Value::Null => "Null".to_string(),
+                            _ => "Other".to_string()
+                        },
+                        trace_val.is_null(),
+                        trace_val
+                    );
+                }
+                DEBUG_LOGGED = true;
+            }
+        }
+
         // get service_name
         let service_name = json::get_string_value(record_val.get("service_name").unwrap());
         // get distinct_value item
