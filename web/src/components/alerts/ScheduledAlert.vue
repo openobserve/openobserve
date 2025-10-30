@@ -1030,46 +1030,15 @@ style=" margin-left: 8px;">
       <!-- query mode section -->
       <div class="tw-w-full" style="">
         <div v-if="!disableQueryTypeSelection"
-        class="scheduled-alert-tabs q-my-md"
-        :style="{
-          width: alertData.stream_type === 'metrics' ? '400px' : '200px'
-        }"
+        class="flex items-center app-tabs-container tw-h-[36px] q-mr-sm tw-w-fit tw-mt-2 tw-mb-8"
         >
-        <q-tabs
-          data-test="scheduled-alert-tabs"
-          v-model="tab"
-          no-caps
-          outside-arrows
-          size="sm"
-          mobile-arrows
-          class="bg-white text-primary"
-          @update:model-value="updateTab"
-        >
-          <q-tab
-            :disable="dateTimePicker.length > 0"
-            data-test="scheduled-alert-custom-tab"
-            name="custom"
-            :label="t('alerts.quick')"
-            >
-            <q-tooltip max-width="200px"
-style="font-size: 12px;"
-v-if="dateTimePicker.length > 0">
-              Quick mode is disabled when comparision window is added.
-            </q-tooltip>
-          </q-tab>
-          <q-tab
-            data-test="scheduled-alert-sql-tab"
-            name="sql"
-            :label="t('alerts.sql')"
+          <AppTabs
+            data-test="scheduled-alert-tabs"
+            :tabs="tabOptions"
+            class="tabs-selection-container"
+            v-model:active-tab="tab"
+            @update:active-tab="updateTab"
           />
-          <q-tab
-          :disable="dateTimePicker.length > 0"
-            data-test="scheduled-alert-metrics-tab"
-            v-if="alertData.stream_type === 'metrics'"
-            name="promql"
-            :label="t('alerts.promql')"
-          />
-        </q-tabs>
         </div>
         <template v-if="tab === 'custom'"
           class='q-pa-none q-ma-none'
@@ -1081,9 +1050,6 @@ v-if="dateTimePicker.length > 0">
             @add-group="updateGroup"
             @remove-group="removeConditionGroup"
             @input:update="(name, field) => emits('input:update', name, field)" />
-
-          
-
         </template>
         <template v-else>
           <!-- view section -->
@@ -1675,6 +1641,7 @@ import O2AIChat from "../O2AIChat.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 
 import useParser from "@/composables/useParser";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -1747,6 +1714,36 @@ const promqlQuery = ref(props.promql);
 const router = useRouter();
 
 const tab = ref(props.query_type || "custom");
+
+const tabOptions = computed(() => {
+  const tabs = [
+    {
+      label: t("alerts.quick"),
+      value: "custom",
+      disabled: dateTimePicker.value.length > 0,
+      tooltipLabel: dateTimePicker.value.length > 0
+        ? "Quick mode is disabled when comparison window is added."
+        : "",
+    },
+    {
+      label: t("alerts.sql"),
+      value: "sql",
+    },
+  ];
+
+  if (props.alertData.stream_type === "metrics") {
+    tabs.push({
+      label: t("alerts.promql"),
+      value: "promql",
+      disabled: dateTimePicker.value.length > 0,
+      tooltipLabel: dateTimePicker.value.length > 0
+        ? "PromQL is disabled when comparison window is added."
+        : "",
+    });
+  }
+
+  return tabs;
+});
 
 const q = useQuasar();
 

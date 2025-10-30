@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           activeTab === tab.value ? 'active text-primary' : '',
           tab.disabled && 'disabled',
           tab.hide && 'hidden',
+          activeTab !== tab.value ? 'inactive' : ''
         ]"
         @click="changeTab(tab)"
       >
