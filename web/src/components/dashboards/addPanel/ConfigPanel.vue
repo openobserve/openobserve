@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         borderless
         v-model="dashboardPanelData.data.description"
         autogrow
-        class="showLabelOnTop"
+        class="showLabelOnTop el-border"
         data-test="dashboard-config-description"
        hide-bottom-space/>
     </div>
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         borderless
         v-model="dashboardPanelData.data.description"
         autogrow
-        class="showLabelOnTop"
+        class="showLabelOnTop el-border"
         data-test="dashboard-config-description"
        hide-bottom-space/>
     </div>
@@ -1613,6 +1613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="addTimeShift"
         style="cursor: pointer; padding: 0px 5px"
         label="+ Add"
+        class="el-border"
         no-caps
         data-test="dashboard-addpanel-config-time-shift-add-btn"
       />

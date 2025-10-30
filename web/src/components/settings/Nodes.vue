@@ -21,10 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="splitterModel"
       :limits="[0, 250]"
       unit="px"
-      style="min-height: 90vh; overflow: hidden"
+      style="overflow: hidden; height: calc(100vh - 40px);"
     >
-      <template style="background-color: red" v-slot:before>
-        <div class="full-height  q-pt-sm tw-mt-4">
+      <template v-slot:before>
+        <div class=" q-pt-sm tw-mt-4"
+        style="height: calc(100vh - 80px);"
+        >
           <div class="sticky-header q-px-sm">
             <span class="q-ma-none q-pa-sm" style="font-size: 18px;">
               {{t("nodes.filter_header")}} <q-icon name="filter_list" />
@@ -396,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           class="nodes-list-table tw-border-l tw-border-solid tw-border-gray-1200 tw-rounded-none"
           dense
-          style="width: 100%; height: calc(100vh - 40px); overflow-y: auto;"
+          style="width: 100%; height: calc(100vh - 50px); overflow-y: auto;"
         >
           <template #no-data><NoData /></template>
           <template #top="scope">
