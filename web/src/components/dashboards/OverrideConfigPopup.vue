@@ -117,7 +117,7 @@
       @click="addOverrideConfig"
       label="+ Add field override"
       no-caps
-      class="q-mt-md"
+      class="q-mt-md el-border"
     />
 
     <q-card-actions align="right">

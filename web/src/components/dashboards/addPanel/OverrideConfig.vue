@@ -27,6 +27,7 @@
       :label="' Add field override'"
       no-caps
       data-test="dashboard-addpanel-config-override-config-add-btn"
+      class="el-border"
     />
 
     <q-dialog v-model="showOverrideConfigPopup">
