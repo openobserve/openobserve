@@ -1322,14 +1322,6 @@ export default defineComponent({
             "enrichment_tables",
           ];
 
-          if (
-            node.io_type == "output" &&
-            node.data.node_type == "stream" &&
-            !validDestinationStreamTypes.includes(node.data.stream_type)
-          ) {
-            pipelineErrors.push({
-              message: `Pipeline - ${index}: Destination Stream type is required`,
-              field: "destination_stream_type",
             });
           }
         });
