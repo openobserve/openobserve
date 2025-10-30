@@ -633,6 +633,12 @@ pub fn get_ts_col_order_by(
     }
 }
 
+enum DeletionCriteria {
+    TimeRange(i64, i64),
+    ThresholdTimestamp(i64),
+    DeleteAll,
+}
+
 /// Cache selection strategies determine how to choose the best cached result when multiple caches
 /// exist:
 ///
@@ -674,8 +680,49 @@ pub(crate) fn select_cache_meta(
     }
 }
 
+fn parse_cache_file_timestamps(file_path: &str) -> Option<(i64, i64)> {
+    let file_name = file_path.split('/').next_back()?;
+    let parts: Vec<&str> = file_name.split('_').collect();
+    if parts.len() >= 2
+        && let (Ok(start_ts), Ok(end_ts)) = (parts[0].parse::<i64>(), parts[1].parse::<i64>())
+    {
+        return Some((start_ts, end_ts));
+    }
+    None
+}
+
+fn time_ranges_overlap(start1: i64, end1: i64, start2: i64, end2: i64) -> bool {
+    // Check if file data range overlaps with clean range
+    // File overlaps if: file_start < clean_end AND file_end > clean_start
+    // NOTE: Partial overlap is considered an overlap
+    start1 < end2 && end1 > start2
+}
+
+fn should_delete_cache_file(file_path: &str, criteria: &DeletionCriteria) -> bool {
+    let Some((file_start_ts, file_end_ts)) = parse_cache_file_timestamps(file_path) else {
+        return false;
+    };
+
+    match criteria {
+        // First check for time range overlapping files
+        DeletionCriteria::TimeRange(clean_start, clean_end) => {
+            time_ranges_overlap(file_start_ts, file_end_ts, *clean_start, *clean_end)
+        }
+        // Second check for threshold timestamp
+        // Only delete if start_time <= delete_ts (keep cache from delete_ts onwards)
+        DeletionCriteria::ThresholdTimestamp(delete_ts) => file_start_ts <= *delete_ts,
+        // Last check for delete all
+        DeletionCriteria::DeleteAll => true,
+    }
+}
+
 #[tracing::instrument]
-pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
+pub async fn delete_cache(
+    path: &str,
+    delete_ts: i64,
+    clean_start_ts: Option<i64>,
+    clean_end_ts: Option<i64>,
+) -> std::io::Result<bool> {
     let root_dir = disk::get_dir().await;
     // Part 1: delete the results cache
     let pattern = format!("{root_dir}/results/{path}");
@@ -683,26 +730,23 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut remove_files: Vec<String> = vec![];
 
-    for file in files {
-        // If timestamp is provided, check if we should delete this file
-        if delete_ts > 0 {
-            // Parse the start_time from filename:
-            // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
-            if let Some(file_name) = file.split('/').next_back()
-                && let Some(start_time_str) = file_name.split('_').next()
-                && let Ok(start_time) = start_time_str.parse::<i64>()
-            {
-                // Only delete if start_time > delete_ts (keep cache from delete_ts onwards)
-                if start_time > delete_ts {
-                    continue; // Skip this file, keep it
-                }
-            }
-        }
+    let criteria = match (clean_start_ts, clean_end_ts, delete_ts) {
+        // First check for time range
+        (Some(start), Some(end), _) => DeletionCriteria::TimeRange(start, end),
+        // Second check for threshold timestamp
+        (_, _, ts) if ts > 0 => DeletionCriteria::ThresholdTimestamp(ts),
+        // Last check for delete all
+        _ => DeletionCriteria::DeleteAll,
+    };
 
+    for file in files {
+        if !should_delete_cache_file(&file, &criteria) {
+            continue;
+        }
         match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {
-                log::error!("Error deleting cache: {e}");
+                log::error!("Error deleting cache: {:?}", e);
                 return Err(std::io::Error::other("Error deleting cache"));
             }
         }
@@ -715,26 +759,13 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
         let aggs_files = scan_files(&aggs_pattern, "arrow", None).unwrap_or_default();
 
         for file in aggs_files {
-            // If timestamp is provided, check if we should delete this file
-            if delete_ts > 0 {
-                // Parse the start_time from filename
-                // {start_time}_{end_time}.arrow
-                if let Some(file_name) = file.split('/').next_back()
-                    && let Some(start_time_str) = file_name.split('_').next()
-                    && let Ok(start_time) = start_time_str.parse::<i64>()
-                {
-                    // Only delete if start_time > delete_ts (keep cache from delete_ts
-                    // onwards)
-                    if start_time > delete_ts {
-                        continue; // Skip this file, keep it
-                    }
-                }
+            if !should_delete_cache_file(&file, &criteria) {
+                continue;
             }
-
             match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
-                Ok(_) => {}
+                Ok(_) => remove_files.push(file),
                 Err(e) => {
-                    log::error!("Error deleting cache: {e:?}");
+                    log::error!("Error deleting cache: {:?}", e);
                     return Err(std::io::Error::other("Error deleting cache"));
                 }
             }
