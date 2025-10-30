@@ -9,7 +9,7 @@
       hide-bottom-space
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
-      class="condition-logical-operator q-mt-sm"
+      class="condition-logical-operator"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}}`"
     />
     <q-btn-group>
@@ -47,6 +47,7 @@
               @filter="filterStreamFn"
               @update:model-value="handleFieldChange"
               :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
+              class="o2-custom-select-dashboard"
             />
             <q-btn
               size="xs"
@@ -54,6 +55,7 @@
               @click="removeColumnName"
               icon="close"
               :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
+              class="el-border"
             />
           </div>
           <div style="height: 100%">
@@ -93,6 +95,7 @@
                         :label="t('common.operator')"
                         style="width: 100%"
                         data-test="dashboard-add-condition-operator"
+                        class="o2-custom-select-dashboard"
                       />
                       <CommonAutoComplete
                         v-if="
@@ -125,6 +128,7 @@
                       use-input
                       @filter="filterListFn"
                       data-test="dashboard-add-condition-list-tab"
+                      class="o2-custom-select-dashboard"
                     >
                       <template v-slot:selected>
                         {{
