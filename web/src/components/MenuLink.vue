@@ -252,7 +252,7 @@ export default defineComponent({
       top: 50%;
       transform: translateY(-50%);
       // Brighter gradient
-      background: linear-gradient(180deg, var(--o2-theme-color) 0%, var(--o2-theme-color) 50%, var(--o2-theme-color) 100%);
+      background: linear-gradient(180deg, var(--o2-primary-btn-bg) 0%, var(--o2-primary-btn-bg) 50%, var(--o2-primary-btn-bg) 100%);
       border-radius: 0 2px 2px 0;
       // Minimal glow
       box-shadow: 0 0 6px var(--o2-menu-color);
@@ -283,6 +283,12 @@ export default defineComponent({
 
     &::before {
       display: none;
+    }
+  }
+
+  &[aria-label="Billing"] {
+    .q-icon {
+      font-size: 1.3rem;
     }
   }
 }
@@ -361,4 +367,5 @@ body.body--light {
     }
   }
 }
+
 </style>

@@ -108,6 +108,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             </div>
+
+            <div class="tile">
+              <div class="tile-content rounded-borders text-center column justify-between "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               role="article"
+               aria-label="Ingested data size statistics">
+              <!-- Top Section (60%) -->
+                <div class="column justify-between" >
+                  <!-- Title row -->
+                  <div class="row justify-between">
+                    <div class="tile-title">{{ t("home.totalDataIngested") }}</div>
+                    <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                      <img :src="ingestedSizeIcon" alt="" />
+                    </div>
+                  </div>
+
+                  <!-- Performance text -->
+                  <div v-if="false" class="performance-text "
+                  :class="store.state.theme === 'dark' ? 'negative-increase-dark' : 'negative-increase-light'"
+                  >
+                    <q-icon name="arrow_downward" size="14px" /> 2.89% from last week
+                  </div>
+                </div>
+
+                <!-- Bottom Section (40%) -->
+                <div class="data-to-display row items-end " aria-live="polite">
+                  {{ formattedAnimatedIngestedSize }}
+                </div>
+              </div>
+            </div>
+
+            
             <div class="tile">
               <div class="tile-content rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
@@ -134,36 +166,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Bottom Section (40%) -->
             <div class="data-to-display row items-end " aria-live="polite">
               {{ formattedAnimatedCompressedSize }}
-            </div>
-            </div>
-            </div>
-
-            <div class="tile">
-              <div class="tile-content rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               role="article"
-               aria-label="Ingested data size statistics">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between" >
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="tile-title">{{ t("home.totalDataIngested") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="ingestedSizeIcon" alt="" />
-                  </div>
-                </div>
-
-                <!-- Performance text -->
-                <div v-if="false" class="performance-text "
-                :class="store.state.theme === 'dark' ? 'negative-increase-dark' : 'negative-increase-light'"
-                >
-                  <q-icon name="arrow_downward" size="14px" /> 2.89% from last week
-                </div>
-              </div>
-
-            <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end " aria-live="polite">
-              {{ formattedAnimatedIngestedSize }}
             </div>
             </div>
             </div>
