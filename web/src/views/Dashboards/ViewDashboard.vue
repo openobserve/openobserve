@@ -20,10 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page :key="store.state.selectedOrganization.identifier" class="tw-h-full">
     <div
       ref="fullscreenDiv"
-      :class="{'fullscreen': isFullscreen,
+      :class="{
+        fullscreen: isFullscreen,
         'tw-h-[calc(100vh-105px)]': !store.state.printMode,
-        'print-mode-container': store.state.printMode
-        }"
+        'print-mode-container': store.state.printMode,
+      }"
       class="tw-mx-[0.625rem] q-pt-xs"
     >
       <div
@@ -1309,14 +1310,15 @@ export default defineComponent({
 }
 
 .fullscreen {
-  width: 100vw;
-  height: 100vh;
-  overflow-y: auto; /* Enables scrolling within the div */
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 10000; /* Ensure it's on top */
-  /* Additional styling as needed */
+  width: 100vw !important;
+  height: 100vh !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 99999 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: var(--q-color-page-background, #ffffff) !important;
 }
 
 .print-mode-container {
