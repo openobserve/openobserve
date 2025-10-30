@@ -67,7 +67,9 @@ test.describe("dashboard streaming testcases", () => {
       "logs",
       "e2e_automate",
       "kubernetes_container_name",
-      true
+      true, // customValueSearc
+      null, // filterConfig
+      true  // showMultipleValues
     );
 
     // await page.waitForTimeout(3000);

@@ -722,7 +722,9 @@ test.describe("dashboard filter testcases", () => {
       "logs",
       "e2e_automate",
       "kubernetes_container_name",
-      true
+      true, // customValueSearc
+      null, // filterConfig
+      true  // showMultipleValues
     );
 
     // await page.waitForLoadState('networkidle');
