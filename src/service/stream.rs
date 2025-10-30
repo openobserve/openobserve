@@ -1069,6 +1069,7 @@ pub async fn update_fields_type(
         min_ts,
         &mut schema_map,
         false,
+        None,
     )
     .await?;
 

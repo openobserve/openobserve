@@ -15,7 +15,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    io::Write,
     sync::Arc,
     time::Instant,
 };
@@ -66,6 +65,7 @@ pub mod hec;
 pub mod ingest;
 pub mod loki;
 pub mod otlp;
+pub mod uds;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
@@ -593,39 +593,8 @@ pub fn refactor_map(
     original_map: Map<String, Value>,
     defined_schema_keys: &HashSet<String>,
 ) -> Map<String, Value> {
-    let mut new_map = Map::with_capacity(defined_schema_keys.len() + 2);
-    let mut non_schema_map = Vec::with_capacity(1024); // 1KB
-
-    let mut has_elements = false;
-    non_schema_map.write_all(b"{").unwrap();
-    for (key, value) in original_map {
-        if defined_schema_keys.contains(&key) {
-            new_map.insert(key, value);
-        } else {
-            if has_elements {
-                non_schema_map.write_all(b",").unwrap();
-            } else {
-                has_elements = true;
-            }
-            non_schema_map.write_all(b"\"").unwrap();
-            non_schema_map.write_all(key.as_bytes()).unwrap();
-            non_schema_map.write_all(b"\":\"").unwrap();
-            non_schema_map
-                .write_all(pickup_string_value(value).as_bytes())
-                .unwrap();
-            non_schema_map.write_all(b"\"").unwrap();
-        }
-    }
-    non_schema_map.write_all(b"}").unwrap();
-
-    if has_elements {
-        new_map.insert(
-            get_config().common.column_all.to_string(),
-            Value::String(String::from_utf8(non_schema_map).unwrap()),
-        );
-    }
-
-    new_map
+    // Use the standardized UDS refactoring with legacy string conversion for backward compatibility
+    uds::refactor_map_legacy(original_map, defined_schema_keys)
 }
 
 async fn ingestion_log_enabled() -> bool {

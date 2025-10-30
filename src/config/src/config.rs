@@ -1260,6 +1260,12 @@ pub struct Limit {
         help = "Maximum number of fields allowed in user-defined schema"
     )]
     pub user_defined_schema_max_fields: usize,
+    #[env_config(
+        name = "ZO_UDS_ALL_FIELD_BUFFER_SIZE",
+        default = 65536,
+        help = "Initial buffer size in bytes for _all field JSON generation (default 64KB)"
+    )]
+    pub uds_all_field_buffer_size: usize,
     // MB, total data size of memtable in memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     pub mem_table_max_size: usize,

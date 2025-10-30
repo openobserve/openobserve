@@ -89,51 +89,22 @@ const CORE_TRACE_FIELDS: &[&str] = &[
 /// // - _all: {"user_id":"12345","debug_flag":"true"}
 /// ```
 pub fn refactor_span_attributes(
-    mut span_map: Map<String, Value>,
+    span_map: Map<String, Value>,
     defined_schema_fields: &StdHashSet<String>,
 ) -> Map<String, Value> {
     let cfg = get_config();
     let mut new_map = Map::with_capacity(CORE_TRACE_FIELDS.len() + defined_schema_fields.len() + 2);
     let mut non_schema_attrs = Map::new();
 
-    // Debug logging to understand what fields we're receiving
-    static mut LOGGED_ONCE: bool = false;
-    unsafe {
-        if !LOGGED_ONCE {
-            let input_keys: Vec<String> = span_map.keys().cloned().collect();
-            log::info!("[UDS REFACTOR] Input fields ({}): {:?}", input_keys.len(), &input_keys[..input_keys.len().min(20)]);
-            log::info!("[UDS REFACTOR] Core field check - trace_id: {}, span_id: {}, service_name: {}",
-                span_map.contains_key("trace_id"),
-                span_map.contains_key("span_id"),
-                span_map.contains_key("service_name")
-            );
-            log::info!("[UDS REFACTOR] UDS fields: {:?}", defined_schema_fields);
-            LOGGED_ONCE = true;
-        }
-    }
-
-    // CRITICAL FIX: Ensure core fields exist with appropriate defaults
-    // This handles cases where fields might be missing from the input
-    for field in CORE_TRACE_FIELDS {
-        if !span_map.contains_key(*field) {
-            // Skip dot-notation fields (like reference.parent_span_id) as they're handled by flattening
-            if !field.contains('.') {
-                // Don't add empty defaults for critical fields - this will cause issues
-                // Instead, log a warning
-                log::warn!("[UDS REFACTOR] Core field '{}' is MISSING from input!", field);
-            }
-        }
-    }
-
     // Process all fields
     for (key, value) in span_map {
         // ALWAYS include core trace fields regardless of UDS configuration
         if CORE_TRACE_FIELDS.contains(&key.as_str()) {
-            new_map.insert(key.clone(), value);
+            new_map.insert(key, value);
         }
         // Also include user-defined schema attributes
         else if defined_schema_fields.contains(&key) {
-            new_map.insert(key.clone(), value);
+            new_map.insert(key, value);
         }
         // Everything else goes to _all column
         else {
@@ -142,12 +113,10 @@ pub fn refactor_span_attributes(
     }
 
     // Add _all column if there are non-schema attributes
-    // IMPORTANT: _all must be a JSON string, not an object, to match Parquet schema
-    // (DataType::Utf8)
+    // IMPORTANT: _all must be a JSON string, not an object, to match Parquet schema (DataType::Utf8)
     if !non_schema_attrs.is_empty() {
         let all_values_json = serde_json::to_string(&non_schema_attrs).unwrap_or_else(|e| {
-            log::error!(
-                "[UDS] Failed to serialize non-schema attributes to JSON: {}",
+            log::error!("[UDS] Failed to serialize non-schema attributes to JSON: {}",
                 e
             );
             "{}".to_string()
@@ -185,8 +154,8 @@ pub fn refactor_span_attributes(
 pub fn select_important_trace_attributes(
     spans: &[Map<String, Value>],
     max_fields: usize,
-) -> StdHashSet<String> {
-    let mut selected = StdHashSet::new();
+) -> Vec<String> {
+    let mut selected = Vec::new();
 
     // Define semantic convention prefixes in priority order
     // Note: OTLP normalizes dots to underscores during ingestion, so we use underscored names
@@ -226,7 +195,9 @@ pub fn select_important_trace_attributes(
             }
             // Check if any span has this attribute
             if spans.iter().any(|span| span.contains_key(*attr_name)) {
-                selected.insert(attr_name.to_string());
+                if !selected.contains(&attr_name.to_string()) {
+                    selected.push(attr_name.to_string());
+                }
             }
         }
     }
@@ -250,7 +221,9 @@ pub fn select_important_trace_attributes(
             if selected.len() >= max_fields {
                 break;
             }
-            selected.insert(attr_name);
+            if !selected.contains(&attr_name) {
+                selected.push(attr_name);
+            }
         }
     }
 

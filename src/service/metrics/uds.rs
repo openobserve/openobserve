@@ -183,10 +183,10 @@ pub fn recalculate_metric_hash(
 pub fn select_important_metric_labels(
     metrics: &[Map<String, Value>],
     max_fields: usize,
-) -> StdHashSet<String> {
+) -> Vec<String> {
     use std::collections::HashMap;
 
-    let mut selected = StdHashSet::new();
+    let mut selected = Vec::new();
 
     // Define common important labels in priority order
     let important_labels = [
@@ -221,7 +221,9 @@ pub fn select_important_metric_labels(
                 .iter()
                 .any(|metric| metric.contains_key(*label_name))
             {
-                selected.insert(label_name.to_string());
+                if !selected.contains(&label_name.to_string()) {
+                    selected.push(label_name.to_string());
+                }
             }
         }
     }
@@ -245,7 +247,9 @@ pub fn select_important_metric_labels(
             if selected.len() >= max_fields {
                 break;
             }
-            selected.insert(label_name);
+            if !selected.contains(&label_name) {
+                selected.push(label_name);
+            }
         }
     }
 
