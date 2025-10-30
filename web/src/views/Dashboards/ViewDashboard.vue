@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="cancel"
