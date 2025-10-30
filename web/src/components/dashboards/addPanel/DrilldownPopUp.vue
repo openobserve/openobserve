@@ -305,6 +305,9 @@
           left-label
           v-model="drilldownData.data.passAllVariables"
           data-test="dashboard-drilldown-pass-all-variables"
+          class="tw-h-[36px] tw-ml-1 o2-toggle-button-lg"
+          size="lg"
+          :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
         />
       </div>
     </div>
@@ -316,6 +319,9 @@
         left-label
         v-model="drilldownData.targetBlank"
         data-test="dashboard-drilldown-open-in-new-tab"
+        class="tw-h-[36px] tw-ml-1 o2-toggle-button-lg"
+        size="lg"
+        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
       />
     </div>
 
@@ -323,7 +329,9 @@
       <q-btn
         unelevated
         no-caps
-        class="q-mr-sm"
+        class="o2-secondary-button tw-h-[36px] el-border"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        flat
         @click="$emit('close')"
         data-test="cancel-button"
       >
@@ -332,8 +340,9 @@
       <q-btn
         unelevated
         no-caps
-        class="no-border"
-        color="primary"
+        class="o2-primary-button tw-h-[36px] q-ml-md el-border"
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        flat
         @click="saveDrilldown"
         style="min-width: 60px"
         data-test="confirm-button"
