@@ -660,6 +660,7 @@ import {
   outlinedDescription,
   outlinedCode,
   outlinedDevices,
+  outlinedBubbleChart,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -834,6 +835,12 @@ export default defineComponent({
         icon: outlinedAccountTree,
         link: "/traces",
         name: "traces",
+      },
+      {
+        title: "Service Graph",
+        icon: outlinedBubbleChart,
+        link: "/service-graph",
+        name: "serviceGraph",
       },
       {
         title: t("menu.rum"),
