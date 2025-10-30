@@ -74,7 +74,7 @@ jobs:
         uses: arduino/setup-protoc@v3
         with:
           version: "21.12"
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -231,7 +231,7 @@ jobs:
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -327,7 +327,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 

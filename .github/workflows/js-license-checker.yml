@@ -55,7 +55,7 @@ jobs:
             echo "has_package_changes=true" >> $GITHUB_OUTPUT
           fi
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         if: steps.check_changes.outputs.has_changes == 'true' && steps.check_package_changes.outputs.has_package_changes == 'true'
         with:
           node-version: 22
