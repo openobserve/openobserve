@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: calc(100vh - 40px); overflow-y: auto" class="scroll">
+  <div style="overflow-y: auto" class="scroll">
     <div class="tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs">
       <div
       class="flex items-center q-pa-sm card-container"
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div>
     <div>
-    <div class="row" style="height: calc(100vh - 110px); overflow-y: auto">
+    <div class="row" style="overflow-y: auto">
       <div class="tw-pl-[0.625rem]">
       <div
         class="col scroll card-container tw-mr-[0.625rem]"
@@ -170,8 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type,
           )
         "
-        class="col"
-        style="width: 100%; height: 100%; display: flex; flex-direction: row; overflow-x: hidden"
+        class="col tw-mr-[0.625rem]"
+        style="display: flex; flex-direction: row; overflow-x: hidden"
       >
         <!-- collapse field list bar -->
         <div
