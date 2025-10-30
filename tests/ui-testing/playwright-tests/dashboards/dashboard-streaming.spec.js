@@ -44,7 +44,7 @@ test.describe("dashboard streaming testcases", () => {
     const pm = new PageManager(page);
 
     // Enable streaming mode by setting use_streaming=true
-    await pm.managementPage.setStreamingState(true);
+    // await pm.managementPage.setStreamingState(true);
 
     const panelName = pm.dashboardPanelActions.generateUniquePanelName(
       "panel-test-streaming"
@@ -147,7 +147,7 @@ test.describe("dashboard streaming testcases", () => {
       randomDashboardName + "_streaming"
     );
 
-    await pm.managementPage.setStreamingState(false);
+    // await pm.managementPage.setStreamingState(false);
   });
 
   test("should add dashboard variable with filter configuration", async ({
@@ -171,7 +171,7 @@ test.describe("dashboard streaming testcases", () => {
     const pm = new PageManager(page);
 
     // Enable streaming mode by setting use_streaming=true
-    await pm.managementPage.setStreamingState(true);
+    // await pm.managementPage.setStreamingState(true);
 
     const panelName = pm.dashboardPanelActions.generateUniquePanelName(
       "panel-filter-test"
