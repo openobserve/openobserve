@@ -1,5 +1,6 @@
 //dashboard variables page object
 //methods: addDashboardVariable, selectValueFromVariableDropDown
+//addDashboardVariable params: name, streamtype, streamName, field, customValueSearch, filterConfig, showMultipleValues
 import { expect } from "@playwright/test";
 
 export default class DashboardVariables {
@@ -8,14 +9,15 @@ export default class DashboardVariables {
   }
 
   // Method to add a dashboard variable
-  // Parameters: name, streamtype, streamName, field, customValueSearch, filterConfig
+  // Parameters: name, streamtype, streamName, field, customValueSearch, filterConfig, showMultipleValues
   async addDashboardVariable(
     name,
     streamtype,
     streamName,
     field,
     customValueSearch = false, // it is used only when we want to search custom value from variable dropdown
-    filterConfig = null // optional filter configuration { filterName, operator, value }
+    filterConfig = null, // optional filter configuration { filterName, operator, value }
+    showMultipleValues = false // if true, toggles the show multiple values option
   ) {
     // Open Variable Tab
     await this.page
@@ -97,14 +99,19 @@ export default class DashboardVariables {
       //   .getByText(filterConfig.value, { exact: true })
       //   .click();
     }
-    // Custom Value Search if want to search custom value from variable dropdown
-    if (customValueSearch) {
+
+    // Toggle show multiple values based on parameter
+    if (showMultipleValues) {
       await this.page
         .locator(
           '[data-test="dashboard-query_values-show_multiple_values"] div'
         )
         .nth(2)
         .click();
+    }
+
+    // Custom Value Search if want to search custom value from variable dropdown
+    if (customValueSearch) {
       await this.page
         .locator(
           '[data-test="dashboard-multi-select-default-value-toggle-custom"]'
