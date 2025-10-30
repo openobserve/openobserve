@@ -76,9 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-btn
               data-test="alert-list-add-alert-btn"
-              class="q-ml-md text-bold no-border"
-              color="secondary"
-              no-caps
+              class="o2-primary-button tw-h-[36px] q-ml-md"
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              flat
               :label="t(`dashboard.newReport`)"
               @click="createNewReport"
             />
