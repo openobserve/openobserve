@@ -62,10 +62,6 @@ impl RangeFunc for AbsentFunc {
         _time_win: &Option<TimeWindow>,
     ) -> Option<f64> {
         // Return 1.0 if no samples exist, None otherwise
-        if samples.is_empty() {
-            Some(1.0)
-        } else {
-            None
-        }
+        if samples.is_empty() { Some(1.0) } else { None }
     }
 }

@@ -22,7 +22,12 @@ use crate::service::promql::{
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#clamp
 /// Enhanced version that processes all timestamps at once for range queries
-pub(crate) fn clamp_range(data: Value, min: f64, max: f64, eval_ctx: &EvalContext) -> Result<Value> {
+pub(crate) fn clamp_range(
+    data: Value,
+    min: f64,
+    max: f64,
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
     let start = std::time::Instant::now();
     log::info!("[PromQL Timing] clamp_range() started");
     let result = super::eval_range(data, ClampFunc::new(min, max), eval_ctx);
@@ -51,7 +56,9 @@ impl RangeFunc for ClampFunc {
 
     fn exec_instant(&self, data: RangeValue) -> Option<f64> {
         // For instant queries, clamp the last sample value
-        data.samples.last().map(|s| s.value.clamp(self.min, self.max))
+        data.samples
+            .last()
+            .map(|s| s.value.clamp(self.min, self.max))
     }
 
     fn exec_range(
@@ -67,9 +74,10 @@ impl RangeFunc for ClampFunc {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
-    use std::time::Duration;
 
     // Test helper
     fn clamp_test_helper(data: Value, min: f64, max: f64) -> Result<Value> {
