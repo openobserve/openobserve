@@ -1681,6 +1681,16 @@ export default defineComponent({
         },
       });
     };
+
+    const goToAlertInsights = () => {
+      router.push({
+        name: "alertInsights",
+        params: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     const exportAlert = async (row: any) => {
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id);
@@ -2153,6 +2163,7 @@ export default defineComponent({
       showImportAlertDialog,
       importAlert,
       goToAlertHistory,
+      goToAlertInsights,
       getTemplates,
       exportAlert,
       updateActiveFolderId,

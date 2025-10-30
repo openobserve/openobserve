@@ -1,0 +1,245 @@
+<!-- Copyright 2023 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div
+    class="context-menu"
+    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
+    :style="{ top: `${y}px`, left: `${x}px` }"
+    @click.stop
+    data-test="alert-insights-context-menu"
+  >
+    <div class="menu-header tw-px-4 tw-py-2 tw-text-xs tw-font-semibold">
+      {{ panelTitle }}
+    </div>
+    <q-separator />
+
+    <!-- Filter Options -->
+    <div class="menu-section">
+      <div
+        class="menu-item"
+        @click="selectFilter('>=')"
+        data-test="context-menu-gte"
+      >
+        <q-icon name="trending_up" size="18px" class="q-mr-sm" />
+        <span>Filter >= {{ formattedValue }}</span>
+      </div>
+      <div
+        class="menu-item"
+        @click="selectFilter('<=')"
+        data-test="context-menu-lte"
+      >
+        <q-icon name="trending_down" size="18px" class="q-mr-sm" />
+        <span>Filter <= {{ formattedValue }}</span>
+      </div>
+    </div>
+
+    <!-- Alert-specific actions (shown when clicking on alert name) -->
+    <template v-if="isAlertNameContext">
+      <q-separator />
+      <div class="menu-section">
+        <div
+          class="menu-item"
+          @click="selectAlert"
+          data-test="context-menu-select-alert"
+        >
+          <q-icon name="settings" size="18px" class="q-mr-sm" />
+          <span>Configure This Alert</span>
+        </div>
+        <div
+          class="menu-item"
+          @click="viewAlertHistory"
+          data-test="context-menu-view-history"
+        >
+          <q-icon name="history" size="18px" class="q-mr-sm" />
+          <span>View Alert History</span>
+        </div>
+      </div>
+    </template>
+
+    <q-separator />
+    <div class="menu-section">
+      <div
+        class="menu-item"
+        @click="$emit('close')"
+        data-test="context-menu-cancel"
+      >
+        <q-icon name="close" size="18px" class="q-mr-sm" />
+        <span>Cancel</span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, onUnmounted } from "vue";
+import { useStore } from "vuex";
+
+const props = defineProps<{
+  x: number;
+  y: number;
+  value: number | string;
+  panelTitle: string;
+  panelId: string;
+}>();
+
+const emit = defineEmits<{
+  close: [];
+  filter: [
+    {
+      operator: string;
+      value: number;
+      panelId: string;
+      panelTitle: string;
+    }
+  ];
+  "select-alert": [string];
+}>();
+
+const store = useStore();
+
+const isAlertNameContext = computed(() => {
+  // Check if we're clicking on a panel that shows alert names
+  return (
+    props.panelTitle.includes("Alert") &&
+    (props.panelTitle.includes("Frequency") ||
+      props.panelTitle.includes("Effectiveness") ||
+      props.panelTitle.includes("Retry"))
+  );
+});
+
+const formattedValue = computed(() => {
+  if (typeof props.value === "string") {
+    return props.value;
+  }
+
+  // Format numbers
+  if (props.value > 1000000000) {
+    // Likely microseconds timestamp
+    return new Date(props.value / 1000).toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  return Math.round(props.value).toLocaleString();
+});
+
+const selectFilter = (operator: string) => {
+  if (typeof props.value === "number") {
+    emit("filter", {
+      operator,
+      value: props.value,
+      panelId: props.panelId,
+      panelTitle: props.panelTitle,
+    });
+  }
+};
+
+const selectAlert = () => {
+  if (typeof props.value === "string") {
+    emit("select-alert", props.value);
+  }
+};
+
+const viewAlertHistory = () => {
+  if (typeof props.value === "string") {
+    // This will be handled by the parent component
+    emit("select-alert", props.value);
+  }
+};
+
+const handleClickOutside = (event: MouseEvent) => {
+  emit("close");
+};
+
+const handleEscape = (event: KeyboardEvent) => {
+  if (event.key === "Escape") {
+    emit("close");
+  }
+};
+
+onMounted(() => {
+  document.addEventListener("click", handleClickOutside);
+  document.addEventListener("keydown", handleEscape);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("click", handleClickOutside);
+  document.removeEventListener("keydown", handleEscape);
+});
+</script>
+
+<style scoped lang="scss">
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 220px;
+  overflow: hidden;
+
+  &.dark-theme {
+    background: #2d2d2d;
+    border-color: #444;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .menu-header {
+    background: #f5f5f5;
+    color: #666;
+
+    .dark-theme & {
+      background: #1e1e1e;
+      color: #aaa;
+    }
+  }
+
+  .menu-section {
+    padding: 4px 0;
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-size: 14px;
+
+    &:hover {
+      background-color: #f5f5f5;
+
+      .dark-theme & {
+        background-color: #383838;
+      }
+    }
+
+    &:active {
+      background-color: #e8e8e8;
+
+      .dark-theme & {
+        background-color: #444;
+      }
+    }
+  }
+}
+</style>

@@ -220,18 +220,18 @@ impl SchedulerJobPuller {
 
                     // [ENTERPRISE] Register batch for RCA cross-alert correlation
                     // Only for Alert module
-                    #[cfg(feature = "enterprise")]
-                    if matches!(module, TriggerModule::Alert) && !module_triggers.is_empty() {
-                        log::debug!(
-                            "[SCHEDULER][JobPuller-{}] Registering RCA batch with {} alerts",
-                            trace_id,
-                            module_triggers.len()
-                        );
-                        o2_enterprise::enterprise::ai::rca::register_batch(
-                            &trace_id,
-                            module_triggers.len(),
-                        );
-                    }
+                    // #[cfg(feature = "enterprise")]
+                    // if matches!(module, TriggerModule::Alert) && !module_triggers.is_empty() {
+                    //     log::debug!(
+                    //         "[SCHEDULER][JobPuller-{}] Registering RCA batch with {} alerts",
+                    //         trace_id,
+                    //         module_triggers.len()
+                    //     );
+                    //     o2_enterprise::enterprise::ai::rca::register_batch(
+                    //         &trace_id,
+                    //         module_triggers.len(),
+                    //     );
+                    // }
                 }
             }
 
