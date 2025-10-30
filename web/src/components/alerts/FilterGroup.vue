@@ -7,32 +7,16 @@
         opacity: computedOpacity,
         backgroundColor: computedStyleMap
     }"
-    >    <!-- here we can implment the color picker bg -->
-        <div class="  tw-w-fit group-tabs"
-        :class="store.state.theme === 'dark' ? 'dark-mode-group-tabs ' : 'light-mode-group-tabs'"
+    >  
+        <div class="  tw-w-fit condition-tabs el-border"
         >
-            <q-tabs
+          <AppTabs
             data-test="scheduled-alert-tabs"
-            v-model="label"
-            no-caps
-            outside-arrows
-            size="sm"
-            mobile-arrows
-            class=""
-            @update:model-value="toggleLabel"
-      >
-        <q-tab
-          data-test="scheduled-alert-custom-tab"
-          name="or"
-          :label="'OR'"
-        />
-        <q-tab
-          data-test="scheduled-alert-metrics-tab"
-          name="and"
-          :label="'AND'"
-          
-        />
-      </q-tabs>
+            :tabs="tabOptions"
+            class="tw-h-[20px] custom-tabs-selection-container"
+            v-model:active-tab="label"
+            @update:active-tab="toggleLabel"
+          />
       </div>
   
       <!-- Group content -->
@@ -148,7 +132,18 @@
   const store = useStore();
 
   const label = ref(props.group.label);
-  
+
+  const tabOptions = computed(() => [
+    {
+      label: "OR",
+      value: "or",
+    },
+    {
+      label: "AND",
+      value: "and",
+    },
+  ]);
+
   function isGroup(item: any) {
     return item && item.items && Array.isArray(item.items);
   }
@@ -367,7 +362,38 @@ defineExpose({
     }
       }
     }
-
+    
+  .condition-tabs{
+    position: relative;
+    bottom: 14px;
+    border-radius: 4px;
+    height: 28px;
+    padding: 2px;
+    background-color: var(--o2-card-bg);
+  }
+  .custom-tabs-selection-container{
+    border: none;
+    border-radius: none;
+    .o2-tab{
+      border-radius: 4px;
+      height: 24px;
+      padding: 4px 12px;
+      border-bottom: none;
+      white-space: normal;
+      line-height: 1rem;
+      font-size: 10px;
+    }
+    .o2-tab.active{
+      background-color: var(--o2-primary-btn-bg) !important;
+      color: rgba(255,255,255) !important;
+    }
+    .o2-tab:hover{
+      background-color: var(--o2-hover-accent) !important;
+    }
+    .o2-tab.active:hover{
+      background-color: var(--o2-primary-btn-bg) !important;
+    }
+  }
 
 
   </style>
