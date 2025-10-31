@@ -79,6 +79,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
+            :label="t(`alerts.history`)"
+            @click="goToAlertHistory"
+            data-test="alert-history-btn"
+            icon="history"
+          />
+          <q-btn
+            class="q-ml-sm o2-secondary-button tw-h-[36px]"
+            no-caps
+            flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
@@ -1651,6 +1660,15 @@ export default defineComponent({
         },
       });
     };
+
+    const goToAlertHistory = () => {
+      router.push({
+        name: "alertHistory",
+        params: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
     const exportAlert = async (row: any) => {
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id);
@@ -2122,6 +2140,7 @@ export default defineComponent({
       refreshDestination,
       showImportAlertDialog,
       importAlert,
+      goToAlertHistory,
       getTemplates,
       exportAlert,
       updateActiveFolderId,
