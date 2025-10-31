@@ -1148,7 +1148,7 @@
       "tabs": {
         "overview": "Overview",
         "frequency": "Frequency & Dedup",
-        "correlation": "Correlation & Grouping",
+        "correlation": "Errors & Storms Detection",
         "quality": "Alert Quality"
       },
       "filters": {

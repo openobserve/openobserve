@@ -23,41 +23,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-insights-context-menu"
   >
     <div class="menu-header tw-px-4 tw-py-2 tw-text-xs tw-font-semibold">
-      {{ panelTitle }}
+      {{ isAlertNameContext ? value : panelTitle }}
     </div>
     <q-separator />
 
-    <!-- Filter Options -->
-    <div class="menu-section">
-      <div
-        class="menu-item"
-        @click="selectFilter('>=')"
-        data-test="context-menu-gte"
-      >
-        <q-icon name="trending_up" size="18px" class="q-mr-sm" />
-        <span>Filter >= {{ formattedValue }}</span>
-      </div>
-      <div
-        class="menu-item"
-        @click="selectFilter('<=')"
-        data-test="context-menu-lte"
-      >
-        <q-icon name="trending_down" size="18px" class="q-mr-sm" />
-        <span>Filter <= {{ formattedValue }}</span>
-      </div>
-    </div>
-
-    <!-- Alert-specific actions (shown when clicking on alert name) -->
+    <!-- Alert-specific actions (shown for Dedup and similar panels) -->
     <template v-if="isAlertNameContext">
-      <q-separator />
       <div class="menu-section">
         <div
           class="menu-item"
-          @click="selectAlert"
-          data-test="context-menu-select-alert"
+          @click="configureDedupForAlert"
+          data-test="context-menu-configure-dedup"
         >
-          <q-icon name="settings" size="18px" class="q-mr-sm" />
-          <span>Configure This Alert</span>
+          <q-icon name="tune" size="18px" class="q-mr-sm" />
+          <span>Configure Dedup</span>
+        </div>
+        <div
+          class="menu-item"
+          @click="editAlert"
+          data-test="context-menu-edit-alert"
+        >
+          <q-icon name="edit" size="18px" class="q-mr-sm" />
+          <span>Edit Alert</span>
         </div>
         <div
           class="menu-item"
@@ -66,6 +53,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="history" size="18px" class="q-mr-sm" />
           <span>View Alert History</span>
+        </div>
+      </div>
+    </template>
+
+    <!-- Filter Options (shown for other panels) -->
+    <template v-else>
+      <div class="menu-section">
+        <div
+          class="menu-item"
+          @click="selectFilter('>=')"
+          data-test="context-menu-gte"
+        >
+          <q-icon name="trending_up" size="18px" class="q-mr-sm" />
+          <span>Filter >= {{ formattedValue }}</span>
+        </div>
+        <div
+          class="menu-item"
+          @click="selectFilter('<=')"
+          data-test="context-menu-lte"
+        >
+          <q-icon name="trending_down" size="18px" class="q-mr-sm" />
+          <span>Filter <= {{ formattedValue }}</span>
         </div>
       </div>
     </template>
@@ -107,17 +116,29 @@ const emit = defineEmits<{
     }
   ];
   "select-alert": [string];
+  "configure-dedup": [string];
+  "edit-alert": [string];
+  "view-history": [string];
 }>();
 
 const store = useStore();
 
 const isAlertNameContext = computed(() => {
+
   // Check if we're clicking on a panel that shows alert names
+  // Use panelId for more reliable identification instead of panelTitle
+  const alertNamePanels = [
+    "Panel_Alert_Frequency",
+    "Panel_Dedup_Impact",
+    "Panel_Alert_Correlation",
+    "Panel_Alert_Effectiveness",
+    "Panel_Retry_Analysis",
+    "Panel_Execution_Duration",
+  ];
+
   return (
-    props.panelTitle.includes("Alert") &&
-    (props.panelTitle.includes("Frequency") ||
-      props.panelTitle.includes("Effectiveness") ||
-      props.panelTitle.includes("Retry"))
+    typeof props.value === "string" &&
+    alertNamePanels.includes(props.panelId)
   );
 });
 
@@ -152,16 +173,24 @@ const selectFilter = (operator: string) => {
   }
 };
 
-const selectAlert = () => {
+const configureDedupForAlert = () => {
   if (typeof props.value === "string") {
-    emit("select-alert", props.value);
+    emit("configure-dedup", props.value);
+    emit("close");
+  }
+};
+
+const editAlert = () => {
+  if (typeof props.value === "string") {
+    emit("edit-alert", props.value);
+    emit("close");
   }
 };
 
 const viewAlertHistory = () => {
   if (typeof props.value === "string") {
-    // This will be handled by the parent component
-    emit("select-alert", props.value);
+    emit("view-history", props.value);
+    emit("close");
   }
 };
 

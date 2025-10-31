@@ -96,6 +96,7 @@ export const usePanelDataLoader = (
     store.state.selectedOrganization.identifier,
     dashboardId?.value,
     panelSchema.value.id,
+    panelSchema.value.config?.enable_annotations ?? true, // Default to true when not specified
   );
 
   const shouldFetchAnnotations = () => {

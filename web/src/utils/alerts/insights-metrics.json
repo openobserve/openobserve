@@ -27,12 +27,13 @@
               "zoom": 1,
               "lat": 0,
               "lng": 0
-            }
+            },
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT COUNT(DISTINCT key) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL]",
+              "query": "SELECT COUNT(DISTINCT SPLIT_PART(key, '/', 1)) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL]",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -80,7 +81,8 @@
               "zoom": 1,
               "lat": 0,
               "lng": 0
-            }
+            },
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
@@ -127,7 +129,8 @@
               "zoom": 1,
               "lat": 0,
               "lng": 0
-            }
+            },
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
@@ -174,7 +177,8 @@
               "zoom": 1,
               "lat": 0,
               "lng": 0
-            }
+            },
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
@@ -226,7 +230,8 @@
             },
             "dataZoom": {
               "yAxisIndex": 0
-            }
+            },
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
@@ -286,7 +291,8 @@
             },
             "dataZoom": {
               "yAxisIndex": "none"
-            }
+            },
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
@@ -333,7 +339,8 @@
           "description": "Breakdown of trigger execution statuses",
           "config": {
             "show_legends": true,
-            "legends_position": "right"
+            "legends_position": "right",
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
@@ -391,12 +398,13 @@
             },
             "dataZoom": {
               "yAxisIndex": 0
-            }
+            },
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT key as \"x_axis_1\", COUNT(*) as fire_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY key ORDER BY fire_count DESC LIMIT 30",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", COUNT(*) as fire_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY fire_count DESC LIMIT 30",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -435,12 +443,13 @@
           "description": "Potential noise reduction with deduplication",
           "config": {
             "wrap_table_cells": false,
-            "table_dynamic_columns": true
+            "table_dynamic_columns": true,
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT key, COUNT(*) as total_fires, COUNT(*) / 24.0 as fires_per_hour, ROUND(COUNT(*) * 0.95) as potential_dedup_savings, ROUND((COUNT(*) * 0.95) * 100.0 / COUNT(*), 1) as savings_percent FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY key HAVING fires_per_hour >= 5 ORDER BY total_fires DESC LIMIT 20",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as key, COUNT(*) as total_fires, COUNT(*) / 24.0 as fires_per_hour, ROUND(COUNT(*) * 0.95) as potential_dedup_savings, ROUND((COUNT(*) * 0.95) * 100.0 / COUNT(*), 1) as savings_percent FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) HAVING fires_per_hour >= 5 ORDER BY total_fires DESC LIMIT 20",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -502,12 +511,13 @@
           "title": "Alert Firing Pattern (Hourly)",
           "description": "Heatmap showing when alerts fire most frequently",
           "config": {
-            "show_legends": true
+            "show_legends": true,
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT key as \"x_axis_1\", DATE_PART('hour', to_timestamp(_timestamp/1000000)) as \"y_axis_1\", COUNT(*) as \"z_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY key, DATE_PART('hour', to_timestamp(_timestamp/1000000)) ORDER BY x_axis_1, y_axis_1",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", DATE_PART('hour', to_timestamp(_timestamp/1000000)) as \"y_axis_1\", COUNT(*) as \"z_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1), DATE_PART('hour', to_timestamp(_timestamp/1000000)) ORDER BY x_axis_1, y_axis_1",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -548,87 +558,8 @@
     },
     {
       "tabId": "correlation",
-      "name": "Correlation & Grouping",
+      "name": "Errors & Storms Detection",
       "panels": [
-        {
-          "id": "Panel_Alert_Correlation",
-          "type": "table",
-          "title": "Alert Correlation Analysis",
-          "description": "Alerts that fire together (within 60 seconds) - Grouping candidates",
-          "config": {
-            "wrap_table_cells": false,
-            "table_dynamic_columns": true,
-            "columns": [
-              {
-                "name": "alert_1",
-                "label": "Alert 1"
-              },
-              {
-                "name": "alert_2",
-                "label": "Alert 2"
-              },
-              {
-                "name": "correlation_count",
-                "label": "Correlation Count"
-              },
-              {
-                "name": "avg_time_diff_microseconds",
-                "label": "Avg Time Diff (\u03bcs)"
-              }
-            ]
-          },
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "WITH alert_times AS ( SELECT key, _timestamp, LAG(key) OVER (ORDER BY _timestamp) as prev_alert, _timestamp - LAG(_timestamp) OVER (ORDER BY _timestamp) as time_diff FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] ) SELECT prev_alert as alert_1, key as alert_2, COUNT(*) as correlation_count, AVG(time_diff) as avg_time_diff_microseconds FROM alert_times WHERE time_diff < 60000000 AND prev_alert IS NOT NULL AND prev_alert != key GROUP BY prev_alert, key HAVING correlation_count >= 5 ORDER BY correlation_count DESC LIMIT 30",
-              "customQuery": true,
-              "fields": {
-                "stream": "triggers",
-                "stream_type": "logs",
-                "x": [
-                  {
-                    "label": "Alert 1",
-                    "alias": "alert_1",
-                    "column": "alert_1",
-                    "color": null,
-                    "isDerived": true
-                  },
-                  {
-                    "label": "Alert 2",
-                    "alias": "alert_2",
-                    "column": "alert_2",
-                    "color": null,
-                    "isDerived": true
-                  }
-                ],
-                "y": [
-                  {
-                    "label": "Correlation Count",
-                    "alias": "correlation_count",
-                    "column": "correlation_count",
-                    "color": null,
-                    "isDerived": true
-                  },
-                  {
-                    "label": "Avg Time Diff (\u03bcs)",
-                    "alias": "avg_time_diff_microseconds",
-                    "column": "avg_time_diff_microseconds",
-                    "color": null,
-                    "isDerived": true
-                  }
-                ],
-                "z": []
-              }
-            }
-          ],
-          "layout": {
-            "x": 0,
-            "y": 0,
-            "w": 24,
-            "h": 12,
-            "i": 1
-          }
-        },
         {
           "id": "Panel_Alert_Storms",
           "type": "table",
@@ -636,12 +567,13 @@
           "description": "Time periods with abnormally high alert volume (>10 alerts in 5 min)",
           "config": {
             "wrap_table_cells": false,
-            "table_dynamic_columns": true
+            "table_dynamic_columns": true,
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
             {
-              "query": "WITH minute_buckets AS ( SELECT DATE_TRUNC('minute', to_timestamp(_timestamp/1000000)) as storm_time, COUNT(*) as alert_count, COUNT(DISTINCT key) as unique_alerts, array_agg(DISTINCT key) as alerts_involved FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY storm_time ) SELECT storm_time, alert_count, unique_alerts, alerts_involved FROM minute_buckets WHERE alert_count > 10 ORDER BY alert_count DESC LIMIT 50",
+              "query": "WITH minute_buckets AS ( SELECT DATE_TRUNC('minute', to_timestamp(_timestamp/1000000)) as storm_time, COUNT(*) as alert_count, COUNT(DISTINCT SPLIT_PART(key, '/', 1)) as unique_alerts, array_agg(DISTINCT SPLIT_PART(key, '/', 1)) as alerts_involved FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY storm_time ) SELECT storm_time, alert_count, unique_alerts, alerts_involved FROM minute_buckets WHERE alert_count > 10 ORDER BY alert_count DESC LIMIT 50",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -697,12 +629,13 @@
           "description": "Most frequent error messages - potential grouping by error type",
           "config": {
             "wrap_table_cells": true,
-            "table_dynamic_columns": true
+            "table_dynamic_columns": true,
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT SUBSTR(error, 1, 100) as error_message, COUNT(*) as occurrence_count, COUNT(DISTINCT key) as affected_alerts FROM \"triggers\" WHERE module = 'alert' AND status='failed' AND error IS NOT NULL [WHERE_CLAUSE_ADDITIONAL] GROUP BY SUBSTR(error, 1, 100) ORDER BY occurrence_count DESC LIMIT 20",
+              "query": "SELECT SUBSTR(error, 1, 100) as error_message, COUNT(*) as occurrence_count, COUNT(DISTINCT SPLIT_PART(key, '/', 1)) as affected_alerts FROM \"triggers\" WHERE module = 'alert' AND status='failed' AND error IS NOT NULL [WHERE_CLAUSE_ADDITIONAL] GROUP BY SUBSTR(error, 1, 100) ORDER BY occurrence_count DESC LIMIT 20",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -757,12 +690,13 @@
           "description": "Quality metrics for each alert",
           "config": {
             "wrap_table_cells": false,
-            "table_dynamic_columns": true
+            "table_dynamic_columns": true,
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT key, COUNT(*) as total_fires, COUNT(CASE WHEN status='completed' THEN 1 END) as successful, COUNT(CASE WHEN status='failed' THEN 1 END) as failed, COUNT(CASE WHEN is_silenced=true THEN 1 END) as silenced, ROUND((COUNT(CASE WHEN status='completed' THEN 1 END) * 100.0 / COUNT(*)), 1) as success_rate, ROUND(AVG(end_time - start_time)) as avg_duration_us FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY key ORDER BY total_fires DESC LIMIT 30",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as key, COUNT(*) as total_fires, COUNT(CASE WHEN status='completed' THEN 1 END) as successful, COUNT(CASE WHEN status='failed' THEN 1 END) as failed, COUNT(CASE WHEN is_silenced=true THEN 1 END) as silenced, ROUND((COUNT(CASE WHEN status='completed' THEN 1 END) * 100.0 / COUNT(*)), 1) as success_rate, ROUND(AVG(end_time - start_time)) as avg_duration_us FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY total_fires DESC LIMIT 30",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -840,12 +774,13 @@
           "config": {
             "show_legends": false,
             "unit": "custom",
-            "decimals": 1
+            "decimals": 1,
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT key as \"x_axis_1\", AVG(retries) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' AND retries > 0 [WHERE_CLAUSE_ADDITIONAL] GROUP BY key ORDER BY y_axis_1 DESC LIMIT 20",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", AVG(retries) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' AND retries > 0 [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY y_axis_1 DESC LIMIT 20",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -885,12 +820,13 @@
           "config": {
             "show_legends": false,
             "unit": "microseconds",
-            "decimals": 0
+            "decimals": 0,
+            "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT key as \"x_axis_1\", AVG(end_time - start_time) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY key ORDER BY y_axis_1 DESC LIMIT 20",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", AVG(end_time - start_time) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY y_axis_1 DESC LIMIT 20",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
