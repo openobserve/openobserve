@@ -377,16 +377,17 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
   --o2-scrollbar-thumb-active-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
 
   --o2-theme-color: #112027;
+  --o2-dark-theme-color: #3F7994;
 
   --o2-body-primary-bg: rgba(14, 19, 29, 0.01);
   --o2-body-secondary-bg: rgba(14, 19, 29, 0.4);
 
-  --o2-primary-btn-bg: #{$theme-color};
+  --o2-primary-btn-bg: var(--o2-dark-theme-color);
   --o2-primary-btn-text: #{$o2-gray-100};
   --q-primary: var(--o2-theme-color);
 
-  --o2-toggle-track-bg: #{$theme-color};
-  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
+  --o2-toggle-track-bg: var(--o2-dark-theme-color);
+  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-dark-theme-color) 30%, rgb(100, 100, 100));
 
   --o2-card-bg: #1f2223;
 
@@ -408,4 +409,6 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
 
   --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, #112027);
   --o2-actions-column-shawdow: rgba(125, 125, 125, 0.694);
+
+    --q-primary: var(--o2-dark-theme-color);
 }
