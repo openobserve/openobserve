@@ -965,8 +965,8 @@ class="q-pr-sm q-pt-xs" />
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
+              <div v-else class="tw-flex">
               <q-btn
-                v-else
                 data-test="logs-search-bar-visualize-refresh-btn"
                 dense
                 flat
@@ -982,16 +982,17 @@ class="q-pr-sm q-pt-xs" />
                 :disable="disable"
                 >{{ t("search.runQuery") }}</q-btn
                 >
-                <!-- <q-separator  class="tw-h-[29px] tw-w-[1px]" /> -->
+                <q-separator  class="tw-h-[29px] tw-w-[1px]" />
               <q-btn-dropdown
                 flat
                 class="tw-h-[29px] search-button-dropdown"
-                :class="
+                :class="[
                   config.isEnterprise == 'true' &&
                   visualizeSearchRequestTraceIds.length
                     ? 'tw-bg-[#ec1414]'
-                    : 'tw-bg-[#5ca380]'
-                "
+                    : 'tw-bg-[#575FC5] tw-text-white',
+                    config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-dropdown-normal-border-radius'
+              ]"
                 unelevated
                 dense
               >
@@ -1002,7 +1003,7 @@ class="q-pr-sm q-pt-xs" />
                   flat
                   no-caps
                   :title="'Refresh Cache & Run Query'"
-                  class="q-pa-sm search-button tw-rounded-r-none tw-text-[12px]"
+                  class="q-pa-sm search-button-dropdown tw-text-[12px] "
                   @click="handleRunQueryFn(true)"
                   :disable="
                     config.isEnterprise == 'true' &&
@@ -1013,8 +1014,9 @@ class="q-pr-sm q-pt-xs" />
                   Refresh Cache & Run Query</q-btn
                 >
               </q-btn-dropdown>
+              </div>
             </div>
-            <div v-else>
+            <div v-else class="tw-flex">
               <q-btn
                 v-if="
                   config.isEnterprise == 'true' &&
@@ -1037,7 +1039,6 @@ class="q-pr-sm q-pt-xs" />
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                flat
                 :title="t('search.runQuery')"
                 class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
                 style="font-size: 11px"
@@ -1054,14 +1055,16 @@ class="q-pr-sm q-pt-xs" />
                 "
                 >{{ t("search.runQuery") }}</q-btn
               >
-              <q-separator  class="tw-h-[29px] tw-w-[1px]" />
-              <q-btn-dropdown flat class="tw-h-[29px] search-button-dropdown" 
-              :class="
+               <q-separator  class="tw-h-[29px] tw-w-[1px]" />
+              <q-btn-dropdown flat class="tw-h-[29px]"
+              :class="[
               config.isEnterprise == 'true' &&
                   (!!searchObj.data.searchRequestTraceIds.length ||
                     !!searchObj.data.searchWebSocketTraceIds.length) &&
                   (searchObj.loading == true ||
-                    searchObj.loadingHistogram == true) ? 'tw-bg-[#ec1414]' : 'tw-bg-[#5ca380]'"
+                    searchObj.loadingHistogram == true) ? 'tw-bg-[#f67a7a]' : 'tw-bg-[#575FC5] tw-text-white',
+              config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-dropdown-normal-border-radius'
+              ]"
                unelevated dense >
                     <q-btn
                       data-test="logs-search-bar-refresh-btn"
@@ -1070,7 +1073,13 @@ class="q-pr-sm q-pt-xs" />
                       flat
                       no-caps
                       :title="'Refresh Cache & Run Query'"
-                      class="q-pa-sm search-button tw-rounded-r-none tw-text-[12px] "
+                      class="q-pa-sm search-button-dropdown tw-text-[12px] "
+                      :class="
+                    config.isEnterprise == 'true' &&
+                    visualizeSearchRequestTraceIds.length
+                      ? 'tw-bg-[#ec1414]'
+                      : 'tw-bg-[#5ca380]'
+                  "
                       @click="handleRunQueryFn(true)"
                       :disable="
                         searchObj.loading == true ||
@@ -3689,11 +3698,11 @@ export default defineComponent({
 
     const handleHistogramMode = () => {};
 
-    const handleRunQueryFn = () => {
+    const handleRunQueryFn = (clear_cache = false) => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
-        emit("handleRunQueryFn", typeof refresh_cache === 'boolean' ? refresh_cache : false);
+        emit("handleRunQueryFn", typeof clear_cache === 'boolean' ? clear_cache : false);
       } else {
-        handleRunQuery();
+        handleRunQuery(typeof clear_cache === 'boolean' ? clear_cache : false);
       }
     };
 
