@@ -1326,6 +1326,14 @@ export default defineComponent({
   overflow-y: auto !important;
 }
 
+@media print {
+  .print-mode-container {
+    height: auto !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+}
+
 .dashboard-icons {
   height: 30px;
   transition: all 0.2s ease;

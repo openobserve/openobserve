@@ -1545,6 +1545,14 @@ export default defineComponent({
   }
 }
 
+@media print {
+  .tw-h-full,
+  .tw-h-\[calc\(100vh-105px\)\],
+  .tw-overflow-y-auto {
+    overflow: visible !important;
+  }
+}
+
 .q-drawer {
   border-radius: 0.625rem;
 }
