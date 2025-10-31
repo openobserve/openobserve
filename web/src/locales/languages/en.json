@@ -83,7 +83,8 @@
     "favourite": "Favorite",
     "refresh": "Refresh",
     "contactUs": "Contact Us",
-    "addFolder": "Add Folder"
+    "addFolder": "Add Folder",
+    "status": "Status"
   },
   "search": {
     "resetFields": "Reset selected table fields",
@@ -1137,7 +1138,8 @@
       "sendStrategyAll": "All",
       "groupWaitTime": "Group Wait Time (seconds)",
       "groupWaitTimeTooltip": "Time to wait and collect similar alerts before sending a grouped notification. Allows batching of alerts that occur in quick succession."
-    }
+    },
+    "noHistory": "No alert history found"
   },
   "alert_templates": {
     "header": "Templates",
