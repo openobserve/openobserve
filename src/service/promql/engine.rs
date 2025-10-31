@@ -473,6 +473,8 @@ impl Engine {
         let data = self
             .selector_load_data_owned(&selector, Some(range))
             .await?;
+
+        // TODO: add offset back here
         let values = match data.get_range_values() {
             Some(v) => v,
             None => return Ok(vec![]),
