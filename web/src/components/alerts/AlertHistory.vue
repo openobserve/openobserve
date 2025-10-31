@@ -18,231 +18,223 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="alert-history-page"
     class="q-pa-none flex"
-    style="height: calc(100vh - 65px)"
-    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
-    <div
-      class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-border-b-[1px]"
-      :class="
-        store.state.theme === 'dark'
-          ? 'tw-border-gray-500'
-          : 'tw-border-gray-200'
-      "
-    >
-      <div class="flex items-center">
-        <q-btn
-          icon="arrow_back"
-          flat
-          round
-          @click="goBack"
-          class="q-mr-md"
-          data-test="alert-history-back-btn"
-        />
-        <div
-          class="q-table__title tw-font-[600]"
-          data-test="alerts-history-title"
-        >
-          {{ t(`alerts.history`) }}
-        </div>
-      </div>
-      <div class="flex q-ml-auto items-center">
-        <div class="q-mr-md">
-          <DateTime
-            ref="dateTimeRef"
-            auto-apply
-            :default-type="dateTimeType"
-            :default-absolute-time="{
-              startTime: absoluteTime.startTime,
-              endTime: absoluteTime.endTime,
-            }"
-            :default-relative-time="relativeTime"
-            data-test="alert-history-date-picker"
-            @on:date-change="updateDateTime"
+    <div class="tw-w-full tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs">
+      <div class="card-container flex">
+        <div class="flex items-center">
+          <q-btn
+            icon="arrow_back"
+            flat
+            round
+            @click="goBack"
+            class="q-mr-md"
+            data-test="alert-history-back-btn"
           />
+          <div
+            class="q-table__title tw-font-[600]"
+            data-test="alerts-history-title"
+          >
+            {{ t(`alerts.history`) }}
+          </div>
         </div>
-        <q-select
-          v-model="selectedAlert"
-          dense
-          borderless
-          use-input
-          hide-selected
-          fill-input
-          input-debounce="0"
-          :options="filteredAlertOptions"
-          @filter="filterAlertOptions"
-          @input-value="setSearchQuery"
-          @update:model-value="onAlertSelected"
-          :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
-          data-test="alert-history-search-select"
-          class="o2-search-input q-mr-md"
-          style="min-width: 250px"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-search-input-dark'
-              : 'o2-search-input-light'
-          "
-          clearable
-          @clear="clearSearch"
-        >
-          <template v-slot:prepend>
-            <q-icon
-              class="o2-search-input-icon"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-search-input-icon-dark'
-                  : 'o2-search-input-icon-light'
-              "
-              name="search"
+        <div class="flex q-ml-auto items-center">
+          <div class="q-mr-md">
+            <DateTime
+              ref="dateTimeRef"
+              auto-apply
+              :default-type="dateTimeType"
+              :default-absolute-time="{
+                startTime: absoluteTime.startTime,
+                endTime: absoluteTime.endTime,
+              }"
+              :default-relative-time="relativeTime"
+              data-test="alert-history-date-picker"
+              @on:date-change="updateDateTime"
             />
-          </template>
-          <template v-slot:no-option>
-            <q-item>
-              <q-item-section class="text-grey">
-                No alerts found
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
-        <q-btn
-          icon="search"
-          flat
-          round
-          @click="manualSearch"
-          data-test="alert-history-manual-search-btn"
-          :disable="loading"
-          class="q-mr-md"
-        >
-          <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
-        </q-btn>
-        <q-btn
-          icon="refresh"
-          flat
-          round
-          @click="refreshData"
-          data-test="alert-history-refresh-btn"
-          :loading="loading"
-        >
-          <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
-        </q-btn>
+          </div>
+          <q-select
+            v-model="selectedAlert"
+            dense
+            borderless
+            use-input
+            hide-selected
+            fill-input
+            input-debounce="0"
+            :options="filteredAlertOptions"
+            @filter="filterAlertOptions"
+            @input-value="setSearchQuery"
+            @update:model-value="onAlertSelected"
+            :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
+            data-test="alert-history-search-select"
+            class="o2-search-input q-mr-md"
+            style="min-width: 250px"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-search-input-dark'
+                : 'o2-search-input-light'
+            "
+            clearable
+            @clear="clearSearch"
+          >
+            <template v-slot:prepend>
+              <q-icon
+                class="o2-search-input-icon"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-search-input-icon-dark'
+                    : 'o2-search-input-icon-light'
+                "
+                name="search"
+              />
+            </template>
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">
+                  No alerts found
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
+          <q-btn
+            icon="search"
+            flat
+            round
+            @click="manualSearch"
+            data-test="alert-history-manual-search-btn"
+            :disable="loading"
+            class="q-mr-md"
+          >
+            <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
+          </q-btn>
+          <q-btn
+            icon="refresh"
+            flat
+            round
+            @click="refreshData"
+            data-test="alert-history-refresh-btn"
+            :loading="loading"
+          >
+            <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
+          </q-btn>
+        </div>
       </div>
     </div>
 
-    <div
-      class="full-width alert-history-table"
-      style="height: calc(100vh - 138px)"
-    >
-      <q-table
-        data-test="alert-history-table"
-        ref="qTable"
-        :rows="rows"
-        :columns="columns"
-        row-key="id"
-        v-model:pagination="pagination"
-        :loading="loading"
-        :rows-per-page-options="rowsPerPageOptions"
-        @request="onRequest"
-        binary-state-sort
-        flat
-        bordered
-        class="full-height"
+    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+      <div
+        class="full-width alert-history-table card-container"
+        style="height: calc(100vh - 105px)"
       >
-        <template #no-data>
-          <div class="full-width row flex-center q-py-lg text-grey-7">
-            <q-icon name="info" size="2em" class="q-mr-sm" />
-            <span>{{ t("alerts.noHistory") || "No alert history found" }}</span>
-          </div>
-        </template>
+        <q-table
+          data-test="alert-history-table"
+          ref="qTable"
+          :rows="rows"
+          :columns="columns"
+          row-key="id"
+          v-model:pagination="pagination"
+          :rows-per-page-options="rowsPerPageOptions"
+          @request="onRequest"
+          class="o2-quasar-table o2-quasar-table-header-sticky"
+        >
+          <template #no-data>
+            <!-- <div class="full-width row flex-center q-py-lg text-grey-7">
+              <q-icon name="info" size="2em" class="q-mr-sm" />
+              <span>{{ t("alerts.noHistory") || "No alert history found" }}</span>
+            </div> -->
+            <no-data />
+          </template>
 
-        <template #body-cell-timestamp="props">
-          <q-td :props="props">
-            {{ formatDate(props.row.timestamp) }}
-          </q-td>
-        </template>
+          <template #body-cell-timestamp="props">
+            <q-td :props="props">
+              {{ formatDate(props.row.timestamp) }}
+            </q-td>
+          </template>
 
-        <template #body-cell-status="props">
-          <q-td :props="props">
-            <q-chip
-              :color="getStatusColor(props.row.status)"
-              text-color="white"
-              size="sm"
-              dense
-            >
-              {{ props.row.status }}
-            </q-chip>
-          </q-td>
-        </template>
+          <template #body-cell-status="props">
+            <q-td :props="props">
+              <q-chip
+                :color="getStatusColor(props.row.status)"
+                text-color="white"
+                size="sm"
+                dense
+              >
+                {{ props.row.status }}
+              </q-chip>
+            </q-td>
+          </template>
 
-        <template #body-cell-is_realtime="props">
-          <q-td :props="props">
-            <q-icon
-              :name="props.row.is_realtime ? 'check_circle' : 'schedule'"
-              :color="props.row.is_realtime ? 'positive' : 'grey'"
-              size="sm"
-            >
-              <q-tooltip>
-                {{ props.row.is_realtime ? "Real-time" : "Scheduled" }}
-              </q-tooltip>
-            </q-icon>
-          </q-td>
-        </template>
+          <template #body-cell-is_realtime="props">
+            <q-td :props="props">
+              <q-icon
+                :name="props.row.is_realtime ? 'check_circle' : 'schedule'"
+                :color="props.row.is_realtime ? 'positive' : 'grey'"
+                size="sm"
+              >
+                <q-tooltip>
+                  {{ props.row.is_realtime ? "Real-time" : "Scheduled" }}
+                </q-tooltip>
+              </q-icon>
+            </q-td>
+          </template>
 
-        <template #body-cell-is_silenced="props">
-          <q-td :props="props">
-            <q-icon
-              v-if="props.row.is_silenced"
-              name="volume_off"
-              color="warning"
-              size="sm"
-            >
-              <q-tooltip>Silenced</q-tooltip>
-            </q-icon>
-          </q-td>
-        </template>
+          <template #body-cell-is_silenced="props">
+            <q-td :props="props">
+              <q-icon
+                v-if="props.row.is_silenced"
+                name="volume_off"
+                color="warning"
+                size="sm"
+              >
+                <q-tooltip>Silenced</q-tooltip>
+              </q-icon>
+            </q-td>
+          </template>
 
-        <template #body-cell-duration="props">
-          <q-td :props="props">
-            {{ formatDuration(props.row.end_time - props.row.start_time) }}
-          </q-td>
-        </template>
+          <template #body-cell-duration="props">
+            <q-td :props="props">
+              {{ formatDuration(props.row.end_time - props.row.start_time) }}
+            </q-td>
+          </template>
 
-        <template #body-cell-error="props">
-          <q-td :props="props">
-            <q-icon
-              v-if="props.row.error"
-              name="error"
-              color="negative"
-              size="sm"
-              class="cursor-pointer"
-              @click="showErrorDialog(props.row.error)"
-            >
-              <q-tooltip>Click to view error</q-tooltip>
-            </q-icon>
-          </q-td>
-        </template>
+          <template #body-cell-error="props">
+            <q-td :props="props">
+              <q-icon
+                v-if="props.row.error"
+                name="error"
+                color="negative"
+                size="sm"
+                class="cursor-pointer"
+                @click="showErrorDialog(props.row.error)"
+              >
+                <q-tooltip>Click to view error</q-tooltip>
+              </q-icon>
+            </q-td>
+          </template>
 
-        <template #body-cell-actions="props">
-          <q-td :props="props">
-            <q-btn
-              icon="visibility"
-              flat
-              dense
-              round
-              @click="showDetailsDialog(props.row)"
-              data-test="alert-history-view-details"
-            >
-              <q-tooltip>View Details</q-tooltip>
-            </q-btn>
-          </q-td>
-        </template>
+          <template #body-cell-actions="props">
+            <q-td :props="props">
+              <q-btn
+                icon="visibility"
+                flat
+                dense
+                round
+                @click="showDetailsDialog(props.row)"
+                data-test="alert-history-view-details"
+              >
+                <q-tooltip>View Details</q-tooltip>
+              </q-btn>
+            </q-td>
+          </template>
 
-        <template #bottom>
-          <QTablePagination
-            :pagination="pagination"
-            :rows-per-page-options="rowsPerPageOptions"
-            @update:pagination="onRequest({ pagination: $event })"
-          />
-        </template>
-      </q-table>
+          <template #bottom>
+            <QTablePagination
+              :pagination="pagination"
+              :rows-per-page-options="rowsPerPageOptions"
+              @update:pagination="onRequest({ pagination: $event })"
+            />
+          </template>
+        </q-table>
+      </div>
     </div>
 
     <!-- Details Dialog -->
@@ -496,6 +488,7 @@ import { useQuasar, date } from "quasar";
 import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
+import NoData from "@/components/shared/grid/NoData.vue";
 
 const { t } = useI18n();
 const store = useStore();
