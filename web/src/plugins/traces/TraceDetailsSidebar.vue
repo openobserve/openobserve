@@ -168,7 +168,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
       >
         <template v-slot:body-cell="props">
-          <q-td class="text-left">
+          <q-td
+            class="text-left"
+            :class="
+              props.col.name === 'field'
+                ? store.state.theme === 'dark'
+                  ? 'tw-text-red-400'
+                  : 'tw-text-red-700'
+                : ''
+            "
+          >
             {{ props.row[props.col.name] }}
           </q-td>
         </template>
@@ -186,7 +195,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
       >
         <template v-slot:body-cell="props">
-          <q-td class="text-left">
+          <q-td
+            class="text-left"
+            :class="
+              props.col.name === 'field'
+                ? store.state.theme === 'dark'
+                  ? 'tw-text-red-400'
+                  : 'tw-text-red-700'
+                : ''
+            "
+          >
             {{ props.row[props.col.name] }}
           </q-td>
         </template>
