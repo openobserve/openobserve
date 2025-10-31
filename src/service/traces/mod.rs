@@ -19,7 +19,8 @@ use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    DISTINCT_FIELDS, TIMESTAMP_COL_NAME, get_config,
+    ALL_VALUES_COL_NAME, DISTINCT_FIELDS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
+    get_config,
     meta::{
         alerts::alert::Alert,
         otlp::OtlpRequestType,
@@ -206,7 +207,37 @@ pub async fn handle_otlp_request(
     )
     .await;
     let mut stream_pipeline_inputs = Vec::new();
+    let mut original_options = Vec::new();
     // End pipeline params construction
+
+    let mut stream_params = vec![StreamParams::new(
+        org_id,
+        &traces_stream_name,
+        StreamType::Traces,
+    )];
+    if let Some(exec_pl) = &executable_pipeline {
+        let pl_destinations = exec_pl.get_all_destination_streams();
+        stream_params.extend(pl_destinations);
+    }
+
+    let mut user_defined_schema_map: std::collections::HashMap<
+        String,
+        Option<std::collections::HashSet<String>>,
+    > = std::collections::HashMap::new();
+    let mut streams_need_original_map: std::collections::HashMap<String, bool> =
+        std::collections::HashMap::new();
+    let mut streams_need_all_values_map: std::collections::HashMap<String, bool> =
+        std::collections::HashMap::new();
+    crate::service::ingestion::get_uds_and_original_data_streams(
+        &stream_params,
+        &mut user_defined_schema_map,
+        &mut streams_need_original_map,
+        &mut streams_need_all_values_map,
+    )
+    .await;
+
+    let store_original_when_pipeline_exists =
+        executable_pipeline.is_some() && streams_need_original_map.values().any(|val| *val);
 
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
@@ -405,6 +436,25 @@ pub async fn handle_otlp_request(
                 }
 
                 let mut value: json::Value = json::to_value(local_val).unwrap();
+
+                let original_data = if value.is_object() {
+                    // 2. current stream does not have pipeline
+                    if executable_pipeline.is_none() {
+                        // current stream requires original
+                        streams_need_original_map
+                            .get(&traces_stream_name)
+                            .is_some_and(|v| *v)
+                            .then(|| value.to_string())
+                    } else {
+                        // 3. with pipeline, storing original as long as streams_need_original_set
+                        //    is not empty
+                        // because not sure the pipeline destinations
+                        store_original_when_pipeline_exists.then(|| value.to_string())
+                    }
+                } else {
+                    None // `item` won't be flattened, no need to store original
+                };
+
                 // add timestamp
                 value.as_object_mut().unwrap().insert(
                     TIMESTAMP_COL_NAME.to_string(),
@@ -413,6 +463,7 @@ pub async fn handle_otlp_request(
 
                 if executable_pipeline.is_some() {
                     stream_pipeline_inputs.push(value);
+                    original_options.push(original_data);
                 } else {
                     // JSON Flattening
                     value = flatten::flatten(value).map_err(|e| {
@@ -420,7 +471,7 @@ pub async fn handle_otlp_request(
                     })?;
 
                     // get json object
-                    let record_val = match value.take() {
+                    let mut record_val = match value.take() {
                         json::Value::Object(v) => v,
                         _ => {
                             log::error!(
@@ -436,6 +487,53 @@ pub async fn handle_otlp_request(
                             ));
                         }
                     };
+
+                    if let Some(Some(fields)) = user_defined_schema_map.get(&traces_stream_name) {
+                        record_val = crate::service::logs::refactor_map(record_val, fields);
+                    }
+
+                    // add `_original` and '_record_id` if required by StreamSettings
+                    if streams_need_original_map
+                        .get(&traces_stream_name)
+                        .is_some_and(|v| *v)
+                        && let Some(original_data) = original_data
+                    {
+                        record_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
+                        let record_id = crate::service::ingestion::generate_record_id(
+                            org_id,
+                            &traces_stream_name,
+                            &StreamType::Traces,
+                        );
+                        record_val.insert(
+                            ID_COL_NAME.to_string(),
+                            json::Value::String(record_id.to_string()),
+                        );
+                    }
+
+                    // add `_all_values` if required by StreamSettings
+                    if streams_need_all_values_map
+                        .get(&traces_stream_name)
+                        .is_some_and(|v| *v)
+                    {
+                        let mut values = Vec::with_capacity(record_val.len());
+                        for (k, value) in record_val.iter() {
+                            if [
+                                TIMESTAMP_COL_NAME,
+                                ID_COL_NAME,
+                                ORIGINAL_DATA_COL_NAME,
+                                ALL_VALUES_COL_NAME,
+                            ]
+                            .contains(&k.as_str())
+                            {
+                                continue;
+                            }
+                            values.push(value.to_string());
+                        }
+                        record_val.insert(
+                            ALL_VALUES_COL_NAME.to_string(),
+                            json::Value::String(values.join(" ")),
+                        );
+                    }
 
                     let (ts_data, _) = json_data_by_stream
                         .entry(traces_stream_name.to_string())
@@ -475,9 +573,22 @@ pub async fn handle_otlp_request(
                         continue;
                     }
 
-                    for (_idx, mut res) in stream_pl_results {
+                    let destination_stream = stream_params.stream_name.to_string();
+
+                    if !user_defined_schema_map.contains_key(&destination_stream) {
+                        // a new dynamically created stream. need to check the two maps again
+                        crate::service::ingestion::get_uds_and_original_data_streams(
+                            &[stream_params],
+                            &mut user_defined_schema_map,
+                            &mut streams_need_original_map,
+                            &mut streams_need_all_values_map,
+                        )
+                        .await;
+                    }
+
+                    for (idx, mut res) in stream_pl_results {
                         // get json object
-                        let record_val = match res.take() {
+                        let mut record_val = match res.take() {
                             json::Value::Object(v) => v,
                             _ => {
                                 log::error!(
@@ -497,7 +608,7 @@ pub async fn handle_otlp_request(
 
                         log::debug!(
                             "[TRACES:OTLP] pipeline result for stream: {} got {} records",
-                            stream_params.stream_name,
+                            destination_stream,
                             record_val.len()
                         );
 
@@ -511,8 +622,63 @@ pub async fn handle_otlp_request(
                             partial_success.rejected_spans += 1;
                             continue;
                         };
+
+                        if let Some(Some(fields)) = user_defined_schema_map.get(&destination_stream)
+                        {
+                            record_val = crate::service::logs::refactor_map(record_val, fields);
+                        }
+
+                        // usize::MAX used as a flag when pipeline is applied with ResultArray vrl
+                        //  - invalid original_data
+                        // add `_original` and '_record_id` if required by StreamSettings
+                        if idx != usize::MAX
+                            && streams_need_original_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v)
+                            && original_options[idx].is_some()
+                        {
+                            record_val.insert(
+                                ORIGINAL_DATA_COL_NAME.to_string(),
+                                original_options[idx].clone().unwrap().into(),
+                            );
+                            let record_id = crate::service::ingestion::generate_record_id(
+                                org_id,
+                                &destination_stream,
+                                &StreamType::Traces,
+                            );
+                            record_val.insert(
+                                ID_COL_NAME.to_string(),
+                                json::Value::String(record_id.to_string()),
+                            );
+                        }
+
+                        // add `_all_values` if required by StreamSettings
+                        if streams_need_all_values_map
+                            .get(&destination_stream)
+                            .is_some_and(|v| *v)
+                        {
+                            let mut values = Vec::with_capacity(record_val.len());
+                            for (k, value) in record_val.iter() {
+                                if [
+                                    TIMESTAMP_COL_NAME,
+                                    ID_COL_NAME,
+                                    ORIGINAL_DATA_COL_NAME,
+                                    ALL_VALUES_COL_NAME,
+                                ]
+                                .contains(&k.as_str())
+                                {
+                                    continue;
+                                }
+                                values.push(value.to_string());
+                            }
+                            record_val.insert(
+                                ALL_VALUES_COL_NAME.to_string(),
+                                json::Value::String(values.join(" ")),
+                            );
+                        }
+
                         let (ts_data, _) = json_data_by_stream
-                            .entry(stream_params.stream_name.to_string())
+                            .entry(destination_stream.clone())
                             .or_insert((Vec::new(), None));
                         ts_data.push((timestamp, record_val));
                     }

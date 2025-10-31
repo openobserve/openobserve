@@ -1197,7 +1197,7 @@ export default defineComponent({
     });
 
     const showStoreOriginalDataToggle = computed(() => {
-      return modelValue.stream_type !== "traces";
+      return true;
     });
     //here we added a watcher to
     //1. if user defined schema is enabled then we need to show the schema fields tab and also need to make sure that it would be the active tab
