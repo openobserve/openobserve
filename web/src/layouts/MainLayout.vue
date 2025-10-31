@@ -601,22 +601,6 @@ import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
-import {
-  Home,
-  Search,
-  BarChart3,
-  GitBranch,
-  Layout,
-  FileText,
-  AlertTriangle,
-  TvMinimal,
-  Database,
-  Users,
-  ShieldUser,
-  Code,
-  FileBarChart,
-  Settings,
-} from "lucide-vue-next";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -762,75 +746,76 @@ export default defineComponent({
     let user = store.state.userInfo;
 
     var linksList = ref([
-      {
-        title: t("menu.home"),
-        iconComponent: markRaw(Home),
-        link: "/",
-        exact: true,
-        name: "home",
-      },
-      {
-        title: t("menu.search"),
-        iconComponent: markRaw(Search),
-        link: "/logs",
-        name: "logs",
-      },
-      {
-        title: t("menu.metrics"),
-        iconComponent: markRaw(BarChart3),
-        link: "/metrics",
-        name: "metrics",
-      },
-      {
-        title: t("menu.traces"),
-        iconComponent: markRaw(GitBranch),
-        link: "/traces",
-        name: "traces",
-      },
-      {
-        title: "Service Graph",
-        icon: outlinedBubbleChart,
-        link: "/service-graph",
-        name: "serviceGraph",
-      },
-      {
-        title: t("menu.rum"),
-        iconComponent: markRaw(TvMinimal),
-        link: "/rum",
-        name: "rum",
-      },
-      {
-        title: t("menu.dashboard"),
-        iconComponent: markRaw(Layout),
-        link: "/dashboards",
-        name: "dashboards",
-      },
-      {
-        title: t("menu.index"),
-        iconComponent: markRaw(Database),
-        link: "/streams",
-        name: "streams",
-      },
-      {
-        title: t("menu.alerts"),
-        iconComponent: markRaw(AlertTriangle),
-        link: "/alerts",
-        name: "alertList",
-      },
-      {
-        title: t("menu.ingestion"),
-        iconComponent: markRaw(FileText),
-        link: "/ingestion",
-        name: "ingestion",
-      },
-      {
-        title: t("menu.iam"),
-        iconComponent: markRaw(Users),
-        link: "/iam",
-        display: store.state?.currentuser?.role == "admin" ? true : false,
-        name: "iam",
-      },
-    ]);
+        {
+          title: t("menu.home"),
+          icon: outlinedHome,
+          link: "/",
+          exact: true,
+          name: "home",
+        },
+        {
+          title: t("menu.search"),
+          icon: outlinedSearch,
+          link: "/logs",
+          name: "logs",
+        },
+        {
+          title: t("menu.metrics"),
+          icon: outlinedBarChart,
+          link: "/metrics",
+          name: "metrics",
+        },
+        {
+          title: t("menu.traces"),
+          icon: outlinedAccountTree,
+          link: "/traces",
+          name: "traces",
+        },
+        {
+          title: "Service Graph",
+          icon: outlinedBubbleChart,
+          link: "/service-graph",
+          name: "serviceGraph",
+        },
+        {
+          title: t("menu.rum"),
+          icon: outlinedDevices,
+          link: "/rum",
+          name: "rum",
+        },
+        {
+          title: t("menu.dashboard"),
+          icon: outlinedDashboard,
+          link: "/dashboards",
+          name: "dashboards",
+        },
+        {
+          title: t("menu.index"),
+          icon: outlinedWindow,
+          link: "/streams",
+          name: "streams",
+        },
+        {
+          title: t("menu.alerts"),
+          icon: outlinedReportProblem,
+          link: "/alerts",
+          name: "alertList",
+        },
+        {
+          title: t("menu.ingestion"),
+          icon: outlinedFilterAlt,
+          link: "/ingestion",
+          name: "ingestion",
+        },
+        {
+          title: t("menu.iam"),
+          icon: outlinedManageAccounts,
+          link: "/iam",
+          display: store.state?.currentuser?.role == "admin" ? true : false,
+          name: "iam",
+        },
+      ]);
+
 
     const langList = [
       {
@@ -1647,7 +1632,7 @@ export default defineComponent({
 
       .q-icon {
         height: 1.3rem;
-        width: 1rem;
+        width: 1.3rem;
       }
 
       &.q-router-link--active {
