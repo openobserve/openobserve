@@ -832,30 +832,6 @@ export default defineComponent({
           ? JSON.parse(props.span.links)
           : props.span.links;
 
-        // If there are no real links, return sample data for testing
-        if (!parsedLinks || parsedLinks.length === 0) {
-          return [
-            {
-              context: {
-                traceId: "abc123def456ghi789jkl012mno345pq",
-                spanId: "span1234567890ab",
-              },
-            },
-            {
-              context: {
-                traceId: "xyz789uvw456rst123opq890lmn567cd",
-                spanId: "span0987654321xy",
-              },
-            },
-            {
-              context: {
-                traceId: "pqr456stu789vwx012yza345bcd678ef",
-                spanId: "spanabcdef123456",
-              },
-            },
-          ];
-        }
-
         return parsedLinks;
       } catch (e) {
         console.log("Error parsing span links:", e);
