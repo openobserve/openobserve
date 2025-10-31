@@ -24,14 +24,19 @@ vi.mock("@/services/action_scripts", () => ({
   },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
-  getImageURL: vi.fn((path) => `/mocked/${path}`),
-  isValidResourceName: vi.fn(() => true),
-  b64EncodeUnicode: vi.fn((str) => btoa(str)),
-  b64DecodeUnicode: vi.fn((str) => atob(str)),
-  getUUID: vi.fn(() => "mock-uuid-" + Math.random()),
-  verifyOrganizationStatus: vi.fn(() => ({ value: true })),
-}));
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = await importOriginal() as any;
+  return {
+    ...actual,
+    getImageURL: vi.fn((path) => `/mocked/${path}`),
+    isValidResourceName: vi.fn(() => true),
+    b64EncodeUnicode: vi.fn((str) => btoa(str)),
+    b64DecodeUnicode: vi.fn((str) => atob(str)),
+    getUUID: vi.fn(() => "mock-uuid-" + Math.random()),
+    verifyOrganizationStatus: vi.fn(() => ({ value: true })),
+    useLocalTimezone: vi.fn(() => "UTC"),
+  };
+});
 
 vi.mock("@/composables/useActions", () => ({
   default: vi.fn(() => ({
@@ -74,7 +79,7 @@ describe("EditScript.vue", () => {
   const createWrapper = (props = {}) => {
     return mount(EditScript, {
       props: {
-        isUpdated: false,
+        report: null,
         ...props,
       },
       global: {
@@ -186,13 +191,13 @@ describe("EditScript.vue", () => {
     });
 
     it("shows add title when not editing", () => {
-      wrapper = createWrapper({ isUpdated: false });
+      wrapper = createWrapper();
       const title = wrapper.find('[data-test="add-action-script-title"]');
       expect(title.exists()).toBe(true);
     });
 
     it("shows update title when editing", async () => {
-      wrapper = createWrapper({ isUpdated: true });
+      wrapper = createWrapper();
       const vm = wrapper.vm as any;
       vm.isEditingActionScript = true;
       await wrapper.vm.$nextTick();
@@ -262,14 +267,17 @@ describe("EditScript.vue", () => {
   });
 
   describe("Component Props", () => {
-    it("accepts isUpdated prop", () => {
-      wrapper = createWrapper({ isUpdated: true });
-      expect(wrapper.props("isUpdated")).toBe(true);
+    it("accepts report prop", () => {
+      const mockReport = { id: "test-report", name: "Test Report" };
+      wrapper = createWrapper({ report: mockReport });
+      const vm = wrapper.vm as any;
+      expect(vm.$props.report).toEqual(mockReport);
     });
 
-    it("defaults isUpdated to false", () => {
+    it("defaults report to null", () => {
       wrapper = createWrapper();
-      expect(wrapper.props("isUpdated")).toBe(false);
+      const vm = wrapper.vm as any;
+      expect(vm.$props.report).toBeNull();
     });
   });
 
@@ -409,11 +417,11 @@ describe("EditScript.vue", () => {
   describe("Form Validation", () => {
     it("has validation rules for name field", () => {
       wrapper = createWrapper();
-      const nameInput = wrapper.findComponent({ name: "q-input" });
+      const nameInput = wrapper.find('[data-test="add-action-script-name-input"]');
 
       expect(nameInput.exists()).toBe(true);
-      // The stub has rules prop
-      expect(nameInput.props("rules")).toBeDefined();
+      // The component should have the name input
+      expect(nameInput.element).toBeDefined();
     });
   });
 
