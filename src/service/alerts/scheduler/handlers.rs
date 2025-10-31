@@ -306,21 +306,22 @@ async fn handle_alert_triggers(
     #[cfg(feature = "cloud")]
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
+            let mut alert = alert;
             log::info!(
-                "skipping alert {} id {} in org {} because free trial expiry",
+                "pausing alert {} id {} in org {} because free trial expiry",
                 alert.name,
                 trigger.module_key,
                 trigger.org
             );
+            alert.enabled = false;
             // Update the trigger job to the next expected trigger time to check again
-            let next_run_at = alert.trigger_condition.get_next_trigger_time(
-                true,
-                alert.tz_offset,
-                false,
-                None,
-            )?;
-            new_trigger.next_run_at = next_run_at;
-            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+            if let Err(e) = set_without_updating_trigger(&trigger.org, alert).await {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause alert due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    &trigger.module_key
+                );
+            }
             return Ok(());
         }
     }
@@ -960,12 +961,20 @@ async fn handle_report_triggers(
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
             log::info!(
-                "skipping report {}  in org {} because free trial expiry",
+                "pausing report {}  in org {} because free trial expiry",
                 report_name,
                 trigger.org
             );
-            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+            report.enabled = false;
+            if let Err(e) =
+                crate::service::dashboards::reports::enable(&report.org_id, &report.name, false).await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause report due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    report_name
+                );
+            }
             return Ok(());
         }
     }
@@ -1250,13 +1259,22 @@ async fn handle_derived_stream_triggers(
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
             log::info!(
-                "[Scheduler trace_id {scheduler_trace_id}] Skipping pipeline {} id {} in org {} because free trial expiry",
+                "[Scheduler trace_id {scheduler_trace_id}] pausing pipeline {} id {} in org {} because free trial expiry",
                 pipeline.name,
                 pipeline_id,
                 trigger.org
             );
-            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+
+            if let Err(e) =
+                crate::service::pipeline::enable_pipeline(&pipeline.org, &pipeline.id, false, false)
+                    .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause pipeline due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    pipeline.name
+                );
+            }
             return Ok(());
         }
     }
