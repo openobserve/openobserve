@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div
-                    style="width: calc(30%);position: relative; bottom: 21px;"
+                    style="width: calc(30%);position: relative;"
                     data-test="dashboard-folder-dropdown"
                   >
                     <select-folder-dropdown
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-file>
                   </div>
                   <div
-                    style="width: calc(30%);position: relative; bottom: 21px;"
+                    style="width: calc(30%);position: relative;"
                   >
                     <select-folder-dropdown
                       @folder-selected="selectedFolder = $event"

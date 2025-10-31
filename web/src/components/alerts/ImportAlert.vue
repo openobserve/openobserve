@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  style="width: calc(30%); position: relative; bottom: 21px;"
+                  style="width: calc(30%); position: relative; top:10px;"
                   data-test="alert-folder-dropdown"
                 >
                   <SelectFolderDropDown
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-slot:hint> .json files only </template>
                   </q-file>
                 </div>
-                <div style="width: calc(30%); position: relative; bottom: 22px;">
+                <div style="width: calc(30%); position: relative;">
                   <SelectFolderDropDown
                     :type="'alerts'"
                     @folder-selected="updateActiveFolderId"

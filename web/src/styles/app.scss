@@ -245,32 +245,6 @@ body {
   flex-shrink: 0 !important; // Prevent icon from shrinking
 }
 
-/* ============================================================================
-   CUSTOM TAB ICON STYLING
-   Icon styling for vertical tabs with Lucide icons
-   ============================================================================ */
-
-.o2-tab-icon {
-  width: 20px !important;
-  height: 20px !important;
-  margin-right: 0.6rem !important; // 12px spacing after icon
-  margin-left: 0.1rem !important; // 12px spacing after icon
-  flex-shrink: 0 !important; // Prevent icon from shrinking
-}
-
-/* ============================================================================
-   CUSTOM TAB ICON STYLING
-   Icon styling for vertical tabs with Lucide icons
-   ============================================================================ */
-
-.o2-tab-icon {
-  width: 20px !important;
-  height: 20px !important;
-  margin-right: 0.6rem !important; // 12px spacing after icon
-  margin-left: 0.1rem !important; // 12px spacing after icon
-  flex-shrink: 0 !important; // Prevent icon from shrinking
-}
-
 .spitter-container {
   width: 100%;
   height: 100%;
@@ -564,16 +538,6 @@ body {
     position: sticky;
     right: 0;
     z-index: 1;
-  }
-  tr{
-    td{
-      border-bottom: 1px solid var(--o2-border-color) !important;
-    }
-  }
-  tr{
-    td{
-      border-bottom: 1px solid var(--o2-border-color) !important;
-    }
   }
   tr{
     td{
@@ -1245,25 +1209,6 @@ body {
   right: 0px;
 }
 
-/* ============================================================================
-   SPLITTER ICON COLLAPSE/EXPAND BUTTONS
-   Specific styles for collapse/expand icons in splitter separators
-   ============================================================================ */
-
-.splitter-icon-collapse {
-  position: absolute !important;
-  top: 14px !important;
-  left: 14px !important;
-  z-index: 100 !important;
-}
-
-.splitter-icon-expand {
-  position: absolute !important;
-  top: 14px !important;
-  left: -2px !important;
-  z-index: 100 !important;
-}
-
 
 
 /* ============================================================================
@@ -1329,22 +1274,6 @@ body {
       .q-field__native{
         min-height: 2.25rem;
        height: 2.25rem;
-    }
-  }
-
-  .q-field__control-container{
-      .q-field__native{
-        min-height: 2.25rem !important;
-       height: 2.25rem !important;
-       padding: 0px !important;
-    }
-  }
-
-  .q-field__control-container{
-      .q-field__native{
-        min-height: 2.25rem !important;
-       height: 2.25rem !important;
-       padding: 0px !important;
     }
   }
 
