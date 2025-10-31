@@ -111,17 +111,20 @@ impl ExecutionPlanVisitor for PlanVisitor {
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Int64Array, RecordBatch, StringArray};
     use arrow_schema::{DataType, Field, Schema};
     use datafusion::{
         common::Result,
-        datasource::MemTable,
         execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
         physical_plan::get_plan_string,
         prelude::{SessionConfig, SessionContext},
     };
 
-    use crate::service::search::datafusion::optimizer::join_reorder::JoinReorderRule;
+    use super::*;
+    use crate::service::search::datafusion::{
+        optimizer::limit_join_right_side::LimitJoinRightSide,
+        planner::extension_planner::OpenobserveQueryPlanner,
+        table_provider::empty_table::NewEmptyTable,
+    };
 
     #[tokio::test]
     async fn test_join_reorder() -> Result<()> {
@@ -130,20 +133,51 @@ mod tests {
             Field::new("name", DataType::Utf8, false),
         ]));
 
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5])),
-                Arc::new(StringArray::from(vec![
-                    "openobserve",
-                    "observe",
-                    "openobserve",
-                    "oo",
-                    "o2",
-                ])),
-            ],
-        )
-        .unwrap();
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("t", schema.clone()).with_partitions(12);
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let sql = "SELECT count(*) from t where name in (select distinct name from t)";
+        let plan = ctx.state().create_logical_plan(sql).await?;
+        let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+        let expected = vec![
+            "ProjectionExec: expr=[count(Int64(1))@0 as count(*)]",
+            "  AggregateExec: mode=Final, gby=[], aggr=[count(Int64(1))]",
+            "    CoalescePartitionsExec",
+            "      AggregateExec: mode=Partial, gby=[], aggr=[count(Int64(1))]",
+            "        ProjectionExec: expr=[]",
+            "          CoalesceBatchesExec: target_batch_size=8192",
+            "            HashJoinExec: mode=Partitioned, join_type=RightSemi, on=[(name@0, name@0)]",
+            "              AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
+            "                CoalesceBatchesExec: target_batch_size=8192",
+            "                  RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "                    AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
+            "                      CooperativeExec",
+            "                        NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
+            "              CoalesceBatchesExec: target_batch_size=8192",
+            "                RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "                  CooperativeExec",
+            "                    NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
+        ];
+
+        assert_eq!(expected, get_plan_string(&physical_plan));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_join_reorder_intersect() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new().with_target_partitions(12))
@@ -152,7 +186,98 @@ mod tests {
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .build();
         let ctx = SessionContext::new_with_state(state);
-        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        let provider = NewEmptyTable::new("t", schema.clone()).with_partitions(12);
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let sql = "SELECT name FROM t WHERE _timestamp > 1000 INTERSECT SELECT name FROM t WHERE _timestamp < 2000";
+        let plan = ctx.state().create_logical_plan(sql).await?;
+        let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+        let expected = vec![
+            "CoalesceBatchesExec: target_batch_size=8192",
+            "  HashJoinExec: mode=Partitioned, join_type=LeftSemi, on=[(name@0, name@0)]",
+            "    AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
+            "      CoalesceBatchesExec: target_batch_size=8192",
+            "        RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "          AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
+            "            CoalesceBatchesExec: target_batch_size=8192",
+            "              FilterExec: _timestamp@0 > 1000, projection=[name@1]",
+            "                CooperativeExec",
+            "                  NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp > Int64(1000)\"]",
+            "    CoalesceBatchesExec: target_batch_size=8192",
+            "      RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "        CoalesceBatchesExec: target_batch_size=8192",
+            "          FilterExec: _timestamp@0 < 2000, projection=[name@1]",
+            "            CooperativeExec",
+            "              NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"]",
+        ];
+
+        assert_eq!(expected, get_plan_string(&physical_plan));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_join_reorder_except() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("t", schema.clone()).with_partitions(12);
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let sql = "SELECT name FROM t WHERE _timestamp > 1000 EXCEPT SELECT name FROM t WHERE _timestamp < 2000";
+        let plan = ctx.state().create_logical_plan(sql).await?;
+        let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+        let expected = vec![
+            "CoalesceBatchesExec: target_batch_size=8192",
+            "  HashJoinExec: mode=Partitioned, join_type=LeftAnti, on=[(name@0, name@0)]",
+            "    AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
+            "      CoalesceBatchesExec: target_batch_size=8192",
+            "        RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "          AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
+            "            CoalesceBatchesExec: target_batch_size=8192",
+            "              FilterExec: _timestamp@0 > 1000, projection=[name@1]",
+            "                CooperativeExec",
+            "                  NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp > Int64(1000)\"]",
+            "    CoalesceBatchesExec: target_batch_size=8192",
+            "      RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "        CoalesceBatchesExec: target_batch_size=8192",
+            "          FilterExec: _timestamp@0 < 2000, projection=[name@1]",
+            "            CooperativeExec",
+            "              NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"]",
+        ];
+
+        assert_eq!(expected, get_plan_string(&physical_plan));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_join_reorder_dedup() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)))
+            .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
+            .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("t", schema.clone()).with_partitions(12);
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
         let sql = "SELECT count(*) from t where name in (select distinct name from t)";
@@ -167,17 +292,118 @@ mod tests {
             "        ProjectionExec: expr=[]",
             "          CoalesceBatchesExec: target_batch_size=8192",
             "            HashJoinExec: mode=CollectLeft, join_type=RightSemi, on=[(name@0, name@0)]",
-            "              AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
-            "                CoalesceBatchesExec: target_batch_size=8192",
-            "                  RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
-            "                    RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
-            "                      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
-            "                        DataSourceExec: partitions=1, partition_sizes=[1]",
-            "              DataSourceExec: partitions=1, partition_sizes=[1]",
+            "              DeduplicationExec: columns: [name@0]",
+            "                SortExec: TopK(fetch=50000), expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]",
+            "                  CoalescePartitionsExec",
+            "                    AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[], lim=[50000]",
+            "                      CoalesceBatchesExec: target_batch_size=8192",
+            "                        RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "                          AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[], lim=[50000]",
+            "                            CooperativeExec",
+            "                              NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
+            "              CooperativeExec",
+            "                NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_join_reorder_intersect_dedup() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)))
+            .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
+            .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("t", schema.clone()).with_partitions(12);
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let sql = "SELECT name FROM t WHERE _timestamp > 1000 INTERSECT SELECT name FROM t WHERE _timestamp < 2000";
+        let plan = ctx.state().create_logical_plan(sql).await?;
+        let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+        let expected = vec![
+            "CoalesceBatchesExec: target_batch_size=8192",
+            "  HashJoinExec: mode=CollectLeft, join_type=RightSemi, on=[(name@0, name@0)]",
+            "    ProjectionExec: expr=[name@1 as name]",
+            "      DeduplicationExec: columns: [name@1]",
+            "        SortExec: expr=[name@1 DESC NULLS LAST, _timestamp@0 DESC NULLS LAST], preserve_partitioning=[false]",
+            "          SortPreservingMergeExec: [_timestamp@0 DESC NULLS LAST], fetch=50000",
+            "            CoalesceBatchesExec: target_batch_size=8192, fetch=50000",
+            "              FilterExec: _timestamp@0 < 2000",
+            "                CooperativeExec",
+            "                  NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"], sorted_by_time=true",
+            "    AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
+            "      CoalesceBatchesExec: target_batch_size=8192",
+            "        RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "          AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
+            "            CoalesceBatchesExec: target_batch_size=8192",
+            "              FilterExec: _timestamp@0 > 1000, projection=[name@1]",
+            "                CooperativeExec",
+            "                  NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp > Int64(1000)\"]",
+        ];
+
+        assert_eq!(expected, get_plan_string(&physical_plan));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_join_reorder_except_dedup() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)))
+            .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
+            .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("t", schema.clone()).with_partitions(12);
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let sql = "SELECT name FROM t WHERE _timestamp > 1000 EXCEPT SELECT name FROM t WHERE _timestamp < 2000";
+        let plan = ctx.state().create_logical_plan(sql).await?;
+        let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+        let expected = vec![
+            "CoalesceBatchesExec: target_batch_size=8192",
+            "  HashJoinExec: mode=CollectLeft, join_type=RightAnti, on=[(name@0, name@0)]",
+            "    ProjectionExec: expr=[name@1 as name]",
+            "      DeduplicationExec: columns: [name@1]",
+            "        SortExec: expr=[name@1 DESC NULLS LAST, _timestamp@0 DESC NULLS LAST], preserve_partitioning=[false]",
+            "          SortPreservingMergeExec: [_timestamp@0 DESC NULLS LAST], fetch=50000",
+            "            CoalesceBatchesExec: target_batch_size=8192, fetch=50000",
+            "              FilterExec: _timestamp@0 < 2000",
+            "                CooperativeExec",
+            "                  NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"], sorted_by_time=true",
+            "    AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
+            "      CoalesceBatchesExec: target_batch_size=8192",
+            "        RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "          AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
+            "            CoalesceBatchesExec: target_batch_size=8192",
+            "              FilterExec: _timestamp@0 > 1000, projection=[name@1]",
+            "                CooperativeExec",
+            "                  NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp > Int64(1000)\"]",
+        ];
+
+        assert_eq!(expected, get_plan_string(&physical_plan));
         Ok(())
     }
 }
