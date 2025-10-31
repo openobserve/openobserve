@@ -1484,6 +1484,14 @@ export const usePanelDataLoader = (
         formattedInterval.unit,
       ) * 1000;
 
+    // calculate range in seconds (total time range of the dashboard)
+    // Note: startISOTimestamp and endISOTimestamp are in microseconds (from API)
+    const __range_micros = endISOTimestamp - startISOTimestamp;
+    const __range_seconds = __range_micros / 1000000;  // Convert microseconds to seconds
+
+    // format range, ensuring it's never empty (minimum 1s for PromQL compatibility)
+    const formattedRange = formatRateInterval(__range_seconds) || "1s";
+
     const fixedVariables = [
       {
         name: "__interval_ms",
@@ -1496,6 +1504,18 @@ export const usePanelDataLoader = (
       {
         name: "__rate_interval",
         value: `${formatRateInterval(__rate_interval)}`,
+      },
+      {
+        name: "__range",
+        value: formattedRange,
+      },
+      {
+        name: "__range_s",
+        value: `${Math.floor(__range_seconds)}`,
+      },
+      {
+        name: "__range_ms",
+        value: `${Math.floor(__range_seconds * 1000)}`,
       },
     ];
 

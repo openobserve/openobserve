@@ -118,6 +118,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-toggle>
         </div>
+        <!-- Explain Query Button -->
+        <q-btn
+          v-if="!store.state.isAiChatEnabled && searchObj.meta.sqlMode"
+          data-test="logs-search-bar-explain-query-btn"
+          no-caps
+          flat
+          dense
+          icon="lightbulb"
+          class="toolbar-reset-btn"
+          :disable="!searchObj.data.query || searchObj.data.query.trim() === ''"
+          @click="openExplainDialog"
+        >
+          <q-tooltip>
+            {{ t("search.explainTooltip") }}
+          </q-tooltip>
+        </q-btn>
         <!-- moved to dropdown if ai chat is enabled -->
         <q-btn
           v-if="!store.state.isAiChatEnabled"
@@ -746,6 +762,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
               <q-separator />
+              <q-item
+                v-if="searchObj.meta.sqlMode"
+                data-test="logs-search-bar-explain-query-menu-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                :disable="!searchObj.data.query || searchObj.data.query.trim() === ''"
+                @click="openExplainDialog"
+              >
+                <q-item-section v-close-popup>
+                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                    <q-icon name="lightbulb" size="20px" />
+                    {{ t("search.explainQuery") }}</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+              <q-separator v-if="searchObj.meta.sqlMode" />
               <q-item
                 v-if="config.isEnterprise == 'true'"
                 data-test="search-scheduler-create-new-btn"
@@ -1465,6 +1498,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmUpdate = false"
       v-model="confirmUpdate"
     />
+    <!-- Query Plan Dialog -->
+    <QueryPlanDialog
+      v-model="showExplainDialog"
+      :searchObj="searchObj"
+    />
   </div>
 </template>
 
@@ -1504,6 +1542,7 @@ import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { json2csv } from "json-2-csv";
+import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
 import {
   mergeDeep,
   b64DecodeUnicode,
@@ -1560,6 +1599,7 @@ export default defineComponent({
     TransformSelector,
     FunctionSelector,
     CodeQueryEditor,
+    QueryPlanDialog,
   },
   emits: [
     "searchdata",
@@ -1783,6 +1823,7 @@ export default defineComponent({
     const isSavedViewAction = ref("create");
     const savedViewName = ref("");
     const savedViewSelectedName = ref("");
+    const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
     const savedViewDropdownModel = ref(false);
@@ -3873,6 +3914,14 @@ export default defineComponent({
 
     // [END] cancel running queries
 
+    // [START] explain query functionality
+    const openExplainDialog = () => {
+      if (searchObj.data.query && searchObj.data.query.trim() !== "") {
+        showExplainDialog.value = true;
+      }
+    };
+    // [END] explain query functionality
+
     return {
       $q,
       t,
@@ -4010,6 +4059,8 @@ export default defineComponent({
       buildStreamQuery,
       updateActionSelection,
       updateEditorWidth,
+      showExplainDialog,
+      openExplainDialog,
     };
   },
   computed: {

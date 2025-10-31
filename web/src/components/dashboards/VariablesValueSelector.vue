@@ -1632,33 +1632,7 @@ export default defineComponent({
             `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
           );
           for (const childVariable of childVariableObjects) {
-            // Only apply guard for REST API mode
-
-            if (isInitialLoad) {
-              variableLog(
-                variableObject.name,
-                `finalizePartialVariableLoading: Initial load, always loading child variable ${childVariable.name}`,
-              );
-              await loadSingleVariableDataByName(childVariable, true);
-              continue;
-            }
-            if (
-              (childVariable.isVariableLoadingPending ||
-                oldVariablesData[name] !== variableObject.value) &&
-              !childVariable.isLoading &&
-              !childVariable.isVariableLoadingPending
-            ) {
-              variableLog(
-                variableObject.name,
-                `finalizePartialVariableLoading: [REST] Loading child variable ${childVariable.name} as parent value changed`,
-              );
               await loadSingleVariableDataByName(childVariable, false);
-            } else {
-              variableLog(
-                variableObject.name,
-                `finalizePartialVariableLoading: [REST] Skipping child variable ${childVariable.name} loading as parent value did not change or child is already loading/pending`,
-              );
-            }
           }
         }
       } catch (error) {
