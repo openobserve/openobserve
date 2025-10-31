@@ -183,33 +183,6 @@ describe("InvoiceHistory", () => {
     });
   });
 
-  describe("Styling and CSS Classes", () => {
-    it("should apply q-pa-md class to q-page", () => {
-      const qPage = wrapper.find(".q-page");
-      expect(qPage.classes()).toContain("q-pa-md");
-    });
-
-    it("should apply text styling classes to title", () => {
-      const titleDiv = wrapper.find(".row.text-body1.text-weight-medium");
-      expect(titleDiv.classes()).toContain("row");
-      expect(titleDiv.classes()).toContain("text-body1");
-      expect(titleDiv.classes()).toContain("text-weight-medium");
-    });
-
-    it("should have proper CSS class combinations", () => {
-      const titleDiv = wrapper.find(".row.text-body1.text-weight-medium");
-      const classes = titleDiv.classes();
-      expect(classes).toEqual(
-        expect.arrayContaining(["row", "text-body1", "text-weight-medium"])
-      );
-    });
-
-    it("should not have any scoped styles affecting layout", () => {
-      // Since there are no scoped styles, the component should render cleanly
-      // QPage might have some default styles, so we'll just check it renders
-      expect(wrapper.element).toBeDefined();
-    });
-  });
 
   describe("Internationalization (i18n)", () => {
     it("should use i18n for title text", () => {

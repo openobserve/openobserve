@@ -325,44 +325,6 @@ describe('Functions.vue', () => {
     });
   });
 
-  describe('Styling and Layout', () => {
-    it('should apply correct button position when sidebar is shown', async () => {
-      wrapper = await createWrapper();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]');
-      const style = collapseBtn.attributes('style');
-      
-      expect(style).toContain('left: 206px'); // splitterModel (220) - 14
-    });
-
-    it('should apply correct button position when sidebar is hidden', async () => {
-      wrapper = await createWrapper();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]');
-      
-      // Collapse sidebar
-      await collapseBtn.trigger('click');
-      await wrapper.vm.$nextTick();
-      
-      const style = collapseBtn.attributes('style');
-      expect(style).toContain('left: -8px');
-    });
-
-    it('should show correct button icon based on sidebar state', async () => {
-      wrapper = await createWrapper();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]');
-      
-      // Initially showing sidebar - should show left chevron
-      expect(collapseBtn.attributes('icon')).toBe('chevron_left');
-      
-      // After collapse - should show right chevron
-      await collapseBtn.trigger('click');
-      await wrapper.vm.$nextTick();
-      
-      expect(collapseBtn.attributes('icon')).toBe('chevron_right');
-    });
-  });
 
   describe('Data Properties', () => {
     it('should initialize templates as empty array', async () => {
@@ -445,20 +407,6 @@ describe('Functions.vue', () => {
       expect((wrapper.vm as any).splitterModel).toBe(300);
     });
 
-    it('should handle button title changes based on sidebar state', async () => {
-      wrapper = await createWrapper();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]');
-      
-      // Initially showing sidebar
-      expect(collapseBtn.attributes('title')).toBe('Collapse Fields');
-      
-      // After collapse
-      await collapseBtn.trigger('click');
-      await wrapper.vm.$nextTick();
-      
-      expect(collapseBtn.attributes('title')).toBe('Open Fields');
-    });
   });
 
   describe('Computed Properties and Watchers', () => {

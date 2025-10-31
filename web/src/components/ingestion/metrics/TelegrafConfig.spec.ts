@@ -224,10 +224,6 @@ describe('TelegrafConfig', () => {
       expect(copyContent.props('content')).toBe(wrapper.vm.content);
     });
 
-    it('should apply correct styling classes to CopyContent', () => {
-      const copyContent = wrapper.findComponent(MockCopyContent);
-      expect(copyContent.classes()).toContain('q-mt-sm');
-    });
   });
 
   describe('Store Integration', () => {

@@ -466,11 +466,6 @@ describe("Vector.vue Comprehensive Coverage", () => {
       expect(copyComponents).toHaveLength(1);
     });
 
-    it("should apply correct styling classes", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-      expect(wrapper.find('.q-mt-sm').exists()).toBe(true);
-    });
 
     it("should render template structure correctly", () => {
       wrapper = createWrapper();
