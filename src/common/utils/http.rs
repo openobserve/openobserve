@@ -129,6 +129,11 @@ pub(crate) fn get_is_multi_stream_search_from_request(query: &HashMap<String, St
 }
 
 #[inline(always)]
+pub(crate) fn get_clear_cache_from_request(query: &HashMap<String, String>) -> bool {
+    get_key_as_bool(query, "clear_cache")
+}
+
+#[inline(always)]
 pub(crate) fn get_folder(query: &HashMap<String, String>) -> String {
     match query.get("folder") {
         Some(s) => s.to_string(),

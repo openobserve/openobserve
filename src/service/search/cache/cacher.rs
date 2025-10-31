@@ -551,21 +551,59 @@ pub fn calculate_deltas(
 }
 
 pub async fn cache_results_to_disk(
+    trace_id: &str,
     file_path: &str,
     file_name: &str,
     data: String,
+    clear_cache: bool,
+    clean_start_ts: Option<i64>,
+    clean_end_ts: Option<i64>,
 ) -> std::io::Result<bool> {
+    let start = std::time::Instant::now();
+    log::info!("[trace_id {trace_id}] Caching results to disk");
+
+    if clear_cache {
+        log::info!(
+            "[trace_id {trace_id}] Clearing cache for file path as use_cache: false, clear_cache: {clear_cache}, start: {},  {file_path}",
+            start.elapsed().as_millis(),
+        );
+        let _ = delete_cache(file_path, 0, clean_start_ts, clean_end_ts)
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[trace_id {trace_id}] Clearing cache for file path error: {}",
+                    e
+                );
+                e
+            });
+        log::info!(
+            "[trace_id {trace_id}] Clearing cache for file path completed. use_cache: false, clear_cache: {clear_cache}, took: {} ms, {file_path}",
+            start.elapsed().as_millis(),
+        );
+    }
+
     let file = format!("results/{file_path}/{file_name}");
     if disk::exist(&file).await {
         return Ok(false);
     }
     match disk::set(&file, Bytes::from(data)).await {
-        Ok(_) => Ok(true),
+        Ok(_) => {
+            log::info!(
+                "[trace_id {trace_id}] After clearing cache, Cached results to disk completed, took: {} ms",
+                start.elapsed().as_millis()
+            );
+        }
         Err(e) => {
-            log::error!("Error caching results to disk: {e}");
-            Err(std::io::Error::other("Error caching results to disk"))
+            log::error!("[trace_id {trace_id}] Error caching results to disk: {e}");
+            return Err(std::io::Error::other("Error caching results to disk"));
         }
     }
+
+    log::info!(
+        "[trace_id {trace_id}] Cached results to disk completed, took: {} ms",
+        start.elapsed().as_millis()
+    );
+    Ok(true)
 }
 
 pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<String> {

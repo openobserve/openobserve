@@ -446,6 +446,7 @@ pub async fn search(
             file_path,
             is_aggregate,
             c_resp.is_descending,
+            req.clear_cache,
             is_histogram_non_ts_order,
         )
         .await;
@@ -822,6 +823,7 @@ pub async fn write_results(
     file_path: String,
     is_aggregate: bool,
     is_descending: bool,
+    clear_cache: bool,
     is_histogram_non_ts_order: bool,
 ) {
     if res.hits.is_empty() {
@@ -904,9 +906,18 @@ pub async fn write_results(
     );
     let res_cache = json::to_string(&res).unwrap();
     let query_key = file_path.replace('/', "_");
+    let trace_id = trace_id.to_string();
     tokio::spawn(async move {
-        match SearchService::cache::cacher::cache_results_to_disk(&file_path, &file_name, res_cache)
-            .await
+        match SearchService::cache::cacher::cache_results_to_disk(
+            &trace_id,
+            &file_path,
+            &file_name,
+            res_cache,
+            clear_cache,
+            Some(accept_start_time),
+            Some(accept_end_time),
+        )
+        .await
         {
             Ok(success) => {
                 if success {

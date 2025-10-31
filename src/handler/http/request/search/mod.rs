@@ -48,11 +48,11 @@ use crate::{
             auth::UserEmail,
             functions,
             http::{
-                get_dashboard_info_from_request, get_enable_align_histogram_from_request,
-                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request, get_work_group,
+                get_clear_cache_from_request, get_dashboard_info_from_request,
+                get_enable_align_histogram_from_request, get_is_multi_stream_search_from_request,
+                get_is_ui_histogram_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
             },
             stream::get_settings_max_query_range,
         },
@@ -272,6 +272,7 @@ pub async fn search(
         req.query.sql = sql;
     };
     req.use_cache = get_use_cache_from_request(&query);
+    req.clear_cache = get_clear_cache_from_request(&query);
 
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {
@@ -918,6 +919,7 @@ pub async fn build_search_request_per_field(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: req.use_cache,
+        clear_cache: req.clear_cache,
         local_mode: None,
     };
 
@@ -1129,6 +1131,7 @@ async fn values_v1(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: default_use_cache(),
+        clear_cache: get_clear_cache_from_request(&query),
         local_mode: None,
     };
 

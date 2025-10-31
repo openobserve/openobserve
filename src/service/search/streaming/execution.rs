@@ -35,7 +35,7 @@ use super::{
 };
 use crate::{
     common::meta::search::{QueryDelta, SearchResultType},
-    service::search::{self as SearchService},
+    service::search::{self as SearchService, cache::cacher::delete_cache},
 };
 
 /// Do partitioned search without cache
@@ -313,6 +313,12 @@ pub async fn do_partitioned_search(
     if is_streaming_aggs && partition_resp.streaming_id.is_some() {
         #[cfg(feature = "enterprise")]
         streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
+    }
+
+    // Check if streaming_aggs and clear cache is set
+    if is_streaming_aggs && req.clear_cache {
+        // TODO: delete steaming aggs cache
+        // delete_cache(path, delete_ts, clean_start_ts, clean_end_ts)
     }
     Ok(())
 }

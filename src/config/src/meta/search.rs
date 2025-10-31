@@ -70,6 +70,8 @@ pub struct Request {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default = "default_use_cache")]
     pub use_cache: bool,
+    #[serde(default)]
+    pub clear_cache: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub local_mode: Option<bool>,
 }
@@ -651,6 +653,7 @@ impl SearchHistoryRequest {
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
             use_cache: default_use_cache(),
+            clear_cache: false,
             local_mode: None,
         };
         Ok(search_req)
@@ -1241,6 +1244,7 @@ impl MultiStreamRequest {
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
                 use_cache: default_use_cache(),
+                clear_cache: false,
                 local_mode: None,
             });
         }
@@ -1277,6 +1281,8 @@ pub struct ValuesRequest {
     pub timeout: Option<i64>,
     #[serde(default)]
     pub use_cache: bool,
+    #[serde(default)]
+    pub clear_cache: bool,
     pub stream_name: String,
     pub stream_type: StreamType,
     pub sql: String,

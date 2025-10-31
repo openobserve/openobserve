@@ -49,10 +49,11 @@ use crate::{
         utils::{
             auth::UserEmail,
             http::{
-                get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
-                get_is_ui_histogram_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request,
+                get_clear_cache_from_request, get_fallback_order_by_col_from_request,
+                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
+                get_or_create_trace_id, get_search_event_context_from_request,
+                get_search_type_from_request, get_stream_type_from_request,
+                get_use_cache_from_request,
             },
         },
     },
@@ -316,6 +317,7 @@ pub async fn search_http2_stream(
 
     // Set use_cache from query params
     req.use_cache = get_use_cache_from_request(&query);
+    req.clear_cache = get_clear_cache_from_request(&query);
 
     // Set search type if not set
     if req.search_type.is_none() {
