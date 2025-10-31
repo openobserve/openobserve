@@ -621,6 +621,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="to-be-clone-alert-name"
                 v-model="toBeCloneAlertName"
                 label="Alert Name"
+                class="showLabelOnTop q-mb-sm"
+                stack-label
+                hide-bottom-space
+                borderless
+                dense
               />
               <q-select
                 data-test="to-be-clone-stream-type"
@@ -628,6 +633,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 label="Stream Type"
                 :options="streamTypes"
                 @update:model-value="updateStreams()"
+                borderless
+                dense
+                class="showLabelOnTop no-case tw-mt-[1px] q-mb-sm"
               />
               <q-select
                 data-test="to-be-clone-stream-name"
@@ -642,17 +650,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 fill-input
                 hide-selected
                 :input-debounce="400"
+                borderless
+                dense
+                class="showLabelOnTop no-case tw-mt-[1px] q-mb-sm"
               />
               <SelectFolderDropDown
                   :type="'alerts'"
                   @folder-selected="updateFolderIdToBeCloned"
                   :activeFolderId="folderIdToBeCloned"
                   />
-              <div class="flex justify-center q-mt-lg">
+              <div class="flex justify-center q-mt-sm">
                 <q-btn
                   data-test="clone-alert-cancel-btn"
                   v-close-popup="true"
-                  class="q-mb-md text-bold"
+                  class="o2-secondary-button tw-h-[36px]"
                   :label="t('alerts.cancel')"
                   text-color="light-text"
                   padding="sm md"
@@ -661,8 +672,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   data-test="clone-alert-submit-btn"
                   :label="t('alerts.save')"
-                  class="q-mb-md text-bold no-border q-ml-sm"
-                  color="secondary"
+                  class="o2-primary-button tw-h-[36px] q-ml-md"
                   padding="sm xl"
                   type="submit"
                   :disable="isSubmitting"
