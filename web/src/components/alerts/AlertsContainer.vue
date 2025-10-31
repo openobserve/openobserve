@@ -123,24 +123,9 @@
     color: #555555;
   }
   .light-mode-container{
-    border: 1px solid #E6E6E6;
-    border-top-left-radius: 4px;
-    border-top-right-radius: 4px;
-    background-color: #FCFCFC;
 
-    & > .cursor-pointer:hover {
-      background-color: #F5F5F5;
-    }
   }
   .dark-mode-container{
-    border: 1px solid #343434;
-    border-top-left-radius: 4px;
-    border-top-right-radius: 4px;
-    background-color: #2A2A2A;
-
-    & > .cursor-pointer:hover {
-      background-color: #333333;
-    }
   }
   </style>
   
