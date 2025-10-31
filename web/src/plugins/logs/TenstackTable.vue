@@ -232,7 +232,10 @@ class="q-mr-xs" />
               minWidth: '100%',
             }"
             :data-index="virtualRow.index"
-            :ref="(node: any) => rowVirtualizer.measureElement(node)"
+            :data-expanded="
+              formattedRows[virtualRow.index]?.original?.isExpandedRow
+            "
+            :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
             class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b tw-cursor-pointer"
             :class="[
               store.state.theme === 'dark'
@@ -712,11 +715,17 @@ const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
-    estimateSize: () => 20,
-    overscan: 80,
+    estimateSize: () => 22,
+    overscan: 20,
     measureElement:
       typeof window !== "undefined" && !isFirefox.value
-        ? (element: any) => element?.getBoundingClientRect().height
+        ? (element: any) => {
+            if (element.dataset.expanded == "true") {
+              return element?.getBoundingClientRect().height;
+            } else {
+              return 22;
+            }
+          }
         : undefined,
   };
 });
