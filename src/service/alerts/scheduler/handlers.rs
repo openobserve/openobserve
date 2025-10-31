@@ -967,7 +967,8 @@ async fn handle_report_triggers(
             );
             report.enabled = false;
             if let Err(e) =
-                crate::service::dashboards::reports::enable(&report.org_id, &report.name, false).await
+                crate::service::dashboards::reports::enable(&report.org_id, &report.name, false)
+                    .await
             {
                 log::error!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause report due to trial expiry: {}/{} : {e}",
