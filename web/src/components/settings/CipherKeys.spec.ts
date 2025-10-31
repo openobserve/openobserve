@@ -54,6 +54,8 @@ vi.mock("@/services/segment_analytics", () => ({
 
 vi.mock("@/utils/zincutils", () => ({
   convertToTitleCase: vi.fn((str) => str),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock("@/aws-exports", () => ({

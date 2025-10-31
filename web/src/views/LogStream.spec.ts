@@ -52,6 +52,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     },
     getTimezoneOffset: () => 0,
     getTimezonesByOffset: () => [],
+    useLocalTimezone: vi.fn(() => "UTC"),
   };
 });
 

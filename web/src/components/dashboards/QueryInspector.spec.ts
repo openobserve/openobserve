@@ -84,6 +84,7 @@ describe("QueryInspector", () => {
     data: {
       title: "Error Analysis Dashboard",
       id: "dashboard-1",
+      useLocalTimezone: vi.fn(() => "UTC"),
     },
   };
 

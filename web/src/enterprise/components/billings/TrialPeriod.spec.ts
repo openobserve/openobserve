@@ -11,6 +11,8 @@ installQuasar();
 // Mock getDueDays function
 vi.mock("@/utils/zincutils", () => ({
   getDueDays: vi.fn()
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 // Mock aws-exports

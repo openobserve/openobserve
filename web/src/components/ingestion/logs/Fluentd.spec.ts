@@ -80,7 +80,8 @@ const mockStore = createStore({
 // Create mock i18n
 const mockI18n = createI18n({
   locale: 'en',
-  messages: {
+  messages: {,
+  useLocalTimezone: vi.fn(() => "UTC"),
     en: {}
   }
 });

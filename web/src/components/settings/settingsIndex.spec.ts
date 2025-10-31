@@ -54,6 +54,7 @@ vi.mock('quasar', async () => {
     ...actual,
     useQuasar: () => ({
       notify: globalMockNotify,
+      useLocalTimezone: vi.fn(() => "UTC"),
     }),
   };
 });

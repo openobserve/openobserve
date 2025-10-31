@@ -29,6 +29,8 @@ vi.mock('@/services/regex_pattern', () => ({
 
 vi.mock('@/utils/zincutils', () => ({
   convertUnixToQuasarFormat: vi.fn()
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock('@/aws-exports', () => ({

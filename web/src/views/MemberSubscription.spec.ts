@@ -17,6 +17,7 @@ vi.mock('@/services/organizations', () => ({
 vi.mock('@/utils/zincutils', () => ({
   useLocalOrganization: vi.fn(),
   getPath: vi.fn(() => 'http://localhost:3000'),
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 // Mock SanitizedHtmlRenderer component

@@ -93,6 +93,7 @@ vi.mock("@/utils/zincutils", () => ({
   formatDuration: vi.fn((ms) => `${Math.floor(ms / 1000)}s`),
   b64DecodeUnicode: vi.fn((str) => atob(str)),
   b64EncodeUnicode: vi.fn((str) => btoa(str)),
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock("@/utils/date", () => ({

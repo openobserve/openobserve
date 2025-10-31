@@ -20,7 +20,8 @@ describe("NoOrganizationSelected", () => {
         stubs: {
           'q-img': {
             template: '<div class="q-img" :src="src"><slot /></div>',
-            props: ['src']
+            props: ['src'],
+            useLocalTimezone: vi.fn(() => "UTC"),
           }
         }
       },

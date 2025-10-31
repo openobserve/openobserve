@@ -38,6 +38,8 @@ vi.mock("lodash-es", () => ({
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
   getPath: vi.fn(() => "/test/path"),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 // Mock vuex

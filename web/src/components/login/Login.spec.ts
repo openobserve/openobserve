@@ -109,11 +109,13 @@ describe("Login", () => {
     Object.defineProperty(wrapper.vm, '$q', {
       value: { notify: mockNotify },
       writable: true,
+      useLocalTimezone: vi.fn(() => "UTC"),
     });
     
     Object.defineProperty(wrapper.vm, 'loginform', {
       value: { value: { resetValidation: mockResetValidation } },
       writable: true,
+      useLocalTimezone: vi.fn(() => "UTC"),
     });
     
     return { mockNotify, mockResetValidation };
@@ -175,6 +177,7 @@ describe("Login", () => {
         removeItem: vi.fn(),
       },
       writable: true,
+      useLocalTimezone: vi.fn(() => "UTC"),
     });
 
     Object.defineProperty(window, "location", {
@@ -182,6 +185,7 @@ describe("Login", () => {
         href: "",
       },
       writable: true,
+      useLocalTimezone: vi.fn(() => "UTC"),
     });
   });
 
@@ -609,6 +613,7 @@ describe("Login", () => {
         removeItem: mockRemoveItem,
       },
       writable: true,
+      useLocalTimezone: vi.fn(() => "UTC"),
     });
 
     wrapper = mount(Login, {

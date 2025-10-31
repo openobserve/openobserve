@@ -40,6 +40,8 @@ const i18n = createI18n({
 vi.mock("@/utils/zincutils", () => ({
   timestampToTimezoneDate: vi.fn(),
   durationFormatter: vi.fn(),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({

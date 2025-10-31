@@ -33,6 +33,7 @@ describe("Pagination", () => {
     computedRowsNumber: 50,
     prevPage: vi.fn(),
     nextPage: vi.fn(),
+    useLocalTimezone: vi.fn(() => "UTC"),
   };
 
   beforeEach(() => {

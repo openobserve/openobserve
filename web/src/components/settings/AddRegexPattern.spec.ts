@@ -39,6 +39,8 @@ vi.mock("@/composables/useStreams", () => ({
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => path),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock("@/aws-exports", () => ({

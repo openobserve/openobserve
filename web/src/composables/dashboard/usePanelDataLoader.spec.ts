@@ -194,7 +194,8 @@ vi.mock("vue", async () => {
   const actual = await vi.importActual("vue");
   return {
     ...actual,
-    onMounted: vi.fn(() => {}), // Don't execute callback to avoid loadData being called automatically
+    onMounted: vi.fn(() => {}), // Don't execute callback to avoid loadData being called automatically,
+    useLocalTimezone: vi.fn(() => "UTC"),
     onUnmounted: vi.fn((cb) => cb?.()),
   };
 });

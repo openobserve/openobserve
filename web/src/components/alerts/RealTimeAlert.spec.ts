@@ -28,6 +28,7 @@ installQuasar({
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `mock-${path}`),
   useLocalOrganization: vi.fn(() => ({ value: "test-org" })),
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock("vuex", () => ({

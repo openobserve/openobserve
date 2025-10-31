@@ -149,6 +149,8 @@ vi.mock("@/utils/zincutils", async (importOriginal: any) => {
         ...(route1 || []),
         ...(route2 || []),
       ]),
+  ,
+    useLocalTimezone: vi.fn(() => "UTC"),
   };
 });
 

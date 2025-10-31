@@ -36,7 +36,8 @@ vi.mock("vue-router", () => ({
 
 // Mock Quasar
 const mockQuasar = {
-  notify: vi.fn()
+  notify: vi.fn(),
+  useLocalTimezone: vi.fn(() => "UTC"),
 };
 
 vi.mock("quasar", async (importOriginal) => {

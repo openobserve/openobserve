@@ -94,6 +94,8 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 // Mock additional utilities that may cause import issues
 vi.mock("@/utils/zincutils", () => ({
   useLocalWrapContent: vi.fn(() => null),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 vi.mock("@/utils/query/sqlUtils", () => ({}));
 vi.mock("@/utils/query/search", () => ({}));

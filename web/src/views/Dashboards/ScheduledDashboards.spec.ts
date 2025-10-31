@@ -71,7 +71,8 @@ vi.mock('vue-i18n', () => ({
 }));
 
 vi.mock('@/utils/zincutils', () => ({
-  getImageURL: vi.fn((path: string) => `/mocked/${path}`)
+  getImageURL: vi.fn((path: string) => `/mocked/${path}`),
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock('@/utils/date', () => ({

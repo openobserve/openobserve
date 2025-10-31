@@ -29,6 +29,8 @@ vi.mock("@/stores", () => ({
 
 vi.mock("@/utils/zincutils", () => ({
   getUUID: vi.fn(() => "test-uuid-1234-5678-9012"),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 // Mock Web Worker

@@ -163,6 +163,7 @@ describe('AssociatedRegexPatterns.vue', () => {
         unmount: vi.fn(),
         emitted: vi.fn(() => ({})),
         setProps: vi.fn(),
+        useLocalTimezone: vi.fn(() => "UTC"),
         $nextTick: vi.fn().mockResolvedValue(undefined),
       } as any;
     }

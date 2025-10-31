@@ -43,6 +43,8 @@ vi.mock("@/composables/useLoading", () => ({
 // Mock zinc utils
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn(),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 import AddFolder from "@/components/dashboards/AddFolder.vue";

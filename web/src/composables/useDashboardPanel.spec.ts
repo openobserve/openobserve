@@ -584,6 +584,7 @@ describe("useDashboardPanel", () => {
         .map((_, i) => ({
           name: `field_${i}`,
           type: "Utf8",
+          useLocalTimezone: vi.fn(() => "UTC"),
         }));
 
       panel.dashboardPanelData.meta.stream.selectedStreamFields =

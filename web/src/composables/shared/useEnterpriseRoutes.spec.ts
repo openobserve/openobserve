@@ -35,6 +35,8 @@ vi.mock("@/aws-exports", () => {
 // Mock routeGuard
 vi.mock("@/utils/zincutils", () => ({
   routeGuard: vi.fn((to, from, next) => next()),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 // Mock all component imports

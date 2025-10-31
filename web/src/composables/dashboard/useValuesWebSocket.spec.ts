@@ -37,6 +37,7 @@ vi.mock("@/utils/zincutils", () => ({
   })),
   isWebSocketEnabled: vi.fn(() => false),
   isStreamingEnabled: vi.fn(() => false),
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock("@/services/stream", () => ({

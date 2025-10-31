@@ -42,6 +42,8 @@ vi.mock("@/services/billings", () => ({
 vi.mock("@/utils/zincutils", () => ({
   useLocalOrganization: vi.fn(),
   convertToTitleCase: vi.fn((str) => str),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 // Mock config

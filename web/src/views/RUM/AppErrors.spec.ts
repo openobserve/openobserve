@@ -95,6 +95,7 @@ vi.mock('@/services/search', () => ({
 vi.mock('@/utils/zincutils', () => ({
   b64DecodeUnicode: vi.fn((str) => decodeURIComponent(str)),
   b64EncodeUnicode: vi.fn((str) => encodeURIComponent(str)),
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 // Mock async components

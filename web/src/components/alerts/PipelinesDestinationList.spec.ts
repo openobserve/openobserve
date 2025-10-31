@@ -22,6 +22,8 @@ vi.mock('@/services/alert_templates', () => ({
 
 vi.mock('@/utils/zincutils', () => ({
   getImageURL: vi.fn(() => 'mocked-image-url'),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 // Mock Quasar

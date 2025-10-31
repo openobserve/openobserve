@@ -31,7 +31,8 @@ describe('NoData.vue', () => {
         stubs: {
           'q-img': {
             template: '<div class="q-img-stub" :data-src="src">{{ src }}</div>',
-            props: ['src', 'style']
+            props: ['src', 'style'],
+            useLocalTimezone: vi.fn(() => "UTC"),
           }
         }
       }

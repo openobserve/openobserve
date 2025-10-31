@@ -28,7 +28,8 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     ...actual,
     getImageURL: vi.fn((path: string) => `/mocked/path/${path}`),
     getIngestionURL: vi.fn(() => "https://api.openobserve.ai"),
-    maskText: vi.fn((text: string) => text ? `${text.substring(0, 4)}****${text.substring(text.length - 4)}` : "")
+    maskText: vi.fn((text: string) => text ? `${text.substring(0, 4)}****${text.substring(text.length - 4)}` : ""),
+    useLocalTimezone: vi.fn(() => "UTC"),
   };
 });
 

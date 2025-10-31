@@ -41,7 +41,8 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
       port: "5080",
       protocol: "http",
       tls: false
-    }))
+    })),
+    useLocalTimezone: vi.fn(() => "UTC"),
   };
 });
 

@@ -9,6 +9,8 @@ installQuasar();
 
 vi.mock("@/utils/zincutils", () => ({
   convertUnixToQuasarFormat: vi.fn(() => "2023-01-01 10:00:00")
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 describe("ResumePipelineDialog", () => {

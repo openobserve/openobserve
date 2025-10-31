@@ -22,6 +22,8 @@ vi.mock('quasar', async () => {
 vi.mock('@/utils/zincutils', () => ({
   maskText: vi.fn((text) => '*'.repeat(text.length)),
   b64EncodeStandard: vi.fn((text) => btoa(text)),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 const mockStore = createStore({

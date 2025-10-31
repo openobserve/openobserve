@@ -91,6 +91,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     getPath: vi.fn(() => "/"),
     useLocalOrganization: vi.fn(() => ({ value: "default" })),
     useLocalCurrentUser: vi.fn(() => ({ value: "test-user" })),
+    useLocalTimezone: vi.fn(() => "UTC"),
   };
 });
 

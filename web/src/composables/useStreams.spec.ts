@@ -37,6 +37,8 @@ vi.mock("quasar", () => ({
 // Mock utilities
 vi.mock("@/utils/zincutils", () => ({
   deepCopy: vi.fn((obj) => JSON.parse(JSON.stringify(obj)))
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 // Mock Store

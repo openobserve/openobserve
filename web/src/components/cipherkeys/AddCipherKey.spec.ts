@@ -10,6 +10,8 @@ vi.mock('@/services/cipher_keys');
 vi.mock('@/utils/zincutils', () => ({
   isValidResourceName: vi.fn(() => true),
   maxLengthCharValidation: vi.fn(() => true)
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock('vue-i18n', () => ({

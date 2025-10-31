@@ -42,7 +42,8 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
       if (duration < 3600) return `${Math.floor(duration / 60)}m`;
       return `${Math.floor(duration / 3600)}h`;
     }),
-    mergeRoutes: vi.fn((route1, route2) => [
+    mergeRoutes: vi.fn((route1, route2) => [,
+    useLocalTimezone: vi.fn(() => "UTC"),
       ...(route1 || []),
       ...(route2 || []),
     ]),

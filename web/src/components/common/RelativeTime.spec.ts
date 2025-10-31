@@ -9,6 +9,8 @@ installQuasar();
 
 vi.mock("@/utils/zincutils", () => ({
   timestampToTimezoneDate: vi.fn(() => "2023-01-01 10:00:00.000")
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 describe("RelativeTime", () => {

@@ -19,7 +19,11 @@ import organizationsService from "@/services/organizations";
 import * as zincutils from "@/utils/zincutils";
 
 vi.mock("@/services/organizations");
-vi.mock("@/utils/zincutils");
+vi.mock("@/utils/zincutils", () => ({
+  useLocalOrganization: vi.fn(),
+  getPath: vi.fn(),
+  useLocalTimezone: vi.fn(() => "UTC"),
+}));
 vi.mock("vuex", () => ({
   useStore: () => ({
     dispatch: vi.fn(),

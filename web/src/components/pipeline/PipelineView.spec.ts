@@ -139,6 +139,7 @@ describe("PipelineView", () => {
           CustomNode: true,
           CustomEdge: true,
           DropzoneBackground: true,
+          useLocalTimezone: vi.fn(() => "UTC"),
         },
       },
     });

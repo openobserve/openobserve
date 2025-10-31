@@ -33,7 +33,8 @@ const mockStore = {
   state: {
     selectedOrganization: {
       identifier: "test_org_123",
-      name: "Test Organization"
+      name: "Test Organization",
+      useLocalTimezone: vi.fn(() => "UTC"),
     },
   },
 };

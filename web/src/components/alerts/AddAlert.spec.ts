@@ -118,6 +118,8 @@ vi.mock('@/utils/zincutils', async () => {
     ...actual,
     getUUID: vi.fn(() => 'mock-uuid'),
     getTimezonesByOffset: vi.fn(() => Promise.resolve(['UTC'])),
+
+    useLocalTimezone: vi.fn(() => "UTC"),
   } as any;
 });
 vi.mock('@/services/alerts', () => {

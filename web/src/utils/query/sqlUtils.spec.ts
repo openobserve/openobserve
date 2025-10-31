@@ -40,6 +40,8 @@ const mockSqlify = vi.fn();
 vi.mock("@/utils/zincutils", () => ({
   splitQuotedString: vi.fn((str: string) => str.split(",")),
   escapeSingleQuotes: vi.fn((str: string) => str?.replace(/'/g, "''")),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 let mockParser: any;

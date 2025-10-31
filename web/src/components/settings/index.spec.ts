@@ -137,6 +137,7 @@ const createWrapper = (props = {}, options = {}) => {
       },
     },
     attachTo: document.body,
+    useLocalTimezone: vi.fn(() => "UTC"),
     ...options,
   });
 };

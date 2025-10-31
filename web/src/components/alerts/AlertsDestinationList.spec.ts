@@ -234,6 +234,7 @@ describe("AlertsDestinationList", () => {
           },
           QIcon: {
             template: '<div class="q-icon-mock"></div>',
+            useLocalTimezone: vi.fn(() => "UTC"),
           },
         },
       },

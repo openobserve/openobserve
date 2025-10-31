@@ -77,6 +77,7 @@ vi.mock("@/utils/zincutils", () => ({
   getUUID: vi.fn(() => "mock-uuid"),
   verifyOrganizationStatus: vi.fn(() => ({ value: true })),
   convertUnixToQuasarFormat: vi.fn((timestamp) => "2023-01-01 10:00:00"),
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 describe("ActionScripts.vue", () => {

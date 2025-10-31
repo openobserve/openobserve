@@ -17,6 +17,8 @@ vi.mock("@/services/segment_analytics", () => ({
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn(() => "mock-image-url")
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock("@/aws-exports", () => ({

@@ -82,6 +82,8 @@ vi.mock("@/utils/zincutils", () => ({
   b64DecodeUnicode: vi.fn((str) => atob(str)),
   convertDateToTimestamp: vi.fn(),
   useLocalWrapContent: vi.fn(() => false),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 // Mock navigator.clipboard

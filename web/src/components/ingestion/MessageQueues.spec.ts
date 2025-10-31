@@ -106,7 +106,8 @@ describe("MessageQueues.vue", () => {
           $q: mockQuasar,
           $t: (key: string) => key,
         },
-        stubs: {
+        stubs: {,
+        useLocalTimezone: vi.fn(() => "UTC"),
           "q-splitter": true,
           "q-input": true,
           "q-tabs": true,

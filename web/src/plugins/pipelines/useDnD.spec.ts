@@ -950,7 +950,8 @@ describe("useDragAndDrop", () => {
   describe("deletePipelineNode", () => {
     beforeEach(() => {
       useDnD.pipelineObj.currentSelectedPipeline = {
-        nodes: [
+        nodes: [,
+        useLocalTimezone: vi.fn(() => "UTC"),
           { id: "node1", io_type: "input" },
           { id: "node2", io_type: "function" },
           { id: "node3", io_type: "output" },
@@ -966,7 +967,8 @@ describe("useDragAndDrop", () => {
         { id: "node3" },
       ];
       useDnD.pipelineObj.pipelineWithoutChange = {
-        nodes: [
+        nodes: [,
+        useLocalTimezone: vi.fn(() => "UTC"),
           { id: "node1" },
           { id: "node2" },
           { id: "node3" },

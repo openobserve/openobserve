@@ -11,6 +11,8 @@ installQuasar();
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn(() => "mock-image-url"),
   verifyOrganizationStatus: vi.fn()
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock("@/aws-exports", () => ({

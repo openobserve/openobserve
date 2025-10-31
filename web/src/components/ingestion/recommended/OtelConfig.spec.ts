@@ -27,6 +27,7 @@ vi.mock('@/utils/zincutils', () => ({
   getIngestionURL: vi.fn(),
   getEndPoint: vi.fn(),
   b64EncodeStandard: vi.fn(),
+  useLocalTimezone: vi.fn(() => "UTC"),
 }))
 
 // Mock ContentCopy component

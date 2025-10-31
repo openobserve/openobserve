@@ -9,6 +9,8 @@ import { nextTick } from 'vue';
 // Mock dependencies
 vi.mock('@/utils/zincutils', () => ({
   getImageURL: vi.fn(() => 'mock-image-url'),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock('@/utils/commons', () => ({

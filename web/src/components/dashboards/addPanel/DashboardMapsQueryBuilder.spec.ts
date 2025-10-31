@@ -86,6 +86,8 @@ vi.mock("quasar", async () => {
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn(() => "mocked-image-url")
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 describe("DashboardMapsQueryBuilder", () => {

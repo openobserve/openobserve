@@ -56,6 +56,7 @@ vi.mock("@/utils/zincutils", () => ({
   useLocalCurrentUser: vi.fn(),
   useLocalOrganization: vi.fn(() => ({ value: null })),
   getImageURL: vi.fn(),
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock("@/components/login/Login.vue", () => ({

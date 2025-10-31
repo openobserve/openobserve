@@ -56,6 +56,8 @@ vi.mock("@/utils/zincutils", async () => {
     ...actual,
     getImageURL: vi.fn(() => "mocked-image-url"),
     mergeRoutes: vi.fn((route1: any, route2: any) => route1)
+  ,
+    useLocalTimezone: vi.fn(() => "UTC"),
   };
 });
 

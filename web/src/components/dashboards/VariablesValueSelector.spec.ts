@@ -101,6 +101,7 @@ vi.mock("@/utils/dashboard/variables/variablesDependencyUtils", () => ({
     variables.forEach((variable) => {
       graph[variable.name] = {
         parentVariables: [],
+        useLocalTimezone: vi.fn(() => "UTC"),
         childVariables: [],
       };
     });

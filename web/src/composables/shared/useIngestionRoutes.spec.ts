@@ -24,6 +24,8 @@ vi.mock("@/aws-exports", () => ({
 
 vi.mock("@/utils/zincutils", () => ({
   routeGuard: vi.fn((to, from, next) => next())
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock("@/components/ingestion/logs/SyslogNg.vue", () => ({ default: {} }));

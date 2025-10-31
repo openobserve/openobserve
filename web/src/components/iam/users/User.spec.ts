@@ -111,7 +111,8 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     getImageURL: vi.fn(() => "http://test.com/image.png"),
     formatDate: vi.fn(() => "2023-12-01"),
     formatDateTime: vi.fn(() => "2023-12-01 12:00:00"),
-    convertDateFormat: vi.fn(() => "2023-12-01")
+    convertDateFormat: vi.fn(() => "2023-12-01"),
+    useLocalTimezone: vi.fn(() => "UTC"),
   };
 });
 

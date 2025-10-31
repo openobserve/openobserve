@@ -126,7 +126,8 @@ vi.mock("./useDnD", () => ({
     mockPipelineObj = {
       currentSelectedPipeline: {
         nodes: [],
-        edges: []
+        edges: [],
+        useLocalTimezone: vi.fn(() => "UTC"),
       },
       dirtyFlag: false
     };
@@ -169,7 +170,8 @@ describe("PipelineFlow.vue", () => {
     mockPipelineObj = {
       currentSelectedPipeline: {
         nodes: [],
-        edges: []
+        edges: [],
+        useLocalTimezone: vi.fn(() => "UTC"),
       },
       dirtyFlag: false
     };

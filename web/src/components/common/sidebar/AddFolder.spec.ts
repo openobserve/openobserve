@@ -37,7 +37,8 @@ vi.mock('@/utils/zincutils.ts', () => ({
   getImageURL: vi.fn().mockReturnValue('mock-image-url'),
   useLocalOrganization: vi.fn().mockReturnValue({
     organization: { id: 1, name: 'test-org' }
-  })
+  }),
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 vi.mock('@/composables/useLoading.ts', () => ({

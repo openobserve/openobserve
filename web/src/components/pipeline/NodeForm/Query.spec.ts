@@ -23,6 +23,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     getTimezoneOffset: vi.fn(() => -300),
     getUUID: vi.fn(() => "mock-uuid-123"),
     useLocalOrganization: vi.fn(() => ({ identifier: "mock-org" })),
+    useLocalTimezone: vi.fn(() => "UTC"),
     useLocalCurrentUser: vi.fn(() => ({ email: "test@example.com" })),
   };
 });

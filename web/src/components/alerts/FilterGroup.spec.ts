@@ -9,6 +9,8 @@ import { nextTick } from 'vue';
 // Mock getUUID
 vi.mock('@/utils/zincutils', () => ({
   getUUID: vi.fn(() => 'mock-uuid-123'),
+,
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 const mockStore = createStore({

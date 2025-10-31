@@ -87,7 +87,8 @@ const i18n = createI18n({
         extendTrial: "Extend Trial"
       },
       common: {
-        cancel: "Cancel"
+        cancel: "Cancel",
+        useLocalTimezone: vi.fn(() => "UTC"),
       }
     }
   }
