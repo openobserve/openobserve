@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'width: 100%; height: calc(100vh - 124px)' 
                 : 'width: 100%'"
 
-                class="o2-quasar-table o2-quasar-table-header-sticky"
+                class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
               >
               <template v-slot:header="props">
                 <q-tr :props="props">

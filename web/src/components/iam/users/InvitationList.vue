@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :columns="columns"
       row-key="token"
       :pagination="pagination"
-      class="o2-quasar-table"
+      class="o2-quasar-table o2-row-md"
       :class="
         store.state.theme == 'dark'
           ? 'o2-quasar-table-dark'

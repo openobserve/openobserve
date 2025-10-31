@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       :pagination="pagination"
       :loading="loading"
-      class="o2-quasar-table o2-quasar-table-header-sticky"
+      class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
       style="overflow-y: auto;"
       :style="hasVisibleRows
             ? 'height: calc(100vh - 127px); overflow-y: auto;' 

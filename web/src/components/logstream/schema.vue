@@ -394,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :pagination="pagination"
                   selection="multiple"
                   v-model:selected="selectedFields"
-                  class="q-table o2-quasar-table o2-schema-table"
+                  class="q-table o2-quasar-table o2-row-md o2-schema-table"
                   id="schemaFieldList"
                   :style="{
                     height: `${indexData.defaultFts ? 'calc(100vh - 363px)' : 'calc(100vh - 330px)'}`,

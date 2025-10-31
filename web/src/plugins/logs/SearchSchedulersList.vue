@@ -50,7 +50,7 @@
             :pagination="pagination"
             row-key="trace_id"
             :rows-per-page-options="[]"
-            class="o2-quasar-table o2-quasar-table-header-sticky"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh - 128px); overflow-y: auto;' : 'height: 0px'"
             :sort-method="sortMethod"
           >

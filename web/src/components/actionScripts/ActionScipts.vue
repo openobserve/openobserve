@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :pagination="pagination"
             style="width: 100%;"
             :style="{ height: hasVisibleRows ? 'calc(100vh - 124px)' : '' }"
-            class="o2-quasar-table o2-quasar-table-header-sticky o2-last-row-border"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky o2-last-row-border"
             >
             <template #no-data>
               <NoData />
