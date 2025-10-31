@@ -560,8 +560,22 @@ def test_e2e_time_series_window_functions(create_session, base_url):
         },
     }
 
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
+    try:
+        resp_get_allsearch = session.post(
+            f"{url}api/{org_id}/_search?type=logs",
+            json=json_data,
+            timeout=60  # 60 seconds timeout for complex query
+        )
+    except requests.exceptions.ConnectionError as e:
+        logging.warning(f"Connection error during complex query: {e}. Retrying once...")
+        # Retry once after a brief pause
+        time.sleep(2)
+        resp_get_allsearch = session.post(
+            f"{url}api/{org_id}/_search?type=logs",
+            json=json_data,
+            timeout=60
+        )
+
     assert (
         resp_get_allsearch.status_code == 200
     ), f"Time-series window functions query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"

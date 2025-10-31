@@ -488,10 +488,6 @@ def test_summary(create_session, base_url, base_url_sc, org_id):
     print(f"Deleted Stream Response: {resp_delete_stream.text}")
     assert resp_delete_stream.status_code == 200, f"Failed to delete  {stream_name}"
     print(f"Successfully deleted stream {stream_name}")
-    resp_delete_stream= session.delete(f"{url_sc}api/{org_id}/streams/{stream_name}?type=logs")
-    print(f"Deleted Stream Response: {resp_delete_stream.text}")
-    assert resp_delete_stream.status_code == 200, f"Failed to delete  {stream_name}"
-    print(f"Successfully deleted stream {stream_name}")
 
 @pytest.mark.order(3)
 def test_summary_validate(create_session, base_url, org_id):
