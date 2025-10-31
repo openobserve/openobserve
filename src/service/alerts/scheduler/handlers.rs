@@ -807,7 +807,7 @@ async fn handle_query_recommendations_triggers(
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use config::meta::triggers::{Trigger, TriggerStatus};
+    use config::meta::triggers::TriggerStatus;
 
     let cfg = get_config();
     let query_recommendation_analysis_interval = cfg.limit.query_recommendation_analysis_interval;
@@ -817,28 +817,8 @@ async fn handle_query_recommendations_triggers(
         .as_micros() as i64
         + query_recommendation_analysis_interval * 1_000_000;
 
-    if trigger.status == TriggerStatus::Processing && trigger.retries == 0 {
-        let new_trigger = db::scheduler::Trigger {
-            status: TriggerStatus::Waiting,
-            retries: 3,
-            next_run_at,
-            ..trigger.clone()
-        };
-        db::scheduler::update_trigger(new_trigger, false, trace_id).await?;
-        return Err(anyhow::anyhow!(
-            "Query Recommendations Job failed through all retries"
-        ));
-    }
+    log::info!("[QUERY_RECOMMENDATIONS] Generating Query Recommendations. trace_id={trace_id}");
 
-    log::info!("Generating Query Recommendations. trace_id={trace_id}");
-    let trigger = Trigger {
-        status: TriggerStatus::Processing,
-        retries: trigger.retries - 1,
-        ..trigger
-    };
-    db::scheduler::update_trigger(trigger.clone(), false, trace_id)
-        .await
-        .inspect_err(|e| log::error!("Error updating trigger state for processing. e={:?}", e))?;
     let query_recommendation_service = QueryRecommendationService {
         ctx: Arc::new(QueryOptimizerContext),
         query_recommendation_analysis_interval: cfg.limit.query_recommendation_analysis_interval,
@@ -851,30 +831,40 @@ async fn handle_query_recommendations_triggers(
         .await
         .inspect_err(|e| {
             log::error!(
-                "Recommendation service stopped with an error: Error={:?}",
+                "[QUERY_RECOMMENDATIONS] Recommendation service stopped with an error: Error={:?}",
                 e
             );
         })
         .inspect(|_| {
-            log::warn!("Recommendation job completed. trace_id={trace_id}!");
+            log::info!("[QUERY_RECOMMENDATIONS] Recommendation job completed successfully. trace_id={trace_id}");
         });
 
-    if let Err(e) = result {
-        return Err(anyhow::anyhow!(
-            "Query Recommendations Job operation encounted an error: e={:?}",
-            e
-        ));
-    }
-
+    // Always queue the next run, regardless of success or failure
     let new_trigger = db::scheduler::Trigger {
         status: TriggerStatus::Waiting,
         retries: 3,
         next_run_at,
         ..trigger
     };
+
     db::scheduler::update_trigger(new_trigger, false, trace_id)
         .await
-        .inspect_err(|e| log::error!("Failed to update QueryRecommendations trigger. e={:?}", e))?;
+        .inspect_err(|e| {
+            log::error!(
+                "[QUERY_RECOMMENDATIONS] Failed to update QueryRecommendations trigger. e={:?}",
+                e
+            )
+        })?;
+
+    // If there was an error during generation, log it but don't prevent the next run from being
+    // queued
+    if let Err(e) = result {
+        log::error!(
+            "[QUERY_RECOMMENDATIONS] Query Recommendations Job operation encountered an error: e={:?}",
+            e
+        );
+        // Return Ok since the next run has been successfully queued
+    }
 
     Ok(())
 }
