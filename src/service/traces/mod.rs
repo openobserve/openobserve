@@ -844,7 +844,8 @@ async fn write_traces(
 
     // Start check for schema
     let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
-    let _ = check_for_schema(
+
+    let (_, infer_schema) = check_for_schema(
         org_id,
         stream_name,
         StreamType::Traces,
@@ -853,7 +854,11 @@ async fn write_traces(
         *min_timestamp,
         false, // is_derived is false for traces
     )
-    .await;
+    .await
+    .map_err(|e| {
+        log::error!("Error while checking traces schema for {org_id}/{stream_name}: {e}");
+        std::io::Error::other(e.to_string())
+    })?;
     let record_schema = traces_schema_map
         .get(stream_name)
         .unwrap()
@@ -861,8 +866,14 @@ async fn write_traces(
         .as_ref()
         .clone()
         .with_metadata(HashMap::new());
-    let record_schema = Arc::new(record_schema);
     let schema_key = record_schema.hash_key();
+    // use latest schema as schema key
+    // use inferred schema as record schema
+    let record_schema = match infer_schema {
+        // use latest_schema's datetype for record schema
+        Some(schema) => Arc::new(schema.cloned_from(&record_schema)),
+        None => Arc::new(record_schema),
+    };
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);

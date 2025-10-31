@@ -25,7 +25,13 @@ use config::{
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
-    meta::{promql::METADATA_LABEL, stream::StreamType},
+    meta::{
+        promql::{
+            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
+            TYPE_LABEL, VALUE_LABEL,
+        },
+        stream::StreamType,
+    },
     metrics,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt, time::now_micros},
 };
@@ -42,6 +48,32 @@ use crate::{
     common::meta::{authz::Authz, ingestion::StreamSchemaChk, stream::SchemaEvolution},
     service::db,
 };
+
+const METRICS_REQUIRED_FIELDS: &[&str] = &[
+    NAME_LABEL,      // __name__ - metric name (stream identifier)
+    TYPE_LABEL,      // __type__ - metric type (counter, gauge, histogram, etc.)
+    HASH_LABEL,      // __hash__ - series identifier
+    VALUE_LABEL,     // value - the actual metric value
+    "_timestamp",    // timestamp
+    BUCKET_LABEL,    // le - histogram bucket upper bound
+    QUANTILE_LABEL,  // quantile - summary quantile
+    EXEMPLARS_LABEL, // exemplars - trace exemplars
+];
+
+const TRACES_REQUIRED_FIELDS: &[&str] = &[
+    "trace_id",
+    "span_id",
+    "service_name",
+    "operation_name",
+    "start_time",
+    "end_time",
+    "duration",
+    "span_kind",
+    "span_status",
+    "flags",
+    "events",
+    "links",
+];
 
 pub(crate) fn get_upto_discard_error() -> anyhow::Error {
     anyhow::anyhow!(
@@ -219,7 +251,6 @@ pub async fn get_merged_schema(
         Schema::new(merged_fields).with_metadata(metadata),
     ))
 }
-
 // handle_diff_schema is a slow path, it acquires a lock to update schema
 // steps:
 // 1. get schema from db, if schema is empty, set schema and return
@@ -352,7 +383,10 @@ pub(crate) async fn handle_diff_schema(
     // user-defined schema does not include _timestamp or _all columns
     if cfg.common.allow_user_defined_schemas
         && cfg.limit.schema_max_fields_to_enable_uds > 0
-        && stream_type == StreamType::Logs
+        && matches!(
+            stream_type,
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces
+        )
         && defined_schema_fields.is_empty()
         && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds
     {
@@ -367,14 +401,37 @@ pub(crate) async fn handle_diff_schema(
                 || field_name == cfg.common.column_all
         };
 
-        // Add FTS fields first
-        for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-            if final_schema.field_with_name(field).is_ok()
-                && !should_skip(field)
-                && uds_fields.insert(field.to_string())
-                && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
-            {
-                break;
+        if stream_type == StreamType::Logs {
+            // Add FTS fields first
+            for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
+                if final_schema.field_with_name(field).is_ok()
+                    && !should_skip(field)
+                    && uds_fields.insert(field.to_string())
+                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
+                {
+                    break;
+                }
+            }
+        } else if stream_type == StreamType::Metrics {
+            // add required fields first
+            for field in METRICS_REQUIRED_FIELDS.iter() {
+                if final_schema.field_with_name(field).is_ok()
+                    && !should_skip(field)
+                    && uds_fields.insert(field.to_string())
+                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
+                {
+                    break;
+                }
+            }
+        } else if stream_type == StreamType::Traces {
+            for field in TRACES_REQUIRED_FIELDS.iter() {
+                if final_schema.field_with_name(field).is_ok()
+                    && !should_skip(field)
+                    && uds_fields.insert(field.to_string())
+                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
+                {
+                    break;
+                }
             }
         }
 
