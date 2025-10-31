@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :style="invoiceHistory.length > 0
         ? 'width: 100%; height: calc(100vh - 150px); overflow-y: auto;'
         : 'width: 100%'"
-     class="o2-quasar-table o2-quasar-table-header-sticky"
+     class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
   >
     <template #no-data><NoData /></template>
     <template #body-cell-actions="props">

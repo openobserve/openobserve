@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :pagination="pagination"
-        class="o2-quasar-table o2-quasar-table-header-sticky o2-last-row-border"
+        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky o2-last-row-border"
         :style="hasVisibleRows
             ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
             : 'width: 100%'"

@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="card-container tw-h-[calc(100vh-126px)]">
           <q-table
             data-test="log-stream-table"
-            class="o2-quasar-table o2-quasar-table-header-sticky"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             ref="qTable"
             v-model:selected="selected"
             :rows="logStream"

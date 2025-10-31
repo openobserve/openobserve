@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'height: calc(100vh - 124px)'
                 : ''
             "
-            class="o2-quasar-table o2-quasar-table-header-sticky"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           >
             <!-- if data not available show nodata component -->
             <template #no-data>

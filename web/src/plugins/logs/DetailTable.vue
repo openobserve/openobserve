@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="tableColumns"
             :row-key="(row) => 'field_' + row.field"
             :rows-per-page-options="[0]"
-            class="q-table o2-quasar-table o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+            class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
             dense
           >
             <template v-slot:body-cell-field="props">
