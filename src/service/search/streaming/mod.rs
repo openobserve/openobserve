@@ -18,11 +18,12 @@
 //! This module contains all the components for handling streaming search requests,
 //! including caching, execution, sorting, and utility functions.
 
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 use config::{
     meta::{
-        search::{StreamResponses, ValuesEventContext},
+        dashboards::usage_report::DashboardInfo,
+        search::{SearchEventType, StreamResponses, ValuesEventContext},
         sql::OrderBy,
         stream::StreamType,
     },
@@ -82,6 +83,9 @@ pub async fn process_search_stream_request(
     log::debug!(
         "[HTTP2_STREAM trace_id {trace_id}] Received HTTP/2 stream request for org_id: {org_id}",
     );
+
+    #[cfg(feature = "enterprise")]
+    let audit_enabled = get_o2_config().common.audit_enabled && _audit_ctx.is_some();
 
     // Send a progress: 0 event as an indicator of search initiation
     if sender
@@ -156,7 +160,7 @@ pub async fn process_search_stream_request(
                 #[cfg(feature = "enterprise")]
                 {
                     let resp = map_error_to_http_response(&e, None).status().into();
-                    if get_o2_config().common.audit_enabled {
+                    if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
                             user_email: user_id,
@@ -262,7 +266,7 @@ pub async fn process_search_stream_request(
                 #[cfg(feature = "enterprise")]
                 {
                     let resp = map_error_to_http_response(&e, None).status().into();
-                    if get_o2_config().common.audit_enabled {
+                    if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
                             user_email: user_id,
@@ -341,7 +345,7 @@ pub async fn process_search_stream_request(
                 #[cfg(feature = "enterprise")]
                 {
                     let resp = map_error_to_http_response(&e, None).status().into();
-                    if get_o2_config().common.audit_enabled {
+                    if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
                             user_email: user_id,
@@ -408,7 +412,7 @@ pub async fn process_search_stream_request(
             #[cfg(feature = "enterprise")]
             {
                 let resp = map_error_to_http_response(&e, None).status().into();
-                if get_o2_config().common.audit_enabled {
+                if audit_enabled {
                     // Using spawn to handle the async call
                     audit(AuditMessage {
                         user_email: user_id,
@@ -470,7 +474,7 @@ pub async fn process_search_stream_request(
             #[cfg(feature = "enterprise")]
             {
                 let resp = map_error_to_http_response(&e, None).status().into();
-                if get_o2_config().common.audit_enabled {
+                if audit_enabled {
                     // Using spawn to handle the async call
                     audit(AuditMessage {
                         user_email: user_id,
@@ -512,7 +516,7 @@ pub async fn process_search_stream_request(
 
     #[cfg(feature = "enterprise")]
     {
-        if get_o2_config().common.audit_enabled {
+        if audit_enabled {
             // Using spawn to handle the async call
             audit(AuditMessage {
                 user_email: user_id,
@@ -534,13 +538,262 @@ pub async fn process_search_stream_request(
     }
 
     // Send a completion signal
+    if sender.send(Ok(StreamResponses::Done)).await.is_err() {
+        log::warn!(
+            "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending completion message to client",
+        );
+    }
+}
+
+/// Multi-stream search processing function that handles multiple independent queries
+/// and streams results as they become available from each query
+#[allow(clippy::too_many_arguments)]
+pub async fn process_search_stream_request_multi(
+    org_id: String,
+    user_id: String,
+    trace_id: String,
+    queries: Vec<config::meta::search::Request>,
+    stream_type: StreamType,
+    search_span: tracing::Span,
+    sender: mpsc::Sender<Result<config::meta::search::StreamResponses, infra::errors::Error>>,
+    _fallback_order_by_col: Option<String>,
+    _audit_ctx: Option<AuditContext>,
+    _dashboard_info: Option<DashboardInfo>,
+    search_type: Option<SearchEventType>,
+    search_event_context: Option<config::meta::search::SearchEventContext>,
+) {
+    log::debug!(
+        "[HTTP2_STREAM_MULTI trace_id {trace_id}] Processing multi-stream request with {} queries for org_id: {org_id}",
+        queries.len()
+    );
+
+    // Send initial progress event
     if sender
-        .send(Ok(config::meta::search::StreamResponses::Done))
+        .send(Ok(StreamResponses::Progress { percent: 0 }))
         .await
         .is_err()
     {
         log::warn!(
-            "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending completion message to client",
+            "[HTTP2_STREAM_MULTI trace_id {trace_id}] Sender is closed, stop sending progress event to client",
+        );
+        return;
+    }
+
+    let total_queries = queries.len();
+    let _started_at = chrono::Utc::now().timestamp_micros();
+
+    // Shared progress channel for all queries
+    let (progress_tx, mut progress_rx) = mpsc::channel::<(usize, usize)>(100);
+
+    // Process each query independently
+    let mut query_tasks = Vec::new();
+
+    for (query_index, mut req) in queries.into_iter().enumerate() {
+        let query_trace_id = format!("{trace_id}-q{query_index}");
+        let org_id_clone = org_id.clone();
+        let user_id_clone = user_id.clone();
+        let sender_clone = sender.clone();
+        let search_span_clone = search_span.clone();
+        let progress_tx_clone = progress_tx.clone();
+
+        // Clone search context for each query
+        let query_search_type = search_type;
+        let query_search_event_context = search_event_context.clone();
+
+        let task = tokio::spawn(async move {
+            log::debug!(
+                "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Starting query {query_index}: {}",
+                req.query.sql
+            );
+
+            // Get stream names for this specific query
+            // Note: Permissions are now checked at the handler level using the streams field
+            let stream_names = match config::meta::sql::resolve_stream_names(&req.query.sql) {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Failed to resolve stream names: {e}"
+                    );
+                    let _ = sender_clone.send(Err(e.into())).await;
+                    return;
+                }
+            };
+
+            // Set query metadata
+            req.search_type = query_search_type;
+            req.search_event_context = query_search_event_context;
+
+            // Create a nested sender for this specific query results
+            let (query_sender, mut query_receiver) =
+                mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
+
+            // Launch the individual search stream request
+            let search_task = process_search_stream_request(
+                org_id_clone.clone(),
+                user_id_clone.clone(),
+                query_trace_id.clone(),
+                req,
+                stream_type,
+                stream_names,
+                OrderBy::default(),
+                search_span_clone.clone(),
+                query_sender,
+                None,  // no values context for multi-stream
+                None,  // no fallback order by col
+                None,  // no audit context for individual queries
+                false, // not multi stream search at individual level
+            );
+
+            tokio::spawn(search_task);
+
+            // Forward results from this query to the main sender, prefixed with query info
+            while let Some(result) = query_receiver.recv().await {
+                match result {
+                    Ok(response) => {
+                        // Add query index to the response
+                        let prefixed_response = match response {
+                            StreamResponses::SearchResponse {
+                                mut results,
+                                streaming_aggs,
+                                streaming_id,
+                                time_offset,
+                            } => {
+                                // Add query index to metadata
+                                results.query_index = Some(query_index);
+                                StreamResponses::SearchResponse {
+                                    results,
+                                    streaming_aggs,
+                                    streaming_id,
+                                    time_offset,
+                                }
+                            }
+                            StreamResponses::Progress { percent } => {
+                                // Send progress update to consolidator
+                                let _ = progress_tx_clone.send((query_index, percent)).await;
+                                // Don't forward individual progress events
+                                continue;
+                            }
+                            StreamResponses::Done => {
+                                // Don't forward individual Done events
+                                // Only the outer wrapper should send Done
+                                continue;
+                            }
+                            other => other, // Forward other responses as-is
+                        };
+
+                        if sender_clone.send(Ok(prefixed_response)).await.is_err() {
+                            log::warn!(
+                                "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Main sender is closed"
+                            );
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Query error: {e}"
+                        );
+                        // Send error but continue with other queries
+                        let _ = sender_clone.send(Err(e)).await;
+                        break;
+                    }
+                }
+            }
+
+            log::debug!(
+                "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Query {query_index} completed"
+            );
+        });
+
+        query_tasks.push(task);
+    }
+
+    // Drop original sender so channel closes when all tasks complete
+    drop(progress_tx);
+
+    // Spawn progress consolidator task
+    let sender_for_consolidator = sender.clone();
+    let trace_id_for_consolidator = trace_id.clone();
+    let consolidator_task = tokio::spawn(async move {
+        let mut progress_map: HashMap<usize, usize> = HashMap::new();
+        let mut last_sent_percent = 0;
+
+        while let Some((query_index, percent)) = progress_rx.recv().await {
+            // Update progress for this query
+            progress_map.insert(query_index, percent);
+
+            // Calculate average progress across all queries
+            let sum: usize = progress_map.values().sum();
+            let avg_percent = sum / total_queries;
+
+            // Only send if progress increased (monotonic progress)
+            if avg_percent > last_sent_percent {
+                if sender_for_consolidator
+                    .send(Ok(StreamResponses::Progress {
+                        percent: avg_percent,
+                    }))
+                    .await
+                    .is_err()
+                {
+                    log::warn!(
+                        "[HTTP2_STREAM_MULTI trace_id {trace_id_for_consolidator}] \
+                         Sender closed while sending progress"
+                    );
+                    break;
+                }
+                last_sent_percent = avg_percent;
+            }
+        }
+    });
+
+    // Wait for all queries to complete
+    for task in query_tasks {
+        // Check if sender is closed before waiting for next task
+        if sender.is_closed() {
+            log::warn!("[HTTP2_STREAM_MULTI trace_id {trace_id}] Sender closed, stopping early");
+            return;
+        }
+
+        if let Err(e) = task.await {
+            log::error!("[HTTP2_STREAM_MULTI trace_id {trace_id}] Task join error: {e}");
+        }
+    }
+
+    // Wait for consolidator to finish processing all progress updates
+    if let Err(e) = consolidator_task.await {
+        log::error!("[HTTP2_STREAM_MULTI trace_id {trace_id}] Consolidator task join error: {e}");
+    }
+
+    log::info!(
+        "[HTTP2_STREAM_MULTI trace_id {trace_id}] All {} queries completed",
+        total_queries
+    );
+
+    #[cfg(feature = "enterprise")]
+    if let Some(audit_ctx) = _audit_ctx
+        && get_o2_config().common.audit_enabled
+    {
+        audit(AuditMessage {
+            user_email: user_id,
+            org_id,
+            _timestamp: chrono::Utc::now().timestamp(),
+            protocol: Protocol::Http,
+            response_meta: ResponseMeta {
+                http_method: audit_ctx.method.to_string(),
+                http_path: audit_ctx.path.to_string(),
+                http_query_params: audit_ctx.query_params.to_string(),
+                http_body: audit_ctx.body.to_string(),
+                http_response_code: 200,
+                error_msg: None,
+                trace_id: Some(trace_id.to_string()),
+            },
+        })
+        .await;
+    }
+
+    // Send completion signal
+    if sender.send(Ok(StreamResponses::Done)).await.is_err() {
+        log::warn!(
+            "[HTTP2_STREAM_MULTI trace_id {trace_id}] Sender is closed, stop sending completion message to client"
         );
     }
 }

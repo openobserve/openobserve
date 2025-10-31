@@ -94,7 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mt-lg"
                 >
                   <h5 class="text-center">
-                    <q-icon name="warning" color="warning" size="10rem" /><br />
+                    <q-icon name="warning"
+color="warning" size="10rem" /><br />
                     <div
                       data-test="logs-search-filter-error-message"
                       v-html="searchObj.data.filterErrMsg"
@@ -174,7 +175,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-none"
                   >
-                    <q-icon name="info" color="primary" size="md" /> Select a
+                    <q-icon name="info"
+color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -193,7 +195,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                     <q-btn
                       v-if="
@@ -220,7 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -374,14 +378,14 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep, debounce } from "lodash-es";
-import { buildSqlQuery, getFieldsFromQuery, isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
+import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
-import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
+import { isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
 import queryService from "@/services/search";
@@ -565,7 +569,6 @@ export default defineComponent({
       cancelQuery,
       getRegionInfo,
       sendCancelSearchMessage,
-      setCommunicationMethod,
     } = useSearchBar();
     let {
       getJobData,
@@ -576,12 +579,10 @@ export default defineComponent({
       handleRunQuery,
       enableRefreshInterval,
       clearSearchObj,
-      processHttpHistogramResults,
       loadVisualizeData,
     } = useLogs();
 
     const {
-      getHistogramQueryData,
       resetHistogramWithError,
       generateHistogramData,
       generateHistogramSkeleton,
@@ -598,8 +599,12 @@ export default defineComponent({
       updateUrlQueryParams,
       addTraceId,
     } = logsUtils();
-    const { buildWebSocketPayload, buildSearch, initializeSearchConnection } =
-      useSearchStream();
+    const {
+      getHistogramData,
+      buildWebSocketPayload,
+      buildSearch,
+      initializeSearchConnection,
+    } = useSearchStream();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
@@ -1124,9 +1129,9 @@ export default defineComponent({
             streams.forEach((stream: string, index: number) => {
               // Add UNION for all but the first SELECT statement
               if (index > 0) {
-                searchObj.data.query += " UNION ";
+                searchObj.data.query += " UNION ALL BY NAME ";
               }
-              searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
+              searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}"${whereClause ? " " + whereClause : ""}`;
             });
 
             if (
@@ -1369,7 +1374,6 @@ export default defineComponent({
 
       return parsedSQL;
     };
-
 
     const handleQuickModeChange = () => {
       if (searchObj.meta.quickMode == true) {
@@ -1804,15 +1808,15 @@ export default defineComponent({
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
           let logsPageQuery = "";
-          
+
           // handle sql mode
-          if(!searchObj.meta.sqlMode){
+          if (!searchObj.meta.sqlMode) {
             const queryBuild = buildSearch();
             logsPageQuery = queryBuild?.query?.sql ?? "";
           } else {
             logsPageQuery = searchObj.data.query;
           }
-          
+
           // Check if query is SELECT * which is not supported for visualization
           if (
             store.state.zoConfig.quick_mode_enabled === true &&
@@ -2334,7 +2338,6 @@ export default defineComponent({
       redirectBackToLogs,
       handleRunQuery,
       refreshTimezone,
-      getHistogramQueryData,
       generateHistogramSkeleton,
       setInterestingFieldInSQLQuery,
       handleQuickModeChange,
@@ -2348,21 +2351,19 @@ export default defineComponent({
       fnParsedSQL,
       isLimitQuery,
       buildWebSocketPayload,
+      getHistogramData,
       initializeSearchConnection,
       addTraceId,
-      isWebSocketEnabled,
       showJobScheduler,
       showSearchScheduler,
       closeSearchSchedulerFn,
       isDistinctQuery,
       isWithQuery,
       isStreamingEnabled,
-      setCommunicationMethod,
       sendToAiChat,
       processInterestingFiledInSQLQuery,
       removeFieldByName,
       dashboardPanelData,
-      processHttpHistogramResults,
       searchResponseForVisualization,
       shouldUseHistogramQuery,
       clearSchemaCache,
@@ -2492,52 +2493,10 @@ export default defineComponent({
         ) {
           this.searchObj.meta.histogramDirtyFlag = false;
 
-          // this.handleRunQuery();
-          this.searchObj.loadingHistogram = true;
-
-          this.setCommunicationMethod();
-
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 
-          if (
-            this.searchObj.communicationMethod === "ws" ||
-            this.searchObj.communicationMethod === "streaming"
-          ) {
-            // Use WebSocket for histogram data
-            const payload = this.buildWebSocketPayload(
-              this.searchObj.data.histogramQuery,
-              false,
-              "histogram",
-              {
-                isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
-                is_ui_histogram: true,
-              },
-            );
-            const requestId = this.initializeSearchConnection(payload);
-
-            if (requestId) {
-              this.addTraceId(payload.traceId);
-            }
-
-            return;
-          }
-
-          this.processHttpHistogramResults(
-            this.searchObj.data.customDownloadQueryObj,
-          )
-            .then((res: any) => {
-              this.refreshTimezone();
-              const timeout = setTimeout(() => {
-                if (this.searchResultRef) this.searchResultRef.reDrawChart();
-              }, 100);
-
-              // Store timeout reference for cleanup
-              this.chartRedrawTimeout = timeout;
-            })
-            .finally(() => {
-              this.searchObj.loadingHistogram = false;
-            });
+          this.getHistogramData(this.searchObj.data.histogramQuery);
         }
       }
 
@@ -2549,24 +2508,6 @@ export default defineComponent({
           this.searchObj.config.splitterModel > 0;
       }
     },
-    // changeStream: {
-    //   handler(stream, streamOld) {
-    //     if (
-    //       this.searchObj.data.stream.selectedStream.hasOwnProperty("value") &&
-    //       this.searchObj.data.stream.selectedStream.value != ""
-    //     ) {
-    //       this.searchObj.data.tempFunctionContent = "";
-    //       this.searchBarRef.resetFunctionContent();
-    //       if (streamOld.value) this.searchObj.data.query = "";
-    //       if (streamOld.value) this.setQuery(this.searchObj.meta.sqlMode);
-    //       this.searchObj.loading = true;
-    //       // setTimeout(() => {
-    //       //   this.runQueryFn();
-    //       // }, 500);
-    //     }
-    //   },
-    //   immediate: false,
-    // },
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
       // Clear any existing timeout
