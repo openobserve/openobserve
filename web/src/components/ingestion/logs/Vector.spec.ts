@@ -106,8 +106,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
 
     it("should have correct component structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-      expect(wrapper.find('.q-mt-sm').exists()).toBe(true);
+      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
     });
 
     it("should initialize with all required dependencies", () => {
@@ -360,7 +359,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
 
     it("should render CopyContent with correct classes", () => {
       wrapper = createWrapper();
-      const copyContentContainer = wrapper.find('.q-mt-sm');
+      const copyContentContainer = wrapper.find('.copy-content-container-cls');
       expect(copyContentContainer.exists()).toBe(true);
     });
 
@@ -456,7 +455,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
   describe("Template Rendering Tests", () => {
     it("should render main container with correct classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('.q-ma-md');
+      const container = wrapper.find('.q-pa-sm');
       expect(container.exists()).toBe(true);
     });
 
@@ -470,7 +469,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
     it("should render template structure correctly", () => {
       wrapper = createWrapper();
       const template = wrapper.html();
-      expect(template).toContain('q-ma-md');
+      expect(template).toContain('q-pa-sm');
       expect(template).toContain('copy-content-mock');
     });
   });

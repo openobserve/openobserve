@@ -93,7 +93,7 @@ describe('TelegrafConfig', () => {
     });
 
     it('should render main container div', () => {
-      expect(wrapper.find('.q-ma-md').exists()).toBe(true);
+      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
     });
 
     it('should render CopyContent component', () => {

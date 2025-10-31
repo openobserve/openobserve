@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="q-pa-sm">
-    <CopyContent :content="content" />
+    <CopyContent class="copy-content-container-cls" :content="content" />
   </div>
 </template>
 
