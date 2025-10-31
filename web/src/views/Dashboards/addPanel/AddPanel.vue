@@ -191,22 +191,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-list>
             </q-btn-dropdown>
           </q-btn-group>
-
-          <q-btn
-            v-else
-            data-test="dashboard-apply"
-            class="o2-primary-button tw-h-[36px] q-ml-md"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            no-caps
-            flat
-            dense
-            :label="t('panel.apply')"
-            @click="runQuery"
-          />
         </template>
       </div>
     </div>
