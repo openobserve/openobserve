@@ -94,8 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mt-lg"
                 >
                   <h5 class="text-center">
-                    <q-icon name="warning"
-color="warning" size="10rem" /><br />
+                    <q-icon name="warning" color="warning"
+size="10rem" /><br />
                     <div
                       data-test="logs-search-filter-error-message"
                       v-html="searchObj.data.filterErrMsg"
@@ -175,8 +175,8 @@ color="warning" size="10rem" /><br />
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-none"
                   >
-                    <q-icon name="info"
-color="primary" size="md" /> Select a
+                    <q-icon name="info" color="primary"
+size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -195,8 +195,8 @@ color="primary" size="md" /> Select a
                     data-test="logs-search-error-message"
                     class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info"
-color="primary" size="md" />
+                    <q-icon name="info" color="primary"
+size="md" />
                     {{ t("search.noRecordFound") }}
                     <q-btn
                       v-if="
@@ -223,8 +223,8 @@ color="primary" size="md" />
                     data-test="logs-search-error-message"
                     class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info"
-color="primary" size="md" />
+                    <q-icon name="info" color="primary"
+size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -919,6 +919,7 @@ export default defineComponent({
           }
 
           if (isLogsTab()) {
+            searchObj.loading = true;
             loadLogsData();
           } else {
             loadVisualizeData();
