@@ -657,7 +657,7 @@ describe('AddFunction.vue Branch Coverage', () => {
     });
   });
 
-
+  describe('AI Chat Integration', () => {
     it('should show AI chat when enabled and not in add function component', async () => {
       const aiEnabledStore = createStore({
         state: {

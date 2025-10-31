@@ -368,7 +368,7 @@ const getErrorLogs = () => {
       : ""
   } GROUP BY ${errorFields} type, service order by zo_sql_timestamp DESC`;
 
-  req.query.sql.replace("\n", " ");
+  req.query.sql.replaceAll("\n", " ");
   delete req.aggs;
   isLoading.value.push(true);
 
