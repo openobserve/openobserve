@@ -53,3 +53,22 @@
 .detail-table-list {
   height: calc(100vh - 290px);
 }
+
+// Add vertical borders between columns for detail table
+.searchdetaildialog .o2-schema-table {
+  :deep(thead th) {
+    border-right: 1px solid var(--o2-border-color) !important;
+
+    &:last-child {
+      border-right: none !important;
+    }
+  }
+
+  tbody td {
+    border-right: 1px solid var(--o2-border-color) !important;
+
+    &:last-child {
+      border-right: none !important;
+    }
+  }
+}
