@@ -38,7 +38,7 @@ use hashbrown::HashSet;
 use infra::{
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, get_stream_setting_log_patterns_enabled,
+        get_stream_setting_index_fields,
     },
     storage,
 };
@@ -686,10 +686,12 @@ async fn merge_files(
 
     // get latest version of schema
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
+    #[cfg(feature = "enterprise")]
+    let log_patterns_enabled =
+        infra::schema::get_stream_setting_log_patterns_enabled(&stream_settings);
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
-    let log_patterns_enabled = get_stream_setting_log_patterns_enabled(&stream_settings);
     let (defined_schema_fields, need_original, index_original_data, index_all_values) =
         match stream_settings {
             Some(s) => (
