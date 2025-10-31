@@ -675,6 +675,8 @@ export default defineComponent({
           // if parent variable is not loaded or it's value is changed, isVariableLoadingPending will be true
           isVariableLoadingPending: false,
           isVariablePartialLoaded: true,
+          // Initialize options array for all variables
+          options: item.options || [],
         };
 
         variableLog(
