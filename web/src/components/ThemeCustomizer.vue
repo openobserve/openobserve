@@ -72,12 +72,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-btn>
               </div>
 
-              <div class="row items-center q-gutter-sm">
+              <!-- Show opacity slider only for body backgrounds, not theme color -->
+              <div v-if="colorVar.name !== '--o2-theme-color'" class="row items-center q-gutter-sm">
                 <div class="text-caption" style="min-width: 60px;">Opacity:</div>
                 <q-slider
                   :model-value="colorVar.opacity"
                   @update:model-value="(val) => updateOpacity(colorVar.name, val, 'light')"
-                  :min="1"
+                  :min="0"
                   :max="10"
                   :step="1"
                   label
@@ -113,12 +114,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-btn>
               </div>
 
-              <div class="row items-center q-gutter-sm">
+              <!-- Show opacity slider only for body backgrounds, not dark theme color -->
+              <div v-if="colorVar.name !== '--o2-dark-theme-color'" class="row items-center q-gutter-sm">
                 <div class="text-caption" style="min-width: 60px;">Opacity:</div>
                 <q-slider
                   :model-value="colorVar.opacity"
                   @update:model-value="(val) => updateOpacity(colorVar.name, val, 'dark')"
-                  :min="1"
+                  :min="0"
                   :max="10"
                   :step="1"
                   label
@@ -150,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, reactive } from "vue";
+import { ref, watch, reactive, onMounted, onUnmounted } from "vue";
 import { useThemeCustomizer } from "@/composables/useThemeCustomizer";
 import { useQuasar } from "quasar";
 
@@ -184,69 +186,27 @@ const lightModeVariables = reactive([
     value: "#599BAE",
     opacity: 4, // 0.4 alpha
   },
-  {
-    name: "--o2-menu-gradient-start",
-    label: "Menu Gradient Start",
-    value: "#599BAE",
-    opacity: 1, // 0.1 alpha
-  },
-  {
-    name: "--o2-menu-gradient-end",
-    label: "Menu Gradient End",
-    value: "#599BAE",
-    opacity: 1, // 0.1 alpha
-  },
-  {
-    name: "--o2-menu-border-color",
-    label: "Menu Border Color",
-    value: "#599BAE",
-    opacity: 6, // 0.6 alpha
-  },
-  {
-    name: "--o2-actions-column-shawdow",
-    label: "Actions Column Shadow",
-    value: "#000000",
-    opacity: 1, // 0.1 alpha
-  },
 ]);
 
-// Dark Mode Variables
+// Dark Mode Variables - use same variable names as light mode
 const darkModeVariables = reactive([
   {
     name: "--o2-dark-theme-color",
-    label: "Dark Theme Color",
-    value: "#112027",
+    label: "Dark Theme Color (for buttons/toggles)",
+    value: "#3F7994",
     opacity: 10, // 1.0 alpha
   },
   {
-    name: "--o2-dark-body-primary-bg",
+    name: "--o2-body-primary-bg",
     label: "Body Primary Background",
-    value: "#0E131D",
-    opacity: 1, // 0.1 alpha
+    value: "#000000",
+    opacity: 0, // 0.0 alpha (transparent by default)
   },
   {
-    name: "--o2-dark-body-secondary-bg",
+    name: "--o2-body-secondary-bg",
     label: "Body Secondary Background",
-    value: "#0E131D",
-    opacity: 4, // 0.4 alpha
-  },
-  {
-    name: "--o2-dark-menu-gradient-start",
-    label: "Menu Gradient Start",
-    value: "#599BAE",
-    opacity: 1, // 0.1 alpha
-  },
-  {
-    name: "--o2-dark-menu-gradient-end",
-    label: "Menu Gradient End",
-    value: "#9ED7E7",
-    opacity: 1, // 0.1 alpha
-  },
-  {
-    name: "--o2-dark-actions-column-shawdow",
-    label: "Actions Column Shadow",
-    value: "#7D7D7D",
-    opacity: 7, // 0.7 alpha (0.694 rounded)
+    value: "#000000",
+    opacity: 0, // 0.0 alpha (transparent by default)
   },
 ]);
 
@@ -258,6 +218,106 @@ watch(isOpen, (val) => {
 // Watch dialogOpen to sync back
 watch(dialogOpen, (val) => {
   isOpen.value = val;
+});
+
+// Function to apply menu variables based on theme color
+// Menu uses theme color with different opacities:
+// - Menu Gradient Start: 0.04 (4%)
+// - Menu Gradient End: 0.08 (8%)
+// - Menu Border Color: 0.6 (60%)
+const applyMenuVariables = (themeColorHex: string, targetElement: HTMLElement) => {
+  const menuGradientStart = hexToRgba(themeColorHex, 0.4); // 0.4 on 1-10 scale = 0.04 alpha
+  const menuGradientEnd = hexToRgba(themeColorHex, 0.8);   // 0.8 on 1-10 scale = 0.08 alpha
+  const menuBorderColor = hexToRgba(themeColorHex, 6);     // 6 on 1-10 scale = 0.6 alpha
+
+  targetElement.style.setProperty('--o2-menu-gradient-start', menuGradientStart);
+  targetElement.style.setProperty('--o2-menu-gradient-end', menuGradientEnd);
+  targetElement.style.setProperty('--o2-menu-border-color', menuBorderColor);
+};
+
+// Function to apply all variables for the current mode
+const applyAllVariablesForCurrentMode = () => {
+  const isDarkMode = document.body.classList.contains('body--dark');
+
+  // List of all shared variable names that can appear in both modes
+  const sharedVariables = [
+    '--o2-body-primary-bg',
+    '--o2-body-secondary-bg',
+    '--o2-menu-gradient-start',
+    '--o2-menu-gradient-end',
+    '--o2-menu-border-color'
+  ];
+
+  if (isDarkMode) {
+    // Clear shared variables from :root (light mode)
+    sharedVariables.forEach(varName => {
+      document.documentElement.style.removeProperty(varName);
+    });
+    // Also clear light-specific variables
+    document.documentElement.style.removeProperty('--o2-theme-color');
+
+    // Apply all dark mode variables to body (this overrides SCSS defaults)
+    darkModeVariables.forEach(colorVar => {
+      const rgbaColor = hexToRgba(colorVar.value, colorVar.opacity);
+      document.body.style.setProperty(colorVar.name, rgbaColor);
+    });
+
+    // Apply menu variables based on dark theme color
+    const darkThemeColor = darkModeVariables.find(v => v.name === '--o2-dark-theme-color');
+    if (darkThemeColor) {
+      applyMenuVariables(darkThemeColor.value, document.body);
+    }
+  } else {
+    // Clear shared variables from body (dark mode)
+    sharedVariables.forEach(varName => {
+      document.body.style.removeProperty(varName);
+    });
+    // Also clear dark-specific variable
+    document.body.style.removeProperty('--o2-dark-theme-color');
+
+    // Apply all light mode variables to :root (this overrides SCSS defaults)
+    lightModeVariables.forEach(colorVar => {
+      const rgbaColor = hexToRgba(colorVar.value, colorVar.opacity);
+      document.documentElement.style.setProperty(colorVar.name, rgbaColor);
+    });
+
+    // Apply menu variables based on light theme color
+    const lightThemeColor = lightModeVariables.find(v => v.name === '--o2-theme-color');
+    if (lightThemeColor) {
+      applyMenuVariables(lightThemeColor.value, document.documentElement);
+    }
+  }
+
+  // Update body gradient
+  updateBodyGradient();
+};
+
+// Watch for theme changes and reapply variables
+let observer: MutationObserver | null = null;
+
+onMounted(() => {
+  // Apply initial variables for current mode
+  applyAllVariablesForCurrentMode();
+
+  // Start observing body class changes
+  observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        applyAllVariablesForCurrentMode();
+      }
+    });
+  });
+
+  observer.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['class']
+  });
+});
+
+onUnmounted(() => {
+  if (observer) {
+    observer.disconnect();
+  }
 });
 
 const openColorPicker = (colorName: string, mode: "light" | "dark") => {
@@ -297,26 +357,55 @@ const updateOpacity = (colorName: string, newOpacity: number, mode: "light" | "d
   if (colorVar) {
     colorVar.opacity = newOpacity;
     const rgbaColor = hexToRgba(colorVar.value, newOpacity);
-    document.documentElement.style.setProperty(colorName, rgbaColor);
-    console.log(`Updated ${colorName} opacity to ${newOpacity}: ${rgbaColor}`);
+
+    // Apply to the correct element based on mode
+    const targetElement = mode === "dark" && document.body.classList.contains('body--dark')
+      ? document.body
+      : document.documentElement;
+
+    targetElement.style.setProperty(colorName, rgbaColor);
+
+    // If changing theme color, update menu variables
+    if (colorName === '--o2-theme-color' || colorName === '--o2-dark-theme-color') {
+      applyMenuVariables(colorVar.value, targetElement);
+    }
 
     // If changing body backgrounds, force update the gradient
-    if (colorName === '--o2-body-primary-bg' || colorName === '--o2-body-secondary-bg' ||
-        colorName === '--o2-dark-body-primary-bg' || colorName === '--o2-dark-body-secondary-bg') {
+    if (colorName === '--o2-body-primary-bg' || colorName === '--o2-body-secondary-bg') {
       updateBodyGradient();
     }
   }
 };
 
 const updateBodyGradient = () => {
-  const primaryBg = document.documentElement.style.getPropertyValue('--o2-body-primary-bg') ||
-                    getComputedStyle(document.documentElement).getPropertyValue('--o2-body-primary-bg').trim();
-  const secondaryBg = document.documentElement.style.getPropertyValue('--o2-body-secondary-bg') ||
-                      getComputedStyle(document.documentElement).getPropertyValue('--o2-body-secondary-bg').trim();
+  const isDarkMode = document.body.classList.contains('body--dark');
 
-  const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
-  document.body.style.setProperty('background', gradient, 'important');
-  console.log('Updated body gradient:', gradient);
+  if (isDarkMode) {
+    // In dark mode, check if user has customized the background
+    const darkPrimary = darkModeVariables.find(v => v.name === '--o2-body-primary-bg');
+    const darkSecondary = darkModeVariables.find(v => v.name === '--o2-body-secondary-bg');
+
+    // Only apply gradient if user has set opacity > 0
+    if (darkPrimary && darkPrimary.opacity > 0 || darkSecondary && darkSecondary.opacity > 0) {
+      const primaryBg = darkPrimary ? hexToRgba(darkPrimary.value, darkPrimary.opacity) : 'transparent';
+      const secondaryBg = darkSecondary ? hexToRgba(darkSecondary.value, darkSecondary.opacity) : 'transparent';
+
+      const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
+      document.body.style.setProperty('background', gradient, 'important');
+    } else {
+      // Remove any custom gradient, let SCSS take over
+      document.body.style.removeProperty('background');
+    }
+  } else {
+    // In light mode, apply custom gradient
+    const lightPrimary = lightModeVariables.find(v => v.name === '--o2-body-primary-bg');
+    const lightSecondary = lightModeVariables.find(v => v.name === '--o2-body-secondary-bg');
+    const primaryBg = lightPrimary ? hexToRgba(lightPrimary.value, lightPrimary.opacity) : 'rgba(89, 155, 174, 0.1)';
+    const secondaryBg = lightSecondary ? hexToRgba(lightSecondary.value, lightSecondary.opacity) : 'rgba(89, 155, 174, 0.4)';
+
+    const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
+    document.body.style.setProperty('background', gradient, 'important');
+  }
 };
 
 const applyColor = () => {
@@ -325,12 +414,21 @@ const applyColor = () => {
   if (colorVar) {
     colorVar.value = currentColorValue.value;
     const rgbaColor = hexToRgba(colorVar.value, colorVar.opacity);
-    document.documentElement.style.setProperty(currentColorName.value, rgbaColor);
-    console.log(`Applied ${currentColorName.value}: ${rgbaColor}`);
+
+    // Apply to the correct element based on mode
+    const targetElement = currentMode.value === "dark" && document.body.classList.contains('body--dark')
+      ? document.body
+      : document.documentElement;
+
+    targetElement.style.setProperty(currentColorName.value, rgbaColor);
+
+    // If changing theme color, update menu variables
+    if (currentColorName.value === '--o2-theme-color' || currentColorName.value === '--o2-dark-theme-color') {
+      applyMenuVariables(colorVar.value, targetElement);
+    }
 
     // If changing body backgrounds, force update the gradient
-    if (currentColorName.value === '--o2-body-primary-bg' || currentColorName.value === '--o2-body-secondary-bg' ||
-        currentColorName.value === '--o2-dark-body-primary-bg' || currentColorName.value === '--o2-dark-body-secondary-bg') {
+    if (currentColorName.value === '--o2-body-primary-bg' || currentColorName.value === '--o2-body-secondary-bg') {
       updateBodyGradient();
     }
   }
