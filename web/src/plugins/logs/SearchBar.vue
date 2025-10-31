@@ -151,25 +151,6 @@ alt="SQL Mode" class="toolbar-icon" />
             {{ t("search.explainTooltip") }}
           </q-tooltip>
         </q-btn>
-        <div class="toolbar-toggle-container">
-          <q-toggle
-            data-test="logs-search-bar-show-patterns-toggle-btn"
-            v-model="searchObj.meta.showPatterns"
-            class="o2-toggle-button-xs"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-          >
-            <q-icon name="pattern" size="xs" class="toolbar-icon" />
-            <q-tooltip>
-              {{ t("search.showPatternsLabel") }}
-            </q-tooltip>
-          </q-toggle>
-        </div>
         <!-- moved to dropdown if ai chat is enabled -->
         <q-btn
           v-if="!store.state.isAiChatEnabled"
