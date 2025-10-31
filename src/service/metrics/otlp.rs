@@ -19,7 +19,7 @@ use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
 use chrono::Utc;
 use config::{
-    TIMESTAMP_COL_NAME,
+    ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     meta::{
         alerts::alert,
         otlp::OtlpRequestType,
@@ -138,6 +138,16 @@ pub async fn handle_otlp_request(
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
+
+    let mut user_defined_schema_map: std::collections::HashMap<
+        String,
+        Option<std::collections::HashSet<String>>,
+    > = std::collections::HashMap::new();
+    let mut streams_need_original_map: std::collections::HashMap<String, bool> =
+        std::collections::HashMap::new();
+    let mut streams_need_all_values_map: std::collections::HashMap<String, bool> =
+        std::collections::HashMap::new();
+    let mut original_options = Vec::new();
 
     // associated pipeline
     let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
@@ -318,6 +328,57 @@ pub async fn handle_otlp_request(
                         }
                     }
 
+                    let mut stream_params = vec![StreamParams::new(
+                        org_id,
+                        &local_metric_name,
+                        StreamType::Metrics,
+                    )];
+
+                    if let Some(exec_pl) =
+                        &stream_executable_pipelines.get(local_metric_name).unwrap()
+                    {
+                        let pl_destinations = exec_pl.get_all_destination_streams();
+                        stream_params.extend(pl_destinations);
+                    }
+
+                    // Start get user defined schema
+                    crate::service::ingestion::get_uds_and_original_data_streams(
+                        &stream_params,
+                        &mut user_defined_schema_map,
+                        &mut streams_need_original_map,
+                        &mut streams_need_all_values_map,
+                    )
+                    .await;
+                    // with pipeline, we need to store original if any of the destinations requires
+                    // original
+                    let store_original_when_pipeline_exists = stream_executable_pipelines
+                        .get(local_metric_name)
+                        .unwrap()
+                        .is_some()
+                        && streams_need_original_map.values().any(|val| *val);
+                    // End get user defined schema
+
+                    // store a copy of original data before it's being transformed and/or flattened,
+                    // when
+                    // 1. original data is an object
+                    let original_data = if stream_executable_pipelines
+                        .get(local_metric_name)
+                        .unwrap()
+                        .is_none()
+                    {
+                        // 2. current stream does not have pipeline
+                        // current stream requires original
+                        streams_need_original_map
+                            .get(local_metric_name)
+                            .is_some_and(|v| *v)
+                            .then(|| rec.to_string())
+                    } else {
+                        // 3. with pipeline, storing original as long as streams_need_original_set
+                        //    is not empty
+                        // because not sure the pipeline destinations
+                        store_original_when_pipeline_exists.then(|| rec.to_string())
+                    };
+
                     // ready to be buffered for downstream processing
                     if stream_executable_pipelines
                         .get(local_metric_name)
@@ -328,7 +389,57 @@ pub async fn handle_otlp_request(
                             .entry(local_metric_name.to_string())
                             .or_default()
                             .push(rec);
+                        original_options.push(original_data);
                     } else {
+                        let mut local_val = rec.as_object().unwrap().clone();
+                        if let Some(Some(fields)) = user_defined_schema_map.get(local_metric_name) {
+                            local_val = crate::service::logs::refactor_map(local_val, fields);
+                        }
+
+                        // add `_original` and '_record_id` if required by StreamSettings
+                        if streams_need_original_map
+                            .get(local_metric_name)
+                            .is_some_and(|v| *v)
+                            && let Some(original_data) = original_data
+                        {
+                            local_val
+                                .insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
+                            let record_id = crate::service::ingestion::generate_record_id(
+                                org_id,
+                                local_metric_name,
+                                &StreamType::Metrics,
+                            );
+                            local_val.insert(
+                                ID_COL_NAME.to_string(),
+                                json::Value::String(record_id.to_string()),
+                            );
+                        }
+
+                        // add `_all_values` if required by StreamSettings
+                        if streams_need_all_values_map
+                            .get(local_metric_name)
+                            .is_some_and(|v| *v)
+                        {
+                            let mut values = Vec::with_capacity(local_val.len());
+                            for (k, value) in local_val.iter() {
+                                if [
+                                    TIMESTAMP_COL_NAME,
+                                    ID_COL_NAME,
+                                    ORIGINAL_DATA_COL_NAME,
+                                    ALL_VALUES_COL_NAME,
+                                ]
+                                .contains(&k.as_str())
+                                {
+                                    continue;
+                                }
+                                values.push(value.to_string());
+                            }
+                            local_val.insert(
+                                ALL_VALUES_COL_NAME.to_string(),
+                                json::Value::String(values.join(" ")),
+                            );
+                        }
+                        let rec = json::Value::Object(local_val);
                         json_data_by_stream
                             .entry(local_metric_name.to_string())
                             .or_default()
@@ -370,25 +481,98 @@ pub async fn handle_otlp_request(
                         if stream_params.stream_type != StreamType::Metrics {
                             continue;
                         }
+
+                        let destination_stream = stream_params.stream_name.to_string();
+
+                        if !user_defined_schema_map.contains_key(&destination_stream) {
+                            // a new dynamically created stream. need to check the two maps again
+                            crate::service::ingestion::get_uds_and_original_data_streams(
+                                &[stream_params],
+                                &mut user_defined_schema_map,
+                                &mut streams_need_original_map,
+                                &mut streams_need_all_values_map,
+                            )
+                            .await;
+                        }
+
                         // add partition keys
-                        if !stream_partitioning_map.contains_key(stream_params.stream_name.as_str())
-                        {
+                        if !stream_partitioning_map.contains_key(destination_stream.as_str()) {
                             let partition_det =
                                 crate::service::ingestion::get_stream_partition_keys(
                                     org_id,
                                     &StreamType::Metrics,
-                                    &stream_params.stream_name,
+                                    &destination_stream,
                                 )
                                 .await;
-                            stream_partitioning_map.insert(
-                                stream_params.stream_name.to_string(),
-                                partition_det.clone(),
-                            );
+                            stream_partitioning_map
+                                .insert(destination_stream.clone(), partition_det.clone());
                         }
-                        for (_, res) in stream_pl_results {
+                        for (idx, mut res) in stream_pl_results {
+                            let mut local_val = match res.take() {
+                                json::Value::Object(val) => val,
+                                _ => unreachable!(),
+                            };
+
+                            if let Some(Some(fields)) =
+                                user_defined_schema_map.get(&destination_stream)
+                            {
+                                local_val = crate::service::logs::refactor_map(local_val, fields);
+                            }
+
+                            // usize::MAX used as a flag when pipeline is applied with ResultArray
+                            // vrl
+                            //  - invalid original_data
+                            // add `_original` and '_record_id` if required by StreamSettings
+                            if idx != usize::MAX
+                                && streams_need_original_map
+                                    .get(&destination_stream)
+                                    .is_some_and(|v| *v)
+                                && original_options[idx].is_some()
+                            {
+                                local_val.insert(
+                                    ORIGINAL_DATA_COL_NAME.to_string(),
+                                    original_options[idx].clone().unwrap().into(),
+                                );
+                                let record_id = crate::service::ingestion::generate_record_id(
+                                    org_id,
+                                    &destination_stream,
+                                    &StreamType::Metrics,
+                                );
+                                local_val.insert(
+                                    ID_COL_NAME.to_string(),
+                                    json::Value::String(record_id.to_string()),
+                                );
+                            }
+
+                            // add `_all_values` if required by StreamSettings
+                            if streams_need_all_values_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v)
+                            {
+                                let mut values = Vec::with_capacity(local_val.len());
+                                for (k, value) in local_val.iter() {
+                                    if [
+                                        TIMESTAMP_COL_NAME,
+                                        ID_COL_NAME,
+                                        ORIGINAL_DATA_COL_NAME,
+                                        ALL_VALUES_COL_NAME,
+                                    ]
+                                    .contains(&k.as_str())
+                                    {
+                                        continue;
+                                    }
+                                    values.push(value.to_string());
+                                }
+                                local_val.insert(
+                                    ALL_VALUES_COL_NAME.to_string(),
+                                    json::Value::String(values.join(" ")),
+                                );
+                            }
+
+                            let res = json::Value::Object(local_val);
                             // buffer to downstream processing directly
                             json_data_by_stream
-                                .entry(stream_params.stream_name.to_string())
+                                .entry(destination_stream.clone())
                                 .or_default()
                                 .push(res);
                         }
