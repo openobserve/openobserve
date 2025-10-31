@@ -13,26 +13,82 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ahash::{HashMap, HashMapExt};
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
-use rayon::prelude::*;
 
-use crate::service::promql::value::{InstantValue, Sample, Value};
+use crate::service::promql::{
+    aggregations::{Accumulate, AggFunc},
+    value::{EvalContext, Sample, Value},
+};
 
-pub fn avg(timestamp: i64, param: &Option<LabelModifier>, data: Value) -> Result<Value> {
-    let score_values = super::eval_arithmetic(param, data, "avg", |total, val| total + val)?;
-    if score_values.is_none() {
-        return Ok(Value::None);
+/// Aggregates Matrix input for range queries
+pub fn avg_range(
+    param: &Option<LabelModifier>,
+    data: Value,
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
+    let start = std::time::Instant::now();
+    let (input_size, timestamps_count) = match &data {
+        Value::Matrix(m) => (m.len(), eval_ctx.timestamps().len()),
+        _ => (0, 0),
+    };
+    log::info!(
+        "[PromQL Timing] avg_range() started with {input_size} series and {timestamps_count} timestamps",
+    );
+
+    let result = super::eval_arithmetic_range(param, data, Avg, eval_ctx);
+    log::info!(
+        "[PromQL Timing] avg_range() execution took: {:?}",
+        start.elapsed()
+    );
+    result
+}
+
+pub struct Avg;
+
+impl AggFunc for Avg {
+    fn name(&self) -> &'static str {
+        "avg"
     }
-    let values = score_values
-        .unwrap()
-        .into_par_iter()
-        .map(|(_, mut v)| InstantValue {
-            labels: std::mem::take(&mut v.labels),
-            sample: Sample::new(timestamp, v.value / v.num as f64),
-        })
-        .collect();
-    Ok(Value::Vector(values))
+
+    fn build(&self) -> Box<dyn super::Accumulate> {
+        Box::new(AvgAccumulate::new())
+    }
+}
+
+pub struct AvgAccumulate {
+    sum: HashMap<i64, f64>,
+    count: HashMap<i64, usize>,
+}
+
+impl AvgAccumulate {
+    fn new() -> Self {
+        AvgAccumulate {
+            sum: HashMap::new(),
+            count: HashMap::new(),
+        }
+    }
+}
+
+impl Accumulate for AvgAccumulate {
+    fn accumulate(&mut self, sample: &Sample) {
+        let sum_entry = self.sum.entry(sample.timestamp).or_insert(0.0);
+        *sum_entry += sample.value;
+        let count_entry = self.count.entry(sample.timestamp).or_insert(0);
+        *count_entry += 1;
+    }
+
+    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+        self.sum
+            .into_iter()
+            .filter_map(|(timestamp, sum)| {
+                self.count
+                    .get(&timestamp)
+                    .map(|&count| Sample::new(timestamp, sum / count as f64))
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -40,13 +96,13 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::service::promql::value::{InstantValue, Label, Sample, Value};
+    use crate::service::promql::value::{Label, RangeValue, Sample, Value};
 
     #[test]
-    fn test_avg_function() {
+    fn test_avg_range_function() {
         let timestamp = 1640995200; // 2022-01-01 00:00:00 UTC
 
-        // Create test data with multiple samples
+        // Create test data with multiple samples as Matrix (range query format)
         let labels1 = vec![
             Arc::new(Label::new("instance", "server1")),
             Arc::new(Label::new("job", "node_exporter")),
@@ -57,34 +113,43 @@ mod tests {
             Arc::new(Label::new("job", "node_exporter")),
         ];
 
-        let data = Value::Vector(vec![
-            InstantValue {
+        let data = Value::Matrix(vec![
+            RangeValue {
                 labels: labels1.clone(),
-                sample: Sample::new(timestamp, 10.0),
+                samples: vec![Sample::new(timestamp, 10.0)],
+                exemplars: None,
+                time_window: None,
             },
-            InstantValue {
+            RangeValue {
                 labels: labels1.clone(),
-                sample: Sample::new(timestamp, 20.0),
+                samples: vec![Sample::new(timestamp, 20.0)],
+                exemplars: None,
+                time_window: None,
             },
-            InstantValue {
+            RangeValue {
                 labels: labels2.clone(),
-                sample: Sample::new(timestamp, 30.0),
+                samples: vec![Sample::new(timestamp, 30.0)],
+                exemplars: None,
+                time_window: None,
             },
         ]);
 
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+
         // Test avg without label grouping - all samples should be averaged together
-        let result = avg(timestamp, &None, data.clone()).unwrap();
+        let result = avg_range(&None, data.clone(), &eval_ctx).unwrap();
 
         match result {
-            Value::Vector(values) => {
-                assert_eq!(values.len(), 1);
+            Value::Matrix(matrix) => {
+                assert_eq!(matrix.len(), 1);
+                let series = &matrix[0];
                 // All samples are grouped together when no label modifier is provided
-                assert_eq!(values[0].sample.value, 20.0); // (10 + 20 + 30) / 3
-                assert_eq!(values[0].sample.timestamp, timestamp);
+                assert_eq!(series.samples[0].value, 20.0); // (10 + 20 + 30) / 3
+                assert_eq!(series.samples[0].timestamp, timestamp);
                 // Should have empty labels since all samples are grouped together
-                assert!(values[0].labels.is_empty());
+                assert!(series.labels.is_empty());
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }

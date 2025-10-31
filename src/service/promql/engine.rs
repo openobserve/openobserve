@@ -706,43 +706,71 @@ impl Engine {
         param: &Option<Box<PromExpr>>,
         modifier: &Option<LabelModifier>,
     ) -> Result<Value> {
-        let sample_time = self.time;
         let input = self.exec_expr(expr).await?;
 
+        // Create an eval context if we don't have one (for instant queries)
+        let eval_ctx = self.eval_ctx.as_ref().cloned().unwrap();
+
         Ok(match op.id() {
-            token::T_SUM => {
-                // Use range version if we have an eval context
-                if let Some(ref eval_ctx) = self.eval_ctx {
-                    aggregations::sum_range(modifier, input, eval_ctx)?
-                } else {
-                    aggregations::sum(sample_time, modifier, input)?
-                }
-            }
-            token::T_AVG => aggregations::avg(sample_time, modifier, input)?,
-            token::T_COUNT => aggregations::count(sample_time, modifier, input)?,
-            token::T_MIN => aggregations::min(sample_time, modifier, input)?,
-            token::T_MAX => aggregations::max(sample_time, modifier, input)?,
-            token::T_GROUP => aggregations::group(sample_time, modifier, input)?,
-            token::T_STDDEV => aggregations::stddev(sample_time, modifier, input)?,
-            token::T_STDVAR => aggregations::stdvar(sample_time, modifier, input)?,
+            token::T_SUM => aggregations::sum_range(modifier, input, &eval_ctx)?,
+            token::T_AVG => aggregations::avg_range(modifier, input, &eval_ctx)?,
+            token::T_COUNT => aggregations::count_range(modifier, input, &eval_ctx)?,
+            token::T_MIN => aggregations::min_range(modifier, input, &eval_ctx)?,
+            token::T_MAX => aggregations::max_range(modifier, input, &eval_ctx)?,
+            token::T_GROUP => aggregations::group_range(modifier, input, &eval_ctx)?,
+            token::T_STDDEV => aggregations::stddev_range(modifier, input, &eval_ctx)?,
+            token::T_STDVAR => aggregations::stdvar_range(modifier, input, &eval_ctx)?,
             token::T_TOPK => {
-                aggregations::topk(self, param.clone().unwrap(), modifier, input).await?
+                let param_expr = param.clone().unwrap();
+                let k_value = self.exec_expr(&param_expr).await?;
+                let k = match k_value {
+                    Value::Float(f) => f as usize,
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "[topk] param must be a number".to_string(),
+                        ));
+                    }
+                };
+                aggregations::topk_range(k, modifier, input, &eval_ctx)?
             }
             token::T_BOTTOMK => {
-                aggregations::bottomk(self, param.clone().unwrap(), modifier, input).await?
+                let param_expr = param.clone().unwrap();
+                let k_value = self.exec_expr(&param_expr).await?;
+                let k = match k_value {
+                    Value::Float(f) => f as usize,
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "[bottomk] param must be a number".to_string(),
+                        ));
+                    }
+                };
+                aggregations::bottomk_range(k, modifier, input, &eval_ctx)?
             }
             token::T_COUNT_VALUES => {
-                aggregations::count_values(
-                    self,
-                    sample_time,
-                    param.clone().unwrap(),
-                    modifier,
-                    input,
-                )
-                .await?
+                let param_expr = param.clone().unwrap();
+                let label_name = self.exec_expr(&param_expr).await?;
+                let label_name_str = match label_name {
+                    Value::String(s) => s,
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "[count_values] param must be a string".to_string(),
+                        ));
+                    }
+                };
+                aggregations::count_values_range(&label_name_str, modifier, input, &eval_ctx)?
             }
             token::T_QUANTILE => {
-                aggregations::quantile(self, sample_time, param.clone().unwrap(), input).await?
+                let param_expr = param.clone().unwrap();
+                let qtile_value = self.exec_expr(&param_expr).await?;
+                let qtile = match qtile_value {
+                    Value::Float(f) => f,
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "[quantile] param must be a number".to_string(),
+                        ));
+                    }
+                };
+                aggregations::quantile_range(qtile, input, &eval_ctx)?
             }
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(

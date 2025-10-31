@@ -13,26 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ahash::{HashMap, HashMapExt};
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
 
 use crate::service::promql::{
-    aggregations::score_to_instant_value,
-    value::{EvalContext, Value},
+    aggregations::{Accumulate, AggFunc},
+    value::{EvalContext, Sample, Value},
 };
 
-pub fn sum(timestamp: i64, param: &Option<LabelModifier>, data: Value) -> Result<Value> {
-    let score_values = super::eval_arithmetic(param, data, "sum", |total, val| total + val)?;
-    if score_values.is_none() {
-        return Ok(Value::None);
-    }
-    Ok(Value::Vector(score_to_instant_value(
-        timestamp,
-        score_values,
-    )))
-}
-
-/// Range version that processes Matrix input for range queries
+/// Aggregates Matrix input for range queries
 pub fn sum_range(
     param: &Option<LabelModifier>,
     data: Value,
@@ -44,18 +34,53 @@ pub fn sum_range(
         _ => (0, 0),
     };
     log::info!(
-        "[PromQL Timing] sum_range() started with {} series and {} timestamps",
-        input_size,
-        timestamps_count
+        "[PromQL Timing] sum_range() started with {input_size} series and {timestamps_count} timestamps",
     );
 
-    let result =
-        super::eval_arithmetic_range(param, data, "sum", |total, val| total + val, eval_ctx);
+    let result = super::eval_arithmetic_range(param, data, Sum, eval_ctx);
     log::info!(
         "[PromQL Timing] sum_range() execution took: {:?}",
         start.elapsed()
     );
     result
+}
+
+pub struct Sum;
+
+impl AggFunc for Sum {
+    fn name(&self) -> &'static str {
+        "sum"
+    }
+
+    fn build(&self) -> Box<dyn super::Accumulate> {
+        Box::new(SumAccumulate::new())
+    }
+}
+
+pub struct SumAccumulate {
+    sum: HashMap<i64, f64>,
+}
+
+impl SumAccumulate {
+    fn new() -> Self {
+        SumAccumulate {
+            sum: HashMap::new(),
+        }
+    }
+}
+
+impl Accumulate for SumAccumulate {
+    fn accumulate(&mut self, sample: &Sample) {
+        let entry = self.sum.entry(sample.timestamp).or_insert(0.0);
+        *entry += sample.value;
+    }
+
+    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+        self.sum
+            .into_iter()
+            .map(|(timestamp, value)| Sample::new(timestamp, value))
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -65,53 +90,7 @@ mod tests {
     use promql_parser::parser::LabelModifier;
 
     use super::*;
-    use crate::service::promql::value::{InstantValue, Label, RangeValue, Sample, Value};
-
-    #[test]
-    fn test_sum_function() {
-        let timestamp = 1640995200; // 2022-01-01 00:00:00 UTC
-
-        // Create test data with multiple samples
-        let labels1 = vec![
-            Arc::new(Label::new("instance", "server1")),
-            Arc::new(Label::new("job", "node_exporter")),
-        ];
-
-        let labels2 = vec![
-            Arc::new(Label::new("instance", "server2")),
-            Arc::new(Label::new("job", "node_exporter")),
-        ];
-
-        let data = Value::Vector(vec![
-            InstantValue {
-                labels: labels1.clone(),
-                sample: Sample::new(timestamp, 10.5),
-            },
-            InstantValue {
-                labels: labels1.clone(),
-                sample: Sample::new(timestamp, 15.3),
-            },
-            InstantValue {
-                labels: labels2.clone(),
-                sample: Sample::new(timestamp, 8.2),
-            },
-        ]);
-
-        // Test sum without label grouping - all samples should be summed together
-        let result = sum(timestamp, &None, data.clone()).unwrap();
-
-        match result {
-            Value::Vector(values) => {
-                assert_eq!(values.len(), 1);
-                // All samples are grouped together when no label modifier is provided
-                assert_eq!(values[0].sample.value, 34.0); // 10.5 + 15.3 + 8.2
-                assert_eq!(values[0].sample.timestamp, timestamp);
-                // Should have empty labels since all samples are grouped together
-                assert!(values[0].labels.is_empty());
-            }
-            _ => panic!("Expected Vector result"),
-        }
-    }
+    use crate::service::promql::value::{Label, RangeValue, Sample, Value};
 
     #[test]
     fn test_sum_range_function() {

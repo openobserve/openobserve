@@ -13,55 +13,90 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ahash::{HashMap, HashMapExt};
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::Expr as PromExpr;
-use rayon::prelude::*;
 
 use crate::service::promql::{
-    Engine, aggregations::prepare_vector, common::quantile as calculate_quantile, value::Value,
+    aggregations::{Accumulate, AggFunc},
+    common::quantile as calculate_quantile,
+    value::{EvalContext, Sample, Value},
 };
 
-pub async fn quantile(
-    ctx: &mut Engine,
-    timestamp: i64,
-    param: Box<PromExpr>,
-    data: Value,
-) -> Result<Value> {
-    let param = ctx.exec_expr(&param).await?;
-    let qtile = match param {
-        Value::Float(v) => v,
-        _ => {
-            return Err(DataFusionError::Plan(
-                "[quantile] param must be a NumberLiteral".to_string(),
-            ));
-        }
+/// Aggregates Matrix input for range queries
+/// Note: quantile aggregates all series into a single result (no label grouping)
+pub fn quantile_range(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    let (input_size, timestamps_count) = match &data {
+        Value::Matrix(m) => (m.len(), eval_ctx.timestamps().len()),
+        _ => (0, 0),
     };
-    let data = match data {
-        Value::Vector(v) => v,
-        Value::None => return Ok(Value::None),
-        _ => {
-            return Err(DataFusionError::Plan(
-                "[quantile] function only accept vector values".to_string(),
-            ));
-        }
-    };
+    log::info!(
+        "[PromQL Timing] quantile_range({qtile}) started with {input_size} series and {timestamps_count} timestamps",
+    );
 
-    if qtile < 0 as f64 || qtile > 1_f64 || qtile.is_nan() {
-        let value = match qtile.signum() as i32 {
-            1 => f64::INFINITY,
-            -1 => f64::NEG_INFINITY,
-            _ => f64::NAN,
-        };
-        return prepare_vector(timestamp, value);
+    // Validate quantile parameter
+    if !(0.0..=1.0).contains(&qtile) || qtile.is_nan() {
+        return Err(DataFusionError::Plan(format!(
+            "[quantile] parameter must be between 0 and 1, got {qtile}"
+        )));
     }
 
-    if data.is_empty() {
-        return prepare_vector(timestamp, f64::NAN);
+    let result = super::eval_arithmetic_range(&None, data, Quantile { qtile }, eval_ctx);
+    log::info!(
+        "[PromQL Timing] quantile_range({qtile}) execution took: {:?}",
+        start.elapsed()
+    );
+    result
+}
+
+pub struct Quantile {
+    qtile: f64,
+}
+
+impl AggFunc for Quantile {
+    fn name(&self) -> &'static str {
+        "quantile"
     }
 
-    let values: Vec<f64> = data.into_par_iter().map(|item| item.sample.value).collect();
-    let quantile_value = calculate_quantile(&values, qtile).unwrap();
-    prepare_vector(timestamp, quantile_value)
+    fn build(&self) -> Box<dyn super::Accumulate> {
+        Box::new(QuantileAccumulate::new(self.qtile))
+    }
+}
+
+pub struct QuantileAccumulate {
+    qtile: f64,
+    // Store all values per timestamp for quantile calculation
+    values: HashMap<i64, Vec<f64>>,
+}
+
+impl QuantileAccumulate {
+    fn new(qtile: f64) -> Self {
+        QuantileAccumulate {
+            qtile,
+            values: HashMap::new(),
+        }
+    }
+}
+
+impl Accumulate for QuantileAccumulate {
+    fn accumulate(&mut self, sample: &Sample) {
+        let entry = self.values.entry(sample.timestamp).or_default();
+        entry.push(sample.value);
+    }
+
+    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+        self.values
+            .into_iter()
+            .filter_map(|(timestamp, values)| {
+                if values.is_empty() {
+                    return Some(Sample::new(timestamp, f64::NAN));
+                }
+                // Calculate quantile
+                calculate_quantile(&values, self.qtile)
+                    .map(|quantile_val| Sample::new(timestamp, quantile_val))
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]

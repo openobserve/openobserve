@@ -13,38 +13,145 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::error::Result;
-use promql_parser::parser::{Expr as PromExpr, LabelModifier};
+use config::utils::sort::sort_float;
+use datafusion::error::{DataFusionError, Result};
+use promql_parser::parser::LabelModifier;
+use rayon::prelude::*;
 
-use crate::service::promql::{Engine, value::Value};
+use crate::service::promql::value::{EvalContext, RangeValue, Value};
 
-pub async fn bottomk(
-    ctx: &mut Engine,
-    param: Box<PromExpr>,
+/// Aggregates Matrix input for range queries
+/// For each timestamp, selects the bottom K series by value
+pub fn bottomk_range(
+    k: usize,
     modifier: &Option<LabelModifier>,
     data: Value,
+    eval_ctx: &EvalContext,
 ) -> Result<Value> {
-    super::eval_top(ctx, param, data, modifier, true).await
+    let start = std::time::Instant::now();
+    let matrix = match data {
+        Value::Matrix(m) => m,
+        Value::None => return Ok(Value::None),
+        _ => {
+            return Err(DataFusionError::Plan(
+                "[bottomk] function only accept matrix values".to_string(),
+            ));
+        }
+    };
+
+    if matrix.is_empty() || k == 0 {
+        return Ok(Value::None);
+    }
+
+    log::info!(
+        "[PromQL Timing] bottomk_range(k={}) started with {} series and {} timestamps",
+        k,
+        matrix.len(),
+        eval_ctx.timestamps().len()
+    );
+
+    // For bottomk, we select the bottom k series at each timestamp
+    // We need to preserve the original series structure
+    let eval_timestamps: ahash::HashSet<i64> = eval_ctx.timestamps().iter().cloned().collect();
+
+    // Group series by label modifier
+    let grouped_series = super::group_series_by_labels(&matrix, modifier);
+
+    // Process each group
+    let result: Vec<RangeValue> = grouped_series
+        .par_iter()
+        .flat_map(|(_, series_indices)| {
+            // For each timestamp, select bottom k series from this group
+            select_bottomk_series(&matrix, series_indices, k, &eval_timestamps)
+        })
+        .collect();
+
+    log::info!(
+        "[PromQL Timing] bottomk_range(k={}) completed in {:?}, produced {} series",
+        k,
+        start.elapsed(),
+        result.len()
+    );
+
+    if result.is_empty() {
+        Ok(Value::None)
+    } else {
+        Ok(Value::Matrix(result))
+    }
+}
+
+// Helper function to select bottom k series at each timestamp
+fn select_bottomk_series(
+    matrix: &[RangeValue],
+    series_indices: &[usize],
+    k: usize,
+    eval_timestamps: &ahash::HashSet<i64>,
+) -> Vec<RangeValue> {
+    // For bottomk, we keep the original series but only include timestamps
+    // where they are in the bottom k
+    let mut result = Vec::new();
+
+    for &series_idx in series_indices {
+        let series = &matrix[series_idx];
+        let mut filtered_samples = Vec::new();
+
+        // Group samples by timestamp and compare
+        for sample in &series.samples {
+            if !eval_timestamps.contains(&sample.timestamp) {
+                continue;
+            }
+
+            // Check if this sample is in bottom k at this timestamp
+            let mut values_at_timestamp: Vec<(usize, f64)> = series_indices
+                .iter()
+                .filter_map(|&idx| {
+                    matrix[idx]
+                        .samples
+                        .iter()
+                        .find(|s| s.timestamp == sample.timestamp)
+                        .map(|s| (idx, s.value))
+                })
+                .collect();
+
+            // Sort by value (ascending for bottom k)
+            values_at_timestamp.sort_by(|(_, a), (_, b)| sort_float(a, b));
+
+            // Check if current series is in bottom k
+            let is_in_bottomk = values_at_timestamp
+                .iter()
+                .take(k)
+                .any(|(idx, _)| *idx == series_idx);
+
+            if is_in_bottomk {
+                filtered_samples.push(*sample);
+            }
+        }
+
+        if !filtered_samples.is_empty() {
+            result.push(RangeValue {
+                labels: series.labels.clone(),
+                samples: filtered_samples,
+                exemplars: series.exemplars.clone(),
+                time_window: series.time_window.clone(),
+            });
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use std::sync::Arc;
 
-    use promql_parser::parser::{Expr as PromExpr, NumberLiteral};
-    use tonic::async_trait;
-
     use super::*;
-    use crate::service::promql::{
-        exec::PromqlContext,
-        value::{InstantValue, Label, Sample, Value},
-    };
+    use crate::service::promql::value::{Label, RangeValue, Sample, Value};
 
-    #[tokio::test]
-    async fn test_bottomk_function() {
+    #[test]
+    fn test_bottomk_range_function() {
         let timestamp = 1640995200; // 2022-01-01 00:00:00 UTC
 
-        // Create test data with multiple samples
+        // Create test data with multiple samples as Matrix (range query format)
         let labels1 = vec![
             Arc::new(Label::new("instance", "server1")),
             Arc::new(Label::new("job", "node_exporter")),
@@ -60,99 +167,93 @@ pub(crate) mod tests {
             Arc::new(Label::new("job", "node_exporter")),
         ];
 
-        let data = Value::Vector(vec![
-            InstantValue {
+        let data = Value::Matrix(vec![
+            RangeValue {
                 labels: labels1.clone(),
-                sample: Sample::new(timestamp, 15.3), // Highest value
+                samples: vec![Sample::new(timestamp, 15.3)], // Highest value
+                exemplars: None,
+                time_window: None,
             },
-            InstantValue {
-                labels: labels1.clone(),
-                sample: Sample::new(timestamp, 10.5), // Middle value
-            },
-            InstantValue {
+            RangeValue {
                 labels: labels2.clone(),
-                sample: Sample::new(timestamp, 8.2), // Lowest value
+                samples: vec![Sample::new(timestamp, 8.2)], // Lowest value
+                exemplars: None,
+                time_window: None,
             },
-            InstantValue {
+            RangeValue {
                 labels: labels3.clone(),
-                sample: Sample::new(timestamp, 12.1), // Second lowest
+                samples: vec![Sample::new(timestamp, 12.1)], // Middle value
+                exemplars: None,
+                time_window: None,
             },
         ]);
 
-        // Create a mock Engine context
-        let ctx = Arc::new(PromqlContext::new("test_org", MockTableProvider, false, 30));
-        let mut engine = Engine::new("test_trace", ctx, timestamp);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
 
         // Test bottomk(2) without label grouping - should return 2 lowest values
-        let param = Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 }));
-        let result = bottomk(&mut engine, param, &None, data.clone())
-            .await
-            .unwrap();
+        let result = bottomk_range(2, &None, data.clone(), &eval_ctx).unwrap();
 
         match result {
-            Value::Vector(values) => {
-                assert_eq!(values.len(), 2);
-                // Should return the 2 lowest values: 8.2 and 10.5
-                let values_sorted: Vec<f64> = values.iter().map(|v| v.sample.value).collect();
-                assert!(values_sorted.contains(&8.2));
-                assert!(values_sorted.contains(&10.5));
-                assert!(!values_sorted.contains(&15.3)); // Should not contain highest
-                assert!(!values_sorted.contains(&12.1)); // Should not contain this one
+            Value::Matrix(matrix) => {
+                assert_eq!(matrix.len(), 2);
+                // Should return the 2 lowest values: 8.2 and 12.1
+                let mut values: Vec<f64> = matrix.iter().map(|s| s.samples[0].value).collect();
+                values.sort_by(|a, b| a.partial_cmp(b).unwrap()); // Sort ascending
+                assert_eq!(values[0], 8.2); // Lowest
+                assert_eq!(values[1], 12.1); // Second lowest
 
                 // All samples should have the same timestamp
-                for value in &values {
-                    assert_eq!(value.sample.timestamp, timestamp);
+                for series in &matrix {
+                    assert_eq!(series.samples[0].timestamp, timestamp);
                 }
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_bottomk_empty_input() {
+    #[test]
+    fn test_bottomk_range_empty_input() {
         let timestamp = 1640995200;
 
         // Create empty data
-        let data = Value::Vector(vec![]);
+        let data = Value::Matrix(vec![]);
 
-        // Create a mock Engine context
-        let ctx = Arc::new(PromqlContext::new("test_org", MockTableProvider, false, 30));
-        let mut engine = Engine::new("test_trace", ctx, timestamp);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
 
         // Test bottomk(2) with empty input
-        let param = Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 }));
-        let result = bottomk(&mut engine, param, &None, data).await.unwrap();
+        let result = bottomk_range(2, &None, data, &eval_ctx).unwrap();
 
         match result {
-            Value::Vector(values) => {
-                assert_eq!(values.len(), 0); // Should return empty vector
+            Value::None => {
+                // Should return None for empty input
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected None result for empty input"),
         }
     }
 
-    // Mock TableProvider for testing
-    pub struct MockTableProvider;
+    #[test]
+    fn test_bottomk_range_k_zero() {
+        let timestamp = 1640995200;
 
-    #[async_trait]
-    impl crate::service::promql::TableProvider for MockTableProvider {
-        async fn create_context(
-            &self,
-            _org_id: &str,
-            _stream_name: &str,
-            _time_range: (i64, i64),
-            _machers: promql_parser::label::Matchers,
-            _label_selector: Option<std::collections::HashSet<String>>,
-            _filters: &mut [(String, Vec<String>)],
-        ) -> datafusion::error::Result<
-            Vec<(
-                datafusion::prelude::SessionContext,
-                std::sync::Arc<arrow::datatypes::Schema>,
-                config::meta::search::ScanStats,
-            )>,
-        > {
-            // Return empty result for testing
-            Ok(vec![])
+        let labels = vec![Arc::new(Label::new("instance", "server1"))];
+
+        let data = Value::Matrix(vec![RangeValue {
+            labels: labels.clone(),
+            samples: vec![Sample::new(timestamp, 10.5)],
+            exemplars: None,
+            time_window: None,
+        }]);
+
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+
+        // Test bottomk(0) - should return None
+        let result = bottomk_range(0, &None, data, &eval_ctx).unwrap();
+
+        match result {
+            Value::None => {
+                // Should return None when k=0
+            }
+            _ => panic!("Expected None result when k=0"),
         }
     }
 }
