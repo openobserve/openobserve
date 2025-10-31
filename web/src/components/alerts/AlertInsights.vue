@@ -236,7 +236,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Dashboard Content -->
-    <div class="dashboard-content q-pa-md">
+    <div
+      class="dashboard-content q-pa-md"
+      @contextmenu="handleNativeContextMenu"
+    >
       <div v-show="isLoading" class="loading-container flex items-center justify-center">
         <q-spinner-hourglass color="primary" size="40px" />
         <div class="q-ml-md">Loading insights...</div>
@@ -274,7 +277,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :panel-id="contextMenu.panelId"
       @close="contextMenu.show = false"
       @filter="handleContextMenuFilter"
-      @select-alert="handleSelectAlert"
+      @configure-dedup="handleConfigureDedup"
+      @edit-alert="handleEditAlert"
+      @view-history="handleViewHistory"
     />
   </div>
 </template>
@@ -292,6 +297,7 @@ import { useAlertInsights } from "@/composables/useAlertInsights";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import insightsConfig from "@/utils/alerts/insights-metrics.json";
 import config from "@/aws-exports";
+import alertsService from "@/services/alerts";
 
 const router = useRouter();
 const route = useRoute();
@@ -322,6 +328,7 @@ const dateTimeRef = ref(null);
 const currentTab = ref("overview");
 const selectedAlertForAction = ref<string | null>(null);
 const dashboardData = ref<any>(null); // Store dashboard config as ref instead of computed
+const alertsList = ref<any[]>([]); // Cache alerts list
 
 // Provide selectedTabId to RenderDashboardCharts
 provide("selectedTabId", currentTab);
@@ -365,20 +372,12 @@ const loadDashboard = () => {
   const baseFilters = getBaseFilters();
   const org = store.state.selectedOrganization.identifier;
 
-  console.log("[AlertInsights] Building dashboard config", {
-    currentTab: currentTab.value,
-    org,
-    baseFilters,
-    timeRange: timeRange.value
-  });
-
   // Find the current tab
   const currentTabData = config.tabs?.find(
     (tab: any) => tab.tabId === currentTab.value
   );
 
   if (!currentTabData) {
-    console.warn("[AlertInsights] Tab not found:", currentTab.value);
     dashboardData.value = config;
     return;
   }
@@ -411,14 +410,6 @@ const loadDashboard = () => {
         const additionalClause = allFilters.length > 0 ? `AND ${allFilters.join(" AND ")}` : "";
         query = query.replace(/\[WHERE_CLAUSE_ADDITIONAL\]/g, additionalClause);
 
-        console.log("[AlertInsights] Panel query", {
-          panel: panel.title,
-          originalQuery: panel.queries[0].query,
-          modifiedQuery: query,
-          whereClause,
-          additionalClause
-        });
-
         panel.queries[0].query = query;
 
         // Update stream to query "triggers"
@@ -436,17 +427,32 @@ const loadDashboard = () => {
     tabs: [currentTabData],
   };
 
-  console.log("[AlertInsights] Final dashboard config:", result);
-  console.log("[AlertInsights] Panels count:", currentTabData.panels?.length);
-  console.log("[AlertInsights] First panel:", currentTabData.panels?.[0]);
-  console.log("[AlertInsights] Time range being passed:", timeRange.value);
-  console.log("[AlertInsights] Dashboard ID:", result.dashboardId);
-  console.log("[AlertInsights] Tab ID:", currentTabData.tabId);
-
   dashboardData.value = result;
 };
 
 // Methods
+const fetchAlerts = async () => {
+  try {
+    const res = await alertsService.listByFolderId(
+      1,
+      10000, // Fetch all alerts
+      "name",
+      false,
+      "",
+      "default",//store.state.selectedOrganization.identifier,
+      "", // Empty folder to get all alerts
+      ""
+    );
+    alertsList.value = res.data.list || [];
+  } catch (error) {
+    $q.notify({
+      type: "negative",
+      message: "Failed to load alerts",
+      timeout: 2000,
+    });
+  }
+};
+
 const goBack = () => {
   router.push({ name: "alertList" });
 };
@@ -502,6 +508,52 @@ const onDataZoom = (data: any) => {
   refreshDashboard();
 };
 
+const handleNativeContextMenu = (event: MouseEvent) => {
+  // Only handle context menu on Frequency & Dedup tab
+  if (currentTab.value !== 'frequency') {
+    return; // Let other handlers or default behavior work
+  }
+
+  const target = event.target as HTMLElement;
+
+  // Find if we clicked on a table cell
+  const tableCell = target.closest('td');
+  if (!tableCell) {
+    return; // Not a table cell, let default behavior work
+  }
+
+  // Get the text content of the cell (this is the alert key)
+  const alertKey = tableCell.textContent?.trim();
+
+  // Extract alert name (remove the /unique_id part)
+  // Format: alert_name/unique_id -> alert_name
+  const alertName = alertKey?.split('/')[0];
+
+  // Check if this is the "Alert Key" column (first column in Dedup table)
+  const cellIndex = Array.from(tableCell.parentElement?.children || []).indexOf(tableCell);
+
+  // Only show context menu for the first column (Alert Key column)
+  if (cellIndex === 0 && alertName && alertName.length > 0) {
+    // ONLY prevent default if we're showing our custom menu
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Find the panel title from dashboard data
+    const currentTabData = dashboardData.value?.tabs?.[0];
+    const dedupPanel = currentTabData?.panels?.find((p: any) =>
+      p.title?.includes('Dedup')
+    );
+
+    contextMenu.show = true;
+    contextMenu.x = event.clientX;
+    contextMenu.y = event.clientY;
+    contextMenu.value = alertName;
+    contextMenu.panelId = dedupPanel?.id || '';
+    contextMenu.panelTitle = dedupPanel?.title || 'Dedup Impact Analysis';
+  }
+  // If not first column or no alert name, let default context menu show
+};
+
 const handleChartContextMenu = (event: any) => {
   const { x, y, value, panelId, panel } = event;
 
@@ -525,9 +577,81 @@ const handleContextMenuFilter = (filter: any) => {
   refreshDashboard();
 };
 
-const handleSelectAlert = (alertName: string) => {
-  selectedAlertForAction.value = alertName;
-  contextMenu.show = false;
+const handleConfigureDedup = async (alertName: string) => {
+  try {
+    // Use cached alerts list
+    const alert = alertsList.value.find((a: any) => a.name === alertName);
+
+    if (!alert) {
+      $q.notify({
+        type: "negative",
+        message: `Alert "${alertName}" not found in ${alertsList.value.length} alerts`,
+        timeout: 3000,
+      });
+      return;
+    }
+
+    // Navigate to alert edit page with dedup section
+    await router.push({
+      name: "alertList",
+      query: {
+        action: "update",
+        alert_id: alert.alert_id, // Use alert_id instead of id
+        name: alert.name,
+        org_identifier: store.state.selectedOrganization.identifier,
+        folder: alert.folder_id || "default",
+        section: "dedup",
+      },
+    });
+  } catch (error) {
+    $q.notify({
+      type: "negative",
+      message: "Failed to navigate to alert",
+      timeout: 2000,
+    });
+  }
+};
+
+const handleEditAlert = async (alertName: string) => {
+  try {
+    // Use cached alerts list
+    const alert = alertsList.value.find((a: any) => a.name === alertName);
+
+    if (!alert) {
+      $q.notify({
+        type: "negative",
+        message: "Alert not found",
+        timeout: 2000,
+      });
+      return;
+    }
+
+    await router.push({
+      name: "alertList",
+      query: {
+        action: "update",
+        alert_id: alert.alert_id, // Use alert_id instead of id
+        name: alert.name,
+        org_identifier: store.state.selectedOrganization.identifier,
+        folder: alert.folder_id || "default",
+      },
+    });
+  } catch (error) {
+    $q.notify({
+      type: "negative",
+      message: "Failed to navigate to alert",
+      timeout: 2000,
+    });
+  }
+};
+
+const handleViewHistory = (alertName: string) => {
+  router.push({
+    name: "alertHistory",
+    query: {
+      alert_name: alertName,
+    },
+  });
 };
 
 const formatFilterValue = (value: number): string => {
@@ -597,6 +721,9 @@ onMounted(async () => {
   if (route.query.tab) {
     currentTab.value = route.query.tab as string;
   }
+
+  // Fetch alerts list once on mount
+  await fetchAlerts();
 
   // Load initial dashboard data
   loadDashboard();
