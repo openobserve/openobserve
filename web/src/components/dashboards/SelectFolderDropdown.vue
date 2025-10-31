@@ -153,3 +153,10 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped lang="scss">
+.q-select .q-field__control-container .q-field__native {
+  height: 1rem !important;
+  min-height: 1rem !important;
+}
+</style>
