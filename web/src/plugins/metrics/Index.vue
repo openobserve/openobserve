@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #after>
-              <div class="row card-container tw-ml-[0.625rem]">
+              <div class="row card-container">
                 <div
                   class="row"
                   style="height: calc(100vh - 106px); overflow-y: auto"

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
     <q-separator />
-    <q-card-section class="q-px-md q-py-sm">
+    <q-card-section class="q-px-md q-py-sm add-dashboard-form-card-section">
       <q-form ref="addDashboardForm" @submit.stop="onSubmit.execute">
         <q-input
           v-if="beingUpdated"
@@ -272,3 +272,10 @@ export default defineComponent({
   components: { SelectFolderDropdown },
 });
 </script>
+<style lang="scss">
+.add-dashboard-form-card-section {
+  .add-folder-btn {
+    margin-top: 36px !important;
+  }
+}
+</style>
