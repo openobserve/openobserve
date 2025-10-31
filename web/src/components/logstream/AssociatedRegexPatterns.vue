@@ -74,7 +74,7 @@
                             @filter-method="handleFilterMethod"
                           >
                             <template v-slot:body="props">
-                              <q-tr :data-test="`associated-regex-patterns-applied-patterns-table-row-${props.row.pattern_id}`" class="tw-cursor-pointer " :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'dark-selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'light-selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
+                              <q-tr :data-test="`associated-regex-patterns-applied-patterns-table-row-${props.row.pattern_id}`" class="tw-cursor-pointer " :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
                                 <q-td :data-test="`associated-regex-patterns-applied-patterns-table-cell-${props.row.pattern_id}`" class="tw-flex tw-justify-between tw-items-center" style="border-bottom: 0px; font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px;" :props="props" key="pattern_name">
                                   <span class="regex-pattern-name">
                                     {{ props.row.pattern_name }}
@@ -117,7 +117,7 @@
                             @:filter-method="handleFilterMethod"
                           >
                           <template v-slot:body="props">
-                              <q-tr :data-test="`associated-regex-patterns-all-patterns-table-row-${props.row.pattern_id}`" style="padding: 8px 0px !important;"  class="tw-cursor-pointer" :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'dark-selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'light-selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
+                              <q-tr :data-test="`associated-regex-patterns-all-patterns-table-row-${props.row.pattern_id}`" style="padding: 8px 0px !important;"  class="tw-cursor-pointer" :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
                                 <q-td :data-test="`associated-regex-patterns-all-patterns-table-cell-${props.row.pattern_id}`" class="tw-flex tw-justify-between tw-items-center " style="border-bottom: 0px;  font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px; " :props="props" key="pattern_name">
                                  <span class="regex-pattern-name">{{ props.row.pattern_name }}</span> 
                                   <span v-if="checkIfPatternIsApplied(props.row.pattern_id)">
@@ -235,7 +235,7 @@
                   </span>
                 </div>
                 <div class="tw-h-[19px] -tw-mb-1 tw-flex tw-items-center tw-justify-end tw-font-[600] " style="border-radius: 3px;">
-                            <q-btn :disable="testString.length === 0 || testLoading" class="tw-px-2 tw-bg-[#5960B2] tw-text-[12px] tw-text-white tw-min-h-[19px] tw-h-[19px] tw-flex tw-items-center tw-justify-center"
+                            <q-btn :disable="testString.length === 0 || testLoading" class="tw-px-2 o2-primary-button tw-min-h-[19px] tw-h-[19px] tw-flex tw-items-center tw-justify-center"
                         style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
                         <span>
                             Test Input
@@ -324,6 +324,7 @@
               <!-- remove or add pattern button  -->
                <div class="tw-mb-4">
                 <q-btn @click="handleAddOrRemovePattern" borderless no-caps class="q-mr-md o2-secondary-button tw-h-[36px] no-border">
+                  <q-icon class="tw-mr-1" :name="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'delete' : 'add'"></q-icon>
                   <span>
                     {{ checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'Remove Pattern' : 'Add Pattern' }}
                   </span> 
@@ -917,11 +918,9 @@ export default defineComponent({
         }
     }
 
-    .light-selected-pattern-row {
-    background-color: #E1E3F6;
-  }
-  .dark-selected-pattern-row {
-    background-color: #7C87EF38 !important;
+    .selected-pattern-row {
+      color: var(--o2-tab-text-color);
+      background-color: var(--o2-tab-bg);
   }
 .dark-associated-regex-patterns-table{
   background-color: #1F1F1F !important;
