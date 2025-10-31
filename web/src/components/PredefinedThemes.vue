@@ -20,6 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">Predefined Themes</div>
         <q-space />
+        <q-btn
+          icon="content_copy"
+          flat
+          round
+          dense
+          @click="copyAppliedTheme"
+        >
+          <q-tooltip>Copy Applied Theme Configuration</q-tooltip>
+        </q-btn>
         <q-btn icon="close" flat round dense v-close-popup />
       </q-card-section>
 
@@ -292,40 +301,40 @@ const predefinedThemes = [
     id: 1,
     name: "Pastel Dream",
     light: {
-      themeColor: "#A2D2FF",
+      themeColor: "#f28846",
       themeColorOpacity: 10,
-      primaryBg: "#FFAFCC",
-      primaryBgOpacity: 1,
-      secondaryBg: "#FFC8DD",
-      secondaryBgOpacity: 4,
+      primaryBg: "#f28846",
+      primaryBgOpacity: 2,
+      secondaryBg: "#ebac65",
+      secondaryBgOpacity: 3,
     },
     dark: {
-      themeColor: "#5E9DB8",
+      themeColor: "#c95f44",
       themeColorOpacity: 10,
-      primaryBg: "#2D1B2E",
-      primaryBgOpacity: 2,
-      secondaryBg: "#1A2332",
-      secondaryBgOpacity: 5,
+      primaryBg: "#c47e49",
+      primaryBgOpacity: 7,
+      secondaryBg: "#000712",
+      secondaryBgOpacity: 7,
     },
   },
   {
     id: 2,
     name: "Ocean Breeze",
     light: {
-      themeColor: "#4A90E2",
+      themeColor: "#7678ed",
       themeColorOpacity: 10,
-      primaryBg: "#7CB9E8",
-      primaryBgOpacity: 1,
-      secondaryBg: "#B0E0E6",
-      secondaryBgOpacity: 3,
+      primaryBg: "#7e80fc",
+      primaryBgOpacity: 2,
+      secondaryBg: "#6668d1",
+      secondaryBgOpacity: 2,
     },
     dark: {
-      themeColor: "#4A9FD8",
-      themeColorOpacity: 10,
-      primaryBg: "#1B3A52",
-      primaryBgOpacity: 3,
-      secondaryBg: "#0F2537",
-      secondaryBgOpacity: 6,
+      themeColor: "#5053f2",
+      themeColorOpacity: 9,
+      primaryBg: "#040424",
+      primaryBgOpacity: 7,
+      secondaryBg: "#161a59",
+      secondaryBgOpacity: 8,
     },
   },
   {
@@ -337,15 +346,15 @@ const predefinedThemes = [
       primaryBg: "#A8D5BA",
       primaryBgOpacity: 2,
       secondaryBg: "#C8E6C9",
-      secondaryBgOpacity: 4,
+      secondaryBgOpacity: 2,
     },
     dark: {
-      themeColor: "#4CAF50",
+      themeColor: "#457B9D",
       themeColorOpacity: 10,
-      primaryBg: "#1B4D2A",
+      primaryBg: "#1D3557",
       primaryBgOpacity: 2,
-      secondaryBg: "#0D3318",
-      secondaryBgOpacity: 5,
+      secondaryBg: "#0D1B2A",
+      secondaryBgOpacity: 2,
     },
   },
   {
@@ -355,39 +364,40 @@ const predefinedThemes = [
       themeColor: "#FF6B6B",
       themeColorOpacity: 10,
       primaryBg: "#FFB347",
-      primaryBgOpacity: 1,
+      primaryBgOpacity: 2,
       secondaryBg: "#FFCC99",
-      secondaryBgOpacity: 3,
+      secondaryBgOpacity: 2,
     },
     dark: {
       themeColor: "#FF6B6B",
       themeColorOpacity: 10,
       primaryBg: "#4D1F1F",
-      primaryBgOpacity: 3,
+      primaryBgOpacity: 2,
       secondaryBg: "#331A1A",
-      secondaryBgOpacity: 5,
+      secondaryBgOpacity: 2,
     },
   },
-  {
-    id: 5,
-    name: "Purple Haze",
-    light: {
-      themeColor: "#9B59B6",
-      themeColorOpacity: 10,
-      primaryBg: "#D7BDE2",
-      primaryBgOpacity: 2,
-      secondaryBg: "#E8DAEF",
-      secondaryBgOpacity: 4,
-    },
-    dark: {
-      themeColor: "#B088D9",
-      themeColorOpacity: 10,
-      primaryBg: "#2C1F3D",
-      primaryBgOpacity: 2,
-      secondaryBg: "#1A1225",
-      secondaryBgOpacity: 6,
-    },
+{
+  id: 5,
+  name: "Emerald Mist",
+  light: {
+    themeColor: "#E26A6A",
+    themeColorOpacity: 10,
+    primaryBg: "#F8F6F6",
+    primaryBgOpacity: 2,
+    secondaryBg: "#ECE9E9",
+    secondaryBgOpacity: 2,
   },
+  dark: {
+    themeColor: "#FF8A80",
+    themeColorOpacity: 10,
+    primaryBg: "#191617",
+    primaryBgOpacity: 2,
+    secondaryBg: "#231F20",
+    secondaryBgOpacity: 2,
+  },
+}
+
 ];
 
 const applyTheme = (theme: any, mode: "light" | "dark") => {
@@ -434,6 +444,89 @@ const isThemeApplied = (theme: any, mode: "light" | "dark"): boolean => {
   } else {
     return appliedDarkTheme.value === theme.id;
   }
+};
+
+const copyAppliedTheme = () => {
+  // Get the currently applied themes
+  const lightTheme = predefinedThemes.find(t => t.id === appliedLightTheme.value);
+  const darkTheme = predefinedThemes.find(t => t.id === appliedDarkTheme.value);
+
+  if (!lightTheme && !darkTheme) {
+    $q.notify({
+      type: 'warning',
+      message: 'No theme has been applied yet. Please apply a theme first.',
+      position: 'top',
+      timeout: 2000,
+    });
+    return;
+  }
+
+  // Build the theme configuration object
+  const themeConfig: any = {
+    id: lightTheme?.id || darkTheme?.id || 1,
+    name: lightTheme?.name || darkTheme?.name || "Custom Theme",
+    light: {
+      themeColor: "#3F7994",
+      themeColorOpacity: 10,
+      primaryBg: "#599BAE",
+      primaryBgOpacity: 1,
+      secondaryBg: "#599BAE",
+      secondaryBgOpacity: 4,
+    },
+    dark: {
+      themeColor: "#3F7994",
+      themeColorOpacity: 10,
+      primaryBg: "#000000",
+      primaryBgOpacity: 0,
+      secondaryBg: "#000000",
+      secondaryBgOpacity: 0,
+    },
+  };
+
+  // If light theme is applied, get its values with user-selected opacities
+  if (lightTheme) {
+    themeConfig.light = {
+      themeColor: lightTheme.light.themeColor,
+      themeColorOpacity: getOpacity(lightTheme.id, 'light', 'themeColor', lightTheme.light.themeColorOpacity),
+      primaryBg: lightTheme.light.primaryBg,
+      primaryBgOpacity: getOpacity(lightTheme.id, 'light', 'primaryBg', lightTheme.light.primaryBgOpacity),
+      secondaryBg: lightTheme.light.secondaryBg,
+      secondaryBgOpacity: getOpacity(lightTheme.id, 'light', 'secondaryBg', lightTheme.light.secondaryBgOpacity),
+    };
+  }
+
+  // If dark theme is applied, get its values with user-selected opacities
+  if (darkTheme) {
+    themeConfig.dark = {
+      themeColor: darkTheme.dark.themeColor,
+      themeColorOpacity: getOpacity(darkTheme.id, 'dark', 'themeColor', darkTheme.dark.themeColorOpacity),
+      primaryBg: darkTheme.dark.primaryBg,
+      primaryBgOpacity: getOpacity(darkTheme.id, 'dark', 'primaryBg', darkTheme.dark.primaryBgOpacity),
+      secondaryBg: darkTheme.dark.secondaryBg,
+      secondaryBgOpacity: getOpacity(darkTheme.id, 'dark', 'secondaryBg', darkTheme.dark.secondaryBgOpacity),
+    };
+  }
+
+  // Format as JSON string with proper indentation
+  const jsonString = JSON.stringify(themeConfig, null, 2);
+
+  // Copy to clipboard
+  navigator.clipboard.writeText(jsonString).then(() => {
+    $q.notify({
+      type: 'positive',
+      message: 'Theme configuration copied to clipboard!',
+      position: 'top',
+      timeout: 2000,
+    });
+  }).catch((err) => {
+    console.error('Failed to copy:', err);
+    $q.notify({
+      type: 'negative',
+      message: 'Failed to copy theme configuration',
+      position: 'top',
+      timeout: 2000,
+    });
+  });
 };
 </script>
 

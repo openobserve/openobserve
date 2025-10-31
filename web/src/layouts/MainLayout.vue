@@ -139,7 +139,7 @@ class="warning" />{{
             data-test="menu-link-predefined-themes-item"
           >
             <div class="row items-center no-wrap">
-              <q-icon name="palette" class="header-icon"></q-icon>
+              <q-icon name="color_lens" class="header-icon"></q-icon>
             </div>
             <q-tooltip anchor="top middle" self="bottom middle">
               Predefined Themes
@@ -154,7 +154,7 @@ class="warning" />{{
             data-test="menu-link-theme-customizer-item"
           >
             <div class="row items-center no-wrap">
-              <q-icon name="color_lens" class="header-icon"></q-icon>
+              <q-icon name="format_color_fill" class="header-icon"></q-icon>
             </div>
             <q-tooltip anchor="top middle" self="bottom middle">
               Customize Theme

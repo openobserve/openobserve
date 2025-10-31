@@ -72,8 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-btn>
               </div>
 
-              <!-- Show opacity slider only for body backgrounds, not theme color -->
-              <div v-if="colorVar.name !== '--o2-theme-color'" class="row items-center q-gutter-sm">
+              <!-- Opacity slider for all colors -->
+              <div class="row items-center q-gutter-sm">
                 <div class="text-caption" style="min-width: 60px;">Opacity:</div>
                 <q-slider
                   :model-value="colorVar.opacity"
@@ -114,8 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-btn>
               </div>
 
-              <!-- Show opacity slider only for body backgrounds, not dark theme color -->
-              <div v-if="colorVar.name !== '--o2-dark-theme-color'" class="row items-center q-gutter-sm">
+              <!-- Opacity slider for all colors -->
+              <div class="row items-center q-gutter-sm">
                 <div class="text-caption" style="min-width: 60px;">Opacity:</div>
                 <q-slider
                   :model-value="colorVar.opacity"
