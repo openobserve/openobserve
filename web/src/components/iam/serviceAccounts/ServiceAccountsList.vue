@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="card-container tw-h-[calc(100vh-127px)]">
           <q-table
             ref="qTable"
-            class="o2-quasar-table o2-quasar-table-header-sticky"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             :rows="visibleRows"
             :columns="columns"
             row-key="id"

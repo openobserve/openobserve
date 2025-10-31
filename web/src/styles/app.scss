@@ -520,6 +520,12 @@ body {
 }
 
 .o2-quasar-table{
+
+  &.o2-row-md{
+    th, td {
+      height: 36px !important;
+    }
+  }
   th,td {
     padding: 0px 5px !important;
     height: 36px;

@@ -163,12 +163,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="tagColumns"
         :row-key="(row) => 'tr_' + row.name"
         :pagination="pagination"
-        class="q-table o2-quasar-table o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
         id="schemaFieldList"
         dense
       >
         <template v-slot:body-cell="props">
-          <q-td class="text-left">
+          <q-td
+            class="text-left"
+            :class="
+              props.col.name === 'field'
+                ? store.state.theme === 'dark'
+                  ? 'tw-text-red-400'
+                  : 'tw-text-red-700'
+                : ''
+            "
+          >
             {{ props.row[props.col.name] }}
           </q-td>
         </template>
@@ -182,11 +191,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="processColumns"
         :row-key="(row) => 'tr_' + row.name"
         :pagination="pagination"
-        class="q-table o2-quasar-table o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
         dense
       >
         <template v-slot:body-cell="props">
-          <q-td class="text-left">
+          <q-td
+            class="text-left"
+            :class="
+              props.col.name === 'field'
+                ? store.state.theme === 'dark'
+                  ? 'tw-text-red-400'
+                  : 'tw-text-red-700'
+                : ''
+            "
+          >
             {{ props.row[props.col.name] }}
           </q-td>
         </template>
@@ -208,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="eventColumns"
         row-key="name"
         :pagination="pagination"
-        class="q-table o2-quasar-table o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
         dense
         style="max-height: 400px"
       >
@@ -282,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="exceptionEventColumns"
         row-key="name"
         :pagination="pagination"
-        class="q-table o2-quasar-table o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
         dense
         style="max-height: 400px"
       >

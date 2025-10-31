@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :dense="true"
           :virtual-scroll="false"
           :title="t('iam.roles')"
-          class="o2-quasar-table o2-quasar-table-header-sticky"
+          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
           :hideTopPagination="true"
           :showBottomPaginationWithTitle="true"
