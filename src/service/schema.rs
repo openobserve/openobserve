@@ -89,6 +89,7 @@ pub async fn check_for_schema(
 
     // fast path
     if schema.schema().fields.eq(&inferred_schema.fields) {
+        log::info!("here, check_for_schema got fast path");
         return Ok((
             SchemaEvolution {
                 is_schema_changed: false,
@@ -116,6 +117,7 @@ pub async fn check_for_schema(
     let mut need_insert_new_latest = false;
     let is_new = schema.schema().fields().is_empty();
     if !is_new {
+        log::info!("here, check_for_schema got !is_new schema : {schema:?}");
         let (is_schema_changed, field_datatype_delta) =
             get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
@@ -161,6 +163,8 @@ pub async fn check_for_schema(
         }
     }
 
+    log::info!("here, check_for_schema got slow path");
+
     // slow path
     let ret = handle_diff_schema(
         org_id,
@@ -192,6 +196,9 @@ pub async fn check_for_schema(
         )
         .await?;
     }
+
+    log::info!("here, check_for_schema got after handle_diff_schema : {inferred_schema:?}");
+    log::info!("here, check_for_schema final schema map : {stream_schema_map:?}");
 
     Ok((ret, Some(inferred_schema)))
 }

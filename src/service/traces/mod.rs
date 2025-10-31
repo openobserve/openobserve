@@ -865,6 +865,7 @@ async fn write_traces(
     let schema_key = record_schema.hash_key();
 
     log::info!("here, record schema for {org_id}/{stream_name} : {record_schema:?}");
+    log::info!("here, trace schema map for {org_id} : {traces_schema_map:?}");
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
