@@ -97,11 +97,8 @@ import {
   b64EncodeUnicode,
   escapeSingleQuotes,
   generateTraceContext,
-  isStreamingEnabled,
-  isWebSocketEnabled,
 } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
-import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
@@ -242,18 +239,12 @@ export default defineComponent({
     // Flag to track initial load
     // const isInitialLoad = ref(true);
 
-    const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-      useHttpStreaming();
-
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
     const variableFirstResponseProcessed = ref<{ [key: string]: boolean }>({});
 
-    // ------------- Start WebSocket Implementation -------------
-    const {
-      fetchQueryDataWithWebSocket,
-      sendSearchMessageBasedOnRequestId,
-      cancelSearchQueryBasedOnRequestId,
-    } = useSearchWebSocket();
+    // ------------- Start HTTP2/Streaming Implementation -------------
+    const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
+      useHttpStreaming();
 
     // Utility functions
     const addTraceId = (field: string, traceId: string) => {
@@ -273,7 +264,7 @@ export default defineComponent({
 
     const cancelTraceId = (field: string) => {
       const traceIds = traceIdMapper.value[field];
-      if (isStreamingEnabled(store.state) && traceIds && traceIds.length > 0) {
+      if (traceIds && traceIds.length > 0) {
         traceIds.forEach((traceId) => {
           cancelStreamQueryBasedOnRequestId({
             trace_id: traceId,
@@ -284,21 +275,9 @@ export default defineComponent({
         // Clear the trace IDs after cancellation
         traceIdMapper.value[field] = [];
       }
-
-      if (isWebSocketEnabled(store.state) && traceIds && traceIds.length > 0) {
-        traceIds.forEach((traceId) => {
-          cancelSearchQueryBasedOnRequestId({
-            trace_id: traceId,
-            org_id: store?.state?.selectedOrganization?.identifier,
-          });
-        });
-
-        // Clear the trace IDs after cancellation
-        traceIdMapper.value[field] = [];
-      }
     };
 
-    // onUnmounted want to cancel the values api call for all http2, websocket and streaming
+    // onUnmounted want to cancel the values api call for all http2, and streaming
     onUnmounted(() => {
       // Cancel all active trace IDs for all variables
       Object.keys(traceIdMapper.value).forEach((field) => {
@@ -311,30 +290,6 @@ export default defineComponent({
         currentlyExecutingPromises[key] = null;
       });
     });
-
-    const sendSearchMessage = (queryReq: any) => {
-      const payload = {
-        type: "values",
-        content: {
-          trace_id: queryReq.traceId,
-          payload: queryReq.queryReq,
-          stream_type: queryReq.queryReq.stream_type || "logs",
-          search_type: "ui",
-          use_cache: (window as any).use_cache ?? true,
-          org_id: store.state.selectedOrganization.identifier,
-        },
-      };
-
-      if (
-        Object.hasOwn(queryReq.queryReq, "regions") &&
-        Object.hasOwn(queryReq.queryReq, "clusters")
-      ) {
-        payload.content.payload["regions"] = queryReq.queryReq.regions;
-        payload.content.payload["clusters"] = queryReq.queryReq.clusters;
-      }
-
-      sendSearchMessageBasedOnRequestId(payload);
-    };
 
     const handleSearchClose = (
       payload: any,
@@ -599,31 +554,17 @@ export default defineComponent({
       emitVariablesData();
     };
 
-    const initializeWebSocketConnection = (
+    const initializeStreamingConnection = (
       payload: any,
       variableObject: any,
     ): any => {
-      if (isStreamingEnabled(store.state)) {
-        fetchQueryDataWithHttpStream(payload, {
-          data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
-          error: (p: any, r: any) => handleSearchError(p, r, variableObject),
-          complete: (p: any, r: any) => handleSearchClose(p, r, variableObject),
-          reset: handleSearchReset,
-        });
-        return;
-      }
-
-      if (isWebSocketEnabled(store.state)) {
-        fetchQueryDataWithWebSocket(payload, {
-          open: sendSearchMessage,
-          close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
-          error: (p: any, r: any) => handleSearchError(p, r, variableObject),
-          message: (p: any, r: any) =>
-            handleSearchResponse(p, r, variableObject),
-          reset: handleSearchReset,
-        }) as string;
-        return;
-      }
+      // Use HTTP2/streaming for all dashboard variable values
+      fetchQueryDataWithHttpStream(payload, {
+        data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
+        error: (p: any, r: any) => handleSearchError(p, r, variableObject),
+        complete: (p: any, r: any) => handleSearchClose(p, r, variableObject),
+        reset: handleSearchReset,
+      });
     };
     const fetchFieldValuesWithWebsocket = (
       variableObject: any,
@@ -674,11 +615,11 @@ export default defineComponent({
         meta: payload,
       };
       try {
-        // Start new connection
-        initializeWebSocketConnection(wsPayload, variableObject);
+        // Start new streaming connection
+        initializeStreamingConnection(wsPayload, variableObject);
         addTraceId(variableObject.name, wsPayload.traceId);
       } catch (error) {
-        console.error("WebSocket connection failed:", error);
+        console.error("Streaming connection failed:", error);
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;
       }
@@ -734,6 +675,8 @@ export default defineComponent({
           // if parent variable is not loaded or it's value is changed, isVariableLoadingPending will be true
           isVariableLoadingPending: false,
           isVariablePartialLoaded: true,
+          // Initialize options array for all variables
+          options: item.options || [],
         };
 
         variableLog(
@@ -1366,55 +1309,10 @@ export default defineComponent({
               searchText,
             );
 
-            if (
-              isWebSocketEnabled(store.state) ||
-              isStreamingEnabled(store.state)
-            ) {
-              // For WebSocket, we don't need to wait for the response here
-              // as it will be handled by the WebSocket handlers
-              fetchFieldValuesWithWebsocket(variableObject, queryContext);
-              return true;
-            } else {
-              try {
-                // For REST API, we handle the response directly
-                const response = await fetchFieldValuesREST(
-                  variableObject,
-                  queryContext,
-                );
-
-                if (response?.data?.hits) {
-                  const originalValue = JSON.parse(
-                    JSON.stringify(variableObject.value),
-                  );
-
-                  updateVariableOptions(variableObject, response.data.hits);
-
-                  const hasValueChanged =
-                    Array.isArray(originalValue) &&
-                    Array.isArray(variableObject.value)
-                      ? JSON.stringify(originalValue) !==
-                        JSON.stringify(variableObject.value)
-                      : originalValue !== variableObject.value;
-
-                  if (hasValueChanged) {
-                    finalizePartialVariableLoading(variableObject, true);
-                  } else {
-                    // just set the partially loaded state
-                    variableObject.isVariablePartialLoaded = true;
-                  }
-
-                  finalizeVariableLoading(variableObject, true);
-                  return true;
-                }
-              } catch (error) {
-                // console.error(
-                //   `Error fetching field values for variable ${variableObject.name}:`,
-                //   error,
-                // );
-                return false;
-              }
-            }
-            return false;
+            // Use HTTP2/streaming for all dashboard variable values
+            // We don't need to wait for the response here as it will be handled by the streaming handlers
+            fetchFieldValuesWithWebsocket(variableObject, queryContext);
+            return true;
           } catch (error) {
             resetVariableState(variableObject);
             return false;
@@ -1736,43 +1634,7 @@ export default defineComponent({
             `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
           );
           for (const childVariable of childVariableObjects) {
-            // Only apply guard for REST API mode
-            if (
-              !isStreamingEnabled(store.state) &&
-              !isWebSocketEnabled(store.state)
-            ) {
-              if (isInitialLoad) {
-                variableLog(
-                  variableObject.name,
-                  `finalizePartialVariableLoading: Initial load, always loading child variable ${childVariable.name}`,
-                );
-                await loadSingleVariableDataByName(childVariable, true);
-                continue;
-              }
-              if (
-                (childVariable.isVariableLoadingPending ||
-                  oldVariablesData[name] !== variableObject.value) &&
-                !childVariable.isLoading &&
-                !childVariable.isVariableLoadingPending
-              ) {
-                variableLog(
-                  variableObject.name,
-                  `finalizePartialVariableLoading: [REST] Loading child variable ${childVariable.name} as parent value changed`,
-                );
-                await loadSingleVariableDataByName(childVariable, false);
-              } else {
-                variableLog(
-                  variableObject.name,
-                  `finalizePartialVariableLoading: [REST] Skipping child variable ${childVariable.name} loading as parent value did not change or child is already loading/pending`,
-                );
-              }
-            } else {
-              variableLog(
-                variableObject.name,
-                `finalizePartialVariableLoading: [Streaming/WebSocket] Loading child variable ${childVariable.name}`,
-              );
-              await loadSingleVariableDataByName(childVariable, isInitialLoad);
-            }
+              await loadSingleVariableDataByName(childVariable, false);
           }
         }
       } catch (error) {

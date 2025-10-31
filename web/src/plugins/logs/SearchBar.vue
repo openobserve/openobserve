@@ -1958,7 +1958,6 @@ export default defineComponent({
     );
 
     onBeforeUnmount(() => {
-      console.log("onBeforeUnmount");
       queryEditorRef.value = null;
       fnEditorRef.value = null;
     });
@@ -2046,7 +2045,6 @@ export default defineComponent({
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
       // }
-      console.log("value", value);
       searchObj.data.editorValue = value;
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
@@ -3434,7 +3432,7 @@ export default defineComponent({
             })
             .filter(Boolean);
 
-          searchObj.data.query = queries.join(" UNION ");
+          searchObj.data.query = queries.join(" UNION ALL BY NAME ");
           searchObj.data.editorValue = searchObj.data.query;
         }
       } else {
