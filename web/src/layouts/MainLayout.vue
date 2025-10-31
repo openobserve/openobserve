@@ -135,6 +135,21 @@ class="warning" />{{
             flat
             dense
             :ripple="false"
+            @click="openPredefinedThemes"
+            data-test="menu-link-predefined-themes-item"
+          >
+            <div class="row items-center no-wrap">
+              <q-icon name="palette" class="header-icon"></q-icon>
+            </div>
+            <q-tooltip anchor="top middle" self="bottom middle">
+              Predefined Themes
+            </q-tooltip>
+          </q-btn>
+          <q-btn
+            round
+            flat
+            dense
+            :ripple="false"
             @click="openThemeCustomizer"
             data-test="menu-link-theme-customizer-item"
           >
@@ -529,6 +544,7 @@ class="padding-none" />
 full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
+    <PredefinedThemes />
     <ThemeCustomizer />
   </q-layout>
 </template>
@@ -592,6 +608,8 @@ import billings from "@/services/billings";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import ThemeCustomizer from "../components/ThemeCustomizer.vue";
 import { useThemeCustomizer } from "@/composables/useThemeCustomizer";
+import PredefinedThemes from "../components/PredefinedThemes.vue";
+import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
 import {
   outlinedHome,
@@ -651,6 +669,7 @@ export default defineComponent({
     SlackIcon,
     ManagementIcon,
     ThemeSwitcher,
+    PredefinedThemes,
     ThemeCustomizer,
     O2AIChat,
     GetStarted,
@@ -702,6 +721,7 @@ export default defineComponent({
     const { getStreams, resetStreams } = useStreams();
     const { closeSocket } = useSearchWebSocket();
     const { toggleCustomizer } = useThemeCustomizer();
+    const { toggleThemes } = usePredefinedThemes();
 
     const isMonacoEditorLoaded = ref(false);
     const showGetStarted = ref(
@@ -1411,6 +1431,10 @@ export default defineComponent({
     const openThemeCustomizer = () => {
       toggleCustomizer();
     };
+
+    const openPredefinedThemes = () => {
+      toggleThemes();
+    };
     //this is the used to set the selected org to the user clicked org because all the operations are happening on the selected org
     //to make sync with the user clicked org
     //we dont need search query after selectedOrg has been changed so resetting it
@@ -1469,6 +1493,7 @@ export default defineComponent({
       getConfig,
       setRumUser,
       openThemeCustomizer,
+      openPredefinedThemes,
     };
   },
   computed: {

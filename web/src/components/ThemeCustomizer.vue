@@ -155,9 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, watch, reactive, onMounted, onUnmounted } from "vue";
 import { useThemeCustomizer } from "@/composables/useThemeCustomizer";
 import { useQuasar } from "quasar";
+import { useStore } from "vuex";
 
 const $q = useQuasar();
-const { isOpen } = useThemeCustomizer();
+const store = useStore();
+const { isOpen, registerUpdateFunction } = useThemeCustomizer();
 const dialogOpen = ref(false);
 const showColorPicker = ref(false);
 const currentColorName = ref("");
@@ -213,12 +215,38 @@ const darkModeVariables = reactive([
 // Watch isOpen from composable
 watch(isOpen, (val) => {
   dialogOpen.value = val;
+  // When dialog opens, sync activeTab with current store theme
+  if (val) {
+    activeTab.value = store.state.theme === "dark" ? "dark" : "light";
+  }
 });
 
 // Watch dialogOpen to sync back
 watch(dialogOpen, (val) => {
   isOpen.value = val;
 });
+
+// Watch activeTab changes and update store.state.theme accordingly
+watch(activeTab, (newTab) => {
+  const newTheme = newTab === "dark" ? "dark" : "light";
+  if (store.state.theme !== newTheme) {
+    // Update theme in store and localStorage
+    store.dispatch("appTheme", newTheme);
+    localStorage.setItem("theme", newTheme);
+    $q.dark.set(newTheme === "dark");
+  }
+});
+
+// Watch store.state.theme changes and update activeTab accordingly
+watch(
+  () => store.state.theme,
+  (newTheme) => {
+    const newTab = newTheme === "dark" ? "dark" : "light";
+    if (activeTab.value !== newTab) {
+      activeTab.value = newTab;
+    }
+  }
+);
 
 // Function to apply menu variables based on theme color
 // Menu uses theme color with different opacities:
@@ -292,10 +320,67 @@ const applyAllVariablesForCurrentMode = () => {
   updateBodyGradient();
 };
 
+// Function to update theme from external sources (e.g., predefined themes)
+const updateThemeFromPredefined = (themeConfig: any) => {
+  const mode = themeConfig.mode || 'light';
+  const isDarkMode = document.body.classList.contains('body--dark');
+
+  if (mode === 'light') {
+    // Update light mode variables
+    const lightThemeColor = lightModeVariables.find(v => v.name === '--o2-theme-color');
+    const lightPrimaryBg = lightModeVariables.find(v => v.name === '--o2-body-primary-bg');
+    const lightSecondaryBg = lightModeVariables.find(v => v.name === '--o2-body-secondary-bg');
+
+    if (lightThemeColor && themeConfig.themeColor) {
+      lightThemeColor.value = themeConfig.themeColor;
+      lightThemeColor.opacity = themeConfig.themeColorOpacity || 10;
+    }
+    if (lightPrimaryBg && themeConfig.primaryBg) {
+      lightPrimaryBg.value = themeConfig.primaryBg;
+      lightPrimaryBg.opacity = themeConfig.primaryBgOpacity || 1;
+    }
+    if (lightSecondaryBg && themeConfig.secondaryBg) {
+      lightSecondaryBg.value = themeConfig.secondaryBg;
+      lightSecondaryBg.opacity = themeConfig.secondaryBgOpacity || 4;
+    }
+
+    // Only apply if we're currently in light mode
+    if (!isDarkMode) {
+      applyAllVariablesForCurrentMode();
+    }
+  } else {
+    // Update dark mode variables
+    const darkThemeColor = darkModeVariables.find(v => v.name === '--o2-dark-theme-color');
+    const darkPrimaryBg = darkModeVariables.find(v => v.name === '--o2-body-primary-bg');
+    const darkSecondaryBg = darkModeVariables.find(v => v.name === '--o2-body-secondary-bg');
+
+    if (darkThemeColor && themeConfig.themeColor) {
+      darkThemeColor.value = themeConfig.themeColor;
+      darkThemeColor.opacity = themeConfig.themeColorOpacity || 10;
+    }
+    if (darkPrimaryBg && themeConfig.primaryBg) {
+      darkPrimaryBg.value = themeConfig.primaryBg;
+      darkPrimaryBg.opacity = themeConfig.primaryBgOpacity !== undefined ? themeConfig.primaryBgOpacity : 0;
+    }
+    if (darkSecondaryBg && themeConfig.secondaryBg) {
+      darkSecondaryBg.value = themeConfig.secondaryBg;
+      darkSecondaryBg.opacity = themeConfig.secondaryBgOpacity !== undefined ? themeConfig.secondaryBgOpacity : 0;
+    }
+
+    // Only apply if we're currently in dark mode
+    if (isDarkMode) {
+      applyAllVariablesForCurrentMode();
+    }
+  }
+};
+
 // Watch for theme changes and reapply variables
 let observer: MutationObserver | null = null;
 
 onMounted(() => {
+  // Register the update function so predefined themes can update our state
+  registerUpdateFunction(updateThemeFromPredefined);
+
   // Apply initial variables for current mode
   applyAllVariablesForCurrentMode();
 
