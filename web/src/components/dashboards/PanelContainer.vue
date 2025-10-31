@@ -323,20 +323,6 @@ self="top right" max-width="220px">
                 <q-item-label
                   data-test="dashboard-refresh-without-cache"
                   class="q-pa-sm"
-                  >Refresh Without Using Cache</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              v-if="config.isEnterprise === 'true'"
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('Refresh')"
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-refresh-without-cache"
-                  class="q-pa-sm"
                   >Refresh Cache & Reload</q-item-label
                 >
               </q-item-section>
