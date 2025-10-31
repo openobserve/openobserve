@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tabs>
       </q-card-section>
 
-      <q-card-section class="q-pt-none scroll-content">
+      <q-card-section class="q-pt-none">
         <q-tab-panels v-model="activeTab" animated>
           <q-tab-panel name="light" class="q-pa-none">
             <div v-for="colorVar in lightModeVariables" :key="colorVar.name" class="color-item q-mb-lg">
