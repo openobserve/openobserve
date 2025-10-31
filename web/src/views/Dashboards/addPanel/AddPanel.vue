@@ -122,31 +122,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn-group
             v-if="config.isEnterprise === 'true'"
-            class="q-ml-md"
+            class="tw-h-[36px] q-ml-md"
+            :class="
+              store.state.theme === 'dark'
+                ? searchRequestTraceIds.length > 0
+                  ? 'o2-negative-button-dark'
+                  : 'o2-secondary-button-dark'
+                : searchRequestTraceIds.length > 0
+                  ? 'o2-negative-button-light'
+                  : 'o2-secondary-button-light'
+            "
           >
             <q-btn
-              class="o2-primary-button tw-h-[36px] q-ml-md"
-              :class="
-                store.state.theme === 'dark'
-                  ? searchRequestTraceIds.length > 0
-                    ? 'o2-negative-button-dark'
-                    : 'o2-secondary-button-dark'
-                  : searchRequestTraceIds.length > 0
-                    ? 'o2-negative-button-light'
-                    : 'o2-secondary-button-light'
-              "
               :data-test="
                 searchRequestTraceIds.length > 0
                   ? 'dashboard-cancel'
                   : 'dashboard-apply'
               "
-              padding="sm lg"
               :color="
                 searchRequestTraceIds.length > 0 ? 'negative' : 'secondary'
               "
-              :text-color="
-                searchRequestTraceIds.length > 0 ? 'negative' : 'white'
-              "
+              :text-color="'white'"
               no-caps
               :label="
                 searchRequestTraceIds.length > 0
@@ -154,26 +150,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('panel.apply')
               "
               @click="onApplyBtnClick"
-              style="width: 92px;"
+              style="width: 92px"
             />
 
             <q-btn-dropdown
-              class="text-bold no-border"
-              padding="xs"
-              :color="searchRequestTraceIds.length > 0 ? 'negative' : 'secondary'"
-              text-color="white"
+              class="text-bold no-border tw-px-0"
+              :color="
+                searchRequestTraceIds.length > 0 ? 'negative' : 'secondary'
+              "
+              :text-color="'white'"
               no-caps
               auto-close
               dropdown-icon="keyboard_arrow_down"
               :disable="searchRequestTraceIds.length > 0"
             >
               <q-list>
-                <q-item clickable @click="runQuery(true)" :disable="searchRequestTraceIds.length > 0">
+                <q-item
+                  clickable
+                  @click="runQuery(true)"
+                  :disable="searchRequestTraceIds.length > 0"
+                >
                   <q-item-section avatar>
-                    <q-icon size="xs" name="refresh" style="align-items: baseline; padding: 0px;" />
+                    <q-icon
+                      size="xs"
+                      name="refresh"
+                      style="align-items: baseline; padding: 0px"
+                    />
                   </q-item-section>
                   <q-item-section>
-                    <q-item-label style="font-size: 12px; align-items: baseline; padding: 0px;">Refresh Cache & Apply</q-item-label>
+                    <q-item-label
+                      style="
+                        font-size: 12px;
+                        align-items: baseline;
+                        padding: 0px;
+                      "
+                      >Apply without using cache</q-item-label
+                    >
                   </q-item-section>
                 </q-item>
               </q-list>
