@@ -23,7 +23,9 @@ use datafusion::{
     config::ConfigOptions,
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
-        ExecutionPlan, ExecutionPlanVisitor, aggregates::AggregateExec, joins::HashJoinExec,
+        ExecutionPlan, ExecutionPlanVisitor,
+        aggregates::AggregateExec,
+        joins::{HashJoinExec, PartitionMode},
         visit_execution_plan,
     },
 };
@@ -59,7 +61,11 @@ fn swap_join_order(plan: Arc<dyn ExecutionPlan>) -> Result<Transformed<Arc<dyn E
     if let Some(hash_join) = plan.as_any().downcast_ref::<HashJoinExec>() {
         let left = hash_join.left();
         let right = hash_join.right();
-        if !is_agg_exec(left) && is_agg_exec(right) {
+        if !is_agg_exec(left)
+            && is_agg_exec(right)
+            && hash_join.join_type().supports_swap()
+            && hash_join.mode != PartitionMode::CollectLeft
+        {
             return Ok(Transformed::yes(HashJoinExec::swap_inputs(
                 hash_join,
                 hash_join.mode,
