@@ -23,62 +23,114 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'light-theme light-mode'
       "
       class="full-wdith pipeline-list-table"
-      style="height: calc(100vh - 57px);"
+      style="height: calc(100vh - 57px)"
     >
-    <div class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-border-b-[1px] tw-h-[71px]"
-    
-    :class="store.state.theme === 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
-    >
-      <div class="q-table__title tw-font-[600]" data-test="pipeline-list-title">
-            {{ t("pipeline.header") }}
-          </div>
-          <div class="tw-flex tw-items-center q-ml-auto">
-            <div class="app-tabs-container tw-h-[36px] q-mr-md" :class="store.state.theme === 'dark' ? 'app-tabs-container-dark' : 'app-tabs-container-light'">
-              <app-tabs
+      <div
+        class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-border-b-[1px] tw-h-[71px]"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-table-header-dark tw-border-gray-500'
+            : 'o2-table-header-light tw-border-gray-200'
+        "
+      >
+        <div
+          class="q-table__title tw-font-[600]"
+          data-test="pipeline-list-title"
+        >
+          {{ t("pipeline.header") }}
+        </div>
+        <div class="tw-flex tw-items-center q-ml-auto">
+          <div
+            class="app-tabs-container tw-h-[36px] q-mr-md"
+            :class="
+              store.state.theme === 'dark'
+                ? 'app-tabs-container-dark'
+                : 'app-tabs-container-light'
+            "
+          >
+            <app-tabs
               data-test="pipeline-list-tabs"
               class="tabs-selection-container"
-              :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tabs-selection-container-dark'
+                  : 'tabs-selection-container-light'
+              "
               :tabs="tabs"
               v-model:active-tab="activeTab"
               @update:active-tab="updateActiveTab"
             />
-            </div>
-
-            <q-input
-              data-test="pipeline-list-search-input"
-              v-model="filterQuery"
-              borderless
-              dense
-              flat
-              class="no-border o2-search-input"
-              :placeholder="t('pipeline.search')"
-              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
-            >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
-              </template>
-            </q-input>
-            <q-btn
-              data-test="pipeline-list-import-pipeline-btn"
-              class="q-ml-md o2-secondary-button tw-h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              padding="sm lg"
-              no-caps
-              flat
-              :label="t(`pipeline.import`)"
-              @click="routeToImportPipeline"
-            />
-            <q-btn
-              data-test="pipeline-list-add-pipeline-btn"
-              class="q-ml-md o2-primary-button tw-h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              flat
-              no-caps
-              :label="t(`pipeline.addPipeline`)"
-              @click="routeToAddPipeline"
-            />
           </div>
-    </div>
+
+          <q-input
+            data-test="pipeline-list-search-input"
+            v-model="filterQuery"
+            borderless
+            dense
+            flat
+            class="no-border o2-search-input"
+            :placeholder="t('pipeline.search')"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-search-input-dark'
+                : 'o2-search-input-light'
+            "
+          >
+            <template #prepend>
+              <q-icon
+                class="o2-search-input-icon"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-search-input-icon-dark'
+                    : 'o2-search-input-icon-light'
+                "
+                name="search"
+              />
+            </template>
+          </q-input>
+          <q-btn
+            data-test="pipeline-list-history-btn"
+            class="q-ml-md o2-secondary-button tw-h-[36px]"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
+            no-caps
+            flat
+            :label="t(`pipeline.history`)"
+            @click="goToPipelineHistory"
+            icon="history"
+          />
+          <q-btn
+            data-test="pipeline-list-import-pipeline-btn"
+            class="q-ml-md o2-secondary-button tw-h-[36px]"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
+            padding="sm lg"
+            no-caps
+            flat
+            :label="t(`pipeline.import`)"
+            @click="routeToImportPipeline"
+          />
+          <q-btn
+            data-test="pipeline-list-add-pipeline-btn"
+            class="q-ml-md o2-primary-button tw-h-[36px]"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
+            flat
+            no-caps
+            :label="t(`pipeline.addPipeline`)"
+            @click="routeToAddPipeline"
+          />
+        </div>
+      </div>
       <q-table
         data-test="pipeline-list-table"
         ref="qTableRef"
@@ -90,11 +142,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 100%"
         selection="multiple"
         v-model:selected="selectedPipelines"
-        :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 114px)' 
-            : 'width: 100%'"
-        class="o2-quasar-table o2-quasar-table-header-sticky "
-        :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light'"
+        :style="
+          hasVisibleRows
+            ? 'width: 100%; height: calc(100vh - 114px)'
+            : 'width: 100%'
+        "
+        class="o2-quasar-table o2-quasar-table-header-sticky"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark'
+            : 'o2-quasar-table-light o2-quasar-table-header-sticky-light'
+        "
       >
         <template v-slot:body="props">
           <q-tr
@@ -106,7 +164,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td auto-width>
               <q-checkbox
                 v-model="props.selected"
-                :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-table-checkbox-dark'
+                    : 'o2-table-checkbox-light'
+                "
                 class="o2-table-checkbox"
                 size="sm"
                 @click.stop
@@ -211,7 +273,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.stop="showErrorDialog(props.row)"
                   >
                     <q-tooltip>
-                      Last error: {{ new Date(props.row.last_error.last_error_timestamp / 1000).toLocaleString() }}
+                      Last error:
+                      {{
+                        new Date(
+                          props.row.last_error.last_error_timestamp / 1000,
+                        ).toLocaleString()
+                      }}
                     </q-tooltip>
                   </q-btn>
                 </div>
@@ -249,7 +316,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <no-data />
         </template>
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'" class="o2-table-checkbox" />
+          <q-checkbox
+            v-model="scope.selected"
+            size="sm"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-table-checkbox-dark'
+                : 'o2-table-checkbox-light'
+            "
+            class="o2-table-checkbox"
+          />
         </template>
 
         <template v-slot:body-cell-function="props">
@@ -275,16 +351,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #bottom="scope">
           <div class="bottom-btn tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[120px] tw-mr-md">
-                  {{ resultTotal }} {{ t('pipeline.header') }}
-                </div>
+            <div
+              class="o2-table-footer-title tw-flex tw-items-center tw-w-[120px] tw-mr-md"
+            >
+              {{ resultTotal }} {{ t("pipeline.header") }}
+            </div>
             <q-btn
               v-if="selectedPipelines.length > 0"
               data-test="pipeline-list-export-pipelines-btn"
-              class="flex  q-mr-sm items-center no-border o2-secondary-button tw-h-[36px]"
+              class="flex q-mr-sm items-center no-border o2-secondary-button tw-h-[36px]"
               no-caps
               dense
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
               @click="exportBulkPipelines"
             >
               <q-icon name="download" size="16px" />
@@ -296,7 +378,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex q-mr-sm items-center no-border o2-secondary-button tw-h-[36px]"
               no-caps
               dense
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
               @click="bulkTogglePipelines('pause')"
             >
               <q-icon name="pause" size="16px" />
@@ -308,7 +394,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center no-border o2-secondary-button tw-h-[36px] tw-w-[141px]"
               no-caps
               dense
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
               @click="bulkTogglePipelines('resume')"
             >
               <q-icon name="play_arrow" size="16px" />
@@ -325,30 +415,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-              <q-th v-if="columns.length > 0">
-                <q-checkbox
-                  v-model="props.selected"
-                  size="sm"
-                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                  class="o2-table-checkbox"
-                  @update:model-value="props.select"
-                />
-              </q-th>
+          <q-tr :props="props">
+            <!-- Adding this block to render the select-all checkbox -->
+            <q-th v-if="columns.length > 0">
+              <q-checkbox
+                v-model="props.selected"
+                size="sm"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-table-checkbox-dark'
+                    : 'o2-table-checkbox-light'
+                "
+                class="o2-table-checkbox"
+                @update:model-value="props.select"
+              />
+            </q-th>
 
-              <!-- Rendering the rest of the columns -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
+            <!-- Rendering the rest of the columns -->
+            <q-th
+              v-for="col in props.cols"
+              :key="col.name"
+              :props="props"
+              :class="col.classes"
+              :style="col.style"
+            >
+              {{ col.label }}
+            </q-th>
+          </q-tr>
+        </template>
       </q-table>
     </div>
   </div>
@@ -379,10 +473,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog v-model="errorDialog.show" @hide="closeErrorDialog">
     <q-card
       class="pipeline-error-dialog"
-      :class="store.state.theme === 'dark' ? 'pipeline-error-dialog-dark' : 'pipeline-error-dialog-light'"
+      :class="
+        store.state.theme === 'dark'
+          ? 'pipeline-error-dialog-dark'
+          : 'pipeline-error-dialog-light'
+      "
     >
       <!-- Header with Pipeline Name and Timestamp -->
-      <q-card-section class="pipeline-error-header tw-flex tw-items-center tw-justify-between">
+      <q-card-section
+        class="pipeline-error-header tw-flex tw-items-center tw-justify-between"
+      >
         <div class="tw-flex-1">
           <div class="tw-flex tw-items-center tw-gap-3 tw-mb-1">
             <q-icon name="error" size="24px" class="error-icon" />
@@ -391,7 +491,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="error-timestamp">
             <span class="tw-mr-2">Last error:</span>
             <q-icon name="schedule" size="14px" class="tw-mr-1" />
-            {{ errorDialog.data && new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString() }}
+            {{
+              errorDialog.data &&
+              new Date(
+                errorDialog.data.last_error.last_error_timestamp / 1000,
+              ).toLocaleString()
+            }}
           </div>
         </div>
         <q-btn
@@ -416,20 +521,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Node Errors -->
-        <div v-if="errorDialog.data.last_error.node_errors && Object.keys(errorDialog.data.last_error.node_errors).length > 0">
+        <div
+          v-if="
+            errorDialog.data.last_error.node_errors &&
+            Object.keys(errorDialog.data.last_error.node_errors).length > 0
+          "
+        >
           <div class="section-label tw-mb-3">Node Errors</div>
           <div class="node-errors-container">
             <div
-              v-for="(nodeError, nodeId) in errorDialog.data.last_error.node_errors"
+              v-for="(nodeError, nodeId) in errorDialog.data.last_error
+                .node_errors"
               :key="nodeId"
               class="node-error-item"
             >
               <div class="node-error-header">
-                <span class="node-name">{{ nodeError.node_name || nodeId }}</span>
+                <span class="node-name">{{
+                  nodeError.node_name || nodeId
+                }}</span>
                 <span class="node-type">{{ nodeError.node_type }}</span>
               </div>
-              <div v-if="nodeError.error_messages && nodeError.error_messages.length > 0" class="node-error-messages">
-                <div v-for="(msg, idx) in nodeError.error_messages" :key="idx" class="error-message">
+              <div
+                v-if="
+                  nodeError.error_messages &&
+                  nodeError.error_messages.length > 0
+                "
+                class="node-error-messages"
+              >
+                <div
+                  v-for="(msg, idx) in nodeError.error_messages"
+                  :key="idx"
+                  class="error-message"
+                >
                   {{ msg }}
                 </div>
               </div>
@@ -444,7 +567,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-caps
           label="Close"
           class="o2-secondary-button tw-h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           @click="closeErrorDialog"
         />
       </q-card-actions>
@@ -517,7 +644,7 @@ const resumePipelineDialogMeta: any = ref({
   show: false,
   title: "Resume Pipeline Ingestion",
   data: null,
-  onConfirm: () =>  handleResumePipeline(),
+  onConfirm: () => handleResumePipeline(),
   onCancel: () => handleCancelResumePipeline(),
 });
 
@@ -618,20 +745,20 @@ const updateActiveTab = () => {
   resultTotal.value = filteredPipelines.value.length;
   columns.value = getColumnsForActiveTab(activeTab.value);
 };
-//this is the function to check whether the pipeline is enabled or not 
+//this is the function to check whether the pipeline is enabled or not
 //becuase if it is not enabled then we need to show the dialog to resume the pipeline from where it paused / start from now
 //else we need to toggle the pipeline state
 const togglePipeline = (row: any) => {
   //if we are going to pause the pipeline and it is realtime pipeline then we need to toggle the pipeline state and pause the pipeline
   //and the resume at would be false because it is not required to resume the pipeline and for realtime pipelines from where it paused
-  if(row.enabled || row.type == "realtime"){
-    togglePipelineState(row,true);
-  }else{
+  if (row.enabled || row.type == "realtime") {
+    togglePipelineState(row, true);
+  } else {
     //if we are going to resume the pipeline then we need to show the dialog to resume the pipeline from where it paused / start from now as per the user choice
     resumePipelineDialogMeta.value.show = true;
     resumePipelineDialogMeta.value.data = row;
   }
-}
+};
 
 const togglePipelineState = (row: any, from_now: boolean) => {
   const newState = !row.enabled;
@@ -640,7 +767,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
       store.state.selectedOrganization.identifier,
       row.pipeline_id,
       newState,
-      from_now
+      from_now,
     )
     .then(async (response) => {
       row.enabled = newState;
@@ -817,10 +944,10 @@ const getPipelines = async () => {
       if (pipeline.source.source_type === "realtime") {
         pipeline.stream_name = pipeline.source.stream_name;
         pipeline.stream_type = pipeline.source.stream_type;
-        pipeline.frequency = "--"
-        pipeline.period = "--"
-        pipeline.cron = "--"
-        pipeline.sql_query = "--"
+        pipeline.frequency = "--";
+        pipeline.period = "--";
+        pipeline.cron = "--";
+        pipeline.sql_query = "--";
       } else {
         pipeline.stream_type = pipeline.source.stream_type;
         pipeline.frequency =
@@ -977,6 +1104,12 @@ const routeToAddPipeline = () => {
   });
 };
 
+const goToPipelineHistory = () => {
+  router.push({
+    name: "pipelineHistory",
+  });
+};
+
 const exportPipeline = (row: any) => {
   const pipelineToBeExported = row.name;
 
@@ -1038,8 +1171,11 @@ const exportBulkPipelines = () => {
 //if user clicks on run pipeline button then we need toggle the pipeline state and resume the pipeline from where it paused / start from now as per the user choice
 const handleResumePipeline = () => {
   resumePipelineDialogMeta.value.show = false;
-  togglePipelineState(resumePipelineDialogMeta.value.data,shouldStartfromNow.value);
-}
+  togglePipelineState(
+    resumePipelineDialogMeta.value.data,
+    shouldStartfromNow.value,
+  );
+};
 //if user clicks on cancel button then we need to just close the dialog and do not toggle the pipeline state
 const handleCancelResumePipeline = () => {
   resumePipelineDialogMeta.value.show = false;
@@ -1047,9 +1183,9 @@ const handleCancelResumePipeline = () => {
 };
 
 const visibleRows = computed(() => {
-    if (!filterQuery.value) return filteredPipelines.value || []
-    return filterData(filteredPipelines.value || [], filterQuery.value)
-  });
+  if (!filterQuery.value) return filteredPipelines.value || [];
+  return filterData(filteredPipelines.value || [], filterQuery.value);
+});
 
 const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
@@ -1064,16 +1200,16 @@ const closeErrorDialog = () => {
 };
 
 const bulkTogglePipelines = async (action: "pause" | "resume") => {
-    const dismiss = q.notify({
-      spinner: true,
-      message: `${action === "resume" ? "Resuming" : "Pausing"} pipelines...`,
-      timeout: 0,
-    });
+  const dismiss = q.notify({
+    spinner: true,
+    message: `${action === "resume" ? "Resuming" : "Pausing"} pipelines...`,
+    timeout: 0,
+  });
   try {
     const isResuming = action === "resume";
     // Filter pipelines based on action
     const pipelinesToToggle = selectedPipelines.value.filter((pipeline: any) =>
-      isResuming ? !pipeline.enabled : pipeline.enabled
+      isResuming ? !pipeline.enabled : pipeline.enabled,
     );
 
     if (pipelinesToToggle.length === 0) {
@@ -1095,7 +1231,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     const response = await pipelineService.bulkToggleState(
       store.state.selectedOrganization.identifier,
       isResuming,
-      payload
+      payload,
     );
 
     if (response) {
@@ -1119,7 +1255,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
       timeout: 2000,
     });
   }
-  };
+};
 </script>
 <style lang="scss" scoped>
 .dark-mode {
@@ -1259,7 +1395,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
 .error-summary-box {
   padding: 16px;
   border-radius: 8px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -1319,7 +1455,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
   border-radius: 6px;
   background: rgba(239, 68, 68, 0.06);
   border-left: 3px solid #ef4444;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;

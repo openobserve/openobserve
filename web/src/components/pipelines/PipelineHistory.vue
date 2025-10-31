@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="alert-history-page"
+    data-test="pipeline-history-page"
     class="q-pa-none flex"
     style="height: calc(100vh - 65px)"
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
@@ -36,13 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           round
           @click="goBack"
           class="q-mr-md"
-          data-test="alert-history-back-btn"
+          data-test="pipeline-history-back-btn"
         />
         <div
           class="q-table__title tw-font-[600]"
-          data-test="alerts-history-title"
+          data-test="pipeline-history-title"
         >
-          {{ t(`alerts.history`) }}
+          {{ t(`pipeline.history`) }}
         </div>
       </div>
       <div class="flex q-ml-auto items-center">
@@ -56,24 +56,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               endTime: absoluteTime.endTime,
             }"
             :default-relative-time="relativeTime"
-            data-test="alert-history-date-picker"
+            data-test="pipeline-history-date-picker"
             @on:date-change="updateDateTime"
           />
         </div>
         <q-select
-          v-model="selectedAlert"
+          v-model="selectedPipeline"
           dense
           borderless
           use-input
           hide-selected
           fill-input
           input-debounce="0"
-          :options="filteredAlertOptions"
-          @filter="filterAlertOptions"
+          :options="filteredPipelineOptions"
+          @filter="filterPipelineOptions"
           @input-value="setSearchQuery"
-          @update:model-value="onAlertSelected"
-          :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
-          data-test="alert-history-search-select"
+          @update:model-value="onPipelineSelected"
+          :placeholder="
+            t(`pipeline.searchHistory`) || 'Select or search pipeline...'
+          "
+          data-test="pipeline-history-search-select"
           class="o2-search-input q-mr-md"
           style="min-width: 250px"
           :class="
@@ -98,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:no-option>
             <q-item>
               <q-item-section class="text-grey">
-                No alerts found
+                No pipelines found
               </q-item-section>
             </q-item>
           </template>
@@ -108,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           round
           @click="manualSearch"
-          data-test="alert-history-manual-search-btn"
+          data-test="pipeline-history-manual-search-btn"
           :disable="loading"
           class="q-mr-md"
         >
@@ -119,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           round
           @click="refreshData"
-          data-test="alert-history-refresh-btn"
+          data-test="pipeline-history-refresh-btn"
           :loading="loading"
         >
           <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
@@ -128,11 +130,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      class="full-width alert-history-table"
+      class="full-width pipeline-history-table"
       style="height: calc(100vh - 138px)"
     >
       <q-table
-        data-test="alert-history-table"
+        data-test="pipeline-history-table"
         ref="qTable"
         :rows="rows"
         :columns="columns"
@@ -149,7 +151,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #no-data>
           <div class="full-width row flex-center q-py-lg text-grey-7">
             <q-icon name="info" size="2em" class="q-mr-sm" />
-            <span>{{ t("alerts.noHistory") || "No alert history found" }}</span>
+            <span>{{
+              t("pipeline.noHistory") || "No pipeline history found"
+            }}</span>
           </div>
         </template>
 
@@ -228,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               round
               @click="showDetailsDialog(props.row)"
-              data-test="alert-history-view-details"
+              data-test="pipeline-history-view-details"
             >
               <q-tooltip>View Details</q-tooltip>
             </q-btn>
@@ -251,10 +255,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-dialog v-model="detailsDialog" position="standard">
       <q-card
         style="width: 700px; max-width: 80vw; max-height: 90vh"
-        class="alert-details-dialog"
+        class="pipeline-details-dialog"
       >
         <q-card-section class="row items-center q-pb-xs bg-primary text-white">
-          <div class="text-h6">Alert Execution Details</div>
+          <div class="text-h6">Pipeline Execution Details</div>
           <q-space />
           <q-btn icon="close" flat round dense v-close-popup />
         </q-card-section>
@@ -271,9 +275,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="detail-section">
               <div class="row q-col-gutter-md">
                 <div class="col-6">
-                  <div class="text-caption text-grey-7 q-mb-xs">Alert Name</div>
+                  <div class="text-caption text-grey-7 q-mb-xs">
+                    Pipeline Name
+                  </div>
                   <div class="text-body2 text-weight-medium">
-                    {{ selectedRow.alert_name }}
+                    {{ selectedRow.pipeline_name }}
                   </div>
                 </div>
                 <div class="col-6">
@@ -317,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-separator class="q-my-sm" />
 
-            <!-- Alert Configuration -->
+            <!-- Pipeline Configuration -->
             <div class="detail-section">
               <div class="row q-col-gutter-md">
                 <div class="col-6">
@@ -497,7 +503,8 @@ import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
 import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
-import alertsService from "@/services/alerts";
+import pipelinesService from "@/services/pipelines";
+import http from "@/services/http";
 
 const { t } = useI18n();
 const store = useStore();
@@ -508,9 +515,9 @@ const $q = useQuasar();
 const loading = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
-const selectedAlert = ref<string | null>(null);
-const allAlerts = ref<any[]>([]);
-const filteredAlertOptions = ref<string[]>([]);
+const selectedPipeline = ref<string | null>(null);
+const allPipelines = ref<any[]>([]);
+const filteredPipelineOptions = ref<string[]>([]);
 const pagination = ref({
   page: 1,
   rowsPerPage: 20,
@@ -561,9 +568,9 @@ const columns = ref([
     sortable: true,
   },
   {
-    name: "alert_name",
-    label: "Alert Name",
-    field: "alert_name",
+    name: "pipeline_name",
+    label: "Pipeline Name",
+    field: "pipeline_name",
     align: "left",
     sortable: true,
   },
@@ -604,7 +611,7 @@ const columns = ref([
   },
   {
     name: "error",
-    label: "Error",
+    label: "Errors",
     field: "error",
     align: "center",
     sortable: false,
@@ -625,37 +632,30 @@ const filteredRows = computed(() => {
 });
 
 // Methods
-const fetchAlertsList = async () => {
+const fetchPipelinesList = async () => {
   try {
     const org = store.state.selectedOrganization.identifier;
 
-    // Fetch all alerts for the organization
-    const res = await alertsService.listByFolderId(
-      1,
-      1000,
-      "name",
-      false,
-      "",
-      org,
-      "", // all folders
-      "", // no query filter
-    );
+    // Fetch all pipelines for the organization
+    const res = await pipelinesService.getPipelines(org);
 
     if (res.data && res.data.list) {
-      // Extract alert names and sort them
-      allAlerts.value = res.data.list.map((alert: any) => alert.name).sort();
-      filteredAlertOptions.value = [...allAlerts.value];
+      // Extract pipeline names and sort them
+      allPipelines.value = res.data.list
+        .map((pipeline: any) => pipeline.name)
+        .sort();
+      filteredPipelineOptions.value = [...allPipelines.value];
     }
   } catch (error: any) {
-    console.error("Error fetching alerts list:", error);
-    // Silently fail - user can still type alert names manually
+    console.error("Error fetching pipelines list:", error);
+    // Silently fail - user can still type pipeline names manually
   }
 };
 
-const filterAlertOptions = (val: string, update: any) => {
+const filterPipelineOptions = (val: string, update: any) => {
   update(() => {
     const needle = val.toLowerCase();
-    filteredAlertOptions.value = allAlerts.value.filter((v) =>
+    filteredPipelineOptions.value = allPipelines.value.filter((v) =>
       v.toLowerCase().includes(needle),
     );
   });
@@ -665,7 +665,7 @@ const setSearchQuery = (val: string) => {
   searchQuery.value = val;
 };
 
-const onAlertSelected = (val: string | null) => {
+const onPipelineSelected = (val: string | null) => {
   if (val) {
     searchQuery.value = val;
   }
@@ -673,15 +673,15 @@ const onAlertSelected = (val: string | null) => {
 
 const clearSearch = () => {
   searchQuery.value = "";
-  selectedAlert.value = null;
+  selectedPipeline.value = null;
 };
 
 const manualSearch = () => {
   pagination.value.page = 1;
-  fetchAlertHistory();
+  fetchPipelineHistory();
 };
 
-const fetchAlertHistory = async () => {
+const fetchPipelineHistory = async () => {
   loading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
@@ -690,7 +690,7 @@ const fetchAlertHistory = async () => {
     const startTime = dateTimeValues.value.startTime;
     const endTime = dateTimeValues.value.endTime;
 
-    const query: any = {
+    const params: any = {
       start_time: startTime.toString(),
       end_time: endTime.toString(),
       from: (
@@ -700,12 +700,13 @@ const fetchAlertHistory = async () => {
       size: pagination.value.rowsPerPage.toString(),
     };
 
-    // Add alert_name filter if search query is provided
+    // Add pipeline_name filter if search query is provided
     if (searchQuery.value && searchQuery.value.trim()) {
-      query.alert_name = searchQuery.value.trim();
+      params.pipeline_name = searchQuery.value.trim();
     }
 
-    const response = await alertsService.getHistory(org, query);
+    const url = `/api/${org}/pipelines/history`;
+    const response = await http().get(url, { params });
 
     if (response.data) {
       // Handle the response data
@@ -721,18 +722,18 @@ const fetchAlertHistory = async () => {
       pagination.value.rowsNumber = historyData.total || 0;
 
       if (rows.value.length === 0) {
-        console.warn("No alert history found for the selected time range");
+        console.warn("No pipeline history found for the selected time range");
       }
     }
   } catch (error: any) {
-    console.error("Error fetching alert history:", error);
+    console.error("Error fetching pipeline history:", error);
     console.error("Error response:", error.response);
     $q.notify({
       type: "negative",
       message:
         error.response?.data?.message ||
         error.message ||
-        "Failed to fetch alert history",
+        "Failed to fetch pipeline history",
     });
   } finally {
     loading.value = false;
@@ -762,7 +763,7 @@ const updateDateTime = (value: any) => {
 
   // Reset pagination and fetch new data
   pagination.value.page = 1;
-  fetchAlertHistory();
+  fetchPipelineHistory();
 };
 
 const onRequest = (props: any) => {
@@ -772,11 +773,11 @@ const onRequest = (props: any) => {
     ...props.pagination,
   };
 
-  fetchAlertHistory();
+  fetchPipelineHistory();
 };
 
 const refreshData = () => {
-  fetchAlertHistory();
+  fetchPipelineHistory();
 };
 
 const formatDate = (timestamp: number) => {
@@ -831,38 +832,38 @@ const showErrorDialog = (error: string) => {
 };
 
 const goBack = () => {
-  router.push({ name: "alertList" });
+  router.push({ name: "pipelines" });
 };
 
 // Lifecycle
 onMounted(async () => {
-  // Fetch alerts list for dropdown
-  await fetchAlertsList();
-  // Fetch initial alert history
-  fetchAlertHistory();
+  // Fetch pipelines list for dropdown
+  await fetchPipelinesList();
+  // Fetch initial pipeline history
+  fetchPipelineHistory();
 });
 
 // Watch for organization change
 watch(
   () => store.state.selectedOrganization.identifier,
   async () => {
-    // Re-fetch alerts list when organization changes
-    await fetchAlertsList();
+    // Re-fetch pipelines list when organization changes
+    await fetchPipelinesList();
     // Reset search
     clearSearch();
     // Fetch history for new organization
-    fetchAlertHistory();
+    fetchPipelineHistory();
   },
 );
 const changePagination = (val: { label: string; value: any }) => {
   pagination.value.rowsPerPage = val.value;
   pagination.value.page = 1; // Reset to first page when changing page size
-  fetchAlertHistory();
+  fetchPipelineHistory();
 };
 </script>
 
 <style scoped lang="scss">
-.alert-history-table {
+.pipeline-history-table {
   :deep(.q-table) {
     width: 100%;
 
@@ -872,7 +873,7 @@ const changePagination = (val: { label: string; value: any }) => {
   }
 }
 
-.alert-details-dialog {
+.pipeline-details-dialog {
   :deep(.q-dialog__inner) {
     padding: 24px;
   }

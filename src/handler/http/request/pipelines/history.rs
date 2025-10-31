@@ -35,15 +35,15 @@ use crate::{
     },
     handler::http::extractors::Headers,
     service::{
-        db::alerts::alert::list as list_alerts,
+        db::pipeline::list_by_org as list_pipelines,
         search::{self as SearchService},
     },
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AlertHistoryQuery {
-    /// Filter by specific alert name
-    pub alert_name: Option<String>,
+pub struct PipelineHistoryQuery {
+    /// Filter by specific pipeline name
+    pub pipeline_name: Option<String>,
     /// Start time in Unix timestamp microseconds
     pub start_time: Option<i64>,
     /// End time in Unix timestamp microseconds
@@ -55,9 +55,9 @@ pub struct AlertHistoryQuery {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct AlertHistoryEntry {
+pub struct PipelineHistoryEntry {
     pub timestamp: i64,
-    pub alert_name: String,
+    pub pipeline_name: String,
     pub org: String,
     pub status: String,
     pub is_realtime: bool,
@@ -75,42 +75,42 @@ pub struct AlertHistoryEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct AlertHistoryResponse {
+pub struct PipelineHistoryResponse {
     pub total: usize,
     pub from: i64,
     pub size: i64,
-    pub hits: Vec<AlertHistoryEntry>,
+    pub hits: Vec<PipelineHistoryEntry>,
 }
 
-/// GetAlertHistory
+/// GetPipelineHistory
 #[utoipa::path(
     context_path = "/api",
-    tag = "Alerts",
-    operation_id = "GetAlertHistory",
-    summary = "Get alert execution history",
-    description = "Retrieves the execution history of alerts for the organization. This endpoint queries the _meta organization's triggers stream to provide details about when alerts were triggered, their status, and execution details.",
+    tag = "Pipelines",
+    operation_id = "GetPipelineHistory",
+    summary = "Get pipeline execution history",
+    description = "Retrieves the execution history of pipelines for the organization. This endpoint queries the _meta organization's triggers stream to provide details about when pipelines were triggered, their status, and execution details.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_name" = Option<String>, Query, description = "Filter by specific alert name"),
+        ("pipeline_name" = Option<String>, Query, description = "Filter by specific pipeline name"),
         ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds"),
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds"),
         ("from" = Option<i64>, Query, description = "Pagination offset (default: 0)"),
         ("size" = Option<i64>, Query, description = "Number of results to return (default: 100, max: 1000)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = AlertHistoryResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = PipelineHistoryResponse),
         (status = 400, description = "Bad Request", content_type = "application/json"),
         (status = 403, description = "Forbidden", content_type = "application/json"),
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
 )]
-#[get("/{org_id}/alerts/history")]
-pub async fn get_alert_history(
+#[get("/{org_id}/pipelines/history")]
+pub async fn get_pipeline_history(
     path: web::Path<String>,
-    query: web::Query<AlertHistoryQuery>,
+    query: web::Query<PipelineHistoryQuery>,
     Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
 ) -> HttpResponse {
@@ -132,21 +132,21 @@ pub async fn get_alert_history(
         return MetaHttpResponse::bad_request("start_time must be before end_time");
     }
 
-    // Get all alert names for the organization to validate the filter
-    let alert_names = match get_organization_alert_names(&org_id).await {
+    // Get all pipeline names for the organization to validate the filter
+    let pipeline_names = match get_organization_pipeline_names(&org_id).await {
         Ok(names) => names,
         Err(e) => {
-            log::error!("Failed to get alert names for org {}: {}", org_id, e);
-            return MetaHttpResponse::internal_error(format!("Failed to get alert names: {e}"));
+            log::error!("Failed to get pipeline names for org {}: {}", org_id, e);
+            return MetaHttpResponse::internal_error(format!("Failed to get pipeline names: {e}"));
         }
     };
 
-    // If alert_name filter is provided, validate it exists
-    if let Some(ref alert_name) = query.alert_name
-        && !alert_names.contains(alert_name)
+    // If pipeline_name filter is provided, validate it exists
+    if let Some(ref pipeline_name) = query.pipeline_name
+        && !pipeline_names.contains(pipeline_name)
     {
         return MetaHttpResponse::not_found(format!(
-            "Alert '{alert_name}' not found in organization"
+            "Pipeline '{pipeline_name}' not found in organization"
         ));
     }
 
@@ -157,10 +157,10 @@ pub async fn get_alert_history(
          delay_in_secs, evaluation_took_in_secs, \
          source_node, query_took \
          FROM \"{TRIGGERS_USAGE_STREAM}\" \
-         WHERE module = 'alert' AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+         WHERE (module in ('derived_stream', 'pipeline')) AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
 
-    // Helper function to escape alert names for SQL LIKE patterns
+    // Helper function to escape pipeline names for SQL LIKE patterns
     fn escape_like(input: &str) -> String {
         let mut escaped = String::with_capacity(input.len());
         for c in input.chars() {
@@ -175,23 +175,23 @@ pub async fn get_alert_history(
         escaped
     }
 
-    // Add alert name filter if provided
-    // The key field contains the alert name in the format "alert_name/alert_id"
-    if let Some(ref alert_name) = query.alert_name {
-        // We need to filter where key starts with the alert name
-        let escaped_name = escape_like(alert_name);
+    // Add pipeline name filter if provided
+    // The key field contains the pipeline name in the format "pipeline_name/pipeline_id"
+    if let Some(ref pipeline_name) = query.pipeline_name {
+        // We need to filter where key starts with the pipeline name
+        let escaped_name = escape_like(pipeline_name);
         sql.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
-    } else if !alert_names.is_empty() {
-        // Filter by all alerts in the organization
-        let alert_filter = alert_names
+    } else if !pipeline_names.is_empty() {
+        // Filter by all pipelines in the organization
+        let pipeline_filter = pipeline_names
             .iter()
-            .map(|name| format!("key LIKE '{}/%'", name.replace("'", "''")))
+            .map(|name| format!("key LIKE '%{}%'", name.replace("'", "''")))
             .collect::<Vec<_>>()
             .join(" OR ");
-        sql.push_str(&format!(" AND ({alert_filter})"));
+        sql.push_str(&format!(" AND ({pipeline_filter})"));
     } else {
-        // No alerts in the organization, return empty result
-        return MetaHttpResponse::json(AlertHistoryResponse {
+        // No pipelines in the organization, return empty result
+        return MetaHttpResponse::json(PipelineHistoryResponse {
             total: 0,
             from,
             size,
@@ -238,29 +238,29 @@ pub async fn get_alert_history(
     {
         Ok(result) => result,
         Err(e) => {
-            log::error!("Failed to search alert history: {}", e);
+            log::error!("Failed to search pipeline history: {}", e);
             return MetaHttpResponse::internal_error(format!(
-                "Failed to search alert history: {e}"
+                "Failed to search pipeline history: {e}"
             ));
         }
     };
 
-    // Parse the search results into AlertHistoryEntry objects
+    // Parse the search results into PipelineHistoryEntry objects
     let mut entries = Vec::new();
     for hit in search_result.hits {
-        // Extract alert name from key field (format: "alert_name/alert_id")
+        // Extract pipeline name from key field (format: "pipeline_name/pipeline_id")
         let key = hit.get("key").and_then(|v| v.as_str()).unwrap_or("");
 
-        let alert_name = key.split('/').next().unwrap_or("").to_string();
+        let pipeline_name = key.split('/').next().unwrap_or("").to_string();
 
-        // Skip if alert_name is empty
-        if alert_name.is_empty() {
+        // Skip if pipeline_name is empty
+        if pipeline_name.is_empty() {
             continue;
         }
 
-        entries.push(AlertHistoryEntry {
+        entries.push(PipelineHistoryEntry {
             timestamp: hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
-            alert_name,
+            pipeline_name,
             org: hit
                 .get("org")
                 .and_then(|v| v.as_str())
@@ -299,7 +299,7 @@ pub async fn get_alert_history(
     }
 
     // Build response
-    let response = AlertHistoryResponse {
+    let response = PipelineHistoryResponse {
         total: search_result.total,
         from,
         size,
@@ -309,13 +309,16 @@ pub async fn get_alert_history(
     MetaHttpResponse::json(response)
 }
 
-/// Helper function to get all alert names for an organization
-async fn get_organization_alert_names(org_id: &str) -> Result<Vec<String>, anyhow::Error> {
-    // Get all alerts for the organization
-    let alerts = list_alerts(org_id, None, None).await?;
+/// Helper function to get all pipeline names for an organization
+async fn get_organization_pipeline_names(org_id: &str) -> Result<Vec<String>, anyhow::Error> {
+    // Get all pipelines for the organization
+    let pipelines = list_pipelines(org_id).await?;
 
-    // Extract alert names
-    let names: Vec<String> = alerts.into_iter().map(|alert| alert.name).collect();
+    // Extract pipeline names
+    let names: Vec<String> = pipelines
+        .into_iter()
+        .map(|pipeline| pipeline.name)
+        .collect();
 
     Ok(names)
 }
