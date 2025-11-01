@@ -96,7 +96,6 @@ export const usePanelDataLoader = (
     store.state.selectedOrganization.identifier,
     dashboardId?.value,
     panelSchema.value.id,
-    panelSchema.value.config?.enable_annotations ?? true, // Default to true when not specified
   );
 
   const shouldFetchAnnotations = () => {
@@ -825,11 +824,10 @@ export const usePanelDataLoader = (
         timestamps.start_time != "Invalid Date" &&
         timestamps.end_time != "Invalid Date"
       ) {
-        // Convert milliseconds to microseconds for OpenObserve API
         startISOTimestamp = new Date(
           timestamps.start_time.toISOString(),
-        ).getTime() * 1000;
-        endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+        ).getTime();
+        endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
       } else {
         return;
       }
