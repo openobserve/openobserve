@@ -584,9 +584,6 @@ pub async fn process_search_stream_request(
 
     #[cfg(feature = "enterprise")]
     {
-        if audit_enabled {
-        if get_o2_config().common.audit_enabled && _audit_ctx.is_some() {
-            let audit_ctx = _audit_ctx.as_ref().unwrap();
         if get_o2_config().common.audit_enabled
             && let Some(audit_ctx) = _audit_ctx.as_ref()
         {
@@ -790,8 +787,9 @@ pub async fn process_search_stream_request_multi(
                 query_sender,
                 None,  // no values context for multi-stream
                 None,  // no fallback order by col
-                None,  // no audit context for individual queries
+                None,  // no audit context for individualueries
                 false, // not multi stream search at individual level
+                false, // no pattern extraction for multi-stream
             );
 
             tokio::spawn(search_task);

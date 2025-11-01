@@ -923,6 +923,9 @@ export default defineComponent({
           return;
         }
 
+        // Override the size with the pattern scan size from UI
+        queryReq.query.size = patternsState.value.scanSize;
+
         const streamName = searchObj.data.stream.selectedStream[0];
         if (!streamName) {
           console.log("[Index] No stream selected");
