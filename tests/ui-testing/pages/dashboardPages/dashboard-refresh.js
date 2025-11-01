@@ -65,31 +65,46 @@ export default class DashboardTimeRefresh {
     await this.page.waitForSelector('.q-date', { state: 'visible', timeout: 10000 });
     await this.page.waitForTimeout(1000);
 
-    // Try to find and click the date buttons
-    // Use a more flexible approach that checks if dates are available
+    // Helper function to find and click a date, navigating if needed
+    const clickDateWithNavigation = async (day) => {
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (attempts < maxAttempts) {
+        const dayButtons = this.page.getByRole("button", { name: String(day), exact: true });
+        const count = await dayButtons.count();
+
+        if (count > 0) {
+          // Find a button that's not disabled
+          for (let i = 0; i < count; i++) {
+            const button = dayButtons.nth(i);
+            const isDisabled = await button.getAttribute('disabled');
+            if (!isDisabled) {
+              await button.click();
+              await this.page.waitForTimeout(300);
+              return true;
+            }
+          }
+        }
+
+        // If date not found or all disabled, try navigating to next month
+        attempts++;
+        if (attempts < maxAttempts) {
+          const nextButton = this.page.locator("button").filter({ hasText: "chevron_right" }).first();
+          await nextButton.click();
+          await this.page.waitForTimeout(500);
+        }
+      }
+
+      throw new Error(`Day ${day} not found after ${maxAttempts} attempts`);
+    };
+
     try {
-      // First try to click start day
-      const startDayButtons = this.page.getByRole("button", { name: String(startDay) });
-      const startCount = await startDayButtons.count();
+      // Click start day
+      await clickDateWithNavigation(startDay);
 
-      if (startCount === 0) {
-        throw new Error(`Start day ${startDay} not found in current calendar view`);
-      }
-
-      // Click the last matching button (usually the one in the current/next month)
-      await startDayButtons.last().click();
-      await this.page.waitForTimeout(300);
-
-      // Then try to click end day
-      const endDayButtons = this.page.getByRole("button", { name: String(endDay) });
-      const endCount = await endDayButtons.count();
-
-      if (endCount === 0) {
-        throw new Error(`End day ${endDay} not found in current calendar view`);
-      }
-
-      await endDayButtons.last().click();
-      await this.page.waitForTimeout(300);
+      // Click end day
+      await clickDateWithNavigation(endDay);
 
     } catch (error) {
       console.error(`Error selecting dates: ${error.message}`);
