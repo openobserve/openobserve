@@ -789,6 +789,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <div
+                      v-if="config.isEnterprise === 'true'"
                       :class="[
                         'tw-flex tw-items-center tw-justify-between tw-text-sm',
                         store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
