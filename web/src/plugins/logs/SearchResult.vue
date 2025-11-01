@@ -485,18 +485,45 @@ color="warning" size="xs"></q-icon> Error while
                     </q-avatar>
                   </div>
                   <div class="col">
-                    <div
-                      class="text-body2 ellipsis"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-grey-4'
-                          : 'text-grey-8'
-                      "
-                    >
-                      {{ pattern.description }}
+                    <!-- Template shown first with info icon -->
+                    <div class="tw-flex tw-items-center q-mb-xs">
+                      <div
+                        class="text-body2 ellipsis"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'text-grey-4'
+                            : 'text-grey-8'
+                        "
+                        style="
+                          font-family:
+                            &quot;Monaco&quot;, &quot;Menlo&quot;,
+                            &quot;Courier New&quot;, monospace;
+                          font-size: 0.8125rem;
+                        "
+                      >
+                        {{ pattern.template }}
+                      </div>
+                      <q-icon
+                        :name="outlinedInfo"
+                        size="17px"
+                        class="q-ml-xs cursor-pointer"
+                        :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                      >
+                        <q-tooltip
+                          anchor="center right"
+                          self="center left"
+                          max-width="300px"
+                          style="font-size: 12px;"
+                        >
+                          <div class="text-weight-bold q-mb-xs">Template vs Description</div>
+                          <div class="q-mb-xs"><strong>Template:</strong> {{ pattern.template }}</div>
+                          <div><strong>Description:</strong> {{ pattern.description }}</div>
+                        </q-tooltip>
+                      </q-icon>
                     </div>
+                    <!-- Occurrences and percentage on second line -->
                     <div
-                      class="text-caption q-mt-xs"
+                      class="text-caption"
                       :class="
                         store.state.theme === 'dark'
                           ? 'text-grey-6'
@@ -564,40 +591,6 @@ color="warning" size="xs"></q-icon> Error while
                       >
                     </q-icon>
                   </div>
-                </div>
-              </q-card-section>
-
-              <q-separator />
-
-              <!-- Template Display - Compact -->
-              <q-card-section class="q-pa-md">
-                <div
-                  class="text-caption text-uppercase text-weight-medium q-mb-sm"
-                  :class="
-                    store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-7'
-                  "
-                >
-                  Pattern Template
-                </div>
-                <div
-                  class="q-pa-sm"
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
-                  "
-                  style="
-                    font-family:
-                      &quot;Monaco&quot;, &quot;Menlo&quot;,
-                      &quot;Courier New&quot;, monospace;
-                    font-size: 0.75rem;
-                    line-height: 1.5;
-                    border-radius: 0.25rem;
-                    border-left: 0.1875rem solid;
-                    word-break: break-all;
-                    white-space: pre-wrap;
-                    border-color: var(--q-primary);
-                  "
-                >
-                  {{ pattern.template }}
                 </div>
               </q-card-section>
             </q-card>
@@ -1020,6 +1013,7 @@ import {
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
@@ -1686,6 +1680,7 @@ export default defineComponent({
       extractConstantsFromPattern,
       isEditingScanSize,
       toggleEditScanSize,
+      outlinedInfo,
     };
   },
   computed: {
