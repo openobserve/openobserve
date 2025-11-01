@@ -135,6 +135,9 @@ pub async fn process_search_stream_request(
             max_logs_for_extraction: max_logs,
             min_cluster_size: o2_config.log_patterns.min_cluster_size,
             similarity_threshold: o2_config.log_patterns.similarity_threshold,
+            xdrain_depth: o2_config.log_patterns.xdrain_depth,
+            xdrain_max_child: o2_config.log_patterns.xdrain_max_child,
+            max_clusters: o2_config.log_patterns.max_clusters,
             min_field_length: o2_config.log_patterns.min_field_length,
             fts_fields: all_fts_fields,
         };

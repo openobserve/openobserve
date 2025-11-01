@@ -63,8 +63,9 @@ export default function usePatterns() {
       const transformedPatterns = response.data.patterns.map(
         (pattern: any) => ({
           ...pattern,
-          // Add template field (same as description for display)
-          template: pattern.description,
+          // Use the actual template field from backend (with SDR types like <:IP>, <:NUM>)
+          // description field is the simplified, human-readable version
+          template: pattern.template || pattern.description,
           // Calculate percentage if not present
           percentage:
             pattern.percentage ||
