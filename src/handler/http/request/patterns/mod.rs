@@ -15,6 +15,8 @@
 
 use actix_web::{HttpResponse, post, web};
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::utils::check_stream_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::extractors::Headers,
@@ -46,9 +48,12 @@ use crate::{
     responses(
         (status = 200, description = "Success", body = serde_json::Value),
         (status = 400, description = "Bad Request"),
-        (status = 403, description = "Forbidden - Enterprise feature only"),
+        (status = 403, description = "Forbidden - Enterprise feature only or Unauthorized Access"),
         (status = 500, description = "Internal Server Error"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+    )
 )]
 #[post("/{org_id}/streams/{stream_name}/patterns/extract")]
 pub async fn extract_patterns(
@@ -127,6 +132,27 @@ pub async fn extract_patterns(
             trace_id,
             stream_names
         );
+
+        // Check permissions for each stream (same as _search API)
+        #[cfg(feature = "enterprise")]
+        for stream_name_check in stream_names.iter() {
+            if let Some(res) = check_stream_permissions(
+                stream_name_check,
+                &org_id,
+                &user_id,
+                &config::meta::stream::StreamType::Logs,
+            )
+            .await
+            {
+                log::warn!(
+                    "[PATTERNS trace_id {}] Unauthorized access attempt by user {} for stream {}",
+                    trace_id,
+                    user_id,
+                    stream_name_check
+                );
+                return Ok(res);
+            }
+        }
 
         // Set a reasonable size limit for pattern extraction
         if req.query.size == 0 {

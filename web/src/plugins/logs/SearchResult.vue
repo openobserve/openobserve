@@ -1409,8 +1409,8 @@ export default defineComponent({
       // Build multiple match_all() clauses, one for each constant
       // Each match_all takes a single string
       const matchAllClauses = constants.map((constant) => {
-        // Escape single quotes in the constant
-        const escapedConstant = constant.replace(/'/g, "\\'");
+        // Escape backslashes first, then single quotes in the constant
+        const escapedConstant = constant.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
         return `match_all('${escapedConstant}')`;
       });
 
