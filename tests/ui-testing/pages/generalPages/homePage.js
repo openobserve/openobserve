@@ -53,29 +53,15 @@ export class HomePage {
         // await this.page.pause();
         await this.page.waitForTimeout(5000);
         await this.page.reload();
-
-        // Open organization dropdown
         await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
-        await this.page.waitForTimeout(2000);
-
-        // Wait for the organization menu to be visible
-        await this.page.waitForSelector('[data-test="organization-search-input"]', { state: 'visible', timeout: 10000 });
+        await this.page.waitForTimeout(5000);
 
         // Search for the organization
         await this.page.locator('[data-test="organization-search-input"]').fill(orgName);
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForTimeout(2000);
 
-        // Wait for search results and click the organization
-        // Try multiple selectors in case the structure changed
-        try {
-            await this.page.locator('[data-test="organization-menu-item-label-item-label"]').first().waitFor({ state: 'visible', timeout: 5000 });
-            await this.page.locator('[data-test="organization-menu-item-label-item-label"]').first().click();
-        } catch (error) {
-            // Fallback: try alternative selectors
-            const orgMenuItem = this.page.getByRole('option').filter({ hasText: orgName }).first();
-            await orgMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-            await orgMenuItem.click();
-        }
+        // Click the organization from search results
+        await this.page.locator('[data-test="organization-menu-item-label-item-label"]').first().click();
     }
 
     async homePageURLValidation(orgName) {
