@@ -30,11 +30,18 @@ export default class DashboardTimeRefresh {
     await this.timeTab.waitFor({ state: "attached" });
     await this.timeTab.click();
 
+    // Wait for the date-time picker to be visible
+    await this.page.waitForTimeout(500);
+
+    // Wait for relative time tab to be visible before clicking
+    await this.relativeTime.waitFor({ state: "visible", timeout: 10000 });
     await this.relativeTime.click();
+
     await this.page
       .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
       .waitFor({
         state: "visible",
+        timeout: 10000,
       });
     await this.page
       .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
@@ -47,34 +54,49 @@ export default class DashboardTimeRefresh {
     // Open the date-time picker
     await this.timeTab.click();
 
+    // Wait for picker to open
+    await this.page.waitForTimeout(500);
+
     // Switch to the absolute tab
+    await this.absolutetimeTime.waitFor({ state: 'visible', timeout: 10000 });
     await this.absolutetimeTime.click();
 
     // Wait for date picker to be visible
     await this.page.waitForSelector('.q-date', { state: 'visible', timeout: 10000 });
+    await this.page.waitForTimeout(1000);
 
-    // Click the left chevron button (if needed)
-    await this.page
-      .locator("button")
-      .filter({ hasText: "chevron_left" })
-      .first()
-      .click();
+    // Try to find and click the date buttons
+    // Use a more flexible approach that checks if dates are available
+    try {
+      // First try to click start day
+      const startDayButtons = this.page.getByRole("button", { name: String(startDay) });
+      const startCount = await startDayButtons.count();
 
-    // Wait a moment for calendar to update after navigation
-    await this.page.waitForTimeout(500);
+      if (startCount === 0) {
+        throw new Error(`Start day ${startDay} not found in current calendar view`);
+      }
 
-    // Select the start and end days dynamically
-    const startDayButton = this.page
-      .getByRole("button", { name: String(startDay) })
-      .last();
-    await startDayButton.waitFor({ state: 'visible', timeout: 10000 });
-    await startDayButton.click();
+      // Click the last matching button (usually the one in the current/next month)
+      await startDayButtons.last().click();
+      await this.page.waitForTimeout(300);
 
-    const endDayButton = this.page
-      .getByRole("button", { name: String(endDay) })
-      .last();
-    await endDayButton.waitFor({ state: 'visible', timeout: 10000 });
-    await endDayButton.click();
+      // Then try to click end day
+      const endDayButtons = this.page.getByRole("button", { name: String(endDay) });
+      const endCount = await endDayButtons.count();
+
+      if (endCount === 0) {
+        throw new Error(`End day ${endDay} not found in current calendar view`);
+      }
+
+      await endDayButtons.last().click();
+      await this.page.waitForTimeout(300);
+
+    } catch (error) {
+      console.error(`Error selecting dates: ${error.message}`);
+      // Take screenshot for debugging
+      await this.page.screenshot({ path: 'date-picker-error.png' });
+      throw error;
+    }
 
     // Optionally, click the apply button to confirm the selection
     await this.applyBtn.click();
