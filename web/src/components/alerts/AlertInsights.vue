@@ -41,12 +41,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="flex items-center">
-        <DateTime
+        <date-time
           ref="dateTimeRef"
           auto-apply
           :default-type="dateTimeType"
+          :default-absolute-time="{
+            startTime: timeRange.__global.start_time.getTime(),
+            endTime: timeRange.__global.end_time.getTime(),
+          }"
           :default-relative-time="relativeTime"
           @on:date-change="updateDateTime"
+          @on:timezone-change="updateTimezone"
           class="datetime-picker"
           data-test="alert-insights-datetime"
         />
@@ -291,7 +296,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
-import DateTime from "@/components/DateTime.vue";
+import dateTime from "@/components/DateTimePickerDashboard.vue";
 import AlertInsightsContextMenu from "./AlertInsightsContextMenu.vue";
 import { useAlertInsights } from "@/composables/useAlertInsights";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
@@ -460,8 +465,8 @@ const goBack = () => {
 const updateDateTime = (value: any) => {
   timeRange.value = {
     __global: {
-      start_time: new Date(value.startTime / 1000),
-      end_time: new Date(value.endTime / 1000),
+      start_time: new Date(value.startTime ),
+      end_time: new Date(value.endTime ),
     },
   };
 
@@ -473,6 +478,12 @@ const updateDateTime = (value: any) => {
   }
 
   refreshDashboard();
+};
+
+const updateTimezone = (value: any) => {
+  // Handle timezone changes if needed
+  // Currently the date-time component manages timezone internally
+  // This is here for compatibility with the logs date picker
 };
 
 const refreshDashboard = async () => {

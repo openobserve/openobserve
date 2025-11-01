@@ -1,6 +1,6 @@
 {
   "version": 5,
-  "dashboardId": "alert-insights-metrics",
+  "dashboardId": "",
   "title": "Alert Insights",
   "description": "Interactive alert analysis for deduplication and grouping decisions",
   "role": "",
