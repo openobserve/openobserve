@@ -193,6 +193,7 @@ class="warning" />{{
                       <div
                         class="org-menu-item"
                         v-close-popup
+                        data-test="organization-menu-item-label-item-label"
                         :class="{
                           'org-menu-item--active':
                             props.row.identifier === userClickedOrg?.identifier,
