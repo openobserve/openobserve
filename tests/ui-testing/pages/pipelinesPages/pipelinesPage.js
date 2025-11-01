@@ -32,7 +32,8 @@ export class PipelinesPage {
         this.pipelineNameRequiredMessage = page.getByText(
           "Pipeline name is required"
         );
-        this.pipelineNameInput = page.getByLabel("Enter Pipeline Name");
+        // this.pipelineNameInput = page.getByLabel("Enter Pipeline Name");
+        this.pipelineNameInput = page.locator('[aria-label="Enter Pipeline Name"]');
         this.sourceNodeRequiredMessage = page.getByText("Source node is required");
         this.streamNameInput = page.getByLabel("Stream Name *");
         this.e2eAutomateOption = page.getByRole("option", { name: "e2e_automate" , exact: true});
