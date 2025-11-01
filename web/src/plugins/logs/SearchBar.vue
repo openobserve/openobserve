@@ -46,12 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <q-btn
                 data-test="logs-visualize-toggle"
-                :class="
-                  searchObj.meta.logsVisualizeToggle === 'visualize'
-                    ? 'selected'
-                    : ''
-                "
-                class="button button-center tw-flex tw-justify-center tw-items-center no-border no-outline tw-rounded-none q-px-sm btn-height-32"
+                :class="[
+                  searchObj.meta.logsVisualizeToggle === 'visualize' ? 'selected' : '',
+                  config.isEnterprise == 'true' ? 'button button-center tw-rounded-none' : 'button button-right !tw-rounded-l-none',
+                  'tw-flex tw-justify-center tw-items-center no-border no-outline q-px-sm btn-height-32'
+                ]"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disable="isVisualizeDisabled"
                 no-caps
@@ -67,7 +66,7 @@ class="icon-sm" />
                 </q-tooltip>
               </q-btn>
             </div>
-            <div>
+            <div v-if="config.isEnterprise == 'true'">
               <q-btn
                 data-test="logs-patterns-toggle"
                 :class="
