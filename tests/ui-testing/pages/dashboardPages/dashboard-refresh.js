@@ -30,18 +30,11 @@ export default class DashboardTimeRefresh {
     await this.timeTab.waitFor({ state: "attached" });
     await this.timeTab.click();
 
-    // Wait for the date-time picker to be visible
-    await this.page.waitForTimeout(500);
-
-    // Wait for relative time tab to be visible before clicking
-    await this.relativeTime.waitFor({ state: "visible", timeout: 10000 });
     await this.relativeTime.click();
-
     await this.page
       .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
       .waitFor({
         state: "visible",
-        timeout: 10000,
       });
     await this.page
       .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
@@ -54,43 +47,25 @@ export default class DashboardTimeRefresh {
     // Open the date-time picker
     await this.timeTab.click();
 
-    // Wait for picker to open
-    await this.page.waitForTimeout(500);
-
     // Switch to the absolute tab
-    await this.absolutetimeTime.waitFor({ state: 'visible', timeout: 10000 });
     await this.absolutetimeTime.click();
 
-    // Wait for date picker to be visible
-    await this.page.waitForSelector('.q-date', { state: 'visible', timeout: 10000 });
-    await this.page.waitForTimeout(1000);
+    // Click the left chevron button (if needed)
+    await this.page
+      .locator("button")
+      .filter({ hasText: "chevron_left" })
+      .first()
+      .click();
 
-    // Instead of looking for specific dates, find any available dates in the current calendar
-    // This makes the test more robust across different months
-    try {
-      // Get all date buttons that are not disabled
-      const allDateButtons = this.page.locator('.q-date__calendar-item button:not([disabled])');
-      const count = await allDateButtons.count();
-
-      if (count < 2) {
-        throw new Error(`Not enough enabled dates found in calendar. Found: ${count}`);
-      }
-
-      // Click first available date (start date)
-      await allDateButtons.nth(0).click();
-      await this.page.waitForTimeout(300);
-
-      // Click a later date (end date) - use index based on count to ensure it's different
-      const endIndex = Math.min(count - 1, 7); // Select a date ~1 week later or last available
-      await allDateButtons.nth(endIndex).click();
-      await this.page.waitForTimeout(300);
-
-    } catch (error) {
-      console.error(`Error selecting dates: ${error.message}`);
-      // Take screenshot for debugging
-      await this.page.screenshot({ path: 'date-picker-error.png' });
-      throw error;
-    }
+    // Select the start and end days dynamically
+    await this.page
+      .getByRole("button", { name: String(startDay) })
+      .last()
+      .click();
+    await this.page
+      .getByRole("button", { name: String(endDay) })
+      .last()
+      .click();
 
     // Optionally, click the apply button to confirm the selection
     await this.applyBtn.click();
