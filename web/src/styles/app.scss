@@ -1311,6 +1311,15 @@ body {
   }
 }
 
+.select-pagination {
+  .q-field__control-container{
+      .q-field__native{
+        min-height: 1.5rem !important;
+       height: 1.5rem !important;
+    }
+  }
+}
+
 /* ============================================================================
    Select Dropdown Options Hover
    Adds hover background color and text color to q-select dropdown menu options

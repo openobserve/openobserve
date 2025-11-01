@@ -629,7 +629,12 @@ export default defineComponent({
       updateUrlQueryParams,
       addTraceId,
     } = logsUtils();
-    const { buildWebSocketPayload, buildSearch, initializeSearchConnection } =
+    const {
+      buildWebSocketPayload,
+      buildSearch,
+      initializeSearchConnection,
+      getHistogramData,
+    } =
       useSearchStream();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -2400,6 +2405,7 @@ export default defineComponent({
       searchResponseForVisualization,
       shouldUseHistogramQuery,
       clearSchemaCache,
+      getHistogramData,
     };
   },
   computed: {
@@ -2526,52 +2532,10 @@ export default defineComponent({
         ) {
           this.searchObj.meta.histogramDirtyFlag = false;
 
-          // this.handleRunQuery();
-          this.searchObj.loadingHistogram = true;
-
-          this.setCommunicationMethod();
-
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 
-          if (
-            this.searchObj.communicationMethod === "ws" ||
-            this.searchObj.communicationMethod === "streaming"
-          ) {
-            // Use WebSocket for histogram data
-            const payload = this.buildWebSocketPayload(
-              this.searchObj.data.histogramQuery,
-              false,
-              "histogram",
-              {
-                isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
-                is_ui_histogram: true,
-              },
-            );
-            const requestId = this.initializeSearchConnection(payload);
-
-            if (requestId) {
-              this.addTraceId(payload.traceId);
-            }
-
-            return;
-          }
-
-          this.processHttpHistogramResults(
-            this.searchObj.data.customDownloadQueryObj,
-          )
-            .then((res: any) => {
-              this.refreshTimezone();
-              const timeout = setTimeout(() => {
-                if (this.searchResultRef) this.searchResultRef.reDrawChart();
-              }, 100);
-
-              // Store timeout reference for cleanup
-              this.chartRedrawTimeout = timeout;
-            })
-            .finally(() => {
-              this.searchObj.loadingHistogram = false;
-            });
+          this.getHistogramData(this.searchObj.data.histogramQuery);
         }
       }
 
