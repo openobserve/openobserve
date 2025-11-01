@@ -29,8 +29,8 @@ export class PipelinesPage {
         this.savePipelineButton = page.locator(
           '[data-test="add-pipeline-save-btn"]'
         );
-        // Use role="alert" to target the form field error, not the notification
-        this.pipelineNameRequiredMessage = page.locator('[role="alert"]').getByText(
+        // Target the form field error inside q-field__bottom, not the notification
+        this.pipelineNameRequiredMessage = page.locator('.q-field__bottom [role="alert"]').getByText(
           "Pipeline name is required"
         );
         // Updated selector to use placeholder since aria-label doesn't exist
