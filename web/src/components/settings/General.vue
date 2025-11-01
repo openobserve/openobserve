@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div :class="store.state.theme == 'dark' ? 'dark-settings-theme' : 'light-settings-theme'">
+  <div>
     <div class="q-px-md q-py-md">
       <div class="general-page-title">
         {{ t("settings.generalPageTitle") }}
@@ -39,16 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model.number="scrapeIntereval"
               type="number"
               min="0"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop o2-numeric-input q-ml-sm"
-              :class="store.state.theme == 'dark' ? 'o2-numeric-input-dark' : 'o2-numeric-input-light' "
+              class="showLabelOnTop q-ml-sm"
               stack-label
-              outlined
-              filled
               dense
-              data-test="general-settings-scrape-interval"
+              borderless
               hide-bottom-space
+              data-test="general-settings-scrape-interval"
               :rules="[(val: any) => !!val || 'Scrape interval is required']"
               :lazy-rules="true"
               style="width: 120px;"
@@ -65,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="onSubmit.isLoading.value"
               :label="t('dashboard.save')"
               class="q-mb-md o2-primary-button no-border tw-h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               type="submit"
               no-caps
               size="md"
@@ -92,27 +87,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div v-if="editingText || store.state.zoConfig.custom_logo_text == ''" class="tw-flex tw-gap-3 tw-items-center">
             <q-input
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop o2-text-input tw-w-[250px] tw-mr-sm"
+              class="showLabelOnTop tw-w-[250px] tw-mr-sm"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               data-test="settings_ent_logo_custom_text"
-              :class="store.state.theme == 'dark' ? 'o2-text-input-dark' : 'o2-text-input-light'"
               v-model="customText"
             />
             <div class="btn-group tw-flex tw-h-[28px]">
               <q-btn
                 type="button"
                 class="q-mr-sm"
-                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 no-caps
                 color="red"
                 icon="close"
                 dense
-                flat
                 size="sm"
                 @click="editingText = !editingText"
               ></q-btn>
@@ -123,8 +112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mr-sm "
                 dense
                 size="sm"
-                flat
-                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 color="primary"
                 type="submit"
                 no-caps
@@ -185,15 +172,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="setting_ent_custom_logo_img_file_upload"
             v-model="files"
             :label="'Drag & drop or click to upload'"
-            filled
             counter
             :counter-label="counterLabelFn"
             max-file-size="20481"
             accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
             @rejected="onRejected"
             dense
+            borderless
             class="q-mx-none o2-file-input tw-w-[250px] "
-            :class="store.state.theme == 'dark' ? 'o2-text-input-dark' : 'o2-text-input-light'"
           >
             <template v-slot:prepend>
               <q-icon name="attach_file" />
@@ -203,12 +189,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 type="button"
                 class="q-mr-sm"
-                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 no-caps
                 color="red"
                 icon="close"
                 dense
-                flat
                 size="sm"
                 @click="files = null"
               ></q-btn>
@@ -219,8 +203,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mr-sm "
                 dense
                 size="sm"
-                flat
-                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 color="primary"
                 type="submit"
                 no-caps
@@ -256,14 +238,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button tw-h-[28px] no-border"
           flat
           no-caps
-          :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelConfirmDialog"
         />
         <q-btn
           data-test="logs-search-bar-confirm-dialog-ok-btn"
           :label="t('confirmDialog.ok')"
           class="o2-primary-button tw-h-[28px] no-border"
-          :class="store.state.theme == 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           no-caps
           flat
           @click="confirmDialogOK"
@@ -642,11 +622,6 @@ export default defineComponent({
 }
 .text-btn-border-dark{
   border: 1px solid #6F737A ;
-}
-
-:deep(.o2-file-input .q-field__bottom) {
-  padding: 0px;
-  padding-top: 8px;
 }
 
 </style>

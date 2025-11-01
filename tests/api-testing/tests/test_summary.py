@@ -449,12 +449,8 @@ def test_summary(create_session, base_url, base_url_sc, org_id):
         resp_delete_function.status_code == 200
     ), f"Deleting this function, but got {resp_delete_function.status_code} {resp_delete_function.content}"
     print(f"Function deleted successfully")
-    ), f"Deleting this function, but got {resp_delete_function.status_code} {resp_delete_function.content}"
-    print(f"Function deleted successfully")
 
     # Proceed to delete the dashboard
-    resp_get_alldashboards = session.get(f"{url_sc}api/{org_id}/dashboards")
-    assert resp_get_alldashboards.status_code == 200, f"Expected status code 200 but got {resp_get_alldashboards.status_code}"
     resp_get_alldashboards = session.get(f"{url_sc}api/{org_id}/dashboards")
     assert resp_get_alldashboards.status_code == 200, f"Expected status code 200 but got {resp_get_alldashboards.status_code}"
     # Parse the response JSON
@@ -488,10 +484,6 @@ def test_summary(create_session, base_url, base_url_sc, org_id):
     time.sleep(3)
 
     # Proceed to delete the stream
-    resp_delete_stream= session.delete(f"{url_sc}api/{org_id}/streams/{stream_name}?type=logs")
-    print(f"Deleted Stream Response: {resp_delete_stream.text}")
-    assert resp_delete_stream.status_code == 200, f"Failed to delete  {stream_name}"
-    print(f"Successfully deleted stream {stream_name}")
     resp_delete_stream= session.delete(f"{url_sc}api/{org_id}/streams/{stream_name}?type=logs")
     print(f"Deleted Stream Response: {resp_delete_stream.text}")
     assert resp_delete_stream.status_code == 200, f"Failed to delete  {stream_name}"

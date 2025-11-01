@@ -17,20 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="deduplication-config q-pa-none q-ma-none">
     <div class="tw-w-full">
-      <div class="tw-w-full tw-ml-2">
+      <div class="tw-w-full">
         <AlertsContainer
           :name="t('alerts.deduplication.title')"
           v-model:is-expanded="isExpanded"
           :label="t('alerts.deduplication.title')"
           :subLabel="t('alerts.deduplication.subtitle')"
           icon="filter_alt"
-          class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2"
+          class="tw-w-full col-12 tw-pl-4 tw-pr-2 tw-py-2"
           :iconClass="'tw-mt-[2px]'"
         />
       </div>
 
       <div v-if="isExpanded" class="tw-w-full row alert-setup-container">
-        <div class="q-mt-sm tw-w-full">
+        <q-separator class="tw-my-2"/>
+        <div class="q-mt-sm tw-w-full tw-pl-3">
           <!-- Enable/Disable Toggle -->
           <div class="flex justify-start items-center tw-font-semibold tw-pb-3">
             <div style="width: 200px">{{ t("alerts.deduplication.enable") }}</div>
@@ -142,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="q-pa-md">
                   <!-- Enable Grouping -->
-                  <div class="flex justify-start items-center tw-font-semibold tw-pb-3">
+                  <div class="flex justify-start items-center tw-font-semibold tw-pb-3 tw-mx-2">
                     <div style="width: 200px">{{ t("alerts.deduplication.enableGrouping") }}</div>
                     <q-toggle
                       v-model="groupingEnabled"

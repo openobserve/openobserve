@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="row">
-      <div class="float-right col q-mb-xs flex">
-        <div class="button-group logs-visualize-toggle q-ml-xs">
+    <div class="row !tw-m-0 !tw-p-[0.375rem] !tw-items-start">
+      <div class="float-right col flex">
+        <div class="button-group logs-visualize-toggle element-box-shadow">
           <div class="row">
             <div>
               <q-btn
@@ -56,12 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disable="isVisualizeDisabled"
                 no-caps
                 size="sm"
+                :icon="outlinedShowChart"
               >
-                <img
-                  :src="visualizeIcon"
-                  alt="Visualize"
-                  class="icon-sm"
-                />
                 <q-tooltip v-if="isVisualizeDisabled">
                   {{ t("search.enableSqlModeOrSelectSingleStream") }}
                 </q-tooltip>
@@ -74,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- moved to dropdown if ai chat is enabled -->
         <div
-          class="toolbar-toggle-container"
+          class="toolbar-toggle-container element-box-shadow"
           v-if="!store.state.isAiChatEnabled"
         >
           <q-toggle
@@ -91,11 +87,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           </q-toggle>
           <img :src="histogramIcon" alt="Histogram" class="toolbar-icon" />
+          <q-tooltip class="toolbar-icon" />
           <q-tooltip>
             {{ t("search.showHistogramLabel") }}
           </q-tooltip>
         </div>
-        <div class="toolbar-toggle-container">
+        <div class="toolbar-toggle-container element-box-shadow">
           <q-toggle
             data-test="logs-search-bar-sql-mode-toggle-btn"
             v-model="searchObj.meta.sqlMode"
@@ -109,7 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="sqlIcon" alt="SQL Mode" class="toolbar-icon" />
+            <img :src="sqlIcon" alt="SQL Mode"
+class="toolbar-icon" />
             <q-tooltip v-if="isSqlModeDisabled">
               {{ t("search.sqlModeDisabledForVisualization") }}
             </q-tooltip>
@@ -142,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           dense
           icon="restart_alt"
-          class="toolbar-reset-btn"
+          class="toolbar-reset-btn element-box-shadow"
           @click="resetFilters"
         >
           <q-tooltip>
@@ -154,19 +152,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!store.state.isAiChatEnabled"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
-          class="syntax-guide-in-toolbar"
+          class="syntax-guide-in-toolbar element-box-shadow"
         >
         </syntax-guide>
-        <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
+        <q-btn-group class="q-ml-xs q-pa-none element-box-shadow el-border">
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
             v-model="savedViewDropdownModel"
-            icon="save"
-            icon-right="saved_search"
             @click="fnSavedView"
             @show="loadSavedView"
             split
-            class="no-outline saved-views-dropdown no-border"
+            icon="save"
+            icon-right="saved_search"
+            class="saved-views-dropdown no-border"
           >
             <q-list
               :style="
@@ -240,7 +238,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-tr>
                     </template>
                     <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list" no-hover>
+                      <q-td :props="props" class="field_list"
+no-hover>
                         <q-item
                           class="q-pa-sm saved-view-item"
                           clickable
@@ -429,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- this is the button group responsible for showing all the utilities when ai chat is enabled -->
         <q-btn
           v-if="store.state.isAiChatEnabled"
-          class="group-menu-btn"
+          class="group-menu-btn element-box-shadow"
           no-caps
           menu-anchor="bottom left"
           menu-self="top left"
@@ -441,13 +440,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Histogram Toggle -->
               <q-item
                 clickable
-                @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+                @click="
+                  searchObj.meta.showHistogram = !searchObj.meta.showHistogram
+                "
                 data-test="logs-search-bar-show-histogram-toggle-btn"
                 class="q-pa-sm saved-view-item"
               >
                 <q-item-section>
                   <q-item-label class="tw-flex tw-items-center">
-                    <div style="width: 28px; display: flex; align-items: center; margin-right: 12px">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        margin-right: 12px;
+                      "
+                    >
                       <q-toggle
                         v-model="searchObj.meta.showHistogram"
                         size="xs"
@@ -470,13 +478,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Wrap Content Toggle -->
               <q-item
                 clickable
-                @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+                @click="
+                  searchObj.meta.toggleSourceWrap =
+                    !searchObj.meta.toggleSourceWrap
+                "
                 data-test="logs-search-bar-wrap-table-content-toggle-btn"
                 class="q-pa-sm saved-view-item"
               >
                 <q-item-section>
                   <q-item-label class="tw-flex tw-items-center">
-                    <div style="width: 28px; display: flex; align-items: center; margin-right: 12px">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        margin-right: 12px;
+                      "
+                    >
                       <q-toggle
                         v-model="searchObj.meta.toggleSourceWrap"
                         size="xs"
@@ -499,13 +517,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Quick Mode Toggle -->
               <q-item
                 clickable
-                @click="searchObj.meta.quickMode = !searchObj.meta.quickMode; handleQuickMode()"
+                @click="
+                  searchObj.meta.quickMode = !searchObj.meta.quickMode;
+                  handleQuickMode();
+                "
                 data-test="logs-search-bar-quick-mode-toggle-btn"
                 class="q-pa-sm saved-view-item"
               >
                 <q-item-section>
                   <q-item-label class="tw-flex tw-items-center">
-                    <div style="width: 28px; display: flex; align-items: center; margin-right: 12px">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        margin-right: 12px;
+                      "
+                    >
                       <q-toggle
                         v-model="searchObj.meta.quickMode"
                         size="xs"
@@ -529,7 +557,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-item clickable class="q-pa-sm saved-view-item">
                 <q-item-section>
                   <q-item-label class="tw-flex tw-items-center">
-                    <div style="width: 28px; display: flex; align-items: center; justify-content: center; margin-right: 12px">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-right: 12px;
+                      "
+                    >
                       <syntax-guide
                         data-test="logs-search-bar-sql-mode-toggle-btn"
                         :sqlmode="searchObj.meta.sqlMode"
@@ -553,7 +589,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section>
                   <q-item-label class="tw-flex tw-items-center">
-                    <div style="width: 28px; display: flex; align-items: center; justify-content: center; margin-right: 8px; margin-left: 3px;">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-right: 8px;
+                        margin-left: 3px;
+                      "
+                    >
                       <q-icon name="restart_alt" size="20px" />
                     </div>
                     {{ t("search.resetFilters") }}
@@ -564,7 +609,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-menu>
         </q-btn>
         <!-- moved to dropdown if ai chat is enabled -->
-        <div class="toolbar-toggle-container" v-if="!store.state.isAiChatEnabled">
+        <div
+          class="toolbar-toggle-container element-box-shadow"
+          v-if="!store.state.isAiChatEnabled"
+        >
           <q-toggle
             data-test="logs-search-bar-quick-mode-toggle-btn"
             v-model="searchObj.meta.quickMode"
@@ -578,7 +626,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="quickModeIcon" alt="Quick Mode" class="toolbar-icon" />
+            <img :src="quickModeIcon" alt="Quick Mode"
+class="toolbar-icon" />
             <q-tooltip>
               {{ t("search.quickModeLabel") }}
             </q-tooltip>
@@ -586,7 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="float-right col-auto q-mb-xs">
+      <div class="float-right col-auto">
         <!-- this is moved to dropdown if ai chat is enabled -->
         <div
           v-if="!store.state.isAiChatEnabled"
@@ -595,7 +644,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-toggle
             data-test="logs-search-bar-wrap-table-content-toggle-btn"
             v-model="searchObj.meta.toggleSourceWrap"
-            class="o2-toggle-button-xs"
+            class="o2-toggle-button-xs element-box-shadow"
             size="xs"
             flat
             :class="
@@ -630,11 +679,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           data-test="logs-search-bar-share-link-btn"
-          class="q-mr-xs download-logs-btn q-px-sm"
-          size="sm"
-          icon="share"
+          class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
+          size="xs"
           @click="shareLink.execute()"
           :loading="shareLink.isLoading.value"
+          icon="share"
         >
           <q-tooltip>
             {{ t("search.shareLink") }}
@@ -643,9 +692,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-btn
           data-test="logs-search-bar-more-options-btn"
-          class="q-mr-xs download-logs-btn q-px-sm"
-          icon="menu"
+          class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
         >
+        <Menu size="1rem" />
           <q-menu>
             <q-list>
               <q-item
@@ -710,7 +759,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         downloadLogs(searchObj.data.queryResults.hits, 'csv')
                       "
                     >
-                      <q-icon name="grid_on" size="14px" class="q-pr-sm" />
+                      <q-icon name="grid_on" size="14px"
+class="q-pr-sm q-pt-xs" />
                       <q-item-section>
                         <q-item-label
                           class="tw-flex tw-items-center tw-gap-2 q-mr-md"
@@ -728,7 +778,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         downloadLogs(searchObj.data.queryResults.hits, 'json')
                       "
                     >
-                      <q-icon name="data_object" size="14px" class="q-pr-sm" />
+                      <q-icon name="data_object" size="14px"
+class="q-pr-sm q-pt-xs" />
                       <q-item-section>
                         <q-item-label
                           class="tw-flex tw-items-center tw-gap-2 q-mr-md"
@@ -850,6 +901,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
             :disable="disable"
+            class="element-box-shadow"
           />
         </div>
         <div class="search-time float-left q-mr-xs">
@@ -865,7 +917,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @trigger="$emit('onAutoIntervalTrigger')"
             />
             <q-btn-group
-              class="no-outline q-pa-none no-border q-mr-xs"
+              class="q-pa-none q-mr-xs element-box-shadow el-border"
               v-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -880,23 +932,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-input
                   ref="reginFilterRef"
-                  filled
-                  flat
+                  borderless
                   dense
+                  clearable
+                  class="!tw-mb-[0.375rem] indexlist-search-input q-mx-sm q-mt-sm"
                   v-model="regionFilter"
                   :label="t('search.regionFilterMsg')"
                 >
-                  <template v-slot:append>
-                    <q-icon
-                      v-if="regionFilter !== ''"
-                      name="clear"
-                      class="cursor-pointer"
-                      @click="resetRegionFilter"
-                    />
-                  </template>
                 </q-input>
                 <q-tree
-                  class="col-12 col-sm-6"
+                  class="col-12 col-sm-6 q-mx-sm q-mb-sm"
                   :nodes="store.state.regionInfo"
                   node-key="label"
                   :filter="regionFilter"
@@ -916,7 +961,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button tw-w-[90px]"
+                class="q-pa-none search-button cancel-search-button tw-w-[90px] element-box-shadow"
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -926,9 +971,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.runQuery')"
-                class="q-pa-none o2-primary-button tw-h-[30px]"
+                class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
                 no-caps
-                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-primary-button-dark'
+                    : 'o2-primary-button-light'
+                "
                 @click="handleRunQueryFn"
                 :disable="disable"
                 >{{ t("search.runQuery") }}</q-btn
@@ -948,7 +997,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button tw-w-[90px]"
+                class="q-pa-none search-button cancel-search-button tw-w-[90px] element-box-shadow"
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -959,10 +1008,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.runQuery')"
-                class="q-pa-none o2-primary-button tw-h-[30px]"
-                style="font-size: 11px;"
+                class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
+                style="font-size: 11px"
                 no-caps
-                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-primary-button-dark'
+                    : 'o2-primary-button-light'
+                "
                 @click="handleRunQueryFn"
                 :disable="
                   searchObj.loading == true ||
@@ -977,43 +1030,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="row query-editor-container">
       <div
-        class="col"
-        style="border-top: 1px solid #dbdbdb; height: 100%"
+        class="col tw-h-full"
         :class="{ 'expand-on-focus': isFocused }"
         :style="backgroundColorStyle"
       >
         <q-splitter
-          class="logs-search-splitter"
+          class="logs-search-splitter !tw-h-full"
           no-scroll
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"
-          style="width: 100%; height: 100%"
         >
           <template #before>
-            <code-query-editor
-              v-if="router.currentRoute.value.name === 'logs'"
-              data-test="logs-search-bar-query-editor"
-              editor-id="logsQueryEditor"
-              ref="queryEditorRef"
-              class="monaco-editor"
-              :style="editorWidthToggleFunction"
-              v-model:query="searchObj.data.query"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
-              :debounceTime="100"
-              @update:query="updateQueryValue"
-              @run-query="handleRunQueryFn"
-              @keydown="handleKeyDown"
-              :class="
-                searchObj.data.editorValue == '' &&
-                searchObj.meta.queryEditorPlaceholderFlag
-                  ? 'empty-query'
-                  : ''
-              "
-              language="sql"
-              @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
-              @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
-            />
+            <div
+              class="col tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mx-[0.375rem] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-full"
+            >
+              <code-query-editor
+                v-if="router.currentRoute.value.name === 'logs'"
+                data-test="logs-search-bar-query-editor"
+                editor-id="logsQueryEditor"
+                ref="queryEditorRef"
+                class="monaco-editor tw-px-[0.325rem] tw-py-[0.125rem]"
+                :style="editorWidthToggleFunction"
+                v-model:query="searchObj.data.query"
+                :keywords="autoCompleteKeywords"
+                :suggestions="autoCompleteSuggestions"
+                :debounceTime="100"
+                @update:query="updateQueryValue"
+                @run-query="handleRunQueryFn"
+                @keydown="handleKeyDown"
+                :class="
+                  searchObj.data.editorValue == '' &&
+                  searchObj.meta.queryEditorPlaceholderFlag
+                    ? 'empty-query'
+                    : ''
+                "
+                language="sql"
+                @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
+                @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
+              />
+            </div>
           </template>
           <template #after>
             <div
@@ -1023,29 +1078,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template v-if="showFunctionEditor">
                 <div class="tw-relative tw-h-full tw-w-full">
-                  <code-query-editor
-                    v-if="router.currentRoute.value.name === 'logs'"
-                    data-test="logs-vrl-function-editor"
-                    ref="fnEditorRef"
-                    editor-id="fnEditor"
-                    class="monaco-editor"
-                    v-model:query="searchObj.data.tempFunctionContent"
-                    :class="
-                      searchObj.data.tempFunctionContent == '' &&
-                      searchObj.meta.functionEditorPlaceholderFlag
-                        ? 'empty-function'
-                        : ''
-                    "
-                    :readOnly="
-                      searchObj.meta.logsVisualizeToggle === 'visualize'
-                    "
-                    @keydown="handleKeyDown"
-                    language="vrl"
-                    @focus="
-                      searchObj.meta.functionEditorPlaceholderFlag = false
-                    "
-                    @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
-                  />
+                  <div
+                    class="tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mr-[0.375rem] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-full"
+                  >
+                    <code-query-editor
+                      v-if="router.currentRoute.value.name === 'logs'"
+                      data-test="logs-vrl-function-editor"
+                      ref="fnEditorRef"
+                      editor-id="fnEditor"
+                      class="monaco-editor tw-px-[0.325rem] tw-py-[0.125rem]"
+                      v-model:query="searchObj.data.tempFunctionContent"
+                      :class="
+                        searchObj.data.tempFunctionContent == '' &&
+                        searchObj.meta.functionEditorPlaceholderFlag
+                          ? 'empty-function'
+                          : ''
+                      "
+                      :readOnly="
+                        searchObj.meta.logsVisualizeToggle === 'visualize'
+                      "
+                      @keydown="handleKeyDown"
+                      language="vrl"
+                      @focus="
+                        searchObj.meta.functionEditorPlaceholderFlag = false
+                      "
+                      @blur="
+                        searchObj.meta.functionEditorPlaceholderFlag = true
+                      "
+                    />
+                  </div>
                 </div>
                 <div
                   v-if="searchObj.meta.logsVisualizeToggle === 'visualize'"
@@ -1089,15 +1150,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-btn
         data-test="logs-query-editor-full_screen-btn"
-        :icon="isFocused ? 'fullscreen_exit' : 'fullscreen'"
         :title="isFocused ? 'Collapse' : 'Expand'"
         dense
         size="10px"
         round
         color="primary"
         @click="isFocused = !isFocused"
-        style="position: absolute; top: 45px; right: 3px; z-index: 20"
-      ></q-btn>
+        class="tw-absolute tw-top-[3.1rem] tw-right-[1.2rem] tw-z-50"
+      >
+      <Maximize size='0.8rem' v-if="!isFocused" />
+      <Minimize size="0.8rem" v-else />
+    </q-btn>
     </div>
 
     <q-dialog ref="confirmDialog" v-model="confirmDialogVisible">
@@ -1245,8 +1308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[
                 (val) => !!val.trim() || 'This field is required',
@@ -1270,22 +1332,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               bg-color="input-bg"
               class="q-py-sm showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
           </div>
         </q-card-section>
 
-        <q-card-actions align="right" class="bg-white text-teal">
+        <q-card-actions align="right">
           <q-btn
             data-test="saved-view-dialog-cancel-btn"
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
-            color="secondary"
             v-close-popup
           />
           <q-btn
@@ -1294,8 +1354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unelevated
             no-caps
             :label="t('common.save')"
-            color="primary"
-            class="text-bold"
+            class="o2-primary-button"
             @click="handleSavedView"
           />
           <q-btn
@@ -1317,7 +1376,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-section class="q-pt-none">
-          <span>Update</span>
+          <div class="tw-flex tw-items-center ">
+          <span class="tw-mt-2">Update</span>
           <q-toggle
             data-test="saved-function-action-toggle"
             v-bind:disable="functionOptions.length == 0"
@@ -1326,20 +1386,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             true-value="create"
             false-value="update"
             label=""
+            size="lg"
+            class="o2-toggle-button-lg"
             @change="savedFunctionName = ''"
           />
-          <span>Create</span>
+          <span class="tw-mt-2">Create</span>
+          </div>
           <div v-if="isSavedFunctionAction == 'create'">
             <q-input
               data-test="saved-function-name-input"
               v-model="savedFunctionName"
               :label="t('search.saveFunctionName')"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[
                 (val) => !!val.trim() || 'This field is required',
@@ -1359,26 +1419,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('search.saveFunctionName')"
               placeholder="Select Function Name"
               :popup-content-style="{ textTransform: 'capitalize' }"
-              color="input-border"
-              bg-color="input-bg"
               class="q-py-sm showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
           </div>
         </q-card-section>
 
-        <q-card-actions align="right" class="bg-white text-teal">
+        <q-card-actions align="right">
           <q-btn
             data-test="saved-function-dialog-cancel-btn"
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
-            color="secondary"
             v-close-popup
           />
           <q-btn
@@ -1387,8 +1443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unelevated
             no-caps
             :label="t('confirmDialog.ok')"
-            color="primary"
-            class="text-bold"
+            class="o2-primary-button"
             @click="saveFunction"
           />
           <q-btn
@@ -1397,8 +1452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unelevated
             no-caps
             :label="t('confirmDialog.loading')"
-            color="primary"
-            class="text-bold"
+            class="o2-primary-button"
           />
         </q-card-actions>
       </q-card>
@@ -1413,7 +1467,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <div class="text-left q-mb-xs">
               No of Records:
-              <q-icon name="info" size="17px" class="q-ml-xs cursor-pointer">
+              <q-icon name="info" size="17px"
+class="q-ml-xs cursor-pointer">
                 <q-tooltip
                   anchor="center right"
                   self="center left"
@@ -1436,8 +1491,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               tabindex="0"
               min="100"
@@ -1450,19 +1504,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.8"
             class="text-left mapping-warning-msg q-mt-md"
           >
-            <q-icon name="warning" color="red" class="q-mr-sm" />
+            <q-icon name="warning" color="red"
+class="q-mr-sm" />
             <span>Histogram will be disabled for the schedule job</span>
           </div>
         </q-card-section>
 
-        <q-card-actions align="right" class="text-teal">
+        <q-card-actions align="right">
           <q-btn
             data-test="search-scheduler-max-records-cancel-btn"
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
-            color="secondary"
             v-close-popup
             @click="
               {
@@ -1476,8 +1530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unelevated
             no-caps
             :label="t('confirmDialog.ok')"
-            color="primary"
-            class="text-bold"
+            class="o2-primary-button"
             @click="addJobScheduler"
             v-close-popup
           />
@@ -1525,7 +1578,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar, copyToClipboard, is } from "quasar";
+import { useQuasar, copyToClipboard, is, QTooltip } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
@@ -1579,6 +1632,8 @@ import {
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
+import { Bookmark, ChartLine, ChartNoAxesColumn, RefreshCcw, ScanSearch, Share, Menu, Maximize, Minimize } from "lucide-vue-next";
+import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
 
 const defaultValue: any = () => {
   return {
@@ -1600,6 +1655,15 @@ export default defineComponent({
     FunctionSelector,
     CodeQueryEditor,
     QueryPlanDialog,
+    ScanSearch,
+    ChartLine,
+    ChartNoAxesColumn,
+    RefreshCcw,
+    Bookmark,
+    Share,
+    Menu,
+    Maximize,
+    Minimize,
   },
   emits: [
     "searchdata",
@@ -1752,12 +1816,8 @@ export default defineComponent({
     } = useSearchBar();
     const { loadStreamLists, extractFields } = useStreamFields();
 
-    const {
-      refreshData,
-      handleRunQuery,
-      getJobData,
-      routeToSearchSchedule,
-    } = useLogs();
+    const { refreshData, handleRunQuery, getJobData, routeToSearchSchedule } =
+      useLogs();
 
     const { isStreamExists, isStreamFetched, getStreams } = useStreams();
     const queryEditorRef = ref(null);
@@ -3699,14 +3759,14 @@ export default defineComponent({
         backgroundColor:
           searchObj.data.transformType === "function" && isFocused.value
             ? isDarkMode
-              ? "#575A5A"
-              : "#E0E0E0" // Dark mode: grey, Light mode: yellow (or any color)
+              ? "var(--o2-card-bg)"
+              : "var(--o2-card-bg)" // Dark mode: grey, Light mode: yellow (or any color)
             : "",
         borderBottom:
           searchObj.data.transformType === "function" && isFocused.value
             ? isDarkMode
-              ? "2px solid #575A5A "
-              : "2px solid #E0E0E0"
+              ? "0.375rem solid var(--o2-card-bg)"
+              : "0.375rem solid var(--o2-card-bg)"
             : "none",
       };
     });
@@ -3866,10 +3926,14 @@ export default defineComponent({
         searchObj.config.fnSplitterModel = 100;
       }
     };
+    //so if it is active we need light this is fixed 
+    //if it is inactive we will be having 2 conditions
+    //1. if dark mode show light color
+    //2.if light mode show dark color
     const visualizeIcon = computed(() => {
       return searchObj.meta.logsVisualizeToggle === "visualize"
         ? getImageURL("images/common/visualize_icon_light.svg")
-        : getImageURL("images/common/visualize_icon_dark.svg");
+        : store.state.theme == 'dark' ? getImageURL("images/common/visualize_icon_light.svg") : getImageURL("images/common/visualize_icon_dark.svg");
     });
     const histogramIcon = computed(() => {
       return store.state.theme === "dark"
@@ -4061,6 +4125,7 @@ export default defineComponent({
       updateEditorWidth,
       showExplainDialog,
       openExplainDialog,
+      outlinedShowChart,
     };
   },
   computed: {
@@ -4180,8 +4245,7 @@ export default defineComponent({
                     filter +
                     " group by" +
                     afterGroupBy;
-                } 
-                else if (query.toLowerCase().includes("limit")) {
+                } else if (query.toLowerCase().includes("limit")) {
                   const [beforeLimit, afterLimit] = queryIndexSplit(
                     query,
                     "limit",
@@ -4218,8 +4282,7 @@ export default defineComponent({
                     filter +
                     " group by" +
                     afterGroupBy;
-                }
-                 else if (query.toLowerCase().includes("limit")) {
+                } else if (query.toLowerCase().includes("limit")) {
                   const [beforeLimit, afterLimit] = queryIndexSplit(
                     query,
                     "limit",
@@ -4306,7 +4369,7 @@ export default defineComponent({
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 0.0625rem solid rgba(0, 0, 0, 0.12); // 1px
+  border: 0.0625rem solid var(--o2-border-color); // 1px
   border-radius: 0.375rem; // 6px
   transition: all 0.2s ease;
   cursor: pointer;
@@ -4317,7 +4380,7 @@ export default defineComponent({
 }
 
 .dark-theme .toolbar-toggle-container {
-  border: 0.0625rem solid rgb(196, 196, 196);
+  border: 0.0625rem solid var(--o2-border-color);
 }
 
 .toolbar-icon {
@@ -4352,7 +4415,7 @@ export default defineComponent({
 .toolbar-reset-btn {
   padding: 0.25rem 0.375rem; // 4px 6px
   margin-left: 0.25rem; // 8px
-  border: 0.0625rem solid rgba(0, 0, 0, 0.12); // 1px
+  border: 0.0625rem solid var(--o2-border-color); // 1px
   border-radius: 0.375rem; // 6px
   transition: all 0.2s ease;
   min-height: 1.875rem; // 30px
@@ -4366,12 +4429,13 @@ export default defineComponent({
   }
 
   &.theme-dark {
-    border-color: rgb(196, 196, 196) !important;
+    border-color: var(--o2-border-color) !important;
   }
 }
 
-.q-dark .toolbar-reset-btn, .dark-theme .toolbar-reset-btn {
-  border-color: rgb(196,196,196);
+.q-dark .toolbar-reset-btn,
+.dark-theme .toolbar-reset-btn {
+  border-color: var(--o2-border-color);
 }
 
 .group-menu-btn {
@@ -4393,7 +4457,8 @@ export default defineComponent({
   }
 }
 
-.dark-theme .group-menu-btn, .q-dark .group-menu-btn {
-  border: 0.0625rem solid rgb(196, 196, 196) !important;
+.dark-theme .group-menu-btn,
+.q-dark .group-menu-btn {
+  border: 0.0625rem solid var(--o2-border-color) !important;
 }
 </style>

@@ -107,8 +107,7 @@ describe("Curl", () => {
 
     it("should have correct component structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-      expect(wrapper.find('.q-mt-sm').exists()).toBe(true);
+      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
     });
   });
 
@@ -292,7 +291,7 @@ describe("Curl", () => {
 
     it("should render CopyContent with correct classes", () => {
       wrapper = createWrapper();
-      const copyContentContainer = wrapper.find('.q-mt-sm');
+      const copyContentContainer = wrapper.find('.copy-content-container-cls');
       expect(copyContentContainer.exists()).toBe(true);
     });
   });
@@ -343,7 +342,7 @@ describe("Curl", () => {
   describe("Template Rendering", () => {
     it("should render main container with correct classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('.q-ma-md');
+      const container = wrapper.find('.q-pa-sm');
       expect(container.exists()).toBe(true);
     });
 

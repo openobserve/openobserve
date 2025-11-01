@@ -35,7 +35,7 @@ export
     await this.homeIcon.hover();
     await this.page.waitForSelector('[data-test="menu-link-settings-item"]');
         await this.managementMenuItem.click({ force: true });
-        await expect(this.page.getByRole('main')).toContainText('Management');
+        await expect(this.page.getByRole('main')).toContainText('General Settings');
     }
 
     async managementPageDefaultMultiOrg() {
