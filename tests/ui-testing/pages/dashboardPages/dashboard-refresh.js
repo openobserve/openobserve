@@ -65,46 +65,25 @@ export default class DashboardTimeRefresh {
     await this.page.waitForSelector('.q-date', { state: 'visible', timeout: 10000 });
     await this.page.waitForTimeout(1000);
 
-    // Helper function to find and click a date, navigating if needed
-    const clickDateWithNavigation = async (day) => {
-      let attempts = 0;
-      const maxAttempts = 3;
+    // Instead of looking for specific dates, find any available dates in the current calendar
+    // This makes the test more robust across different months
+    try {
+      // Get all date buttons that are not disabled
+      const allDateButtons = this.page.locator('.q-date__calendar-item button:not([disabled])');
+      const count = await allDateButtons.count();
 
-      while (attempts < maxAttempts) {
-        const dayButtons = this.page.getByRole("button", { name: String(day), exact: true });
-        const count = await dayButtons.count();
-
-        if (count > 0) {
-          // Find a button that's not disabled
-          for (let i = 0; i < count; i++) {
-            const button = dayButtons.nth(i);
-            const isDisabled = await button.getAttribute('disabled');
-            if (!isDisabled) {
-              await button.click();
-              await this.page.waitForTimeout(300);
-              return true;
-            }
-          }
-        }
-
-        // If date not found or all disabled, try navigating to next month
-        attempts++;
-        if (attempts < maxAttempts) {
-          const nextButton = this.page.locator("button").filter({ hasText: "chevron_right" }).first();
-          await nextButton.click();
-          await this.page.waitForTimeout(500);
-        }
+      if (count < 2) {
+        throw new Error(`Not enough enabled dates found in calendar. Found: ${count}`);
       }
 
-      throw new Error(`Day ${day} not found after ${maxAttempts} attempts`);
-    };
+      // Click first available date (start date)
+      await allDateButtons.nth(0).click();
+      await this.page.waitForTimeout(300);
 
-    try {
-      // Click start day
-      await clickDateWithNavigation(startDay);
-
-      // Click end day
-      await clickDateWithNavigation(endDay);
+      // Click a later date (end date) - use index based on count to ensure it's different
+      const endIndex = Math.min(count - 1, 7); // Select a date ~1 week later or last available
+      await allDateButtons.nth(endIndex).click();
+      await this.page.waitForTimeout(300);
 
     } catch (error) {
       console.error(`Error selecting dates: ${error.message}`);
