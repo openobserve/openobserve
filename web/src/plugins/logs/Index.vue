@@ -652,6 +652,7 @@ export default defineComponent({
       addTraceId,
     } = logsUtils();
     const {
+      getHistogramData,
       buildWebSocketPayload,
       buildSearch,
       initializeSearchConnection,
