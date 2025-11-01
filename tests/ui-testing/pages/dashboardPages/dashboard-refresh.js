@@ -50,6 +50,9 @@ export default class DashboardTimeRefresh {
     // Switch to the absolute tab
     await this.absolutetimeTime.click();
 
+    // Wait for date picker to be visible
+    await this.page.waitForSelector('.q-date', { state: 'visible', timeout: 10000 });
+
     // Click the left chevron button (if needed)
     await this.page
       .locator("button")
@@ -57,15 +60,21 @@ export default class DashboardTimeRefresh {
       .first()
       .click();
 
+    // Wait a moment for calendar to update after navigation
+    await this.page.waitForTimeout(500);
+
     // Select the start and end days dynamically
-    await this.page
+    const startDayButton = this.page
       .getByRole("button", { name: String(startDay) })
-      .last()
-      .click();
-    await this.page
+      .last();
+    await startDayButton.waitFor({ state: 'visible', timeout: 10000 });
+    await startDayButton.click();
+
+    const endDayButton = this.page
       .getByRole("button", { name: String(endDay) })
-      .last()
-      .click();
+      .last();
+    await endDayButton.waitFor({ state: 'visible', timeout: 10000 });
+    await endDayButton.click();
 
     // Optionally, click the apply button to confirm the selection
     await this.applyBtn.click();
