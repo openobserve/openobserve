@@ -623,10 +623,10 @@ export default defineComponent({
       addTraceId,
     } = logsUtils();
     const {
+      getHistogramData,
       buildWebSocketPayload,
       buildSearch,
       initializeSearchConnection,
-      getQueryReq,
     } = useSearchStream();
 
     // Initialize patterns composable (completely separate from logs)
@@ -886,7 +886,7 @@ export default defineComponent({
       searchObj.loading = true;
 
       try {
-        const queryReq = getQueryReq(false, false);
+        const queryReq = buildSearch();
         if (!queryReq) {
           console.log("[Index] No query request available");
           searchObj.loading = false;
