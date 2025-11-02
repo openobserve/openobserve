@@ -22,12 +22,12 @@
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
-      <div class="flex q-gutter-sm items-center">
+      <div class="flex items-center" style="gap: 0.5rem">
         <!-- histogram interval for sql queries -->
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          class="q-ml-sm"
+          class="viewpanel-icons"
           style="width: 150px"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
         />
@@ -35,6 +35,7 @@
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"
+          class="viewpanel-icons"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
           @hide="setTimeForVariables()"
@@ -46,6 +47,7 @@
             store.state?.zoConfig?.min_auto_refresh_interval || 5
           "
           @trigger="refreshData"
+          class="viewpanel-icons"
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <q-btn
@@ -54,7 +56,7 @@
             searchRequestTraceIds.length &&
             disable
           "
-          class="q-ml-sm"
+          class="viewpanel-icons el-border"
           outline
           padding="xs"
           no-caps
@@ -69,7 +71,7 @@
         </q-btn>
         <q-btn
           v-else
-          class="q-ml-sm"
+          class="viewpanel-icons el-border"
           :outline="isVariablesChanged ? true : false"
           padding="xs"
           no-caps
@@ -92,7 +94,7 @@
           no-caps
           @click="goBack"
           padding="xs"
-          class="q-ml-md"
+          class="viewpanel-icons el-border"
           flat
           icon="close"
           data-test="dashboard-viewpanel-close-btn"
@@ -765,5 +767,38 @@ export default defineComponent({
 
 .warning {
   color: var(--q-warning);
+}
+
+.viewpanel-icons {
+  height: 30px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+
+  :deep(.date-time-button) {
+    height: 30px;
+    min-height: 30px;
+  }
+
+  :deep(.q-btn-dropdown) {
+    height: 30px;
+    min-height: 30px;
+    padding: 0 8px;
+
+    .q-btn__content {
+      line-height: normal;
+      align-items: center;
+    }
+  }
+}
+
+.el-border {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
 }
 </style>

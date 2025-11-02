@@ -74,7 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(tick, index) in baseTracePosition['tics']"
         class="trace-tic"
-        :class="{'trace-tic-first': index === 0, 'bg-dark-tic': store.state.theme === 'dark'}"
+        :class="{
+          'trace-tic-first': index === 0,
+          'bg-dark-tic': store.state.theme === 'dark',
+        }"
         :key="tick.value + index"
         :style="{
           left: tick.left,
@@ -131,7 +134,6 @@ $traceChartHeight: 250px;
   z-index: 1999;
   position: sticky;
   border-radius: 0.5rem 0.5rem 0 0;
-  border: 0.0625rem solid #ececec;
 }
 
 .trace-header-container.bg-grey-9 {

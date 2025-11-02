@@ -382,16 +382,40 @@ body {
   @include scrollbars;
 }
 
-.body--dark {
-  --q-primary: #5960b2;
-  --q-secondary: #5ca380;
-  --q-accent: #f5f5f5;
-  --q-positive: #5ca380;
-  --q-negative: #ec1414;
-  --q-info: #31ccec;
-  --q-warning: #f2c037;
-  --q-dark: #181a1b;
-  --q-dark-page: #181a1b;
+// .body--dark {
+//   --q-primary: #5960b2;
+//   --q-secondary: #5ca380;
+//   --q-accent: #f5f5f5;
+//   --q-positive: #5ca380;
+//   --q-negative: #ec1414;
+//   --q-info: #31ccec;
+//   --q-warning: #f2c037;
+//   --q-dark: #181a1b;
+//   --q-dark-page: #181a1b;
+// }
+
+body.desktop .q-focus-helper:before,
+body.desktop .q-focusable:focus > .q-focus-helper, 
+body.desktop .q-manual-focusable--focused > .q-focus-helper, 
+body.desktop .q-hoverable:hover > .q-focus-helper{
+  background: transparent !important;
+}
+
+.q-layout__section--marginal {
+  background: transparent;
+}
+
+.q-btn, .q-btn-dropdown, .q-btn-group {
+  &::before {
+    box-shadow: none;
+  }
+  text-transform: none;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.q-btn .q-icon, .q-btn .q-spinner {
+  font-size: 1rem;
 }
 
 .q-list,

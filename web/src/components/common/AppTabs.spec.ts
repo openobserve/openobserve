@@ -36,7 +36,7 @@ describe("AppTabs", () => {
   });
 
   it("should render all non-hidden tabs", () => {
-    const tabs = wrapper.findAll('.rum-tab');
+    const tabs = wrapper.findAll('.o2-tab');
     expect(tabs).toHaveLength(5);
   });
 
@@ -106,12 +106,12 @@ describe("AppTabs", () => {
       }
     });
     
-    expect(hiddenWrapper.find('.rum-tabs').exists()).toBe(false);
+    expect(hiddenWrapper.find('.o2-tabs').exists()).toBe(false);
     hiddenWrapper.unmount();
   });
 
   it("should render when show prop is true (default)", () => {
-    expect(wrapper.find('.rum-tabs').exists()).toBe(true);
+    expect(wrapper.find('.o2-tabs').exists()).toBe(true);
   });
 
   it("should handle changeTab function correctly", () => {

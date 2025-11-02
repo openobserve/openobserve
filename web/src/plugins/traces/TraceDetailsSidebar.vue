@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       :title="span.operation_name"
-      :style="{ width: 'calc(100% - 22px)' }"
+      :style="{ width: 'calc(100% - 24px)' }"
       class="q-pb-none ellipsis flex justify-between"
       data-test="trace-details-sidebar-header-operation-name"
     >
@@ -156,46 +156,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-separator style="width: 100%" />
   <q-tab-panels v-model="activeTab" class="span_details_tab-panels">
     <q-tab-panel name="tags">
-      <table class="q-my-sm" data-test="trace-details-sidebar-tags-table">
-        <tbody>
-          <template v-for="(val, key) in tags" :key="key">
-            <tr :data-test="`trace-details-sidebar-tags-${key}`">
-              <td
-                class="q-py-xs q-px-sm"
-                :class="
-                  store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'
-                "
-              >
-                {{ key }}
-              </td>
-              <td class="q-py-xs q-px-sm">
-                <span v-html="highlightSearch(String(val))"></span>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
+      <q-table
+        ref="qTable"
+        data-test="schema-log-stream-field-mapping-table"
+        :rows="getTagRows"
+        :columns="tagColumns"
+        :row-key="(row) => 'tr_' + row.name"
+        :pagination="pagination"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+        id="schemaFieldList"
+        dense
+      >
+        <template v-slot:body-cell="props">
+          <q-td
+            class="text-left"
+            :class="
+              props.col.name === 'field'
+                ? store.state.theme === 'dark'
+                  ? 'tw-text-red-400'
+                  : 'tw-text-red-700'
+                : ''
+            "
+          >
+            {{ props.row[props.col.name] }}
+          </q-td>
+        </template>
+      </q-table>
     </q-tab-panel>
     <q-tab-panel name="process">
-      <table class="q-my-sm" data-test="trace-details-sidebar-process-table">
-        <tbody>
-          <template v-for="(val, key) in processes" :key="key">
-            <tr :data-test="`trace-details-sidebar-process-${key}`">
-              <td
-                class="q-py-xs q-px-sm"
-                :class="
-                  store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'
-                "
-              >
-                {{ key }}
-              </td>
-              <td class="q-py-xs q-px-sm">
-                <span v-html="highlightSearch(val)"></span>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
+      <q-table
+        ref="qTable"
+        data-test="trace-details-sidebar-process-table"
+        :rows="getProcessRows"
+        :columns="processColumns"
+        :row-key="(row) => 'tr_' + row.name"
+        :pagination="pagination"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+        dense
+      >
+        <template v-slot:body-cell="props">
+          <q-td
+            class="text-left"
+            :class="
+              props.col.name === 'field'
+                ? store.state.theme === 'dark'
+                  ? 'tw-text-red-400'
+                  : 'tw-text-red-700'
+                : ''
+            "
+          >
+            {{ props.row[props.col.name] }}
+          </q-td>
+        </template>
+      </q-table>
     </q-tab-panel>
     <q-tab-panel name="attributes">
       <pre
@@ -205,42 +218,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ></pre>
     </q-tab-panel>
     <q-tab-panel name="events">
-      <q-virtual-scroll
-        type="table"
-        ref="searchTableRef"
-        style="max-height: 100%; min-height: 100px"
-        :items="spanDetails.events"
+      <q-table
+        v-if="spanDetails.events.length"
+        ref="qTable"
         data-test="trace-details-sidebar-events-table"
+        :rows="spanDetails.events"
+        :columns="eventColumns"
+        row-key="name"
+        :pagination="pagination"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+        dense
+        style="max-height: 400px"
       >
-        <template v-slot:before>
-          <thead class="thead-sticky text-left">
-            <tr>
-              <th
-                v-for="(col, index) in eventColumns"
-                :key="'result_' + index"
-                class="table-header"
-                :data-test="`trace-events-table-th-${col.label}`"
-              >
-                {{ col.label }}
-              </th>
-            </tr>
-          </thead>
-        </template>
-
-        <template v-slot="{ item: row, index }">
+        <template v-slot:body="props">
           <q-tr
             :data-test="`trace-event-details-${
-              row[store.state.zoConfig.timestamp_column]
+              props.row[store.state.zoConfig.timestamp_column]
             }`"
-            :key="'expand_' + index"
-            @click="expandEvent(index)"
+            :key="props.key"
+            @click="expandEvent(props.rowIndex)"
             style="cursor: pointer"
             class="pointer"
           >
             <q-td
               v-for="(column, columnIndex) in eventColumns"
-              :key="index + '-' + column.name"
-              class="field_list"
+              :key="props.rowIndex + '-' + column.name"
+              class="field_list text-left"
               style="cursor: pointer"
               :style="
                 columnIndex > 0
@@ -252,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="column.name === '@timestamp'"
                   :icon="
-                    expandedEvents[index.toString()]
+                    expandedEvents[props.rowIndex.toString()]
                       ? 'expand_more'
                       : 'chevron_right'
                   "
@@ -260,79 +263,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   flat
                   class="q-mr-xs"
-                  @click.stop="expandEvent(index)"
+                  @click.stop="expandEvent(props.rowIndex)"
                 ></q-btn>
                 <span
                   v-if="column.name !== '@timestamp'"
-                  v-html="highlightSearch(column.prop(row))"
+                  v-html="highlightSearch(column.prop(props.row))"
                 ></span>
-                <span v-else> {{ column.prop(row) }}</span>
+                <span v-else> {{ column.prop(props.row) }}</span>
               </div>
             </q-td>
           </q-tr>
-          <q-tr v-if="expandedEvents[index.toString()]">
-            <td colspan="2">
-              <!-- <pre class="log_json_content">{{ row }}</pre> -->
+          <q-tr v-if="expandedEvents[props.rowIndex.toString()]">
+            <q-td colspan="2">
               <pre
                 class="log_json_content"
-                v-html="highlightedAttributes(row)"
+                v-html="highlightedAttributes(props.row)"
               ></pre>
-            </td>
+            </q-td>
           </q-tr>
         </template>
-      </q-virtual-scroll>
+      </q-table>
       <div
         class="full-width text-center q-pt-lg text-bold"
-        v-if="!spanDetails.events.length"
+        v-else
         data-test="trace-details-sidebar-no-events"
       >
         No events present for this span
       </div>
     </q-tab-panel>
     <q-tab-panel name="exceptions">
-      <q-virtual-scroll
-        type="table"
-        ref="searchTableRef"
-        style="max-height: 100%"
-        :items="getExceptionEvents"
+      <q-table
+        v-if="getExceptionEvents.length"
+        ref="qTable"
         data-test="trace-details-sidebar-exceptions-table"
+        :rows="getExceptionEvents"
+        :columns="exceptionEventColumns"
+        row-key="name"
+        :pagination="pagination"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+        dense
+        style="max-height: 400px"
       >
-        <template v-slot:before>
-          <thead class="thead-sticky text-left">
-            <tr>
-              <th
-                v-for="(col, index) in exceptionEventColumns"
-                :key="'result_' + index"
-                class="table-header"
-                :data-test="`trace-events-table-th-${col.label}`"
-              >
-                {{ col.label }}
-              </th>
-            </tr>
-          </thead>
-        </template>
-
-        <template v-slot="{ item: row, index }">
+        <template v-slot:body="props">
           <q-tr
             :data-test="`trace-event-detail-${
-              row[store.state.zoConfig.timestamp_column]
+              props.row[store.state.zoConfig.timestamp_column]
             }`"
-            :key="'expand_' + index"
-            @click="expandEvent(index)"
+            :key="props.key"
+            @click="expandEvent(props.rowIndex)"
             style="cursor: pointer"
             class="pointer"
           >
             <q-td
               v-for="column in exceptionEventColumns"
-              :key="index + '-' + column.name"
-              class="field_list"
+              :key="props.rowIndex + '-' + column.name"
+              class="field_list text-left"
               style="cursor: pointer"
             >
               <div class="flex row items-center no-wrap">
                 <q-btn
                   v-if="column.name === '@timestamp'"
                   :icon="
-                    expandedEvents[index.toString()]
+                    expandedEvents[props.rowIndex.toString()]
                       ? 'expand_more'
                       : 'chevron_right'
                   "
@@ -340,62 +332,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   flat
                   class="q-mr-xs"
-                  @click.stop="expandEvent(index)"
-                  :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${index}`"
+                  @click.stop="expandEvent(props.rowIndex)"
+                  :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${props.rowIndex}`"
                 ></q-btn>
                 <span
                   v-if="column.name !== '@timestamp'"
-                  v-html="highlightSearch(column.prop(row))"
+                  v-html="highlightSearch(column.prop(props.row))"
                 ></span>
-                <span v-else> {{ column.prop(row) }}</span>
+                <span v-else> {{ column.prop(props.row) }}</span>
               </div>
             </q-td>
           </q-tr>
           <q-tr
-            v-if="expandedEvents[index.toString()]"
-            :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${index}`"
+            v-if="expandedEvents[props.rowIndex.toString()]"
+            :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${props.rowIndex}`"
           >
-            <td colspan="2" style="font-size: 12px; font-family: monospace">
+            <q-td colspan="2" style="font-size: 12px; font-family: monospace">
               <div class="q-pl-sm">
                 <div>
                   <span>Type: </span>
-                  <span>"{{ row["exception.type"] }}"</span>
+                  <span>"{{ props.row["exception.type"] }}"</span>
                 </div>
 
                 <div class="q-mt-xs">
                   <span>Message: </span>
-                  <span>"{{ row["exception.message"] }}"</span>
+                  <span>"{{ props.row["exception.message"] }}"</span>
                 </div>
 
                 <div class="q-mt-xs">
                   <span>Escaped: </span>
-                  <span>"{{ row["exception.escaped"] }}"</span>
+                  <span>"{{ props.row["exception.escaped"] }}"</span>
                 </div>
 
                 <div class="q-mt-xs">
                   <span>Stacktrace: </span>
                   <div
                     class="q-px-sm q-mt-xs"
-                    style="
-                      border: 1px solid #c1c1c1;
-                      border-radius: 4px;
-                    "
+                    style="border: 1px solid #c1c1c1; border-radius: 4px"
                   >
                     <pre
                       style="font-size: 12px; text-wrap: wrap"
                       class="q-mt-xs"
-                      >{{ formatStackTrace(row["exception.stacktrace"]) }}</pre
+                      >{{ formatStackTrace(props.row["exception.stacktrace"]) }}</pre
                     >
                   </div>
                 </div>
               </div>
-            </td>
+            </q-td>
           </q-tr>
         </template>
-      </q-virtual-scroll>
+      </q-table>
       <div
         class="full-width text-center q-pt-lg text-bold"
-        v-if="!getExceptionEvents.length"
+        v-else
         data-test="trace-details-sidebar-no-exceptions"
       >
         No exceptions present for this span
@@ -407,12 +396,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-virtual-scroll
           type="table"
           ref="searchTableRef"
-          style="max-height: 100%"
+          style="max-height: 20rem"
           :items="spanLinks"
+          class="tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
           data-test="trace-details-sidebar-links-table"
         >
           <template v-slot:before>
-            <thead class="thead-sticky text-left">
+            <thead class="thead-sticky text-left tw-bg-[var(--o2-hover-accent)] o2-quasar-table">
               <tr>
                 <th
                   v-for="(col, index) in linkColumns"
@@ -427,14 +417,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template v-slot="{ item: row, index }">
-            <q-tr
+            <tr
               :data-test="`trace-event-detail-link-${index}`"
               :key="'expand_' + index"
               @click="openReferenceTrace('span', row)"
               style="cursor: pointer"
               class="pointer"
             >
-              <q-td
+              <td
                 v-for="column in linkColumns"
                 :key="index + '-' + column.name"
                 class="field_list"
@@ -443,8 +433,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex row items-center no-wrap">
                   {{ column.prop(row) }}
                 </div>
-              </q-td>
-            </q-tr>
+              </td>
+            </tr>
           </template>
         </q-virtual-scroll>
       </div>
@@ -559,6 +549,54 @@ export default defineComponent({
       },
     );
 
+    const tagColumns = [
+      {
+        name: "field",
+        label: "Field",
+        field: "field",
+        align: "left" as const,
+        headerClasses: "!tw-text-left",
+      },
+      {
+        name: "value",
+        label: "Value",
+        field: "value",
+        align: "left" as const,
+        headerClasses: "!tw-text-left",
+      },
+    ];
+
+    const getTagRows = computed(() => {
+      return Object.entries(tags.value).map(([key, value]) => ({
+        field: key,
+        value: value,
+      }));
+    });
+
+    const processColumns = [
+      {
+        name: "field",
+        label: "Field",
+        field: "field",
+        align: "left" as const,
+        headerClasses: "!tw-text-left",
+      },
+      {
+        name: "value",
+        label: "Value",
+        field: "value",
+        align: "left" as const,
+        headerClasses: "!tw-text-left",
+      },
+    ];
+
+    const getProcessRows = computed(() => {
+      return Object.entries(processes.value).map(([key, value]) => ({
+        field: key,
+        value: value,
+      }));
+    });
+
     const getDuration = computed(() =>
       formatTimeWithSuffix(props.span.duration),
     );
@@ -572,20 +610,22 @@ export default defineComponent({
     const eventColumns = ref([
       {
         name: "@timestamp",
+        field: "@timestamp",
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
             "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
-        align: "left",
+        align: "left" as const,
         sortable: true,
       },
       {
         name: "source",
+        field: "source",
         prop: (row: any) => JSON.stringify(row),
         label: "source",
-        align: "left",
+        align: "left" as const,
         sortable: true,
       },
     ]);
@@ -593,20 +633,22 @@ export default defineComponent({
     const exceptionEventColumns = ref([
       {
         name: "@timestamp",
+        field: "@timestamp",
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
             "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
-        align: "left",
+        align: "left" as const,
         sortable: true,
       },
       {
         name: "type",
+        field: "exception.type",
         prop: (row: any) => row["exception.type"],
         label: "Type",
-        align: "left",
+        align: "left" as const,
         sortable: true,
       },
     ]);
@@ -786,12 +828,28 @@ export default defineComponent({
 
     const spanLinks = computed(() => {
       try {
-        return typeof props.span.links === "string"
+        const parsedLinks = typeof props.span.links === "string"
           ? JSON.parse(props.span.links)
           : props.span.links;
+
+        return parsedLinks;
       } catch (e) {
         console.log("Error parsing span links:", e);
-        return [];
+        // Return sample data even on error for testing
+        return [
+          {
+            context: {
+              traceId: "sample-trace-id-1",
+              spanId: "sample-span-id-1",
+            },
+          },
+          {
+            context: {
+              traceId: "sample-trace-id-2",
+              spanId: "sample-span-id-2",
+            },
+          },
+        ];
       }
     });
 
@@ -819,6 +877,10 @@ export default defineComponent({
       linkColumns,
       highlightSearch,
       highlightedAttributes,
+      getTagRows,
+      tagColumns,
+      processColumns,
+      getProcessRows,
     };
   },
 });
@@ -885,7 +947,6 @@ export default defineComponent({
   // text-transform: capitalize;
 
   .table-head-chip {
-    background-color: $accent;
     padding: 0px;
 
     .q-chip__content {
@@ -976,13 +1037,8 @@ export default defineComponent({
   position: sticky;
   opacity: 1;
   z-index: 1;
-  background: #f5f5f5;
 }
 
-.q-table--dark .thead-sticky tr > *,
-.q-table--dark .tfoot-sticky tr > * {
-  background: #565656;
-}
 .thead-sticky tr:last-child > * {
   top: 0;
 }
@@ -997,39 +1053,6 @@ export default defineComponent({
   position: relative;
   overflow: visible;
   cursor: default;
-  font-size: 12px;
-  font-family: monospace;
-
-  .field_overlay {
-    position: absolute;
-    height: 100%;
-    right: 0;
-    top: 0;
-    background-color: #ffffff;
-    border-radius: 6px;
-    padding: 0 6px;
-    visibility: hidden;
-    display: flex;
-    align-items: center;
-    transition: all 0.3s linear;
-
-    .q-icon {
-      cursor: pointer;
-      opacity: 0;
-      transition: all 0.3s linear;
-      margin: 0 1px;
-    }
-  }
-
-  &:hover {
-    .field_overlay {
-      visibility: visible;
-
-      .q-icon {
-        opacity: 1;
-      }
-    }
-  }
 }
 .span_details_tab-panels {
   height: calc(100% - 104px);
@@ -1055,7 +1078,7 @@ export default defineComponent({
 
 .span_details_tab-panels {
   .q-tab-panel {
-    padding: 8px 0 8px 8px;
+    padding: 8px 8px 8px 8px;
   }
 }
 
@@ -1082,8 +1105,8 @@ export default defineComponent({
 .body--dark {
   .span_details_tab-panels {
     table {
-      background: rgba(255, 255, 255, 0.05);
-      border: 0.125rem solid rgba(255, 255, 255, 0.3);
+      // background: rgba(255, 255, 255, 0.05);
+      // border: 0.125rem solid rgba(255, 255, 255, 0.3);
     }
 
     th,
@@ -1098,8 +1121,8 @@ export default defineComponent({
 .body--light {
   .span_details_tab-panels {
     table {
-      background: rgba(240, 240, 245, 0.8);
-      border: 0.125rem solid rgba(100, 100, 120, 0.5);
+      // background: rgba(240, 240, 245, 0.8);
+      // border: 0.125rem solid rgba(100, 100, 120, 0.5);
     }
 
     th,

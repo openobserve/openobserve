@@ -78,14 +78,13 @@
       <q-btn
         flat
         :label="t('common.cancel')"
-        color="primary"
+        class="q-ml-sm o2-secondary-button tw-h-[36px]"
         v-close-popup
         data-test="json-editor-cancel"
       />
       <q-btn
-        class="text-bold no-border"
+        class="q-ml-sm o2-primary-button tw-h-[36px]"
         padding="sm lg"
-        color="secondary"
         no-caps
         :label="t('common.save')"
         @click="saveChanges"

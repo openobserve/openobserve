@@ -208,6 +208,7 @@ export default {
   background: rgba(240, 253, 244, 0.9);
   box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
   transition: all 0.3s ease;
+  padding: 8px 16px;
 
   &:hover {
     background: rgba(240, 253, 244, 1);

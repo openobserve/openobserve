@@ -65,8 +65,15 @@ describe("ImportRegexPattern", () => {
           "q-separator": true,
           "q-form": true,
           "q-file": true,
-          "q-splitter": true,
-          "app-tabs": true,
+          "q-splitter": {
+            template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
+            props: ['modelValue', 'style', 'noScroll']
+          },
+          "app-tabs": {
+            template: '<div :data-test="$attrs[\'data-test\']" :class="$attrs.class"><slot></slot></div>',
+            props: ['tabs', 'activeTab'],
+            emits: ['update:active-tab']
+          },
           "query-editor": true,
           "q-icon": true
         }
