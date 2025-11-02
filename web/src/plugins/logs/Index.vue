@@ -656,7 +656,6 @@ export default defineComponent({
       buildWebSocketPayload,
       buildSearch,
       initializeSearchConnection,
-      getHistogramData,
     } = useSearchStream();
 
     // Initialize patterns composable (completely separate from logs)

@@ -2013,25 +2013,6 @@ export default defineComponent({
       return owner;
     };
 
-    const filterAlertsByTab = (refreshResults: boolean = true) => {
-      if(!refreshResults){
-       return;
-      }
-      //here we are filtering the alerts by the activeTab
-      //why allAlerts.value is used because we are not fetching the alerts again, 
-      // we are just assigning the alerts to the filteredResults
-      if (activeTab.value === "scheduled") {
-        filteredResults.value = allAlerts.value.filter((alert: any) => !alert.is_real_time);
-      } 
-      //we filter the alerts by the realTime tab
-      else if (activeTab.value === "realTime") {
-        filteredResults.value = allAlerts.value.filter((alert: any) => alert.is_real_time);
-      }
-      //else we will return all the alerts
-      else{
-        filteredResults.value = allAlerts.value;
-      }
-    };
     //this function is used to refresh the imported alerts
     const refreshImportedAlerts = async (store: any, folderId: any) => {
       await getAlertsFn(store, folderId);
