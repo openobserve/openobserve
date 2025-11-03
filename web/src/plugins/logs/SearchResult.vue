@@ -210,6 +210,7 @@ color="warning" size="xs"></q-icon> Error while
             @click="toggleErrorDetails"
             size="sm"
             data-test="logs-page-histogram-error-details-btn"
+            class="o2-secondary-button"
             >{{ t("search.histogramErrorBtnLabel") }}</q-btn
           ><br />
           <span v-if="disableMoreErrorDetails">

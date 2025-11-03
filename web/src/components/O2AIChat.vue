@@ -222,8 +222,8 @@
               v-model="selectedModel"
               :options="availableModels"
               dense
-              :borderless="true"
-              class="tw-w-24 model-selector"
+              flat
+              borderless
               style="max-width: 100px; height: 36px;"
             >
               <template v-slot:selected-item="scope">

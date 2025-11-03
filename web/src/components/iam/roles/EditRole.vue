@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-show="activeTab === 'permissions'"
           data-test="edit-role-permissions-section"
-          class="card-container"
+          class="card-container tw-h-[calc(100vh-200px)]"
         >
           <div
             class="flex justify-between items-center"
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div></div>
             <div
               data-test="edit-role-permissions-ui-type-toggle"
-              class="q-mr-md"
+              class="q-mr-md q-my-xs"
               style="
               border: 1px solid #d7d7d7;
               width: fit-content;
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div data-test="edit-role-permissions-table-section">
+          <div data-test="edit-role-permissions-table-section" class="el-border-radius q-px-md">
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
                 ref="permissionTableRef"
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     language="json"
                     ref="permissionJsonEditorRef"
                     v-model:query="permissionsJsonValue"
-                    style="height: calc(100vh - 328px)"
+                    style="height: calc(100vh - 295px)"
                   />
                 </div>
                 <div v-if="isHelpOpen" style="width: 350px" class="q-pa-sm">
