@@ -78,7 +78,6 @@ impl PromqlContext {
         trace_id: &str,
         stmt: EvalStmt,
     ) -> Result<(Value, Option<String>, ScanStats)> {
-        let cfg = config::get_config();
         self.start = micros_since_epoch(stmt.start);
         self.end = micros_since_epoch(stmt.end);
         if stmt.interval > Duration::ZERO {
@@ -97,7 +96,8 @@ impl PromqlContext {
             result_type = Some("matrix".to_string());
         } else {
             // Instant query
-            let mut engine = Engine::new(trace_id, ctx, self.start);
+            let eval_ctx = EvalContext::instant(self.start);
+            let mut engine = Engine::new(trace_id, ctx, eval_ctx);
             let (mut value, result_type_exec) = engine.exec(&expr).await?;
             if let Value::Float(val) = value {
                 value = Value::Sample(Sample::new(self.end, val));
@@ -116,8 +116,8 @@ impl PromqlContext {
         let eval_ctx = EvalContext::new(self.start, self.end, self.interval);
         let mut engine = Engine::new_with_context(trace_id, ctx.clone(), eval_ctx.clone());
 
-        match engine.exec(&expr).await {
-            Ok((Value::Matrix(matrix), result_type_exec)) => {
+        match engine.exec(&expr).await? {
+            (Value::Matrix(matrix), result_type_exec) => {
                 // Optimized path succeeded - we got all results in one go
                 if result_type_exec.is_some() {
                     result_type = result_type_exec;
@@ -126,113 +126,13 @@ impl PromqlContext {
                 value.sort();
                 return Ok((value, result_type, *self.scan_stats.read().await));
             }
-            Ok((Value::None, _)) => {
-                return Ok((Value::None, result_type, *self.scan_stats.read().await));
+            (Value::None, result_type_exec) => {
+                return Ok((Value::None, result_type_exec, *self.scan_stats.read().await));
             }
-            Err(e) => {
-                log::warn!(
-                    "PromQL optimized range query execution failed, falling back to per-timestamp execution: {e}"
-                );
-                // Optimized path didn't work, fall back to the original per-timestamp approach
-                // This happens for queries that don't support the optimized path yet
-            }
-            _ => {
-                log::warn!(
-                    "PromQL optimized range query execution returned unexpected result, falling back to per-timestamp execution"
-                );
+            (value, result_type_exec) => {
+                return Ok((value, result_type_exec, *self.scan_stats.read().await));
             }
         }
-
-        println!("\nFalling back to per-timestamp execution for PromQL query\n");
-
-        // Fallback: Original per-timestamp approach
-        let mut instant_vectors = Vec::new();
-        let mut string_literals = Vec::new();
-        let mut tasks = Vec::new();
-        let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
-        let nr_steps = (self.end - self.start + self.interval - 1) / self.interval;
-        for i in 0..nr_steps {
-            let time = self.start + (self.interval * i);
-            let expr = expr.clone();
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let mut engine = Engine::new(trace_id, ctx.clone(), time);
-            let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
-                tokio::task::spawn(async move {
-                    let ret = engine.exec(&expr).await;
-                    drop(permit);
-                    ret
-                });
-            tasks.push((time, task));
-        }
-
-        for (time, ret) in tasks {
-            let (result, result_type_exec) = match ret.await {
-                Ok(Ok((value, result_type))) => (value, result_type),
-                Ok(Err(e)) => {
-                    log::error!("Error executing query engine: {e}");
-                    return Err(e);
-                }
-                Err(e) => {
-                    log::error!("Error executing query task: {e}");
-                    return Err(DataFusionError::Execution(e.to_string()));
-                }
-            };
-            if result_type.is_none() && result_type_exec.is_some() {
-                result_type = result_type_exec;
-            }
-            match result {
-                Value::Instant(v) => {
-                    instant_vectors.push(RangeValue::new(v.labels.to_owned(), [v.sample]))
-                }
-                Value::Vector(vs) => instant_vectors.extend(
-                    vs.into_iter()
-                        .map(|v| RangeValue::new(v.labels.to_owned(), [v.sample])),
-                ),
-                Value::Range(v) => instant_vectors.push(v),
-                Value::Matrix(vs) => instant_vectors.extend(vs),
-                Value::Sample(s) => instant_vectors.push(RangeValue::new(Labels::default(), [s])),
-                Value::Float(val) => instant_vectors
-                    .push(RangeValue::new(Labels::default(), [Sample::new(time, val)])),
-                Value::String(val) => string_literals.push(val),
-                Value::None => continue,
-            };
-        }
-
-        if !string_literals.is_empty() {
-            let output_str = string_literals.join(", ");
-            return Ok((
-                Value::String(output_str),
-                result_type,
-                *self.scan_stats.read().await,
-            ));
-        }
-
-        // empty result quick return
-        if instant_vectors.is_empty() {
-            return Ok((Value::None, result_type, *self.scan_stats.read().await));
-        }
-
-        // merge data
-        let mut merged_data = HashMap::new();
-        let mut merged_metrics = HashMap::new();
-        for value in instant_vectors {
-            merged_data
-                .entry(signature(&value.labels))
-                .or_insert_with(Vec::new)
-                .extend(value.samples);
-            merged_metrics.insert(signature(&value.labels), value.labels);
-        }
-        let merged_data = merged_data
-            .into_iter()
-            .map(|(sig, samples)| {
-                RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
-            })
-            .collect::<Vec<_>>();
-
-        // sort data
-        let mut value = Value::Matrix(merged_data);
-        value.sort();
-        Ok((value, result_type, *self.scan_stats.read().await))
     }
 
     /// Query exemplars
@@ -266,7 +166,8 @@ impl PromqlContext {
             let time = self.start;
             let expr = Arc::new(expr);
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let mut engine = Engine::new(trace_id, ctx.clone(), time);
+            let eval_ctx = EvalContext::instant(time);
+            let mut engine = Engine::new(trace_id, ctx.clone(), eval_ctx);
             let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
                 tokio::task::spawn(async move {
                     let ret = engine.exec(&expr).await;

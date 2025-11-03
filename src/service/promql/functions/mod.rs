@@ -61,7 +61,7 @@ pub(crate) use clamp::clamp_range;
 pub(crate) use count_over_time::count_over_time_range;
 pub(crate) use delta::delta_range;
 pub(crate) use deriv::deriv_range;
-pub(crate) use histogram::{histogram_quantile, histogram_quantile_range};
+pub(crate) use histogram::histogram_quantile_range;
 pub(crate) use holt_winters::holt_winters_range;
 pub(crate) use idelta::idelta_range;
 pub(crate) use increase::increase_range;
