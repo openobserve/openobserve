@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use chrono::{DateTime, Datelike, Timelike};
 #[cfg(feature = "enterprise")]
 use config::META_ORG_ID;
@@ -32,7 +34,6 @@ use config::{
     },
     metrics,
 };
-use std::time::Duration;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::auditor;
 #[cfg(feature = "enterprise")]
@@ -216,9 +217,7 @@ async fn publish_usage(usages: Vec<UsageData>) {
 pub fn publish_triggers_usage(trigger: TriggerData) {
     let cfg = get_config();
     if !cfg.common.usage_enabled {
-        log::debug!(
-            "[SELF-REPORTING] Skipping trigger usage publish - usage reporting disabled"
-        );
+        log::debug!("[SELF-REPORTING] Skipping trigger usage publish - usage reporting disabled");
         return;
     }
 
@@ -250,7 +249,8 @@ pub fn publish_triggers_usage(trigger: TriggerData) {
                 log::warn!(
                     "[SELF-REPORTING] Usage queue full, dropping trigger data for org={}, key={}. \
                      System is overloaded. Consider increasing ZO_USAGE_REPORTING_THREAD_NUM or ZO_USAGE_BATCH_SIZE.",
-                    org, key
+                    org,
+                    key
                 );
             } else {
                 log::warn!(
@@ -276,9 +276,7 @@ pub fn publish_triggers_usage(trigger: TriggerData) {
 pub async fn publish_error(error_data: ErrorData) {
     let cfg = get_config();
     if !cfg.common.usage_enabled {
-        log::debug!(
-            "[SELF-REPORTING] Skipping error publish - usage reporting disabled"
-        );
+        log::debug!("[SELF-REPORTING] Skipping error publish - usage reporting disabled");
         return;
     }
 
@@ -305,10 +303,7 @@ pub async fn publish_error(error_data: ErrorData) {
 
     let start = std::time::Instant::now();
     match queues::ERROR_QUEUE
-        .enqueue_with_timeout(
-            ReportingData::Error(Box::new(error_data)),
-            timeout_duration,
-        )
+        .enqueue_with_timeout(ReportingData::Error(Box::new(error_data)), timeout_duration)
         .await
     {
         Ok(()) => {

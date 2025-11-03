@@ -79,7 +79,8 @@ impl ReportingQueue {
 
     /// Enqueue data with blocking wait until space is available.
     /// This is the original behavior - blocks indefinitely if channel is full.
-    /// WARNING: This can cause indefinite blocking! Consider using try_enqueue() or enqueue_with_timeout().
+    /// WARNING: This can cause indefinite blocking! Consider using try_enqueue()
+    /// or enqueue_with_timeout().
     pub async fn enqueue(
         &self,
         reporting_data: ReportingData,
@@ -131,9 +132,15 @@ impl ReportingQueue {
             ReportingData::Error(_) => "Error",
         };
 
-        match self.msg_sender.try_send(ReportingMessage::Data(reporting_data)) {
+        match self
+            .msg_sender
+            .try_send(ReportingMessage::Data(reporting_data))
+        {
             Ok(()) => {
-                log::debug!("[SELF-REPORTING] try_enqueue: Successfully queued {} data", data_type);
+                log::debug!(
+                    "[SELF-REPORTING] try_enqueue: Successfully queued {} data",
+                    data_type
+                );
                 Ok(())
             }
             Err(e @ mpsc::error::TrySendError::Full(_)) => {
@@ -962,7 +969,10 @@ mod tests {
 
         // Try to enqueue second item - should immediately return error (queue full)
         let result2 = queue.try_enqueue(ReportingData::Trigger(Box::new(trigger_data2)));
-        assert!(result2.is_err(), "Second enqueue should fail with queue full");
+        assert!(
+            result2.is_err(),
+            "Second enqueue should fail with queue full"
+        );
 
         match result2 {
             Err(mpsc::error::TrySendError::Full(_)) => {
@@ -1098,10 +1108,7 @@ mod tests {
     #[test]
     fn test_enqueue_error_display() {
         let timeout_err = EnqueueError::Timeout;
-        assert_eq!(
-            format!("{}", timeout_err),
-            "Enqueue operation timed out"
-        );
+        assert_eq!(format!("{}", timeout_err), "Enqueue operation timed out");
 
         let (tx, _rx) = mpsc::channel::<ReportingMessage>(1);
         drop(_rx); // Close the receiver
