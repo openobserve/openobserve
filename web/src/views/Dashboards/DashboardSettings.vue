@@ -186,4 +186,18 @@ export default defineComponent({
     }
   }
 }
+
+:deep(.q-splitter__before) {
+  border-right: 1px solid $border-color;
+}
+
+.dark-mode {
+  :deep(.q-splitter__before) {
+    border-right-color: rgba(255, 255, 255, 0.12);
+  }
+}
+
+:deep(.q-splitter__separator) {
+  display: none !important;
+}
 </style>
