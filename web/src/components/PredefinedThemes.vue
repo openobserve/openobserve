@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="dialogOpen" position="right" maximized>
-    <q-card style="width: 400px; max-width: 90vw;">
+  <q-dialog v-model="dialogOpen" position="right" maximized seamless>
+    <q-card class="predefined-theme-card" style="width: 400px; max-width: 90vw;">
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">Predefined Themes</div>
         <q-space />
@@ -50,18 +50,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-tab-panels v-model="activeTab" animated>
           <!-- Light Mode Themes -->
           <q-tab-panel name="light" class="q-pa-none">
-            <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card q-mb-md">
-              <div class="row items-center q-mb-sm">
-                <div class="text-subtitle1">{{ theme.name }}</div>
+            <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card q-mb-sm">
+              <div class="row items-center q-mb-xs">
+                <div class="text-subtitle2">{{ theme.name }}</div>
                 <q-space />
-                <q-badge v-if="isThemeApplied(theme, 'light')" color="positive" label="Applied" />
+                <q-badge v-if="isThemeApplied(theme, 'light')" color="positive" label="Applied" class="text-caption" />
               </div>
 
-              <div class="row q-mb-md">
-                <div class="col">
-                  <div class="text-caption text-grey-7">Theme Color</div>
-                  <div class="color-preview" :style="{ backgroundColor: hexToRgba(theme.light.themeColor, getOpacity(theme.id, 'light', 'themeColor', theme.light.themeColorOpacity)) }"></div>
-                  <div class="text-caption q-mb-xs">{{ theme.light.themeColor }}</div>
+              <div class="row q-mb-sm q-col-gutter-sm">
+                <div class="col-5">
+                  <div class="text-caption text-grey-7 q-mb-xs">Theme Color</div>
+                  <div class="color-preview-compact" :style="{ backgroundColor: hexToRgba(theme.light.themeColor, getOpacity(theme.id, 'light', 'themeColor', theme.light.themeColorOpacity)) }"></div>
+                  <div class="text-caption">{{ theme.light.themeColor }}</div>
+                </div>
+                <div class="col-7">
+                  <div class="text-caption text-grey-7 q-mb-xs">Opacity</div>
                   <q-select
                     :model-value="getOpacity(theme.id, 'light', 'themeColor', theme.light.themeColorOpacity)"
                     @update:model-value="(val) => setOpacity(theme.id, 'light', 'themeColor', val)"
@@ -69,45 +72,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                     emit-value
                     map-options
-                    label="Opacity"
                     class="o2-custom-select-dashboard"
-                  />
-                </div>
-                <div class="col q-px-sm">
-                  <div class="text-caption text-grey-7">Primary BG</div>
-                  <div class="color-preview" :style="{ backgroundColor: hexToRgba(theme.light.primaryBg, getOpacity(theme.id, 'light', 'primaryBg', theme.light.primaryBgOpacity)) }"></div>
-                  <div class="text-caption q-mb-xs">{{ theme.light.primaryBg }}</div>
-                  <q-select
-                    :model-value="getOpacity(theme.id, 'light', 'primaryBg', theme.light.primaryBgOpacity)"
-                    @update:model-value="(val) => setOpacity(theme.id, 'light', 'primaryBg', val)"
-                    :options="opacityOptions"
-                    dense
-                    emit-value
-                    map-options
-                    label="Opacity"
-                     class="o2-custom-select-dashboard"
-                  />
-                </div>
-                <div class="col">
-                  <div class="text-caption text-grey-7">Secondary BG</div>
-                  <div class="color-preview" :style="{ backgroundColor: hexToRgba(theme.light.secondaryBg, getOpacity(theme.id, 'light', 'secondaryBg', theme.light.secondaryBgOpacity)) }"></div>
-                  <div class="text-caption q-mb-xs">{{ theme.light.secondaryBg }}</div>
-                  <q-select
-                    :model-value="getOpacity(theme.id, 'light', 'secondaryBg', theme.light.secondaryBgOpacity)"
-                    @update:model-value="(val) => setOpacity(theme.id, 'light', 'secondaryBg', val)"
-                    :options="opacityOptions"
-                    dense
-                    emit-value
-                    map-options
-                    label="Opacity"
-                     class="o2-custom-select-dashboard"
                   />
                 </div>
               </div>
 
               <q-btn
-                label="Apply Theme"
+                label="Apply"
                 color="primary"
+                size="sm"
                 class="full-width"
                 @click="applyTheme(theme, 'light')"
               />
@@ -116,18 +89,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Dark Mode Themes -->
           <q-tab-panel name="dark" class="q-pa-none">
-            <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card q-mb-md">
-              <div class="row items-center q-mb-sm">
-                <div class="text-subtitle1">{{ theme.name }}</div>
+            <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card q-mb-sm">
+              <div class="row items-center q-mb-xs">
+                <div class="text-subtitle2">{{ theme.name }}</div>
                 <q-space />
-                <q-badge v-if="isThemeApplied(theme, 'dark')" color="positive" label="Applied" />
+                <q-badge v-if="isThemeApplied(theme, 'dark')" color="positive" label="Applied" class="text-caption" />
               </div>
 
-              <div class="row q-mb-md">
-                <div class="col">
-                  <div class="text-caption text-grey-7">Theme Color</div>
-                  <div class="color-preview" :style="{ backgroundColor: hexToRgba(theme.dark.themeColor, getOpacity(theme.id, 'dark', 'themeColor', theme.dark.themeColorOpacity)) }"></div>
-                  <div class="text-caption q-mb-xs">{{ theme.dark.themeColor }}</div>
+              <div class="row q-mb-sm q-col-gutter-sm">
+                <div class="col-5">
+                  <div class="text-caption text-grey-7 q-mb-xs">Theme Color</div>
+                  <div class="color-preview-compact" :style="{ backgroundColor: hexToRgba(theme.dark.themeColor, getOpacity(theme.id, 'dark', 'themeColor', theme.dark.themeColorOpacity)) }"></div>
+                  <div class="text-caption">{{ theme.dark.themeColor }}</div>
+                </div>
+                <div class="col-7">
+                  <div class="text-caption text-grey-7 q-mb-xs">Opacity</div>
                   <q-select
                     :model-value="getOpacity(theme.id, 'dark', 'themeColor', theme.dark.themeColorOpacity)"
                     @update:model-value="(val) => setOpacity(theme.id, 'dark', 'themeColor', val)"
@@ -135,45 +111,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                     emit-value
                     map-options
-                    label="Opacity"
-                     class="o2-custom-select-dashboard"
-                  />
-                </div>
-                <div class="col q-px-sm">
-                  <div class="text-caption text-grey-7">Primary BG</div>
-                  <div class="color-preview" :style="{ backgroundColor: hexToRgba(theme.dark.primaryBg, getOpacity(theme.id, 'dark', 'primaryBg', theme.dark.primaryBgOpacity)) }"></div>
-                  <div class="text-caption q-mb-xs">{{ theme.dark.primaryBg }}</div>
-                  <q-select
-                    :model-value="getOpacity(theme.id, 'dark', 'primaryBg', theme.dark.primaryBgOpacity)"
-                    @update:model-value="(val) => setOpacity(theme.id, 'dark', 'primaryBg', val)"
-                    :options="opacityOptions"
-                    dense
-                    emit-value
-                    map-options
-                    label="Opacity"
-                     class="o2-custom-select-dashboard"
-                  />
-                </div>
-                <div class="col">
-                  <div class="text-caption text-grey-7">Secondary BG</div>
-                  <div class="color-preview" :style="{ backgroundColor: hexToRgba(theme.dark.secondaryBg, getOpacity(theme.id, 'dark', 'secondaryBg', theme.dark.secondaryBgOpacity)) }"></div>
-                  <div class="text-caption q-mb-xs">{{ theme.dark.secondaryBg }}</div>
-                  <q-select
-                    :model-value="getOpacity(theme.id, 'dark', 'secondaryBg', theme.dark.secondaryBgOpacity)"
-                    @update:model-value="(val) => setOpacity(theme.id, 'dark', 'secondaryBg', val)"
-                    :options="opacityOptions"
-                    emit-value
-                    dense
-                    map-options
-                    label="Opacity"
                     class="o2-custom-select-dashboard"
                   />
                 </div>
               </div>
 
               <q-btn
-                label="Apply Theme"
+                label="Apply"
                 color="primary"
+                size="sm"
                 class="full-width"
                 @click="applyTheme(theme, 'dark')"
               />
@@ -299,22 +245,14 @@ const hexToRgba = (hex: string, opacity: number): string => {
 const predefinedThemes = [
   {
     id: 1,
-    name: "Pastel Dream",
+    name: "Default Blue",
     light: {
-      themeColor: "#f28846",
+      themeColor: "#3F7994",
       themeColorOpacity: 10,
-      primaryBg: "#f28846",
-      primaryBgOpacity: 2,
-      secondaryBg: "#ebac65",
-      secondaryBgOpacity: 3,
     },
     dark: {
-      themeColor: "#c95f44",
+      themeColor: "#5B9FBE",
       themeColorOpacity: 10,
-      primaryBg: "#c47e49",
-      primaryBgOpacity: 7,
-      secondaryBg: "#000712",
-      secondaryBgOpacity: 7,
     },
   },
   {
@@ -323,100 +261,99 @@ const predefinedThemes = [
     light: {
       themeColor: "#7678ed",
       themeColorOpacity: 10,
-      primaryBg: "#7e80fc",
-      primaryBgOpacity: 2,
-      secondaryBg: "#6668d1",
-      secondaryBgOpacity: 2,
     },
     dark: {
-      themeColor: "#5053f2",
-      themeColorOpacity: 9,
-      primaryBg: "#040424",
-      primaryBgOpacity: 7,
-      secondaryBg: "#161a59",
-      secondaryBgOpacity: 8,
+      themeColor: "#8B8DF0",
+      themeColorOpacity: 10,
     },
   },
   {
     id: 3,
-    name: "Forest Green",
+    name: "Sunset Orange",
     light: {
-      themeColor: "#2D7A3E",
+      themeColor: "#f28846",
       themeColorOpacity: 10,
-      primaryBg: "#A8D5BA",
-      primaryBgOpacity: 2,
-      secondaryBg: "#C8E6C9",
-      secondaryBgOpacity: 2,
     },
     dark: {
-      themeColor: "#457B9D",
+      themeColor: "#FF9D5C",
       themeColorOpacity: 10,
-      primaryBg: "#1D3557",
-      primaryBgOpacity: 2,
-      secondaryBg: "#0D1B2A",
-      secondaryBgOpacity: 2,
     },
   },
   {
     id: 4,
-    name: "Sunset Glow",
+    name: "Purple Dream",
     light: {
-      themeColor: "#FF6B6B",
+      themeColor: "#9C27B0",
       themeColorOpacity: 10,
-      primaryBg: "#FFB347",
-      primaryBgOpacity: 2,
-      secondaryBg: "#FFCC99",
-      secondaryBgOpacity: 2,
     },
     dark: {
-      themeColor: "#FF6B6B",
+      themeColor: "#BA68C8",
       themeColorOpacity: 10,
-      primaryBg: "#4D1F1F",
-      primaryBgOpacity: 2,
-      secondaryBg: "#331A1A",
-      secondaryBgOpacity: 2,
     },
   },
-{
-  id: 5,
-  name: "Emerald Mist",
-  light: {
-    themeColor: "#E26A6A",
-    themeColorOpacity: 10,
-    primaryBg: "#F8F6F6",
-    primaryBgOpacity: 2,
-    secondaryBg: "#ECE9E9",
-    secondaryBgOpacity: 2,
+  {
+    id: 5,
+    name: "Indigo Night",
+    light: {
+      themeColor: "#3F51B5",
+      themeColorOpacity: 10,
+    },
+    dark: {
+      themeColor: "#5C6BC0",
+      themeColorOpacity: 10,
+    },
   },
-  dark: {
-    themeColor: "#FF8A80",
-    themeColorOpacity: 10,
-    primaryBg: "#191617",
-    primaryBgOpacity: 2,
-    secondaryBg: "#231F20",
-    secondaryBgOpacity: 2,
+  {
+    id: 6,
+    name: "Deep Sea",
+    light: {
+      themeColor: "#006064",
+      themeColorOpacity: 10,
+    },
+    dark: {
+      themeColor: "#00838F",
+      themeColorOpacity: 10,
+    },
   },
-}
-
+  {
+    id: 7,
+    name: "Rose Wine",
+    light: {
+      themeColor: "#C2185B",
+      themeColorOpacity: 10,
+    },
+    dark: {
+      themeColor: "#EC407A",
+      themeColorOpacity: 10,
+    },
+  },
+  {
+    id: 8,
+    name: "Sky Blue",
+    light: {
+      themeColor: "#0288D1",
+      themeColorOpacity: 10,
+    },
+    dark: {
+      themeColor: "#29B6F6",
+      themeColorOpacity: 10,
+    },
+  }
 ];
 
 const applyTheme = (theme: any, mode: "light" | "dark") => {
   const modeColors = mode === "light" ? theme.light : theme.dark;
 
-  // Get user-selected opacity values (or use defaults)
+  // Get user-selected theme color opacity (or use default)
   const themeColorOpacity = getOpacity(theme.id, mode, 'themeColor', modeColors.themeColorOpacity);
-  const primaryBgOpacity = getOpacity(theme.id, mode, 'primaryBg', modeColors.primaryBgOpacity);
-  const secondaryBgOpacity = getOpacity(theme.id, mode, 'secondaryBg', modeColors.secondaryBgOpacity);
 
   // Create theme config object to pass to ThemeCustomizer
-  const themeConfig = {
+  // Only pass theme color for both light and dark modes
+  // Backgrounds will use defaults from SCSS
+  const themeConfig: any = {
     mode: mode,
     themeColor: modeColors.themeColor,
     themeColorOpacity: themeColorOpacity,
-    primaryBg: modeColors.primaryBg,
-    primaryBgOpacity: primaryBgOpacity,
-    secondaryBg: modeColors.secondaryBg,
-    secondaryBgOpacity: secondaryBgOpacity,
   };
 
   // Apply theme through the ThemeCustomizer composable
@@ -468,42 +405,26 @@ const copyAppliedTheme = () => {
     light: {
       themeColor: "#3F7994",
       themeColorOpacity: 10,
-      primaryBg: "#599BAE",
-      primaryBgOpacity: 1,
-      secondaryBg: "#599BAE",
-      secondaryBgOpacity: 4,
     },
     dark: {
       themeColor: "#3F7994",
       themeColorOpacity: 10,
-      primaryBg: "#000000",
-      primaryBgOpacity: 0,
-      secondaryBg: "#000000",
-      secondaryBgOpacity: 0,
     },
   };
 
-  // If light theme is applied, get its values with user-selected opacities
+  // If light theme is applied, get its values with user-selected opacity
   if (lightTheme) {
     themeConfig.light = {
       themeColor: lightTheme.light.themeColor,
       themeColorOpacity: getOpacity(lightTheme.id, 'light', 'themeColor', lightTheme.light.themeColorOpacity),
-      primaryBg: lightTheme.light.primaryBg,
-      primaryBgOpacity: getOpacity(lightTheme.id, 'light', 'primaryBg', lightTheme.light.primaryBgOpacity),
-      secondaryBg: lightTheme.light.secondaryBg,
-      secondaryBgOpacity: getOpacity(lightTheme.id, 'light', 'secondaryBg', lightTheme.light.secondaryBgOpacity),
     };
   }
 
-  // If dark theme is applied, get its values with user-selected opacities
+  // If dark theme is applied, get its values with user-selected opacity
   if (darkTheme) {
     themeConfig.dark = {
       themeColor: darkTheme.dark.themeColor,
       themeColorOpacity: getOpacity(darkTheme.id, 'dark', 'themeColor', darkTheme.dark.themeColorOpacity),
-      primaryBg: darkTheme.dark.primaryBg,
-      primaryBgOpacity: getOpacity(darkTheme.id, 'dark', 'primaryBg', darkTheme.dark.primaryBgOpacity),
-      secondaryBg: darkTheme.dark.secondaryBg,
-      secondaryBgOpacity: getOpacity(darkTheme.id, 'dark', 'secondaryBg', darkTheme.dark.secondaryBgOpacity),
     };
   }
 
@@ -537,9 +458,9 @@ const copyAppliedTheme = () => {
 }
 
 .theme-card {
-  padding: 16px;
+  padding: 10px 12px;
   border: 1px solid var(--o2-border-color);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--o2-card-bg);
 }
 
@@ -549,5 +470,31 @@ const copyAppliedTheme = () => {
   border-radius: 4px;
   border: 1px solid var(--o2-border-color);
   margin: 8px 0;
+}
+
+.color-preview-compact {
+  width: 100%;
+  height: 50px;
+  border-radius: 4px;
+  border: 1px solid var(--o2-border-color);
+  margin: 4px 0 2px 0;
+}
+.predefined-theme-card{
+  width: 450px;
+  max-width: 90vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+  color: rgba(0, 0, 0, 0.87);
+  opacity: 0;
+
+  body.body--dark & {
+    background: #1d1d1d;
+    color: rgba(255, 255, 255, 0.87);
+  }
+  &:hover{
+    opacity: 1;
+  }
 }
 </style>

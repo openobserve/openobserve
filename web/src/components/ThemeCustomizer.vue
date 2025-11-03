@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="dialogOpen" position="right" maximized>
+  <q-dialog v-model="dialogOpen" position="right" maximized seamless>
     <q-card class="theme-customizer-card">
       <q-card-section class="row items-center q-pb-none sticky-header">
         <div class="text-h6">Theme Customization</div>
@@ -168,7 +168,7 @@ const currentColorValue = ref("");
 const currentMode = ref<"light" | "dark">("light");
 const activeTab = ref("light");
 
-// Light Mode Variables
+// Light Mode Variables - only theme color, backgrounds are auto-calculated
 const lightModeVariables = reactive([
   {
     name: "--o2-theme-color",
@@ -176,39 +176,15 @@ const lightModeVariables = reactive([
     value: "#3F7994",
     opacity: 10, // 1.0 alpha (fully opaque)
   },
-  {
-    name: "--o2-body-primary-bg",
-    label: "Body Primary Background",
-    value: "#599BAE",
-    opacity: 1, // 0.1 alpha
-  },
-  {
-    name: "--o2-body-secondary-bg",
-    label: "Body Secondary Background",
-    value: "#599BAE",
-    opacity: 4, // 0.4 alpha
-  },
 ]);
 
-// Dark Mode Variables - use same variable names as light mode
+// Dark Mode Variables - only theme color, no background customization
 const darkModeVariables = reactive([
   {
     name: "--o2-dark-theme-color",
     label: "Dark Theme Color (for buttons/toggles)",
     value: "#3F7994",
     opacity: 10, // 1.0 alpha
-  },
-  {
-    name: "--o2-body-primary-bg",
-    label: "Body Primary Background",
-    value: "#000000",
-    opacity: 0, // 0.0 alpha (transparent by default)
-  },
-  {
-    name: "--o2-body-secondary-bg",
-    label: "Body Secondary Background",
-    value: "#000000",
-    opacity: 0, // 0.0 alpha (transparent by default)
   },
 ]);
 
@@ -284,11 +260,14 @@ const applyAllVariablesForCurrentMode = () => {
     // Also clear light-specific variables
     document.documentElement.style.removeProperty('--o2-theme-color');
 
-    // Apply all dark mode variables to body (this overrides SCSS defaults)
+    // Apply dark mode theme color only (let SCSS handle backgrounds)
     darkModeVariables.forEach(colorVar => {
       const rgbaColor = hexToRgba(colorVar.value, colorVar.opacity);
       document.body.style.setProperty(colorVar.name, rgbaColor);
     });
+
+    // Remove any custom background, let SCSS take over for dark mode
+    document.body.style.removeProperty('background');
 
     // Apply menu variables based on dark theme color
     const darkThemeColor = darkModeVariables.find(v => v.name === '--o2-dark-theme-color');
@@ -303,21 +282,27 @@ const applyAllVariablesForCurrentMode = () => {
     // Also clear dark-specific variable
     document.body.style.removeProperty('--o2-dark-theme-color');
 
-    // Apply all light mode variables to :root (this overrides SCSS defaults)
-    lightModeVariables.forEach(colorVar => {
-      const rgbaColor = hexToRgba(colorVar.value, colorVar.opacity);
-      document.documentElement.style.setProperty(colorVar.name, rgbaColor);
-    });
-
-    // Apply menu variables based on light theme color
+    // Apply theme color to :root
     const lightThemeColor = lightModeVariables.find(v => v.name === '--o2-theme-color');
     if (lightThemeColor) {
+      const rgbaColor = hexToRgba(lightThemeColor.value, lightThemeColor.opacity);
+      document.documentElement.style.setProperty('--o2-theme-color', rgbaColor);
+
+      // Apply menu variables based on light theme color
       applyMenuVariables(lightThemeColor.value, document.documentElement);
+
+      // Auto-calculate and apply background colors based on theme color
+      const primaryBg = hexToRgba(lightThemeColor.value, 0.1); // 0.01 alpha (1%)
+      const secondaryBg = hexToRgba(lightThemeColor.value, 4); // 0.4 alpha (40%)
+
+      document.documentElement.style.setProperty('--o2-body-primary-bg', primaryBg);
+      document.documentElement.style.setProperty('--o2-body-secondary-bg', secondaryBg);
+
+      // Update body gradient with auto-calculated colors
+      const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
+      document.body.style.setProperty('background', gradient, 'important');
     }
   }
-
-  // Update body gradient
-  updateBodyGradient();
 };
 
 // Function to update theme from external sources (e.g., predefined themes)
@@ -326,22 +311,12 @@ const updateThemeFromPredefined = (themeConfig: any) => {
   const isDarkMode = document.body.classList.contains('body--dark');
 
   if (mode === 'light') {
-    // Update light mode variables
+    // Update light mode variables - only theme color
     const lightThemeColor = lightModeVariables.find(v => v.name === '--o2-theme-color');
-    const lightPrimaryBg = lightModeVariables.find(v => v.name === '--o2-body-primary-bg');
-    const lightSecondaryBg = lightModeVariables.find(v => v.name === '--o2-body-secondary-bg');
 
     if (lightThemeColor && themeConfig.themeColor) {
       lightThemeColor.value = themeConfig.themeColor;
       lightThemeColor.opacity = themeConfig.themeColorOpacity || 10;
-    }
-    if (lightPrimaryBg && themeConfig.primaryBg) {
-      lightPrimaryBg.value = themeConfig.primaryBg;
-      lightPrimaryBg.opacity = themeConfig.primaryBgOpacity || 1;
-    }
-    if (lightSecondaryBg && themeConfig.secondaryBg) {
-      lightSecondaryBg.value = themeConfig.secondaryBg;
-      lightSecondaryBg.opacity = themeConfig.secondaryBgOpacity || 4;
     }
 
     // Only apply if we're currently in light mode
@@ -349,22 +324,12 @@ const updateThemeFromPredefined = (themeConfig: any) => {
       applyAllVariablesForCurrentMode();
     }
   } else {
-    // Update dark mode variables
+    // Update dark mode variables - only theme color
     const darkThemeColor = darkModeVariables.find(v => v.name === '--o2-dark-theme-color');
-    const darkPrimaryBg = darkModeVariables.find(v => v.name === '--o2-body-primary-bg');
-    const darkSecondaryBg = darkModeVariables.find(v => v.name === '--o2-body-secondary-bg');
 
     if (darkThemeColor && themeConfig.themeColor) {
       darkThemeColor.value = themeConfig.themeColor;
       darkThemeColor.opacity = themeConfig.themeColorOpacity || 10;
-    }
-    if (darkPrimaryBg && themeConfig.primaryBg) {
-      darkPrimaryBg.value = themeConfig.primaryBg;
-      darkPrimaryBg.opacity = themeConfig.primaryBgOpacity !== undefined ? themeConfig.primaryBgOpacity : 0;
-    }
-    if (darkSecondaryBg && themeConfig.secondaryBg) {
-      darkSecondaryBg.value = themeConfig.secondaryBg;
-      darkSecondaryBg.opacity = themeConfig.secondaryBgOpacity !== undefined ? themeConfig.secondaryBgOpacity : 0;
     }
 
     // Only apply if we're currently in dark mode
@@ -450,46 +415,25 @@ const updateOpacity = (colorName: string, newOpacity: number, mode: "light" | "d
 
     targetElement.style.setProperty(colorName, rgbaColor);
 
-    // If changing theme color, update menu variables
-    if (colorName === '--o2-theme-color' || colorName === '--o2-dark-theme-color') {
+    // If changing theme color, update menu variables and backgrounds
+    if (colorName === '--o2-theme-color') {
       applyMenuVariables(colorVar.value, targetElement);
-    }
 
-    // If changing body backgrounds, force update the gradient
-    if (colorName === '--o2-body-primary-bg' || colorName === '--o2-body-secondary-bg') {
-      updateBodyGradient();
-    }
-  }
-};
+      // Auto-update background colors based on new theme color
+      const primaryBg = hexToRgba(colorVar.value, 0.1); // 0.01 alpha (1%)
+      const secondaryBg = hexToRgba(colorVar.value, 4); // 0.4 alpha (40%)
 
-const updateBodyGradient = () => {
-  const isDarkMode = document.body.classList.contains('body--dark');
+      document.documentElement.style.setProperty('--o2-body-primary-bg', primaryBg);
+      document.documentElement.style.setProperty('--o2-body-secondary-bg', secondaryBg);
 
-  if (isDarkMode) {
-    // In dark mode, check if user has customized the background
-    const darkPrimary = darkModeVariables.find(v => v.name === '--o2-body-primary-bg');
-    const darkSecondary = darkModeVariables.find(v => v.name === '--o2-body-secondary-bg');
-
-    // Only apply gradient if user has set opacity > 0
-    if (darkPrimary && darkPrimary.opacity > 0 || darkSecondary && darkSecondary.opacity > 0) {
-      const primaryBg = darkPrimary ? hexToRgba(darkPrimary.value, darkPrimary.opacity) : 'transparent';
-      const secondaryBg = darkSecondary ? hexToRgba(darkSecondary.value, darkSecondary.opacity) : 'transparent';
-
+      // Update body gradient
       const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
       document.body.style.setProperty('background', gradient, 'important');
-    } else {
-      // Remove any custom gradient, let SCSS take over
-      document.body.style.removeProperty('background');
     }
-  } else {
-    // In light mode, apply custom gradient
-    const lightPrimary = lightModeVariables.find(v => v.name === '--o2-body-primary-bg');
-    const lightSecondary = lightModeVariables.find(v => v.name === '--o2-body-secondary-bg');
-    const primaryBg = lightPrimary ? hexToRgba(lightPrimary.value, lightPrimary.opacity) : 'rgba(89, 155, 174, 0.1)';
-    const secondaryBg = lightSecondary ? hexToRgba(lightSecondary.value, lightSecondary.opacity) : 'rgba(89, 155, 174, 0.4)';
 
-    const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
-    document.body.style.setProperty('background', gradient, 'important');
+    if (colorName === '--o2-dark-theme-color') {
+      applyMenuVariables(colorVar.value, targetElement);
+    }
   }
 };
 
@@ -507,14 +451,24 @@ const applyColor = () => {
 
     targetElement.style.setProperty(currentColorName.value, rgbaColor);
 
-    // If changing theme color, update menu variables
-    if (currentColorName.value === '--o2-theme-color' || currentColorName.value === '--o2-dark-theme-color') {
+    // If changing theme color, update menu variables and backgrounds
+    if (currentColorName.value === '--o2-theme-color') {
       applyMenuVariables(colorVar.value, targetElement);
+
+      // Auto-update background colors based on new theme color
+      const primaryBg = hexToRgba(colorVar.value, 0.1); // 0.01 alpha (1%)
+      const secondaryBg = hexToRgba(colorVar.value, 4); // 0.4 alpha (40%)
+
+      document.documentElement.style.setProperty('--o2-body-primary-bg', primaryBg);
+      document.documentElement.style.setProperty('--o2-body-secondary-bg', secondaryBg);
+
+      // Update body gradient
+      const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
+      document.body.style.setProperty('background', gradient, 'important');
     }
 
-    // If changing body backgrounds, force update the gradient
-    if (currentColorName.value === '--o2-body-primary-bg' || currentColorName.value === '--o2-body-secondary-bg') {
-      updateBodyGradient();
+    if (currentColorName.value === '--o2-dark-theme-color') {
+      applyMenuVariables(colorVar.value, targetElement);
     }
   }
 };
@@ -577,13 +531,20 @@ const copyColorConfig = async () => {
   flex-direction: column;
   background-color: #ffffff;
   color: rgba(0, 0, 0, 0.87);
+  opacity: 0;
 
   body.body--dark & {
     background: #1d1d1d;
     color: rgba(255, 255, 255, 0.87);
   }
+  &:hover{
+    opacity: 1;
+  }
 }
 
+// .theme-customizer-card :hover{
+//   opacity: 1;
+// }
 .sticky-header {
   position: sticky;
   top: 0;
