@@ -52,7 +52,7 @@ export default defineComponent({
     const ingestionURL = getIngestionURL();
     endpoint.value = getEndPoint(ingestionURL);
 
-    const content = `curl -u [EMAIL]:[PASSCODE] -k ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/default/_json -d '[{"level":"info","job":"test","log":"test message for openobserve"}]'`;
+    const content = `curl -u [EMAIL]:[PASSCODE] -k ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/default/_json -d "[{\\"level\\":\\"info\\",\\"job\\":\\"test\\",\\"log\\":\\"test message for openobserve\\"}]"`;
 
     return {
       store,
