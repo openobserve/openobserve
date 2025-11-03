@@ -17,165 +17,167 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div>
-    <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
-    <span
-      v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue"
-      id="dashboardVariablesAndPanelsDataLoaded"
-      style="display: none"
-    >
-    </span>
-    <VariablesValueSelector
-      v-if="currentTimeObj['__global'] || currentTimeObj['__variables']"
-      :variablesConfig="dashboardData?.variables"
-      :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
-      :selectedTimeDate="
-        currentTimeObj['__variables'] || currentTimeObj['__global']
-      "
-      :initialVariableValues="initialVariableValues"
-      @variablesData="variablesDataUpdated"
-      ref="variablesValueSelectorRef"
-    />
-    <TabList
-      v-if="showTabs && selectedTabId !== null"
-      class="q-mt-sm"
-      :dashboardData="dashboardData"
-      :viewOnly="viewOnly"
-      @refresh="refreshDashboard"
-    />
-    <slot name="before_panels" />
-    <div class="displayDiv">
-      <div
-        v-if="
-          store.state.printMode &&
-          panels.length === 1 &&
-          panels[0].type === 'table'
-        "
-        style="height: 100%; width: 100%"
+  <div class="card-container"
+    :class="store.state.printMode ? '' : 'tw-h-full tw-overflow-y-auto' " >
+    <div class="tw-px-[0.625rem]">
+      <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
+      <span
+        v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue"
+        id="dashboardVariablesAndPanelsDataLoaded"
+        style="display: none"
       >
-        <PanelContainer
-          @onDeletePanel="onDeletePanel"
-          @onViewPanel="onViewPanel"
-          :viewOnly="viewOnly"
-          :data="panels[0] || {}"
-          :dashboardId="dashboardData.dashboardId"
-          :folderId="folderId"
-          :reportId="folderId"
-          :selectedTimeDate="
-            (panels[0]?.id ? currentTimeObj[panels[0].id] : undefined) ||
-            currentTimeObj['__global'] ||
-            {}
-          "
-          :variablesData="
-            currentVariablesDataRef[panels[0].id] ||
-            currentVariablesDataRef['__global']
-          "
-          :forceLoad="forceLoad"
-          :searchType="searchType"
-          :runId="runId"
-          :tabId="selectedTabId"
-          :tabName="
-            dashboardData?.tabs?.find((tab: any) => tab.tabId === selectedTabId)
-              ?.name
-          "
-          :dashboardName="dashboardName"
-          :folderName="folderName"
-          @updated:data-zoom="$emit('updated:data-zoom', $event)"
-          @onMovePanel="onMovePanel"
-          @refreshPanelRequest="refreshPanelRequest"
-          @refresh="refreshDashboard"
-          @update:initial-variable-values="updateInitialVariableValues"
-          @onEditLayout="openEditLayout"
-          @contextmenu="$emit('chart:contextmenu', $event)"
-          style="height: 100%; width: 100%"
-        />
-      </div>
-      <div v-else ref="gridStackContainer"
-class="grid-stack">
+      </span>
+      <VariablesValueSelector
+        v-if="currentTimeObj['__global'] || currentTimeObj['__variables']"
+        :variablesConfig="dashboardData?.variables"
+        :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
+        :selectedTimeDate="
+          currentTimeObj['__variables'] || currentTimeObj['__global']
+        "
+        :initialVariableValues="initialVariableValues"
+        @variablesData="variablesDataUpdated"
+        ref="variablesValueSelectorRef"
+      />
+      <TabList
+        v-if="showTabs && selectedTabId !== null"
+        class="q-mt-sm"
+        :dashboardData="dashboardData"
+        :viewOnly="viewOnly"
+        @refresh="refreshDashboard"
+      />
+      <slot name="before_panels" />
+      <div class="displayDiv">
         <div
-          v-for="item in panels"
-          :key="item.id + selectedTabId"
-          :gs-id="item.id"
-          :gs-x="getPanelLayout(item, 'x')"
-          :gs-y="getPanelLayout(item, 'y')"
-          :gs-w="getPanelLayout(item, 'w')"
-          :gs-h="getPanelLayout(item, 'h')"
-          :gs-min-w="getMinimumWidth(item.type)"
-          :gs-min-h="getMinimumHeight(item.type)"
-          class="grid-stack-item gridBackground"
-          :class="store.state.theme == 'dark' ? 'dark' : ''"
+          v-if="
+            store.state.printMode &&
+            panels.length === 1 &&
+            panels[0].type === 'table'
+          "
+          style="height: 100%; width: 100%"
         >
-          <div class="grid-stack-item-content">
-            <PanelContainer
-              @onDeletePanel="onDeletePanel"
-              @onViewPanel="onViewPanel"
-              :viewOnly="viewOnly"
-              :data="item"
-              :dashboardId="dashboardData.dashboardId"
-              :folderId="folderId"
-              :reportId="reportId"
-              :selectedTimeDate="
-                currentTimeObj[item.id] || currentTimeObj['__global'] || {}
-              "
-              :variablesData="
-                currentVariablesDataRef[item.id] ||
-                currentVariablesDataRef['__global']
-              "
-              :currentVariablesData="variablesData"
-              :width="getPanelLayout(item, 'w')"
-              :height="getPanelLayout(item, 'h')"
-              :forceLoad="forceLoad"
-              :searchType="searchType"
-              :runId="runId"
-              :tabId="selectedTabId"
-              :tabName="
-                dashboardData?.tabs?.find(
-                  (tab: any) => tab.tabId === selectedTabId,
-                )?.name
-              "
-              :dashboardName="dashboardName"
-              :folderName="folderName"
-              :allowAlertCreation="allowAlertCreation"
-              @updated:data-zoom="$emit('updated:data-zoom', $event)"
-              @onMovePanel="onMovePanel"
-              @refreshPanelRequest="refreshPanelRequest"
-              @refresh="refreshDashboard"
-              @update:initial-variable-values="updateInitialVariableValues"
-              @onEditLayout="openEditLayout"
-              @update:runId="updateRunId"
-              @contextmenu="$emit('chart:contextmenu', $event)"
-            >
-            </PanelContainer>
+          <PanelContainer
+            @onDeletePanel="onDeletePanel"
+            @onViewPanel="onViewPanel"
+            :viewOnly="viewOnly"
+            :data="panels[0] || {}"
+            :dashboardId="dashboardData.dashboardId"
+            :folderId="folderId"
+            :reportId="folderId"
+            :selectedTimeDate="
+              (panels[0]?.id ? currentTimeObj[panels[0].id] : undefined) ||
+              currentTimeObj['__global'] ||
+              {}
+            "
+            :variablesData="
+              currentVariablesDataRef[panels[0].id] ||
+              currentVariablesDataRef['__global']
+            "
+            :forceLoad="forceLoad"
+            :searchType="searchType"
+            :runId="runId"
+            :tabId="selectedTabId"
+            :tabName="
+              dashboardData?.tabs?.find((tab: any) => tab.tabId === selectedTabId)
+                ?.name
+            "
+            :dashboardName="dashboardName"
+            :folderName="folderName"
+            @updated:data-zoom="$emit('updated:data-zoom', $event)"
+            @onMovePanel="onMovePanel"
+            @refreshPanelRequest="refreshPanelRequest"
+            @refresh="refreshDashboard"
+            @update:initial-variable-values="updateInitialVariableValues"
+            @onEditLayout="openEditLayout"
+            @contextmenu="$emit('chart:contextmenu', $event)"
+            style="height: 100%; width: 100%"
+          />
+        </div>
+        <div v-else ref="gridStackContainer"
+  class="grid-stack">
+          <div
+            v-for="item in panels"
+            :key="item.id + selectedTabId"
+            :gs-id="item.id"
+            :gs-x="getPanelLayout(item, 'x')"
+            :gs-y="getPanelLayout(item, 'y')"
+            :gs-w="getPanelLayout(item, 'w')"
+            :gs-h="getPanelLayout(item, 'h')"
+            :gs-min-w="getMinimumWidth(item.type)"
+            :gs-min-h="getMinimumHeight(item.type)"
+            class="grid-stack-item gridBackground"
+            :class="store.state.theme == 'dark' ? 'dark' : ''"
+          >
+            <div class="grid-stack-item-content">
+              <PanelContainer
+                @onDeletePanel="onDeletePanel"
+                @onViewPanel="onViewPanel"
+                :viewOnly="viewOnly"
+                :data="item"
+                :dashboardId="dashboardData.dashboardId"
+                :folderId="folderId"
+                :reportId="reportId"
+                :selectedTimeDate="
+                  currentTimeObj[item.id] || currentTimeObj['__global'] || {}
+                "
+                :variablesData="
+                  currentVariablesDataRef[item.id] ||
+                  currentVariablesDataRef['__global']
+                "
+                :currentVariablesData="variablesData"
+                :width="getPanelLayout(item, 'w')"
+                :height="getPanelLayout(item, 'h')"
+                :forceLoad="forceLoad"
+                :searchType="searchType"
+                :runId="runId"
+                :tabId="selectedTabId"
+                :tabName="
+                  dashboardData?.tabs?.find(
+                    (tab: any) => tab.tabId === selectedTabId,
+                  )?.name
+                "
+                :dashboardName="dashboardName"
+                :folderName="folderName"
+                :allowAlertCreation="allowAlertCreation"
+                @updated:data-zoom="$emit('updated:data-zoom', $event)"
+                @onMovePanel="onMovePanel"
+                @refreshPanelRequest="refreshPanelRequest"
+                @refresh="refreshDashboard"
+                @update:initial-variable-values="updateInitialVariableValues"
+                @onEditLayout="openEditLayout"
+                @update:runId="updateRunId"
+                @contextmenu="$emit('chart:contextmenu', $event)"
+              >
+              </PanelContainer>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- view panel dialog -->
-    <q-dialog
-      v-model="showViewPanel"
-      :no-route-dismiss="true"
-      full-height
-      full-width
-    >
-      <q-card style="overflow: hidden">
-        <ViewPanel
-          :folderId="folderId"
-          :dashboardId="dashboardData.dashboardId"
-          :panelId="viewPanelId"
-          :selectedDateForViewPanel="selectedDateForViewPanel"
-          :initialVariableValues="variablesData"
-          :searchType="searchType"
-          @close-panel="() => (showViewPanel = false)"
-          :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-          @update:initial-variable-values="updateInitialVariableValues"
-        />
-      </q-card>
-    </q-dialog>
-    <div v-if="!panels.length">
-      <!-- if data not available show nodata component -->
-      <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
-    </div>
+      <!-- view panel dialog -->
+      <q-dialog
+        v-model="showViewPanel"
+        :no-route-dismiss="true"
+        full-height
+        full-width
+      >
+        <q-card style="overflow: hidden">
+          <ViewPanel
+            :folderId="folderId"
+            :dashboardId="dashboardData.dashboardId"
+            :panelId="viewPanelId"
+            :selectedDateForViewPanel="selectedDateForViewPanel"
+            :initialVariableValues="variablesData"
+            :searchType="searchType"
+            @close-panel="() => (showViewPanel = false)"
+            @update:initial-variable-values="updateInitialVariableValues"
+          />
+        </q-card>
+      </q-dialog>
+      <div v-if="!panels.length">
+        <!-- if data not available show nodata component -->
+        <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
+      </div>
+  </div>
   </div>
 </template>
 
@@ -526,8 +528,8 @@ export default defineComponent({
       // Initialize GridStack with optimal configuration
       gridStackInstance = GridStack.init(
         {
-          column: 48, // 48-column grid for fine-grained positioning
-          cellHeight: "34px", // Base cell height
+          column: 192, // 192-column grid for fine-grained positioning
+          cellHeight: "17px", // Base cell height
           margin: 2, // Minimal margin between panels
           draggable: {
             enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable dragging unless view-only or saving
@@ -666,9 +668,9 @@ export default defineComponent({
       } else if (position == "y") {
         return panelData?.layout?.y || 0;
       } else if (position == "w") {
-        return panelData?.layout?.w || 12;
+        return panelData?.layout?.w || 96;
       } else if (position == "h") {
-        return panelData?.layout?.h || 8;
+        return panelData?.layout?.h || 18;
       } else if (position == "i") {
         return panelData?.layout?.i || panelData.id;
       }
@@ -685,7 +687,7 @@ export default defineComponent({
         case "pie":
         case "scatter":
         case "table":
-          return 4; // 4 grid units minimum height
+          return 8; // 8 grid units minimum height
 
         default:
           break;
@@ -702,7 +704,7 @@ export default defineComponent({
         case "pie":
         case "scatter":
         case "table":
-          return 3; // 3 grid units minimum width
+          return 12; // 12 grid units minimum width
 
         default:
           break;

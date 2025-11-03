@@ -2,87 +2,321 @@
 
 html, body {
   margin: 0 !important;
-  padding: 0 !important;
+padding: 0 !important;
 }
+
+body {
+  background: var(--o2-body-secondary-bg);  /* fallback for old browsers */
+  background: -webkit-linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));  /* Chrome 10-25, Safari 5.1-6 */
+  background: linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg)); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+  overflow: hidden;
+  color: var(--o2-text-primary);
+
+  // background: -webkit-linear-gradient(
+  //   to bottom right,
+  //   rgba(63, 121, 148, 0.05),
+  //   rgba(89, 185, 122, 0.4)
+  // );
+
+  // /* Modern browsers (W3C, IE10+, Edge, Firefox, Chrome, Safari) */
+  // background: linear-gradient(
+  //   to bottom right,
+  //   rgba(63, 121, 148, 0.05),
+  //   rgba(89, 185, 122, 0.4)
+  // );
+}
+
+//here also we need to change whenever we decided to change the bg 
+//because we are using this in alert destination import , pipeline destination import , sdr import 
+//because there the after slot is covered with card container so using thig
+.o2-custom-bg{
+    background: var(--o2-body-secondary-bg);  /* fallback for old browsers */
+  background: -webkit-linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));  /* Chrome 10-25, Safari 5.1-6 */
+  background: linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg)); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+  overflow: hidden;
+}
+  
+.card-container {
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
+}
+
+.q-page {
+  border-radius: 0.375rem;
+}
+
+.q-btn {
+  &::before {
+    border: none;
+  }
+}
+
+.header-menu {
+  @extend .el-border-radius;
+
+  width: auto;
+  display: inline-flex;
+  background-color: var(--o2-header-menu-bg);
+  position: relative;
+
+  .q-btn .q-icon, .q-btn .q-spinner {
+    font-size: 1.3rem;
+  }
+}
+
+.logs-table-list {
+  .q-btn .q-icon, .q-btn .q-spinner {
+    font-size: 0.8rem;
+  }
+}
+
+// .element-box-shadow {
+//   box-shadow: var(--o2-box-shadow);
+// }
+
+.q-splitter--vertical {
+  >.q-splitter__separator {
+    width: 0.625rem; // 10px
+    z-index: 999 !important;
+    height: 100vh;
+    background: transparent;
+  }
+}
+
+.q-splitter--horizontal {
+  >.q-splitter__separator {
+    height: 0; // 10px
+    z-index: 99;
+    background: transparent;
+  }
+}
+
+.el-border {
+  border: 0.0625rem solid var(--o2-border-color);
+}
+
+.el-border-radius {
+  border-radius: 0.375rem;
+}
+
+/** 
+=====================================================================
+    input related heights defined here
+=====================================================================
+**/
+
+.el-input-min-height {
+  min-height: 2.25rem !important;
+}
+
+.el-input-height {
+  height: 2.25rem !important;
+}
+
+.el-input-max-height {
+  height: 2.25rem !important;
+}
+
+
+/** 
+=====================================================================
+    select (dropdown) related heights defined here
+=====================================================================
+**/
+
+.el-select-min-height {
+  min-height: 2.25rem !important;
+}
+
+.el-select-height {
+  height: 2.25rem !important;
+}
+
+.el-select-max-height {
+  height: 2.25rem !important;
+}
+
+
+/** 
+=====================================================================
+    side dropdown related widths defined here
+=====================================================================
+**/
+.el-side-dropdown-width{
+  width: 30vw !important; 
+}
+
+
+
+/** 
+=====================================================================
+    input file related heights defined here
+=====================================================================
+**/
+.el-input-file-min-height {
+  min-height: 2.25rem !important;
+}
+
+.el-input-file-height {
+  height: 2.25rem !important;
+}
+
+.el-input-file-max-height {
+  height: 2.25rem !important;
+}
+
+
+.o2-secondary-button {
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.q-tabs {
+  &--vertical {
+    .q-tab {
+      @extend .el-border-radius;
+      justify-content: flex-start;
+      padding: 0 0.6rem 0 0.6rem;
+      text-transform: capitalize;
+      margin: 0.5rem;
+
+      &:hover{
+        background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
+      }
+
+      &__content.tab_content {
+        .q-tab {
+          &__icon + &__label {
+            padding-left: 0.875rem;
+            font-weight: 600;
+          }
+        }
+      }
+      &--active {
+        color: var(--o2-tab-text-color);
+        background-color: var(--o2-tab-bg);
+      }
+    }
+  }
+
+  &--horizontal {
+    .q-tab {
+      border-radius: 0.375rem 0.375rem 0 0;
+      justify-content: flex-start;
+      padding: 0 0.6rem 0 0.6rem;
+      text-transform: capitalize;
+      min-height: 35px;
+
+      &:hover{
+        background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
+      }
+
+      &__content.tab_content {
+        padding: 0px;
+        .q-tab {
+          &__icon + &__label {
+            padding-left: 0.875rem;
+            font-weight: 600;
+          }
+        }
+      }
+      &--active {
+        color: var(--o2-tab-text-color);
+        background-color: var(--o2-tab-bg);
+      }
+    }
+  }
+}
+
+/* ============================================================================
+   CUSTOM TAB ICON STYLING
+   Icon styling for vertical tabs with Lucide icons
+   ============================================================================ */
+
+.o2-tab-icon {
+  width: 20px !important;
+  height: 20px !important;
+  margin-right: 0.6rem !important; // 12px spacing after icon
+  margin-left: 0.1rem !important; // 12px spacing after icon
+  flex-shrink: 0 !important; // Prevent icon from shrinking
+}
+
+.spitter-container {
+  width: 100%;
+  height: 100%;
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  overflow: auto;
+  flex: 10000 1 0%;
+}
+
+// .q-splitter--vertical {
+//   width: 0.625rem; // 10px
+//   height: 100%;
+// }
+
+// .q-splitter--horizontal {
+//   width: 0.625rem; // 10px
+//   height: 100%;
+// }
 
 /* ============================================================================
    MODERN LEAN SCROLLBAR STYLES
    Thin, minimal design with primary color scheme
    ============================================================================ */
 
+/* Base scrollbar style */
 ::-webkit-scrollbar {
-  width: 0.5rem; // 8px - thinner for modern look
-  height: 0.5rem; // 8px
+  width: 0.4rem;   // thinner for modern look
+  height: 0.4rem;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent; // Clean, minimal track
-  border-radius: 0.25rem; // 4px - subtle rounding
+  background: var(--o2-scrollbar-track-bg, transparent);
+  border-radius: 0.25rem;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(87, 95, 197, 0.4); // Light primary color
-  border-radius: 0.25rem; // 4px - subtle rounding
-  transition: background 0.2s ease;
-  cursor: pointer; // Hand pointer
+  border-radius: 0.25rem;
+  background: white; // hidden by default
+  transition: background 0.3s ease;
+  cursor: pointer;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(87, 95, 197, 0.6); // Slightly darker on hover
-  cursor: pointer; // Hand pointer
+/* When user hovers over the entire scrollable area */
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--o2-scrollbar-thumb-bg, transparent);
 }
 
-::-webkit-scrollbar-thumb:active {
-  background: rgba(87, 95, 197, 0.8); // More visible when dragging
-  cursor: grabbing; // Grabbing hand when dragging
+*:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--o2-scrollbar-thumb-hover-bg, rgba(0, 0, 0, 0.1));
+  cursor: pointer;
 }
 
-// Dark theme scrollbar
-.theme-dark {
-  ::-webkit-scrollbar-track {
-    background: transparent; // Clean, minimal track
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: rgba(161, 175, 255, 0.4); // Light dark-mode primary color
-    transition: background 0.2s ease;
-    cursor: pointer; // Hand pointer
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(161, 175, 255, 0.6);
-    cursor: pointer; // Hand pointer
-  }
-
-  ::-webkit-scrollbar-thumb:active {
-    background: rgba(161, 175, 255, 0.8);
-    cursor: grabbing; // Grabbing hand when dragging
-  }
+*:hover::-webkit-scrollbar-thumb:active {
+  background: var(--o2-scrollbar-thumb-active-bg, rgba(0, 0, 0, 0.15));
+  cursor: grabbing;
 }
 
-// Light theme scrollbar
-.theme-light {
-  ::-webkit-scrollbar-track {
-    background: transparent; // Clean, minimal track
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: rgba(87, 95, 197, 0.4); // Light primary color
-    transition: background 0.2s ease;
-    cursor: pointer; // Hand pointer
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(87, 95, 197, 0.6);
-    cursor: pointer; // Hand pointer
-  }
-
-  ::-webkit-scrollbar-thumb:active {
-    background: rgba(87, 95, 197, 0.8);
-    cursor: grabbing; // Grabbing hand when dragging
-  }
+*:hover::-webkit-scrollbar-track {
+  background: var(--o2-scrollbar-track-hover-bg, rgba(0, 0, 0, 0.02));
 }
 
+/* Firefox support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+/* When hovered */
+*:hover {
+  scrollbar-color: var(--o2-scrollbar-thumb-bg, transparent)
+                   var(--o2-scrollbar-track-hover-bg, rgba(0, 0, 0, 0.02));
+}
 
 .q-w-sm {
   width: 360px;
@@ -201,9 +435,10 @@ html, body {
   }
 }
 
-.monaco-editor {
-  outline-width: 0px;
-  outline-style: none;
+.o2-container-navbarheight {
+  height: calc(100vh - 42px);
+  overflow: auto;
+  // padding: 0.625rem; // 10px
 }
 
 .o2-page-title {
@@ -264,11 +499,36 @@ html, body {
 //add if we want to apply dark theme to the table , we need to add a class dark-o2-quasar-table to the table
 //add if we want to apply light theme to the table , we need to add a class light-o2-quasar-table to the table
 //if there are actions in the table , we need to add a class actions-column to the last column
+.table-container thead, .o2-quasar-table thead {
+    // background: var(--o2-table-header-bg);
+    // opacity: 0.9;
+    tr {
+      background: var(--o2-table-header-bg) !important;
+    }
+}
+
+.q-table {
+  border-radius: 0.375rem;
+  tbody .q-tr:hover {
+    background: color-mix(in srgb, var(--o2-theme-color) 5%, var(--o2-theme-mode) 90%);
+  }
+}
+
+.q-table__card{
+  box-shadow: none;
+  background-color: transparent;
+}
 
 .o2-quasar-table{
+
+  &.o2-row-md{
+    th, td {
+      height: 36px !important;
+    }
+  }
   th,td {
-    padding: 0px 16px !important;
-    height: 36px !important;
+    padding: 0px 5px !important;
+    height: 36px;
   };
 
 
@@ -278,27 +538,24 @@ html, body {
     position: sticky;
     right: 0;
     z-index: 1;
-    background: #ffffff;
-    box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
   }
-}
-//here we have dark theme styling for the table
-//`. we are changing the background color of the actions column
-.o2-quasar-table-dark{
-  th:last-child.actions-column,
-  td:last-child.actions-column {
-    background: var(--q-dark);
-    box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1);
-    width: 150px;
+  tr{
+    td{
+      border-bottom: 1px solid var(--o2-border-color) !important;
+    }
+  }
+  tr{
+    td{
+      border-bottom: 1px solid var(--o2-border-color) !important;
+    }
   }
 }
 
-.o2-quasar-table-light{
+.o2-quasar-table{
   th:last-child.actions-column,
   td:last-child.actions-column {
-    background: #ffffff;
     width: 150px;
-    box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
+    box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
   }
 }
 //this is for in some of pages we are having a header for eg: pipelines ,functions ,enrichments listing pages
@@ -346,23 +603,6 @@ html, body {
 }
 
 
-//some times if there are less records or if user tries to search anything the last row of the table is not having border at the bottom
-
-.o2-last-row-border-light{
-  tr:last-child{
-    td{
-      border-bottom: 1px solid #E4E7EC !important;
-    }
-  }
-}
-
-.o2-last-row-border-dark{
-  tr:last-child{
-    td{
-      border-bottom: 1px solid #575A5A !important;
-    }
-  }
-}
 
 
 //this is used to target the table in the app-table component internally it uses q-table component
@@ -382,52 +622,19 @@ html, body {
       position: sticky;
       right: 0;
       z-index: 1;
-      width: 150px !important;
+      width: 100px ;
+      box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
     }
   }
   .q-table{
     thead{
+            background: var(--o2-table-header-bg) !important;
       th:last-child.actions-column{
         position: sticky;
         right: 0;
         z-index: 1;
-      }
-    }
-  }
-}
-.o2-quasar-app-table-light{
-  .q-virtual-scroll__content{
-    td:last-child.actions-column {
-      background: #ffffff !important;
-      box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1) !important;
-      width: 150px !important;
-    }
-  }
-  .q-table{
-    thead{
-      th:last-child.actions-column{
-        background: #ffffff !important;
-        box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1) !important;
-        width: 150px !important;
-      }
-    }
-  }
-}
-
-.o2-quasar-app-table-dark{
-  .q-virtual-scroll__content{
-    td:last-child.actions-column {
-      background: var(--q-dark) !important;
-      box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1) !important;
-      width: 150px !important;
-    }
-  }
-  .q-table{
-    thead{
-      th:last-child.actions-column{
-        background: var(--q-dark) !important;
-        box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1) !important;
-        width: 150px !important;
+        box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
+        width: 100px;
       }
     }
   }
@@ -436,9 +643,9 @@ html, body {
 //so to make this work just introduce a new div around the app-tabs component and add the class app-tabs-container to it
 //and then add the class tabs-selection-container-dark or tabs-selection-container-light to the app-tabs component
 .app-tabs-container{
-  border: 1px solid #cacaca;
+  @extend .el-border;
+  @extend .el-border-radius;
   padding: 2px;
-  border-radius: 2px;
 }
 
 .tabs-selection-container-dark{
@@ -457,7 +664,7 @@ html, body {
     background-color: $primary !important;
     color: white !important;
     border: 1px solid #cacaca !important;
-    border-bottom: 1px solid #cacaca !important;
+    // border-bottom: 1px solid #cacaca !important;
   }
   .rum-tab:hover{
     background-color: #373A3B !important;
@@ -467,28 +674,29 @@ html, body {
   }
 }
 
-.tabs-selection-container-light{
-  border: none !important;
-  border-radius: none !important;
-  .rum-tab{
-    border-radius: 4px !important;
-    height: 30px !important;
-    margin: 0 2px !important;
-    padding: 4px 12px !important;
+.tabs-selection-container{
+  border: none;
+  border-radius: none;
+  border-bottom: none !important;
+  .o2-tab{
+    border-radius: 4px;
+    height: 30px;
+    padding: 4px 12px;
+    border-bottom: none;
+    width: auto;
+    white-space: normal;
+    line-height: 1.5rem;
     border-bottom: none !important;
-    width: auto !important;
-    white-space: normal !important;
   }
-  .rum-tab.active{
-    background-color: $primary !important;
-    color: white !important;
-    border: 1px solid #cacaca !important;
+  .o2-tab.active{
+    background-color: var(--o2-primary-btn-bg) !important;
+    color: rgba(255,255,255) !important;
   }
-  .rum-tab:hover{
-    background-color: #f0f0f0 !important;
+  .o2-tab:hover{
+    background-color: var(--o2-hover-accent) !important;
   }
-  .rum-tab.active:hover{
-    background-color: $primary !important;
+  .o2-tab.active:hover{
+    background-color: var(--o2-primary-btn-bg) !important;
   }
 }
 
@@ -499,24 +707,11 @@ html, body {
 //any non theme related styling should be done here inside the o2-table-checkbox class
 .o2-table-checkbox{
   .q-checkbox__bg{
-    width: 16px !important;
-    height: 16px !important;
-  }
-}
-.o2-table-checkbox-light{
-  .q-checkbox__inner--truthy .q-checkbox__bg, .q-checkbox__inner--indet .q-checkbox__bg {
-    background: #575FC5 !important;
-    border: 2px solid #575FC5 !important;
+    width: 13px !important;
+    height: 13px !important;
   }
 }
 
-
-.o2-table-checkbox-dark{
-  .q-checkbox__inner--truthy .q-checkbox__bg, .q-checkbox__inner--indet .q-checkbox__bg {
-    background: #575FC5 !important;
-    border: 2px solid #575FC5 !important;
-  }
-}
 
 //this is used to target the radio button in the app
 //we need to add the class o2-radio-button-light or o2-radio-button-dark to the radio button directly
@@ -585,75 +780,34 @@ html, body {
 //any non theme related styling should be done here inside the o2-search-input class
 
 .o2-search-input{
-  height: 36px !important;
+  
+  height: 36px;
+  width: 200px !important;
   .q-field__control{
-  height: 36px !important;
-  border-radius: 4px !important;
-  display: flex;
-  align-items: end;
-  font-size: 13px;
-  padding: 0px 6px !important;
-  font-weight: 500 !important;
-  color: transparent !important;
-}
+    @extend .el-border-radius;
+    @extend .el-border;
+    
+    height: 36px;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    padding: 0px 6px !important;
+    font-weight: 500;
+  }
   .q-field__prepend{
     height: 36px !important;
     padding-bottom: 4px !important;
   }
-  .q-field--highlighted{
-    .q-field__control{
-      background-color: red !important;
-    }
-  }
   .q-field__append{
-    padding-top: 8px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .q-icon {
+    height: 16px;
+    width: 16px;
+    margin-right: 10px;
   }
 }
-
-.o2-search-input-light{
-  .q-field__control{
-    background-color: #ffffff !important;
-    outline: 1px solid #C9CCD6 !important;
-
-  }
-}
-.o2-search-input-dark{
-  .q-field__control{
-    background-color: #2B2D30 !important;
-    border: 1px solid #4E5157 !important;
-  }
-}
-//this is done because we need to select the search input when it is focused
-.o2-search-input-light.q-field--focused .q-field__control {
-  outline: 2px solid #575FC5 !important;
-  box-shadow: none !important;
-  background-color: #FFFFFF !important;
-  border-radius: 4px !important;
-}
-
-.o2-search-input-dark.q-field--focused .q-field__control {
-  outline: 2px solid #575FC5 !important;
-  box-shadow: none !important;
-  background-color: #2B2D30 !important;
-  border-radius: 4px !important;
-}
-
-//this is for search input icon
-//we have added the class o2-search-input-icon-light or o2-search-input-icon-dark to the search input icon
-//any non theme related styling should be done here inside the o2-search-input-icon class
-
-.o2-search-input-icon{
-  height: 16px !important;
-  width: 16px !important;
-  margin-right: 10px;
-}
-.o2-search-input-icon-light{
-  color: #818594;
-}
-.o2-search-input-icon-dark{
-  color: #6F737A;
-}
-
 //this is for o2 secondary button
 //in a page we can have multiple secondary buttons so we need to add the class o2-secondary-button-light or o2-secondary-button-dark to the button
 //any non theme related styling should be done here inside the o2-secondary-button class
@@ -665,6 +819,13 @@ html, body {
   border-radius: 4px !important;
   padding: 0px 12px !important;
   min-width: 90px !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
+  }
 }
 
 
@@ -677,28 +838,50 @@ html, body {
   padding: 0px 12px !important;
   min-width: 90px !important;
   height: 28px !important;
-}
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
 
-.o2-secondary-button-light{
-  color: #19191E !important;
-  border: 1px solid #D3D5DB !important;
-  background-color: #F7F8FA;
-}
-.o2-secondary-button-dark{
-  color: #DFE1E5 !important;
-  border: 1px solid #6F737A !important;
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
+  }
 }
 
 
+// .o2-primary-button{
+//   font-size: 13px ;
+//   font-weight: 500 !important;
+//   line-height: 16px !important;
+//   padding: 0px 12px !important;
+//   border-radius: 0.375rem !important;
+//   min-width: 90px !important;
+//   background-color: var(--o2-primary-btn-bg);
+//   color: var(--o2-primary-btn-text);
 
-.o2-primary-button{
-  font-size: 13px ;
+//   &:hover {
+//     opacity: 0.8;
+//   }
+// }
+.o2-primary-button {
+  font-size: 13px;
   font-weight: 500 !important;
   line-height: 16px !important;
   padding: 0px 12px !important;
   border-radius: 0.375rem !important;
   min-width: 90px !important;
+  background-color: var(--o2-primary-btn-bg);
+  color: var(--o2-primary-btn-text);
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+
+  /* subtle default glow */
+  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
+
+  &:hover {
+    opacity: 0.9;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
+  }
 }
+
 .o2-primary-button-small{
   height: 28px !important;
   font-size: 13px !important;
@@ -707,25 +890,41 @@ html, body {
   padding: 0px 12px !important;
   border-radius: 4px !important;
   min-width: 90px !important;
-}
+  background-color: var(--o2-primary-btn-bg);
+  color: var(--o2-primary-btn-text);
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
 
-.o2-primary-button-light{
-  background-color: #575FC5 !important;
-  color: #ffffff !important;
-  border: 1px solid #575FC5 !important;
-  &:hover{
-    background-color: #6B76E3 !important;
-    border: 1px solid #6B76E3 !important;
+  /* subtle default glow */
+  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
+
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
   }
 }
-//TODO o2: after getting the dark theme work on it
-.o2-primary-button-dark{
-  background-color: #575FC5 !important;
+
+.o2-negative-button-light{
+  background-color: #ec1414 !important;
   color: #ffffff !important;
-  border: 1px solid #575FC5 !important;
+  border: 1px solid #ec1414 !important;
+  // box-shadow: 0 0 8px color-mix(in srgb, #ec1414, transparent 60%);
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
   &:hover{
-    background-color: #6B76E3 !important;
-    border: 1px solid #6B76E3 !important;
+    background-color: #f13939 !important;
+    border: 1px solid #f13939 !important;
+      
+  }
+}
+.o2-negative-button-dark{
+  background-color: #ec1414 !important;
+  color: #ffffff !important;
+  border: 1px solid #ec1414 !important;
+  // box-shadow: 0 0 8px color-mix(in srgb, #ec1414, transparent 60%);
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  &:hover{
+    background-color: #f13939 !important;
+    border: 1px solid #f13939 !important;
+    box-shadow: 0 0 14px color-mix(in srgb, #f13939, transparent 30%);
   }
 }
 
@@ -735,7 +934,7 @@ html, body {
     height: 20px;
     border-radius: 16px;
     width: 36px;
-    background-color: #EBECF0;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__thumb:after{
@@ -748,6 +947,10 @@ html, body {
     margin-top: 6px;
   }
   .q-toggle__inner--truthy{
+      color: #ffffff !important;
+      .q-toggle__track{
+        background-color: var(--o2-toggle-track-bg);
+      }
     .q-toggle__thumb:after{
       position: relative;
       top: 3.2px !important;
@@ -759,28 +962,26 @@ html, body {
 
 .o2-toggle-button-sm-light{
   .q-toggle__track{
-    background-color: #acbbf3;
-    border: 1px solid #D3D5DB !important;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff !important;
     .q-toggle__track{
-      background-color: #575FC5;
+      background-color: var(--o2-toggle-track-bg);
     }
-    }
+  }
 }
 
 .o2-toggle-button-sm-dark{
   .q-toggle__track{
-    background-color: #2f415e;
-    border: 1px solid #6F737A !important;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff !important;
     .q-toggle__track{
-      background-color: #6B76E3;
+      background-color: var(--o2-toggle-track-bg);
     }
     } 
 }
@@ -791,7 +992,7 @@ html, body {
     height: 24px;
     border-radius: 16px;
     width: 44px;
-    background-color: #EBECF0;
+   background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__thumb:after{
@@ -812,6 +1013,10 @@ html, body {
     margin-top: 6px;
   }
   .q-toggle__inner--truthy{
+    color: #ffffff;
+    .q-toggle__track{
+      background-color: var(--o2-toggle-track-bg);
+    }
     .q-toggle__thumb:after{
       top: 5.8px;
       left: 3.8px;
@@ -827,33 +1032,6 @@ html, body {
   }
 }
 
-.o2-toggle-button-lg-light{
-  .q-toggle__track{
-    background-color: #acbbf3;
-    border: 1px solid #D3D5DB !important;
-    opacity: 100%;
-  }
-  .q-toggle__inner--truthy{
-    color: #ffffff;
-    .q-toggle__track{
-      background-color: #575FC5;
-    }
-    }
-}
-
-.o2-toggle-button-lg-dark{
-  .q-toggle__track{
-    background-color: #2f415e;
-    border: 1px solid #6F737A !important;
-    opacity: 100%;
-  }
-  .q-toggle__inner--truthy{
-    color: #ffffff;
-    .q-toggle__track{
-      background-color: #6B76E3;
-    }
-    }
-}
 
 
 //o2 in xs size
@@ -883,15 +1061,15 @@ html, body {
   }
   
   .q-toggle__track{
-    height: 20px;
+    height: 17px;
     padding-bottom: 16px;
     border-radius: 16px;
-    width: 32px;
-    background-color: #EBECF0;
+    width: 30px;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__thumb:after{
-    top: 0.5px;
+    top: 0.02em;
     left: -0.5px;
     height: 14px;
     width: 14px;
@@ -909,6 +1087,10 @@ html, body {
   }
 
   .q-toggle__inner--truthy{
+     color: #ffffff;
+      .q-toggle__track{
+        background-color: var(--o2-toggle-track-bg);
+      }
     .q-toggle__thumb:after{
       top: 0.5px;
       left: 1.2px;
@@ -933,37 +1115,9 @@ html, body {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 32px;
+  min-height: 30px;
 }
 
-.o2-toggle-button-xs-light{
-  .q-toggle__track{
-    background-color: #acbbf3;
-    border: 1px solid #D3D5DB !important;
-    opacity: 100%;
-  }
-  .q-toggle__inner--truthy{
-    color: #ffffff;
-    .q-toggle__track{
-      background-color: #575FC5;
-    }
-    }
-}
-
-.o2-toggle-button-xs-dark{
-  .q-toggle__track{
-    background-color: #2f415e;
-    border: 1px solid #9CA3AF !important;
-    opacity: 100%;
-  }
-  .q-toggle__inner--truthy{
-    color: #ffffff;
-    .q-toggle__track{
-      background-color: #6B76E3;
-      border: 1px solid #818CF8 !important;
-    }
-    }
-}
 
 
 .o2-input-text-box-light{
@@ -1024,55 +1178,28 @@ html, body {
 }
 
 /* ============================================================================
-   SPLITTER SECTION COLLAPSE BUTTON
-   Reusable collapse button for splitter sections across all pages
+   SPLITTER TRANSITIONS
+   Disable transitions for smoother splitter behavior
    ============================================================================ */
 
-.splitter-section-collapse-btn {
-  z-index: 1001 !important;
-  position: absolute !important;
-  background: lightgray !important;
-  border-radius: 4px !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-  transition: all 0.2s ease;
-  min-width: 0.75rem !important;
-  width: 0.75rem !important;
-  height: 36px !important;
-  padding: 0 !important;
-  cursor: pointer;
-
-  .q-icon {
-    color: rgba(0, 0, 0, 0.5) !important;
-    font-size: 18px !important;
+.q-splitter {
+  .q-splitter__before,
+  .q-splitter__after {
+    transition: none !important;
   }
 
-  &:hover {
-    background: var(--q-primary) !important;
-    opacity: 0.85;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+  .q-splitter__separator {
+    transition: none !important;
+    z-index: 1 !important; // Lower z-index so scrollbar overlaps it
 
-    .q-icon {
-      color: white !important;
+    &[aria-disabled="true"] {
+      width: 0px;
     }
-  }
 
-  &--visible {
-    right: -10px !important;
-    top: 5% !important;
-    transform: translateY(-50%) !important;
-
-    &:hover {
-      transform: translateY(-50%) translateX(-2px) !important;
-    }
-  }
-
-  &--hidden {
-    left: -10px !important;
-    top: 5% !important;
-    transform: translateY(-50%) !important;
-
-    &:hover {
-      transform: translateY(-50%) translateX(10px) !important;
+    .q-btn {
+      .q-icon {
+        font-size: 0.8rem;
+      }
     }
   }
 }
@@ -1080,4 +1207,306 @@ html, body {
 .q-splitter--vertical > .q-splitter__separator > div {
   left:0px;
   right: 0px;
+}
+
+
+
+/* ============================================================================
+   Input Section
+   Reusable Input Section across all pages with consistent borders and radius
+   ============================================================================ */
+
+.q-input {
+  min-height: 2.25rem;
+  font-size: 0.813rem;
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    min-height: 2.25rem;
+    max-height: 2.25rem;
+    background-color: transparent;
+    line-height: 1.5rem;
+    padding: 0rem 0.75rem !important;
+  }
+  .q-field__control-container{
+      .q-field__native{
+       height: 2.25rem !important;
+    }
+  }
+  &:hover .q-field__control {
+    border-color: var(--border-color-hover) !important;
+  }
+}
+
+
+/* ============================================================================
+   Select Section (Dropdown)
+   Reusable Select Section across all pages with consistent borders and radius
+   ============================================================================ */
+
+.q-select {
+  min-height: 2.25rem !important;
+  font-size: 0.813rem;
+  .q-field__inner {
+    min-height: 2.25rem !important;
+    max-height: 2.25rem !important;
+  }
+
+
+
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    min-height: 2.25rem !important;
+    max-height: 2.25rem !important;
+    height: 2.25rem !important;
+    background-color: transparent;
+    line-height: 1.5rem;
+    padding: 0rem 0.75rem !important;
+
+  }
+
+  .q-field__bottom{
+    padding: 4px !important
+  }
+
+  .q-field__control-container{
+      .q-field__native{
+        min-height: 2.25rem;
+       height: 2.25rem;
+    }
+  }
+
+  .q-field__control-container{
+      .q-field__native{
+        min-height: 2.25rem !important;
+       height: 2.25rem !important;
+       padding: 0px !important;
+    }
+  }
+
+  .q-field__marginal {
+    height: 2.25rem !important;
+  }
+
+  &:not(.q-field--disabled):hover .q-field__control {
+    border-color: var(--border-color-hover) !important;
+  }
+
+  .q-field__append {
+    align-items: center;
+    height: 2.25rem !important;
+  }
+
+  .q-field__append .q-icon:not(.q-select__dropdown-icon) {
+    margin-top: 4px;
+  }
+
+  .q-select__dropdown-icon {
+    transition: transform 0.3s ease;
+  }
+
+  &.q-field--focused .q-select__dropdown-icon {
+    transform: rotate(180deg);
+  }
+}
+
+.select-pagination {
+  .q-field__control-container{
+      .q-field__native{
+        min-height: 1.5rem !important;
+       height: 1.5rem !important;
+    }
+  }
+}
+
+/* ============================================================================
+   Select Dropdown Options Hover
+   Adds hover background color and text color to q-select dropdown menu options
+   ============================================================================ */
+
+.q-menu .q-item {
+  &:hover {
+    background-color: var(--o2-tab-bg) !important;
+    color: var(--o2-primary-btn-bg) !important;
+  }
+}
+
+.q-list--dark, .q-item--dark {
+  color: var(--o2-text-primary);
+}
+
+
+
+/* ============================================================================
+   reusable side dialog  in the app
+   ============================================================================
+ */
+
+ .o2-side-dialog {
+  width: 30vw !important;
+ }
+
+
+/* ============================================================================
+   use this as class for any icons in actions section of the table 
+   ============================================================================
+ */
+
+ .o2-actions-icons {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+
+/* ============================================================================
+   resuable file input in the app
+   ============================================================================
+ */
+
+.o2-file-input {
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    min-height: 2.25rem;
+    max-height: 2.25rem;
+    background-color: transparent;
+    line-height: 1.5rem;
+    padding: 0rem 0.75rem !important;
+  }
+  &:hover .q-field__control {
+    border-color: var(--border-color-hover) !important;
+  }
+}
+
+
+
+.o2-management-header{
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
+  padding: 1rem 1.5rem;
+}
+
+
+//============================================================================
+//   Monaco Editor Styling Start
+//============================================================================ 
+
+  .monaco-editor {
+    outline-width: 0px;
+    outline-style: none;
+  }
+
+  .empty-query .monaco-editor-background {
+    background-image: url("../assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
+  }
+
+  .empty-function .monaco-editor-background {
+    background-image: url("../assets/images/common/vrl-function.png");
+    background-repeat: no-repeat;
+    background-size: 170px;
+  }
+
+  
+//============================================================================
+//     Monaco Editor Styling End
+//============================================================================ 
+  
+
+.o2-custom-select-dashboard{
+  min-height: 2.5rem !important;
+
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    min-height: 2.5rem !important;
+    max-height: 2.5rem !important;
+    height: 2.5rem !important;
+  }
+
+  .q-field__native, .q-field__input {
+    padding-bottom: 0.25rem !important;
+  }
+
+  .q-field__append {
+    align-items: center;
+    height: 2.5rem !important;
+  }
+
+}
+
+.dashboard-chart-border{
+  border: 0.03rem solid var(--o2-border-color);
+}
+
+.o2-custom-table-header-bg{
+  background: var(--o2-table-header-bg);
+}
+
+
+.splitter-icon-collapse {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
+  position: absolute !important;
+  top: 26px !important;
+  left: 4px !important;
+  z-index: 100 !important;
+  border-radius: 0.325rem;
+}
+
+.splitter-icon-expand {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
+  position: absolute !important;
+  top: 26px !important;
+  left: 5px !important;
+  z-index: 100 !important;
+  border-radius: 0.325rem;
+}
+
+.feature-card {
+  @extend .el-border-radius;
+  padding: 1rem;
+  transition: all 0.3s ease;
+  position: relative;
+  border: 1px solid;
+  background: var(--tile-bg);
+  border: 0.0625rem solid var(--o2-border-color);
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  }
+}
+
+.actions-column {
+  .q-btn {
+    &:hover {
+      background-color: var(--o2-tab-bg) !important;
+    }
+  }
+}
+
+.add-folder-btn{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  border-radius: 4px !important;
+  padding: 0px 12px !important;
+  margin-top: 0px !important;
+  min-width: auto !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
+  }
+  
+}
+
+.no-data-image {
+  color: var(--o2-theme-color);
 }

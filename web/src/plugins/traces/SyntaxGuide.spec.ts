@@ -219,9 +219,12 @@ describe("SyntaxGuide", () => {
   describe("Styling and Classes", () => {
     it("should have correct button styling classes", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.classes()).toContain("q-ml-xs");
+      // Button classes have been updated to use Tailwind CSS
+      // q-ml-xs has been removed, but q-pa-xs and syntax-guide-button remain
       expect(button.classes()).toContain("q-pa-xs");
       expect(button.classes()).toContain("syntax-guide-button");
+      // Verify Tailwind classes are present
+      expect(button.classes()).toContain("tw-cursor-pointer");
     });
   });
 

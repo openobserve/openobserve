@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-details" :style="backgroundStyle">
+  <div class="trace-details">
     <div
       class="trace-details-content"
       v-if="
@@ -27,206 +27,208 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         )
       "
     >
-      <div class="trace-combined-header-wrapper" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
-        <div class="full-width flex items-center toolbar flex justify-between q-pb-sm">
+      <div class="trace-combined-header-wrapper card-container">
+        <div
+          class="full-width flex items-center toolbar flex justify-between q-pb-sm"
+        >
           <div class="flex items-center">
-          <div
-            data-test="trace-details-back-btn"
-            class="flex justify-center items-center q-mr-sm cursor-pointer trace-back-btn"
-            title="Traces List"
-            @click="routeToTracesList"
-          >
-            <q-icon name="arrow_back_ios_new" size="14px" />
-          </div>
-          <div
-            data-test="trace-details-operation-name"
-            class="text-subtitle1 q-mr-lg ellipsis toolbar-operation-name"
-            :title="traceTree[0]['operationName']"
-          >
-            {{ traceTree[0]["operationName"] }}
-          </div>
-          <div class="q-mr-lg flex items-center text-body2">
-            <div class="flex items-center">
-              Trace ID:
-              <div
-                data-test="trace-details-trace-id"
-                class="toolbar-trace-id ellipsis q-pl-xs"
-                :title="spanList[0]['trace_id']"
-              >
-                {{ spanList[0]["trace_id"] }}
-              </div>
+            <div
+              data-test="trace-details-back-btn"
+              class="flex justify-center items-center q-mr-sm cursor-pointer trace-back-btn"
+              title="Traces List"
+              @click="routeToTracesList"
+            >
+              <q-icon name="arrow_back_ios_new" size="14px" />
             </div>
-            <q-icon
-              data-test="trace-details-copy-trace-id-btn"
-              class="q-ml-xs cursor-pointer trace-copy-icon"
-              size="12px"
-              name="content_copy"
-              title="Copy"
-              @click="copyTraceId"
-            />
-          </div>
-
-          <div data-test="trace-details-spans-count" class="q-pb-xs q-mr-lg">
-            Spans: {{ spanList.length }}
-          </div>
-
-          <!-- TODO OK: Create component for this usecase multi select with button -->
-          <div class="o2-input flex items-center trace-logs-selector">
-            <q-select
-              data-test="trace-details-log-streams-select"
-              v-model="searchObj.data.traceDetails.selectedLogStreams"
-              :label="
-                searchObj.data.traceDetails.selectedLogStreams.length
-                  ? ''
-                  : t('search.selectIndex')
-              "
-              :options="filteredStreamOptions"
-              data-cy="stream-selection"
-              input-debounce="0"
-              behavior="menu"
-              filled
-              multiple
-              borderless
-              dense
-              fill-input
-              :title="selectedStreamsString"
+            <div
+              data-test="trace-details-operation-name"
+              class="text-subtitle1 q-mr-lg ellipsis toolbar-operation-name"
+              :title="traceTree[0]['operationName']"
             >
-              <template #no-option>
-                <div class="o2-input log-stream-search-input">
-                  <q-input
-                    data-test="trace-details-stream-search-input"
-                    v-model="streamSearchValue"
-                    borderless
-                    filled
-                    debounce="500"
-                    autofocus
-                    dense
-                    size="xs"
-                    @update:model-value="filterStreamFn"
-                    class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                    :placeholder="t('search.searchStream')"
-                  >
-                    <template #prepend>
-                      <q-icon name="search" class="cursor-pointer" />
-                    </template>
-                  </q-input>
+              {{ traceTree[0]["operationName"] }}
+            </div>
+            <div class="q-mr-lg flex items-center text-body2">
+              <div class="flex items-center">
+                Trace ID:
+                <div
+                  data-test="trace-details-trace-id"
+                  class="toolbar-trace-id ellipsis q-pl-xs"
+                  :title="spanList[0]['trace_id']"
+                >
+                  {{ spanList[0]["trace_id"] }}
                 </div>
-                <q-item>
-                  <q-item-section> {{ t("search.noResult") }}</q-item-section>
-                </q-item>
-              </template>
-              <template #before-options>
-                <div class="o2-input log-stream-search-input">
-                  <q-input
-                    data-test="trace-details-stream-search-input-options"
-                    v-model="streamSearchValue"
-                    borderless
-                    debounce="500"
-                    filled
-                    dense
-                    autofocus
-                    @update:model-value="filterStreamFn"
-                    class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                    :placeholder="t('search.searchStream')"
-                  >
-                    <template #prepend>
-                      <q-icon name="search" class="cursor-pointer" />
-                    </template>
-                  </q-input>
-                </div>
-              </template>
-            </q-select>
-            <q-btn
-              data-test="trace-details-view-logs-btn"
-              v-close-popup="true"
-              class="text-bold traces-view-logs-btn"
-              :label="
-                searchObj.meta.redirectedFromLogs
-                  ? t('traces.backToLogs')
-                  : t('traces.viewLogs')
-              "
-              text-color="light-text"
-              padding="sm sm"
-              size="sm"
-              no-caps
-              dense
-              icon="search"
-              @click="redirectToLogs"
-            />
-          </div>
-        </div>
-        <div class="flex items-center">
-          <div
-            class="flex justify-center items-center tw-border tw-pl-2 tw-border-gray-300 trace-search-container"
-          >
-            <q-input
-              data-test="trace-details-search-input"
-              v-model="searchQuery"
-              placeholder="Search..."
-              @update:model-value="handleSearchQueryChange"
-              dense
-              borderless
-              clearable
-              debounce="500"
-              class="q-mr-sm custom-height flex items-center"
-            />
-            <p
-              data-test="trace-details-search-results"
-              class="tw-mr-1"
-              v-if="searchResults"
-            >
-              <small
-                ><span>{{ currentIndex + 1 }}</span> of
-                <span>{{ searchResults }}</span></small
+              </div>
+              <q-icon
+                data-test="trace-details-copy-trace-id-btn"
+                class="q-ml-xs cursor-pointer trace-copy-icon"
+                size="12px"
+                name="content_copy"
+                title="Copy"
+                @click="copyTraceId"
+              />
+            </div>
+
+            <div data-test="trace-details-spans-count" class="q-pb-xs q-mr-lg">
+              Spans: {{ spanList.length }}
+            </div>
+
+            <!-- TODO OK: Create component for this usecase multi select with button -->
+            <div class="o2-input flex items-center trace-logs-selector">
+              <q-select
+                data-test="trace-details-log-streams-select"
+                v-model="searchObj.data.traceDetails.selectedLogStreams"
+                :label="
+                  searchObj.data.traceDetails.selectedLogStreams.length
+                    ? ''
+                    : t('search.selectIndex')
+                "
+                :options="filteredStreamOptions"
+                data-cy="stream-selection"
+                input-debounce="0"
+                behavior="menu"
+                filled
+                multiple
+                borderless
+                dense
+                fill-input
+                :title="selectedStreamsString"
               >
-            </p>
+                <template #no-option>
+                  <div class="o2-input log-stream-search-input">
+                    <q-input
+                      data-test="trace-details-stream-search-input"
+                      v-model="streamSearchValue"
+                      borderless
+                      filled
+                      debounce="500"
+                      autofocus
+                      dense
+                      size="xs"
+                      @update:model-value="filterStreamFn"
+                      class="q-ml-auto q-mb-xs no-border q-pa-xs"
+                      :placeholder="t('search.searchStream')"
+                    >
+                      <template #prepend>
+                        <q-icon name="search" class="cursor-pointer" />
+                      </template>
+                    </q-input>
+                  </div>
+                  <q-item>
+                    <q-item-section> {{ t("search.noResult") }}</q-item-section>
+                  </q-item>
+                </template>
+                <template #before-options>
+                  <div class="o2-input log-stream-search-input">
+                    <q-input
+                      data-test="trace-details-stream-search-input-options"
+                      v-model="streamSearchValue"
+                      borderless
+                      debounce="500"
+                      filled
+                      dense
+                      autofocus
+                      @update:model-value="filterStreamFn"
+                      class="q-ml-auto q-mb-xs no-border q-pa-xs"
+                      :placeholder="t('search.searchStream')"
+                    >
+                      <template #prepend>
+                        <q-icon name="search" class="cursor-pointer" />
+                      </template>
+                    </q-input>
+                  </div>
+                </template>
+              </q-select>
+              <q-btn
+                data-test="trace-details-view-logs-btn"
+                v-close-popup="true"
+                class="text-bold traces-view-logs-btn"
+                :label="
+                  searchObj.meta.redirectedFromLogs
+                    ? t('traces.backToLogs')
+                    : t('traces.viewLogs')
+                "
+                text-color="light-text"
+                padding="sm sm"
+                size="sm"
+                no-caps
+                dense
+                icon="search"
+                @click="redirectToLogs"
+              />
+            </div>
+          </div>
+          <div class="flex items-center">
+            <div
+              class="flex justify-center items-center tw-pl-2 trace-search-container"
+            >
+              <q-input
+                data-test="trace-details-search-input"
+                v-model="searchQuery"
+                placeholder="Search..."
+                @update:model-value="handleSearchQueryChange"
+                dense
+                borderless
+                clearable
+                debounce="500"
+                class="q-mr-sm custom-height flex items-center"
+              />
+              <p
+                data-test="trace-details-search-results"
+                class="tw-mr-1"
+                v-if="searchResults"
+              >
+                <small
+                  ><span>{{ currentIndex + 1 }}</span> of
+                  <span>{{ searchResults }}</span></small
+                >
+              </p>
+              <q-btn
+                data-test="trace-details-search-prev-btn"
+                v-if="searchResults"
+                :disable="currentIndex === 0"
+                class="tw-mr-1 download-logs-btn flex"
+                flat
+                round
+                title="Previous"
+                icon="keyboard_arrow_up"
+                @click="prevMatch"
+                dense
+                :size="`sm`"
+              />
+              <q-btn
+                data-test="trace-details-search-next-btn"
+                v-if="searchResults"
+                :disable="currentIndex + 1 === searchResults"
+                class="tw-mr-1 download-logs-btn flex"
+                flat
+                round
+                title="Next"
+                icon="keyboard_arrow_down"
+                @click="nextMatch"
+                dense
+                :size="`sm`"
+              />
+            </div>
             <q-btn
-              data-test="trace-details-search-prev-btn"
-              v-if="searchResults"
-              :disable="currentIndex === 0"
-              class="tw-mr-1 download-logs-btn flex"
-              flat
+              data-test="trace-details-share-link-btn"
+              class="q-mr-sm download-logs-btn"
+              size="sm"
+              icon="share"
               round
-              title="Previous"
-              icon="keyboard_arrow_up"
-              @click="prevMatch"
-              dense
-              :size="`sm`"
+              flat
+              no-outline
+              :title="t('search.shareLink')"
+              @click="shareLink"
             />
             <q-btn
-              data-test="trace-details-search-next-btn"
-              v-if="searchResults"
-              :disable="currentIndex + 1 === searchResults"
-              class="tw-mr-1 download-logs-btn flex"
-              flat
+              data-test="trace-details-close-btn"
               round
-              title="Next"
-              icon="keyboard_arrow_down"
-              @click="nextMatch"
-              dense
-              :size="`sm`"
+              flat
+              icon="cancel"
+              size="md"
+              @click="routeToTracesList"
             />
           </div>
-          <q-btn
-            data-test="trace-details-share-link-btn"
-            class="q-mr-sm download-logs-btn"
-            size="sm"
-            icon="share"
-            round
-            flat
-            no-outline
-            :title="t('search.shareLink')"
-            @click="shareLink"
-          />
-          <q-btn
-            data-test="trace-details-close-btn"
-            round
-            flat
-            icon="cancel"
-            size="md"
-            @click="routeToTracesList"
-          />
-        </div>
         </div>
 
         <q-separator class="q-my-sm" />
@@ -268,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 no-caps
                 size="11px"
-                class="q-px-sm visual-selection-btn"
+                class="q-px-sm visual-selection-btn tw-rounded-[0.25rem]"
                 @click="activeVisual = visual.value"
               >
                 <q-icon><component :is="visual.icon" /></q-icon>
@@ -298,84 +300,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div style="display: flex; flex: 1; min-height: 0;">
-      <div
-        class="histogram-spans-container"
-        :class="[
-          isSidebarOpen ? 'histogram-container' : 'histogram-container-full',
-          isTimelineExpanded ? '' : 'full',
-        ]"
-        ref="parentContainer"
-      >
+      <div style="display: flex; flex: 1; min-height: 0">
         <div
-          class="trace-tree-wrapper"
-          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+          class="histogram-spans-container"
+          :class="[
+            isSidebarOpen ? 'histogram-container' : 'histogram-container-full',
+            isTimelineExpanded ? '' : 'full',
+          ]"
+          ref="parentContainer"
         >
-          <trace-header
-            data-test="trace-details-header"
-            :baseTracePosition="baseTracePosition"
-            :splitterWidth="leftWidth"
-            @resize-start="startResize"
-          />
-          <div style="display: flex; flex: 1; min-height: 0;">
-            <div class="relative-position trace-content-scroll">
-              <div
-                class="trace-tree-container"
-                data-test="trace-details-tree-container"
-              >
-                <div class="position-relative">
-                  <div
-                    :style="{
-                      width: '1px',
-                      left: `${leftWidth}px`,
-                      backgroundColor:
-                        store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
-                      zIndex: 999,
-                      top: '-28px',
-                      height: `${spanPositionList.length * spanDimensions.height + 28}px`,
-                      cursor: 'col-resize',
-                    }"
-                    class="absolute resize"
-                    @mousedown="startResize"
-                  />
-                  <trace-tree
-                    data-test="trace-details-tree"
-                    :collapseMapping="collapseMapping"
-                    :spans="spanPositionList"
-                    :baseTracePosition="baseTracePosition"
-                    :spanDimensions="spanDimensions"
-                    :spanMap="spanMap"
-                    :leftWidth="leftWidth"
-                    ref="traceTreeRef"
-                    :search-query="searchQuery"
-                    :spanList="spanList"
-                    @toggle-collapse="toggleSpanCollapse"
-                    @select-span="updateSelectedSpan"
-                    @update-current-index="handleIndexUpdate"
-                    @search-result="handleSearchResult"
-                  />
+          <div class="trace-tree-wrapper card-container">
+            <trace-header
+              data-test="trace-details-header"
+              :baseTracePosition="baseTracePosition"
+              :splitterWidth="leftWidth"
+              @resize-start="startResize"
+            />
+            <div style="display: flex; flex: 1; min-height: 0">
+              <div class="relative-position trace-content-scroll">
+                <div
+                  class="trace-tree-container"
+                  data-test="trace-details-tree-container"
+                >
+                  <div class="position-relative">
+                    <div
+                      :style="{
+                        width: '1px',
+                        left: `${leftWidth}px`,
+                        backgroundColor:
+                          store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
+                        zIndex: 999,
+                        top: '-28px',
+                        height: `${spanPositionList.length * spanDimensions.height + 28}px`,
+                        cursor: 'col-resize',
+                      }"
+                      class="absolute resize"
+                      @mousedown="startResize"
+                    />
+                    <trace-tree
+                      data-test="trace-details-tree"
+                      :collapseMapping="collapseMapping"
+                      :spans="spanPositionList"
+                      :baseTracePosition="baseTracePosition"
+                      :spanDimensions="spanDimensions"
+                      :spanMap="spanMap"
+                      :leftWidth="leftWidth"
+                      ref="traceTreeRef"
+                      :search-query="searchQuery"
+                      :spanList="spanList"
+                      @toggle-collapse="toggleSpanCollapse"
+                      @select-span="updateSelectedSpan"
+                      @update-current-index="handleIndexUpdate"
+                      @search-result="handleSearchResult"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-            <q-separator v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)" vertical />
-            <div
-              v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-              class="histogram-sidebar-inner"
-              :class="isTimelineExpanded ? '' : 'full'"
-            >
-              <trace-details-sidebar
-                data-test="trace-details-sidebar"
-                :span="spanMap[selectedSpanId as string]"
-                :baseTracePosition="baseTracePosition"
-                :search-query="searchQuery"
-                @view-logs="redirectToLogs"
-                @close="closeSidebar"
-                @open-trace="openTraceLink"
+              <q-separator
+                v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
+                vertical
               />
+              <div
+                v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
+                class="histogram-sidebar-inner"
+                :class="isTimelineExpanded ? '' : 'full'"
+              >
+                <trace-details-sidebar
+                  data-test="trace-details-sidebar"
+                  :span="spanMap[selectedSpanId as string]"
+                  :baseTracePosition="baseTracePosition"
+                  :search-query="searchQuery"
+                  @view-logs="redirectToLogs"
+                  @close="closeSidebar"
+                  @open-trace="openTraceLink"
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
       </div>
     </div>
     <div
@@ -695,8 +697,8 @@ export default defineComponent({
         searchService
           .get_traces({
             org_identifier: orgIdentifier,
-            start_time: Number(router.currentRoute.value.query.from),
-            end_time: Number(router.currentRoute.value.query.to),
+            start_time: Number(router.currentRoute.value.query.from) - 10000,
+            end_time: Number(router.currentRoute.value.query.to) + 10000,
             filter: filter || "",
             size: 1,
             from: 0,
@@ -737,8 +739,8 @@ export default defineComponent({
             getTraceDetails({
               stream: streamName,
               trace_id: trace.trace_id,
-              from: startTime,
-              to: endTime,
+              from: startTime - 10000,
+              to: endTime + 10000,
             });
           })
           .catch(() => {
@@ -1368,7 +1370,6 @@ export default defineComponent({
       showTraceDetails,
       traceDetails,
       updateSelectedSpan,
-      backgroundStyle,
       routeToTracesList,
       openTraceLink,
       convertTimeFromNsToMs,
@@ -1446,22 +1447,11 @@ $traceChartCollapseHeight: 42px;
 }
 
 .trace-tree-wrapper {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(0.625rem);
-  border-radius: 0.5rem;
-  border: 0.1875rem solid rgba(255, 255, 255, 0.3);
   overflow: hidden;
   height: calc(100% - 2.5rem);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  margin-bottom: 2.5rem;
-}
-
-.trace-tree-wrapper.bg-white {
-  background: rgba(240, 240, 245, 0.8);
-  backdrop-filter: blur(0.625rem);
-  border: 0.1875rem solid rgba(100, 100, 120, 0.5);
 }
 
 .trace-tree-container {
@@ -1475,11 +1465,11 @@ $traceChartCollapseHeight: 42px;
   cursor: pointer;
   padding-right: 8px;
   border-radius: 2px;
-  padding-top: 2px;
+  padding-top: 3px;
   padding-bottom: 2px;
 
   &:hover {
-    background-color: rgba($primary, 0.9);
+    background-color: var(--o2-theme-color);
     color: #ffffff;
 
     .q-icon {
@@ -1567,31 +1557,20 @@ html:has(.trace-details) {
   }
 
   .visual-selector-container {
-    background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(0.625rem);
-    border-radius: 0.5rem;
-    border: 0.0625rem solid rgba(255, 255, 255, 0.1);
-    padding: 0.125rem;
-  }
-
-  .visual-selector-container.bg-white {
-    background: rgba(240, 240, 245, 0.8);
-    border: 0.125rem solid rgba(100, 100, 120, 0.3);
+    border-radius: 0.25rem;
+    border: 0.0625rem solid var(--o2-border-color);
   }
 
   .trace-combined-header-wrapper {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(0.625rem);
-    border-radius: 0.5rem;
-    border: 0.0625rem solid rgba(255, 255, 255, 0.1);
-    padding: 0.5rem;
-    margin-bottom: 0.5rem;
+    padding: 0.375rem;
+    margin-bottom: 0.625rem;
     flex-shrink: 0;
   }
 
   .trace-combined-header-wrapper.bg-white {
-    background: rgba(240, 240, 245, 0.8);
-    border: 0.125rem solid rgba(100, 100, 120, 0.3);
+    // background: rgba(240, 240, 245, 0.8);
+    // border: 0.125rem solid rgba(100, 100, 120, 0.3);
   }
 
   .chart-container-inner {

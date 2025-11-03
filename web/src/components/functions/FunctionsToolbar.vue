@@ -1,9 +1,9 @@
 <template>
   <div
-    class="functions-toolbar tw-pb-1.5 tw-w-full tw-flex tw-justify-between tw-items-center"
+    class="tw-w-full tw-flex tw-justify-between tw-items-center"
   >
     <div class="tw-flex tw-items-center">
-      <div class="tw-mr-2 add-function-back-btn">
+      <div class="add-function-back-btn">
         <div
           data-test="add-function-back-btn"
           class="flex justify-center items-center cursor-pointer"
@@ -19,7 +19,7 @@
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
       </div>
-      <div class="tw-text-lg tw-w-full add-function-title q-mr-md">
+      <div class="tw-text-lg tw-w-full add-function-title q-mr-sm">
         Add Function
       </div>
       <q-form ref="addFunctionForm" class="o2-input">
@@ -53,7 +53,6 @@
             :name="outlinedInfo"
             size="20px"
             class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-7'"
           >
             <q-tooltip
               anchor="center right"
@@ -93,7 +92,6 @@
         data-test="add-function-fullscreen-btn"
         v-close-popup="true"
         class="o2-secondary-button tw-h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         :label="t('common.fullscreen')"
         no-caps
         flat
@@ -103,7 +101,6 @@
       <q-btn
         data-test="add-function-cancel-btn"
         class="tw-ml-[12px] o2-secondary-button no-border tw-h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         flat
         :label="t('function.cancel')"
         no-caps
@@ -113,7 +110,6 @@
         data-test="add-function-test-btn"
         :label="t('function.testFunction')"
         class="tw-ml-[12px] o2-secondary-button no-border tw-h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         no-caps
         icon="play_arrow"
         @click="emit('test')"
@@ -122,7 +118,6 @@
         data-test="add-function-save-btn"
         :label="t('function.save')"
         class="tw-ml-[12px] o2-primary-button no-border tw-h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         flat
         type="submit"
         no-caps

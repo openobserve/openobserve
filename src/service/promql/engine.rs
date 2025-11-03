@@ -48,8 +48,7 @@ use super::{
     utils::{apply_label_selector, apply_matchers},
 };
 use crate::service::promql::{
-    DEFAULT_MAX_SERIES_PER_QUERY, aggregations, binaries, functions, micros,
-    rewrite::remove_filter_all, value::*,
+    aggregations, binaries, functions, micros, rewrite::remove_filter_all, value::*,
 };
 
 pub struct Engine {
@@ -263,7 +262,7 @@ impl Engine {
                         .iter()
                         .map(|v| RangeValue {
                             labels: v.labels.to_owned(),
-                            samples: vec![v.sample.clone()],
+                            samples: vec![v.sample],
                             exemplars: None,
                             time_window: time_window.clone(),
                         })
@@ -271,7 +270,7 @@ impl Engine {
                     Value::Instant(v) => {
                         vec![RangeValue {
                             labels: v.labels.to_owned(),
-                            samples: vec![v.sample.clone()],
+                            samples: vec![v.sample],
                             exemplars: None,
                             time_window,
                         }]
@@ -496,13 +495,19 @@ impl Engine {
             let end_index = metric
                 .samples
                 .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
-            let samples = metric.samples[start_index..end_index]
-                .iter()
-                .map(|v| Sample {
-                    timestamp: v.timestamp + offset_modifier,
-                    value: v.value,
-                })
-                .collect::<Vec<_>>();
+            let samples = if offset_modifier == 0 {
+                metric.samples[start_index..end_index].to_vec()
+            } else {
+                let slice = &metric.samples[start_index..end_index];
+                let mut samples = Vec::with_capacity(slice.len());
+                for &sample in slice {
+                    samples.push(Sample {
+                        timestamp: sample.timestamp + offset_modifier,
+                        value: sample.value,
+                    });
+                }
+                samples
+            };
             let exemplars = if self.ctx.query_exemplars {
                 metric.exemplars.clone()
             } else {
@@ -1116,7 +1121,6 @@ async fn selector_load_data_from_datafusion(
     label_selector: &Option<HashSet<String>>,
     query_exemplars: bool,
 ) -> Result<HashMap<HashLabelValue, RangeValue>> {
-    let cfg = config::get_config();
     let table_name = selector.name.as_ref().unwrap();
     let mut df_group = match ctx.table(table_name).await {
         Ok(v) => v.filter(
@@ -1144,7 +1148,8 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
-    let label_cols = df_group
+    // get label columns
+    let mut label_cols = df_group
         .schema()
         .fields()
         .iter()
@@ -1157,16 +1162,13 @@ async fn selector_load_data_from_datafusion(
             {
                 None
             } else {
-                Some(col(name))
+                Some(name)
             }
         })
         .collect::<Vec<_>>();
-
-    let max_series = if cfg.limit.metrics_max_series_per_query > 0 {
-        cfg.limit.metrics_max_series_per_query
-    } else {
-        DEFAULT_MAX_SERIES_PER_QUERY
-    };
+    // sort labels to have a consistent order
+    label_cols.sort();
+    let label_cols = label_cols.into_iter().map(col).collect::<Vec<_>>();
 
     // get hash & timestamp
     let start_time = std::time::Instant::now();
@@ -1176,13 +1178,11 @@ async fn selector_load_data_from_datafusion(
             vec![col(HASH_LABEL)],
             vec![max(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
         )?
-        .sort(vec![col(HASH_LABEL).sort(true, true)])?
-        .limit(0, Some(max_series))?
         .collect()
         .await?;
 
     let hash_field_type = schema.field_with_name(HASH_LABEL).unwrap().data_type();
-    let (mut timestamp_values, hash_value_set): (Vec<_>, HashSet<HashLabelValue>) =
+    let (timestamp_values, hash_value_set): (HashSet<i64>, HashSet<HashLabelValue>) =
         if hash_field_type == &DataType::UInt64 {
             sub_batch
                 .iter()
@@ -1226,8 +1226,6 @@ async fn selector_load_data_from_datafusion(
                 })
                 .unzip()
         };
-    timestamp_values.sort();
-    timestamp_values.dedup();
     let timestamp_values = timestamp_values.into_iter().map(lit).collect::<Vec<_>>();
 
     log::info!(
@@ -1245,11 +1243,12 @@ async fn selector_load_data_from_datafusion(
 
     let mut metrics: HashMap<HashLabelValue, RangeValue> =
         HashMap::with_capacity(hash_value_set.len());
+    let mut labels = Vec::new();
     for batch in series {
         let columns = batch.columns();
         let schema = batch.schema();
         let fields = schema.fields();
-        let mut cols = fields
+        let cols = fields
             .iter()
             .zip(columns)
             .filter_map(|(field, col)| {
@@ -1262,8 +1261,6 @@ async fn selector_load_data_from_datafusion(
                 }
             })
             .collect::<Vec<(_, _)>>();
-        cols.sort_by(|a, b| a.0.cmp(b.0));
-        let mut labels = Vec::with_capacity(columns.len());
         if hash_field_type == &DataType::UInt64 {
             let hash_values = batch
                 .column_by_name(HASH_LABEL)
@@ -1322,7 +1319,7 @@ async fn selector_load_data_from_datafusion(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] load series took: {:?}",
+        "[trace_id: {trace_id}] load hashing and series took: {:?}",
         start_time.elapsed()
     );
 
@@ -1352,11 +1349,6 @@ async fn load_samples_from_datafusion(
         .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?
         .execute_stream_partitioned()
         .await?;
-
-    log::info!(
-        "[trace_id: {trace_id}] load samples from datafusion took: {:?}",
-        start_time.elapsed()
-    );
 
     let mut tasks = Vec::new();
     for mut stream in streams {
@@ -1438,7 +1430,7 @@ async fn load_samples_from_datafusion(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] group batches took: {:?}",
+        "[trace_id: {trace_id}] load samples from datafusion took: {:?}",
         start_time.elapsed()
     );
 
@@ -1457,11 +1449,6 @@ async fn load_exemplars_from_datafusion(
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
         .execute_stream_partitioned()
         .await?;
-
-    log::info!(
-        "[trace_id: {trace_id}] load exemplars from datafusion took: {:?}",
-        start_time.elapsed()
-    );
 
     let mut tasks = Vec::new();
     for mut stream in streams {
@@ -1567,7 +1554,7 @@ async fn load_exemplars_from_datafusion(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] group batches took: {:?}",
+        "[trace_id: {trace_id}] load exemplars from datafusion took: {:?}",
         start_time.elapsed()
     );
 

@@ -45,6 +45,7 @@ inherits = "release"
 debug = true
 strip = false
 codegen-units = 4
+split-debuginfo = "packed"
 
 [dependencies]
 actix-cors = "0.7"
@@ -106,6 +107,7 @@ itertools.workspace = true
 jsonwebtoken = "9.3"
 log.workspace = true
 maxminddb = "0.26"
+md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.43", default-features = false, optional = true }
 once_cell.workspace = true
@@ -253,9 +255,9 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "50.1.0"
-datafusion-proto = "50.1.0"
-datafusion-functions-aggregate-common = "50.1.0"
+datafusion = "50.2.0"
+datafusion-proto = "50.2.0"
+datafusion-functions-aggregate-common = "50.2.0"
 datafusion-functions-json = "0.50.0"
 expect-test = "1.4"
 arrow = { version = "56.0.0", features = ["ipc_compression", "prettyprint"] }
@@ -284,7 +286,7 @@ lettre = { version = "0.11", default-features = false, features = [
     "pool",
     "tokio1",
     "tokio1-rustls-tls",
-    "aws-lc-rs"
+    "aws-lc-rs",
 ] }
 log = "0.4"
 md5 = "0.8.0"
@@ -306,7 +308,7 @@ opentelemetry-otlp = { version = "0.30", features = [
     "serde",
     "trace",
     "reqwest-client",
-    "grpc-tonic"
+    "grpc-tonic",
 ] }
 opentelemetry-proto = { version = "0.30", features = [
     "gen-tonic",
@@ -389,6 +391,10 @@ utoipa = { version = "5", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 uuid = { version = "1.18.1", features = ["v7"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "2003d617c7befdc7aa7f73a37263d272cd4a3718" }
-vrl = { version = "0.27.0", git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["value", "compiler", "test"] }
+vrl = { version = "0.27.0", git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = [
+    "value",
+    "compiler",
+    "test",
+] }
 zip = "6.0.0"
 zstd = "0.13"

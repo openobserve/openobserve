@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="drag-allow">
       <q-bar
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'transparent'"
         dense
         class="q-px-xs"
         style="border-top-left-radius: 3px; border-top-right-radius: 3px"
@@ -98,7 +98,7 @@ self="top right" max-width="220px">
           </q-tooltip>
         </q-btn>
         <q-btn
-          v-if="maxQueryRange.length > 0"
+          v-if="maxQueryRangeWarning"
           :icon="outlinedWarning"
           flat
           size="xs"
@@ -109,7 +109,7 @@ self="top right" max-width="220px">
           <q-tooltip anchor="bottom right"
 self="top right" max-width="220px">
             <div style="white-space: pre-wrap">
-              {{ maxQueryRange.join("\n\n") }}
+              {{ maxQueryRangeWarning }}
             </div>
           </q-tooltip>
         </q-btn>
@@ -431,7 +431,7 @@ import {
 } from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
-import { getFunctionErrorMessage, getUUID } from "@/utils/zincutils";
+import { getFunctionErrorMessage, getUUID, processQueryMetadataErrors } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -502,33 +502,15 @@ export default defineComponent({
       metaData.value = metadata;
     };
 
-    const maxQueryRange: any = ref([]);
+    const maxQueryRangeWarning = ref("");
 
     const limitNumberOfSeriesWarningMessage = ref("");
 
     const handleResultMetadataUpdate = (metadata: any) => {
-      const combinedWarnings: any[] = [];
-      metadata.forEach((query: any) => {
-        if (
-          query?.function_error &&
-          query?.new_start_time &&
-          query?.new_end_time
-        ) {
-          const combinedMessage = getFunctionErrorMessage(
-            query.function_error,
-            query.new_start_time,
-            query.new_end_time,
-            store.state.timezone,
-          );
-          combinedWarnings.push(combinedMessage);
-        } else if (query?.function_error) {
-          combinedWarnings.push(query.function_error);
-        }
-      });
-
-      // NOTE: for multi query, just show the first query warning
-      maxQueryRange.value =
-        combinedWarnings.length > 0 ? [combinedWarnings[0]] : [];
+      maxQueryRangeWarning.value = processQueryMetadataErrors(
+        metadata,
+        store.state.timezone,
+      );
     };
 
     // to store and show when the panel was last loaded
@@ -920,7 +902,7 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange,
       handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
       lastTriggeredAt,
-      maxQueryRange,
+      maxQueryRangeWarning,
       metaData,
       showViewPanel,
       dependentAdHocVariable,

@@ -21,7 +21,7 @@ use utoipa::ToSchema;
 
 use crate::{
     meta::{
-        alerts::{QueryCondition, TriggerCondition},
+        alerts::{QueryCondition, TriggerCondition, deduplication::DeduplicationConfig},
         stream::StreamType,
         triggers::{ScheduledTriggerData, Trigger},
     },
@@ -74,6 +74,8 @@ pub struct Alert {
     pub updated_at: Option<DateTime<FixedOffset>>,
     #[serde(default)]
     pub last_edited_by: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deduplication: Option<DeduplicationConfig>,
 }
 
 impl PartialEq for Alert {
@@ -106,6 +108,7 @@ impl Default for Alert {
             updated_at: None,
             last_edited_by: None,
             last_satisfied_at: None,
+            deduplication: None,
         }
     }
 }

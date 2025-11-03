@@ -17,49 +17,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="sessions_page">
     <template v-if="isSessionReplayEnabled">
-      <div class="text-right q-py-sm flex align-center justify-between">
-        <syntax-guide class="q-mr-sm" />
-        <div class="flex align-center justify-end metrics-date-time q-mr-md">
-          <date-time
-            auto-apply
-            :default-type="sessionState.data.datetime.valueType"
-            :default-absolute-time="{
-              startTime: sessionState.data.datetime.startTime,
-              endTime: sessionState.data.datetime.endTime,
-            }"
-            :default-relative-time="
-              sessionState.data.datetime.relativeTimePeriod
+      <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
+        <div class="card-container">
+          <div class="text-right q-py-sm flex align-center justify-between">
+            <syntax-guide class="q-mr-sm" />
+            <div
+              class="flex align-center justify-end metrics-date-time q-mr-md"
+            >
+              <date-time
+                auto-apply
+                :default-type="sessionState.data.datetime.valueType"
+                :default-absolute-time="{
+                  startTime: sessionState.data.datetime.startTime,
+                  endTime: sessionState.data.datetime.endTime,
+                }"
+                :default-relative-time="
+                  sessionState.data.datetime.relativeTimePeriod
+                "
+                data-test="logs-search-bar-date-time-dropdown"
+                class="q-mr-md"
+                @on:date-change="updateDateChange"
+              />
+              <q-btn
+                data-test="metrics-explorer-run-query-button"
+                data-cy="metrics-explorer-run-query-button"
+                dense
+                flat
+                title="Run query"
+                class="q-pa-none search-button"
+                @click="runQuery"
+              >
+                Run query
+              </q-btn>
+            </div>
+          </div>
+          <div
+            style="
+              border-top: 1px solid rgb(219, 219, 219);
+              border-bottom: 1px solid rgb(219, 219, 219);
             "
-            data-test="logs-search-bar-date-time-dropdown"
-            class="q-mr-md"
-            @on:date-change="updateDateChange"
-          />
-          <q-btn
-            data-test="metrics-explorer-run-query-button"
-            data-cy="metrics-explorer-run-query-button"
-            dense
-            flat
-            title="Run query"
-            class="q-pa-none search-button"
-            @click="runQuery"
           >
-            Run query
-          </q-btn>
+            <query-editor
+              editor-id="session-replay-query-editor"
+              class="monaco-editor"
+              v-model:query="sessionState.data.editorValue"
+              :debounce-time="300"
+              style="height: 40px !important"
+            />
+          </div>
         </div>
-      </div>
-      <div
-        style="
-          border-top: 1px solid rgb(219, 219, 219);
-          border-bottom: 1px solid rgb(219, 219, 219);
-        "
-      >
-        <query-editor
-          editor-id="session-replay-query-editor"
-          class="monaco-editor"
-          v-model:query="sessionState.data.editorValue"
-          :debounce-time="300"
-          style="height: 40px !important"
-        />
       </div>
       <q-splitter
         class="logs-horizontal-splitter full-height"
@@ -68,15 +74,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         vertical
       >
         <template #before>
-          <FieldList
-            :fields="streamFields"
-            :time-stamp="{
-              startTime: dateTime.startTime,
-              endTime: dateTime.endTime,
-            }"
-            :stream-name="rumSessionStreamName"
-            @event-emitted="handleSidebarEvent"
-          />
+          <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
+            <FieldList
+              :fields="streamFields"
+              :time-stamp="{
+                startTime: dateTime.startTime,
+                endTime: dateTime.endTime,
+              }"
+              :stream-name="rumSessionStreamName"
+              @event-emitted="handleSidebarEvent"
+            />
+          </div>
         </template>
         <template #separator>
           <q-avatar
@@ -88,66 +96,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #after>
-          <div class="q-mt-xs">
-            <template v-if="isLoading.length">
-              <div
-                class="q-pb-lg flex items-center justify-center text-center"
-                style="height: calc(100vh - 190px)"
-              >
-                <div>
-                  <q-spinner-hourglass
-                    color="primary"
-                    size="40px"
-                    style="margin: 0 auto; display: block"
-                  />
-                  <div class="text-center full-width">
-                    Hold on tight, we're fetching your sessions.
+          <div class="tw-pb-[0.625rem] tw-pr-[0.625rem]">
+            <div class="card-container">
+              <template v-if="isLoading.length">
+                <div
+                  class="q-pb-lg flex items-center justify-center text-center"
+                  style="height: calc(100vh - 190px)"
+                >
+                  <div>
+                    <q-spinner-hourglass
+                      color="primary"
+                      size="40px"
+                      style="margin: 0 auto; display: block"
+                    />
+                    <div class="text-center full-width">
+                      Hold on tight, we're fetching your sessions.
+                    </div>
                   </div>
                 </div>
-              </div>
-            </template>
-            <template v-else>
-              <AppTable
-                :columns="columns"
-                :rows="rows"
-                class="app-table-container"
-                :bordered="false"
-                @event-emitted="handleTableEvents"
-              >
-                <template v-slot:session_location_column="slotProps">
-                  <SessionLocationColumn :column="slotProps.column.row" />
-                </template>
-              </AppTable>
-            </template>
+              </template>
+              <template v-else>
+                <AppTable
+                  :columns="columns"
+                  :rows="rows"
+                  class="app-table-container"
+                  :bordered="false"
+                  @event-emitted="handleTableEvents"
+                >
+                  <template v-slot:session_location_column="slotProps">
+                    <SessionLocationColumn :column="slotProps.column.row" />
+                  </template>
+                </AppTable>
+              </template>
+            </div>
           </div>
         </template>
       </q-splitter>
     </template>
     <template v-else>
-      <div class="q-pa-lg enable-rum" style="max-width: 1024px">
-        <div class="q-pb-lg">
-          <div class="text-left text-h6 text-bold q-pb-md">
-            Discover Session Replay to Understand User Interactions in Detail
-          </div>
-          <div class="text-subtitle1">
-            Session Replay captures and replays user interactions on your
-            website or application. This allows you to visually review how users
-            navigate, where they click, what they type, and how they engage with
-            your content
-          </div>
-          <div>
-            <div></div>
+      <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
+        <div class="card-container">
+          <div class="q-pa-lg enable-rum" style="max-width: 1024px">
+            <div class="q-pb-lg">
+              <div class="text-left text-h6 text-bold q-pb-md">
+                Discover Session Replay to Understand User Interactions in
+                Detail
+              </div>
+              <div class="text-subtitle1">
+                Session Replay captures and replays user interactions on your
+                website or application. This allows you to visually review how
+                users navigate, where they click, what they type, and how they
+                engage with your content
+              </div>
+              <div>
+                <div></div>
+              </div>
+            </div>
+            <q-btn
+              class="bg-secondary rounded text-white"
+              no-caps
+              title="Get started with Real User Monitoring"
+              @click="getStarted"
+            >
+              Get Started
+              <q-icon name="arrow_forward" size="20px"
+class="q-ml-xs" />
+            </q-btn>
           </div>
         </div>
-        <q-btn
-          class="bg-secondary rounded text-white"
-          no-caps
-          title="Get started with Real User Monitoring"
-          @click="getStarted"
-        >
-          Get Started
-          <q-icon name="arrow_forward" size="20px" class="q-ml-xs" />
-        </q-btn>
       </div>
     </template>
   </div>

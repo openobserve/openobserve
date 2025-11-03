@@ -657,72 +657,7 @@ describe('AddFunction.vue Branch Coverage', () => {
     });
   });
 
-  describe('Theme and AI Chat Conditional Styling Branch Coverage', () => {
-    it('should apply dark theme styles', async () => {
-      const darkStore = createStore({
-        state: {
-          ...mockStore.state,
-          theme: 'dark', // Branch condition: === 'dark'
-        },
-        actions: mockStore.actions,
-      });
-
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n, mockRouter],
-          provide: {
-            store: darkStore,
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': true,
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
-      });
-
-      // Branch: store.state.theme === 'dark' (line 86-89, 105)
-      const errorContainer = wrapper.find('.q-px-sm.q-pb-sm');
-      if (errorContainer.exists()) {
-        expect(errorContainer.classes()).toContain('bg-grey-10');
-      }
-
-      const testContainer = wrapper.find('.q-px-md.q-pt-sm.q-pb-md');
-      if (testContainer.exists()) {
-        expect(testContainer.classes()).toContain('tw-bg-gray-700');
-      }
-    });
-
-    it('should apply light theme styles', async () => {
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n, mockRouter],
-          provide: {
-            store: mockStore, // theme: 'light'
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': true,
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
-      });
-
-      // Branch: store.state.theme !== 'dark' (line 87-88, 105)
-      const testContainer = wrapper.find('.q-px-md.q-pt-sm.q-pb-md');
-      if (testContainer.exists()) {
-        expect(testContainer.classes()).toContain('tw-bg-zinc-100');
-      }
-    });
-
+  describe('AI Chat Integration', () => {
     it('should show AI chat when enabled and not in add function component', async () => {
       const aiEnabledStore = createStore({
         state: {

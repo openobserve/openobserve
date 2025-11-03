@@ -154,12 +154,19 @@ fn get_data(
 // static METADATA_CACHE: Lazy<Arc<RwLock<HashMap<String, EnrichmentTableMetadata>>>> =
 //     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
-/// Retrieve enrichment table data
+/// Retrieve enrichment table data.
+///
+/// Be careful with `apply_primary_region_if_specified` boolean. If this value is true and the
+/// primary region is specified, this will fetch enrichment table data only from the specified
+/// primary region and will ignore the other regions. Ideally only for cache_enrichment_table
+/// function used when starting a node, it should be used.
 pub async fn get_enrichment_table(
     org_id: &str,
     table_name: &str,
+    apply_primary_region_if_specified: bool,
 ) -> Result<Arc<Vec<vrl::value::Value>>, anyhow::Error> {
-    let value_type = get_enrichment_table_inner(org_id, table_name).await?;
+    let value_type =
+        get_enrichment_table_inner(org_id, table_name, apply_primary_region_if_specified).await?;
     value_type.to_vrl()
 }
 
@@ -168,6 +175,7 @@ pub async fn get_enrichment_table(
 pub async fn get_enrichment_table_inner(
     org_id: &str,
     table_name: &str,
+    apply_primary_region_if_specified: bool,
 ) -> Result<storage::Values, anyhow::Error> {
     log::debug!("get_enrichment_table: {org_id}/{table_name}");
     let db_stats = enrichment_table::get_meta_table_stats(org_id, table_name)
@@ -179,7 +187,12 @@ pub async fn get_enrichment_table_inner(
 
     let values = if (db_stats.end_time > local_last_updated) || local_last_updated == 0 {
         log::debug!("get_enrichment_table: fetching from remote: {org_id}/{table_name}");
-        enrichment_table::get_enrichment_table_data(org_id, table_name).await?
+        enrichment_table::get_enrichment_table_data(
+            org_id,
+            table_name,
+            apply_primary_region_if_specified,
+        )
+        .await?
     } else {
         log::debug!("get_enrichment_table: fetching from local: {org_id}/{table_name}");
         storage::local::retrieve(org_id, table_name).await?

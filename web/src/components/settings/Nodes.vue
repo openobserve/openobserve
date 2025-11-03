@@ -16,16 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="q-pa-none">
-    <q-separator class="separator" />
+  <q-page>
     <q-splitter
       v-model="splitterModel"
       :limits="[0, 250]"
       unit="px"
-      style="min-height: 90vh; overflow: hidden"
+      style="overflow: hidden; height: calc(100vh - 40px);"
     >
-      <template style="background-color: red" v-slot:before>
-        <div class="full-height  q-pt-sm">
+      <template v-slot:before>
+        <div class=" q-pt-sm tw-mt-4"
+        style="height: calc(100vh - 80px);"
+        >
           <div class="sticky-header q-px-sm">
             <span class="q-ma-none q-pa-sm" style="font-size: 18px;">
               {{t("nodes.filter_header")}} <q-icon name="filter_list" />
@@ -34,9 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  @click="clearAll()">{{t("nodes.clear_all")}}</a></div>
             </span>
           </div>
-          <q-separator class="q-mt-sm q-px-none q-mx-none" />
 
-          <div>
+          <div class="tw-h-[calc(100vh-110px)] tw-overflow-y-auto">
             <q-list>
               <q-expansion-item
                 v-if="regionRows.length > 0 && store.state.zoConfig.super_cluster_enabled"
@@ -64,14 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :filter-method="filterRegionData"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+                        <q-checkbox v-model="scope.selected" size="xs" />
                       </template>
 
                       <template v-slot:body-selection="scope">
                         <q-checkbox 
                           :model-value="scope.selected" 
                           size="xs" 
-                          color="secondary" 
                           @update:model-value="(val, evt) => { 
                             if (Object.hasOwn(scope, 'selected')) {
                               Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
@@ -133,11 +132,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :filter-method="filterClusterData"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+                        <q-checkbox v-model="scope.selected" size="xs" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { 
+                        <q-checkbox :model-value="scope.selected" size="xs" @update:model-value="(val, evt) => { 
                             if (Object.hasOwn(scope, 'selected')) {
                               Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
                             }
@@ -195,11 +194,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-pa-none q-ma-none node-list-filter-table"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+                        <q-checkbox v-model="scope.selected" size="xs" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { 
+                        <q-checkbox :model-value="scope.selected" size="xs" @update:model-value="(val, evt) => { 
                             if (Object.hasOwn(scope, 'selected')) {
                               Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
                             }
@@ -232,13 +231,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model:selected="selectedStatuses" 
                       id="nodesStatusFilter"
                       class="q-pa-none q-ma-none node-list-filter-table"
+                      :style="hasVisibleRows
+                        ? 'width: 100%; height: calc(100vh - 115px); overflow-y: auto;' 
+                        : 'width: 100%'"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+                        <q-checkbox v-model="scope.selected" size="xs" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox :model-value="scope.selected" size="xs" color="secondary" @update:model-value="(val, evt) => { 
+                        <q-checkbox :model-value="scope.selected" size="xs" @update:model-value="(val, evt) => { 
                             if (Object.hasOwn(scope, 'selected')) {
                               Object.getOwnPropertyDescriptor(scope, 'selected')?.set?.(val);
                             }
@@ -372,22 +374,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-card>
               </q-expansion-item>
 
+              <q-btn 
+                :label="t('nodes.applyFilter')" 
+                class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm o2-primary-button tw-h-[36px]" 
+                flat
+                @click="applyFilter()"
+              >
+              </q-btn>
 
             </q-list>
           </div>
-          <div>
-            <q-btn 
-              :label="t('nodes.applyFilter')" 
-              class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm o2-secondary-button tw-h-[36px]" 
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              @click="applyFilter()"
-            >
-            </q-btn>
-          </div>
         </div>
       </template>
-      <template style="background-color: red" v-slot:after>
+      <template v-slot:after>
         <q-table
           ref="qTable"
           :rows="tabledata"
@@ -397,8 +396,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :filter="filterQuery"
           :filter-method="filterData"
           :loading="loading"
-          class="nodes-list-table"
+          class="nodes-list-table tw-border-l tw-border-solid tw-border-gray-1200 tw-rounded-none"
           dense
+          style="width: 100%; height: calc(100vh - 50px); overflow-y: auto;"
         >
           <template #no-data><NoData /></template>
           <template #top="scope">
@@ -412,21 +412,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="col-auto flex q-mb-sm ">
                 <q-input
                   v-model="filterQuery"
-                  filled
                   dense
-                  class="q-ml-none q-mb-xs q-mr-md"
+                  class="q-ml-none q-mb-xs q-mr-sm o2-search-input"
+                  borderless
                   style="width: 400px;"
                   :placeholder="t('nodes.search')"
-                  clearable
                 >
                   <template #prepend>
-                    <q-icon name="search" />
+                    <q-icon name="search" class="o2-search-input-icon" />
                   </template>
                 </q-input>
-                <q-btn :label="t('common.refresh')" class="text-bold text-capitalize no-border o2-primary-button"
-                 style="height: 40px; width: 90px;" 
-                 :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-                 @click="getData(true)">
+                <q-btn 
+                  :label="t('common.refresh')" 
+                  class="o2-secondary-button tw-h-[36px]"
+                  padding="sm"
+                  no-caps
+                  flat
+                  @click="getData(true)">
                 </q-btn>
               </div>
 

@@ -173,6 +173,9 @@ async fn update(msg: Message) -> Result<()> {
                 );
             }
         }
+        TriggerModule::QueryRecommendations => {
+            todo!("We will get here eventually")
+        }
     }
     Ok(())
 }

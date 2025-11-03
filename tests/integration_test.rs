@@ -135,6 +135,14 @@ mod tests {
         fs::remove_dir_all("./data").expect("Delete local dir failed");
     }
 
+    /// Helper function to flush memtable to ensure proper test isolation
+    /// This prevents memtable overflow errors when running sequential ingestion tests
+    async fn flush_memtable() {
+        if let Err(e) = ingester::flush_all().await {
+            log::warn!("Failed to flush memtable: {}", e);
+        }
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn e2e_test() {
         // make sure data dir is deleted before we run integration tests
@@ -175,6 +183,10 @@ mod tests {
         for _i in 0..3 {
             e2e_1_post_bulk().await;
         }
+
+        // Flush memtable after bulk ingestion to ensure proper test isolation
+        // This prevents memtable overflow when subsequent tests try to ingest data
+        flush_memtable().await;
 
         // ingest
         e2e_post_json().await;
@@ -1400,7 +1412,11 @@ mod tests {
             .set_payload(body)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(
+            resp.status().is_success(),
+            "Prometheus write failed with status: {}. This may indicate memtable overflow or resource constraints.",
+            resp.status()
+        );
     }
 
     async fn e2e_get_org_summary() {
@@ -1450,10 +1466,7 @@ mod tests {
         let status = resp.status();
         let text = resp.into_body().try_into_bytes().unwrap_or_default();
         let text = String::from_utf8_lossy(&text).to_string();
-        println!(
-            "e2e_post_alert_template: status: {:?}, text: {:?}",
-            status, text
-        );
+        println!("e2e_post_alert_template: status: {status:?}, text: {text:?}");
         assert!(status.is_success());
     }
 
@@ -3522,7 +3535,8 @@ mod tests {
         assert_ne!(meta_table_stats.start_time, 0);
 
         // Check get_enrichment_table function, it should return same data
-        let data = openobserve::service::enrichment::get_enrichment_table(org_id, table_name).await;
+        let data =
+            openobserve::service::enrichment::get_enrichment_table(org_id, table_name, false).await;
         assert!(data.is_ok());
         let data = data.unwrap();
         assert!(data.len() == 2);
@@ -3896,7 +3910,7 @@ mod tests {
         // Test store function
         let test_data = Values::Json(Arc::new(test_data));
         let result = local::store(org_id, table_name, test_data, updated_at).await;
-        println!("Store result: {:?}", result);
+        println!("Store result: {result:?}");
         assert!(result.is_ok(), "Store should succeed");
 
         // Verify file was created

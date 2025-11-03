@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
+use actix_web::{HttpRequest, HttpResponse, get, http, http::header, post, web};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{search::default_use_cache, stream::StreamType},
@@ -26,6 +26,10 @@ use hashbrown::HashMap;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
+#[cfg(feature = "cloud")]
+use crate::service::ingestion::check_ingestion_allowed;
+// Re-export service graph API handlers
+pub use crate::service::traces::service_graph::{self, get_service_graph_metrics, get_store_stats};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -82,7 +86,28 @@ async fn handle_req(
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
+    // log start processing time
+    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
+        config::utils::time::now_micros()
+    } else {
+        0
+    };
+
     let org_id = org_id.into_inner();
+
+    #[cfg(feature = "cloud")]
+    match check_ingestion_allowed(&org_id, StreamType::Traces, None).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
+    }
+
     let content_type = req
         .headers()
         .get("Content-Type")
@@ -92,18 +117,25 @@ async fn handle_req(
         .headers()
         .get(&get_config().grpc.stream_header_key)
         .and_then(|header| header.to_str().ok());
-    if content_type.eq(CONTENT_TYPE_PROTO) {
-        traces::otlp_proto(&org_id, body, in_stream_name).await
+    let mut resp = if content_type.eq(CONTENT_TYPE_PROTO) {
+        traces::otlp_proto(&org_id, body, in_stream_name).await?
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        traces::otlp_json(&org_id, body, in_stream_name).await
+        traces::otlp_json(&org_id, body, in_stream_name).await?
     } else {
-        Ok(
-            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                "Bad Request",
-            )),
-        )
+        HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+            http::StatusCode::BAD_REQUEST,
+            "Bad Request",
+        ))
+    };
+
+    if process_time > 0 {
+        resp.headers_mut().insert(
+            header::HeaderName::from_static("o2_process_time"),
+            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
+        );
     }
+
+    Ok(resp)
 }
 
 /// GetLatestTraces

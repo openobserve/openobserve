@@ -196,7 +196,7 @@ test.describe("Compare SQL query execution times", () => {
 
   test.afterEach(async ({ page }) => {
     try {
-      await pm.commonActions.flipStreaming();
+      // await pm.commonActions.flipStreaming();
       testLogger.info('Streaming flipped after test');
     } catch (error) {
       testLogger.warn('Streaming flip failed', { error: error.message });

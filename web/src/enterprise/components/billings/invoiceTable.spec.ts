@@ -145,7 +145,7 @@ describe("InvoiceTable Component", () => {
     });
 
     it("should initialize with default pagination settings", () => {
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(5);
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
     });
 
     it("should initialize with empty invoice history", () => {
@@ -167,7 +167,6 @@ describe("InvoiceTable Component", () => {
         { label: "20", value: 20 },
         { label: "50", value: 50 },
         { label: "100", value: 100 },
-        { label: "All", value: 0 },
       ];
       expect(wrapper.vm.perPageOptions).toEqual(expectedOptions);
     });
@@ -216,6 +215,7 @@ describe("InvoiceTable Component", () => {
         field: "actions",
         label: expect.any(String),
         align: "center",
+        classes: "actions-column",
       });
     });
   });
@@ -405,7 +405,7 @@ describe("InvoiceTable Component", () => {
     it("should pass correct props to QTablePagination", () => {
       // Test that pagination properties are correctly configured in the component
       expect(wrapper.vm.resultTotal).toBe(0);
-      expect(wrapper.vm.perPageOptions).toHaveLength(6);
+      expect(wrapper.vm.perPageOptions).toHaveLength(5);
       expect(wrapper.vm.perPageOptions[0]).toEqual({ label: "5", value: 5 });
       
       // Test that pagination functions exist and work
@@ -601,7 +601,7 @@ describe("InvoiceTable Component", () => {
     it("should maintain component integrity", () => {
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm.columns).toHaveLength(7);
-      expect(wrapper.vm.perPageOptions).toHaveLength(6);
+      expect(wrapper.vm.perPageOptions).toHaveLength(5);
     });
   });
 

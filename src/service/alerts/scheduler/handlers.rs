@@ -40,8 +40,12 @@ use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     scheduler::get_scheduler_max_retries,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::recommendations::service::QueryRecommendationService;
 use proto::cluster_rpc;
 
+#[cfg(feature = "enterprise")]
+use crate::service::alerts::scheduler::query_optimization_recommendation::QueryOptimizerContext;
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
 use crate::service::{
@@ -65,6 +69,9 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::Alert => handle_alert_triggers(trace_id, trigger).await,
         db::scheduler::TriggerModule::DerivedStream => {
             handle_derived_stream_triggers(trace_id, trigger).await
+        }
+        config::meta::triggers::TriggerModule::QueryRecommendations => {
+            handle_query_recommendations_triggers(trace_id, trigger).await
         }
     }
 }
@@ -229,7 +236,7 @@ async fn handle_alert_triggers(
                     // next run at is after 5mins
                     let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
                     new_trigger.next_run_at = next_run_at;
-                    db::scheduler::update_trigger(new_trigger).await?;
+                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                 } else {
                     // Mark the trigger as failed
                     db::scheduler::update_status(
@@ -239,6 +246,8 @@ async fn handle_alert_triggers(
                         db::scheduler::TriggerStatus::Waiting,
                         trigger.retries + 1,
                         None,
+                        true,
+                        &query_trace_id,
                     )
                     .await?;
                 }
@@ -297,21 +306,22 @@ async fn handle_alert_triggers(
     #[cfg(feature = "cloud")]
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
+            let mut alert = alert;
             log::info!(
-                "skipping alert {} id {} in org {} because free trial expiry",
+                "pausing alert {} id {} in org {} because free trial expiry",
                 alert.name,
                 trigger.module_key,
                 trigger.org
             );
+            alert.enabled = false;
             // Update the trigger job to the next expected trigger time to check again
-            let next_run_at = alert.trigger_condition.get_next_trigger_time(
-                true,
-                alert.tz_offset,
-                false,
-                None,
-            )?;
-            new_trigger.next_run_at = next_run_at;
-            db::scheduler::update_trigger(new_trigger).await?;
+            if let Err(e) = set_without_updating_trigger(&trigger.org, alert).await {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause alert due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    &trigger.module_key
+                );
+            }
             return Ok(());
         }
     }
@@ -327,7 +337,7 @@ async fn handle_alert_triggers(
             &trigger.module_key
         );
         // wakeup the trigger
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -335,7 +345,7 @@ async fn handle_alert_triggers(
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
         new_trigger.is_silenced = true;
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -367,7 +377,7 @@ async fn handle_alert_triggers(
         // Keep the last_satisfied_at field
         trigger_data.reset();
         new_trigger.data = json::to_string(&trigger_data).unwrap();
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -488,7 +498,7 @@ async fn handle_alert_triggers(
         .evaluate(
             None,
             (Some(start_time), final_end_time),
-            Some(query_trace_id),
+            Some(query_trace_id.clone()),
         )
         .await;
     let evaluation_took = evaluation_took.elapsed().as_secs_f64();
@@ -531,7 +541,7 @@ async fn handle_alert_triggers(
             trigger_data.reset();
             new_trigger.data = json::to_string(&trigger_data).unwrap();
             trigger_data_stream.next_run_at = new_trigger.next_run_at;
-            db::scheduler::update_trigger(new_trigger).await?;
+            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         } else {
             // update its status and retries
             db::scheduler::update_status(
@@ -541,6 +551,8 @@ async fn handle_alert_triggers(
                 db::scheduler::TriggerStatus::Waiting,
                 trigger.retries + 1,
                 None,
+                true,
+                &query_trace_id,
             )
             .await?;
         }
@@ -594,6 +606,55 @@ async fn handle_alert_triggers(
 
     // send notification
     if let Some(data) = trigger_results.data {
+        // Apply deduplication if enabled (enterprise-only feature)
+        #[cfg(feature = "enterprise")]
+        let data = if let Some(db) = ORM_CLIENT.get() {
+            match crate::service::alerts::deduplication::apply_deduplication(
+                db,
+                &alert,
+                data.clone(),
+            )
+            .await
+            {
+                Ok(deduplicated_data) => {
+                    if deduplicated_data.is_empty() {
+                        log::debug!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
+                            &new_trigger.org,
+                            &new_trigger.module_key
+                        );
+                        // All results were deduplicated, skip notification
+                        // Still update the trigger timing
+                        trigger_data.period_end_time = if should_store_last_end_time {
+                            Some(trigger_results.end_time)
+                        } else {
+                            None
+                        };
+                        new_trigger.data = json::to_string(&trigger_data).unwrap();
+                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                        publish_triggers_usage(trigger_data_stream).await;
+                        return Ok(());
+                    }
+                    deduplicated_data
+                }
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error applying deduplication for org: {}, module_key: {}: {}",
+                        &new_trigger.org,
+                        &new_trigger.module_key,
+                        e
+                    );
+                    // On error, continue with original data to avoid missing alerts
+                    data
+                }
+            }
+        } else {
+            log::warn!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Could not connect to ORM for deduplication, continuing without it"
+            );
+            data
+        };
+
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
         // use the main start_time (now - period) and end_time (now) for the alert evaluation.
@@ -649,7 +710,7 @@ async fn handle_alert_triggers(
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
                 // Notification is already sent to some destinations,
                 // hence in case of partial errors, no need to retry
-                db::scheduler::update_trigger(new_trigger).await?;
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             }
             Err(e) => {
                 log::error!(
@@ -677,7 +738,7 @@ async fn handle_alert_triggers(
                     trigger_data.period_end_time = None;
                     new_trigger.data = json::to_string(&trigger_data).unwrap();
                     trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                    db::scheduler::update_trigger(new_trigger).await?;
+                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                 } else {
                     let trigger_data = json::to_string(&trigger_data).unwrap();
                     // Otherwise update its status and data only
@@ -688,6 +749,8 @@ async fn handle_alert_triggers(
                         db::scheduler::TriggerStatus::Waiting,
                         trigger.retries + 1,
                         Some(&trigger_data),
+                        true,
+                        &query_trace_id,
                     )
                     .await?;
                     trigger_data_stream.next_run_at = now;
@@ -711,7 +774,7 @@ async fn handle_alert_triggers(
             None
         };
         new_trigger.data = json::to_string(&trigger_data).unwrap();
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         trigger_data_stream.start_time = start_time;
         trigger_data_stream.end_time = trigger_results.end_time;
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
@@ -727,12 +790,93 @@ async fn handle_alert_triggers(
     Ok(())
 }
 
+#[cfg(not(feature = "enterprise"))]
+async fn handle_query_recommendations_triggers(
+    _trace_id: &str,
+    _trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn handle_query_recommendations_triggers(
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use std::{
+        sync::Arc,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use config::meta::triggers::TriggerStatus;
+
+    let cfg = get_config();
+    let query_recommendation_analysis_interval = cfg.limit.query_recommendation_analysis_interval;
+    let next_run_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Basic relative time")
+        .as_micros() as i64
+        + query_recommendation_analysis_interval * 1_000_000;
+
+    log::info!("[QUERY_RECOMMENDATIONS] Generating Query Recommendations. trace_id={trace_id}");
+
+    let query_recommendation_service = QueryRecommendationService {
+        ctx: Arc::new(QueryOptimizerContext),
+        query_recommendation_analysis_interval: cfg.limit.query_recommendation_analysis_interval,
+        query_recommendation_duration: cfg.limit.query_recommendation_duration,
+        query_recommendation_top_k: cfg.limit.query_recommendation_top_k,
+    };
+
+    let result = query_recommendation_service
+        .run()
+        .await
+        .inspect_err(|e| {
+            log::error!(
+                "[QUERY_RECOMMENDATIONS] Recommendation service stopped with an error: Error={:?}",
+                e
+            );
+        })
+        .inspect(|_| {
+            log::info!("[QUERY_RECOMMENDATIONS] Recommendation job completed successfully. trace_id={trace_id}");
+        });
+
+    // Always queue the next run, regardless of success or failure
+    let new_trigger = db::scheduler::Trigger {
+        status: TriggerStatus::Waiting,
+        retries: 3,
+        next_run_at,
+        ..trigger
+    };
+
+    db::scheduler::update_trigger(new_trigger, false, trace_id)
+        .await
+        .inspect_err(|e| {
+            log::error!(
+                "[QUERY_RECOMMENDATIONS] Failed to update QueryRecommendations trigger. e={:?}",
+                e
+            )
+        })?;
+
+    // If there was an error during generation, log it but don't prevent the next run from being
+    // queued
+    if let Err(e) = result {
+        log::error!(
+            "[QUERY_RECOMMENDATIONS] Query Recommendations Job operation encountered an error: e={:?}",
+            e
+        );
+        // Return Ok since the next run has been successfully queued
+    }
+
+    Ok(())
+}
+
 async fn handle_report_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let scheduler_trace_id = format!("{}/{}", trace_id, ider::generate_trace_id());
+    let query_trace_id = ider::generate_trace_id();
+    let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_report_trigger,org: {}, module_key: {}",
@@ -767,7 +911,7 @@ async fn handle_report_triggers(
                 // next run at is after 5mins
                 let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
                 new_trigger.next_run_at = next_run_at;
-                db::scheduler::update_trigger(new_trigger).await?;
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             } else {
                 // Mark the trigger as failed
                 db::scheduler::update_status(
@@ -777,6 +921,8 @@ async fn handle_report_triggers(
                     db::scheduler::TriggerStatus::Waiting,
                     trigger.retries + 1,
                     None,
+                    true,
+                    &query_trace_id,
                 )
                 .await?;
             }
@@ -815,12 +961,21 @@ async fn handle_report_triggers(
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
             log::info!(
-                "skipping report {}  in org {} because free trial expiry",
+                "pausing report {}  in org {} because free trial expiry",
                 report_name,
                 trigger.org
             );
-            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            db::scheduler::update_trigger(new_trigger).await?;
+            report.enabled = false;
+            if let Err(e) =
+                crate::service::dashboards::reports::enable(&report.org_id, &report.name, false)
+                    .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause report due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    report_name
+                );
+            }
             return Ok(());
         }
     }
@@ -831,7 +986,7 @@ async fn handle_report_triggers(
         );
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
     let mut run_once = false;
@@ -933,7 +1088,7 @@ async fn handle_report_triggers(
             org_id = &new_trigger.org,
             report_name = report_name
         );
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
     match report.send_subscribers().await {
@@ -945,7 +1100,7 @@ async fn handle_report_triggers(
             if run_once {
                 new_trigger.status = db::scheduler::TriggerStatus::Completed;
             }
-            db::scheduler::update_trigger(new_trigger).await?;
+            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             log::debug!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report name: {report_name} id: {report_id}"
             );
@@ -962,7 +1117,7 @@ async fn handle_report_triggers(
                     "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has reached maximum possible retries"
                 );
                 trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                db::scheduler::update_trigger(new_trigger).await?;
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             } else {
                 if run_once {
                     report.enabled = true;
@@ -975,6 +1130,8 @@ async fn handle_report_triggers(
                     db::scheduler::TriggerStatus::Waiting,
                     trigger.retries + 1,
                     None,
+                    true,
+                    &query_trace_id,
                 )
                 .await?;
             }
@@ -1089,7 +1246,7 @@ async fn handle_derived_stream_triggers(
                 log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
                 new_trigger_data.reset();
                 new_trigger.data = new_trigger_data.to_json_string();
-                db::scheduler::update_trigger(new_trigger).await?;
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                 publish_triggers_usage(trigger_data_stream).await;
                 return Err(anyhow::anyhow!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] {}",
@@ -1103,13 +1260,22 @@ async fn handle_derived_stream_triggers(
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
             log::info!(
-                "[Scheduler trace_id {scheduler_trace_id}] Skipping pipeline {} id {} in org {} because free trial expiry",
+                "[Scheduler trace_id {scheduler_trace_id}] pausing pipeline {} id {} in org {} because free trial expiry",
                 pipeline.name,
                 pipeline_id,
                 trigger.org
             );
-            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            db::scheduler::update_trigger(new_trigger).await?;
+
+            if let Err(e) =
+                crate::service::pipeline::enable_pipeline(&pipeline.org, &pipeline.id, false, false)
+                    .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause pipeline due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    pipeline.name
+                );
+            }
             return Ok(());
         }
     }
@@ -1149,7 +1315,7 @@ async fn handle_derived_stream_triggers(
         log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         publish_triggers_usage(trigger_data_stream).await;
         return Ok(());
     }
@@ -1188,7 +1354,7 @@ async fn handle_derived_stream_triggers(
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         publish_triggers_usage(trigger_data_stream).await;
         return Err(anyhow::anyhow!(
             "[SCHEDULER trace_id {scheduler_trace_id}] {}",
@@ -1350,7 +1516,7 @@ async fn handle_derived_stream_triggers(
         trigger_data_stream.error = Some(format!(
             "Invalid timerange - start: {start_time}, end: {end}, should be fixed in the next run"
         ));
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         publish_triggers_usage(trigger_data_stream).await;
         return Ok(());
     }
@@ -1374,7 +1540,7 @@ async fn handle_derived_stream_triggers(
         )?;
         // Start over next time
         new_trigger.retries = 0;
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -1676,7 +1842,7 @@ async fn handle_derived_stream_triggers(
         new_trigger.retries = 0; // start over
     }
 
-    if let Err(e) = db::scheduler::update_trigger(new_trigger).await {
+    if let Err(e) = db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await {
         log::warn!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline({}/{})]: DerivedStream's new trigger failed to be updated, caused by {}",
             &pipeline.org,
