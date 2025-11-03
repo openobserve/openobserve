@@ -267,10 +267,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-dialog>
 
     <q-dialog v-model="isShowToken"  persistent>
-  <q-card  style="width: 40vw; max-height: 90vh; overflow-y: auto;">
+  <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
     <q-card-section  class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center" >
       <div>Service Account Token </div>
-          <q-btn   dense flat icon="close" size="md" @click="isShowToken = false" style="cursor: pointer" />
+          <q-btn   dense flat icon="cancel" size="md" @click="isShowToken = false" style="cursor: pointer" />
     </q-card-section>
 
     <q-card-section>
@@ -278,8 +278,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-flex tw-items-center tw-gap-2" style="padding: 0rem 1rem;  border-radius: 8px;">
   <!-- Token section taking 75% of the width -->
   <div
-    class="text-h6 text-center tw-truncate"
-    style="flex: 3;  padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
+    class="text-h6 text-center tw-truncate el-border"
+    style="flex: 3;  padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
   >
     {{  serviceToken }}
   </div>
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.stop="copyToClipboard(serviceToken)"
       size="lg"
       dense
-      flat
+      outline
       :title="t('serviceAccounts.copyToken')"
       icon="content_copy"
       class="q-mr-xs"
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.stop="downloadTokenAsFile(serviceToken)"
       size="lg"
       dense
-      flat
+      outline
       :title="t('serviceAccounts.downloadToken')"
       icon="file_download"
     />
@@ -811,7 +811,7 @@ export default defineComponent({
   opacity: 0.1 !important;
 }
 .warning-text {
-  color: #F5A623;
+  color: #ec960c;
 }
 
 
