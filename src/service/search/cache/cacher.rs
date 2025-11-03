@@ -720,7 +720,10 @@ pub(crate) fn select_cache_meta(
 
 fn parse_cache_file_timestamps(file_path: &str) -> Option<(i64, i64)> {
     let file_name = file_path.split('/').next_back()?;
-    let parts: Vec<&str> = file_name.split('_').collect();
+    // Remove file extension (e.g., .json, .arrow) before parsing
+    let file_name_without_ext = file_name.split('.').next()?;
+
+    let parts: Vec<&str> = file_name_without_ext.split('_').collect();
     if parts.len() >= 2
         && let (Ok(start_ts), Ok(end_ts)) = (parts[0].parse::<i64>(), parts[1].parse::<i64>())
     {
