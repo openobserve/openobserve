@@ -20,7 +20,7 @@ use config::{
     meta::{
         self_reporting::{
             ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
-            usage::{ERROR_STREAM, TRIGGERS_USAGE_STREAM, TriggerData},
+            usage::{ERROR_STREAM, TRIGGERS_STREAM, TriggerData},
         },
         stream::{StreamParams, StreamType},
     },
@@ -200,7 +200,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         let mut enqueued_on_failure = false;
 
         for org in &additional_reporting_orgs {
-            let trigger_stream = StreamParams::new(org, TRIGGERS_USAGE_STREAM, StreamType::Logs);
+            let trigger_stream = StreamParams::new(org, TRIGGERS_STREAM, StreamType::Logs);
 
             if super::ingestion::ingest_reporting_data(triggers.clone(), trigger_stream)
                 .await
