@@ -952,34 +952,41 @@ class="q-pr-sm q-pt-xs" />
               </q-btn-dropdown>
             </q-btn-group>
             <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'">
-              <q-btn
+              <div v-if="config.isEnterprise == 'true'" class="tw-flex">
+                <q-btn
                 v-if="
-                  config.isEnterprise == 'true' &&
-                  visualizeSearchRequestTraceIds.length
+                  visualizeSearchRequestTraceIds.length > 0
                 "
                 data-test="logs-search-bar-visualize-cancel-btn"
                 dense
                 flat
                 :title="t('search.cancel')"
                 class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
-                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
+                :class="
+                  config.isEnterprise == 'true'
+                    ? 'search-button-enterprise-border-radius'
+                    : 'search-button-normal-border-radius'
+                "
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
-              <div v-else class="tw-flex">
               <q-btn
-                data-test="logs-search-bar-visualize-refresh-btn"
-                dense
-                flat
-                :title="t('search.runQuery')"
-                class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
-                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
-                no-caps
-                @click="handleRunQueryFn"
-                :disable="disable"
-                >{{ t("search.runQuery") }}</q-btn
+                  v-else
+                  data-test="logs-search-bar-visualize-refresh-btn"
+                  dense
+                  flat
+                  :title="t('search.runQuery')"
+                  class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                  :class="
+                    config.isEnterprise == 'true'
+                      ? 'search-button-enterprise-border-radius'
+                      : 'search-button-normal-border-radius'
+                  "
+                  no-caps
+                  @click="handleRunQueryFn"
+                  >{{ t("search.runQuery") }}</q-btn
                 >
-                <q-separator  class="tw-h-[29px] tw-w-[1px]" />
+              <q-separator class="tw-h-[29px] tw-w-[1px]" />
               <q-btn-dropdown
                 flat
                 class="tw-h-[29px] search-button-dropdown"
@@ -988,8 +995,10 @@ class="q-pr-sm q-pt-xs" />
                   visualizeSearchRequestTraceIds.length
                     ? 'o2-color-cancel'
                     : 'o2-color-primary',
-                    config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-normal-border-radius'
-              ]"
+                  config.isEnterprise == 'true'
+                    ? 'search-button-dropdown-enterprise-border-radius'
+                    : 'search-button-normal-border-radius',
+                ]"
                 unelevated
                 dense
               >
@@ -1000,17 +1009,35 @@ class="q-pr-sm q-pt-xs" />
                   flat
                   no-caps
                   :title="'Refresh Cache & Run Query'"
-                  class="q-pa-sm search-button-dropdown tw-text-[12px] "
+                  class="q-pa-sm search-button-dropdown tw-text-[12px]"
                   @click="handleRunQueryFn(true)"
                   :disable="
                     config.isEnterprise == 'true' &&
-                    visualizeSearchRequestTraceIds.length
+                    !!visualizeSearchRequestTraceIds.length
                   "
                 >
                   <q-icon name="refresh" class="q-mr-xs" />
                   Refresh Cache & Run Query</q-btn
                 >
               </q-btn-dropdown>
+              </div>
+              <div v-else class="tw-flex">
+                <q-btn
+                  data-test="logs-search-bar-visualize-refresh-btn"
+                  dense
+                  flat
+                  :title="t('search.runQuery')"
+                  class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                  :class="
+                    config.isEnterprise == 'true'
+                      ? 'search-button-enterprise-border-radius'
+                      : 'search-button-normal-border-radius'
+                  "
+                  no-caps
+                  @click="handleRunQueryFn"
+                  :disable="disable"
+                  >{{ t("search.runQuery") }}</q-btn
+                >
               </div>
             </div>
             <div v-else class="tw-flex">
