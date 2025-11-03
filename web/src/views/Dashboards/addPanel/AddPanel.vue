@@ -112,17 +112,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-btn
             v-if="config.isEnterprise === 'false'"
-            class="q-ml-md text-bold"
             data-test="dashboard-apply"
-            padding="sm lg"
-            color="secondary"
+            class="tw-h-[36px] q-ml-md o2-primary-button"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             no-caps
+            flat
+            dense
             :label="t('panel.apply')"
             @click="() => runQuery(false)"
           />
           <q-btn-group
             v-if="config.isEnterprise === 'true'"
-            class="tw-h-[36px] q-ml-md"
+            class="tw-h-[36px] q-ml-md o2-primary-button"
+            style="padding-left: 0px !important ; padding-right: 0px !important"
             :class="
               store.state.theme === 'dark'
                 ? searchRequestTraceIds.length > 0
@@ -139,10 +145,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'dashboard-cancel'
                   : 'dashboard-apply'
               "
-              :color="
-                searchRequestTraceIds.length > 0 ? 'negative' : 'secondary'
-              "
-              :text-color="'white'"
               no-caps
               :label="
                 searchRequestTraceIds.length > 0
@@ -150,15 +152,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('panel.apply')
               "
               @click="onApplyBtnClick"
-              style="width: 92px"
             />
 
             <q-btn-dropdown
               class="text-bold no-border tw-px-0"
-              :color="
-                searchRequestTraceIds.length > 0 ? 'negative' : 'secondary'
-              "
-              :text-color="'white'"
               no-caps
               auto-close
               dropdown-icon="keyboard_arrow_down"
