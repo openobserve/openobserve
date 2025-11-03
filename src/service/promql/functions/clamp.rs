@@ -13,62 +13,43 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::error::Result;
+use datafusion::error::{DataFusionError, Result};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::service::promql::{
-    functions::RangeFunc,
-    value::{EvalContext, Labels, RangeValue, Sample, TimeWindow, Value},
-};
+use crate::service::promql::value::{RangeValue, Sample, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#clamp
-/// Enhanced version that processes all timestamps at once for range queries
-pub(crate) fn clamp_range(
-    data: Value,
-    min: f64,
-    max: f64,
-    eval_ctx: &EvalContext,
-) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!("[PromQL Timing] clamp_range() started");
-    let result = super::eval_range(data, ClampFunc::new(min, max), eval_ctx);
-    log::info!(
-        "[PromQL Timing] clamp_range() execution took: {:?}",
-        start.elapsed()
-    );
-    result
-}
+pub(crate) fn clamp_range(data: Value, min: f64, max: f64) -> Result<Value> {
+    match data {
+        Value::Matrix(matrix) => {
+            let out: Vec<RangeValue> = matrix
+                .into_par_iter()
+                .map(|mut range_value| {
+                    // Apply clamp to all samples in this range
+                    let samples: Vec<Sample> = range_value
+                        .samples
+                        .into_iter()
+                        .map(|sample| {
+                            let val = sample.value.clamp(min, max);
+                            Sample::new(sample.timestamp, val)
+                        })
+                        .collect();
 
-pub struct ClampFunc {
-    min: f64,
-    max: f64,
-}
-
-impl ClampFunc {
-    pub fn new(min: f64, max: f64) -> Self {
-        ClampFunc { min, max }
-    }
-}
-
-impl RangeFunc for ClampFunc {
-    fn name(&self) -> &'static str {
-        "clamp"
-    }
-
-    fn exec_instant(&self, data: RangeValue) -> Option<f64> {
-        // For instant queries, clamp the last sample value
-        data.samples
-            .last()
-            .map(|s| s.value.clamp(self.min, self.max))
-    }
-
-    fn exec_range(
-        &self,
-        _labels: &Labels,
-        samples: &[Sample],
-        _time_win: &Option<TimeWindow>,
-    ) -> Option<f64> {
-        // For range queries, clamp the last sample value
-        samples.last().map(|s| s.value.clamp(self.min, self.max))
+                    RangeValue {
+                        labels: std::mem::take(&mut range_value.labels),
+                        samples,
+                        exemplars: range_value.exemplars,
+                        time_window: range_value.time_window,
+                    }
+                })
+                .collect();
+            Ok(Value::Matrix(out))
+        }
+        Value::None => Ok(Value::None),
+        _ => Err(DataFusionError::Plan(format!(
+            "Invalid input for clamp, expected matrix but got: {:?}",
+            data.get_type()
+        ))),
     }
 }
 
@@ -77,66 +58,43 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
-    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+    use crate::service::promql::value::{Labels, RangeValue, Sample, TimeWindow, Value};
 
-    // Test helper
-    fn clamp_test_helper(data: Value, min: f64, max: f64) -> Result<Value> {
-        let eval_ctx = EvalContext::instant(1000);
-        clamp_range(data, min, max, &eval_ctx)
+    // Helper function to create a matrix from sample values
+    fn create_matrix(eval_ts: i64, values: Vec<f64>) -> Value {
+        let range_values: Vec<RangeValue> = values
+            .into_iter()
+            .map(|val| RangeValue {
+                labels: Labels::default(),
+                samples: vec![Sample::new(eval_ts, val)],
+                exemplars: None,
+                time_window: Some(TimeWindow {
+                    eval_ts,
+                    range: Duration::from_secs(5),
+                    offset: Duration::ZERO,
+                }),
+            })
+            .collect();
+        Value::Matrix(range_values)
     }
 
     #[test]
     fn test_clamp_function() {
         let eval_ts = 1000;
-
-        // Create range values (clamp operates on range vectors in the new pattern)
-        let range_values = vec![
-            RangeValue {
-                labels: Labels::default(),
-                samples: vec![Sample::new(eval_ts, 5.0)],
-                exemplars: None,
-                time_window: Some(TimeWindow {
-                    eval_ts,
-                    range: Duration::from_secs(5),
-                    offset: Duration::ZERO,
-                }),
-            },
-            RangeValue {
-                labels: Labels::default(),
-                samples: vec![Sample::new(eval_ts, 15.0)],
-                exemplars: None,
-                time_window: Some(TimeWindow {
-                    eval_ts,
-                    range: Duration::from_secs(5),
-                    offset: Duration::ZERO,
-                }),
-            },
-            RangeValue {
-                labels: Labels::default(),
-                samples: vec![Sample::new(eval_ts, 25.0)],
-                exemplars: None,
-                time_window: Some(TimeWindow {
-                    eval_ts,
-                    range: Duration::from_secs(5),
-                    offset: Duration::ZERO,
-                }),
-            },
-        ];
-
-        let matrix = Value::Matrix(range_values);
-        let result = clamp_test_helper(matrix, 10.0, 20.0).unwrap();
+        let matrix = create_matrix(eval_ts, vec![5.0, 15.0, 25.0]);
+        let result = clamp_range(matrix, 10.0, 20.0).unwrap();
 
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 3);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 3);
                 // 5.0 should be clamped to 10.0
-                assert!((v[0].sample.value - 10.0).abs() < 0.001);
+                assert!((m[0].samples[0].value - 10.0).abs() < 0.001);
                 // 15.0 should remain 15.0
-                assert!((v[1].sample.value - 15.0).abs() < 0.001);
+                assert!((m[1].samples[0].value - 15.0).abs() < 0.001);
                 // 25.0 should be clamped to 20.0
-                assert!((v[2].sample.value - 20.0).abs() < 0.001);
+                assert!((m[2].samples[0].value - 20.0).abs() < 0.001);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }
