@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
     <q-separator />
-    <q-card-section class="q-w-md q-mx-sm">
+    <q-card-section class="q-px-md q-py-sm add-dashboard-form-card-section">
       <q-form ref="addDashboardForm" @submit.stop="onSubmit.execute">
         <q-input
           v-if="beingUpdated"
@@ -51,13 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="dashboardData.name"
           :label="t('dashboard.name') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
+          class="showLabelOnTop"
           data-test="add-dashboard-name"
           stack-label
-          outlined
-          filled
+          hide-bottom-space
+          borderless
           dense
           :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
           :lazy-rules="true"
@@ -66,12 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="dashboardData.description"
           :label="t('dashboard.typeDesc')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
+          borderless
+          hide-bottom-space
+          class="showLabelOnTop"
           stack-label
-          outlined
-          filled
           dense
           data-test="add-dashboard-description"
         />
@@ -276,3 +272,10 @@ export default defineComponent({
   components: { SelectFolderDropdown },
 });
 </script>
+<style lang="scss">
+.add-dashboard-form-card-section {
+  .add-folder-btn {
+    margin-top: 36px !important;
+  }
+}
+</style>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-details" :style="backgroundStyle">
+  <div class="trace-details">
     <div
       class="trace-details-content"
       v-if="
@@ -27,10 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         )
       "
     >
-      <div
-        class="trace-combined-header-wrapper"
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-      >
+      <div class="trace-combined-header-wrapper card-container">
         <div
           class="full-width flex items-center toolbar flex justify-between q-pb-sm"
         >
@@ -162,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex items-center">
             <div
-              class="flex justify-center items-center tw-border tw-pl-2 tw-border-gray-300 trace-search-container"
+              class="flex justify-center items-center tw-pl-2 trace-search-container"
             >
               <q-input
                 data-test="trace-details-search-input"
@@ -273,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 no-caps
                 size="11px"
-                class="q-px-sm visual-selection-btn"
+                class="q-px-sm visual-selection-btn tw-rounded-[0.25rem]"
                 @click="activeVisual = visual.value"
               >
                 <q-icon><component :is="visual.icon" /></q-icon>
@@ -312,10 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
           ref="parentContainer"
         >
-          <div
-            class="trace-tree-wrapper"
-            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-          >
+          <div class="trace-tree-wrapper card-container">
             <trace-header
               data-test="trace-details-header"
               :baseTracePosition="baseTracePosition"
@@ -1376,7 +1370,6 @@ export default defineComponent({
       showTraceDetails,
       traceDetails,
       updateSelectedSpan,
-      backgroundStyle,
       routeToTracesList,
       openTraceLink,
       convertTimeFromNsToMs,
@@ -1454,22 +1447,11 @@ $traceChartCollapseHeight: 42px;
 }
 
 .trace-tree-wrapper {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(0.625rem);
-  border-radius: 0.5rem;
-  border: 0.1875rem solid rgba(255, 255, 255, 0.3);
   overflow: hidden;
   height: calc(100% - 2.5rem);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  margin-bottom: 2.5rem;
-}
-
-.trace-tree-wrapper.bg-white {
-  background: rgba(240, 240, 245, 0.8);
-  backdrop-filter: blur(0.625rem);
-  border: 0.1875rem solid rgba(100, 100, 120, 0.5);
 }
 
 .trace-tree-container {
@@ -1483,11 +1465,11 @@ $traceChartCollapseHeight: 42px;
   cursor: pointer;
   padding-right: 8px;
   border-radius: 2px;
-  padding-top: 2px;
+  padding-top: 3px;
   padding-bottom: 2px;
 
   &:hover {
-    background-color: rgba($primary, 0.9);
+    background-color: var(--o2-theme-color);
     color: #ffffff;
 
     .q-icon {
@@ -1575,31 +1557,20 @@ html:has(.trace-details) {
   }
 
   .visual-selector-container {
-    background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(0.625rem);
-    border-radius: 0.5rem;
-    border: 0.0625rem solid rgba(255, 255, 255, 0.1);
-    padding: 0.125rem;
-  }
-
-  .visual-selector-container.bg-white {
-    background: rgba(240, 240, 245, 0.8);
-    border: 0.125rem solid rgba(100, 100, 120, 0.3);
+    border-radius: 0.25rem;
+    border: 0.0625rem solid var(--o2-border-color);
   }
 
   .trace-combined-header-wrapper {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(0.625rem);
-    border-radius: 0.5rem;
-    border: 0.0625rem solid rgba(255, 255, 255, 0.1);
-    padding: 0.5rem;
-    margin-bottom: 0.5rem;
+    padding: 0.375rem;
+    margin-bottom: 0.625rem;
     flex-shrink: 0;
   }
 
   .trace-combined-header-wrapper.bg-white {
-    background: rgba(240, 240, 245, 0.8);
-    border: 0.125rem solid rgba(100, 100, 120, 0.3);
+    // background: rgba(240, 240, 245, 0.8);
+    // border: 0.125rem solid rgba(100, 100, 120, 0.3);
   }
 
   .chart-container-inner {

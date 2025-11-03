@@ -111,7 +111,7 @@ test.describe("Unflattened testcases", () => {
   });
 
   test.afterEach(async ({ page }) => {
-    await pageManager.commonActions.flipStreaming();
+    // await pageManager.commonActions.flipStreaming();
   });
 
   test("stream to toggle store original data toggle and display o2 id", async ({ page }) => {

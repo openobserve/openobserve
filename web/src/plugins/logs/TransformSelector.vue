@@ -19,14 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-toggle
       data-test="logs-search-bar-show-query-toggle-btn"
       v-model="searchObj.meta.showTransformEditor"
-      class="o2-toggle-button-xs"
+      class="o2-toggle-button-xs element-box-shadow"
       size="xs"
       flat
-      :class="
-        store.state.theme === 'dark'
-          ? 'o2-toggle-button-xs-dark'
-          : 'o2-toggle-button-xs-light'
-      "
       :disable="
         !searchObj.data.transformType ||
         searchObj.meta.logsVisualizeToggle === 'visualize'
@@ -41,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <q-btn-group
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="no-outline q-pa-none no-border float-left q-mr-xs transform-selector"
+    class="q-pa-none float-left q-mr-xs tw-h-[32px] transform-selector element-box-shadow el-border"
   >
     <div>
       <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">{{
@@ -54,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="transformIcon"
         :label="transformsLabel"
         no-caps
-        class="saved-views-dropdown btn-function no-case q-pl-sm q-pr-none"
+        class="btn-function no-case q-pl-sm q-pr-none no-border no-outline tw-border-none"
         :class="`${searchObj.data.transformType || 'transform'}-icon`"
         label-class="no-case"
         :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
@@ -142,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="save"
       :disable="searchObj.data.transformType !== 'function' || searchObj.meta.logsVisualizeToggle === 'visualize'"
       @click="fnSavedFunctionDialog"
+
     >
       <q-tooltip class="tw-text-[12px]" :offset="[0, 6]">
         {{
@@ -262,7 +258,7 @@ const transformsLabel = computed(() => {
 const transformIcon = computed(() => {
   if (!isActionsEnabled.value)
     return "img:" + getImageURL("images/common/function.svg");
-  
+
   if (searchObj.data.transformType === "function")
     return "img:" + getImageURL("images/common/function.svg");
 
@@ -336,4 +332,7 @@ const getTransformLabelTooltip = computed(() => {
 
 <style scoped lang="scss">
 @import '@/styles/logs/transform-selector.scss';
+.save-transform-btn{
+  border-left: 1px solid var(--o2-border-color);
+}
 </style>

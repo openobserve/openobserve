@@ -250,7 +250,7 @@ export default defineComponent({
 .logs-search-bar-component {
   padding-bottom: 1px;
   height: 100%;
-  overflow: visible;
+  overflow: hidden;
 
   .function-dropdown {
     width: 205px;

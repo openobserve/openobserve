@@ -15,18 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="preview-alert-container tw-mt-2 " :class="{'preview-alert-container-light': store.state.theme !== 'dark'}" ref="chartPanelRef" style="height: 100%; position: relative">
+  <div class="preview-alert-container card-container" :class="{'preview-alert-container-light': store.state.theme !== 'dark'}" ref="chartPanelRef" style="height: 100%; position: relative">
     <div class="text-bold"
     style="width: 100%; padding: 16px 10px; "
     :style="{ backgroundColor: store.state.theme === 'dark' ? '#2A2A2A' : '#fcfcfc',
-      borderBottom: store.state.theme === 'dark' ? '' : '1px solid #e6e6e6'
-     }"
-
-
+      borderBottom: store.state.theme === 'dark' ? '' : '1px solid #e6e6e6',
+      borderRadius: '0.375rem',
+    }"
     >
       Preview
     </div>
-    <div style="height: 240px !important" data-test="alert-preview-chart" class="preview-alert-chart">
+    <div data-test="alert-preview-chart" class="preview-alert-chart card-container tw-h-[calc(100vh-250px)]">
       <p class="sql-preview" v-if="selectedTab === 'sql'">
         Preview is not available in SQL mode
       </p>

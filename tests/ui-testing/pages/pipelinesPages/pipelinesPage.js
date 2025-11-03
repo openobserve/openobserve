@@ -29,10 +29,12 @@ export class PipelinesPage {
         this.savePipelineButton = page.locator(
           '[data-test="add-pipeline-save-btn"]'
         );
-        this.pipelineNameRequiredMessage = page.getByText(
+        // Target the form field error inside q-field__bottom, not the notification
+        this.pipelineNameRequiredMessage = page.locator('.q-field__bottom [role="alert"]').getByText(
           "Pipeline name is required"
         );
-        this.pipelineNameInput = page.getByLabel("Enter Pipeline Name");
+        // Updated selector to use placeholder since aria-label doesn't exist
+        this.pipelineNameInput = page.locator('input[placeholder="Enter Pipeline Name"]');
         this.sourceNodeRequiredMessage = page.getByText("Source node is required");
         this.streamNameInput = page.getByLabel("Stream Name *");
         this.e2eAutomateOption = page.getByRole("option", { name: "e2e_automate" , exact: true});
@@ -184,6 +186,7 @@ export class PipelinesPage {
     }
 
     async enterPipelineName(pipelineName) {
+        await this.pipelineNameInput.waitFor({ state: 'visible', timeout: 10000 });
         await this.pipelineNameInput.click();
         await this.pipelineNameInput.fill(pipelineName);
     }

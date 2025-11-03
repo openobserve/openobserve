@@ -224,6 +224,8 @@ export default defineComponent({
       default: false,
     },
   },
+  components:{
+  },
   setup() {
     const { t } = useI18n();
     const store = useStore();

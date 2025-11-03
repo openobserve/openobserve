@@ -309,6 +309,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("job init failed: {e}");
             }
 
+            // init service graph workers
+            #[cfg(feature = "enterprise")]
+            if cfg.service_graph.enabled {
+                log::info!("Initializing service graph background workers");
+                openobserve::service::traces::service_graph::init_background_workers();
+            }
+
             // Register job runtime for metrics collection
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
                 openobserve::service::runtime_metrics::register_runtime("job".to_string(), handle);
@@ -461,6 +468,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     e
                 )
             });
+            log::info!("[QUERY_RECOMMENDATIONS] Setup the initial trigger.");
         }
     };
 

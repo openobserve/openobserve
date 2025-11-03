@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="show" class="flex items-center rum-tabs">
+  <div v-if="show" class="flex items-center o2-tabs">
     <div
       :key="tab.value + tab.disabled"
       v-for="tab in tabs as Tab[]"
@@ -23,17 +23,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         :data-test="`tab-${tab.value}`"
-        class="q-px-lg q-py-sm rum-tab text-center"
+        class="q-px-lg q-py-sm o2-tab text-center"
         :style="tab.style"
         :title="tab.title || tab.label"
         :class="[
           activeTab === tab.value ? 'active text-primary' : '',
           tab.disabled && 'disabled',
           tab.hide && 'hidden',
+          activeTab !== tab.value ? 'inactive' : ''
         ]"
         @click="changeTab(tab)"
       >
         {{ tab.label }}
+        <q-tooltip v-if="tab.tooltipLabel">
+          {{ tab.tooltipLabel }}
+        </q-tooltip>
       </div>
     </div>
   </div>
@@ -46,6 +50,7 @@ interface Tab {
   style?: Record<string, string>;
   disabled?: boolean;
   title?: string;
+  tooltipLabel?: string;
   hide?: boolean;
 }
 
@@ -72,14 +77,17 @@ const changeTab = (tab: Tab) => {
 </script>
 
 <style lang="scss" scoped>
-.rum-tabs {
-  .rum-tab {
+.o2-tabs {
+  .o2-tab {
     border-bottom: 2px solid transparent;
-    width: 140px;
+    width: auto;
+    min-width: 80px;
     white-space: nowrap;
   }
   .active {
-    border-bottom: 2px solid $primary;
+    border-bottom: 2px solid var(--o2-theme-color);
+    background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+    color: var(--o2-card-text) !important;
   }
 }
 </style>
