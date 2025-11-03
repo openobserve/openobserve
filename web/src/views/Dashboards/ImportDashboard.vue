@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outline
             @click="goBack()"
             icon="arrow_back_ios_new"
+            class="el-border"
           />
           <div class="text-h6 q-ml-md">
             {{ t("dashboard.importDashboard") }}
@@ -106,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     style="width: calc(30%);position: relative;"
                     data-test="dashboard-folder-dropdown"
+                    class="import-folder-dropdown-container"
                   >
                     <select-folder-dropdown
                       @folder-selected="selectedFolder = $event"
@@ -169,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     style="width: calc(30%);position: relative;"
+                    class="import-folder-dropdown-container"
                   >
                     <select-folder-dropdown
                       @folder-selected="selectedFolder = $event"
@@ -1012,6 +1015,18 @@ export default defineComponent({
     > :first-child {
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+}
+.import-folder-dropdown-container {
+  :deep(.q-field) {
+    padding-top: 10px;
+  }
+  :deep(.flex) {
+    align-items: center !important;
+  }
+  :deep(.add-folder-btn) {
+    margin-bottom: 0 !important;
+    margin-top: 12px !important;
   }
 }
 </style>

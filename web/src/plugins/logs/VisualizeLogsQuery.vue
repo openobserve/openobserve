@@ -279,27 +279,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'html'"
-        class="col column"
-        style="width: 100%; height: 100%; flex: 1"
+        class="col column tw-mr-[0.625rem]"
+        style="height: 100%; flex: 1"
       >
-        <CustomHTMLEditor
-          v-model="dashboardPanelData.data.htmlContent"
-          style="width: 100%; height: 100%"
-          class="col"
-        />
-        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <CustomHTMLEditor
+            v-model="dashboardPanelData.data.htmlContent"
+            style="flex: 1; min-height: 0"
+          />
+          <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
+        </div>
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'markdown'"
-        class="col column"
-        style="width: 100%; height: 100%; flex: 1"
+        class="col column tw-mr-[0.625rem]"
+        style="height: 100%; flex: 1"
       >
-        <CustomMarkdownEditor
-          v-model="dashboardPanelData.data.markdownContent"
-          style="width: 100%; height: 100%"
-          class="col"
-        />
-        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <CustomMarkdownEditor
+            v-model="dashboardPanelData.data.markdownContent"
+            style="flex: 1; min-height: 0"
+          />
+          <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
+        </div>
       </div>
 
       <div

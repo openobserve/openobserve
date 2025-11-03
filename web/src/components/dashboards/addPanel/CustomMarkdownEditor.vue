@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="markdown-editor card-container"
-    style="width: 100%; height: 100%; overflow: auto"
+    style="width: 100%; height: 100%; overflow: hidden"
   >
     <div style="width: 100%; height: 100%">
       <q-splitter
@@ -27,14 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-markdown-editor-splitter"
       >
         <template #before>
-          <div class="col" style="height: 100%">
+          <div class="col" style="height: 100%; display: flex; flex-direction: column;">
             <CodeQueryEditor
               language="markdown"
               v-model:query="markdownContent"
               :debounceTime="500"
               @update:query="onEditorValueChange"
               data-test="dashboard-markdown-editor"
-              style="height: 100%"
+              style="height: 100%; flex: 1;"
             />
           </div>
         </template>

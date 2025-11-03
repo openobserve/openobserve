@@ -241,7 +241,7 @@ describe("SettingsIndex", () => {
       const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
       
       expect(wrapper.vm.showManagementTabs).toBe(true);
-      expect(wrapper.vm.splitterModel).toBe(220);
+      expect(wrapper.vm.splitterModel).toBe(250);
       
       await collapseBtn.trigger("click");
       
@@ -261,7 +261,7 @@ describe("SettingsIndex", () => {
       // Then expand
       await collapseBtn.trigger("click");
       expect(wrapper.vm.showManagementTabs).toBe(true);
-      expect(wrapper.vm.splitterModel).toBe(220);
+      expect(wrapper.vm.splitterModel).toBe(250);
     });
 
     it("should show correct icon when tabs are visible", () => {
@@ -422,7 +422,7 @@ describe("SettingsIndex", () => {
       const wrapper = createWrapper();
       
       expect(wrapper.vm.settingsTab).toBe("general");
-      expect(wrapper.vm.splitterModel).toBe(220);
+      expect(wrapper.vm.splitterModel).toBe(250);
       expect(wrapper.vm.showManagementTabs).toBe(true);
     });
 
