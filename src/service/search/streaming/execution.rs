@@ -33,6 +33,8 @@ use super::{
     sorting::order_search_results,
     utils::{calculate_progress_percentage, get_top_k_values},
 };
+#[cfg(feature = "enterprise")]
+use crate::service::search::cache::cacher::delete_cache;
 use crate::{
     common::meta::search::{QueryDelta, SearchResultType},
     service::search::{self as SearchService},
