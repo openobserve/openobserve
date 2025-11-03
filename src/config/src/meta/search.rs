@@ -2039,6 +2039,7 @@ mod tests {
             stream_name: "test_stream".to_string(),
             stream_type: StreamType::Logs,
             sql: "SELECT * FROM test".to_string(),
+            clear_cache: false,
         };
 
         assert_eq!(request.fields.len(), 2);
