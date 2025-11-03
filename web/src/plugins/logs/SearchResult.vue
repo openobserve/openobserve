@@ -238,7 +238,7 @@ color="warning" size="xs"></q-icon> Error while
       </div>
 
       <!-- Logs View -->
-      <div v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
+      <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
         <tenstack-table
           ref="searchTableRef"
           :columns="getColumns || []"
@@ -276,7 +276,7 @@ color="warning" size="xs"></q-icon> Error while
           @send-to-ai-chat="sendToAiChat"
           @view-trace="redirectToTraces"
         />
-      </div>
+      </template>
 
       <!-- Patterns View -->
       <div
@@ -1410,7 +1410,9 @@ export default defineComponent({
       // Each match_all takes a single string
       const matchAllClauses = constants.map((constant) => {
         // Escape backslashes first, then single quotes in the constant
-        const escapedConstant = constant.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+        const escapedConstant = constant
+          .replace(/\\/g, "\\\\")
+          .replace(/'/g, "\\'");
         return `match_all('${escapedConstant}')`;
       });
 
@@ -1670,7 +1672,6 @@ export default defineComponent({
       resetPlotChart,
       columnSizes,
       selectedStreamFullTextSearchKeys,
-      activeTab,
       patternsColumns,
       selectedPattern,
       showPatternDetails,
