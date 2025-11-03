@@ -1185,16 +1185,16 @@ pub async fn search_multi_stream(
     {
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
-                return MetaHttpResponse::error(
-                    actix_web::http::StatusCode::FORBIDDEN,
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
                     format!("org {org_id} has expired its trial period"),
-                );
+                )));
             }
             Err(e) => {
-                return MetaHttpResponse::error(
-                    actix_web::http::StatusCode::FORBIDDEN,
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
                     e.to_string(),
-                );
+                )));
             }
             _ => {}
         }
