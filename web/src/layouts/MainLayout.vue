@@ -131,6 +131,7 @@ class="warning" />{{
             </div>
           </q-btn>
           <q-btn
+            v-if="showThemes"
             round
             flat
             dense
@@ -147,6 +148,7 @@ class="warning" />{{
             </q-tooltip>
           </q-btn>
           <q-btn
+            v-if="showThemes"
             round
             flat
             dense
@@ -736,6 +738,7 @@ export default defineComponent({
     const aiChatInputContext = ref("");
     const rowsPerPage = ref(10);
     const searchQuery = ref("");
+    const showThemes = ref(localStorage.getItem('show_themes') === 'true');
 
     const filteredOrganizations = computed(() => {
       //we will return all organizations if searchQuery is empty
@@ -1507,6 +1510,7 @@ export default defineComponent({
       openPredefinedThemes,
       isThemeCustomizerOpen,
       isPredefinedThemesOpen,
+      showThemes,
     };
   },
   computed: {
