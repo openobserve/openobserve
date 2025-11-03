@@ -77,9 +77,11 @@
           <q-tr :props="props">
 
           <!-- render the body of the columns -->
-          <q-td v-for="col in columns" :key="col.name " :props="props">
+          <q-td v-for="col in columns" :key="col.name " :props="props" :style="col.style">
             <template v-if="col.name  !== 'actions'">
-              {{ props.row[col.field] }}
+              <div class="o2-table-cell-content">
+                {{ props.row[col.field] }}
+              </div>
             </template>
             <template v-else>
               <div class="tw-flex tw-items-center tw-gap-1 tw-justify-center">
@@ -219,6 +221,7 @@
           field: "pattern",
           label: t("regex_patterns.pattern"),
           align: "left",
+          style: "max-width: 400px; overflow: hidden;",
         },
         {
           name: "created_at",
@@ -484,5 +487,11 @@
 </script>
 
 <style lang="scss">
-
+.o2-table-cell-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  display: block;
+}
 </style>
