@@ -1508,7 +1508,7 @@ fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::
 /// %{User-Agent}i - User-Agent header
 fn get_http_access_log_format() -> String {
     let log_format = get_config().http.access_log_format.to_string();
-    if log_format.is_empty() {
+    if log_format.is_empty() || log_format.to_lowercase() == "common" {
         r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#.to_string()
     } else if log_format.to_lowercase() == "json" {
         r#"{ "remote_ip": "%a", "request": "%r", "status": %s, "response_size": %b, "request_size": "%{Content-Length}i", "referer": "%{Referer}i", "user_agent": "%{User-Agent}i", "response_time_secs": %T }"#
