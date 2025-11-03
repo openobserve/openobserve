@@ -122,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             flat
             dense
+            :disable="searchRequestTraceIds.length > 0"
             :label="t('panel.apply')"
             @click="() => runQuery(false)"
           />
