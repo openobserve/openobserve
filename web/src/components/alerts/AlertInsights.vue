@@ -568,12 +568,25 @@ const handleNativeContextMenu = (event: MouseEvent) => {
 const handleChartContextMenu = (event: any) => {
   const { x, y, value, panelId, panel } = event;
 
-  contextMenu.show = true;
-  contextMenu.x = x;
-  contextMenu.y = y;
-  contextMenu.value = value;
-  contextMenu.panelId = panelId;
-  contextMenu.panelTitle = panel?.title || "";
+  // Only show context menu for alert name panels
+  const alertNamePanels = [
+    "Panel_Alert_Frequency",
+    "Panel_Dedup_Impact",
+    "Panel_Alert_Correlation",
+    "Panel_Alert_Effectiveness",
+    "Panel_Retry_Analysis",
+    "Panel_Execution_Duration",
+  ];
+
+  // Only show context menu if it's an alert name panel with a string value
+  if (typeof value === "string" && alertNamePanels.includes(panelId)) {
+    contextMenu.show = true;
+    contextMenu.x = x;
+    contextMenu.y = y;
+    contextMenu.value = value;
+    contextMenu.panelId = panelId;
+    contextMenu.panelTitle = panel?.title || "";
+  }
 };
 
 const handleContextMenuFilter = (filter: any) => {

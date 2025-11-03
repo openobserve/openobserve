@@ -87,7 +87,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT (COUNT(CASE WHEN status='completed' THEN 1 END) * 100.0 / COUNT(*)) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL]",
+              "query": "SELECT (COUNT(CASE WHEN status='completed' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL]",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -120,8 +120,8 @@
           "description": "Average alert execution duration",
           "config": {
             "show_legends": false,
-            "unit": "microseconds",
-            "decimals": 0,
+            "unit": "minutes",
+            "decimals": 2,
             "base_map": {
               "type": "osm"
             },
@@ -135,7 +135,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT AVG(end_time - start_time) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL]",
+              "query": "SELECT AVG(end_time - start_time) / 60000000.0 as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL]",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -164,8 +164,8 @@
         {
           "id": "Panel_Failed_Count",
           "type": "metric",
-          "title": "Errored Triggers",
-          "description": "Number of trigger executions that encountered errors",
+          "title": "Errored Evaluations",
+          "description": "Number of alert evaluations that encountered errors",
           "config": {
             "show_legends": false,
             "unit": "custom",
@@ -212,8 +212,8 @@
         {
           "id": "Panel_Alert_Volume",
           "type": "bar",
-          "title": "Trigger Volume Over Time",
-          "description": "Total triggers executed over time - Click and drag to zoom, right-click to filter",
+          "title": "Total Evaluations Over Time",
+          "description": "Total alert evaluations over time - Click and drag to zoom",
           "config": {
             "show_legends": false,
             "unit": "custom",
@@ -236,7 +236,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "WITH trigger_metrics AS ( SELECT _timestamp, key, status, (end_time - start_time) as duration, retries, CASE WHEN is_silenced THEN 1 ELSE 0 END as silenced_count, CASE WHEN status='completed' THEN 1 ELSE 0 END as firing_count, CASE WHEN status='failed' THEN 1 ELSE 0 END as errored_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] ) SELECT histogram(_timestamp) as time_bucket, COUNT(*) as total_triggers, SUM(firing_count) as firing_triggers, SUM(errored_count) as errored_triggers, AVG(duration) as avg_duration, SUM(retries) as total_retries FROM trigger_metrics GROUP BY time_bucket ORDER BY time_bucket ASC",
+              "query": "WITH trigger_metrics AS ( SELECT _timestamp, key, status, (end_time - start_time) as duration, retries, CASE WHEN is_silenced THEN 1 ELSE 0 END as silenced_count, CASE WHEN status='completed' THEN 1 ELSE 0 END as firing_count, CASE WHEN status='failed' THEN 1 ELSE 0 END as errored_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] ) SELECT histogram(_timestamp) as time_bucket, COUNT(*) as total_evaluations, SUM(firing_count) as firing_triggers, SUM(errored_count) as errored_triggers, AVG(duration) as avg_duration, SUM(retries) as total_retries FROM trigger_metrics GROUP BY time_bucket ORDER BY time_bucket ASC",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -252,9 +252,9 @@
                 ],
                 "y": [
                   {
-                    "label": "",
-                    "alias": "total_triggers",
-                    "column": "total_triggers",
+                    "label": "Total Evaluations",
+                    "alias": "total_evaluations",
+                    "column": "total_evaluations",
                     "color": "#5960b2",
                     "isDerived": true
                   }
@@ -297,7 +297,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "WITH trigger_metrics AS ( SELECT _timestamp, CASE WHEN status='completed' THEN 1 ELSE 0 END as firing_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] ) SELECT histogram(_timestamp) as time_bucket, (SUM(firing_count) * 100.0 / COUNT(*)) as firing_rate FROM trigger_metrics GROUP BY time_bucket ORDER BY time_bucket ASC",
+              "query": "WITH trigger_metrics AS ( SELECT _timestamp, CASE WHEN status='completed' THEN 1 ELSE 0 END as firing_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] ) SELECT histogram(_timestamp) as time_bucket, (SUM(firing_count) * 100.0 / NULLIF(COUNT(*), 0)) as firing_rate FROM trigger_metrics GROUP BY time_bucket ORDER BY time_bucket ASC",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -335,8 +335,8 @@
         {
           "id": "Panel_Status_Distribution",
           "type": "pie",
-          "title": "Trigger Status Distribution",
-          "description": "Breakdown of trigger execution statuses",
+          "title": "Evaluation Status Distribution",
+          "description": "Breakdown of alert evaluation statuses",
           "config": {
             "show_legends": true,
             "legends_position": "right",
@@ -385,8 +385,8 @@
         {
           "id": "Panel_Alert_Frequency",
           "type": "bar",
-          "title": "Alert Frequency (Dedup Candidates)",
-          "description": "Right-click to set frequency threshold filter",
+          "title": "Alert Firing Frequency (Dedup Candidates)",
+          "description": "Number of times each alert fired - candidates for deduplication",
           "config": {
             "show_legends": false,
             "unit": "custom",
@@ -404,7 +404,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", COUNT(*) as fire_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY fire_count DESC LIMIT 30",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", COUNT(*) as firing_count FROM \"triggers\" WHERE module = 'alert' AND status='completed' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY firing_count DESC LIMIT 30",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -418,9 +418,9 @@
                 ],
                 "y": [
                   {
-                    "label": "Fire Count",
-                    "alias": "fire_count",
-                    "column": "fire_count",
+                    "label": "Firing Count",
+                    "alias": "firing_count",
+                    "column": "firing_count",
                     "color": "#ff6b6b"
                   }
                 ],
@@ -449,7 +449,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT SPLIT_PART(key, '/', 1) as key, COUNT(*) as total_fires, COUNT(*) / 24.0 as fires_per_hour, ROUND(COUNT(*) * 0.95) as potential_dedup_savings, ROUND((COUNT(*) * 0.95) * 100.0 / COUNT(*), 1) as savings_percent FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) HAVING fires_per_hour >= 5 ORDER BY total_fires DESC LIMIT 20",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as key, COUNT(*) as total_firings, COUNT(*) / 24.0 as firings_per_hour, ROUND(COUNT(*) * 0.95) as potential_dedup_savings, ROUND((COUNT(*) * 0.95) * 100.0 / NULLIF(COUNT(*), 0), 1) as savings_percent FROM \"triggers\" WHERE module = 'alert' AND status='completed' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) HAVING firings_per_hour >= 5 ORDER BY total_firings DESC LIMIT 20",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -465,16 +465,16 @@
                 ],
                 "y": [
                   {
-                    "label": "Total Fires",
-                    "alias": "total_fires",
-                    "column": "total_fires",
+                    "label": "Total Firings",
+                    "alias": "total_firings",
+                    "column": "total_firings",
                     "color": null,
                     "isDerived": true
                   },
                   {
-                    "label": "Fires Per Hour",
-                    "alias": "fires_per_hour",
-                    "column": "fires_per_hour",
+                    "label": "Firings Per Hour",
+                    "alias": "firings_per_hour",
+                    "column": "firings_per_hour",
                     "color": null,
                     "isDerived": true
                   },
@@ -696,7 +696,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT SPLIT_PART(key, '/', 1) as key, COUNT(*) as total_fires, COUNT(CASE WHEN status='completed' THEN 1 END) as successful, COUNT(CASE WHEN status='failed' THEN 1 END) as failed, COUNT(CASE WHEN is_silenced=true THEN 1 END) as silenced, ROUND((COUNT(CASE WHEN status='completed' THEN 1 END) * 100.0 / COUNT(*)), 1) as success_rate, ROUND(AVG(end_time - start_time)) as avg_duration_us FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY total_fires DESC LIMIT 30",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as key, COUNT(*) as total_evaluations, COUNT(CASE WHEN status='completed' THEN 1 END) as firing, COUNT(CASE WHEN status='condition_not_satisfied' THEN 1 END) as resolved, COUNT(CASE WHEN status='failed' THEN 1 END) as errored, COUNT(CASE WHEN is_silenced=true THEN 1 END) as silenced, ROUND((COUNT(CASE WHEN status='completed' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)), 1) as firing_rate, ROUND(AVG(end_time - start_time) / 60000000.0, 3) as avg_duration_min FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY total_evaluations DESC LIMIT 30",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -712,23 +712,30 @@
                 ],
                 "y": [
                   {
-                    "label": "Total Fires",
-                    "alias": "total_fires",
-                    "column": "total_fires",
+                    "label": "Total Evaluations",
+                    "alias": "total_evaluations",
+                    "column": "total_evaluations",
                     "color": null,
                     "isDerived": true
                   },
                   {
-                    "label": "Successful",
-                    "alias": "successful",
-                    "column": "successful",
+                    "label": "Firing",
+                    "alias": "firing",
+                    "column": "firing",
                     "color": null,
                     "isDerived": true
                   },
                   {
-                    "label": "Failed",
-                    "alias": "failed",
-                    "column": "failed",
+                    "label": "Resolved",
+                    "alias": "resolved",
+                    "column": "resolved",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Errored",
+                    "alias": "errored",
+                    "column": "errored",
                     "color": null,
                     "isDerived": true
                   },
@@ -740,16 +747,16 @@
                     "isDerived": true
                   },
                   {
-                    "label": "Success Rate %",
-                    "alias": "success_rate",
-                    "column": "success_rate",
+                    "label": "Firing Rate %",
+                    "alias": "firing_rate",
+                    "column": "firing_rate",
                     "color": null,
                     "isDerived": true
                   },
                   {
-                    "label": "Avg Duration (\u03bcs)",
-                    "alias": "avg_duration_us",
-                    "column": "avg_duration_us",
+                    "label": "Avg Duration (min)",
+                    "alias": "avg_duration_min",
+                    "column": "avg_duration_min",
                     "color": null,
                     "isDerived": true
                   }
@@ -819,14 +826,14 @@
           "description": "Alerts with highest execution time",
           "config": {
             "show_legends": false,
-            "unit": "microseconds",
-            "decimals": 0,
+            "unit": "minutes",
+            "decimals": 3,
             "enable_annotations": false
           },
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", AVG(end_time - start_time) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY y_axis_1 DESC LIMIT 20",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", AVG(end_time - start_time) / 60000000.0 as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY y_axis_1 DESC LIMIT 20",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",

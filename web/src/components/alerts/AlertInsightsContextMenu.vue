@@ -55,41 +55,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>View Alert History</span>
         </div>
       </div>
-    </template>
-
-    <!-- Filter Options (shown for other panels) -->
-    <template v-else>
+      <q-separator />
       <div class="menu-section">
         <div
           class="menu-item"
-          @click="selectFilter('>=')"
-          data-test="context-menu-gte"
+          @click="$emit('close')"
+          data-test="context-menu-cancel"
         >
-          <q-icon name="trending_up" size="18px" class="q-mr-sm" />
-          <span>Filter >= {{ formattedValue }}</span>
-        </div>
-        <div
-          class="menu-item"
-          @click="selectFilter('<=')"
-          data-test="context-menu-lte"
-        >
-          <q-icon name="trending_down" size="18px" class="q-mr-sm" />
-          <span>Filter <= {{ formattedValue }}</span>
+          <q-icon name="close" size="18px" class="q-mr-sm" />
+          <span>Cancel</span>
         </div>
       </div>
     </template>
-
-    <q-separator />
-    <div class="menu-section">
-      <div
-        class="menu-item"
-        @click="$emit('close')"
-        data-test="context-menu-cancel"
-      >
-        <q-icon name="close" size="18px" class="q-mr-sm" />
-        <span>Cancel</span>
-      </div>
-    </div>
   </div>
 </template>
 

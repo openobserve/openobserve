@@ -2230,6 +2230,7 @@ export default defineComponent({
       t,
       q,
       store,
+      config,
       dateChangeValue,
       isCloud,
       indexData,
