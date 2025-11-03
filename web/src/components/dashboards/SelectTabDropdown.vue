@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-center items-baseline">
+  <div class="flex justify-center items-start">
     <!-- select new tab -->
     <q-select
       v-model="selectedTab"
@@ -26,10 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       behavior="menu"
       borderless
       dense
-      class="q-mb-xs showLabelOnTop"
-      style="width: calc(100% - 40px)"
+      class="q-mb-xs showLabelOnTop o2-custom-select-dashboard"
+      style="width: calc(100% - 44px)"
       :loading="getTabList.isLoading.value"
-     hide-bottom-space>
+      hide-bottom-space
+    >
       <template #no-option>
         <q-item>
           <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -38,18 +39,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-select>
 
     <q-btn
-      class="q-mb-md text-bold"
+      class="q-mb-md add-folder-btn q-ml-xs"
       data-test="dashboard-tab-new-add"
-      label="+"
-      text-color="light-text"
-      style="width: 40px; height: 42px"
+      style="width: 40px"
+      :style="computedStyle"
       no-caps
+      dense
       @click="
         () => {
           showAddTabDialog = true;
         }
       "
-    />
+    >
+      <q-icon name="add" size="xs" />
+    </q-btn>
   </div>
   <!-- add/edit tab -->
   <q-dialog
@@ -69,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch } from "vue";
+import { defineComponent, onActivated, ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddTab from "../../components/dashboards/tabs/AddTab.vue";
@@ -102,6 +105,10 @@ export default defineComponent({
     const showAddTabDialog: any = ref(false);
     const tabList: any = ref([]);
 
+    const computedStyle = computed(() => {
+      return "height: 35px; margin-top: 13px";
+    });
+
     //dropdown selected folder index
     const selectedTab: any = ref(null);
     const { t } = useI18n();
@@ -123,7 +130,7 @@ export default defineComponent({
       const dashboardData = await getDashboard(
         store,
         props.dashboardId,
-        props.folderId
+        props.folderId,
       );
 
       tabList.value = dashboardData?.tabs?.map((tab: any) => ({
@@ -157,14 +164,14 @@ export default defineComponent({
       () => [props?.dashboardId],
       () => {
         getTabList.execute();
-      }
+      },
     );
 
     watch(
       () => selectedTab.value,
       () => {
         emit("tab-selected", selectedTab?.value);
-      }
+      },
     );
 
     return {
@@ -175,6 +182,7 @@ export default defineComponent({
       showAddTabDialog,
       tabList,
       getTabList,
+      computedStyle,
     };
   },
 });
