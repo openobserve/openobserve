@@ -180,16 +180,6 @@ Pipeline
 Function
 ![Function](./screenshots/function.png)
 
-
-### IAM
-
-SSO (Single Sign On)
-![SSO](./screenshots/sso.png)
-
-RBAC (Role Based Access Control)
-![RBAC](./screenshots/iam_rbac.png)
-
-
 ### SBOM
 
 Software Bill of Materials for OpenObserve

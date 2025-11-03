@@ -15,803 +15,805 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="add-report-section" class="full-width create-report-page">
-    <div class="row items-center no-wrap q-mx-md q-my-sm">
-      <div class="flex items-center">
-        <div
-          data-test="add-report-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
-          title="Go Back"
-          @click="router.back()"
-        >
-          <q-icon name="arrow_back_ios_new" size="14px" />
-        </div>
-        <div
-          v-if="isEditingReport"
-          class="text-h6"
-          data-test="add-report-title"
-        >
-          {{ t("reports.update") }}
-        </div>
-        <div v-else class="text-h6" data-test="add-report-title">
-          {{ t("reports.add") }}
+  <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+    <div data-test="add-report-section" class="full-width create-report-page">
+      <div class="row items-center no-wrap card-container tw-py-[0.675rem] tw-h-[64px] tw-px-[0.675rem] tw-mb-[0.675rem] ">
+        <div class="flex items-center">
+          <div
+            data-test="add-report-back-btn"
+            class="flex justify-center items-center q-mr-md cursor-pointer"
+            style="
+              border: 1.5px solid;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+            "
+            title="Go Back"
+            @click="router.back()"
+          >
+            <q-icon name="arrow_back_ios_new" size="14px" />
+          </div>
+          <div
+            v-if="isEditingReport"
+            class="text-h6"
+            data-test="add-report-title"
+          >
+            {{ t("reports.update") }}
+          </div>
+          <div v-else class="text-h6" data-test="add-report-title">
+            {{ t("reports.add") }}
+          </div>
         </div>
       </div>
-    </div>
-    <q-separator />
-    <div class="flex" style="height: calc(100vh - 152px); overflow: auto">
-      <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="width: 1024px">
-        <q-form
-          class="create-report-form"
-          ref="addReportFormRef"
-          @submit="onSubmit"
-        >
-          <div
-            data-test="add-report-name-input"
-            class="report-name-input o2-input q-px-sm"
-            style="padding-top: 12px"
+      <div class="flex card-container tw-mb-[0.675rem]" style="height: calc(100vh - 192px); overflow: auto">
+        <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="width: 1024px">
+          <q-form
+            class="create-report-form"
+            ref="addReportFormRef"
+            @submit="onSubmit"
           >
-            <q-input
-              v-model.trim="formData.name"
-              :label="t('alerts.name') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              v-bind:readonly="isEditingReport"
-              v-bind:disable="isEditingReport"
-              :rules="[
-                (val: any) =>
-                  !!val
-                    ? isValidResourceName(val) ||
-                      `Characters like :, ?, /, #, and spaces are not allowed.`
-                    : t('common.nameRequired'),
-              ]"
-              tabindex="0"
-              style="width: 400px"
+            <div
+              data-test="add-report-name-input"
+              class="report-name-input o2-input q-px-sm"
+              style="padding-top: 12px"
             >
-              <template v-slot:hint>
-                Characters like :, ?, /, #, and spaces are not allowed.
-              </template>
-            </q-input>
-          </div>
-          <div
-            data-test="add-report-description-input"
-            class="report-name-input o2-input q-px-sm"
-          >
-            <q-input
-              v-model="formData.description"
-              :label="t('reports.description')"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              tabindex="0"
-              style="width: 600px"
-            />
-          </div>
+              <q-input
+                v-model.trim="formData.name"
+                :label="t('alerts.name') + ' *'"
+                color="input-border"
+                bg-color="input-bg"
+                class="showLabelOnTop"
+                stack-label
+                outlined
+                filled
+                dense
+                v-bind:readonly="isEditingReport"
+                v-bind:disable="isEditingReport"
+                :rules="[
+                  (val: any) =>
+                    !!val
+                      ? isValidResourceName(val) ||
+                        `Characters like :, ?, /, #, and spaces are not allowed.`
+                      : t('common.nameRequired'),
+                ]"
+                tabindex="0"
+                style="width: 400px"
+              >
+                <template v-slot:hint>
+                  Characters like :, ?, /, #, and spaces are not allowed.
+                </template>
+              </q-input>
+            </div>
+            <div
+              data-test="add-report-description-input"
+              class="report-name-input o2-input q-px-sm"
+            >
+              <q-input
+                v-model="formData.description"
+                :label="t('reports.description')"
+                color="input-border"
+                bg-color="input-bg"
+                class="showLabelOnTop"
+                stack-label
+                outlined
+                filled
+                dense
+                tabindex="0"
+                style="width: 600px"
+              />
+            </div>
 
-          <div class="tw-flex tw-items-center tw-pt-4">
-            <q-toggle
-              data-test="report-cached-toggle-btn"
-              v-model="isCachedReport"
-              :label="t('reports.cachedReport')"
-            />
-            <q-icon
-              name="info_outline"
-              class="cursor-pointer q-ml-sm"
-              size="16px"
-            >
-              <q-tooltip
-                v-model="showInfoTooltip"
-                anchor="center end"
-                self="center left"
-                class="tw-text-[12px]"
+            <div class="tw-flex tw-items-center tw-pt-4">
+              <q-toggle
+                data-test="report-cached-toggle-btn"
+                v-model="isCachedReport"
+                size="lg"
+                class="q-pl-0 o2-toggle-button-lg tw-h-[36px] tw-ml-1"
+                :label="t('reports.cachedReport')"
+              />
+              <q-icon
+                name="info_outline"
+                class="cursor-pointer q-ml-sm"
+                size="16px"
               >
-                Note: Cached reports are stored for quick access to dashboards;
-                sharing is disabled for these reports.</q-tooltip
-              >
-            </q-icon>
-          </div>
+                <q-tooltip
+                  v-model="showInfoTooltip"
+                  anchor="center end"
+                  self="center left"
+                  class="tw-text-[12px]"
+                >
+                  Note: Cached reports are stored for quick access to dashboards;
+                  sharing is disabled for these reports.</q-tooltip
+                >
+              </q-icon>
+            </div>
 
-          <q-stepper
-            v-model="step"
-            vertical
-            color="primary"
-            animated
-            class="q-mt-md"
-            header-nav
-          >
-            <q-step
-              data-test="add-report-select-dashboard-step"
-              :name="1"
-              title="Select Dashboard"
-              :icon="outlinedDashboard"
-              :done="step > 1"
+            <q-stepper
+              v-model="step"
+              vertical
+              color="primary"
+              animated
+              class="q-mt-md"
+              header-nav
             >
-              <template
-                v-for="(dashboard, index) in formData.dashboards"
-                :key="dashboard.folder + dashboard.dashboard"
+              <q-step
+                data-test="add-report-select-dashboard-step"
+                :name="1"
+                title="Select Dashboard"
+                :icon="outlinedDashboard"
+                :done="step > 1"
               >
-                <div
-                  :data-test="`add-report-dashboard-${index}`"
-                  class="q-my-sm q-px-sm flex items-center justify-start"
+                <template
+                  v-for="(dashboard, index) in formData.dashboards"
+                  :key="dashboard.folder + dashboard.dashboard"
                 >
                   <div
-                    data-test="add-report-folder-select"
-                    class="o2-input q-mr-sm"
-                    style="padding-top: 0; width: 30%"
+                    :data-test="`add-report-dashboard-${index}`"
+                    class="q-my-sm q-px-sm flex items-center justify-start"
                   >
-                    <q-select
-                      v-model="dashboard.folder"
-                      :options="folderOptions"
-                      :label="t('reports.dashboardFolder') + ' *'"
-                      :loading="isFetchingFolders"
-                      :popup-content-style="{ textTransform: 'none' }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="q-py-sm showLabelOnTop no-case"
-                      filled
-                      stack-label
-                      map-options
-                      dense
-                      emit-value
-                      use-input
-                      hide-selected
-                      fill-input
-                      :input-debounce="400"
-                      input-style="text-transform: none;"
-                      @update:model-value="onFolderSelection(dashboard.folder)"
-                      @filter="
-                        (...args: any) =>
-                          onFilterOptions('folders', args[0], args[1])
-                      "
-                      behavior="menu"
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                      style="
-                        min-width: 250px !important;
-                        width: 100% !important;
-                      "
-                    />
+                    <div
+                      data-test="add-report-folder-select"
+                      class="o2-input q-mr-sm"
+                      style="padding-top: 0; width: 30%"
+                    >
+                      <q-select
+                        v-model="dashboard.folder"
+                        :options="folderOptions"
+                        :label="t('reports.dashboardFolder') + ' *'"
+                        :loading="isFetchingFolders"
+                        :popup-content-style="{ textTransform: 'none' }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        filled
+                        stack-label
+                        map-options
+                        dense
+                        emit-value
+                        use-input
+                        hide-selected
+                        fill-input
+                        :input-debounce="400"
+                        input-style="text-transform: none;"
+                        @update:model-value="onFolderSelection(dashboard.folder)"
+                        @filter="
+                          (...args: any) =>
+                            onFilterOptions('folders', args[0], args[1])
+                        "
+                        behavior="menu"
+                        :rules="[(val: any) => !!val || 'Field is required!']"
+                        style="
+                          min-width: 250px !important;
+                          width: 100% !important;
+                        "
+                      />
+                    </div>
+                    <div
+                      data-test="add-report-dashboard-select"
+                      class="o2-input q-mr-sm"
+                      style="padding-top: 0; width: 30%"
+                    >
+                      <q-select
+                        v-model="dashboard.dashboard"
+                        :options="dashboardOptions"
+                        :label="t('reports.dashboard') + ' *'"
+                        :loading="isFetchingDashboard || isFetchingFolders"
+                        :popup-content-style="{ textTransform: 'none' }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        filled
+                        emit-value
+                        map-options
+                        stack-label
+                        dense
+                        use-input
+                        hide-selected
+                        fill-input
+                        input-style="text-transform: none;"
+                        :input-debounce="400"
+                        @update:model-value="
+                          onDashboardSelection(dashboard.dashboard)
+                        "
+                        @filter="
+                          (...args: any) =>
+                            onFilterOptions('dashboards', args[0], args[1])
+                        "
+                        behavior="menu"
+                        :rules="[(val: any) => !!val || 'Field is required!']"
+                        style="
+                          min-width: 250px !important;
+                          width: 100% !important;
+                        "
+                      />
+                    </div>
+                    <div
+                      data-test="add-report-tab-select"
+                      class="o2-input"
+                      style="padding-top: 0; width: 30%"
+                    >
+                      <q-select
+                        v-model="dashboard.tabs"
+                        :options="dashboardTabOptions"
+                        :label="t('reports.dashboardTab') + ' *'"
+                        :loading="isFetchingDashboard || isFetchingFolders"
+                        :popup-content-style="{ textTransform: 'none' }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop"
+                        filled
+                        emit-value
+                        map-options
+                        stack-label
+                        dense
+                        use-input
+                        hide-selected
+                        fill-input
+                        input-style="text-transform: none;"
+                        :input-debounce="400"
+                        :rules="[
+                          (val: any) => !!val.length || 'Field is required!',
+                        ]"
+                        @filter="
+                          (...args: any) =>
+                            onFilterOptions('tabs', args[0], args[1])
+                        "
+                        style="
+                          min-width: 250px !important;
+                          width: 100% !important;
+                        "
+                      />
+                    </div>
+
+                    <div
+                      data-test="add-report-timerange-select"
+                      class="full-width q-mt-sm"
+                    >
+                      <div class="q-mb-sm">
+                        <div
+                          style="font-size: 14px"
+                          class="text-bold text-grey-8"
+                        >
+                          Time Range*
+                        </div>
+                        <div style="font-size: 12px">
+                          Generates report with the data from specified time range
+                        </div>
+                      </div>
+                      <DateTime
+                        auto-apply
+                        :default-type="dashboard.timerange.type"
+                        :default-absolute-time="{
+                          startTime: dashboard.timerange.from,
+                          endTime: dashboard.timerange.to,
+                        }"
+                        :default-relative-time="dashboard.timerange.period"
+                        data-test="add-report-timerange-dropdown"
+                        @on:date-change="updateDateTime"
+                      />
+                    </div>
+
+                    <div
+                      data-test="add-report-variable-select"
+                      class="full-width q-mt-md o2-input"
+                    >
+                      <VariablesInput
+                        :variables="dashboard.variables"
+                        @add:variable="addDashboardVariable"
+                        @remove:variable="removeDashboardVariable"
+                      />
+                    </div>
+                  </div>
+                </template>
+                <q-stepper-navigation>
+                  <q-btn
+                    data-test="add-report-step1-continue-btn"
+                    @click="step = 2"
+                    class="o2-primary-button tw-h-[36px]"
+                    :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                    flat
+                    no-caps
+                    :label="'Continue'"
+                  />
+                </q-stepper-navigation>
+              </q-step>
+
+              <q-step
+                data-test="add-report-select-schedule-step"
+                :name="2"
+                title="Schedule"
+                icon="schedule"
+                :done="step > 2"
+                class="q-mt-md"
+              >
+                <div class="q-my-sm q-px-sm">
+                  <!-- <div class="flex justify-start items-center q-py-sm">
+                <q-icon name="event" class="q-mr-sm" />
+                <div style="font-size: 14px">
+                  The report will be sent immediately after it is saved and will
+                  be sent every hour.
+                </div>
+              </div> -->
+                  <div
+                    style="font-size: 14px"
+                    class="text-bold text-grey-8 q-mb-sm"
+                  >
+                    Frequency
                   </div>
                   <div
-                    data-test="add-report-dashboard-select"
-                    class="o2-input q-mr-sm"
-                    style="padding-top: 0; width: 30%"
+                    style="
+                      border: 1px solid #d7d7d7;
+                      width: fit-content;
+                      border-radius: 2px;
+                    "
                   >
-                    <q-select
-                      v-model="dashboard.dashboard"
-                      :options="dashboardOptions"
-                      :label="t('reports.dashboard') + ' *'"
-                      :loading="isFetchingDashboard || isFetchingFolders"
-                      :popup-content-style="{ textTransform: 'none' }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="q-py-sm showLabelOnTop no-case"
-                      filled
-                      emit-value
-                      map-options
-                      stack-label
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      input-style="text-transform: none;"
-                      :input-debounce="400"
-                      @update:model-value="
-                        onDashboardSelection(dashboard.dashboard)
-                      "
-                      @filter="
-                        (...args: any) =>
-                          onFilterOptions('dashboards', args[0], args[1])
-                      "
-                      behavior="menu"
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                      style="
-                        min-width: 250px !important;
-                        width: 100% !important;
-                      "
-                    />
-                  </div>
-                  <div
-                    data-test="add-report-tab-select"
-                    class="o2-input"
-                    style="padding-top: 0; width: 30%"
-                  >
-                    <q-select
-                      v-model="dashboard.tabs"
-                      :options="dashboardTabOptions"
-                      :label="t('reports.dashboardTab') + ' *'"
-                      :loading="isFetchingDashboard || isFetchingFolders"
-                      :popup-content-style="{ textTransform: 'none' }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="q-py-sm showLabelOnTop"
-                      filled
-                      emit-value
-                      map-options
-                      stack-label
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      input-style="text-transform: none;"
-                      :input-debounce="400"
-                      :rules="[
-                        (val: any) => !!val.length || 'Field is required!',
-                      ]"
-                      @filter="
-                        (...args: any) =>
-                          onFilterOptions('tabs', args[0], args[1])
-                      "
-                      style="
-                        min-width: 250px !important;
-                        width: 100% !important;
-                      "
-                    />
+                    <template v-for="visual in frequencyTabs" :key="visual.value">
+                      <q-btn
+                        :data-test="`add-report-schedule-frequency-${visual.value}-btn`"
+                        :color="visual.value === frequency.type ? 'primary' : ''"
+                        :flat="visual.value === frequency.type ? false : true"
+                        dense
+                        no-caps
+                        size="12px"
+                        class="q-px-lg visual-selection-btn"
+                        style="padding-top: 4px; padding-bottom: 4px"
+                        @click="frequency.type = visual.value"
+                      >
+                        {{ visual.label }}</q-btn
+                      >
+                    </template>
                   </div>
 
-                  <div
-                    data-test="add-report-timerange-select"
-                    class="full-width q-mt-sm"
-                  >
-                    <div class="q-mb-sm">
+                  <template v-if="frequency.type === 'cron'">
+                    <div class="flex items-center justify-start q-mt-md">
                       <div
-                        style="font-size: 14px"
-                        class="text-bold text-grey-8"
+                        data-test="add-report-schedule-custom-interval-input"
+                        class="o2-input q-mr-sm"
+                        style="padding-top: 0; width: 320px"
                       >
-                        Time Range*
+                        <div class="q-mb-xs text-bold text-grey-8">
+                          {{ t("reports.cronExpression") + " *" }}
+                          <q-icon
+                            :name="outlinedInfo"
+                            size="17px"
+                            class="q-ml-xs cursor-pointer"
+                            :class="
+                              store.state.theme === 'dark'
+                                ? 'text-grey-5'
+                                : 'text-grey-7'
+                            "
+                          >
+                            <q-tooltip anchor="center right" self="center left">
+                              <span style="font-size: 14px">
+                                Pattern: * * * * * * means every second.
+                                <br />
+                                Format: [Second (optional) 0-59] [Minute 0-59]
+                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12]
+                                [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
+                                <br />
+                                Use '*' to represent any value, 'L' for the last
+                                day/weekday. <br />
+                                Example: 0 0 12 * * ? - Triggers at 12:00 PM
+                                daily. It specifies second, minute, hour, day of
+                                month, month, and day of week, respectively.</span
+                              >
+                            </q-tooltip>
+                          </q-icon>
+                        </div>
+                        <q-input
+                          filled
+                          v-model="frequency.cron"
+                          color="input-border"
+                          bg-color="input-bg"
+                          type="text"
+                          outlined
+                          :rules="[
+                            (val: any) =>
+                              !!val.length
+                                ? cronError.length
+                                  ? cronError
+                                  : true
+                                : 'Field is required!',
+                          ]"
+                          dense
+                          style="width: 100%"
+                          debounce="400"
+                          @update:model-value="validateFrequency"
+                        />
                       </div>
-                      <div style="font-size: 12px">
-                        Generates report with the data from specified time range
+                      <div class="o2-input">
+                        <q-select
+                          data-test="add-report-schedule-start-timezone-select"
+                          v-model="scheduling.timezone"
+                          :options="filteredTimezone"
+                          @blur="
+                            timezone =
+                              timezone == ''
+                                ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                                : timezone
+                          "
+                          use-input
+                          @filter="timezoneFilterFn"
+                          input-debounce="0"
+                          dense
+                          filled
+                          emit-value
+                          fill-input
+                          hide-selected
+                          :label="t('logStream.timezone') + ' *'"
+                          :display-value="`Timezone: ${timezone}`"
+                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          class="timezone-select showLabelOnTop"
+                          stack-label
+                          outlined
+                          style="width: 300px"
+                        />
                       </div>
                     </div>
-                    <DateTime
-                      auto-apply
-                      :default-type="dashboard.timerange.type"
-                      :default-absolute-time="{
-                        startTime: dashboard.timerange.from,
-                        endTime: dashboard.timerange.to,
-                      }"
-                      :default-relative-time="dashboard.timerange.period"
-                      data-test="add-report-timerange-dropdown"
-                      @on:date-change="updateDateTime"
-                    />
-                  </div>
+                  </template>
+                  <template v-else>
+                    <div class="q-mt-md tw-flex tw-justify-start tw-items-center">
+                      <div
+                        class="tw-flex tw-justify-center tw-align-center"
+                        style="
+                          border: 1px solid #d7d7d7;
+                          width: fit-content;
+                          border-radius: 2px;
+                        "
+                      >
+                        <template v-for="visual in timeTabs" :key="visual.value">
+                          <q-btn
+                            :data-test="`add-report-schedule-${visual.value}-btn`"
+                            :color="
+                              visual.value === selectedTimeTab ? 'primary' : ''
+                            "
+                            :flat="
+                              visual.value === selectedTimeTab ? false : true
+                            "
+                            dense
+                            no-caps
+                            size="12px"
+                            class="q-px-md visual-selection-btn"
+                            style="padding-top: 4px; padding-bottom: 4px"
+                            @click="selectedTimeTab = visual.value"
+                          >
+                            {{ visual.label }}</q-btn
+                          >
+                        </template>
+                      </div>
+                      <q-icon
+                        name="info_outline"
+                        class="cursor-pointer q-ml-sm"
+                        size="16px"
+                      >
+                        <q-tooltip
+                          anchor="center end"
+                          self="center left"
+                          class="tw-text-[12px]"
+                        >
+                          "Schedule Now" will schedule the report using the
+                          current date, time, and timezone.<br />
+                          In "Schedule Later" you can customize the date, time,
+                          and timezone.
+                        </q-tooltip>
+                      </q-icon>
+                    </div>
 
-                  <div
-                    data-test="add-report-variable-select"
-                    class="full-width q-mt-md o2-input"
-                  >
-                    <VariablesInput
-                      :variables="dashboard.variables"
-                      @add:variable="addDashboardVariable"
-                      @remove:variable="removeDashboardVariable"
-                    />
-                  </div>
-                </div>
-              </template>
-              <q-stepper-navigation>
-                <q-btn
-                  data-test="add-report-step1-continue-btn"
-                  @click="step = 2"
-                  class="o2-primary-button tw-h-[36px]"
-                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-                  flat
-                  no-caps
-                  :label="'Continue'"
-                />
-              </q-stepper-navigation>
-            </q-step>
+                    <div
+                      v-if="frequency.type === 'custom'"
+                      class="flex items-start justify-start q-mt-md"
+                    >
+                      <div
+                        data-test="add-report-schedule-custom-interval-input"
+                        class="o2-input q-mr-sm"
+                        style="padding-top: 0; width: 160px"
+                      >
+                        <q-input
+                          filled
+                          v-model="frequency.custom.interval"
+                          label="Repeat every *"
+                          color="input-border"
+                          bg-color="input-bg"
+                          class="showLabelOnTop"
+                          stack-label
+                          type="number"
+                          outlined
+                          dense
+                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          style="width: 100%"
+                        />
+                      </div>
 
-            <q-step
-              data-test="add-report-select-schedule-step"
-              :name="2"
-              title="Schedule"
-              icon="schedule"
-              :done="step > 2"
-              class="q-mt-md"
-            >
-              <div class="q-my-sm q-px-sm">
-                <!-- <div class="flex justify-start items-center q-py-sm">
-              <q-icon name="event" class="q-mr-sm" />
-              <div style="font-size: 14px">
-                The report will be sent immediately after it is saved and will
-                be sent every hour.
-              </div>
-            </div> -->
-                <div
-                  style="font-size: 14px"
-                  class="text-bold text-grey-8 q-mb-sm"
-                >
-                  Frequency
-                </div>
-                <div
-                  style="
-                    border: 1px solid #d7d7d7;
-                    width: fit-content;
-                    border-radius: 2px;
-                  "
-                >
-                  <template v-for="visual in frequencyTabs" :key="visual.value">
-                    <q-btn
-                      :data-test="`add-report-schedule-frequency-${visual.value}-btn`"
-                      :color="visual.value === frequency.type ? 'primary' : ''"
-                      :flat="visual.value === frequency.type ? false : true"
-                      dense
-                      no-caps
-                      size="12px"
-                      class="q-px-lg visual-selection-btn"
-                      style="padding-top: 4px; padding-bottom: 4px"
-                      @click="frequency.type = visual.value"
+                      <div
+                        data-test="add-report-schedule-custom-frequency-select"
+                        class="o2-input"
+                        style="padding-top: 0; width: 160px"
+                      >
+                        <q-select
+                          v-model="frequency.custom.period"
+                          :options="customFrequencyOptions"
+                          :label="'Frequency *'"
+                          :popup-content-style="{ textTransform: 'capitalize' }"
+                          color="input-border"
+                          bg-color="input-bg"
+                          class="q-pt-sm q-pb-none showLabelOnTop no-case"
+                          filled
+                          emit-value
+                          stack-label
+                          dense
+                          behavior="menu"
+                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          style="width: 100% !important"
+                        />
+                      </div>
+                    </div>
+
+                    <div
+                      data-test="add-report-schedule-send-later-section"
+                      v-if="selectedTimeTab === 'scheduleLater'"
+                      class="flex items-center justify-start q-mt-md"
                     >
-                      {{ visual.label }}</q-btn
-                    >
+                      <div
+                        data-test="add-report-schedule-start-date-input"
+                        class="o2-input q-mr-sm"
+                      >
+                        <q-input
+                          filled
+                          v-model="scheduling.date"
+                          label="Start Date *"
+                          color="input-border"
+                          bg-color="input-bg"
+                          class="showLabelOnTop"
+                          :rules="[
+                            (val: any) =>
+                              /^(0[1-9]|[12]\d|3[01])-(0[1-9]|1[0-2])-\d{4}$/.test(
+                                val,
+                              ) || 'Date format is incorrect!',
+                          ]"
+                          stack-label
+                          outlined
+                          dense
+                          style="width: 160px"
+                        >
+                          <template v-slot:append>
+                            <q-icon name="event" class="cursor-pointer">
+                              <q-popup-proxy
+                                cover
+                                transition-show="scale"
+                                transition-hide="scale"
+                              >
+                                <q-date
+                                  v-model="scheduling.date"
+                                  mask="DD-MM-YYYY"
+                                >
+                                  <div class="row items-center justify-end">
+                                    <q-btn
+                                      v-close-popup="true"
+                                      label="Close"
+                                      color="primary"
+                                      flat
+                                    />
+                                  </div>
+                                </q-date>
+                              </q-popup-proxy>
+                            </q-icon>
+                          </template>
+                        </q-input>
+                      </div>
+                      <div
+                        data-test="add-report-schedule-start-time-input"
+                        class="o2-input q-mr-sm"
+                      >
+                        <q-input
+                          filled
+                          v-model="scheduling.time"
+                          label="Start Time *"
+                          color="input-border"
+                          bg-color="input-bg"
+                          class="showLabelOnTop"
+                          mask="time"
+                          :rules="['time']"
+                          stack-label
+                          outlined
+                          dense
+                          style="width: 160px"
+                        >
+                          <template v-slot:append>
+                            <q-icon name="access_time" class="cursor-pointer">
+                              <q-popup-proxy
+                                cover
+                                transition-show="scale"
+                                transition-hide="scale"
+                              >
+                                <q-time v-model="scheduling.time">
+                                  <div class="row items-center justify-end">
+                                    <q-btn
+                                      v-close-popup="true"
+                                      label="Close"
+                                      color="primary"
+                                      flat
+                                    />
+                                  </div>
+                                </q-time>
+                              </q-popup-proxy>
+                            </q-icon>
+                          </template>
+                        </q-input>
+                      </div>
+                      <div class="o2-input">
+                        <q-select
+                          data-test="add-report-schedule-start-timezone-select"
+                          v-model="scheduling.timezone"
+                          :options="filteredTimezone"
+                          @blur="
+                            timezone =
+                              timezone == ''
+                                ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                                : timezone
+                          "
+                          use-input
+                          @filter="timezoneFilterFn"
+                          input-debounce="0"
+                          dense
+                          filled
+                          emit-value
+                          fill-input
+                          hide-selected
+                          :label="t('logStream.timezone') + ' *'"
+                          :display-value="`Timezone: ${timezone}`"
+                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          class="timezone-select showLabelOnTop"
+                          stack-label
+                          outlined
+                          style="width: 300px"
+                        />
+                      </div>
+                    </div>
                   </template>
                 </div>
 
-                <template v-if="frequency.type === 'cron'">
-                  <div class="flex items-center justify-start q-mt-md">
-                    <div
-                      data-test="add-report-schedule-custom-interval-input"
-                      class="o2-input q-mr-sm"
-                      style="padding-top: 0; width: 320px"
-                    >
-                      <div class="q-mb-xs text-bold text-grey-8">
-                        {{ t("reports.cronExpression") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
-                          size="17px"
-                          class="q-ml-xs cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
-                          "
-                        >
-                          <q-tooltip anchor="center right" self="center left">
-                            <span style="font-size: 14px">
-                              Pattern: * * * * * * means every second.
-                              <br />
-                              Format: [Second (optional) 0-59] [Minute 0-59]
-                              [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12]
-                              [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
-                              <br />
-                              Use '*' to represent any value, 'L' for the last
-                              day/weekday. <br />
-                              Example: 0 0 12 * * ? - Triggers at 12:00 PM
-                              daily. It specifies second, minute, hour, day of
-                              month, month, and day of week, respectively.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
-                      </div>
-                      <q-input
-                        filled
-                        v-model="frequency.cron"
-                        color="input-border"
-                        bg-color="input-bg"
-                        type="text"
-                        outlined
-                        :rules="[
-                          (val: any) =>
-                            !!val.length
-                              ? cronError.length
-                                ? cronError
-                                : true
-                              : 'Field is required!',
-                        ]"
-                        dense
-                        style="width: 100%"
-                        debounce="400"
-                        @update:model-value="validateFrequency"
-                      />
-                    </div>
-                    <div class="o2-input">
-                      <q-select
-                        data-test="add-report-schedule-start-timezone-select"
-                        v-model="scheduling.timezone"
-                        :options="filteredTimezone"
-                        @blur="
-                          timezone =
-                            timezone == ''
-                              ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                              : timezone
-                        "
-                        use-input
-                        @filter="timezoneFilterFn"
-                        input-debounce="0"
-                        dense
-                        filled
-                        emit-value
-                        fill-input
-                        hide-selected
-                        :label="t('logStream.timezone') + ' *'"
-                        :display-value="`Timezone: ${timezone}`"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        class="timezone-select showLabelOnTop"
-                        stack-label
-                        outlined
-                        style="width: 300px"
-                      />
-                    </div>
-                  </div>
-                </template>
-                <template v-else>
-                  <div class="q-mt-md tw-flex tw-justify-start tw-items-center">
-                    <div
-                      class="tw-flex tw-justify-center tw-align-center"
-                      style="
-                        border: 1px solid #d7d7d7;
-                        width: fit-content;
-                        border-radius: 2px;
-                      "
-                    >
-                      <template v-for="visual in timeTabs" :key="visual.value">
-                        <q-btn
-                          :data-test="`add-report-schedule-${visual.value}-btn`"
-                          :color="
-                            visual.value === selectedTimeTab ? 'primary' : ''
-                          "
-                          :flat="
-                            visual.value === selectedTimeTab ? false : true
-                          "
-                          dense
-                          no-caps
-                          size="12px"
-                          class="q-px-md visual-selection-btn"
-                          style="padding-top: 4px; padding-bottom: 4px"
-                          @click="selectedTimeTab = visual.value"
-                        >
-                          {{ visual.label }}</q-btn
-                        >
-                      </template>
-                    </div>
-                    <q-icon
-                      name="info_outline"
-                      class="cursor-pointer q-ml-sm"
-                      size="16px"
-                    >
-                      <q-tooltip
-                        anchor="center end"
-                        self="center left"
-                        class="tw-text-[12px]"
-                      >
-                        "Schedule Now" will schedule the report using the
-                        current date, time, and timezone.<br />
-                        In "Schedule Later" you can customize the date, time,
-                        and timezone.
-                      </q-tooltip>
-                    </q-icon>
-                  </div>
-
-                  <div
-                    v-if="frequency.type === 'custom'"
-                    class="flex items-start justify-start q-mt-md"
-                  >
-                    <div
-                      data-test="add-report-schedule-custom-interval-input"
-                      class="o2-input q-mr-sm"
-                      style="padding-top: 0; width: 160px"
-                    >
-                      <q-input
-                        filled
-                        v-model="frequency.custom.interval"
-                        label="Repeat every *"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="showLabelOnTop"
-                        stack-label
-                        type="number"
-                        outlined
-                        dense
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        style="width: 100%"
-                      />
-                    </div>
-
-                    <div
-                      data-test="add-report-schedule-custom-frequency-select"
-                      class="o2-input"
-                      style="padding-top: 0; width: 160px"
-                    >
-                      <q-select
-                        v-model="frequency.custom.period"
-                        :options="customFrequencyOptions"
-                        :label="'Frequency *'"
-                        :popup-content-style="{ textTransform: 'capitalize' }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="q-pt-sm q-pb-none showLabelOnTop no-case"
-                        filled
-                        emit-value
-                        stack-label
-                        dense
-                        behavior="menu"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        style="width: 100% !important"
-                      />
-                    </div>
-                  </div>
-
-                  <div
-                    data-test="add-report-schedule-send-later-section"
-                    v-if="selectedTimeTab === 'scheduleLater'"
-                    class="flex items-center justify-start q-mt-md"
-                  >
-                    <div
-                      data-test="add-report-schedule-start-date-input"
-                      class="o2-input q-mr-sm"
-                    >
-                      <q-input
-                        filled
-                        v-model="scheduling.date"
-                        label="Start Date *"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="showLabelOnTop"
-                        :rules="[
-                          (val: any) =>
-                            /^(0[1-9]|[12]\d|3[01])-(0[1-9]|1[0-2])-\d{4}$/.test(
-                              val,
-                            ) || 'Date format is incorrect!',
-                        ]"
-                        stack-label
-                        outlined
-                        dense
-                        style="width: 160px"
-                      >
-                        <template v-slot:append>
-                          <q-icon name="event" class="cursor-pointer">
-                            <q-popup-proxy
-                              cover
-                              transition-show="scale"
-                              transition-hide="scale"
-                            >
-                              <q-date
-                                v-model="scheduling.date"
-                                mask="DD-MM-YYYY"
-                              >
-                                <div class="row items-center justify-end">
-                                  <q-btn
-                                    v-close-popup="true"
-                                    label="Close"
-                                    color="primary"
-                                    flat
-                                  />
-                                </div>
-                              </q-date>
-                            </q-popup-proxy>
-                          </q-icon>
-                        </template>
-                      </q-input>
-                    </div>
-                    <div
-                      data-test="add-report-schedule-start-time-input"
-                      class="o2-input q-mr-sm"
-                    >
-                      <q-input
-                        filled
-                        v-model="scheduling.time"
-                        label="Start Time *"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="showLabelOnTop"
-                        mask="time"
-                        :rules="['time']"
-                        stack-label
-                        outlined
-                        dense
-                        style="width: 160px"
-                      >
-                        <template v-slot:append>
-                          <q-icon name="access_time" class="cursor-pointer">
-                            <q-popup-proxy
-                              cover
-                              transition-show="scale"
-                              transition-hide="scale"
-                            >
-                              <q-time v-model="scheduling.time">
-                                <div class="row items-center justify-end">
-                                  <q-btn
-                                    v-close-popup="true"
-                                    label="Close"
-                                    color="primary"
-                                    flat
-                                  />
-                                </div>
-                              </q-time>
-                            </q-popup-proxy>
-                          </q-icon>
-                        </template>
-                      </q-input>
-                    </div>
-                    <div class="o2-input">
-                      <q-select
-                        data-test="add-report-schedule-start-timezone-select"
-                        v-model="scheduling.timezone"
-                        :options="filteredTimezone"
-                        @blur="
-                          timezone =
-                            timezone == ''
-                              ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                              : timezone
-                        "
-                        use-input
-                        @filter="timezoneFilterFn"
-                        input-debounce="0"
-                        dense
-                        filled
-                        emit-value
-                        fill-input
-                        hide-selected
-                        :label="t('logStream.timezone') + ' *'"
-                        :display-value="`Timezone: ${timezone}`"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        class="timezone-select showLabelOnTop"
-                        stack-label
-                        outlined
-                        style="width: 300px"
-                      />
-                    </div>
-                  </div>
-                </template>
-              </div>
-
-              <q-stepper-navigation>
-                <q-btn
-                  data-test="add-report-step2-back-btn"
-                  flat
-                  @click="step = 1"
-                  class="o2-secondary-button tw-h-[36px] q-ml-sm"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  :label="'Back'"
-                  no-caps
-                />
-                <q-btn
-                  v-if="!isCachedReport"
-                  data-test="add-report-step2-continue-btn"
-                  @click="step = 3"
-                  class="o2-primary-button tw-h-[36px] q-ml-md"
-                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-                  flat
-                  no-caps
-                  :label="'Continue'"
-                />
-              </q-stepper-navigation>
-            </q-step>
-
-            <q-step
-              v-if="!isCachedReport"
-              data-test="add-report-share-step"
-              :name="3"
-              title="Share"
-              icon="mail"
-              :done="step > 3"
-              class="q-mt-md"
-            >
-              <div class="q-my-sm q-px-sm">
-                <div
-                  data-test="add-report-share-title-input"
-                  class="report-name-input o2-input"
-                >
-                  <q-input
-                    v-model="formData.title"
-                    :label="t('reports.title') + ' *'"
-                    color="input-border"
-                    bg-color="input-bg"
-                    class="showLabelOnTop"
-                    stack-label
-                    outlined
-                    filled
-                    dense
-                    :rules="[
-                      (val: any) => !!val.trim() || 'Field is required!',
-                    ]"
-                    tabindex="0"
-                    style="width: 400px"
+                <q-stepper-navigation>
+                  <q-btn
+                    data-test="add-report-step2-back-btn"
+                    flat
+                    @click="step = 1"
+                    class="o2-secondary-button tw-h-[36px] q-ml-sm"
+                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    :label="'Back'"
+                    no-caps
                   />
-                </div>
-
-                <div
-                  data-test="add-report-share-recipients-input"
-                  class="report-name-input o2-input"
-                >
-                  <q-input
-                    v-model="emails"
-                    :label="t('reports.recipients') + ' *'"
-                    color="input-border"
-                    bg-color="input-bg"
-                    class="showLabelOnTop"
-                    stack-label
-                    outlined
-                    filled
-                    dense
-                    :rules="[
-                      (val: any) =>
-                        /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
-                          val,
-                        ) || 'Add valid emails!',
-                    ]"
-                    tabindex="0"
-                    style="width: 100%"
-                    borderless
-                    :placeholder="t('user.inviteByEmail')"
+                  <q-btn
+                    v-if="!isCachedReport"
+                    data-test="add-report-step2-continue-btn"
+                    @click="step = 3"
+                    class="o2-primary-button tw-h-[36px] q-ml-md"
+                    :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                    flat
+                    no-caps
+                    :label="'Continue'"
                   />
-                </div>
-                <div data-test="add-report-share-message-section">
-                  <div style="font-size: 14px" class="text-bold text-grey-8">
-                    Message
-                  </div>
+                </q-stepper-navigation>
+              </q-step>
 
-                  <div data-test="add-report-share-message-input">
+              <q-step
+                v-if="!isCachedReport"
+                data-test="add-report-share-step"
+                :name="3"
+                title="Share"
+                icon="mail"
+                :done="step > 3"
+                class="q-mt-md"
+              >
+                <div class="q-my-sm q-px-sm">
+                  <div
+                    data-test="add-report-share-title-input"
+                    class="report-name-input o2-input"
+                  >
                     <q-input
-                      v-model="formData.message"
+                      v-model="formData.title"
+                      :label="t('reports.title') + ' *'"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="showLabelOnTop"
+                      stack-label
+                      outlined
                       filled
-                      type="textarea"
+                      dense
+                      :rules="[
+                        (val: any) => !!val.trim() || 'Field is required!',
+                      ]"
+                      tabindex="0"
+                      style="width: 400px"
                     />
                   </div>
+
+                  <div
+                    data-test="add-report-share-recipients-input"
+                    class="report-name-input o2-input"
+                  >
+                    <q-input
+                      v-model="emails"
+                      :label="t('reports.recipients') + ' *'"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="showLabelOnTop"
+                      stack-label
+                      outlined
+                      filled
+                      dense
+                      :rules="[
+                        (val: any) =>
+                          /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
+                            val,
+                          ) || 'Add valid emails!',
+                      ]"
+                      tabindex="0"
+                      style="width: 100%"
+                      borderless
+                      :placeholder="t('user.inviteByEmail')"
+                    />
+                  </div>
+                  <div data-test="add-report-share-message-section">
+                    <div style="font-size: 14px" class="text-bold text-grey-8">
+                      Message
+                    </div>
+
+                    <div data-test="add-report-share-message-input">
+                      <q-input
+                        v-model="formData.message"
+                        filled
+                        type="textarea"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <q-stepper-navigation>
-                <q-btn
-                  data-test="add-report-step3-back-btn"
-                  flat
-                  @click="step = 2"
-                  class="o2-secondary-button tw-h-[36px] q-ml-sm"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  :label="'Back'"
-                  no-caps
-                />
-              </q-stepper-navigation>
-            </q-step>
-          </q-stepper>
-        </q-form>
+                <q-stepper-navigation>
+                  <q-btn
+                    data-test="add-report-step3-back-btn"
+                    flat
+                    @click="step = 2"
+                    class="o2-secondary-button tw-h-[36px] q-ml-sm"
+                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    :label="'Back'"
+                    no-caps
+                  />
+                </q-stepper-navigation>
+              </q-step>
+            </q-stepper>
+          </q-form>
+        </div>
       </div>
+
     </div>
-    <div
-      class="flex justify-end q-px-md full-width tw-py-3"
-      style="position: sticky; bottom: 0px; z-index: 2"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-      :style="{
-        'box-shadow':
-          store.state.theme === 'dark'
-            ? 'rgb(45 45 45) 0px -4px 7px 0px'
-            : 'rgb(240 240 240) 0px -4px 7px 0px',
-      }"
-    >
-      <q-btn
-        data-test="add-report-cancel-btn"
-        class="q-mr-md o2-secondary-button tw-h-[36px]"
-        :label="t('alerts.cancel')"
-        no-caps
-        flat
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-        @click="openCancelDialog"
-      />
-      <q-btn
-        data-test="add-report-save-btn"
-        class="o2-primary-button no-border tw-h-[36px]"
-        :label="t('alerts.save')"
-        type="submit"
-        no-caps
-        flat
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        @click="saveReport"
-      />
-    </div>
+      <div
+        class="flex justify-end q-px-md full-width tw-py-3 card-container"
+        style="position: sticky; bottom: 0.375rem; z-index: 2"
+        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        :style="{
+          'box-shadow':
+            store.state.theme === 'dark'
+              ? 'rgb(45 45 45) 0px -4px 7px 0px'
+              : 'rgb(240 240 240) 0px -4px 7px 0px',
+        }"
+      >
+        <q-btn
+          data-test="add-report-cancel-btn"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
+          :label="t('alerts.cancel')"
+          no-caps
+          flat
+          @click="openCancelDialog"
+        />
+        <q-btn
+          data-test="add-report-save-btn"
+          class="o2-primary-button no-border tw-h-[36px]"
+          :label="t('alerts.save')"
+          type="submit"
+          no-caps
+          flat
+          @click="saveReport"
+        />
+      </div>
   </div>
   <ConfirmDialog
     v-model="dialog.show"

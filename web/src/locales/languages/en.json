@@ -83,7 +83,8 @@
     "favourite": "Favorite",
     "refresh": "Refresh",
     "contactUs": "Contact Us",
-    "addFolder": "Add Folder"
+    "addFolder": "Add Folder",
+    "status": "Status"
   },
   "search": {
     "resetFields": "Reset selected table fields",
@@ -555,7 +556,9 @@
     "edit": "Edit",
     "delete": "Delete",
     "view": "View",
-    "delay": "Delay"
+    "delay": "Delay",
+    "history": "Pipeline History",
+    "searchHistory": "Enter Pipeline Name"
   },
   "function": {
     "header": "Functions",
@@ -1135,7 +1138,8 @@
       "sendStrategyAll": "All",
       "groupWaitTime": "Group Wait Time (seconds)",
       "groupWaitTimeTooltip": "Time to wait and collect similar alerts before sending a grouped notification. Allows batching of alerts that occur in quick succession."
-    }
+    },
+    "noHistory": "No alert history found"
   },
   "alert_templates": {
     "header": "Templates",
@@ -1249,7 +1253,7 @@
     "allUsersAllowedMessage": "All users with email addresses ending in {domain} will be allowed to login.",
     "emailPlaceholder": "e.g. user{domain}",
     "addEmail": "Add Email",
-    "saveChanges": "Save Changes",
+    "saveChanges": "Save",
     "invalidDomain": "Please enter a valid domain name",
     "invalidEmail": "Please enter a valid email address for this domain",
     "domainAlreadyExists": "This domain has already been added",
@@ -1302,7 +1306,7 @@
     "status": "Status",
     "cancelQuery": "Cancel Query",
     "queryRange": "Query Range",
-    "refreshQuery": "Refresh Query",
+    "refreshQuery": "Refresh",
     "queryType": "Query Type",
     "numOfQueries": "Number of Queries",
     "totalDuration": "Total Exec. Duration",

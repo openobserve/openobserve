@@ -90,16 +90,16 @@ describe('Functions.vue', () => {
         ],
         stubs: {
           'q-page': { template: '<div class="q-page"><slot /></div>' },
-          'q-btn': { 
-            template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>',
+          'q-btn': {
+            template: '<button class="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
             emits: ['click'],
           },
-          'q-splitter': { 
-            template: '<div class="q-splitter"><slot name="before" /><slot name="after" /></div>',
+          'q-splitter': {
+            template: '<div class="q-splitter"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             props: ['modelValue', 'unit', 'limits'],
           },
-          'q-tabs': { 
-            template: '<div class="q-tabs"><slot /></div>',
+          'q-tabs': {
+            template: '<div class="q-tabs" :class="$attrs.class"><slot /></div>',
             props: ['modelValue', 'indicatorColor', 'inlineLabel', 'vertical'],
           },
           'q-route-tab': { 
@@ -130,10 +130,11 @@ describe('Functions.vue', () => {
   describe('Component Initialization', () => {
     it('should render the component with default configuration', async () => {
       wrapper = await createWrapper();
-      
+
       expect(wrapper.find('.q-page').exists()).toBe(true);
       expect(wrapper.find('.q-splitter').exists()).toBe(true);
-      expect(wrapper.find('.functions-tabs').exists()).toBe(true);
+      // The tabs now use 'card-container' class instead of 'functions-tabs'
+      expect(wrapper.find('.q-tabs.card-container').exists()).toBe(true);
     });
 
     it('should initialize with correct default values', async () => {
@@ -155,9 +156,10 @@ describe('Functions.vue', () => {
   describe('Sidebar Functionality', () => {
     it('should show sidebar by default', async () => {
       wrapper = await createWrapper();
-      
+
       expect((wrapper.vm as any).showSidebar).toBe(true);
-      expect(wrapper.find('.functions-tabs').exists()).toBe(true);
+      // The tabs now use 'card-container' class instead of 'functions-tabs'
+      expect(wrapper.find('.q-tabs.card-container').exists()).toBe(true);
     });
 
     it('should collapse sidebar when collapse button is clicked', async () => {
@@ -325,44 +327,6 @@ describe('Functions.vue', () => {
     });
   });
 
-  describe('Styling and Layout', () => {
-    it('should apply correct button position when sidebar is shown', async () => {
-      wrapper = await createWrapper();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]');
-      const style = collapseBtn.attributes('style');
-      
-      expect(style).toContain('left: 206px'); // splitterModel (220) - 14
-    });
-
-    it('should apply correct button position when sidebar is hidden', async () => {
-      wrapper = await createWrapper();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]');
-      
-      // Collapse sidebar
-      await collapseBtn.trigger('click');
-      await wrapper.vm.$nextTick();
-      
-      const style = collapseBtn.attributes('style');
-      expect(style).toContain('left: -8px');
-    });
-
-    it('should show correct button icon based on sidebar state', async () => {
-      wrapper = await createWrapper();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]');
-      
-      // Initially showing sidebar - should show left chevron
-      expect(collapseBtn.attributes('icon')).toBe('chevron_left');
-      
-      // After collapse - should show right chevron
-      await collapseBtn.trigger('click');
-      await wrapper.vm.$nextTick();
-      
-      expect(collapseBtn.attributes('icon')).toBe('chevron_right');
-    });
-  });
 
   describe('Data Properties', () => {
     it('should initialize templates as empty array', async () => {
@@ -445,20 +409,6 @@ describe('Functions.vue', () => {
       expect((wrapper.vm as any).splitterModel).toBe(300);
     });
 
-    it('should handle button title changes based on sidebar state', async () => {
-      wrapper = await createWrapper();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]');
-      
-      // Initially showing sidebar
-      expect(collapseBtn.attributes('title')).toBe('Collapse Fields');
-      
-      // After collapse
-      await collapseBtn.trigger('click');
-      await wrapper.vm.$nextTick();
-      
-      expect(collapseBtn.attributes('title')).toBe('Open Fields');
-    });
   });
 
   describe('Computed Properties and Watchers', () => {

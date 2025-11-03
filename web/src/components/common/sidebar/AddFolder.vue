@@ -46,8 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-py-none showLabelOnTop"
             data-test="dashboard-folder-add-name"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
             :lazy-rules="true"
@@ -61,8 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-folder-add-description"
             class="q-py-md showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless
             dense
           />
   

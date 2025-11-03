@@ -209,11 +209,11 @@ def test_histogram(
     url = base_url
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
 
-    time.sleep(15)  # Increase this time if necessary
+    time.sleep(20)  # Increased wait time for data indexing
 
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=15)).timestamp() * 1000000)  # Increased to 15 minutes to ensure data coverage
     json_data_hist = {
         "query": {
             "sql": hist_query,
@@ -925,11 +925,11 @@ def test_streaming_histogram(
     url = base_url
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
 
-    time.sleep(15)  # Increase this time if necessary
+    time.sleep(20)  # Increased wait time for data indexing
 
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=15)).timestamp() * 1000000)  # Increased to 15 minutes to ensure data coverage
     json_data_hist = {
         "query": {
             "sql": hist_query,

@@ -20,13 +20,10 @@ use o2_enterprise::enterprise::recommendations::{
     meta::{OptimiserRecommendation, Stream},
     service::{QueryRecommendationEngine, QueryRecommendationService},
 };
-use proto::cluster_rpc::{
-    IngestionData, IngestionRequest, IngestionResponse, IngestionType, ingest_server::Ingest,
-};
+use proto::cluster_rpc::{IngestionData, IngestionRequest, IngestionResponse, IngestionType};
 
-use crate::{
-    handler::grpc::request::ingest::Ingester,
-    service::{db::organization, search::search, stream::get_streams},
+use crate::service::{
+    db::organization, ingestion::ingestion_service, search::search, stream::get_streams,
 };
 
 #[derive(Clone)]
@@ -77,7 +74,6 @@ impl QueryRecommendationEngine for QueryOptimizerContext {
         recommendations: Vec<OptimiserRecommendation>,
     ) -> Pin<Box<dyn Future<Output = Result<IngestionResponse, anyhow::Error>> + Send>> {
         Box::pin(async move {
-            let ingester = Ingester {};
             let request = IngestionRequest {
                 org_id: META_ORG_ID.to_string(),
                 stream_type: StreamType::Logs.to_string(),
@@ -90,10 +86,9 @@ impl QueryRecommendationEngine for QueryOptimizerContext {
                 ingestion_type: Some(IngestionType::Json as i32),
                 metadata: None,
             };
-            Ok(ingester
-                .ingest(tonic::Request::new(request))
-                .await?
-                .into_inner())
+            Ok(ingestion_service::ingest(request)
+                .await
+                .map_err(|e| anyhow::anyhow!("Ingestion failed. Error={:?}", e))?)
         })
     }
 }

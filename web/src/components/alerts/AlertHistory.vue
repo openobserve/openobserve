@@ -235,11 +235,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
 
-        <template #bottom>
+        <template #bottom="scope">
           <QTablePagination
-            :pagination="pagination"
-            :rows-per-page-options="rowsPerPageOptions"
-            @update:pagination="onRequest({ pagination: $event })"
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="pagination.rowsNumber"
+            :perPageOptions="rowsPerPageOptions"
+            @update:changeRecordPerPage="changePagination"
           />
         </template>
       </q-table>
@@ -513,8 +515,16 @@ const pagination = ref({
   page: 1,
   rowsPerPage: 20,
   rowsNumber: 0,
+  sortBy: null,
+  descending: false,
 });
-const rowsPerPageOptions = [10, 20, 50, 100];
+
+const rowsPerPageOptions = [
+  { label: "10", value: 10 },
+  { label: "20", value: 20 },
+  { label: "50", value: 50 },
+  { label: "100", value: 100 },
+];
 
 // Date time - default to last 15 minutes (relative)
 const dateTimeRef = ref<any>(null);
@@ -545,63 +555,63 @@ const errorMessage = ref("");
 const columns = ref([
   {
     name: "timestamp",
-    label: t("common.timestamp") || "Timestamp",
+    label: "Timestamp",
     field: "timestamp",
     align: "left",
     sortable: true,
   },
   {
     name: "alert_name",
-    label: t("alerts.name") || "Alert Name",
+    label: "Alert Name",
     field: "alert_name",
     align: "left",
     sortable: true,
   },
   {
     name: "status",
-    label: t("common.status") || "Status",
+    label: "Status",
     field: "status",
     align: "center",
     sortable: true,
   },
   {
     name: "is_realtime",
-    label: t("alerts.type") || "Type",
+    label: "Type",
     field: "is_realtime",
     align: "center",
     sortable: false,
   },
   {
     name: "is_silenced",
-    label: t("alerts.silenced") || "Silenced",
+    label: "Is Silenced",
     field: "is_silenced",
     align: "center",
     sortable: false,
   },
   {
     name: "duration",
-    label: t("common.duration") || "Duration",
+    label: "Duration",
     field: (row: any) => row.end_time - row.start_time,
     align: "right",
     sortable: true,
   },
   {
     name: "retries",
-    label: t("alerts.retries") || "Retries",
+    label: "Retries",
     field: "retries",
     align: "center",
     sortable: true,
   },
   {
     name: "error",
-    label: t("common.error") || "Error",
+    label: "Error",
     field: "error",
     align: "center",
     sortable: false,
   },
   {
     name: "actions",
-    label: t("common.actions") || "Actions",
+    label: "Actions",
     field: "actions",
     align: "center",
     sortable: false,
@@ -756,12 +766,11 @@ const updateDateTime = (value: any) => {
 };
 
 const onRequest = (props: any) => {
-  const { page, rowsPerPage, sortBy, descending } = props.pagination;
-
-  pagination.value.page = page;
-  pagination.value.rowsPerPage = rowsPerPage;
-  pagination.value.sortBy = sortBy;
-  pagination.value.descending = descending;
+  // The pagination component passes the updated pagination object
+  pagination.value = {
+    ...pagination.value,
+    ...props.pagination,
+  };
 
   fetchAlertHistory();
 };
@@ -845,6 +854,11 @@ watch(
     fetchAlertHistory();
   },
 );
+const changePagination = (val: { label: string; value: any }) => {
+  pagination.value.rowsPerPage = val.value;
+  pagination.value.page = 1; // Reset to first page when changing page size
+  fetchAlertHistory();
+};
 </script>
 
 <style scoped lang="scss">
