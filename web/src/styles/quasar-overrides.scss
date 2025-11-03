@@ -562,3 +562,7 @@ body.desktop .q-hoverable:hover > .q-focus-helper{
     }
   }
 }
+
+.q-table thead tr, .q-table tbody td {
+    height: 35px;
+}
