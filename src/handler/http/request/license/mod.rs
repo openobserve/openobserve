@@ -79,12 +79,9 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
 }
 
 #[get("/license")]
-pub async fn get_license_info(Headers(user_email): Headers<UserEmail>) -> HttpResponse {
-    let email = user_email.user_id;
-    if let Err(_) = check_license_permission(&email, "GET").await {
-        return HttpResponse::Forbidden().json("Unauthorized Access to license");
-    }
-
+pub async fn get_license_info(Headers(_email): Headers<UserEmail>) -> HttpResponse {
+    // we want anyone to be able to see the license info, so we bypass
+    // all the permission checks here.
     let (key, license) = match get_license().await {
         Some((k, l)) => (Some(k), Some(l)),
         None => (None, None),
