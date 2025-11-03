@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn class="round-button" round flat dense :ripple="false" @click="toggleDarkMode">
-    <q-icon :name="DarkModeIcon" size="25px" class="header-icon"></q-icon>
+  <q-btn rounded flat dense :ripple="false" @click="toggleDarkMode">
+    <q-icon :name="DarkModeIcon" class="header-icon"></q-icon>
     <q-tooltip anchor="top middle" self="bottom middle">
       Switch to {{ darkMode ? "Light Mode" : "Dark Mode" }}
     </q-tooltip>

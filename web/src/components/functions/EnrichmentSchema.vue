@@ -35,7 +35,7 @@
             </div>
             <div class="col-auto">
             <q-btn v-close-popup="true" round
-    flat icon="close" />
+    flat icon="cancel" />
             </div>
         </div>
         </q-card-section>

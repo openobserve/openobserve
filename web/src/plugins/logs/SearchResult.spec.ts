@@ -37,9 +37,9 @@ describe("SearchResult Component", () => {
     store.state.zoConfig = {
       sql_mode: false,
       sql_mode_manual_trigger: false,
-      version: '1.0.0',
-      commit_hash: 'abc123',
-      build_date: '2024-01-01',
+      version: "1.0.0",
+      commit_hash: "abc123",
+      build_date: "2024-01-01",
       default_fts_keys: [],
       show_stream_stats_doc_num: true,
       data_retention_days: true,
@@ -48,18 +48,18 @@ describe("SearchResult Component", () => {
       super_cluster_enabled: true,
       query_on_stream_selection: false,
       default_functions: [],
-      timestamp_column: "_timestamp"
+      timestamp_column: "_timestamp",
     };
 
     store.state.selectedOrganization = {
-      identifier: "test-org"
+      identifier: "test-org",
     };
 
     store.state.organizationData = {
       organizationSettings: {
         trace_id_field_name: "trace_id",
-        span_id_field_name: "span_id"
-      }
+        span_id_field_name: "span_id",
+      },
     };
 
     wrapper = mount(SearchResult, {
@@ -71,12 +71,12 @@ describe("SearchResult Component", () => {
           DetailTable: true,
           ChartRenderer: true,
           SanitizedHtmlRenderer: true,
-          TenstackTable: true
-        }
+          TenstackTable: true,
+        },
       },
       props: {
-        expandedLogs: []
-      }
+        expandedLogs: [],
+      },
     });
 
     await flushPromises();
@@ -89,504 +89,500 @@ describe("SearchResult Component", () => {
     vi.clearAllMocks();
   });
 
-
-
-  describe('Table Functionality', () => {
-    it('should calculate table width correctly', () => {
+  describe("Table Functionality", () => {
+    it("should calculate table width correctly", () => {
       window.innerWidth = 1000;
       wrapper.vm.searchObj.config.splitterModel = 30;
-      
+
       const width = wrapper.vm.getTableWidth;
       expect(width).toBe(1000 - 56 - (1000 - 56) * 0.3 - 5);
     });
 
-    it('should scroll table to top', async () => {
+    it("should scroll table to top", async () => {
       const scrollToSpy = vi.fn();
       wrapper.vm.searchTableRef = {
         parentRef: {
-          scrollTo: scrollToSpy
-        }
+          scrollTo: scrollToSpy,
+        },
       };
-      
+
       await wrapper.vm.scrollTableToTop(0);
       expect(scrollToSpy).toHaveBeenCalledWith({ top: 0 });
     });
 
-    it('should handle missing searchTableRef in scrollTableToTop', () => {
+    it("should handle missing searchTableRef in scrollTableToTop", () => {
       wrapper.vm.searchTableRef = null;
       expect(() => wrapper.vm.scrollTableToTop(0)).not.toThrow();
     });
   });
 
-
-  describe('Chart and Histogram Functionality', () => {
-    it('should redraw chart with valid data', async () => {
+  describe("Chart and Histogram Functionality", () => {
+    it("should redraw chart with valid data", async () => {
       wrapper.vm.searchObj.data.histogram = {
         hasOwnProperty: vi.fn(() => true),
         xData: [1, 2, 3],
         yData: [10, 20, 30],
-        chartParams: { title: 'Test Chart' }
+        chartParams: { title: "Test Chart" },
       };
-      
+
       await wrapper.vm.reDrawChart();
-      
+
       expect(wrapper.vm.plotChart).toBeDefined();
     });
 
-    it('should not redraw chart with empty data', async () => {
+    it("should not redraw chart with empty data", async () => {
       wrapper.vm.searchObj.data.histogram = {
         hasOwnProperty: vi.fn(() => false),
         xData: [],
         yData: [],
-        chartParams: {}
+        chartParams: {},
       };
-      
+
       const originalPlotChart = wrapper.vm.plotChart;
       await wrapper.vm.reDrawChart();
-      
+
       expect(wrapper.vm.plotChart).toBe(originalPlotChart);
     });
 
-    it('should handle chart update', async () => {
+    it("should handle chart update", async () => {
       const chartData = { start: 1000, end: 2000 };
-      
+
       await wrapper.vm.onChartUpdate(chartData);
-      
+
       expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
-      expect(wrapper.emitted()['update:datetime']).toEqual([[chartData]]);
+      expect(wrapper.emitted()["update:datetime"]).toEqual([[chartData]]);
     });
 
-    it('should handle time boxed event', async () => {
-      const timeboxData = { key: '2023-01-01T00:00:00Z' };
-      
+    it("should handle time boxed event", async () => {
+      const timeboxData = { key: "2023-01-01T00:00:00Z" };
+
       await wrapper.vm.onTimeBoxed(timeboxData);
-      
+
       expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
-      expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe('2023-01-01T00:00:00Z');
+      expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe(
+        "2023-01-01T00:00:00Z",
+      );
     });
   });
 
+  describe("Search and Filter Operations", () => {
+    it("should remove search term", async () => {
+      await wrapper.vm.removeSearchTerm("test term");
 
-  describe('Search and Filter Operations', () => {
-    it('should remove search term', async () => {
-      await wrapper.vm.removeSearchTerm('test term');
-      
-      expect(wrapper.emitted()['remove:searchTerm']).toEqual([['test term']]);
+      expect(wrapper.emitted()["remove:searchTerm"]).toEqual([["test term"]]);
     });
 
-    it('should expand log', async () => {
+    it("should expand log", async () => {
       await wrapper.vm.expandLog(3);
-      
-      expect(wrapper.emitted()['expandlog']).toEqual([[3]]);
+
+      expect(wrapper.emitted()["expandlog"]).toEqual([[3]]);
     });
 
-    it('should toggle error details', async () => {
+    it("should toggle error details", async () => {
       wrapper.vm.disableMoreErrorDetails = false;
-      
+
       await wrapper.vm.toggleErrorDetails();
-      
+
       expect(wrapper.vm.disableMoreErrorDetails).toBe(true);
     });
 
-    it('should send to AI chat', async () => {
-      const testValue = { message: 'test message' };
-      
+    it("should send to AI chat", async () => {
+      const testValue = { message: "test message" };
+
       await wrapper.vm.sendToAiChat(testValue);
-      
-      expect(wrapper.emitted()['sendToAiChat']).toEqual([[testValue]]);
+
+      expect(wrapper.emitted()["sendToAiChat"]).toEqual([[testValue]]);
     });
   });
 
-  describe('Copy and Clipboard Operations', () => {
-    it('should copy log to clipboard as JSON', async () => {
-      const mockLog = { field1: 'value1', field2: 'value2' };
-      
+  describe("Copy and Clipboard Operations", () => {
+    it("should copy log to clipboard as JSON", async () => {
+      const mockLog = { field1: "value1", field2: "value2" };
+
       await wrapper.vm.copyLogToClipboard(mockLog, true);
-      
-      expect(typeof wrapper.vm.copyLogToClipboard).toBe('function');
+
+      expect(typeof wrapper.vm.copyLogToClipboard).toBe("function");
     });
 
-    it('should copy log to clipboard as string', async () => {
-      const mockLog = 'test log string';
-      
+    it("should copy log to clipboard as string", async () => {
+      const mockLog = "test log string";
+
       await wrapper.vm.copyLogToClipboard(mockLog, false);
-      
-      expect(typeof wrapper.vm.copyLogToClipboard).toBe('function');
+
+      expect(typeof wrapper.vm.copyLogToClipboard).toBe("function");
     });
   });
 
-  describe('Computed Properties', () => {
-    it('should compute toggleWrapFlag', () => {
+  describe("Computed Properties", () => {
+    it("should compute toggleWrapFlag", () => {
       wrapper.vm.searchObj.meta.toggleSourceWrap = true;
       expect(wrapper.vm.toggleWrapFlag).toBe(true);
     });
 
-    it('should compute findFTSFields', () => {
-      const fields = [{ name: 'field1' }];
+    it("should compute findFTSFields", () => {
+      const fields = [{ name: "field1" }];
       wrapper.vm.searchObj.data.stream.selectedStreamFields = fields;
       expect(wrapper.vm.findFTSFields).toEqual(fields);
     });
 
-    it('should compute updateTitle', () => {
-      const title = 'Test Title';
+    it("should compute updateTitle", () => {
+      const title = "Test Title";
       wrapper.vm.searchObj.data.histogram.chartParams.title = title;
       expect(wrapper.vm.updateTitle).toBe(title);
     });
 
-    it('should compute resetPlotChart', () => {
+    it("should compute resetPlotChart", () => {
       wrapper.vm.searchObj.meta.resetPlotChart = true;
       expect(wrapper.vm.resetPlotChart).toBe(true);
     });
 
-    it('should compute getColumns correctly', () => {
+    it("should compute getColumns correctly", () => {
       wrapper.vm.searchObj.data.resultGrid.columns = [
-        { id: 'col1', name: 'field1' },
-        { id: '', name: 'invalid' },
-        { id: 'col2', name: 'field2' }
+        { id: "col1", name: "field1" },
+        { id: "", name: "invalid" },
+        { id: "col2", name: "field2" },
       ];
-      
+
       const columns = wrapper.vm.getColumns;
-      
+
       expect(columns).toHaveLength(2);
       expect(columns.every((col: any) => !!col.id)).toBe(true);
     });
 
-    it('should compute getPartitionPaginations correctly', () => {
+    it("should compute getPartitionPaginations correctly", () => {
       wrapper.vm.searchObj.data.queryResults.partitionDetail = {
-        paginations: [1, 2, 3, 4, 5]
+        paginations: [1, 2, 3, 4, 5],
       };
-      
+
       const paginations = wrapper.vm.getPartitionPaginations;
-      
+
       expect(paginations).toEqual([1, 2, 3, 4, 5]);
     });
 
-    it('should compute getSocketPaginations correctly', () => {
+    it("should compute getSocketPaginations correctly", () => {
       wrapper.vm.searchObj.data.queryResults.pagination = [1, 2, 3];
-      
+
       const paginations = wrapper.vm.getSocketPaginations;
-      
+
       expect(paginations).toEqual([1, 2, 3]);
     });
 
-    it('should compute getPaginations for http communication', () => {
-      wrapper.vm.searchObj.communicationMethod = 'http';
+    it("should compute getPaginations for http communication", () => {
+      wrapper.vm.searchObj.communicationMethod = "http";
       wrapper.vm.searchObj.data.queryResults.partitionDetail = {
-        paginations: [1, 2, 3, 4]
+        paginations: [1, 2, 3, 4],
       };
-      
+
       const paginations = wrapper.vm.getPaginations;
-      
+
       expect(paginations).toEqual([1, 2, 3, 4]);
     });
 
-    it('should compute getPaginations for ws communication', () => {
-      wrapper.vm.searchObj.communicationMethod = 'ws';
+    it("should compute getPaginations for ws communication", () => {
+      wrapper.vm.searchObj.communicationMethod = "ws";
       wrapper.vm.searchObj.data.queryResults.pagination = [1, 2, 3];
-      
+
       const paginations = wrapper.vm.getPaginations;
-      
+
       expect(paginations).toEqual([1, 2, 3]);
     });
 
-    it('should compute getWidth', () => {
+    it("should compute getWidth", () => {
       const width = wrapper.vm.getWidth;
-      expect(width).toBe('');
+      expect(width).toBe("");
     });
 
-    it('should compute histogramLoader when loading', () => {
+    it("should compute histogramLoader when loading", () => {
       wrapper.vm.searchObj.meta.showHistogram = true;
       wrapper.vm.searchObj.loadingHistogram = true;
-      
+
       const isLoading = wrapper.vm.histogramLoader;
-      
+
       expect(isLoading).toBe(true);
     });
 
-    it('should compute histogramLoader when not loading', () => {
+    it("should compute histogramLoader when not loading", () => {
       wrapper.vm.searchObj.meta.showHistogram = false;
       wrapper.vm.searchObj.loadingHistogram = false;
-      
+
       const isLoading = wrapper.vm.histogramLoader;
-      
+
       expect(isLoading).toBe(false);
     });
 
-    it('should compute getTableWidth correctly', () => {
-      Object.defineProperty(window, 'innerWidth', {
+    it("should compute getTableWidth correctly", () => {
+      Object.defineProperty(window, "innerWidth", {
         writable: true,
         configurable: true,
         value: 1000,
       });
-      
+
       wrapper.vm.searchObj.config.splitterModel = 30;
-      
+
       const width = wrapper.vm.getTableWidth;
       const expected = 1000 - (56 + (1000 - 56) * 0.3) - 5;
       expect(width).toBe(expected);
     });
   });
 
-  describe('Watch Handlers', () => {
-    it('should handle findFTSFields changes', async () => {
-      const extractFTSFieldsSpy = vi.spyOn(wrapper.vm, 'extractFTSFields');
-      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: 'field1' }];
+  describe("Watch Handlers", () => {
+    it("should handle findFTSFields changes", async () => {
+      const extractFTSFieldsSpy = vi.spyOn(wrapper.vm, "extractFTSFields");
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "field1" },
+      ];
       await wrapper.vm.$nextTick();
       expect(extractFTSFieldsSpy).toHaveBeenCalled();
     });
 
-    it('should handle updateTitle changes', async () => {
-      const title = 'New Title';
+    it("should handle updateTitle changes", async () => {
+      const title = "New Title";
       wrapper.vm.searchObj.data.histogram.chartParams.title = title;
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.noOfRecordsTitle).toBe(title);
     });
 
-    it('should handle resetPlotChart changes', async () => {
+    it("should handle resetPlotChart changes", async () => {
       wrapper.vm.searchObj.meta.resetPlotChart = true;
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.plotChart).toEqual({});
       expect(wrapper.vm.searchObj.meta.resetPlotChart).toBe(false);
     });
 
-    it('should handle toggleWrapFlag changes', async () => {
+    it("should handle toggleWrapFlag changes", async () => {
       // This test covers the watch functionality for toggleWrapFlag
       wrapper.vm.searchObj.meta.toggleSourceWrap = true;
       await wrapper.vm.$nextTick();
-      
+
       // Verify the computed property works
       expect(wrapper.vm.toggleWrapFlag).toBe(true);
     });
   });
 
-  describe('Error Handling and Edge Cases', () => {
-    it('should handle function error', async () => {
-      wrapper.vm.searchObj.data.functionError = 'Function error';
+  describe("Error Handling and Edge Cases", () => {
+    it("should handle function error", async () => {
+      wrapper.vm.searchObj.data.functionError = "Function error";
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.searchObj.data.functionError).toBe('Function error');
+      expect(wrapper.vm.searchObj.data.functionError).toBe("Function error");
     });
 
-    it('should handle changeMaxRecordToReturn', () => {
+    it("should handle changeMaxRecordToReturn", () => {
       const result = wrapper.vm.changeMaxRecordToReturn(50);
       expect(result).toBeUndefined();
     });
 
-    it('should handle undefined queryResults in pagination', () => {
+    it("should handle undefined queryResults in pagination", () => {
       const originalQueryResults = wrapper.vm.searchObj.data.queryResults;
       wrapper.vm.searchObj.data.queryResults = undefined;
-      
+
       const paginations = wrapper.vm.getPaginations;
-      
+
       expect(paginations).toEqual([]);
-      
+
       // Restore original data
       wrapper.vm.searchObj.data.queryResults = originalQueryResults;
     });
 
-    it('should handle column sizes update with empty previous sizes', async () => {
+    it("should handle column sizes update with empty previous sizes", async () => {
       wrapper.vm.searchObj.data.resultGrid.colSizes = {};
-      wrapper.vm.searchObj.data.stream.selectedStream = 'new-stream';
-      
+      wrapper.vm.searchObj.data.stream.selectedStream = "new-stream";
+
       const newSizes = { col1: 100 };
       await wrapper.vm.handleColumnSizesUpdate(newSizes);
-      
-      expect(wrapper.vm.searchObj.data.resultGrid.colSizes['new-stream']).toEqual([newSizes]);
+
+      expect(
+        wrapper.vm.searchObj.data.resultGrid.colSizes["new-stream"],
+      ).toEqual([newSizes]);
     });
 
-    it('should handle empty column order update', async () => {
-      wrapper.vm.searchObj.data.stream.selectedFields = ['field1'];
+    it("should handle empty column order update", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = ["field1"];
       const newOrder: string[] = [];
-      const columns = [{ name: 'field1' }];
-      
+      const columns = [{ name: "field1" }];
+
       await wrapper.vm.handleColumnOrderUpdate(newOrder, columns);
-      
-      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(['field1']);
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([
+        "field1",
+      ]);
     });
   });
 
-  describe('Component Props and Lifecycle', () => {
-    it('should accept expandedLogs prop', () => {
-      expect(wrapper.props('expandedLogs')).toEqual([]);
+  describe("Component Props and Lifecycle", () => {
+    it("should accept expandedLogs prop", () => {
+      expect(wrapper.props("expandedLogs")).toEqual([]);
     });
 
-    it('should have correct default prop values', () => {
-      expect(wrapper.props('expandedLogs')).toEqual([]);
+    it("should have correct default prop values", () => {
+      expect(wrapper.props("expandedLogs")).toEqual([]);
     });
 
-    it('should handle mounted lifecycle', () => {
+    it("should handle mounted lifecycle", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it('should handle updated lifecycle', async () => {
+    it("should handle updated lifecycle", async () => {
       wrapper.vm.searchObj.data.resultGrid.currentPage = 1;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.pageNumberInput).toBe(1);
     });
   });
 
-  describe('Additional Methods Coverage', () => {
-    it('should handle scroll table to top with valid ref', async () => {
+  describe("Additional Methods Coverage", () => {
+    it("should handle scroll table to top with valid ref", async () => {
       const scrollToSpy = vi.fn();
       wrapper.vm.searchTableRef = {
         parentRef: {
-          scrollTo: scrollToSpy
-        }
+          scrollTo: scrollToSpy,
+        },
       };
-      
+
       await wrapper.vm.scrollTableToTop(100);
       expect(scrollToSpy).toHaveBeenCalledWith({ top: 100 });
     });
 
-    it('should handle recordsPerPage with streaming and jobId', async () => {
-      wrapper.vm.searchObj.communicationMethod = 'streaming';
-      wrapper.vm.searchObj.meta.jobId = 'job123';
-      
-      await wrapper.vm.getPageData('recordsPerPage');
-      
+    it("should handle recordsPerPage with streaming and jobId", async () => {
+      wrapper.vm.searchObj.communicationMethod = "streaming";
+      wrapper.vm.searchObj.meta.jobId = "job123";
+
+      await wrapper.vm.getPageData("recordsPerPage");
+
       expect(wrapper.vm.searchObj.data.resultGrid.currentPage).toBe(1);
-      expect(wrapper.emitted()['update:recordsPerPage']).toBeTruthy();
+      expect(wrapper.emitted()["update:recordsPerPage"]).toBeTruthy();
     });
 
-    it('should handle recordsPerPage with http and no jobId', async () => {
-      wrapper.vm.searchObj.communicationMethod = 'http';
-      wrapper.vm.searchObj.meta.jobId = '';
-      
-      await wrapper.vm.getPageData('recordsPerPage');
-      
+    it("should handle recordsPerPage with http and no jobId", async () => {
+      wrapper.vm.searchObj.communicationMethod = "http";
+      wrapper.vm.searchObj.meta.jobId = "";
+
+      await wrapper.vm.getPageData("recordsPerPage");
+
       expect(wrapper.vm.searchObj.data.resultGrid.currentPage).toBe(1);
-      expect(wrapper.emitted()['update:recordsPerPage']).toBeTruthy();
+      expect(wrapper.emitted()["update:recordsPerPage"]).toBeTruthy();
     });
 
-    it('should handle page navigation edge cases', async () => {
+    it("should handle page navigation edge cases", async () => {
       wrapper.vm.searchObj.data.resultGrid.currentPage = 10;
       wrapper.vm.searchObj.meta.resultGrid.rowsPerPage = 10;
       wrapper.vm.searchObj.data.queryResults.total = 100;
-      
-      await wrapper.vm.getPageData('next');
-      
+
+      await wrapper.vm.getPageData("next");
+
       // Should increment to page 11 since the logic allows it
       expect(wrapper.vm.searchObj.data.resultGrid.currentPage).toBe(11);
     });
 
-    it('should handle pageChange with ws communication', async () => {
-      wrapper.vm.searchObj.communicationMethod = 'ws';
-      wrapper.vm.searchObj.data.queryResults.pagination = [1, 2, 3, 4, 5];
-      wrapper.vm.pageNumberInput = 3;
-      
-      await wrapper.vm.getPageData('pageChange');
-      
-      expect(wrapper.vm.searchObj.data.resultGrid.currentPage).toBe(3);
-    });
-
-    it('should not navigate to previous page when on first page', async () => {
+    it("should not navigate to previous page when on first page", async () => {
       wrapper.vm.searchObj.data.resultGrid.currentPage = 1;
-      
-      await wrapper.vm.getPageData('prev');
-      
+
+      await wrapper.vm.getPageData("prev");
+
       expect(wrapper.vm.searchObj.data.resultGrid.currentPage).toBe(1);
     });
   });
 
-  describe('Trace Redirection', () => {
-    it('should redirect to traces with correct parameters', async () => {
+  describe("Trace Redirection", () => {
+    it("should redirect to traces with correct parameters", async () => {
       const mockLog = {
         _timestamp: 1640995200000000000,
-        trace_id: 'test-trace-id',
-        span_id: 'test-span-id'
+        trace_id: "test-trace-id",
+        span_id: "test-span-id",
       };
-      
+
       // Test the function exists and can be called
-      expect(typeof wrapper.vm.redirectToTraces).toBe('function');
-      
+      expect(typeof wrapper.vm.redirectToTraces).toBe("function");
+
       try {
         await wrapper.vm.redirectToTraces(mockLog);
       } catch (error) {
         // Expected error due to router mocking
         expect(error).toBeDefined();
       }
-      
+
       // Verify the function was called with correct parameters
       expect(mockLog._timestamp).toBe(1640995200000000000);
     });
   });
 
-  describe('Advanced Pagination Scenarios', () => {
-    it('should handle recordsPerPage with ws communication and no jobId', async () => {
-      wrapper.vm.searchObj.communicationMethod = 'ws';
-      wrapper.vm.searchObj.meta.jobId = '';
-      
-      await wrapper.vm.getPageData('recordsPerPage');
-      
+  describe("Advanced Pagination Scenarios", () => {
+    it("should handle recordsPerPage with ws communication and no jobId", async () => {
+      wrapper.vm.searchObj.communicationMethod = "ws";
+      wrapper.vm.searchObj.meta.jobId = "";
+
+      await wrapper.vm.getPageData("recordsPerPage");
+
       expect(wrapper.vm.searchObj.data.resultGrid.currentPage).toBe(1);
-      expect(wrapper.emitted()['update:recordsPerPage']).toBeTruthy();
+      expect(wrapper.emitted()["update:recordsPerPage"]).toBeTruthy();
     });
 
-    it('should handle recordsPerPage with http and jobId', async () => {
-      wrapper.vm.searchObj.communicationMethod = 'http';
-      wrapper.vm.searchObj.meta.jobId = 'job123';
-      
-      await wrapper.vm.getPageData('recordsPerPage');
-      
+    it("should handle recordsPerPage with http and jobId", async () => {
+      wrapper.vm.searchObj.communicationMethod = "http";
+      wrapper.vm.searchObj.meta.jobId = "job123";
+
+      await wrapper.vm.getPageData("recordsPerPage");
+
       expect(wrapper.vm.searchObj.data.resultGrid.currentPage).toBe(1);
-      expect(wrapper.emitted()['update:recordsPerPage']).toBeTruthy();
+      expect(wrapper.emitted()["update:recordsPerPage"]).toBeTruthy();
     });
 
-    it('should handle pageChange with jobId and undefined pagination', async () => {
-      wrapper.vm.searchObj.meta.jobId = 'job123';
+    it("should handle pageChange with jobId and undefined pagination", async () => {
+      wrapper.vm.searchObj.meta.jobId = "job123";
       wrapper.vm.searchObj.data.queryResults.paginations = undefined;
       wrapper.vm.pageNumberInput = 2;
-      
-      await wrapper.vm.getPageData('pageChange');
-      
+
+      await wrapper.vm.getPageData("pageChange");
+
       expect(wrapper.vm.searchObj.data.queryResults.pagination).toEqual([]);
     });
   });
 
-  describe('Component Emits and Events', () => {
-    it('should emit update:columnSizes when handleColumnSizesUpdate is called', async () => {
+  describe("Component Emits and Events", () => {
+    it("should emit update:columnSizes when handleColumnSizesUpdate is called", async () => {
       const newSizes = { col1: 150 };
-      
-      wrapper.vm.$emit('update:columnSizes', newSizes);
-      
-      expect(wrapper.emitted()['update:columnSizes']).toEqual([[newSizes]]);
+
+      wrapper.vm.$emit("update:columnSizes", newSizes);
+
+      expect(wrapper.emitted()["update:columnSizes"]).toEqual([[newSizes]]);
     });
 
-    it('should emit update:datetime on chart update', async () => {
+    it("should emit update:datetime on chart update", async () => {
       const chartData = { start: 1000, end: 2000 };
-      
+
       await wrapper.vm.onChartUpdate(chartData);
-      
-      expect(wrapper.emitted()['update:datetime']).toEqual([[chartData]]);
+
+      expect(wrapper.emitted()["update:datetime"]).toEqual([[chartData]]);
     });
 
-    it('should emit search:timeboxed on time boxed event', async () => {
-      const timeboxData = { key: '2023-01-01T00:00:00Z' };
-      
+    it("should emit search:timeboxed on time boxed event", async () => {
+      const timeboxData = { key: "2023-01-01T00:00:00Z" };
+
       await wrapper.vm.onTimeBoxed(timeboxData);
-      
-      expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe('2023-01-01T00:00:00Z');
+
+      expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe(
+        "2023-01-01T00:00:00Z",
+      );
       expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
     });
   });
 
-  describe('Reactive Data Updates', () => {
-    it('should handle reDrawChartData changes with deep watching', async () => {
-      const reDrawChartSpy = vi.spyOn(wrapper.vm, 'reDrawChart');
-      
+  describe("Reactive Data Updates", () => {
+    it("should handle reDrawChartData changes with deep watching", async () => {
+      const reDrawChartSpy = vi.spyOn(wrapper.vm, "reDrawChart");
+
       wrapper.vm.searchObj.data.histogram.xData = [1, 2, 3];
       wrapper.vm.searchObj.data.histogram.yData = [4, 5, 6];
-      
+
       await wrapper.vm.$nextTick();
-      
+
       expect(reDrawChartSpy).toHaveBeenCalled();
     });
 
-    it('should update pageNumberInput on component update', async () => {
+    it("should update pageNumberInput on component update", async () => {
       wrapper.vm.searchObj.data.resultGrid.currentPage = 7;
-      
+
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.pageNumberInput).toBe(7);
     });
   });

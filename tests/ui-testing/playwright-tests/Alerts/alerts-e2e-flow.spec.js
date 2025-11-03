@@ -28,7 +28,7 @@ test.describe("Alerts E2E Flow", () => {
 
     await pm.commonActions.skipDataIngestionForScheduledAlert(testInfo.title);
     
-    // Navigate to alerts page
+    // Navigate to alerts page 
     await page.goto(
       `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
     );

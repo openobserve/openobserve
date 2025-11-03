@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
     <q-separator />
-    <q-card-section class="q-w-md q-mx-lg">
+    <q-card-section class="q-px-md q-py-sm add-dashboard-form-card-section">
       <q-form ref="addDashboardForm" @submit.stop="onSubmit.execute">
         <q-input
           v-if="beingUpdated"
@@ -51,13 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="dashboardData.name"
           :label="t('dashboard.name') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
+          class="showLabelOnTop"
           data-test="add-dashboard-name"
           stack-label
-          outlined
-          filled
+          hide-bottom-space
+          borderless
           dense
           :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
           :lazy-rules="true"
@@ -66,12 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="dashboardData.description"
           :label="t('dashboard.typeDesc')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
+          borderless
+          hide-bottom-space
+          class="showLabelOnTop"
           stack-label
-          outlined
-          filled
           dense
           data-test="add-dashboard-description"
         />
@@ -84,14 +80,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @folder-selected="selectedFolder = $event"
         />
 
-        <div class="flex justify-center q-mt-lg">
+        <div class="flex justify-start q-mt-sm">
           <q-btn
             v-close-popup="true"
-            class="q-mb-md text-bold"
             :label="t('dashboard.cancel')"
-            text-color="light-text"
-            padding="sm md"
             no-caps
+            flat
+            dense
+            class="o2-secondary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             data-test="dashboard-add-cancel"
           />
           <q-btn
@@ -99,9 +96,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disable="dashboardData.name.trim() === ''"
             :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+            dense
+            flat
+            class="o2-primary-button tw-h-[36px] q-ml-md"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             type="submit"
             no-caps
           />
@@ -274,3 +272,10 @@ export default defineComponent({
   components: { SelectFolderDropdown },
 });
 </script>
+<style lang="scss">
+.add-dashboard-form-card-section {
+  .add-folder-btn {
+    margin-top: 36px !important;
+  }
+}
+</style>

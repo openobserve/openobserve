@@ -16,9 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: calc(100vh - 40px); overflow-y: auto" class="scroll">
-    <div
-      class="flex items-center q-pa-sm"
+  <div style="overflow-y: auto" class="scroll">
+    <div class="tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs">
+      <div
+      class="flex items-center q-pa-sm card-container"
       :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
     >
       <div
@@ -34,8 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="dashboardPanelData.data.title"
             :label="t('panel.name') + '*'"
             class="q-ml-xl dynamic-input"
-            filled
             dense
+            borderless
             :style="inputStyle"
           />
         </div>
@@ -43,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex q-gutter-sm">
         <q-btn
           outline
-          padding="sm"
-          class="q-mr-sm"
+          padding="xs sm"
+          class="q-mr-sm tw-h-[36px] el-border"
           no-caps
           label="Dashboard Tutorial"
           @click="showTutorial"
@@ -58,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           outline
           padding="sm"
-          class="q-mr-sm"
+          class="q-mr-sm tw-h-[36px] el-border"
           no-caps
           icon="info_outline"
           @click="showViewPanel = true"
@@ -73,23 +74,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="selectedDate"
           ref="dateTimePickerRef"
           :disable="disable"
+          class="tw-h-[36px]"
           @hide="setTimeForVariables"
         />
         <q-btn
-          class="q-ml-md text-bold"
           outline
-          padding="sm lg"
           color="red"
           no-caps
+          flat
+          class="o2-secondary-button tw-h-[36px] q-ml-md"
+          style="color: red !important"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           :label="t('panel.discard')"
           @click="goBackToDashboardList"
           data-test="dashboard-panel-discard"
         />
         <q-btn
-          class="q-ml-md text-bold"
-          outline
-          padding="sm lg"
+          class="o2-secondary-button tw-h-[36px] q-ml-md"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           no-caps
+          flat
           :label="t('panel.save')"
           data-test="dashboard-panel-save"
           @click.stop="savePanelData.execute()"
@@ -100,31 +112,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-btn
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-            class="q-ml-md text-bold no-border"
             data-test="dashboard-cancel"
-            padding="sm lg"
-            color="negative"
             no-caps
+            dense
+            flat
+            class="o2-primary-button tw-h-[36px] q-ml-md"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-negative-button-dark'
+                : 'o2-negative-button-light'
+            "
             :label="t('panel.cancel')"
             @click="cancelAddPanelQuery"
           />
           <q-btn
             v-else
-            class="q-ml-md text-bold no-border"
             data-test="dashboard-apply"
-            padding="sm lg"
-            color="secondary"
+            class="o2-primary-button tw-h-[36px] q-ml-md"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             no-caps
+            flat
+            dense
             :label="t('panel.apply')"
             @click="runQuery"
           />
         </template>
       </div>
     </div>
-    <q-separator></q-separator>
-    <div class="row" style="height: calc(100vh - 99px); overflow-y: auto">
+    </div>
+    <div>
+    <div class="row" style="overflow-y: auto">
+      <div class="tw-pl-[0.625rem]">
       <div
-        class="col scroll"
+        class="col scroll card-container tw-mr-[0.625rem]"
         style="
           overflow-y: auto;
           height: 100%;
@@ -137,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-chart-type="resetAggregationFunction"
         />
       </div>
+      </div>
       <q-separator vertical />
       <!-- for query related chart only -->
       <div
@@ -145,22 +170,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type,
           )
         "
-        class="col"
-        style="width: 100%; height: 100%"
+        class="col tw-mr-[0.625rem]"
+        style="display: flex; flex-direction: row; overflow-x: hidden"
       >
+        <!-- collapse field list bar -->
+        <div
+          v-if="!dashboardPanelData.layout.showFieldList"
+          class="field-list-sidebar-header-collapsed card-container"
+          @click="collapseFieldList"
+          style="width: 50px; height: 100%; flex-shrink: 0"
+        >
+          <q-icon
+            name="expand_all"
+            class="field-list-collapsed-icon rotate-90"
+            data-test="dashboard-field-list-collapsed-icon"
+          />
+          <div class="field-list-collapsed-title">{{ t("panel.fields") }}</div>
+        </div>
         <q-splitter
           v-model="dashboardPanelData.layout.splitter"
-          @update:model-value="layoutSplitterUpdated"
-          style="width: 100%; height: 100%"
+          :limits="[0, 20]"
+          :style="{
+            width: dashboardPanelData.layout.showFieldList ? '100%' : 'calc(100% - 50px)',
+            height: '100%'
+          }"
         >
           <template #before>
+            <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
             <div
-              class="col scroll"
-              style="height: calc(100vh - 99px); overflow-y: auto"
+              v-if="dashboardPanelData.layout.showFieldList"
+              class="col scroll card-container"
+              style="height: calc(100vh - 110px); overflow-y: auto"
             >
               <div class="column" style="height: 100%">
-                <div class="col-auto q-pa-sm">
-                  <span class="text-weight-bold">{{ t("panel.fields") }}</span>
+                <div class="col-auto q-pa-sm ">
+                  <span class="text-weight-bold ">{{ t("panel.fields") }}</span>
                 </div>
                 <div class="col" style="width: 100%">
                   <!-- <GetFields :editMode="editMode" /> -->
@@ -168,22 +212,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
+            </div>
           </template>
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
-            <q-avatar
+            <q-btn
               color="primary"
-              text-color="white"
-              size="20px"
-              icon="drag_indicator"
-              style="top: 10px; left: 3.5px"
+              size="sm"
+              :icon="
+                dashboardPanelData.layout.showFieldList
+                  ? 'chevron_left'
+                  : 'chevron_right'
+              "
+              dense
+              round
+              :class="dashboardPanelData.layout.showFieldList ? 'splitter-icon-expand' : 'splitter-icon-collapse'"
+              style="top: 14px; z-index: 100"
+              @click.stop="collapseFieldList"
             />
           </template>
           <template #after>
-            <div class="row">
+              <div class="row card-container">
               <div
                 class="col scroll"
-                style="height: calc(100vh - 99px); overflow-y: auto"
+                style="height: calc(100vh - 110px); overflow-y: auto"
               >
                 <div class="layout-panel-container col">
                   <DashboardQueryBuilder
@@ -230,7 +282,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </div>
-                  <div class="tw-flex tw-justify-end tw-mr-2">
+                  <div class="tw-flex tw-justify-end tw-mr-2 tw-items-center">
+                    <!-- Error/Warning tooltips moved here -->
+                    <q-btn
+                      v-if="errorMessage"
+                      :icon="outlinedWarning"
+                      flat
+                      size="xs"
+                      padding="2px"
+                      data-test="dashboard-panel-error-data-inline"
+                      class="warning q-mr-xs"
+                    >
+                      <q-tooltip
+                        anchor="bottom right"
+                        self="top right"
+                        max-width="220px"
+                      >
+                        <div style="white-space: pre-wrap">
+                          {{ errorMessage }}
+                        </div>
+                      </q-tooltip>
+                    </q-btn>
+                    <q-btn
+                      v-if="maxQueryRangeWarning"
+                      :icon="outlinedWarning"
+                      flat
+                      size="xs"
+                      padding="2px"
+                      data-test="dashboard-panel-max-duration-warning-inline"
+                      class="warning q-mr-xs"
+                    >
+                      <q-tooltip
+                        anchor="bottom right"
+                        self="top right"
+                        max-width="220px"
+                      >
+                        <div style="white-space: pre-wrap">
+                          {{ maxQueryRangeWarning }}
+                        </div>
+                      </q-tooltip>
+                    </q-btn>
+                    <q-btn
+                      v-if="limitNumberOfSeriesWarningMessage"
+                      :icon="symOutlinedDataInfoAlert"
+                      flat
+                      size="xs"
+                      padding="2px"
+                      data-test="dashboard-panel-series-limit-warning-inline"
+                      class="warning q-mr-xs"
+                    >
+                      <q-tooltip
+                        anchor="bottom right"
+                        self="top right"
+                        max-width="220px"
+                      >
+                        <div style="white-space: pre-wrap">
+                          {{ limitNumberOfSeriesWarningMessage }}
+                        </div>
+                      </q-tooltip>
+                    </q-btn>
                     <span v-if="lastTriggeredAt" class="lastRefreshedAt">
                       <span class="lastRefreshedAtIcon">🕑</span
                       ><RelativeTime
@@ -239,10 +349,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </span>
                   </div>
-                  <div class="tw-h-[calc(100vh-500px)]">
+                  <div class="tw-h-[calc(100vh-500px)] tw-min-h-[140px]">
                     <PanelSchemaRenderer
                       v-if="chartData"
                       @metadata-update="metaDataValue"
+                      @result-metadata-update="handleResultMetadataUpdate"
+                      @limit-number-of-series-warning-message-update="
+                        handleLimitNumberOfSeriesWarningMessage
+                      "
                       :key="dashboardPanelData.data.type"
                       :panelSchema="chartData"
                       :dashboard-id="queryParams?.dashboard"
@@ -297,60 +411,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="col column"
         style="width: 100%; height: 100%; flex: 1"
       >
-        <VariablesValueSelector
-          :variablesConfig="currentDashboardData.data?.variables"
-          :showDynamicFilters="
-            currentDashboardData.data?.variables?.showDynamicFilters
-          "
-          :selectedTimeDate="dashboardPanelData.meta.dateTime"
-          @variablesData="variablesDataUpdated"
-          :initialVariableValues="initialVariableValues"
-          class="q-mb-sm"
-        />
-        <CustomHTMLEditor
-          v-model="dashboardPanelData.data.htmlContent"
-          style="width: 100%; height: 100%"
-          class="col"
-          :initialVariableValues="updatedVariablesData"
-        />
-        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <VariablesValueSelector
+            :variablesConfig="currentDashboardData.data?.variables"
+            :showDynamicFilters="
+              currentDashboardData.data?.variables?.showDynamicFilters
+            "
+            :selectedTimeDate="dashboardPanelData.meta.dateTime"
+            @variablesData="variablesDataUpdated"
+            :initialVariableValues="initialVariableValues"
+            class="q-mb-sm"
+          />
+          <CustomHTMLEditor
+            v-model="dashboardPanelData.data.htmlContent"
+            style="width: 100%; height: 100%"
+            class="col"
+            :initialVariableValues="updatedVariablesData"
+          />
+          <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        </div>
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'markdown'"
         class="col column"
         style="width: 100%; height: 100%; flex: 1"
       >
-        <VariablesValueSelector
-          :variablesConfig="currentDashboardData.data?.variables"
-          :showDynamicFilters="
-            currentDashboardData.data?.variables?.showDynamicFilters
-          "
-          :selectedTimeDate="dashboardPanelData.meta.dateTime"
-          @variablesData="variablesDataUpdated"
-          :initialVariableValues="initialVariableValues"
-          class="q-mb-sm"
-        />
-        <CustomMarkdownEditor
-          v-model="dashboardPanelData.data.markdownContent"
-          style="width: 100%; height: 100%"
-          class="col"
-          :initialVariableValues="updatedVariablesData"
-        />
-        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <VariablesValueSelector
+            :variablesConfig="currentDashboardData.data?.variables"
+            :showDynamicFilters="
+              currentDashboardData.data?.variables?.showDynamicFilters
+            "
+            :selectedTimeDate="dashboardPanelData.meta.dateTime"
+            @variablesData="variablesDataUpdated"
+            :initialVariableValues="initialVariableValues"
+            class="q-mb-sm"
+          />
+          <CustomMarkdownEditor
+            v-model="dashboardPanelData.data.markdownContent"
+            style="width: 100%; height: 100%"
+            class="col"
+            :initialVariableValues="updatedVariablesData"
+          />
+          <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        </div>
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'custom_chart'"
-        class="col column"
-        style="height: calc(100vh - 99px); overflow-y: auto"
+        class="col"
+        style="height: calc(100vh - 99px); overflow-y: auto; display: flex; flex-direction: row; overflow-x: hidden"
       >
+        <!-- collapse field list bar -->
+        <div
+          v-if="!dashboardPanelData.layout.showFieldList"
+          class="field-list-sidebar-header-collapsed card-container"
+          @click="collapseFieldList"
+          style="width: 50px; height: 100%; flex-shrink: 0"
+        >
+          <q-icon
+            name="expand_all"
+            class="field-list-collapsed-icon rotate-90"
+            data-test="dashboard-field-list-collapsed-icon"
+          />
+          <div class="field-list-collapsed-title">{{ t("panel.fields") }}</div>
+        </div>
         <q-splitter
           v-model="dashboardPanelData.layout.splitter"
-          @update:model-value="layoutSplitterUpdated"
-          style="width: 100%; height: 100%"
+          :limits="[0, 20]"
+          :style="{
+            width: dashboardPanelData.layout.showFieldList ? '100%' : 'calc(100% - 50px)',
+            height: '100%'
+          }"
         >
           <template #before>
+            <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
             <div
-              class="col scroll"
+              class="col scroll card-container"
               style="height: calc(100vh - 99px); overflow-y: auto"
             >
               <div
@@ -367,12 +503,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
+            </div>
           </template>
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
             <q-btn
               color="primary"
-              size="12px"
+              size="sm"
               :icon="
                 dashboardPanelData.layout.showFieldList
                   ? 'chevron_left'
@@ -381,18 +518,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               round
               style="top: 14px; z-index: 100"
-              :style="{
-                right: dashboardPanelData.layout.showFieldList
-                  ? '-20px'
-                  : '-0px',
-                left: dashboardPanelData.layout.showFieldList ? '5px' : '12px',
-              }"
               @click="collapseFieldList"
             />
           </template>
           <template #after>
             <div
-              class="row"
+              class="row card-container"
               style="height: calc(100vh - 99px); overflow-y: auto"
             >
               <div class="col scroll" style="height: 100%">
@@ -426,6 +557,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <PanelSchemaRenderer
                         v-if="chartData"
                         @metadata-update="metaDataValue"
+                        @result-metadata-update="handleResultMetadataUpdate"
+                        @limit-number-of-series-warning-message-update="
+                          handleLimitNumberOfSeriesWarningMessage
+                        "
                         :key="dashboardPanelData.data.type"
                         :panelSchema="chartData"
                         :dashboard-id="queryParams?.dashboard"
@@ -474,6 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-splitter>
       </div>
     </div>
+    </div>
   </div>
 </template>
 
@@ -520,7 +656,16 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
-import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
+import {
+  createDashboardsContextProvider,
+  contextRegistry,
+} from "@/composables/contextProviders";
+import {
+  outlinedWarning,
+  outlinedRunningWithErrors,
+} from "@quasar/extras/material-icons-outlined";
+import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import { processQueryMetadataErrors } from "@/utils/zincutils";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -601,6 +746,11 @@ export default defineComponent({
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
     };
+
+    // Warning messages
+    const maxQueryRangeWarning = ref("");
+    const limitNumberOfSeriesWarningMessage = ref("");
+    const errorMessage = ref("");
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
@@ -707,8 +857,8 @@ export default defineComponent({
       removeAiContextHandler();
 
       // Clean up dashboard context provider
-      contextRegistry.unregister('dashboards');
-      contextRegistry.setActive('');
+      contextRegistry.unregister("dashboards");
+      contextRegistry.setActive("");
 
       // console.timeEnd("onUnmounted");
 
@@ -777,13 +927,13 @@ export default defineComponent({
 
       // Set up dashboard context provider
       const dashboardProvider = createDashboardsContextProvider(
-        route, 
-        store, 
-        dashboardPanelData, 
-        editMode.value
+        route,
+        store,
+        dashboardPanelData,
+        editMode.value,
       );
-      contextRegistry.register('dashboards', dashboardProvider);
-      contextRegistry.setActive('dashboards');
+      contextRegistry.register("dashboards", dashboardProvider);
+      contextRegistry.setActive("dashboards");
 
       // console.timeEnd("add panel loadDashboard");
     });
@@ -815,11 +965,11 @@ export default defineComponent({
       // console.time("AddPanel:loadDashboard");
       let data = JSON.parse(
         JSON.stringify(
-          await getDashboard(
+          (await getDashboard(
             store,
             route.query.dashboard,
             route.query.folder ?? "default",
-          ) ?? {},
+          )) ?? {},
         ),
       );
       // console.timeEnd("AddPanel:loadDashboard");
@@ -1279,17 +1429,33 @@ export default defineComponent({
       }
     };
 
-    const handleChartApiError = (errorMessage: {
-      message: string;
-      code: string;
-    }) => {
-      if (errorMessage?.message) {
+    const handleChartApiError = (errorMsg: any) => {
+      if (typeof errorMsg === "string") {
+        errorMessage.value = errorMsg;
         const errorList = errorData.errors ?? [];
         errorList.splice(0);
-        errorList.push(errorMessage.message);
+        errorList.push(errorMsg);
+      } else if (errorMsg?.message) {
+        errorMessage.value = errorMsg.message ?? "";
+        const errorList = errorData.errors ?? [];
+        errorList.splice(0);
+        errorList.push(errorMsg.message);
+      } else {
+        errorMessage.value = "";
       }
     };
 
+    // Handle limit number of series warning from PanelSchemaRenderer
+    const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
+      limitNumberOfSeriesWarningMessage.value = message;
+    };
+
+    const handleResultMetadataUpdate = (metadata: any) => {
+      maxQueryRangeWarning.value = processQueryMetadataErrors(
+        metadata,
+        store.state.timezone,
+      );
+    };
     const onDataZoom = (event: any) => {
       // console.time("onDataZoom");
       const selectedDateObj = {
@@ -1719,6 +1885,14 @@ export default defineComponent({
       dateTimeForVariables,
       seriesDataUpdate,
       seriesData,
+      maxQueryRangeWarning,
+      limitNumberOfSeriesWarningMessage,
+      errorMessage,
+      handleLimitNumberOfSeriesWarningMessage,
+      handleResultMetadataUpdate,
+      outlinedWarning,
+      symOutlinedDataInfoAlert,
+      outlinedRunningWithErrors,
     };
   },
   methods: {
@@ -1757,9 +1931,35 @@ export default defineComponent({
   background-color: transparent !important;
 }
 
+.field-list-sidebar-header-collapsed {
+  cursor: pointer;
+  width: 50px;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.field-list-collapsed-icon {
+  margin-top: 10px;
+  font-size: 20px;
+}
+
+.field-list-collapsed-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: bold;
+}
+
 .dynamic-input {
   min-width: 200px;
   max-width: 500px;
   transition: width 0.2s ease;
+}
+
+.warning {
+  color: var(--q-warning);
 }
 </style>

@@ -366,6 +366,13 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             if LOCAL_NODE.name.ne(&node_name) {
                 need_release_ids.push(job.id); // not this node
             }
+
+            // check if there is another job running for this stream
+            if db::compact::stream::is_running(&job.stream) {
+                need_release_ids.push(job.id); // another job is running
+            } else {
+                db::compact::stream::set_running(&job.stream);
+            }
         }
     }
 

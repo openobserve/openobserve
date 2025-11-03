@@ -92,11 +92,12 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.selectTranspose();
 
-    // Apply transpose and wait for API completion
+    // Apply transpose and wait for chart to render
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     await pm.chartTypeSelector.waitForTableDataLoad();
 
-    // Store transposed data after API completion
+    // Store transposed data after rendering is complete
     const transposedTableData = await captureTableData(page);
 
     // Verify that transpose is working by checking structure differences

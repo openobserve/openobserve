@@ -31,9 +31,11 @@ pub mod functions;
 pub mod keys;
 pub mod kv;
 pub mod logs;
+pub mod mcp;
 pub mod metrics;
 pub mod organization;
 pub mod pipeline;
+pub mod pipelines;
 pub mod promql;
 pub mod ratelimit;
 #[cfg(feature = "enterprise")]

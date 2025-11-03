@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, post, web};
+use actix_web::{
+    HttpRequest, HttpResponse, post,
+    web::{self, Query},
+};
 use config::{
     get_config,
     meta::{
@@ -43,17 +46,26 @@ use crate::{
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
-        utils::http::{
-            get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
-            get_is_ui_histogram_from_request, get_or_create_trace_id,
-            get_search_event_context_from_request, get_search_type_from_request,
-            get_stream_type_from_request, get_use_cache_from_request,
+        utils::{
+            auth::UserEmail,
+            http::{
+                get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
+                get_is_ui_histogram_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request,
+            },
         },
     },
-    handler::http::request::search::{
-        build_search_request_per_field, error_utils::map_error_to_http_response,
+    handler::http::{
+        extractors::Headers,
+        request::search::{
+            build_search_request_per_field, error_utils::map_error_to_http_response,
+        },
     },
-    service::{search::streaming::process_search_stream_request, setup_tracing_with_trace_id},
+    service::{
+        search::{streaming::process_search_stream_request, utils::is_permissable_function_error},
+        setup_tracing_with_trace_id,
+    },
 };
 /// Search HTTP2 streaming endpoint
 
@@ -87,6 +99,7 @@ use crate::{
 #[post("/{org_id}/_search_stream")]
 pub async fn search_http2_stream(
     org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> HttpResponse {
@@ -101,12 +114,7 @@ pub async fn search_http2_stream(
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = user_email.user_id;
 
     // Log the request
     log::debug!(
@@ -401,6 +409,7 @@ pub async fn search_http2_stream(
     });
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
+    let search_type = req.search_type;
 
     // Spawn the search task in a separate task
     actix_web::rt::spawn(process_search_stream_request(
@@ -423,6 +432,17 @@ pub async fn search_http2_stream(
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
             Ok(mut v) => {
+                // Check if function error is only - query limit default error and only `ui`
+                if let StreamResponses::SearchResponse {
+                    ref mut results, ..
+                } = v
+                    && search_type == Some(SearchEventType::UI)
+                    && is_permissable_function_error(&results.function_error)
+                {
+                    results.function_error.clear();
+                    results.is_partial = false;
+                }
+
                 if is_ui_histogram
                     && let StreamResponses::SearchResponse {
                         ref mut results, ..
@@ -535,6 +555,8 @@ pub async fn report_to_audit(
 #[post("/{org_id}/_values_stream")]
 pub async fn values_http2_stream(
     org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Query(query): Query<HashMap<String, String>>,
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> HttpResponse {
@@ -549,20 +571,13 @@ pub async fn values_http2_stream(
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = user_email.user_id;
 
     // Log the request
     log::debug!(
         "[HTTP2_STREAM trace_id {trace_id}] Received values HTTP/2 stream request for org_id: {org_id}"
     );
 
-    // Get query params
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let mut stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     #[cfg(feature = "enterprise")]

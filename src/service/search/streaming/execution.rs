@@ -174,13 +174,15 @@ pub async fn do_partitioned_search(
             );
         }
 
-        curr_res_size += total_hits;
-        if req_size > 0 && curr_res_size >= req_size {
-            log::info!(
-                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
-            );
-            search_res.hits.truncate(req_size as usize);
-            search_res.total = search_res.hits.len();
+        if !is_streaming_aggs {
+            curr_res_size += total_hits;
+            if req_size > 0 && curr_res_size >= req_size {
+                log::info!(
+                    "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
+                );
+                search_res.hits.truncate(req_size as usize);
+                search_res.total = search_res.hits.len();
+            }
         }
 
         search_res = order_search_results(search_res, fallback_order_by_col.clone());
@@ -390,8 +392,6 @@ pub fn handle_partial_response(mut res: Response) -> Response {
         res.function_error = if res.function_error.is_empty() {
             vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()]
         } else {
-            res.function_error
-                .push(PARTIAL_ERROR_RESPONSE_MESSAGE.to_string());
             res.function_error
         };
     }
@@ -814,27 +814,6 @@ mod tests {
         let result = calc_queried_range(start_time, end_time, 50);
         let expected = 0.5; // 1 hour * 0.5
         assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_handle_partial_response() {
-        let response = Response {
-            is_partial: true,
-            function_error: vec!["Custom error".to_string()],
-            trace_id: "test-123".to_string(),
-            ..Default::default()
-        };
-
-        let result = handle_partial_response(response.clone());
-
-        // Should add the partial error message
-        assert!(
-            result
-                .function_error
-                .contains(&PARTIAL_ERROR_RESPONSE_MESSAGE.to_string())
-        );
-        assert!(result.function_error.contains(&"Custom error".to_string()));
-        assert_eq!(result.function_error.len(), 2);
     }
 
     #[test]

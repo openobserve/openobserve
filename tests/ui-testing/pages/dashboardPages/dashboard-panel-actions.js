@@ -36,10 +36,10 @@ export default class DashboardactionPage {
   // Wait for chart to render
 
   async waitForChartToRender() {
-    // Wait for it to go back to bg-secondary (render complete)
+    // Wait for it to go back to o2-primary-button-light (render complete)
     await this.page.waitForFunction(() => {
       const btn = document.querySelector('[data-test="dashboard-apply"]');
-      return btn && btn.classList.contains("bg-secondary");
+      return btn && btn.classList.contains("o2-primary-button-light");
     });
   }
 

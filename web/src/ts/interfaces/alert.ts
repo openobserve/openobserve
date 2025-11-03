@@ -49,6 +49,17 @@ export interface Alert {
   context_attributes: { [key: string]: string };
   description: string;
   uuid?: string;
+  deduplication?: {
+    enabled: boolean;
+    fingerprint_fields: string[];
+    time_window_minutes?: number;
+    grouping?: {
+      enabled: boolean;
+      max_group_size: number;
+      send_strategy: "first_with_count" | "summary" | "all";
+      group_wait_seconds: number;
+    };
+  };
 }
 
 // Alert object which is modified in frontend to display in table and form

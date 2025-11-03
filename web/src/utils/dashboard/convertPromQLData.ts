@@ -29,6 +29,10 @@ import {
   getSeriesColor,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
+import {
+  calculateBottomLegendHeight,
+  calculateRightLegendWidth,
+} from "./legendConfiguration";
 
 let moment: any;
 let momentInitialized = false;
@@ -78,6 +82,11 @@ export const convertPromQLData = async (
 ) => {
   // console.time("convertPromQLData");
 
+  // Set gridlines visibility based on config.show_gridlines (default: true)
+  const showGridlines =
+    panelSchema?.config?.show_gridlines !== undefined
+      ? panelSchema.config.show_gridlines
+      : true;
   await importMoment();
 
   // if no data than return it
@@ -95,18 +104,29 @@ export const convertPromQLData = async (
   let extras: any = {};
 
   // get the limit series from the config
-  let limitSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+  const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
 
   // get the total series
   let totalSeries = 0;
   searchQueryData.forEach((queryData: any) => {
-    totalSeries += queryData.result?.length || 0;
+    if (queryData && queryData.result) {
+      totalSeries += queryData.result.length || 0;
+    }
   });
 
-  // Limit number of series to limitSeries
+  // For multiple queries (multi y-axis equivalent), divide the limit equally
+  const numberOfQueries = searchQueryData.filter(
+    (q: any) => q.result?.length > 0,
+  ).length;
+  const limitPerQuery =
+    numberOfQueries > 1 ? Math.floor(maxSeries / numberOfQueries) : maxSeries;
+
+  // Limit number of series to limitPerQuery per query
   const limitedSearchQueryData = searchQueryData.map((queryData: any) => {
-    const remainingSeries = queryData.result?.slice(0, limitSeries);
-    limitSeries = limitSeries - remainingSeries.length;
+    if (!queryData || !queryData.result) {
+      return queryData;
+    }
+    const remainingSeries = queryData.result.slice(0, limitPerQuery);
     return {
       ...queryData,
       result: remainingSeries,
@@ -130,11 +150,13 @@ export const convertPromQLData = async (
   let xAxisData: any = new Set();
 
   // add all series timestamp
-  limitedSearchQueryData.forEach((queryData: any) =>
-    queryData.result.forEach((result: any) =>
-      result.values.forEach((value: any) => xAxisData.add(value[0])),
-    ),
-  );
+  limitedSearchQueryData.forEach((queryData: any) => {
+    if (queryData && queryData.result) {
+      queryData.result.forEach((result: any) =>
+        result.values.forEach((value: any) => xAxisData.add(value[0])),
+      );
+    }
+  });
 
   // sort the timestamp and make an array
   xAxisData = Array.from(xAxisData).sort();
@@ -152,7 +174,7 @@ export const convertPromQLData = async (
 
   const legendConfig: any = {
     show: panelSchema.config?.show_legends,
-    type: "scroll",
+    type: panelSchema.config?.legends_type === "plain" ? "plain" : "scroll",
     orient: legendPosition,
     padding: [10, 20, 10, 10],
     tooltip: {
@@ -351,12 +373,12 @@ export const convertPromQLData = async (
     xAxis: {
       type: "time",
       axisLine: {
-        show: searchQueryData?.every((it: any) => it.result.length == 0)
+        show: searchQueryData?.every((it: any) => it && it.result && it.result.length == 0)
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },
       splitLine: {
-        show: true,
+        show: showGridlines,
         lineStyle: {
           opacity: 0.5,
         },
@@ -383,12 +405,12 @@ export const convertPromQLData = async (
         },
       },
       axisLine: {
-        show: searchQueryData?.every((it: any) => it.result.length == 0)
+        show: searchQueryData?.every((it: any) => it && it.result && it.result.length == 0)
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },
       splitLine: {
-        show: true,
+        show: showGridlines,
         lineStyle: {
           opacity: 0.5,
         },
@@ -421,6 +443,24 @@ export const convertPromQLData = async (
   let totalLength = 0;
   // for gauge chart, it contains grid array, single chart height and width, no. of charts per row and no. of columns
   let gridDataForGauge: any = {};
+
+  // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
+  if (options.xAxis) {
+    (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
+      (axis) => {
+        // if (!axis.splitLine) axis.splitLine = {};
+        axis.splitLine.show = showGridlines;
+      },
+    );
+  }
+  if (options.yAxis) {
+    (Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis]).forEach(
+      (axis) => {
+        // if (!axis.splitLine) axis.splitLine = {};
+        axis.splitLine.show = showGridlines;
+      },
+    );
+  }
 
   if (panelSchema.type === "gauge") {
     // calculate total length of all metrics
@@ -812,7 +852,11 @@ export const convertPromQLData = async (
     legendConfig.orient == "vertical" &&
     panelSchema.config?.show_legends &&
     panelSchema.type != "gauge" &&
-    panelSchema.type != "metric"
+    panelSchema.type != "metric" &&
+    panelSchema?.config?.legends_position == "right" &&
+    (panelSchema?.config?.legends_type == null ||
+      panelSchema?.config?.legends_type === "plain" ||
+      panelSchema?.config?.legends_type === "scroll")
   ) {
     let legendWidth;
 
@@ -821,29 +865,32 @@ export const convertPromQLData = async (
       !isNaN(parseFloat(panelSchema.config.legend_width.value))
       // ["px", "%"].includes(panelSchema.config.legend_width.unit)
     ) {
-      if (panelSchema.config.legend_width.unit === "%") {
-        // If in percentage, calculate percentage of the chartPanelRef width
-        const percentage = panelSchema.config.legend_width.value / 100;
-        legendWidth = chartPanelRef.value?.offsetWidth * percentage;
-      } else {
-        // If in pixels, use the provided value
-        legendWidth = panelSchema.config.legend_width.value;
-      }
-    } else {
-      const maxValue = options.series.reduce((max: any, it: any) => {
-        return max.length < it?.name?.length ? it?.name : max;
-      }, "");
-
-      // If legend_width is not provided or has invalid format, calculate it based on other criteria
       legendWidth =
-        Math.min(
-          chartPanelRef.value?.offsetWidth / 3,
-          calculateWidthText(maxValue) + 60,
-        ) ?? 20;
+        panelSchema.config.legend_width.unit === "%"
+          ? (chartPanelRef.value?.offsetWidth || 0) *
+            (panelSchema.config.legend_width.value / 100)
+          : panelSchema.config.legend_width.value;
+    } else {
+      // Dynamically compute width to ensure legends do not overlap the chart
+      legendWidth = calculateRightLegendWidth(
+        options.series?.length || 0,
+        chartPanelRef.value?.offsetWidth || 800,
+        chartPanelRef.value?.offsetHeight || 400,
+        options.series || [],
+        panelSchema?.config?.legends_type === "scroll" ||
+          panelSchema?.config?.legends_type == null,
+      );
     }
 
+    // Reserve space on the right so that the plot shrinks horizontally
     options.grid.right = legendWidth;
-    options.legend.textStyle.width = legendWidth - 55;
+    // Constrain legend text to the reserved space to avoid overflow
+    options.legend.textStyle.width = Math.max(legendWidth - 55, 60);
+    // Explicitly bound the legend area to the reserved right-side width
+    const containerWidth = chartPanelRef.value?.offsetWidth || 0;
+    const legendLeftPx = Math.max(containerWidth - legendWidth, 0);
+    options.legend.left = legendLeftPx;
+    options.legend.right = 0;
   }
 
   //check if is there any data else filter out axis or series data
@@ -861,6 +908,90 @@ export const convertPromQLData = async (
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
+  // Apply dynamic legend height for bottom legends if conditions are met
+  if (
+    panelSchema?.config?.show_legends &&
+    (panelSchema?.config?.legends_type === "plain" ||
+      (panelSchema.config.legend_height &&
+        !isNaN(parseFloat(panelSchema.config.legend_height.value)))) &&
+    (panelSchema?.config?.legends_position === "bottom" ||
+      panelSchema?.config?.legends_position === null) // Handle null/undefined as auto
+  ) {
+    // Get chart dimensions from chartPanelRef
+    const chartWidth = chartPanelRef.value?.offsetWidth || 800;
+    const chartHeight = chartPanelRef.value?.offsetHeight || 400;
+    // Count legend items from series data
+    const legendCount = options.series?.length || 0;
+
+    // Apply 80% height constraint for plain legends with bottom or auto position
+    const maxHeight =
+      panelSchema?.config?.legends_position === "bottom" ||
+      panelSchema?.config?.legends_position === null
+        ? chartHeight
+        : undefined;
+
+    // Calculate and configure bottom legend positioning to prevent overflow to top
+    // Prefer explicit legend height if provided in config
+    if (
+      panelSchema.config.legend_height &&
+      !isNaN(parseFloat(panelSchema.config.legend_height.value))
+    ) {
+      const legendHeight =
+        panelSchema.config.legend_height.unit === "%"
+          ? chartHeight * (panelSchema.config.legend_height.value / 100)
+          : panelSchema.config.legend_height.value;
+      
+      // Apply the configured height using the same approach as calculateBottomLegendHeight
+      if (options.grid) {
+        options.grid.bottom = legendHeight;
+      }
+      
+      const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
+      options.legend.top = legendTopPosition;
+      options.legend.height = legendHeight - 20; // Constrain height within allocated space
+    } else {
+      // Dynamically compute height to ensure legends do not overlap the chart
+      calculateBottomLegendHeight(
+        legendCount,
+        chartWidth,
+        options.series || [],
+        maxHeight,
+        options.legend,
+        options.grid,
+        chartHeight,
+      );
+    }
+  }
+
+  // Apply legend height for scroll/auto legends at bottom position
+  if (
+    panelSchema?.config?.show_legends &&
+    (panelSchema?.config?.legends_type === "scroll" ||
+      panelSchema?.config?.legends_type == null) && // null means auto, which can be scroll
+    (panelSchema?.config?.legends_position === "bottom" ||
+      panelSchema?.config?.legends_position === null) &&
+    panelSchema.config.legend_height &&
+    !isNaN(parseFloat(panelSchema.config.legend_height.value))
+  ) {
+    // Get chart dimensions from chartPanelRef
+    const chartHeight = chartPanelRef.value?.offsetHeight || 400;
+
+    // Apply explicit legend height for scroll/auto legends
+    const legendHeight =
+      panelSchema.config.legend_height.unit === "%"
+        ? chartHeight * (panelSchema.config.legend_height.value / 100)
+        : panelSchema.config.legend_height.value;
+    
+    // Apply the configured height using the same approach as calculateBottomLegendHeight
+    if (options.grid) {
+      options.grid.bottom = legendHeight;
+    }
+    
+    const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
+    options.legend.top = legendTopPosition;
+    options.legend.height = legendHeight - 20; // Constrain height within allocated space
+  }
+
   // promql query will be always timeseries except gauge and metric text chart.
   // console.timeEnd("convertPromQLData");
   return {

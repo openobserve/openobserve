@@ -4,14 +4,14 @@
       v-model="inputValue"
       @update:model-value="onModelValueChanged"
       dense
-      filled
+      borderless
       :label="label"
       @focus="showOptions = true"
       @blur="hideOptions"
       v-bind="$attrs"
       style="width: 100%"
       data-test="common-auto-complete"
-    >
+     hide-bottom-space>
       <template v-if="hasSlot('label')" v-slot:label>
         <slot name="label"></slot>
       </template>

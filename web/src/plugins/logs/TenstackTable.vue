@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="parentRef" class="container tw-overflow-x-auto tw-relative">
+  <div
+    ref="parentRef"
+    class="container !tw-rounded-none tw-overflow-x-auto tw-relative table-container"
+  >
     <table
       v-if="table"
       data-test="logs-search-result-logs-table"
@@ -56,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? tableRowSize + 'px'
                   : table.getTotalSize() + 'px',
             minWidth: '100%',
-            background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
+            background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
@@ -80,9 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :class="[
                 'resizer',
-                store.state.theme === 'dark'
-                  ? 'tw-bg-zinc-800'
-                  : 'tw-bg-zinc-300',
+                'tw-bg-[var(--o2-border-color)]',
                 header.column.getIsResizing() ? 'isResizing' : '',
               ]"
               :style="{}"
@@ -142,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :colspan="columnOrder.length"
             class="text-bold"
             :style="{
-              background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
+              background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
               opacity: 0.7,
             }"
           >
@@ -161,7 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.7"
           >
             <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs" name="warning" class="q-mr-xs" />
+              <q-icon size="xs"
+name="warning" class="q-mr-xs" />
               {{ errMsg }}
             </div>
           </td>
@@ -236,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               store.state.theme === 'dark'
                 ? 'w-border-gray-800  hover:tw-bg-zinc-800'
-                : 'w-border-gray-100 hover:tw-bg-zinc-100',
+                : 'w-border-gray-100 hover:tw-bg-zinc-200',
               defaultColumns &&
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
@@ -244,7 +246,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'tw-flex',
               (tableRows[virtualRow.index] as any)[
                 store.state.zoConfig.timestamp_column
-              ] === highlightTimestamp
+              ] === highlightTimestamp &&
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? store.state.theme === 'dark'
                   ? 'tw-bg-zinc-700'
                   : 'tw-bg-zinc-300'
@@ -258,10 +261,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- Status color line for entire row -->
-            <div 
-              v-if="!(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
+            <div
+              v-if="
+                !(formattedRows[virtualRow.index]?.original as any)
+                  ?.isExpandedRow
+              "
               class="tw-absolute tw-left-0 tw-inset-y-0 tw-w-1 tw-z-10"
-              :style="{ backgroundColor: getRowStatusColor(tableRows[virtualRow.index]) }"
+              :style="{
+                backgroundColor: getRowStatusColor(tableRows[virtualRow.index]),
+              }"
             ></div>
             <td
               v-if="
@@ -275,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <json-preview
                 :value="tableRows[virtualRow.index - 1] as any"
                 show-copy-button
-                class="tw-py-1"
+                class="tw-py-[0.375rem]"
                 mode="expanded"
                 :highlight-query="highlightQuery"
                 @copy="copyLogToClipboard"
@@ -347,11 +355,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <LogsHighLighting
-                  :data="cell.column.columnDef.id === 'source' ? cell.row.original : cell.renderValue()"
+                  :data="
+                    cell.column.columnDef.id === 'source'
+                      ? cell.row.original
+                      : cell.renderValue()
+                  "
                   :show-braces="cell.column.columnDef.id === 'source'"
                   :show-quotes="cell.column.columnDef.id === 'source'"
                   :query-string="highlightQuery"
-                  :simple-mode="!(cell.column.columnDef.id === 'source' || isFTSColumn(cell.column.columnDef.id, cell.renderValue(), selectedStreamFtsKeys))"
+                  :simple-mode="
+                    !(
+                      cell.column.columnDef.id === 'source' ||
+                      isFTSColumn(
+                        cell.column.columnDef.id,
+                        cell.renderValue(),
+                        selectedStreamFtsKeys,
+                      )
+                    )
+                  "
                 />
                 <O2AIContextAddBtn
                   v-if="
@@ -516,7 +537,6 @@ const getRowStatusColor = (rowData: any) => {
   return statusInfo.color;
 };
 
-
 watch(
   () => props.columns,
   async (newVal) => {
@@ -555,6 +575,9 @@ watch(
   () => columnOrder.value,
   () => {
     emits("update:columnOrder", columnOrder.value, props.columns);
+  },
+  {
+    immediate: true,
   },
 );
 
@@ -910,104 +933,5 @@ defineExpose({
 });
 </script>
 <style scoped lang="scss">
-.resizer {
-  position: absolute;
-  top: 0;
-  height: 100%;
-  width: 5px;
-  cursor: col-resize;
-  user-select: none;
-  touch-action: none;
-}
-
-.resizer.ltr {
-  right: 0;
-}
-
-.resizer.rtl {
-  left: 0;
-}
-
-.resizer.isResizing {
-  background: $primary;
-  opacity: 1;
-}
-
-.container {
-  height: calc(100vh - 294px);
-  overflow: auto;
-}
-
-.cursor-pointer {
-  cursor: pointer;
-}
-
-.select-none {
-  user-select: none;
-}
-
-.text-left {
-  text-align: left;
-}
-
-table {
-  border-collapse: collapse;
-  border-spacing: 0;
-  font-size: 12px !important;
-}
-
-thead {
-  background: lightgray;
-  font-family: "Nunito Sans", sans-serif;
-  font-size: 14px !important;
-}
-
-.table-row {
-  border-bottom: 1px solid gray;
-}
-
-th {
-  text-align: left;
-
-  &:hover {
-    .column-actions {
-      visibility: visible !important;
-    }
-  }
-}
-
-td {
-  font-family: monospace;
-}
-
-.thead-sticky tr > *,
-.tfoot-sticky tr > * {
-  position: sticky;
-  opacity: 1;
-  z-index: 1;
-  background: #f5f5f5;
-}
-
-.q-table--dark .thead-sticky tr > *,
-.q-table--dark .tfoot-sticky tr > * {
-  background: #565656;
-}
-
-.table-cell {
-  &:hover {
-    .table-cell-actions {
-      display: block !important;
-    }
-  }
-}
-
-.table-row-hover {
-  &:hover {
-    .ai-btn {
-      visibility: visible !important;
-      z-index: 2;
-    }
-  }
-}
-
+@import "@/styles/logs/tenstack-table.scss";
 </style>

@@ -122,8 +122,8 @@
               { 'error-message': message.content.startsWith('Error:') }
             ]">
             <div class="message-content" >
-              <q-avatar v-if="message.role === 'user'" size="24px" class="q-mr-sm">
-                <q-icon size="16px" color="primary" name="person" />
+              <q-avatar v-if="message.role === 'user'" size="24px" :class="store.state.theme == 'dark' ? 'dark-user-avatar' : 'light-user-avatar'">
+                <q-icon size="16px" name="person" :color="store.state.theme == 'dark' ? 'white' : '#4a5568'" />
               </q-avatar>
               <div class="message-blocks" style="background-color: transparent;" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
                 <template v-for="(block, blockIndex) in message.blocks" :key="blockIndex">
@@ -175,14 +175,34 @@
               </div>
             </div>
           </div>
-          <div v-if="isLoading" class="">
+          <div v-if="isLoading" id="loading-indicator" class="">
             <q-spinner-dots color="primary" size="2em" />
             <span>Generating response...</span>
           </div>
         </div>
+        
+        <!-- Scroll to bottom button -->
+        <div 
+          v-show="showScrollToBottom" 
+          class="scroll-to-bottom-container"
+        >
+          <q-btn
+            round
+            flat
+            icon="arrow_downward"
+            class="scroll-to-bottom-btn"
+            @click="scrollToBottomSmooth"
+            size="sm"
+          >
+            <q-tooltip anchor="top middle" self="bottom middle">
+              Scroll to bottom
+            </q-tooltip>
+          </q-btn>
+        </div>
       </div>
-      <div class="chat-input-wrapper tw-flex tw-flex-col q-ma-md" >
+      <div class="chat-input-wrapper tw-flex tw-flex-col q-ma-md" @click="focusInput">
         <q-input
+          ref="chatInput"
           v-model="inputMessage"
           placeholder="Write your prompt"
           dense
@@ -194,6 +214,7 @@
           :borderless="true"
           style="max-height: 250px; overflow-y: auto; font-size: 16px;"
           class="chat-input"
+          flat
         >
         </q-input>
         <div class="tw-flex tw-items-center tw-justify-end tw-mt-2 tw-gap-2" :class="store.state.theme == 'dark' ? 'dark-mode-bottom-bar' : 'light-mode-bottom-bar'">
@@ -215,18 +236,32 @@
               </template>
             </q-select>
 
-          <q-btn
-            color="primary"
-            :disable="isLoading || !inputMessage.trim()"
-            @click="sendMessage"
-            class="tw-px-2 tw-rounded-md no-border"
-            no-caps
+          <!-- Debug info - remove this later -->
+          <!-- <div class="tw-text-xs tw-text-gray-500">Loading: {{ isLoading }}, Input: {{ inputMessage.length }}</div> -->
 
+          <!-- Send button - shown when not loading -->
+          <q-btn
+            v-if="!isLoading"
+            :disable="!inputMessage.trim()"
+            @click="sendMessage"
+            round
+            dense
+            flat
+            class="tw-ml-1 send-button"
           >
-            <div class="tw-flex tw-items-center tw-gap-2">
-              <img :src="getGenerateAiIcon" class="tw-w-4 tw-h-4" />
-              <span class="tw-text-[12px]">Generate</span>
-            </div>
+            <q-icon name="send" size="16px" color="white" />
+          </q-btn>
+          
+          <!-- Stop button - shown when loading/streaming -->
+          <q-btn
+            v-if="isLoading"
+            @click="cancelCurrentRequest"
+            round
+            dense
+            flat
+            class="tw-ml-1 stop-button"
+          >
+            <q-icon name="stop" size="16px" color="white" />
           </q-btn>
         </div>
       </div>
@@ -329,6 +364,7 @@ export default defineComponent({
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
+    const chatInput = ref<HTMLElement | null>(null);
     const currentStreamingMessage = ref('');
     const selectedProvider = ref<string>('openai');
     const selectedModel = ref<any>('gpt-4.1');
@@ -342,6 +378,16 @@ export default defineComponent({
     const saveHistoryLoading = ref(false);
     const historySearchTerm = ref('');
     const shouldAutoScroll = ref(true);
+    const showScrollToBottom = ref(false);
+    
+    // AbortController for managing request cancellation - allows users to stop ongoing AI requests
+    const currentAbortController = ref<AbortController | null>(null);
+    
+    // Query history functionality
+    const queryHistory = ref<string[]>([]);
+    const historyIndex = ref(-1);
+    const HISTORY_KEY = 'ai-chat-query-history';
+    const MAX_HISTORY_SIZE = 10;
     
     const modelConfig: any = {
       openai: [
@@ -395,14 +441,94 @@ export default defineComponent({
       
       const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
       const threshold = getScrollThreshold();
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
       
-      shouldAutoScroll.value = scrollTop + clientHeight >= scrollHeight - threshold;
+      shouldAutoScroll.value = isAtBottom;
+      
+      // Show scroll to bottom button when user scrolls up significantly
+      // Only show if there's enough content to scroll and user is not at bottom
+      const hasScrollableContent = scrollHeight > clientHeight + 100; // At least 100px more content
+      const isScrolledUp = scrollTop + clientHeight < scrollHeight - 100; // 100px from bottom
+      
+      showScrollToBottom.value = hasScrollableContent && isScrolledUp;
     };
 
     const scrollToBottom = async () => {
       await nextTick();
       if (messagesContainer.value && shouldAutoScroll.value) {
         messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+      }
+    };
+
+    const scrollToBottomSmooth = async () => {
+      await nextTick();
+      if (messagesContainer.value) {
+        messagesContainer.value.scrollTo({
+          top: messagesContainer.value.scrollHeight,
+          behavior: 'smooth'
+        });
+        // Hide the button immediately when user clicks it
+        showScrollToBottom.value = false;
+        // Reset auto-scroll when user manually scrolls to bottom
+        shouldAutoScroll.value = true;
+      }
+    };
+
+
+    const scrollToLoadingIndicator = async () => {
+      await nextTick();
+      const loadingElement = document.getElementById('loading-indicator');
+      if (loadingElement) {
+        loadingElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    };
+
+    /**
+     * Cancels the currently ongoing AI chat request if one exists
+     * This will stop the streaming response and clean up the request state
+     * Shows a user-friendly notification about the cancellation
+     * 
+     * Called when user clicks the "Stop" button during message generation
+     */
+    const cancelCurrentRequest = async () => {
+      if (currentAbortController.value) {
+        currentAbortController.value.abort();
+        currentAbortController.value = null;
+        
+        // Show user notification about successful cancellation
+        $q.notify({
+          message: 'Response generation stopped',
+          color: 'secondary',
+          position: 'bottom',
+          timeout: 2000,
+          icon: 'stop'
+        });
+        
+        // Update UI state to reflect cancellation
+        isLoading.value = false;
+        
+        // Handle partial message cleanup
+        if (chatMessages.value.length > 0) {
+          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+          if (lastMessage.role === 'assistant') {
+            if (!lastMessage.content) {
+              // Remove empty assistant message that was added for streaming
+              chatMessages.value.pop();
+            } else if (currentStreamingMessage.value) {
+              // Keep partial content but indicate it was cancelled
+              lastMessage.content += '\n\n_[Response stopped by user]_';
+            }
+          }
+        }
+        
+        // Reset streaming state
+        currentStreamingMessage.value = '';
+        
+        // Save the current state including cancellation
+        await saveToHistory();
+        
+        // Scroll to show the final state
+        await scrollToBottom();
       }
     };
 
@@ -470,11 +596,20 @@ export default defineComponent({
                     content = content.replace(/([^`])\s*```/g, '$1\n```');
                     
                     currentStreamingMessage.value += content;
-                    if (chatMessages.value.length > 0) {
-                      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    
+                    // Check if we need to create the assistant message for the first time
+                    const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (!lastMessage || lastMessage.role !== 'assistant') {
+                      // First content chunk - create assistant message
+                      chatMessages.value.push({
+                        role: 'assistant',
+                        content: currentStreamingMessage.value
+                      });
+                    } else {
+                      // Update existing assistant message
                       lastMessage.content = currentStreamingMessage.value;
-                      messageComplete = true;
                     }
+                    messageComplete = true;
                     await scrollToBottom();
                   }
                 } catch (jsonError) {
@@ -510,11 +645,20 @@ export default defineComponent({
                   content = content.replace(/([^`])\s*```/g, '$1\n```');
                   
                   currentStreamingMessage.value += content;
-                  if (chatMessages.value.length > 0) {
-                    const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  
+                  // Check if we need to create the assistant message for the first time
+                  const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  if (!lastMessage || lastMessage.role !== 'assistant') {
+                    // First content chunk - create assistant message
+                    chatMessages.value.push({
+                      role: 'assistant',
+                      content: currentStreamingMessage.value
+                    });
+                  } else {
+                    // Update existing assistant message
                     lastMessage.content = currentStreamingMessage.value;
-                    messageComplete = true;
                   }
+                  messageComplete = true;
                   await scrollToBottom();
                 }
               } catch (e) {
@@ -530,7 +674,14 @@ export default defineComponent({
           await saveToHistory();
         }
       } catch (error) {
-        console.error('Error reading stream:', error);
+        // Handle different types of errors appropriately
+        if (error instanceof Error && error.name === 'AbortError') {
+          // Request was cancelled by user - this is expected behavior, not an error
+          return; // Exit gracefully without logging as error
+        } else {
+          // Genuine error occurred during stream processing
+          console.error('Error reading stream:', error);
+        }
       }
     };
 
@@ -711,32 +862,54 @@ export default defineComponent({
       }
     };
 
+    /**
+     * Sends a message to the AI chat service with streaming response handling
+     * Creates a new AbortController for each request to enable cancellation
+     * Manages the complete request lifecycle from user input to streaming response
+     */
     const sendMessage = async () => {
       if (!inputMessage.value.trim() || isLoading.value) return;
 
       const userMessage = inputMessage.value;
+      
+      // Add to query history before clearing input
+      addToHistory(userMessage);
+      
       chatMessages.value.push({
         role: 'user',
         content: userMessage
       });
       inputMessage.value = '';
       shouldAutoScroll.value = true; // Reset auto-scroll for new message
-      await scrollToBottom();
+      await scrollToBottom(); // Scroll after user message
       await saveToHistory(); // Save after user message
 
       isLoading.value = true;
       currentStreamingMessage.value = '';
       
+      // Create new AbortController for this request - enables cancellation via Stop button
+      currentAbortController.value = new AbortController();
+      
       try {
-        chatMessages.value.push({
-          role: 'assistant',
-          content: ''
-        });
+        // Don't add empty assistant message here - wait for actual content
+        await scrollToLoadingIndicator(); // Scroll directly to loading indicator
+        
         let response: any;
         try { 
-          response = await fetchAiChat(chatMessages.value.slice(0, -1),"",store.state.selectedOrganization.identifier);
+          // Pass abort signal to enable request cancellation
+          response = await fetchAiChat(
+            chatMessages.value,
+            "",
+            store.state.selectedOrganization.identifier,
+            currentAbortController.value.signal
+          );
         } catch (error) {
           console.error('Error fetching AI chat:', error);
+          return;
+        }
+
+        // Check if request was cancelled before processing response
+        if (response && response.cancelled) {
           return;
         }
 
@@ -767,9 +940,8 @@ export default defineComponent({
             role: 'assistant',
             content: 'Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.'
           });
-        } else if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant') {
-          chatMessages.value[chatMessages.value.length - 1].content = errorMessage;
         } else {
+          // Always create a new assistant message with error since we don't pre-create empty ones
           chatMessages.value.push({
             role: 'assistant',
             content: errorMessage
@@ -779,6 +951,10 @@ export default defineComponent({
       }
 
       isLoading.value = false;
+      
+      // Clean up AbortController after request completion (success or error)
+      currentAbortController.value = null;
+      
       await scrollToBottom();
     };
 
@@ -791,7 +967,101 @@ export default defineComponent({
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault(); // Prevent the default enter behavior
         sendMessage();
+      } else if (e.key === 'ArrowUp' && isOnFirstLine(e.target as HTMLTextAreaElement)) {
+        e.preventDefault();
+        navigateHistory('up');
+      } else if (e.key === 'ArrowDown' && historyIndex.value > -1) {
+        e.preventDefault();
+        navigateHistory('down');
       }
+    };
+
+    // Check if cursor is on the first line of textarea
+    const isOnFirstLine = (textarea: HTMLTextAreaElement) => {
+      if (!textarea) return false;
+      
+      const cursorPosition = textarea.selectionStart;
+      const textBeforeCursor = textarea.value.substring(0, cursorPosition);
+      
+      // Check if there are any newlines before cursor position
+      return !textBeforeCursor.includes('\n');
+    };
+
+    // Navigate through query history
+    const navigateHistory = (direction: 'up' | 'down') => {
+      if (queryHistory.value.length === 0) return;
+      
+      if (direction === 'up') {
+        if (historyIndex.value < queryHistory.value.length - 1) {
+          historyIndex.value++;
+          inputMessage.value = queryHistory.value[historyIndex.value];
+        }
+      } else if (direction === 'down') {
+        if (historyIndex.value > 0) {
+          historyIndex.value--;
+          inputMessage.value = queryHistory.value[historyIndex.value];
+        } else if (historyIndex.value === 0) {
+          historyIndex.value = -1;
+          inputMessage.value = '';
+        }
+      }
+    };
+
+    const focusInput = () => {
+      if (chatInput.value) {
+        // For Quasar components, we need to call the focus method on the component
+        chatInput.value.focus();
+        // Alternative: directly focus the native textarea element
+        const textarea = chatInput.value.$el?.querySelector('textarea');
+        if (textarea) {
+          textarea.focus();
+        }
+      }
+    };
+
+    // Load query history from localStorage
+    const loadQueryHistory = () => {
+      try {
+        const stored = localStorage.getItem(HISTORY_KEY);
+        if (stored) {
+          queryHistory.value = JSON.parse(stored);
+        }
+      } catch (error) {
+        console.error('Error loading query history:', error);
+        queryHistory.value = [];
+      }
+    };
+
+    // Save query history to localStorage
+    const saveQueryHistory = () => {
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(queryHistory.value));
+      } catch (error) {
+        console.error('Error saving query history:', error);
+      }
+    };
+
+    // Add query to history
+    const addToHistory = (query: string) => {
+      const trimmedQuery = query.trim();
+      if (!trimmedQuery) return;
+      
+      // Remove if already exists to avoid duplicates
+      const existingIndex = queryHistory.value.indexOf(trimmedQuery);
+      if (existingIndex > -1) {
+        queryHistory.value.splice(existingIndex, 1);
+      }
+      
+      // Add to beginning of array
+      queryHistory.value.unshift(trimmedQuery);
+      
+      // Keep only last MAX_HISTORY_SIZE entries
+      if (queryHistory.value.length > MAX_HISTORY_SIZE) {
+        queryHistory.value = queryHistory.value.slice(0, MAX_HISTORY_SIZE);
+      }
+      
+      saveQueryHistory();
+      historyIndex.value = -1; // Reset index
     };
 
     // Watch for isOpen changes to fetch initial message when opened
@@ -811,9 +1081,18 @@ export default defineComponent({
         loadHistory(); // Load history on mount if chat is open
         loadChat(store.state.currentChatTimestamp);
       }
+      
+      // Load query history from localStorage
+      loadQueryHistory();
     });
 
     onUnmounted(()=>{
+      // Cancel any ongoing requests when component is unmounted to prevent memory leaks
+      if (currentAbortController.value) {
+        currentAbortController.value.abort();
+        currentAbortController.value = null;
+      }
+      
       //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
       //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
       //so we need to make sure that the currentChatTimestamp is set to the correct chatId
@@ -984,7 +1263,9 @@ export default defineComponent({
       isLoading,
       sendMessage,
       handleKeyDown,
+      focusInput,
       messagesContainer,
+      chatInput,
       formatMessage,
       capabilities,
       selectCapability,
@@ -1017,6 +1298,11 @@ export default defineComponent({
       shouldAutoScroll,
       checkIfShouldAutoScroll,
       getScrollThreshold,
+      scrollToLoadingIndicator,
+      scrollToBottomSmooth,
+      showScrollToBottom,
+      cancelCurrentRequest,
+      currentAbortController,
     }
   }
 });
@@ -1026,17 +1312,43 @@ export default defineComponent({
 .chat-container {
   width: 100%;
   height: 100vh;
-  background: var(--q-page-background);
   color: var(--q-primary-text);
   display: flex;
   flex-direction: column;
-  
   overflow: hidden;
+  
+  // Light mode gradient - more sophisticated
+  &.light-mode {
+    background: rgba(255,255,255,0.7);
+    background-size: 400% 400%;
+    animation: subtleShift 20s ease-in-out infinite;
+  }
+  
+  // Dark mode gradient - more sophisticated
+  &.dark-mode {
+    background: rgba(0,0,0,0.7);
+    background-size: 400% 400%;
+    animation: subtleShift 25s ease-in-out infinite;
+  }
 
   .chat-content-wrapper {
     display: flex;
     flex-direction: column;
     height: 100%;
+    
+    // Light mode gradient - more sophisticated
+    &.light-mode {
+      background: transparent;
+      background-size: 400% 400%;
+      animation: subtleShift 20s ease-in-out infinite;
+    }
+    
+    // Dark mode gradient - more sophisticated
+    &.dark-mode {
+      background: transparent;
+      background-size: 400% 400%;
+      animation: subtleShift 25s ease-in-out infinite;
+    }
   }
 
 
@@ -1061,6 +1373,8 @@ export default defineComponent({
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    background: transparent;
+    position: relative;
   }
 
   .messages-container {
@@ -1070,6 +1384,7 @@ export default defineComponent({
     display: flex;
     flex-direction: column;
     gap: 16px;
+    background: transparent;
     max-width: 900px;
     margin: 0 auto;
     width: 100%;
@@ -1091,19 +1406,31 @@ export default defineComponent({
     flex-shrink: 0;
     display: flex;
     justify-content: center;
+    transition: all 0.2s ease;
 
     :deep(.q-field) {
       max-width: 900px;
       width: 100%;
     }
+  
   }
   .light-mode .chat-input-wrapper{
     background:#ffffff;
     border: 1px solid #e4e7ec;
+    border-radius: 12px;
+    &:focus-within {
+      border: 1px solid transparent;
+      box-shadow: 0 0 0 2px #667eea
+    }
   }
   .dark-mode .chat-input-wrapper{
     background:#191919;
     border: 1px solid #323232;
+    border-radius: 12px;
+     &:focus-within {
+      border: 1px solid transparent;
+      box-shadow: 0 0 0 2px #5a6ec3
+    }
   }
 
 
@@ -1123,7 +1450,7 @@ export default defineComponent({
     .message-content {
       display: flex;
       align-items: flex-start;
-      gap: 12px;
+      gap: 6px;
       width: 100%;
     }
 
@@ -1133,11 +1460,16 @@ export default defineComponent({
       flex-direction: column;
       gap: 0;
       min-width: 0;
+      max-width: 100%;
+      overflow-x: auto;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
 
     .text-block {
       width: 100%;
       overflow-wrap: break-word;
+      max-width: 100%;
       &:not(:last-child) {
         margin-bottom: 4px;
       }
@@ -1150,12 +1482,43 @@ export default defineComponent({
         padding: 0;
         line-height: 1.4;
         display: block;
+        max-width: 100%;
+        overflow-x: auto;
         
         code {
           padding: 8px;
           margin: 0;
           display: block;
+          max-width: 100%;
         }
+      }
+
+      // Table styling to prevent horizontal overflow
+      :deep(table) {
+        max-width: 100%;
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+        overflow-x: auto;
+        display: block;
+        white-space: nowrap;
+      }
+
+      :deep(table th), :deep(table td) {
+        padding: 8px 12px;
+        border: 1px solid #e2e8f0;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        text-overflow: ellipsis;
+        overflow: hidden;
+      }
+
+      // Force break long words and URLs
+      :deep(p), :deep(div), :deep(span) {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        max-width: 100%;
       }
     }
 
@@ -1230,24 +1593,40 @@ export default defineComponent({
   }
   .light-mode .message{
     &.user {
-      background: white;
-      color: black;
+      background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
+      border: 1px solid #e0e6ff;
+      border-radius: 12px;
+      color: #2c3e50;
+      margin-left: 40px;
+      width: calc(100% - 40px);
     }
 
     &.assistant {
-      background: #fafafa;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
       color: var(--q-primary-text);
+      margin-left: 0;
+      width: 100%;
     }
   }
   .dark-mode .message{
     &.user {
-      background: #181a1b;
-      color: #e2e2e2;
+      background: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
+      border: 1px solid #3a3d5c;
+      border-radius: 12px;
+      color: #e2e8f0;
+      margin-left: 40px;
+      width: calc(100% - 40px);
     }
 
     &.assistant {
-      background: #181a1b;
+      background: #1a1a1a;
+      border: 1px solid #333333;
+      border-radius: 12px;
       color: #e2e2e2;
+      margin-left: 0;
+      width: 100%;
     }
   }
 
@@ -1264,6 +1643,54 @@ export default defineComponent({
         
       }
     }
+  }
+}
+
+// Avatar styling for user messages
+.light-user-avatar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white;
+}
+
+.dark-user-avatar {
+  background: linear-gradient(135deg, #4c63d2 0%, #5a67d8 100%) !important;
+  color: white;
+}
+
+// Send button gradient styling
+.send-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 15px 0 rgba(102, 126, 234, 0.3) !important;
+  
+  &:hover:not(.disabled):not([disabled]):not(:disabled) {
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
+    box-shadow: 0 6px 20px 0 rgba(102, 126, 234, 0.4) !important;
+    transform: translateY(-1px) !important;
+  }
+  
+  &:active:not(.disabled):not([disabled]):not(:disabled) {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 10px 0 rgba(102, 126, 234, 0.3) !important;
+  }
+
+}
+
+// Stop button gradient styling
+.stop-button {
+  background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%) !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 15px 0 rgba(245, 101, 101, 0.3) !important;
+  
+  &:hover {
+    background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%) !important;
+    box-shadow: 0 6px 20px 0 rgba(245, 101, 101, 0.4) !important;
+    transform: translateY(-1px) !important;
+  }
+  
+  &:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 10px 0 rgba(245, 101, 101, 0.3) !important;
   }
 }
 
@@ -1284,7 +1711,9 @@ export default defineComponent({
   .model-selector{
     background-color: #262626;
     border: 1px solid #3b3b3b;
-    padding: 0px 6px;
+    padding: 0px 4px;
+    border-radius: 4px;
+    padding-left: 4px;
   }
 
 }
@@ -1292,8 +1721,10 @@ export default defineComponent({
 .light-mode-bottom-bar{
   .model-selector{
     background-color: #ffffff;
-    border: 1px solid #f3f3f3;
+    border: 1px solid #bdbbbb;
     padding: 0px 4px;
+    border-radius: 4px;
+    padding-left: 4px;
   }
 }
   .o2-ai-beta-text {
@@ -1329,5 +1760,107 @@ export default defineComponent({
 .history-list-container {
   flex: 1;
   overflow-y: auto;
+}
+
+// Scroll to bottom button styling
+.scroll-to-bottom-container {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.scroll-to-bottom-btn {
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.3s ease;
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  
+  body.body--light & {
+    border: 2px solid #2563eb !important;
+    color: #2563eb !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+  
+  body.body--dark & {
+    border: 2px solid #667eea !important;
+    color: #667eea !important;
+    background: rgba(30, 30, 30, 0.9) !important;
+  }
+  
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    
+    body.body--light & {
+      border: 2px solid #1d4ed8 !important;
+      color: #1d4ed8 !important;
+      background: rgba(255, 255, 255, 1) !important;
+    }
+    
+    body.body--dark & {
+      border: 2px solid #5a6fd8 !important;
+      color: #5a6fd8 !important;
+      background: rgba(40, 40, 40, 0.95) !important;
+    }
+  }
+  
+  &:active {
+    transform: scale(1);
+  }
+  
+  .q-icon {
+    font-size: 18px;
+    animation: bounce 2s infinite;
+    font-weight: bold;
+  }
+}
+
+// Bounce animation for the arrow icon
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-3px);
+  }
+  60% {
+    transform: translateY(-2px);
+  }
+}
+
+// Fade in up animation for button appearance
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// Subtle gradient animation
+@keyframes subtleShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  25% {
+    background-position: 100% 50%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  75% {
+    background-position: 0% 100%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 </style> 

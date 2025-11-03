@@ -16,20 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :style="{
-      height: '30px',
-      border:
-        store.state.theme === 'dark'
-          ? '1px solid #3c3c3c'
-          : '1px solid #ececec',
-    }"
-    style="top: 0; z-index: 1999; position: sticky"
-    class="flex justify-start items-center header-bg bg-grey-2"
+    class="flex justify-start items-center header-bg bg-grey-2 trace-header-container"
     :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
     data-test="trace-header"
   >
     <div
-      class="tw-relative flex justify-start items-center no-wrap row q-px-sm"
+      class="tw-relative flex justify-start items-center no-wrap row q-px-sm trace-header-left"
       :style="{
         width: splitterWidth + 'px',
       }"
@@ -39,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-avatar
         color="primary"
         text-color="white"
-        size="20px"
+        size="1.25rem"
         icon="drag_indicator"
         class="resize-btn"
         @mousedown="handleMouseDown"
@@ -47,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div
-      class="flex justify-start items-center no-wrap row relative-position"
+      class="flex justify-start items-center no-wrap row relative-position trace-header-right"
       :style="{
         width: `calc(100% - ${splitterWidth}px)`,
       }"
@@ -82,15 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(tick, index) in baseTracePosition['tics']"
         class="trace-tic"
+        :class="{
+          'trace-tic-first': index === 0,
+          'bg-dark-tic': store.state.theme === 'dark',
+        }"
         :key="tick.value + index"
         :style="{
-          position: 'absolute',
           left: tick.left,
-          top: '-3px',
-          width: '1px',
-          backgroundColor: store.state.theme === 'dark' ? '#3c3c3c' : '#cacaca',
-          zIndex: index === 0 ? '5' : '1',
-          height: '26px',
         }"
         :data-test="`trace-header-tic-line-${index}`"
       ></div>
@@ -138,25 +128,52 @@ $toolbarHeight: 50px;
 $traceHeaderHeight: 30px;
 $traceChartHeight: 250px;
 
+.trace-header-container {
+  height: 1.875rem;
+  top: 0;
+  z-index: 1999;
+  position: sticky;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.trace-header-container.bg-grey-9 {
+  border-color: #3c3c3c;
+}
+
 .spans-container {
   position: relative;
 }
 
 .collapse-btn {
-  width: 10px;
-  height: 10px;
+  width: 0.625rem;
+  height: 0.625rem;
 }
+
 .trace-tic {
-  height: calc(100vh - $toolbarHeight - 5px - $traceChartHeight);
+  position: absolute;
+  top: -0.1875rem;
+  width: 0.0625rem;
+  background-color: #cacaca;
+  z-index: 1;
+  height: 1.625rem;
+}
+
+.trace-tic.bg-dark-tic {
+  background-color: #3c3c3c;
+}
+
+.trace-tic-first {
+  z-index: 5;
 }
 
 .header-bg {
   background-color: color-mix(in srgb, currentColor 5%, transparent);
 }
+
 .resize-btn {
   position: absolute;
-  right: -10px;
-  top: -2px;
+  right: -0.625rem;
+  top: -0.125rem;
   z-index: 10;
   cursor: col-resize;
 }

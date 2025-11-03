@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit;">
     <div class="row items-center no-wrap q-mx-md q-pt-sm">
-      <div class="flex items-center">
+      <div class="flex items-center tw-py-2">
         <div
           class="flex justify-center items-center q-mr-md cursor-pointer"
           style="
@@ -46,19 +46,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="addCipherKeyFormRef"
       @submit="onSubmit"
     >
-    <div style="height: calc(100vh - 170px); overflow: auto">
+    <div style="height: calc(100vh - 180px); overflow: auto">
       <div class="row">
         <div class="col-4 o2-input flex q-mx-md q-mt-md">
           <q-input
             data-test="add-cipher-key-name-input"
             v-model="formData.name"
             :label="t('cipherKey.name') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop full-width"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             v-bind:readonly="isUpdatingCipherKey"
             v-bind:disable="isUpdatingCipherKey"
@@ -108,9 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 bg-color="input-bg"
                 class="showLabelOnTop full-width"
                 stack-label
-                outlined
-                filled
                 dense
+                borderless
+                hide-bottom-space
                 :options="cipherKeyTypes"
                 option-value="value"
                 option-label="label"
@@ -134,7 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-report-step1-continue-btn"
               @click="validateForm(2)"
               class="o2-primary-button tw-h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               flat
               no-caps
               :label="'Continue'"
@@ -156,7 +152,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               @click="step = 1"
               class="o2-secondary-button tw-h-[36px] q-mb-sm"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               :label="t('common.back')"
               no-caps
             />
@@ -164,22 +159,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-step>
       </q-stepper>
     </div>
-      <div class="flex justify-end q-px-md q-py-md full-width "
+    <div class="tw-mx-2">
+            <div class="flex justify-end q-px-sm q-py-lg full-width"
       style="position: sticky; bottom: 0px; z-index: 2"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-      :style="{
-        'box-shadow':
-          store.state.theme === 'dark'
-            ? 'rgb(45 45 45) 0px -4px 7px 0px'
-            : 'rgb(240 240 240) 0px -4px 7px 0px',
-      }">
+      >
         <q-btn
           data-test="add-cipher-key-cancel-btn"
           class="q-mr-md o2-secondary-button tw-h-[36px]"
           :label="t('common.cancel')"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="openCancelDialog"
         />
         <q-btn
@@ -192,9 +181,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="submit"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         />
       </div>
+    </div>
     </q-form>
     <ConfirmDialog
       v-model="dialog.show"
