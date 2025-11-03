@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
     <q-card-section  class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center" >
       <div>Service Account Token </div>
-          <q-btn   dense flat icon="cancel" size="md" @click="isShowToken = false" style="cursor: pointer" />
+          <q-btn data-test="sa-cancel-button" dense flat icon="cancel" size="md" @click="isShowToken = false" style="cursor: pointer" />
     </q-card-section>
 
     <q-card-section>

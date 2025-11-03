@@ -167,7 +167,7 @@ export class IamPage {
 
     async clickServiceAccountPopUpClosed() {
 
-        await this.page.locator('button').filter({ hasText: 'cancel' }).click();
+        await this.page.locator('[data-test="sa-cancel-button"]').click();
 
     }
 
