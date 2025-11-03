@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     <div class="card-container q-py-sm">
           <span style="font-size: 18px;" class="q-px-md ">{{ editingRole }}</span> 
-         <q-separator />
            <AppTabs
               data-test="edit-role-tabs"
               :tabs="tabs"
