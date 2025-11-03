@@ -130,6 +130,40 @@ class="warning" />{{
               <img :src="getBtnLogo" class="header-icon ai-icon" />
             </div>
           </q-btn>
+          <q-btn
+            v-if="showThemes"
+            round
+            flat
+            dense
+            :ripple="false"
+            @click="openPredefinedThemes"
+            data-test="menu-link-predefined-themes-item"
+            :class="{ 'theme-btn-active': isPredefinedThemesOpen }"
+          >
+            <div class="row items-center no-wrap">
+              <q-icon name="color_lens" class="header-icon"></q-icon>
+            </div>
+            <q-tooltip anchor="top middle" self="bottom middle">
+              Predefined Themes
+            </q-tooltip>
+          </q-btn>
+          <q-btn
+            v-if="showThemes"
+            round
+            flat
+            dense
+            :ripple="false"
+            @click="openThemeCustomizer"
+            data-test="menu-link-theme-customizer-item"
+            :class="{ 'theme-btn-active': isThemeCustomizerOpen }"
+          >
+            <div class="row items-center no-wrap">
+              <q-icon name="format_color_fill" class="header-icon"></q-icon>
+            </div>
+            <q-tooltip anchor="top middle" self="bottom middle">
+              Customize Theme
+            </q-tooltip>
+          </q-btn>
           <div data-test="navbar-organizations-select" class="q-mx-sm row">
             <q-btn
               style="max-width: 250px"
@@ -516,6 +550,8 @@ class="padding-none" />
 full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
+    <PredefinedThemes />
+    <ThemeCustomizer />
   </q-layout>
 </template>
 
@@ -576,6 +612,10 @@ import configService from "@/services/config";
 import streamService from "@/services/stream";
 import billings from "@/services/billings";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
+import ThemeCustomizer from "../components/ThemeCustomizer.vue";
+import { useThemeCustomizer } from "@/composables/useThemeCustomizer";
+import PredefinedThemes from "../components/PredefinedThemes.vue";
+import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
 import {
   outlinedHome,
@@ -636,6 +676,8 @@ export default defineComponent({
     SlackIcon,
     ManagementIcon,
     ThemeSwitcher,
+    PredefinedThemes,
+    ThemeCustomizer,
     O2AIChat,
     GetStarted,
   },
@@ -685,6 +727,8 @@ export default defineComponent({
 
     const { getStreams, resetStreams } = useStreams();
     const { closeSocket } = useSearchWebSocket();
+    const { isOpen: isThemeCustomizerOpen, toggleCustomizer } = useThemeCustomizer();
+    const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
 
     const isMonacoEditorLoaded = ref(false);
     const showGetStarted = ref(
@@ -694,6 +738,7 @@ export default defineComponent({
     const aiChatInputContext = ref("");
     const rowsPerPage = ref(10);
     const searchQuery = ref("");
+    const showThemes = ref(localStorage.getItem('show_themes') === 'true');
 
     const filteredOrganizations = computed(() => {
       //we will return all organizations if searchQuery is empty
@@ -1396,6 +1441,14 @@ export default defineComponent({
         aiChatInputContext.value = value;
       });
     };
+
+    const openThemeCustomizer = () => {
+      toggleCustomizer();
+    };
+
+    const openPredefinedThemes = () => {
+      toggleThemes();
+    };
     //this is the used to set the selected org to the user clicked org because all the operations are happening on the selected org
     //to make sync with the user clicked org
     //we dont need search query after selectedOrg has been changed so resetting it
@@ -1453,6 +1506,11 @@ export default defineComponent({
       updateActionsMenu,
       getConfig,
       setRumUser,
+      openThemeCustomizer,
+      openPredefinedThemes,
+      isThemeCustomizerOpen,
+      isPredefinedThemesOpen,
+      showThemes,
     };
   },
   computed: {
@@ -1900,6 +1958,19 @@ body.ai-chat-open {
 
 .ai-hover-btn:hover .ai-icon {
   transform: rotate(180deg);
+}
+
+.theme-btn-active {
+  background: color-mix(
+    in srgb,
+    var(--o2-theme-color) 15%,
+    transparent 85%
+  ) !important;
+
+  .header-icon {
+    opacity: 1 !important;
+    color: var(--o2-theme-color) !important;
+  }
 }
 
 .organization-menu-o2 {
