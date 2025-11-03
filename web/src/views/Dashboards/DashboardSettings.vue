@@ -179,8 +179,8 @@ export default defineComponent({
           }
         }
         &--active {
-          background-color: $accent;
-          color: $dark;
+          color: var(--o2-tab-text-color);
+          background-color: var(--o2-tab-bg);
         }
       }
     }

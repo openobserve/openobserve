@@ -394,7 +394,8 @@ export default defineComponent({
   grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 100px 120px;
   padding: 8px 0;
   font-weight: 900;
-  border-bottom: 1px solid #cccccc70;
+  border-bottom: 1px solid var(--o2-border-color);
+  background-color: var(--o2-table-header-bg);
 
   .header-item {
     &:first-child {
@@ -408,9 +409,9 @@ export default defineComponent({
   grid-template-columns: 48px minmax(0, 1fr);
   align-items: center;
   border-radius: 4px;
-  border-bottom: 1px solid #cccccc70;
+  border-bottom: 1px solid var(--o2-border-color);
   &:hover {
-    background-color: #cccccc10;
+    background-color: var(--o2-hover-accent);
   }
 }
 
