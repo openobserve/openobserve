@@ -1214,6 +1214,7 @@ mod tests {
             search_type: Some(SearchEventType::UI),
             search_event_context: None,
             use_cache: true,
+            clear_cache: false,
             local_mode: None,
         };
         let mut origin_sql = req.query.sql.clone();
