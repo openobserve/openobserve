@@ -143,10 +143,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="loading"
         :rows-per-page-options="rowsPerPageOptions"
         @request="onRequest"
+        style="width: 100%"
         binary-state-sort
         flat
         bordered
-        class="full-height"
+        class="full-height o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
       >
         <template #no-data>
           <div class="full-width row flex-center q-py-lg text-grey-7">

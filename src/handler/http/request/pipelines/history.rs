@@ -150,16 +150,6 @@ pub async fn get_pipeline_history(
         ));
     }
 
-    // Build SQL query for the _meta organization's triggers stream
-    let mut sql = format!(
-        "SELECT _timestamp, org, key, status, is_realtime, is_silenced, \
-         start_time, end_time, retries, \
-         delay_in_secs, evaluation_took_in_secs, \
-         source_node, query_took \
-         FROM \"{TRIGGERS_STREAM}\" \
-         WHERE (module in ('derived_stream', 'pipeline')) AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
-    );
-
     // Helper function to escape pipeline names for SQL LIKE patterns
     fn escape_like(input: &str) -> String {
         let mut escaped = String::with_capacity(input.len());
@@ -175,12 +165,17 @@ pub async fn get_pipeline_history(
         escaped
     }
 
+    // Build base SQL WHERE clause
+    let mut where_clause = format!(
+        "(module in ('derived_stream', 'pipeline')) AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+    );
+
     // Add pipeline name filter if provided
     // The key field contains the pipeline name in the format "pipeline_name/pipeline_id"
     if let Some(ref pipeline_name) = query.pipeline_name {
         // We need to filter where key starts with the pipeline name
         let escaped_name = escape_like(pipeline_name);
-        sql.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
+        where_clause.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
     } else if !pipeline_names.is_empty() {
         // Filter by all pipelines in the organization
         let pipeline_filter = pipeline_names
@@ -188,7 +183,7 @@ pub async fn get_pipeline_history(
             .map(|name| format!("key LIKE '%{}%'", name.replace("'", "''")))
             .collect::<Vec<_>>()
             .join(" OR ");
-        sql.push_str(&format!(" AND ({pipeline_filter})"));
+        where_clause.push_str(&format!(" AND ({pipeline_filter})"));
     } else {
         // No pipelines in the organization, return empty result
         return MetaHttpResponse::json(PipelineHistoryResponse {
@@ -199,20 +194,23 @@ pub async fn get_pipeline_history(
         });
     }
 
-    // Add ordering and pagination
-    sql.push_str(&format!(
-        " ORDER BY _timestamp DESC LIMIT {size} OFFSET {from}"
-    ));
+    // Get trace ID for the request
+    let trace_id = get_or_create_trace_id(req.headers(), &Span::current());
 
-    // Create search request for _meta organization
-    let search_req = SearchRequest {
+    // Step 1: Get the total count of matching records
+    // Build count query (no LIMIT/OFFSET, will be rewritten to COUNT(*) by track_total_hits)
+    let count_sql = format!(
+        "SELECT _timestamp FROM \"{TRIGGERS_USAGE_STREAM}\" WHERE {where_clause}"
+    );
+
+    let count_req = SearchRequest {
         query: Query {
-            sql: sql.clone(),
+            sql: count_sql,
             start_time,
             end_time,
             from: 0,
-            size,
-            track_total_hits: true,
+            size: 1, // We only need the count, not the actual records
+            track_total_hits: true, // This triggers the COUNT(*) rewrite
             ..Default::default()
         },
         regions: vec![],
@@ -222,8 +220,63 @@ pub async fn get_pipeline_history(
         ..Default::default()
     };
 
-    // Get trace ID for the request
-    let trace_id = get_or_create_trace_id(req.headers(), &Span::current());
+    let total_count = match SearchService::search(
+        &trace_id,
+        META_ORG_ID,
+        StreamType::Logs,
+        Some(user_email.user_id.clone()),
+        &count_req,
+    )
+    .instrument(Span::current())
+    .await
+    {
+        Ok(result) => result.total,
+        Err(e) => {
+            log::error!("Failed to get pipeline history count: {}", e);
+            return MetaHttpResponse::internal_error(format!(
+                "Failed to get pipeline history count: {e}"
+            ));
+        }
+    };
+
+    // If no results or offset is beyond total, return empty
+    if total_count == 0 || from >= total_count as i64 {
+        return MetaHttpResponse::json(PipelineHistoryResponse {
+            total: total_count,
+            from,
+            size,
+            hits: vec![],
+        });
+    }
+
+    // Step 2: Get the actual paginated results
+    // Build data query with LIMIT/OFFSET for pagination
+    let data_sql = format!(
+        "SELECT _timestamp, org, key, status, is_realtime, is_silenced, \
+         start_time, end_time, retries, \
+         delay_in_secs, evaluation_took_in_secs, \
+         source_node, query_took \
+         FROM \"{TRIGGERS_USAGE_STREAM}\" \
+         WHERE {where_clause} \
+         ORDER BY _timestamp DESC LIMIT {size} OFFSET {from}"
+    );
+
+    let data_req = SearchRequest {
+        query: Query {
+            sql: data_sql,
+            start_time,
+            end_time,
+            from: 0,
+            size,
+            track_total_hits: false, // We already have the total, just get the data
+            ..Default::default()
+        },
+        regions: vec![],
+        clusters: vec![],
+        timeout: 0,
+        use_cache: false,
+        ..Default::default()
+    };
 
     // Execute search against _meta organization's triggers stream
     let search_result = match SearchService::search(
@@ -231,7 +284,7 @@ pub async fn get_pipeline_history(
         META_ORG_ID,
         StreamType::Logs,
         Some(user_email.user_id.clone()),
-        &search_req,
+        &data_req,
     )
     .instrument(Span::current())
     .await
@@ -298,9 +351,9 @@ pub async fn get_pipeline_history(
         });
     }
 
-    // Build response
+    // Build response with the accurate total count
     let response = PipelineHistoryResponse {
-        total: search_result.total,
+        total: total_count, // Use the count from the first query, not search_result.total
         from,
         size,
         hits: entries,
