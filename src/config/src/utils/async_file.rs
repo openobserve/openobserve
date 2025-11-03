@@ -82,8 +82,9 @@ pub async fn put_file_contents(
         ));
     };
 
-    // Create a temporary file in the same directory
-    let temp_file = format!("{path}.tmp");
+    // Create a unique temporary file in the same directory to avoid concurrency issues
+    let random_suffix = super::rand::generate_random_string(16);
+    let temp_file = format!("{path}_{random_suffix}.tmp");
 
     // Write to temporary file first
     let mut file_handle = File::create(&temp_file).await?;
@@ -217,22 +218,12 @@ pub fn create_wal_dir_datetime_filter(
             None => start_time.hour(),
         };
 
-        let date_range_check = if let Some(datetime) = Utc
-            .with_ymd_and_hms(
-                year,
-                month,
-                day,
-                hour,
-                start_time.minute(),
-                start_time.second(),
-            )
-            .single()
-            .and_then(|dt| dt.with_nanosecond(start_time.timestamp_subsec_nanos()))
-        {
-            datetime >= start_time && datetime <= end_time
-        } else {
-            false
-        };
+        let date_range_check =
+            if let Some(datetime) = Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).single() {
+                datetime >= start_time && datetime <= end_time
+            } else {
+                false
+            };
 
         date_range_check
             && (!path.is_file()

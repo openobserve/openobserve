@@ -30,6 +30,7 @@ const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
+const ServiceGraph = () => import("@/plugins/traces/ServiceGraph.vue");
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
@@ -158,6 +159,18 @@ const useRoutes = () => {
       component: TraceDetails,
       meta: {
         title: "Trace Details",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "service-graph",
+      name: "serviceGraph",
+      component: ServiceGraph,
+      meta: {
+        keepAlive: true,
+        title: "Service Graph",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -315,6 +328,18 @@ const useRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
+            {
+              path: "history",
+              name: "pipelineHistory",
+              component: () =>
+                import("@/components/pipelines/PipelineHistory.vue"),
+              meta: {
+                title: "Pipeline History",
+              },
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
           ],
         },
       ],
@@ -325,6 +350,28 @@ const useRoutes = () => {
       component: AlertList,
       meta: {
         title: "Alerts",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alerts/add",
+      name: "addAlert",
+      component: () => import("@/views/AddAlertView.vue"),
+      meta: {
+        title: "Add Alert",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alerts/history",
+      name: "alertHistory",
+      component: () => import("@/components/alerts/AlertHistory.vue"),
+      meta: {
+        title: "Alert History",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

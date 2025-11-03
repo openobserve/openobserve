@@ -636,7 +636,16 @@ pub async fn add_user_to_org(
     let email = email.trim().to_lowercase();
     let existing_user = db::user::get_user_record(&email).await;
     let root_user = ROOT_USER.clone();
-    if existing_user.is_ok() {
+    if let Ok(existing_user) = existing_user {
+        // If the user is root, we don't need to add to the org, as root user
+        // already has access to all organizations.
+        if existing_user.is_root {
+            return Ok(HttpResponse::Conflict().json(MetaHttpResponse::message(
+                http::StatusCode::CONFLICT,
+                "User is root user, no need to add to organization.",
+            )));
+        }
+
         let initiating_user = if is_root_user(initiator_id) {
             let local_org = org_id.replace(' ', "_");
             // If the org does not exist, create it
@@ -718,8 +727,8 @@ pub async fn add_user_to_org(
                 "User added to org successfully",
             )))
         } else {
-            Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-                http::StatusCode::UNAUTHORIZED,
+            Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                http::StatusCode::FORBIDDEN,
                 "Not Allowed",
             )))
         }
@@ -1268,9 +1277,13 @@ mod tests {
         db::{self as infra_db, ORM_CLIENT, connect_to_orm},
         table as infra_table,
     };
+    use tokio::sync::Mutex;
 
     use super::*;
     use crate::common::{infra::config::USERS, meta::user::get_default_user_role};
+
+    // Mutex to ensure test setup is serialized to prevent race conditions
+    static TEST_SETUP_LOCK: tokio::sync::OnceCell<Mutex<()>> = tokio::sync::OnceCell::const_new();
 
     #[test]
     fn test_is_user_from_org() {
@@ -1305,6 +1318,12 @@ mod tests {
     }
 
     async fn set_up() {
+        // Acquire lock to serialize database setup across concurrent tests
+        let lock = TEST_SETUP_LOCK
+            .get_or_init(|| async { Mutex::new(()) })
+            .await;
+        let _guard = lock.lock().await;
+
         let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
         // clear the table here as previous tests could have written to it
         let _ = infra::table::org_users::clear().await;
@@ -1312,7 +1331,10 @@ mod tests {
         let _ = infra::table::organizations::clear().await;
         let _ = infra_db::create_table().await;
         let _ = infra_table::create_user_tables().await;
-        let _ = organization::check_and_create_org_without_ofga("dummy").await;
+        // Create organization - this should succeed now that we hold the lock
+        organization::check_and_create_org_without_ofga("dummy")
+            .await
+            .expect("Failed to create dummy organization");
 
         // Clear global caches to ensure test isolation
         USERS.clear();

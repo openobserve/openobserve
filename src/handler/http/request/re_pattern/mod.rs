@@ -15,7 +15,10 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
+use actix_web::{
+    HttpResponse, delete, get, http, post, put,
+    web::{self, Json},
+};
 use infra::table::re_pattern::PatternEntry;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -25,6 +28,7 @@ use crate::common::{
     meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     utils::auth::{remove_ownership, set_ownership},
 };
+use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct PatternCreateRequest {
@@ -88,6 +92,8 @@ struct PatternListResponse {
 struct PatternTestRequest {
     pattern: String,
     test_records: Vec<String>,
+    #[serde(default)]
+    policy: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct PatternTestResponse {
@@ -119,18 +125,13 @@ struct PatternTestResponse {
 #[post("/{org_id}/re_patterns")]
 pub async fn save(
     org_id: web::Path<String>,
-    body: web::Bytes,
-    in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<PatternCreateRequest>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         use infra::table::{re_pattern::PatternEntry, re_pattern_stream_map::PatternPolicy};
         use o2_enterprise::enterprise::re_patterns::PatternManager;
-
-        let req: PatternCreateRequest = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
 
         if req.name.contains(":") {
             return Ok(MetaHttpResponse::bad_request(
@@ -138,22 +139,12 @@ pub async fn save(
             ));
         }
 
-        let user_id = match in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-        {
-            Some(id) => id,
-            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
-        };
+        let user_id = &user_email.user_id;
 
-        match PatternManager::test_pattern(
-            req.pattern.clone(),
-            "".to_string(),
-            PatternPolicy::Redact,
-        ) {
-            Ok(_) => {}
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        if let Err(e) =
+            PatternManager::test_pattern(req.pattern.clone(), "".to_string(), PatternPolicy::Redact)
+        {
+            return Ok(MetaHttpResponse::bad_request(e));
         }
 
         match crate::service::db::re_pattern::add(PatternEntry::new(
@@ -367,7 +358,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 #[put("/{org_id}/re_patterns/{id}")]
 pub async fn update(
     path: web::Path<(String, String)>,
-    body: web::Bytes,
+    web::Json(req): web::Json<PatternCreateRequest>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -375,10 +366,6 @@ pub async fn update(
         use o2_enterprise::enterprise::re_patterns::PatternManager;
 
         let (_org_id, id) = path.into_inner();
-        let req: PatternCreateRequest = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
 
         match infra::table::re_pattern::get(&id).await {
             Ok(Some(k)) => k,
@@ -412,7 +399,7 @@ pub async fn update(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
-        drop(body);
+        drop(req);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
 }
@@ -440,22 +427,21 @@ pub async fn update(
     tag = "RePattern"
 )]
 #[post("/{org_id}/re_patterns/test")]
-pub async fn test(body: web::Bytes) -> Result<HttpResponse, Error> {
+pub async fn test(web::Json(req): web::Json<PatternTestRequest>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         use infra::table::re_pattern_stream_map::PatternPolicy;
         use o2_enterprise::enterprise::re_patterns::PatternManager;
 
-        let req: PatternTestRequest = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
-
         let pattern = req.pattern;
         let inputs = req.test_records;
+        // Default to Redact if policy not specified for backward compatibility
+        let policy = req.policy.as_deref().unwrap_or("Redact");
+        let policy = PatternPolicy::from(policy);
+
         let mut ret = Vec::with_capacity(inputs.len());
         for i in inputs {
-            match PatternManager::test_pattern(pattern.clone(), i, PatternPolicy::Redact) {
+            match PatternManager::test_pattern(pattern.clone(), i, policy) {
                 Ok(v) => {
                     ret.push(v);
                 }
@@ -471,7 +457,7 @@ pub async fn test(body: web::Bytes) -> Result<HttpResponse, Error> {
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(body);
+        drop(req);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
 }

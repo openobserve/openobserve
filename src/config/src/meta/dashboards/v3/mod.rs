@@ -28,7 +28,9 @@ pub struct Dashboard {
     version: i32,
     #[serde(default)]
     pub dashboard_id: String,
+    #[schema(required)]
     pub title: String,
+    #[schema(required)]
     pub description: String,
     #[serde(default)]
     pub role: String,
@@ -63,6 +65,7 @@ impl From<Dashboard> for super::Dashboard {
             v3: Some(value),
             v4: None,
             v5: None,
+            v6: None,
             version,
             hash,
             updated_at,

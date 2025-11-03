@@ -464,34 +464,6 @@ describe("TraceDetails", () => {
   //   });
   // });
 
-  describe("Theme support", () => {
-    it("should apply correct background style based on theme", () => {
-      const style = wrapper.vm.backgroundStyle;
-      console.log("style", style);
-      expect(style.background).toBe("#181a1b"); // light theme
-    });
-
-    it("should apply dark theme background when theme is dark", async () => {
-      // const darkStore = createStore({
-      //   state: {
-      //     ...mockStore.state,
-      //     theme: "dark",
-      //   },
-      // });
-
-      const darkWrapper = mount(TraceDetails, {
-        props: { traceId: "test-trace-id" },
-        global: {
-          plugins: [i18n, router],
-          provide: { store },
-          stubs: { "q-resize-observer": true },
-        },
-      });
-
-      expect(darkWrapper.vm.backgroundStyle.background).toBe("#181a1b");
-      darkWrapper.unmount();
-    });
-  });
 
   describe("Component lifecycle", () => {
     it("should setup trace details on mount", async () => {

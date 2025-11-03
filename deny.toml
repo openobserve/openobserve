@@ -3,8 +3,18 @@
 
 [advisories]
 yanked = "deny"
-ignore = []
 git-fetch-with-cli = true
+ignore = [
+  "RUSTSEC-2023-0071", # from rsa, transitive dep of sqlx
+  "RUSTSEC-2021-0139", # from ansi_term, transitive dep of vrl
+  "RUSTSEC-2024-0370", # we need it even it is no longer maintained
+  "RUSTSEC-2024-0384", # from instant, dep of parking_lot
+  "RUSTSEC-2024-0388", # from derivative, dep of vrl
+  "RUSTSEC-2024-0421", # from idna, transitive dep of vrl
+  "RUSTSEC-2024-0436", # from paste, transitive dep of datafusion
+  "RUSTSEC-2024-0437", # from protobuf, transitive dep of prometheus
+  "RUSTSEC-2025-0020", # from poy3, transitive dep of datafusion-functions-json
+]
 
 [licenses]
 
@@ -39,6 +49,8 @@ exceptions = [
     { name = "ring", allow = ["BSD-4-Clause", "OpenSSL"] },
     { name = "inferno", allow = ["CDDL-1.0"] },
     { name = "libbz2-rs-sys", allow = ["bzip2-1.0.6"] },
+    { name = "aws-lc-sys", allow = ["OpenSSL"] },
+    { name = "borrow-or-share", allow = ["MIT-0"] },
 ]
 
 allow = [
@@ -50,6 +62,7 @@ allow = [
     "Unicode-3.0", # OSI
     "ISC", # OSI + fsf free
     "BSL-1.0",
+    "CC0-1.0"
 ]
 
 [[licenses.clarify]]

@@ -16,7 +16,13 @@
 #[cfg(test)]
 mod tests {
     use core::time;
-    use std::{env, fs, net::SocketAddr, str, sync::Once, thread};
+    use std::{
+        env, fs,
+        net::SocketAddr,
+        str,
+        sync::{Arc, Once},
+        thread,
+    };
 
     use actix_web::{App, http::header::ContentType, test, web};
     use arrow_flight::flight_service_server::FlightServiceServer;
@@ -26,7 +32,7 @@ mod tests {
         get_config,
         meta::{
             alerts::{Operator, QueryCondition, TriggerCondition, alert::Alert},
-            dashboards::{Dashboard, v1},
+            dashboards::{Dashboard, v5},
             pipeline::{
                 Pipeline,
                 components::{DerivedStream, PipelineSource},
@@ -34,13 +40,23 @@ mod tests {
             stream::StreamType,
             triggers::{ScheduledTriggerData, Trigger, TriggerModule, TriggerStatus},
         },
-        utils::json,
+        utils::{
+            enrichment_local_cache::{
+                get_key, get_metadata_content, get_metadata_path, get_table_dir, get_table_path,
+            },
+            json,
+        },
     };
+    use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS};
     use openobserve::{
-        common::meta::ingestion::IngestionResponse,
+        common::{
+            infra::config::ENRICHMENT_TABLES,
+            meta::{ingestion::IngestionResponse, user::UserList},
+        },
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
             http::{
+                self,
                 models::{
                     alerts::responses::{GetAlertResponseBody, ListAlertsResponseBody},
                     destinations::{Destination, DestinationType},
@@ -49,10 +65,15 @@ mod tests {
             },
         },
         migration,
-        service::{alerts::scheduler::handlers::handle_triggers, search::SEARCH_SERVER},
+        service::{
+            alerts::scheduler::handlers::handle_triggers,
+            enrichment::storage::{Values, local},
+            search::SEARCH_SERVER,
+        },
     };
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
+    use serde_json::json;
     use tonic::codec::CompressionEncoding;
 
     static START: Once = Once::new();
@@ -100,7 +121,7 @@ mod tests {
 
         log::info!("starting gRPC server at {}", gaddr);
         tonic::transport::Server::builder()
-            .layer(tonic::service::interceptor(check_auth))
+            .layer(tonic::service::InterceptorLayer::new(check_auth))
             .add_service(search_svc)
             .add_service(flight_svc)
             .serve(gaddr)
@@ -112,6 +133,14 @@ mod tests {
     async fn e2e_100_tear_down() {
         log::info!("Tear Down Invoked");
         fs::remove_dir_all("./data").expect("Delete local dir failed");
+    }
+
+    /// Helper function to flush memtable to ensure proper test isolation
+    /// This prevents memtable overflow errors when running sequential ingestion tests
+    async fn flush_memtable() {
+        if let Err(e) = ingester::flush_all().await {
+            log::warn!("Failed to flush memtable: {}", e);
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -148,9 +177,16 @@ mod tests {
         // init job
         openobserve::job::init().await.unwrap();
 
+        // Wait for async initialization tasks (like default user creation) to complete
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
         for _i in 0..3 {
             e2e_1_post_bulk().await;
         }
+
+        // Flush memtable after bulk ingestion to ensure proper test isolation
+        // This prevents memtable overflow when subsequent tests try to ingest data
+        flush_memtable().await;
 
         // ingest
         e2e_post_json().await;
@@ -181,6 +217,7 @@ mod tests {
         e2e_update_user().await;
         e2e_update_user_with_empty().await;
         e2e_add_user_to_org().await;
+        e2e_add_root_user_to_org().await;
         e2e_list_users().await;
         e2e_get_organizations().await;
         e2e_get_user_passcode().await;
@@ -192,22 +229,18 @@ mod tests {
         {
             let board = e2e_create_dashboard().await;
             let list = e2e_list_dashboards().await;
-            assert_eq!(list[0], board.clone());
+            assert_eq!(list[0], board);
 
-            let board = e2e_update_dashboard(
-                v1::Dashboard {
-                    title: "e2e test".to_owned(),
-                    description: "Logs flow downstream".to_owned(),
-                    ..board.v1.unwrap()
-                },
-                board.hash,
-            )
-            .await;
+            let mut v5_board = board.v5.unwrap();
+            v5_board.title = "e2e test".to_owned();
+            v5_board.description = "Logs flow downstream".to_owned();
+
+            let board = e2e_update_dashboard(v5_board, board.hash).await;
             assert_eq!(
-                e2e_get_dashboard(&board.clone().v1.unwrap().dashboard_id).await,
+                e2e_get_dashboard(&board.v5.as_ref().unwrap().dashboard_id).await,
                 board
             );
-            e2e_delete_dashboard(&board.v1.unwrap().dashboard_id).await;
+            e2e_delete_dashboard(&board.v5.unwrap().dashboard_id).await;
             assert!(e2e_list_dashboards().await.is_empty());
         }
 
@@ -267,8 +300,14 @@ mod tests {
         e2e_handle_derived_stream_success().await;
         e2e_handle_derived_stream_pipeline_not_found().await;
         e2e_handle_derived_stream_max_retries().await;
+        test_derived_stream_invalid_timerange_delay_scenario().await;
+        test_derived_stream_invalid_timerange_with_cron_frequency().await;
         e2e_handle_derived_stream_evaluation_failure().await;
         e2e_cleanup_test_pipeline().await;
+
+        // enrichment table
+        test_enrichment_table_integration().await;
+        test_enrichment_table_local_all_sequential().await;
 
         // others
         e2e_health_check().await;
@@ -778,6 +817,24 @@ mod tests {
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        println!("list users resp: {body_str:?}");
+        // deserialize the body into UserList
+        let user_list: UserList = serde_json::from_str(&body_str).unwrap();
+        assert!(!user_list.data.is_empty());
+        assert!(
+            user_list
+                .data
+                .iter()
+                .any(|user| user.email == "admin@example.com")
+        );
+        assert!(
+            user_list
+                .data
+                .iter()
+                .any(|user| user.email == "nonadmin@example.com")
+        );
     }
 
     async fn e2e_get_organizations() {
@@ -897,11 +954,6 @@ mod tests {
 
     async fn e2e_post_user() {
         let auth = setup();
-        let body_str = r#"{
-                                "email": "nonadmin@example.com",
-                                "password": "Abcd12345",
-                                "role": "admin"
-                            }"#;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
@@ -912,6 +964,20 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
+
+        // Delete user if it exists from previous test runs to avoid conflicts
+        let delete_req = test::TestRequest::delete()
+            .uri(&format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let _ = test::call_service(&app, delete_req).await;
+
+        let body_str = r#"{
+                                "email": "nonadmin@example.com",
+                                "password": "Abcd12345",
+                                "role": "admin"
+                            }"#;
         let req = test::TestRequest::post()
             .uri(&format!("/api/{}/users", "e2e"))
             .insert_header(ContentType::json())
@@ -919,8 +985,12 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
+        // print the body from resp
         println!("post user resp: {resp:?}");
-        assert!(resp.status().is_success());
+        let is_success = resp.status().is_success();
+        let body = test::read_body(resp).await;
+        println!("post user body: {}", String::from_utf8_lossy(&body));
+        assert!(is_success);
     }
 
     async fn e2e_update_user() {
@@ -973,7 +1043,7 @@ mod tests {
         assert!(!resp.status().is_success());
     }
 
-    async fn e2e_add_user_to_org() {
+    async fn e2e_add_root_user_to_org() {
         let auth = setup();
         let body_str = r#"{
             "role":"member"
@@ -995,7 +1065,91 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        // It should fail as root user cannot be added to an organization
+        assert!(!resp.status().is_success());
+    }
+
+    async fn e2e_add_user_to_org() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+
+        // Check if admin@example.com already exists from initialization
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/{}/users", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        let user_list: UserList = serde_json::from_str(&body_str).unwrap();
+        let admin_exists = user_list
+            .data
+            .iter()
+            .any(|user| user.email == "admin@example.com");
+
+        if !admin_exists {
+            // Test that adding user to org fails when user doesn't exist
+            let body_str = r#"{
+                "role":"admin"
+            }"#;
+            let req = test::TestRequest::post()
+                .uri(&format!("/api/{}/users/{}", "e2e", "admin@example.com"))
+                .insert_header(ContentType::json())
+                .append_header(auth)
+                .set_payload(body_str)
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            // Should fail as the user still does not exist
+            assert!(resp.status().is_client_error());
+
+            // Add the user
+            let body_str = r#"{
+                "email": "admin@example.com",
+                "password": "Abcd12345",
+                "role": "admin"
+            }"#;
+
+            let req = test::TestRequest::post()
+                .uri(&format!("/api/{}/users", "e2e"))
+                .insert_header(ContentType::json())
+                .append_header(auth)
+                .set_payload(body_str)
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert!(resp.status().is_success());
+        }
+
+        // Role in the default organization
+        let body_str = r#"{
+            "role":"admin"
+        }"#;
+
+        // Add the user to the default organization with role admin
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/users/{}", "default", "admin@example.com"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        let status = resp.status();
+        let body = test::read_body(resp).await;
+        println!(
+            "add user to default org body: {}",
+            String::from_utf8_lossy(&body)
+        );
+        // Accept both success (user added) and conflict (user already in org) as valid outcomes
+        assert!(status.is_success() || status.as_u16() == 409);
     }
 
     async fn e2e_delete_user() {
@@ -1021,7 +1175,7 @@ mod tests {
 
     async fn e2e_create_dashboard() -> Dashboard {
         let auth = setup();
-        let body_str = r##"{"title":"b2","dashboardId":"","description":"desc2","role":"","owner":"root@example.com","created":"2023-03-30T07:49:41.744+00:00","panels":[{"id":"Panel_ID7857010","type":"bar","fields":{"stream":"default","stream_type":"logs","x":[{"label":"Timestamp","alias":"x_axis_1","column":"_timestamp","color":null,"aggregationFunction":"histogram"}],"y":[{"label":"Kubernetes Host","alias":"y_axis_1","column":"kubernetes_host","color":"#5960b2","aggregationFunction":"count"}],"filter":[{"type":"condition","values":[],"column":"method","operator":"Is Not Null","value":null}]},"config":{"title":"p5","description":"sample config blah blah blah","show_legends":true},"query":"SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE method IS NOT NULL GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"","customQuery":false}],"layouts":[{"x":0,"y":0,"w":12,"h":13,"i":1,"panelId":"Panel_ID7857010","static":false}]}"##;
+        let body_str = r##"{"version":5,"title":"b2","dashboardId":"","description":"desc2","role":"","owner":"root@example.com","created":"2023-03-30T07:49:41.744+00:00","tabs":[{"tabId":"tab1","name":"Main","panels":[{"id":"Panel_ID7857010","type":"bar","title":"p5","description":"sample config blah blah blah","config":{"show_legends":true},"queryType":"sql","queries":[{"query":"SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\" FROM \"default\" GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"","customQuery":false,"fields":{"stream":"default","stream_type":"logs","x":[{"label":"Timestamp","alias":"x_axis_1","column":"_timestamp","color":null,"aggregationFunction":"histogram"}],"y":[{"label":"Kubernetes Host","alias":"y_axis_1","column":"kubernetes_host","color":"#5960b2","aggregationFunction":"count"}],"filter":{"filterType":"group","logicalOperator":"AND","conditions":[]}},"config":{"promql_legend":""}}],"layout":{"x":0,"y":0,"w":12,"h":13,"i":1}}]}]}"##;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
@@ -1039,8 +1193,12 @@ mod tests {
             .set_payload(body_str)
             .to_request();
 
-        let body = test::call_and_read_body(&app, req).await;
-        json::from_slice(&body).unwrap()
+        let resp = test::call_service(&app, req).await;
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        let result: Dashboard = json::from_slice(&body)
+            .unwrap_or_else(|e| panic!("Failed to deserialize dashboard: {e}\nBody: {body_str}"));
+        result
     }
 
     async fn e2e_list_dashboards() -> Vec<Dashboard> {
@@ -1074,7 +1232,7 @@ mod tests {
         dashboards
     }
 
-    async fn e2e_update_dashboard(dashboard: v1::Dashboard, hash: String) -> Dashboard {
+    async fn e2e_update_dashboard(dashboard: v5::Dashboard, hash: String) -> Dashboard {
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -1254,7 +1412,11 @@ mod tests {
             .set_payload(body)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(
+            resp.status().is_success(),
+            "Prometheus write failed with status: {}. This may indicate memtable overflow or resource constraints.",
+            resp.status()
+        );
     }
 
     async fn e2e_get_org_summary() {
@@ -1280,6 +1442,8 @@ mod tests {
     }
 
     async fn e2e_post_alert_template() {
+        use actix_web::body::MessageBody;
+
         let auth = setup();
         let body_str = r#"{"name":"slackTemplate","body":"{\"text\":\"For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active app_name {app_name}\"}"}"#;
         let app = test::init_service(
@@ -1299,7 +1463,11 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let status = resp.status();
+        let text = resp.into_body().try_into_bytes().unwrap_or_default();
+        let text = String::from_utf8_lossy(&text).to_string();
+        println!("e2e_post_alert_template: status: {status:?}, text: {text:?}");
+        assert!(status.is_success());
     }
 
     async fn e2e_get_alert_template() {
@@ -2575,6 +2743,10 @@ mod tests {
                 .num_microseconds()
                 .unwrap();
         let module_key = format!("logs/e2e/test_derived_stream/{}", pipeline.id);
+        println!(
+            "e2e handle derived stream success module_key: {}, where pipeline name is {}",
+            module_key, pipeline.name
+        );
 
         let trigger = Trigger {
             id: 1,
@@ -2596,21 +2768,39 @@ mod tests {
         // Should succeed even with empty data
         assert!(res.is_ok());
 
-        // Verify trigger was updated
-        let trigger = openobserve::service::db::scheduler::get(
-            "e2e",
-            TriggerModule::DerivedStream,
-            &module_key,
-        )
-        .await;
-        assert!(trigger.is_ok());
-        let trigger = trigger.unwrap();
-        let scheduled_trigger_data: ScheduledTriggerData =
-            serde_json::from_str(&trigger.data).unwrap();
-        assert!(scheduled_trigger_data.period_end_time.is_some());
-        assert!(scheduled_trigger_data.period_end_time.unwrap() > 0);
-        assert!(trigger.status == TriggerStatus::Waiting);
-        assert!(trigger.next_run_at > now && trigger.retries == 0);
+        // Verify trigger was updated - retry a few times since trigger processing is async
+        let mut attempts = 0;
+        let max_attempts = 10;
+        let mut trigger_updated = false;
+
+        while attempts < max_attempts {
+            let trigger = openobserve::service::db::scheduler::get(
+                "e2e",
+                TriggerModule::DerivedStream,
+                &module_key,
+            )
+            .await;
+
+            if let Ok(trigger) = trigger
+                && let Ok(scheduled_trigger_data) =
+                    serde_json::from_str::<ScheduledTriggerData>(&trigger.data)
+                && scheduled_trigger_data.period_end_time.is_some()
+            {
+                assert!(scheduled_trigger_data.period_end_time.unwrap() > 0);
+                assert!(trigger.status == TriggerStatus::Waiting);
+                assert!(trigger.next_run_at > now && trigger.retries == 0);
+                trigger_updated = true;
+                break;
+            }
+
+            attempts += 1;
+            thread::sleep(time::Duration::from_millis(100));
+        }
+
+        assert!(
+            trigger_updated,
+            "Trigger was not updated after {max_attempts} attempts"
+        );
     }
 
     async fn e2e_handle_derived_stream_pipeline_not_found() {
@@ -2817,22 +3007,7 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success(), "Failed to delete fields");
 
-        let req = test::TestRequest::get()
-            .uri("/api/e2e/pipelines")
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success(), "Failed to list pipelines");
-        let body = test::read_body(resp).await;
-        let pipeline_response: openobserve::handler::http::models::pipelines::PipelineList =
-            json::from_slice(&body).unwrap();
-        // Get the pipeline that matches the pipeline name
-        let pipeline = pipeline_response
-            .list
-            .iter()
-            .find(|p| p.name == pipeline_data.name);
-        assert!(pipeline.is_some(), "Pipeline not found");
-        let pipeline = pipeline.unwrap();
+        let pipeline = get_pipeline_from_api(pipeline_data.name.as_str()).await;
 
         let now = Utc::now().timestamp_micros();
         let mins_5_later = now
@@ -2875,6 +3050,350 @@ mod tests {
         let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
     }
 
+    // Test to handle case where pipeline triggers for invalid timerange where start time
+    // is greater than end time because of the delay feature which is turned on after alert
+    // is already created and is running for some time.
+
+    async fn test_derived_stream_invalid_timerange_delay_scenario() {
+        // Create a pipeline with derived stream that has delay configured
+        let pipeline_data = Pipeline {
+            id: "test_invalid_timerange_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "e2e".to_string(),
+            name: "test_invalid_timerange_pipeline".to_string(),
+            description: "Test pipeline for invalid timerange delay scenario".to_string(),
+            source: PipelineSource::Scheduled(DerivedStream {
+                org_id: "e2e".to_string(),
+                stream_type: StreamType::Logs,
+                query_condition: QueryCondition {
+                    query_type: config::meta::alerts::QueryType::SQL,
+                    sql: Some("SELECT _timestamp, city FROM \"olympics_schema\"".to_string()),
+                    ..Default::default()
+                },
+                trigger_condition: TriggerCondition {
+                    period: 5,      // 5 minutes
+                    frequency: 300, // 5 minutes in seconds
+                    ..Default::default()
+                },
+                tz_offset: 0,
+                start_at: None,
+                delay: Some(10), // 10 minutes delay
+            }),
+            nodes: vec![
+                // Source node (query node for scheduled pipeline)
+                config::meta::pipeline::components::Node::new(
+                    "source-node-1".to_string(),
+                    config::meta::pipeline::components::NodeData::Query(DerivedStream {
+                        org_id: "e2e".to_string(),
+                        stream_type: StreamType::Logs,
+                        query_condition: QueryCondition {
+                            query_type: config::meta::alerts::QueryType::SQL,
+                            sql: Some(
+                                "SELECT _timestamp, city FROM \"olympics_schema\"".to_string(),
+                            ),
+                            ..Default::default()
+                        },
+                        trigger_condition: TriggerCondition {
+                            period: 5,
+                            frequency: 300,
+                            ..Default::default()
+                        },
+                        tz_offset: 0,
+                        start_at: None,
+                        delay: Some(10), // 10 minutes delay
+                    }),
+                    100.0,
+                    50.0,
+                    "input".to_string(),
+                ),
+                // Destination node (output stream)
+                config::meta::pipeline::components::Node::new(
+                    "dest-node-1".to_string(),
+                    config::meta::pipeline::components::NodeData::Stream(
+                        config::meta::stream::StreamParams {
+                            org_id: "e2e".to_string().into(),
+                            stream_name: "derived_stream".to_string().into(),
+                            stream_type: StreamType::Logs,
+                        },
+                    ),
+                    100.0,
+                    200.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![config::meta::pipeline::components::Edge::new(
+                "source-node-1".to_string(),
+                "dest-node-1".to_string(),
+            )],
+        };
+
+        // Create the pipeline
+        e2e_post_pipeline(pipeline_data.clone()).await;
+        let pipeline = get_pipeline_from_api(pipeline_data.name.as_str()).await;
+
+        // Create a trigger that will cause invalid timerange scenario
+        // Simulate a scenario where the trigger was created before delay was enabled
+        // and now the start time is greater than end time due to delay
+        let current_time = Utc::now().timestamp_micros();
+        // 5 minutes is period of the pipeline and 1 min is delay in processing the pipeline
+        let period_micros = Duration::try_minutes(6)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let timeout = Duration::try_minutes(2)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+
+        // Create trigger with start time that will be greater than end time after delay
+        let trigger_start_time = current_time - period_micros; // 5 minutes ago
+
+        let trigger = Trigger {
+            id: 1,
+            org: "e2e".to_string(),
+            module: TriggerModule::DerivedStream,
+            module_key: format!("logs/e2e/test_invalid_timerange_pipeline/{}", pipeline.id),
+            next_run_at: current_time,
+            start_time: Some(current_time),
+            end_time: Some(current_time + timeout),
+            is_realtime: false,
+            is_silenced: false,
+            status: config::meta::triggers::TriggerStatus::Processing,
+            retries: 0,
+            data: serde_json::json!({
+                "period_end_time": trigger_start_time // This will cause start > end
+            })
+            .to_string(),
+        };
+
+        // Process the trigger - this should handle invalid timerange gracefully
+        let trace_id = "test_invalid_timerange_trace_id";
+        let result = handle_triggers(trace_id, trigger).await;
+
+        // Should not return an error, but should handle invalid timerange gracefully
+        assert!(result.is_ok());
+
+        // Get the trigger from the database
+        let trigger = openobserve::service::db::scheduler::get(
+            "e2e",
+            TriggerModule::DerivedStream,
+            &format!("logs/e2e/test_invalid_timerange_pipeline/{}", pipeline.id),
+        )
+        .await;
+        assert!(trigger.is_ok());
+        let trigger = trigger.unwrap();
+        // Next run at should be greater than current time
+        assert!(trigger.next_run_at > current_time);
+
+        // And last period end time should not change
+        assert_eq!(
+            trigger.data,
+            serde_json::json!({
+                "period_end_time": trigger_start_time
+            })
+            .to_string()
+        );
+
+        // Clean up
+        let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
+        // Also delete the trigger job from scheduled jobs table
+        let _ = openobserve::service::db::scheduler::delete(
+            "e2e",
+            TriggerModule::DerivedStream,
+            &format!("logs/e2e/test_invalid_timerange_pipeline/{}", pipeline.id),
+        )
+        .await;
+    }
+
+    async fn test_derived_stream_invalid_timerange_with_cron_frequency() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes),
+        )
+        .await;
+
+        // Create a pipeline with derived stream using cron frequency
+        let pipeline_data = Pipeline {
+            id: "test_cron_invalid_timerange_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "e2e".to_string(),
+            name: "test_cron_invalid_timerange_pipeline".to_string(),
+            description: "Test pipeline for invalid timerange with cron frequency".to_string(),
+            source: PipelineSource::Scheduled(DerivedStream {
+                org_id: "e2e".to_string(),
+                stream_type: StreamType::Logs,
+                query_condition: QueryCondition {
+                    query_type: config::meta::alerts::QueryType::SQL,
+                    sql: Some("SELECT _timestamp, city FROM \"olympics_schema\"".to_string()),
+                    ..Default::default()
+                },
+                trigger_condition: TriggerCondition {
+                    period: 5,                         // 5 minutes
+                    frequency: 0,                      // 0 for cron frequency
+                    cron: "0 */5 * * * *".to_string(), // Every 5 minutes
+                    frequency_type: config::meta::alerts::FrequencyType::Cron,
+                    ..Default::default()
+                },
+                tz_offset: 0,
+                start_at: None,
+                delay: Some(10), // 10 minutes delay
+            }),
+            nodes: vec![
+                // Source node (query node for scheduled pipeline)
+                config::meta::pipeline::components::Node::new(
+                    "source-node-1".to_string(),
+                    config::meta::pipeline::components::NodeData::Query(DerivedStream {
+                        org_id: "e2e".to_string(),
+                        stream_type: StreamType::Logs,
+                        query_condition: QueryCondition {
+                            query_type: config::meta::alerts::QueryType::SQL,
+                            sql: Some(
+                                "SELECT _timestamp, city FROM \"olympics_schema\"".to_string(),
+                            ),
+                            ..Default::default()
+                        },
+                        trigger_condition: TriggerCondition {
+                            period: 5,
+                            frequency: 0,
+                            cron: "0 */5 * * * *".to_string(),
+                            frequency_type: config::meta::alerts::FrequencyType::Cron,
+                            ..Default::default()
+                        },
+                        tz_offset: 0,
+                        start_at: None,
+                        delay: Some(10), // 10 minutes delay
+                    }),
+                    100.0,
+                    50.0,
+                    "input".to_string(),
+                ),
+                // Destination node (output stream)
+                config::meta::pipeline::components::Node::new(
+                    "dest-node-1".to_string(),
+                    config::meta::pipeline::components::NodeData::Stream(
+                        config::meta::stream::StreamParams {
+                            org_id: "e2e".to_string().into(),
+                            stream_name: "derived_stream".to_string().into(),
+                            stream_type: StreamType::Logs,
+                        },
+                    ),
+                    100.0,
+                    200.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![config::meta::pipeline::components::Edge::new(
+                "source-node-1".to_string(),
+                "dest-node-1".to_string(),
+            )],
+        };
+
+        // Create the pipeline
+        let req = test::TestRequest::post()
+            .uri("/api/e2e/pipelines")
+            .append_header(auth)
+            .set_json(&pipeline_data)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        println!("test derived stream invalid timerange with cron frequency resp: {resp:?}");
+        assert!(resp.status().is_success());
+
+        let pipeline = get_pipeline_from_api(pipeline_data.name.as_str()).await;
+
+        // Create trigger that will cause invalid timerange with cron frequency
+        let current_time = Utc::now().timestamp_micros();
+        let dur_20_mins = Duration::try_minutes(20)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let period_micros = Duration::try_minutes(5)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+
+        // Say, this trigger was last run at 15 mins ago
+        let last_end_time = current_time - dur_20_mins;
+        // Current end time needs to be aligned (as this is cron frequency)
+        let current_next_run_time =
+            TriggerCondition::align_time(last_end_time + period_micros, 0, Some(300)); // This will cause start > end
+        let timeout = Duration::try_minutes(2)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+
+        let trigger = Trigger {
+            id: 3,
+            org: "e2e".to_string(),
+            module: TriggerModule::DerivedStream,
+            module_key: format!(
+                "logs/e2e/test_cron_invalid_timerange_pipeline/{}",
+                pipeline.id
+            ),
+            next_run_at: current_next_run_time,
+            start_time: Some(current_time),
+            end_time: Some(current_time + timeout), // end < start
+            is_realtime: false,
+            is_silenced: false,
+            status: config::meta::triggers::TriggerStatus::Processing,
+            retries: 0,
+            data: serde_json::json!({
+                "period_end_time": last_end_time // This will cause start > end
+            })
+            .to_string(),
+        };
+
+        // Process the trigger
+        let trace_id = "test_cron_invalid_timerange_trace_id";
+        let result = handle_triggers(trace_id, trigger).await;
+
+        // Should handle invalid timerange with cron frequency gracefully
+        assert!(result.is_ok());
+
+        // Get the trigger from the database
+        let trigger = openobserve::service::db::scheduler::get(
+            "e2e",
+            TriggerModule::DerivedStream,
+            &format!(
+                "logs/e2e/test_cron_invalid_timerange_pipeline/{}",
+                pipeline.id
+            ),
+        )
+        .await;
+        assert!(trigger.is_ok());
+        let trigger = trigger.unwrap();
+        // Next run at should be greater than current time
+        assert!(trigger.next_run_at > current_next_run_time);
+        // Next run at should be less than current time, because the frequency is 5 mins
+        assert!(trigger.next_run_at < current_time);
+        assert_eq!(
+            trigger.data,
+            serde_json::json!({
+                "period_end_time": last_end_time
+            })
+            .to_string()
+        );
+
+        // Clean up
+        let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
+        // Also delete the trigger job from scheduled jobs table
+        let _ = openobserve::service::db::scheduler::delete(
+            "e2e",
+            TriggerModule::DerivedStream,
+            &format!(
+                "logs/e2e/test_cron_invalid_timerange_pipeline/{}",
+                pipeline.id
+            ),
+        )
+        .await;
+    }
+
     async fn e2e_cleanup_test_pipeline() {
         // list the pipelines and choose the first one using API
         let auth = setup();
@@ -2902,5 +3421,841 @@ mod tests {
 
         // Clean up test pipelines
         let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
+    }
+
+    async fn get_pipeline_from_api(pipeline_name: &str) -> http::models::pipelines::Pipeline {
+        let auth = setup();
+        // Check if pipeline was saved successfully by doing a list using API
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri("/api/e2e/pipelines")
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success(), "Failed to list pipelines");
+        let body = test::read_body(resp).await;
+        let pipeline_response: openobserve::handler::http::models::pipelines::PipelineList =
+            json::from_slice(&body).unwrap();
+        // Get the pipeline that matches the pipeline name
+        let pipeline = pipeline_response
+            .list
+            .iter()
+            .find(|p| p.name == pipeline_name);
+        assert!(pipeline.is_some(), "Pipeline not found");
+        let pipeline = pipeline.unwrap();
+        pipeline.clone()
+    }
+
+    // ==================== ENRICHMENT TABLE TESTS ====================
+
+    async fn e2e_save_enrichment_data_new_table() {
+        let _auth = setup();
+        let org_id = "e2e";
+        let table_name = "test_enrichment_table";
+
+        // Create test data
+        let mut payload = Vec::new();
+        let mut record1 = json::Map::new();
+        record1.insert("name".to_string(), json::Value::String("John".to_string()));
+        record1.insert("age".to_string(), json::Value::String("25".to_string()));
+        record1.insert(
+            "city".to_string(),
+            json::Value::String("New York".to_string()),
+        );
+        payload.push(record1);
+
+        let mut record2 = json::Map::new();
+        record2.insert("name".to_string(), json::Value::String("Jane".to_string()));
+        record2.insert("age".to_string(), json::Value::String("30".to_string()));
+        record2.insert(
+            "city".to_string(),
+            json::Value::String("Los Angeles".to_string()),
+        );
+        payload.push(record2);
+
+        // Call save_enrichment_data
+        let result = openobserve::service::enrichment_table::save_enrichment_data(
+            org_id, table_name, payload, false, // append_data = false
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert!(response.status().is_success());
+
+        // Verify schema was created in database
+        let schema_exists = openobserve::service::schema::stream_schema_exists(
+            org_id,
+            table_name,
+            config::meta::stream::StreamType::EnrichmentTables,
+            &mut std::collections::HashMap::new(),
+        )
+        .await;
+
+        println!("schema_exists: {schema_exists:?}");
+
+        assert!(schema_exists.has_fields);
+
+        // Verify schema cache was updated
+        let schema_key = format!(
+            "{}/{}/{}",
+            org_id,
+            config::meta::stream::StreamType::EnrichmentTables,
+            table_name
+        );
+        let stream_schemas = STREAM_SCHEMAS.read().await;
+        assert!(stream_schemas.contains_key(&schema_key));
+        drop(stream_schemas);
+
+        // Verify latest schema cache was updated
+        let stream_schemas_latest = STREAM_SCHEMAS_LATEST.read().await;
+        assert!(stream_schemas_latest.contains_key(&schema_key));
+        drop(stream_schemas_latest);
+
+        // Verify stream settings cache was updated
+        let stream_settings = STREAM_SETTINGS.read().await;
+        assert!(stream_settings.contains_key(&schema_key));
+        drop(stream_settings);
+
+        // Get the meta table stats for enrichment table
+        let meta_table_stats =
+            openobserve::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
+                .await;
+        assert!(meta_table_stats.is_some());
+        let meta_table_stats = meta_table_stats.unwrap();
+        assert_ne!(meta_table_stats.size, 0);
+        assert_ne!(meta_table_stats.start_time, 0);
+
+        // Check get_enrichment_table function, it should return same data
+        let data =
+            openobserve::service::enrichment::get_enrichment_table(org_id, table_name, false).await;
+        assert!(data.is_ok());
+        let data = data.unwrap();
+        assert!(data.len() == 2);
+        println!("save enrichment data new tabledata: {data:?}");
+        println!(
+            "save enrichment data new table data[0]: {:?}",
+            data[0].get("name").unwrap().to_string()
+        );
+        assert!(data[0].get("name").unwrap().to_string().eq("\"John\""));
+        assert!(data[1].get("name").unwrap().to_string().eq("\"Jane\""));
+        assert!(data[0].get("age").unwrap().to_string().eq("\"25\""));
+        assert!(data[1].get("age").unwrap().to_string().eq("\"30\""));
+        assert!(data[0].get("city").unwrap().to_string().eq("\"New York\""));
+        assert!(
+            data[1]
+                .get("city")
+                .unwrap()
+                .to_string()
+                .eq("\"Los Angeles\"")
+        );
+
+        // wait for 1 second
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        // Check the ENRICHMENT_TABLES cache to check if the table is created
+        let enrichment_tables = ENRICHMENT_TABLES.clone();
+        println!("save enrichment data new table enrichment_tables: {enrichment_tables:?}");
+        assert!(enrichment_tables.contains_key(&schema_key));
+        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 2);
+
+        drop(enrichment_tables);
+
+        println!("save enrichment data new table meta_table_stats: {meta_table_stats:?}");
+        // Also, it should store the cache in the disk
+        check_enrichment_table_local_disk_cache(org_id, table_name, meta_table_stats.end_time)
+            .await;
+        // Clean up
+        e2e_cleanup_enrichment_table(org_id, table_name).await;
+    }
+
+    async fn e2e_cleanup_enrichment_table(org_id: &str, stream_name: &str) {
+        // Clean up the enrichment table and its schema
+        openobserve::service::enrichment_table::delete_enrichment_table(
+            org_id,
+            stream_name,
+            config::meta::stream::StreamType::EnrichmentTables,
+            (0, chrono::Utc::now().timestamp_micros()),
+        )
+        .await;
+
+        // Verify schema caches are cleaned up
+        let schema_key = format!(
+            "{}/{}/{}",
+            org_id,
+            config::meta::stream::StreamType::EnrichmentTables,
+            stream_name
+        );
+
+        // Check that schema caches are cleared
+        let stream_schemas = STREAM_SCHEMAS.read().await;
+        assert!(!stream_schemas.contains_key(&schema_key));
+        drop(stream_schemas);
+
+        let stream_schemas_latest = STREAM_SCHEMAS_LATEST.read().await;
+        assert!(!stream_schemas_latest.contains_key(&schema_key));
+        drop(stream_schemas_latest);
+
+        let stream_settings = STREAM_SETTINGS.read().await;
+        assert!(!stream_settings.contains_key(&schema_key));
+        drop(stream_settings);
+
+        // wait for 2 seconds
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Check the ENRICHMENT_TABLES cache to check if the table is deleted
+        let enrichment_tables = ENRICHMENT_TABLES.clone();
+        println!("enrichment data cleanup enrichment_tables: {enrichment_tables:?}");
+        assert!(!enrichment_tables.contains_key(&schema_key));
+        drop(enrichment_tables);
+
+        // Check the local disk cache to check if the table is deleted
+        check_enrichment_table_local_disk_cache_deleted(org_id, stream_name).await;
+    }
+
+    async fn e2e_save_enrichment_data_append_mode() {
+        let _auth = setup();
+        let org_id = "e2e";
+        let table_name = "test_enrichment_table_append";
+
+        // First, create initial data
+        let mut initial_payload = Vec::new();
+        let mut record1 = json::Map::new();
+        record1.insert("name".to_string(), json::Value::String("John".to_string()));
+        record1.insert("age".to_string(), json::Value::String("25".to_string()));
+        record1.insert(
+            "city".to_string(),
+            json::Value::String("New York".to_string()),
+        );
+        initial_payload.push(record1);
+
+        let result1 = openobserve::service::enrichment_table::save_enrichment_data(
+            org_id,
+            table_name,
+            initial_payload,
+            false, // append_data = false
+        )
+        .await;
+        assert!(result1.is_ok());
+
+        // Get the meta table stats for enrichment table
+        let meta_table_stats_first =
+            openobserve::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
+                .await;
+        assert!(meta_table_stats_first.is_some());
+        let meta_table_stats_first = meta_table_stats_first.unwrap();
+        assert_ne!(meta_table_stats_first.size, 0);
+        assert_ne!(meta_table_stats_first.start_time, 0);
+        let schema_key = format!(
+            "{}/{}/{}",
+            org_id,
+            config::meta::stream::StreamType::EnrichmentTables,
+            table_name
+        );
+
+        // Wait for 2 seconds
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Check the ENRICHMENT_TABLES cache to check if the table is created
+        let enrichment_tables = ENRICHMENT_TABLES.clone();
+        assert!(enrichment_tables.contains_key(&schema_key));
+        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 1);
+        drop(enrichment_tables);
+
+        println!(
+            "save enrichment data append mode check_enrichment_table_local_disk_cache meta_table_stats_first.start_time 1: {:?}",
+            meta_table_stats_first.start_time
+        );
+        // Check the local disk cache to check if the table is created
+        check_enrichment_table_local_disk_cache(
+            org_id,
+            table_name,
+            meta_table_stats_first.end_time,
+        )
+        .await;
+
+        // Now append more data
+        let mut append_payload = Vec::new();
+        let mut record2 = json::Map::new();
+        record2.insert("name".to_string(), json::Value::String("Jane".to_string()));
+        record2.insert("age".to_string(), json::Value::String("30".to_string()));
+        record2.insert(
+            "city".to_string(),
+            json::Value::String("Los Angeles".to_string()),
+        );
+        append_payload.push(record2);
+
+        let result2 = openobserve::service::enrichment_table::save_enrichment_data(
+            org_id,
+            table_name,
+            append_payload,
+            true, // append_data = true
+        )
+        .await;
+        assert!(result2.is_ok());
+
+        // Verify schema still exists and is valid
+        let schema_exists = openobserve::service::schema::stream_schema_exists(
+            org_id,
+            table_name,
+            config::meta::stream::StreamType::EnrichmentTables,
+            &mut std::collections::HashMap::new(),
+        )
+        .await;
+
+        assert!(schema_exists.has_fields);
+
+        // Get the meta table stats for enrichment table
+        let meta_table_stats_second =
+            openobserve::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
+                .await;
+        assert!(meta_table_stats_second.is_some());
+        let meta_table_stats_second = meta_table_stats_second.unwrap();
+        assert_ne!(meta_table_stats_second.size, 0);
+        assert_ne!(meta_table_stats_second.start_time, 0);
+        assert_eq!(
+            meta_table_stats_second.start_time,
+            meta_table_stats_first.start_time
+        );
+        assert!(meta_table_stats_second.end_time > meta_table_stats_first.end_time);
+
+        // Wait for 2 seconds
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Check the ENRICHMENT_TABLES cache to check if the table is created
+        let enrichment_tables = ENRICHMENT_TABLES.clone();
+        assert!(enrichment_tables.contains_key(&schema_key));
+        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 2);
+        drop(enrichment_tables);
+        println!(
+            "save enrichment data append mode check_enrichment_table_local_disk_cache meta_table_stats_second.start_time 2: {:?}",
+            meta_table_stats_second.start_time
+        );
+
+        // Check the local disk cache to check if the table is created
+        check_enrichment_table_local_disk_cache(
+            org_id,
+            table_name,
+            meta_table_stats_second.end_time,
+        )
+        .await;
+
+        // Clean up
+        e2e_cleanup_enrichment_table(org_id, table_name).await;
+    }
+
+    async fn e2e_save_enrichment_data_schema_evolution() {
+        let _auth = setup();
+        let org_id = "e2e";
+        let table_name = "test_enrichment_table_evolution";
+
+        // First, create initial data with basic fields
+        let mut initial_payload = Vec::new();
+        let mut record1 = json::Map::new();
+        record1.insert("name".to_string(), json::Value::String("John".to_string()));
+        record1.insert("age".to_string(), json::Value::String("25".to_string()));
+        initial_payload.push(record1);
+
+        let result1 = openobserve::service::enrichment_table::save_enrichment_data(
+            org_id,
+            table_name,
+            initial_payload,
+            false, // append_data = false
+        )
+        .await;
+        assert!(result1.is_ok());
+
+        let schema_key = format!(
+            "{}/{}/{}",
+            org_id,
+            config::meta::stream::StreamType::EnrichmentTables,
+            table_name
+        );
+
+        // wait for 2 seconds
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Check the ENRICHMENT_TABLES cache to check if the table is created
+        let enrichment_tables = ENRICHMENT_TABLES.clone();
+        assert!(enrichment_tables.contains_key(&schema_key));
+        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 1);
+        drop(enrichment_tables);
+
+        // Now append data with additional fields (schema evolution)
+        let mut append_payload = Vec::new();
+        let mut record2 = json::Map::new();
+        record2.insert("name".to_string(), json::Value::String("Jane".to_string()));
+        record2.insert("age".to_string(), json::Value::String("30".to_string()));
+        record2.insert(
+            "city".to_string(),
+            json::Value::String("Los Angeles".to_string()),
+        ); // New field
+        record2.insert(
+            "country".to_string(),
+            json::Value::String("USA".to_string()),
+        ); // New field
+        append_payload.push(record2);
+
+        let result2 = openobserve::service::enrichment_table::save_enrichment_data(
+            org_id,
+            table_name,
+            append_payload,
+            true, // append_data = true
+        )
+        .await;
+        assert!(result2.is_ok());
+        let result = result2.unwrap();
+        assert!(!result.status().is_success());
+        // wait for 2 seconds
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Clean up
+        e2e_cleanup_enrichment_table(org_id, table_name).await;
+    }
+
+    // Test runner function that calls all enrichment table tests
+    async fn test_enrichment_table_integration() {
+        e2e_save_enrichment_data_new_table().await;
+        e2e_save_enrichment_data_append_mode().await;
+        e2e_save_enrichment_data_schema_evolution().await;
+    }
+
+    async fn check_enrichment_table_local_disk_cache(
+        org_id: &str,
+        table_name: &str,
+        updated_at: i64,
+    ) {
+        let key = get_key(org_id, table_name);
+        let table_dir = get_table_dir(&key);
+        let file_path = get_table_path(table_dir.to_str().unwrap(), updated_at);
+        assert!(file_path.exists());
+    }
+
+    async fn check_enrichment_table_local_disk_cache_deleted(org_id: &str, table_name: &str) {
+        let key = get_key(org_id, table_name);
+        let table_dir = get_table_dir(&key);
+        assert!(!table_dir.exists());
+    }
+
+    // Helper function to setup schema for enrichment tables in tests
+    async fn setup_enrichment_table_schema(org_id: &str, table_name: &str) {
+        use arrow::datatypes::{DataType, Field, Schema};
+        use config::meta::stream::StreamType;
+
+        // Create a simple schema that matches our test data
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int64, true),
+            Field::new("name", DataType::Utf8, true),
+            Field::new("age", DataType::Int64, true),
+            Field::new("data", DataType::Utf8, true),
+            Field::new("version", DataType::Utf8, true),
+            Field::new("nested", DataType::Utf8, true),
+            Field::new("special_chars", DataType::Utf8, true),
+        ]);
+
+        // Use infra::schema::merge to create/update the schema in the database
+        let result = infra::schema::merge(
+            org_id,
+            table_name,
+            StreamType::EnrichmentTables,
+            &schema,
+            None,
+        )
+        .await;
+
+        // Ignore error if schema already exists
+        match result {
+            Ok(_) => {}
+            Err(e) => {
+                log::debug!("Schema setup for {}/{}: {:?}", org_id, table_name, e);
+            }
+        }
+    }
+
+    async fn test_enrichment_table_local_all_sequential() {
+        // Run all tests sequentially to avoid directory conflicts
+        test_store_and_retrieve().await;
+        test_store_multiple_versions().await;
+        test_retrieve_nonexistent_table().await;
+        test_delete().await;
+        test_delete_nonexistent_table().await;
+        test_get_last_updated_at().await;
+        test_store_data_if_needed().await;
+        test_store_data_if_needed_background().await;
+        test_metadata_persistence().await;
+        test_large_data_handling().await;
+        test_error_handling().await;
+    }
+
+    async fn test_store_and_retrieve() {
+        let org_id = "test_org";
+        let table_name = "test_table";
+        let test_data = vec![
+            json!({"id": 1, "name": "Alice", "age": 25}),
+            json!({"id": 2, "name": "Bob", "age": 30}),
+        ];
+        let updated_at = 1640995200;
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Test store function
+        let test_data = Values::Json(Arc::new(test_data));
+        let result = local::store(org_id, table_name, test_data, updated_at).await;
+        println!("Store result: {result:?}");
+        assert!(result.is_ok(), "Store should succeed");
+
+        // Verify file was created
+        let key = get_key(org_id, table_name);
+        let table_dir = get_table_dir(&key);
+        let file_path = get_table_path(table_dir.to_str().unwrap(), updated_at);
+        assert!(file_path.exists(), "Data file should exist");
+
+        // Verify metadata was created
+        let metadata_path = get_metadata_path();
+        assert!(metadata_path.exists(), "Metadata file should exist");
+
+        // Test retrieve function
+        let retrieved_data = local::retrieve(org_id, table_name).await;
+        assert!(retrieved_data.is_ok(), "Retrieve should succeed");
+
+        let retrieved_data = retrieved_data.unwrap().to_json().unwrap();
+        assert_eq!(retrieved_data.len(), 2, "Should retrieve 2 records");
+        assert_eq!(
+            retrieved_data[0]["id"],
+            json!(1),
+            "First record should match"
+        );
+        assert_eq!(
+            retrieved_data[1]["id"],
+            json!(2),
+            "Second record should match"
+        );
+    }
+
+    async fn test_store_multiple_versions() {
+        let org_id = "test_org";
+        let table_name = "versioned_table";
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Store first version
+        let data_v1 = Values::Json(Arc::new(vec![json!({"id": 1, "version": "v1"})]));
+        let updated_at_v1 = 1640995200;
+        let result = local::store(org_id, table_name, data_v1, updated_at_v1).await;
+        assert!(result.is_ok(), "First store should succeed");
+
+        // Store second version
+        let data_v2 = Values::Json(Arc::new(vec![json!({"id": 2, "version": "v2"})]));
+        let updated_at_v2 = 1640995300;
+        let result = local::store(org_id, table_name, data_v2, updated_at_v2).await;
+        assert!(result.is_ok(), "Second store should succeed");
+
+        // Retrieve should get both versions
+        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        assert_eq!(retrieved_data.len(), 2, "Should retrieve both versions");
+    }
+
+    async fn test_retrieve_nonexistent_table() {
+        let result = local::retrieve("nonexistent_org", "nonexistent_table").await;
+        assert!(
+            result.is_err(),
+            "Should return an error for nonexistent table"
+        );
+    }
+
+    async fn test_delete() {
+        let org_id = "test_org";
+        let table_name = "delete_test_table";
+        let test_data = Values::Json(Arc::new(vec![json!({"id": 1, "data": "test"})]));
+        let updated_at = 1640995200;
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // First store some data
+        let result = local::store(org_id, table_name, test_data, updated_at).await;
+        assert!(result.is_ok(), "Store should succeed");
+
+        // Verify data exists
+        let key = get_key(org_id, table_name);
+        let table_dir = get_table_dir(&key);
+        assert!(table_dir.exists(), "Table directory should exist");
+
+        // Test delete function
+        let result = local::delete(org_id, table_name).await;
+        assert!(result.is_ok(), "Delete should succeed");
+
+        // Verify directory was removed
+        assert!(!table_dir.exists(), "Table directory should be removed");
+
+        // Verify metadata was updated
+        let metadata_content = get_metadata_content().await.unwrap();
+        assert!(
+            !metadata_content.contains_key(&key),
+            "Key should be removed from metadata"
+        );
+    }
+
+    async fn test_delete_nonexistent_table() {
+        // Delete non-existent table should succeed gracefully
+        let result = local::delete("nonexistent_org", "nonexistent_table").await;
+        assert!(
+            result.is_ok(),
+            "Delete should handle nonexistent table gracefully"
+        );
+    }
+
+    async fn test_get_last_updated_at() {
+        let org_id = "test_org";
+        let table_name = "timestamp_test_table";
+        let test_data = Values::Json(Arc::new(vec![json!({"id": 1, "data": "test"})]));
+        let updated_at = 1640995200;
+
+        // Test getting timestamp before storing data
+        let result = local::get_last_updated_at(org_id, table_name).await;
+        assert!(result.is_ok(), "Get last updated should succeed");
+        assert_eq!(result.unwrap(), 0, "Should return 0 for non-existent table");
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Store data
+        local::store(org_id, table_name, test_data, updated_at)
+            .await
+            .unwrap();
+
+        // Test getting timestamp after storing data
+        let result = local::get_last_updated_at(org_id, table_name).await;
+        assert!(result.is_ok(), "Get last updated should succeed");
+        assert_eq!(
+            result.unwrap(),
+            updated_at,
+            "Should return correct timestamp"
+        );
+    }
+
+    async fn test_store_data_if_needed() {
+        let org_id = "test_org";
+        let table_name = "conditional_test_table";
+        let test_data_v1 = Values::Json(Arc::new(vec![json!({"id": 1, "version": "v1"})]));
+        let test_data_v2 = Values::Json(Arc::new(vec![json!({"id": 1, "version": "v2"})]));
+        let updated_at_v1 = 1640995200;
+        let updated_at_v2 = 1640995300;
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Store initial data
+        let result =
+            local::store_data_if_needed(org_id, table_name, test_data_v1, updated_at_v1).await;
+        assert!(result.is_ok(), "Initial store should succeed");
+
+        // Verify data was stored
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert_eq!(
+            retrieved_data[0]["version"],
+            json!("v1"),
+            "Should have v1 data"
+        );
+
+        // Try to store older data (should be ignored)
+        let old_updated_at = 1640995100;
+        let result =
+            local::store_data_if_needed(org_id, table_name, test_data_v2.clone(), old_updated_at)
+                .await;
+        assert!(
+            result.is_ok(),
+            "Store with old timestamp should succeed but not update"
+        );
+
+        // Verify data wasn't changed
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert_eq!(
+            retrieved_data[0]["version"],
+            json!("v1"),
+            "Should still have v1 data"
+        );
+
+        // Store newer data (should update)
+        let result =
+            local::store_data_if_needed(org_id, table_name, test_data_v2, updated_at_v2).await;
+        assert!(result.is_ok(), "Store with newer timestamp should succeed");
+
+        // Verify data was updated
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert_eq!(
+            retrieved_data[0]["version"],
+            json!("v2"),
+            "Should now have v2 data"
+        );
+    }
+
+    async fn test_store_data_if_needed_background() {
+        let org_id = "test_org";
+        let table_name = "background_test_table";
+        let test_data = Values::Json(Arc::new(vec![json!({"id": 1, "data": "background"})]));
+        let updated_at = 1640995200;
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Test background store
+        let result =
+            local::store_data_if_needed_background(org_id, table_name, test_data, updated_at).await;
+        assert!(result.is_ok(), "Background store should succeed");
+
+        // Wait a bit for background task to complete
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Verify data was eventually stored
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert_eq!(retrieved_data.len(), 1, "Should have stored 1 record");
+        assert_eq!(
+            retrieved_data[0]["data"],
+            json!("background"),
+            "Should have correct data"
+        );
+    }
+
+    async fn test_metadata_persistence() {
+        let org_id = "test_org";
+        let table_name = "metadata_test_table";
+        let test_data = Values::Json(Arc::new(vec![json!({"id": 1, "data": "test"})]));
+        let updated_at = 1640995200;
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Store data
+        local::store(org_id, table_name, test_data, updated_at)
+            .await
+            .unwrap();
+
+        // Manually read metadata file
+        let metadata_path = get_metadata_path();
+        let metadata_content = tokio::fs::read_to_string(&metadata_path).await.unwrap();
+        let metadata: std::collections::HashMap<String, i64> =
+            serde_json::from_str(&metadata_content).unwrap();
+
+        let key = get_key(org_id, table_name);
+        assert!(
+            metadata.contains_key(&key),
+            "Metadata should contain the key"
+        );
+        assert_eq!(
+            metadata[&key], updated_at,
+            "Metadata should have correct timestamp"
+        );
+    }
+
+    async fn test_large_data_handling() {
+        let org_id = "test_org";
+        let table_name = "large_data_table";
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Create large dataset (1000 records)
+        let large_data: Vec<_> = (0..1000)
+            .map(|i| {
+                json!({
+                    "id": i,
+                    "name": format!("name_{}", i),
+                    "data": "x".repeat(100), // 100 characters per record
+                    "nested": {
+                        "field1": i * 2,
+                        "field2": format!("nested_value_{}", i)
+                    }
+                })
+            })
+            .collect();
+
+        let updated_at = 1640995200;
+
+        // Test storing large data
+        let large_data = Values::Json(Arc::new(large_data));
+        let result = local::store(org_id, table_name, large_data, updated_at).await;
+        assert!(result.is_ok(), "Should handle large data successfully");
+
+        // Test retrieving large data
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert_eq!(
+            retrieved_data.len(),
+            1000,
+            "Should retrieve all 1000 records"
+        );
+        assert_eq!(
+            retrieved_data[0]["id"],
+            json!(0),
+            "First record should be correct"
+        );
+        assert_eq!(
+            retrieved_data[999]["id"],
+            json!(999),
+            "Last record should be correct"
+        );
+    }
+
+    async fn test_error_handling() {
+        // Test with invalid JSON data
+        let org_id = "test_org";
+        let table_name = "error_test_table";
+
+        // Setup schema before storing data
+        setup_enrichment_table_schema(org_id, table_name).await;
+
+        // Create data that will serialize fine but test edge cases
+        let test_data = Values::Json(Arc::new(vec![
+            json!({"id": 1, "data": null}),
+            json!({"id": 2, "special_chars": "!@#$%^&*()"}),
+        ]));
+        let updated_at = 1640995200;
+
+        let result = local::store(org_id, table_name, test_data, updated_at).await;
+        assert!(
+            result.is_ok(),
+            "Should handle special characters and null values"
+        );
+
+        let retrieved_data = local::retrieve(org_id, table_name)
+            .await
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert_eq!(retrieved_data.len(), 2, "Should retrieve both records");
+        assert!(
+            retrieved_data[0]["data"].is_null(),
+            "Should preserve null values"
+        );
     }
 }

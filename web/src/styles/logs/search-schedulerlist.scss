@@ -1,0 +1,51 @@
+.expanded-content {
+  padding: 0 1rem;
+  min-width: calc(90vw - 20px);
+  max-height: 100vh; /* Set a fixed height for the container */
+  overflow: hidden; /* Hide overflow by default */
+}
+
+.scrollable-content {
+  width: 100%; /* Use the full width of the parent */
+  overflow-y: auto; /* Enable vertical scrolling for long content */
+  padding: 10px; /* Optional: padding for aesthetics */
+  border: 1px solid #ddd; /* Optional: border for visibility */
+  height: 100%;
+  max-height: 200px;
+  /* Use the full height of the parent */
+  text-wrap: normal;
+  background-color: #e8e8e8;
+  color: black;
+}
+
+.q-td {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.custom-table .q-tr > .q-td:nth-child(2) {
+  text-align: left;
+}
+
+.copy-btn-sql {
+  border: #7a54a2 1px solid;
+  color: #7a54a2;
+}
+
+.copy-btn-function {
+  border: #0a7ebc 1px solid;
+  color: #0a7ebc;
+}
+
+.warning-text {
+  color: #f5a623;
+  border: 1px solid #f5a623;
+  border-radius: 2px;
+}
+.expanded-sql {
+  border-left: #7a54a2 3px solid;
+}
+.expanded-function {
+  border-left: #0a7ebc 3px solid;
+}

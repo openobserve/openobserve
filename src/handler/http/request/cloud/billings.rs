@@ -25,8 +25,12 @@ use crate::{
         meta::{http::HttpResponse as MetaHttpResponse, telemetry},
         utils::{auth::UserEmail, redirect_response::RedirectResponseBuilder},
     },
-    handler::http::models::billings::{
-        CheckoutSessionDetailRequestQuery, ListInvoicesResponseBody, ListSubscriptionResponseBody,
+    handler::http::{
+        extractors::Headers,
+        models::billings::{
+            CheckoutSessionDetailRequestQuery, ListInvoicesResponseBody,
+            ListSubscriptionResponseBody,
+        },
     },
     service::{
         organization,
@@ -56,7 +60,7 @@ use crate::{
 #[get("/{org_id}/billings/hosted_subscription_url")]
 pub async fn create_checkout_session(
     path: web::Path<String>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
 ) -> impl Responder {
     let org_id = path.into_inner();
@@ -136,7 +140,7 @@ pub async fn create_checkout_session(
 #[get("/{org_id}/billings/checkout_session_detail")]
 pub async fn process_session_detail(
     path: web::Path<String>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     query: web::Query<CheckoutSessionDetailRequestQuery>,
 ) -> impl Responder {
     let org_id = path.into_inner();
@@ -173,8 +177,18 @@ pub async fn process_session_detail(
                     json::Value::String(query.plan.to_string()),
                 ),
             ]);
-            telemetry::Telemetry::new()
+            let mut telemetry_instance = telemetry::Telemetry::new();
+            telemetry_instance
                 .send_track_event(
+                    "OpenObserve - New subscription started",
+                    Some(segment_event_data.clone()),
+                    false,
+                    false,
+                )
+                .await;
+
+            telemetry_instance
+                .send_keyevent_track_event(
                     "OpenObserve - New subscription started",
                     Some(segment_event_data),
                     false,
@@ -218,7 +232,10 @@ pub async fn process_session_detail(
     ),
 )]
 #[get("/{org_id}/billings/unsubscribe")]
-pub async fn unsubscribe(path: web::Path<String>, user_email: UserEmail) -> impl Responder {
+pub async fn unsubscribe(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> impl Responder {
     let org_id = path.into_inner();
     let email = user_email.user_id.as_str();
 
@@ -265,7 +282,10 @@ pub async fn unsubscribe(path: web::Path<String>, user_email: UserEmail) -> impl
     ),
 )]
 #[get("/{org_id}/billings/invoices")]
-pub async fn list_invoices(path: web::Path<String>, user_email: UserEmail) -> impl Responder {
+pub async fn list_invoices(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> impl Responder {
     let org_id = path.into_inner();
     let email = user_email.user_id.as_str();
     if organization::get_org(&org_id).await.is_none() {
@@ -302,7 +322,10 @@ pub async fn list_invoices(path: web::Path<String>, user_email: UserEmail) -> im
     ),
 )]
 #[get("/{org_id}/billings/list_subscription")]
-pub async fn list_subscription(path: web::Path<String>, user_email: UserEmail) -> impl Responder {
+pub async fn list_subscription(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> impl Responder {
     let org_id = path.into_inner();
     let email = user_email.user_id.as_str();
     match o2_cloud_billings::get_subscription(email, &org_id).await {

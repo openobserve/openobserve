@@ -17,172 +17,168 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="report-list-page"
-    class="q-pa-none flex"
-    style="height: calc(100vh - 57px)"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
+    class="flex"
   >
-  <div class="tw-flex tw-justify-between tw-items-center tw-w-full tw-py-3 tw-px-4 tw-h-[71px] tw-border-b-[1px]"
-    :class="store.state.theme === 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
-    >
-      <div class="q-table__title tw-font-[600]" data-test="report-list-title">
-        {{ t("reports.header") }}
-      </div>
-
-      <div class="tw-flex tw-items-center">
-        <div class="app-tabs-container q-mr-md" :class="store.state.theme === 'dark' ? 'app-tabs-container-dark' : 'app-tabs-container-light'">
-        <app-tabs
-          class="tabs-selection-container"
-          :tabs="tabs"
-          :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
-          v-model:active-tab="activeTab"
-          @update:active-tab="filterReports"
-        />
-        </div>
-        <q-input
-          data-test="report-list-search-input"
-          v-model="filterQuery"
-          borderless
-          dense
-          class="q-ml-auto no-border o2-search-input tw-h-[36px] tw-w-[150px]"
-          :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
-          :placeholder="t('reports.search')"
-        >
-          <template #prepend>
-            <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
-          </template>
-        </q-input>
-        <q-btn
-          data-test="report-list-add-report-btn"
-          class="q-ml-md o2-primary-button tw-h-[36px]"
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          no-caps
-          :label="t(`reports.add`)"
-          @click="createNewReport"
-        />
-      </div>
-    </div>
-    <div class="full-width o2-quasar-table o2-quasar-table-header-sticky"
-    style="height: calc(100vh - 114px) ; overflow-y: auto;"
-    :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
-    >
-      <q-table
-        data-test="report-list-table"
-        ref="reportListTableRef"
-        :rows="visibleRows"
-        :columns="columns"
-        row-key="id"
-        :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
-        style="width: 100%"
-        :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 114px)' 
-            : 'width: 100%'"
-      >
-        <template #no-data>
-          <NoData />
-        </template>
-
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <div
-              v-if="reportsStateLoadingMap[props.row.uuid]"
-              data-test="report-list-toggle-report-state-loader"
-              style="display: inline-block; width: 33.14px; height: auto"
-              class="flex justify-center items-center q-ml-xs"
-              :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
-            >
-              <q-circular-progress
-                indeterminate
-                rounded
-                size="16px"
-                :value="1"
-                color="secondary"
-              />
-            </div>
-            <q-btn
-              v-else
-              :data-test="`report-list-${props.row.name}-pause-start-report`"
-              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-              class="q-ml-xs material-symbols-outlined"
-              padding="sm"
-              unelevated
-              size="sm"
-              :color="props.row.enabled ? 'negative' : 'positive'"
-              round
-              flat
-              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
-              @click="toggleReportState(props.row)"
-            />
-            <q-btn
-              :data-test="`report-list-${props.row.name}-edit-report`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.edit')"
-              @click="editReport(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`report-list-${props.row.name}-delete-report`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.delete')"
-              @click="confirmDeleteReport(props.row)"
-            ></q-btn>
-          </q-td>
-        </template>
-
-        <template v-slot:body-cell-function="props">
-          <q-td :props="props">
-            <q-tooltip>
-              <pre>{{ props.row.sql }}</pre>
-            </q-tooltip>
-            <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
-          </q-td>
-        </template>
-
-        <template #bottom="scope">
-          <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
-                  {{ resultTotal }} {{ t('reports.header') }}
-                </div>
-            <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
+    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+      <div class="card-container tw-mb-[0.625rem]">
+        <div class="tw-flex tw-justify-between tw-items-center tw-w-full tw-py-3 tw-px-4 tw-h-[68px]">
+          <div class="q-table__title tw-font-[600]" data-test="report-list-title">
+            {{ t("reports.header") }}
           </div>
 
-        </template>
+          <div class="tw-flex tw-items-center">
+            <div class="app-tabs-container q-mr-sm">
+            <app-tabs
+              class="tabs-selection-container"
+              :tabs="tabs"
+              v-model:active-tab="activeTab"
+              @update:active-tab="filterReports"
+            />
+            </div>
+            <q-input
+              data-test="report-list-search-input"
+              v-model="filterQuery"
+              borderless
+              dense
+              class="q-ml-auto no-border o2-search-input tw-h-[36px] tw-w-[150px]"
+              :placeholder="t('reports.search')"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
+            <q-btn
+              data-test="report-list-add-report-btn"
+              class="q-ml-sm o2-primary-button tw-h-[36px]"
+              flat
+              no-caps
+              :label="t(`reports.add`)"
+              @click="createNewReport"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+        <div class="card-container full-width o2-quasar-table o2-row-md o2-quasar-table-header-sticky tw-h-[calc(100vh-124px)]">
+          <q-table
+            data-test="report-list-table"
+            ref="reportListTableRef"
+            :rows="visibleRows"
+            :columns="columns"
+            row-key="id"
+            :pagination="pagination"
+            :filter="filterQuery"
+            :filter-method="filterData"
+            style="width: 100%"
+            :style="hasVisibleRows
+                ? 'width: 100%; height: calc(100vh - 124px)' 
+                : 'width: 100%'"
+          >
+            <template #no-data>
+              <NoData />
+            </template>
 
-        <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Rendering the of the columns -->
-               <!-- here we can add the classes class so that the head will be sticky -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
-      </q-table>
+            <template v-slot:body-cell-actions="props">
+              <q-td :props="props">
+                <div
+                  v-if="reportsStateLoadingMap[props.row.uuid]"
+                  data-test="report-list-toggle-report-state-loader"
+                  style="display: inline-block; width: 33.14px; height: auto"
+                  class="flex justify-center items-center"
+                  :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
+                >
+                  <q-circular-progress
+                    indeterminate
+                    rounded
+                    size="16px"
+                    :value="1"
+                    color="secondary"
+                  />
+                </div>
+                <q-btn
+                  v-else
+                  :data-test="`report-list-${props.row.name}-pause-start-report`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  :color="props.row.enabled ? 'negative' : 'positive'"
+                  :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
+                  round
+                  flat
+                  :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
+                  @click="toggleReportState(props.row)"
+                >
+              </q-btn>
+                <q-btn
+                  :data-test="`report-list-${props.row.name}-edit-report`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  icon="edit"
+                  :title="t('alerts.edit')"
+                  @click="editReport(props.row)"
+                >
+              </q-btn>
+                <q-btn
+                  :data-test="`report-list-${props.row.name}-delete-report`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  :icon="outlinedDelete"
+                  :title="t('alerts.delete')"
+                  @click="confirmDeleteReport(props.row)"
+                >
+              </q-btn>
+              </q-td>
+            </template>
+
+            <template v-slot:body-cell-function="props">
+              <q-td :props="props">
+                <q-tooltip>
+                  <pre>{{ props.row.sql }}</pre>
+                </q-tooltip>
+                <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
+              </q-td>
+            </template>
+
+            <template #bottom="scope">
+              <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+                      {{ resultTotal }} {{ t('reports.header') }}
+                    </div>
+                <QTablePagination
+                :scope="scope"
+                :position="'bottom'"
+                :resultTotal="resultTotal"
+                :perPageOptions="perPageOptions"
+                @update:changeRecordPerPage="changePagination"
+              />
+              </div>
+
+            </template>
+
+            <template v-slot:header="props">
+                <q-tr :props="props">
+                  <!-- Rendering the of the columns -->
+                  <!-- here we can add the classes class so that the head will be sticky -->
+                  <q-th
+                    v-for="col in props.cols"
+                    :key="col.name"
+                    :props="props"
+                    :class="col.classes"
+                    :style="col.style"
+                  >
+                    {{ col.label }}
+                  </q-th>
+                </q-tr>
+              </template>
+          </q-table>
+        </div>
+      </div>
     </div>
 
     <ConfirmDialog
@@ -280,8 +276,8 @@ const columns: any = ref<QTableProps["columns"]>([
     name: "#",
     label: "#",
     field: "#",
-    align: "left",
-    style: "width: 67px",
+    align: "center",
+    style: "width: 67px;",
   },
   {
     name: "name",

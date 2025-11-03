@@ -615,7 +615,7 @@ mod meta {
                 )
                 .await
                 {
-                    match db::scheduler::update_trigger(trigger).await {
+                    match db::scheduler::update_trigger(trigger, false, "").await {
                         Ok(_) => Ok(()),
                         Err(e) => {
                             log::error!("Failed to update trigger for alert {schedule_key}: {e}");

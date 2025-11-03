@@ -136,11 +136,13 @@ pub fn apply_vrl_fn(
                         TRANSFORM_FAILED,
                     ])
                     .inc();
-                let err_msg = format!(
-                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row.",
+                // Log full error with record for debugging
+                log::warn!(
+                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row."
                 );
-                log::warn!("{err_msg}");
-                (row, Some(err_msg))
+                // Return only error message without sensitive record data
+                let clean_err = format!("{org_id}/{stream_name:?} vrl failed: {err:?}");
+                (row, Some(clean_err))
             }
         },
         Err(err) => {
@@ -152,11 +154,13 @@ pub fn apply_vrl_fn(
                     TRANSFORM_FAILED,
                 ])
                 .inc();
-            let err_msg = format!(
-                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row.",
+            // Log full error with record for debugging
+            log::warn!(
+                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row."
             );
-            log::warn!("{err_msg}");
-            (row, Some(err_msg))
+            // Return only error message without sensitive record data
+            let clean_err = format!("{org_id}/{stream_name:?} vrl runtime error: {err:?}");
+            (row, Some(clean_err))
         }
     }
 }
@@ -289,15 +293,19 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                             .unwrap();
                     // After the notification is sent successfully, we need to update
                     // the silence period of the trigger
-                    if let Err(e) = db::scheduler::update_trigger(db::scheduler::Trigger {
-                        org: alert.org_id.to_string(),
-                        module: db::scheduler::TriggerModule::Alert,
-                        module_key,
-                        is_silenced: true,
-                        is_realtime: true,
-                        next_run_at,
-                        ..Default::default()
-                    })
+                    if let Err(e) = db::scheduler::update_trigger(
+                        db::scheduler::Trigger {
+                            org: alert.org_id.to_string(),
+                            module: db::scheduler::TriggerModule::Alert,
+                            module_key,
+                            is_silenced: true,
+                            is_realtime: true,
+                            next_run_at,
+                            ..Default::default()
+                        },
+                        false,
+                        "",
+                    )
                     .await
                     {
                         log::error!("Failed to update trigger: {e}");

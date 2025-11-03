@@ -22,12 +22,12 @@
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
-      <div class="flex q-gutter-sm items-center">
+      <div class="flex items-center" style="gap: 0.5rem">
         <!-- histogram interval for sql queries -->
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          class="q-ml-sm"
+          class="viewpanel-icons"
           style="width: 150px"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
         />
@@ -35,6 +35,7 @@
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"
+          class="viewpanel-icons"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
           @hide="setTimeForVariables()"
@@ -46,6 +47,7 @@
             store.state?.zoConfig?.min_auto_refresh_interval || 5
           "
           @trigger="refreshData"
+          class="viewpanel-icons"
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <q-btn
@@ -54,7 +56,7 @@
             searchRequestTraceIds.length &&
             disable
           "
-          class="q-ml-sm"
+          class="viewpanel-icons el-border"
           outline
           padding="xs"
           no-caps
@@ -69,7 +71,7 @@
         </q-btn>
         <q-btn
           v-else
-          class="q-ml-sm"
+          class="viewpanel-icons el-border"
           :outline="isVariablesChanged ? true : false"
           padding="xs"
           no-caps
@@ -92,7 +94,7 @@
           no-caps
           @click="goBack"
           padding="xs"
-          class="q-ml-md"
+          class="viewpanel-icons el-border"
           flat
           icon="close"
           data-test="dashboard-viewpanel-close-btn"
@@ -117,9 +119,67 @@
               />
               <div style="flex: 1; overflow: hidden">
                 <div
-                  class="tw-flex tw-justify-end tw-mr-2"
+                  class="tw-flex tw-justify-end tw-mr-2 tw-items-center"
                   data-test="view-panel-last-refreshed-at"
                 >
+                  <!-- Error/Warning tooltips -->
+                  <q-btn
+                    v-if="errorMessage"
+                    :icon="outlinedWarning"
+                    flat
+                    size="xs"
+                    padding="2px"
+                    data-test="viewpanel-error-data"
+                    class="warning q-mr-xs"
+                  >
+                    <q-tooltip
+                      anchor="bottom right"
+                      self="top right"
+                      max-width="220px"
+                    >
+                      <div style="white-space: pre-wrap">
+                        {{ errorMessage }}
+                      </div>
+                    </q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    v-if="maxQueryRangeWarning"
+                    :icon="outlinedWarning"
+                    flat
+                    size="xs"
+                    padding="2px"
+                    data-test="viewpanel-max-duration-warning"
+                    class="warning q-mr-xs"
+                  >
+                    <q-tooltip
+                      anchor="bottom right"
+                      self="top right"
+                      max-width="220px"
+                    >
+                      <div style="white-space: pre-wrap">
+                        {{ maxQueryRangeWarning }}
+                      </div>
+                    </q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    v-if="limitNumberOfSeriesWarningMessage"
+                    :icon="symOutlinedDataInfoAlert"
+                    flat
+                    size="xs"
+                    padding="2px"
+                    data-test="viewpanel-series-limit-warning"
+                    class="warning q-mr-xs"
+                  >
+                    <q-tooltip
+                      anchor="bottom right"
+                      self="top right"
+                      max-width="220px"
+                    >
+                      <div style="white-space: pre-wrap">
+                        {{ limitNumberOfSeriesWarningMessage }}
+                      </div>
+                    </q-tooltip>
+                  </q-btn>
                   <span v-if="lastTriggeredAt" class="lastRefreshedAt">
                     <span class="lastRefreshedAtIcon">🕑</span
                     ><RelativeTime
@@ -142,6 +202,10 @@
                   @updated:data-zoom="onDataZoom"
                   @update:initialVariableValues="onUpdateInitialVariableValues"
                   @last-triggered-at-update="handleLastTriggeredAtUpdate"
+                  @result-metadata-update="handleResultMetadataUpdate"
+                  @limit-number-of-series-warning-message-update="
+                    handleLimitNumberOfSeriesWarningMessage
+                  "
                   data-test="dashboard-viewpanel-panel-schema-renderer"
                   style="height: calc(100% - 21px)"
                 />
@@ -194,6 +258,9 @@ import { inject, provide, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
+import { processQueryMetadataErrors } from "@/utils/zincutils";
+import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
+import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 
 export default defineComponent({
   name: "ViewPanel",
@@ -305,6 +372,11 @@ export default defineComponent({
     const handleLastTriggeredAtUpdate = (data: any) => {
       lastTriggeredAt.value = data;
     };
+
+    // Warning messages
+    const maxQueryRangeWarning = ref("");
+    const limitNumberOfSeriesWarningMessage = ref("");
+    const errorMessage = ref("");
 
     onBeforeMount(async () => {
       await importSqlParser();
@@ -551,15 +623,28 @@ export default defineComponent({
       emit("closePanel");
     };
 
-    const handleChartApiError = (errorMessage: {
+    const handleChartApiError = (errorMsg: {
       message: string;
       code: string;
     }) => {
-      if (errorMessage?.message) {
+      if (errorMsg?.message) {
+        errorMessage.value = errorMsg.message;
         const errorList = errorData.errors ?? [];
         errorList.splice(0);
-        errorList.push(errorMessage.message);
+        errorList.push(errorMsg.message);
       }
+    };
+
+    // Handle limit number of series warning from PanelSchemaRenderer
+    const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
+      limitNumberOfSeriesWarningMessage.value = message;
+    };
+
+    const handleResultMetadataUpdate = (metadata: any) => {
+      maxQueryRangeWarning.value = processQueryMetadataErrors(
+        metadata,
+        store.state.timezone,
+      );
     };
 
     const getInitialVariablesData = () => {
@@ -641,6 +726,8 @@ export default defineComponent({
       selectedDate,
       errorData,
       handleChartApiError,
+      handleResultMetadataUpdate,
+      handleLimitNumberOfSeriesWarningMessage,
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
@@ -662,6 +749,11 @@ export default defineComponent({
       currentVariablesDataRef,
       isVariablesChanged,
       store,
+      maxQueryRangeWarning,
+      limitNumberOfSeriesWarningMessage,
+      errorMessage,
+      outlinedWarning,
+      symOutlinedDataInfoAlert,
     };
   },
 });
@@ -671,5 +763,42 @@ export default defineComponent({
 .layout-panel-container {
   display: flex;
   flex-direction: column;
+}
+
+.warning {
+  color: var(--q-warning);
+}
+
+.viewpanel-icons {
+  height: 30px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+
+  :deep(.date-time-button) {
+    height: 30px;
+    min-height: 30px;
+  }
+
+  :deep(.q-btn-dropdown) {
+    height: 30px;
+    min-height: 30px;
+    padding: 0 8px;
+
+    .q-btn__content {
+      line-height: normal;
+      align-items: center;
+    }
+  }
+}
+
+.el-border {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
 }
 </style>

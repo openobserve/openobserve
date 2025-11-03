@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width q-mx-lg "  >
-    <div class="row items-center no-wrap q-mx-md q-my-sm">
-      <div class="flex items-center justify-between tw-w-full">
+  <div class="full-width q-mx-lg q-pt-xs">
+    <div class="row items-center no-wrap card-container tw-mx-[0.625rem]  tw-mb-[0.625rem]">
+      <div class="flex items-center justify-between tw-w-full card-container tw-h-[68px] tw-px-2 tw-py-3">
         <div class="flex items-center">
           <div
           data-test="add-alert-back-btn"
@@ -56,23 +56,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-separator />
     <div
       ref="addAlertFormRef"
       style="
-        max-height: calc(100vh - 165px);
+        max-height: calc(100vh - 194px);
         overflow: auto;
         scroll-behavior: smooth;
       "
+      class="tw-mb-2"
     >
-      <div class="row flex tw-gap-2 items-start" style="width: 100%">
-        <div class="col" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+      <div class="row flex items-start" style="width: 100%">
+        <div class="col" :class="store.state.theme === 'dark' ? 'dark-mode1' : 'light-mode1'">
           <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <!-- alerts setup  section -->
+             <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
             <div
-              class="flex tw-mt-1 justify-start items-center flex-wrap "
+              class="flex justify-start items-center flex-wrap card-container"
             >
-              <div class="tw-w-full tw-ml-2   ">
+              <div class="tw-w-full tw-ml-2">
                 <AlertsContainer 
                   name="query"
                   v-model:is-expanded="expandState.alertSetup"
@@ -81,29 +82,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon="edit"
                   class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
                   :iconClass="'tw-mt-[2px]'"
-              />
+                />
               </div>
-              <div v-if="expandState.alertSetup" class="tw-w-full row alert-setup-container">
+              <div v-if="expandState.alertSetup" class="tw-w-full row alert-setup-container o2-alert-tab-border tw-px-4 tw-pt-2 tw-pb-3">
     
               <div class="tw-w-full ">
 
                 <div
-                  class="alert-name-input o2-input flex justify-between items-center tw-gap-10 tw-pb-3"
-                  style="padding-top: 12px;"
+                  class="alert-name-input flex justify-between items-center tw-gap-10 tw-pb-3"
                   data-test="add-alert-name-input-container"
                 >
                   <q-input
                     data-test="add-alert-name-input row"
                     v-model="formData.name"
                     :label="t('alerts.name') + ' *'"
-                    color="input-border"
                       class="showLabelOnTop col"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                     stack-label
-                    outlined
-                    filled
                     dense
-                    hide-bottom-space
+                    borderless
                     v-bind:readonly="beingUpdated"
                     v-bind:disable="beingUpdated"
                     :rules="[
@@ -114,15 +110,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : t('common.nameRequired'),
                     ]"
                     tabindex="0"
+                    hide-bottom-space
                   />
-                  <div class="col" style="height: 62px;">
+                  <div class="col" style="height: 68px;">
                     <SelectFolderDropDown
                       :disableDropdown="beingUpdated"
                       :type="'alerts'"
-                      :style="'height: 30px'"
+                      :style="'height: 36px;'"
                       @folder-selected="updateActiveFolderId"
                       :activeFolderId="activeFolderId"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                   />
                   </div>
                 
@@ -130,13 +126,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                  class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-3"
+                  class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-4"
                   style="padding-top: 0px"
                   data-test="add-alert-stream-type-select-container"
                 >
                   <div
                     data-test="add-alert-stream-type-select"
-                    class="alert-stream-type o2-input tw-w-full col "
+                    class="tw-w-full col "
                     style="padding-top: 0"
 
                   >
@@ -146,13 +142,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="streamTypes"
                       :label="t('alerts.streamType') + ' *'"
                       :popup-content-style="{ textTransform: 'lowercase' }"
-                      color="input-border"
                       class="q-py-sm showLabelOnTop no-case col"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                       stack-label
-                      outlined
-                      filled
+                      borderless
                       dense
+                      hide-bottom-space
                       v-bind:readonly="beingUpdated"
                       v-bind:disable="beingUpdated"
                       @update:model-value="updateStreams()"
@@ -161,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     data-test="add-alert-stream-select"
-                    class="o2-input col"
+                    class="col"
                     style="padding-top: 0"
                   >
                     <q-select
@@ -172,12 +166,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :loading="isFetchingStreams"
                       color="input-border"
                       class="q-py-sm showLabelOnTop no-case col"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                      filled
                       stack-label
                       dense
                       use-input
+                      borderless
                       hide-selected
+                      hide-bottom-space
                       fill-input
                       :input-debounce="400"
                       v-bind:readonly="beingUpdated"
@@ -202,7 +196,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   :label="t('alerts.scheduled')"
                   class="q-ml-none o2-radio-button"
-                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'"
                 />
                 <q-radio
                   data-test="add-alert-realtime-alert-radio"
@@ -214,16 +207,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   :label="t('alerts.realTime')"
                   class="q-ml-none o2-radio-button"
-                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'" 
                   />
               </div>
               </div>
             </div>
-            
+          </div>
 
             <div
               v-if="formData.is_real_time === 'true'"
-              class="q-pr-sm q-pa-none q-ma-none"
+              class="q-pa-none q-ma-none"
               data-test="add-alert-query-input-title"
             >
               <real-time-alert
@@ -243,8 +235,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               />
             </div>
-            <div v-else class="q-pa-none q-ma-none q-pr-sm  ">
+            <div v-else class="q-pa-none q-ma-none  ">
               <scheduled-alert
+                v-if="!isLoadingPanelData"
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
                 :conditions="formData.query_condition?.conditions || {}"
@@ -282,13 +275,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:silence="updateSilence"
                 @refresh:destinations="refreshDestinations"
                 @update:destinations="updateDestinations"
-                class="q-mt-sm"
               />
             </div>
   
             <!-- additional setup starts here -->
-            <div
-              class="flex tw-mt-1 justify-start items-center q-pb-sm flex-wrap "
+             <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
+                   <div
+              class="flex justify-start items-center q-pb-sm flex-wrap card-container"
             >
               <div class="tw-w-full tw-ml-2   ">
                 <AlertsContainer 
@@ -299,19 +292,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
                     />
             </div>
-            <div v-if="expandState.advancedSetup" class=" tw-w-full row alert-setup-container" >
+            <div v-if="expandState.advancedSetup" class=" tw-w-full row alert-setup-container tw-px-4 tw-pt-2 tw-pb-3 o2-alert-tab-border" >
 
-            <div class="tw-w-full row" >
-              <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full">
+            <div class="tw-w-full row">
+              <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full ">
               <variables-input
-                class="o2-input"
                 :variables="formData.context_attributes"
                 @add:variable="addVariable"
                 @remove:variable="removeVariable"
               />
             </div>
-
-            <div v-if="expandState.advancedSetup" class=" tw-w-full">
+            <!-- TODO: make text area also similar to qinput -->
+            <div v-if="expandState.advancedSetup" class=" tw-w-full t">
               <div data-test="add-alert-description-input tw-w-full " :class="store.state.theme === 'dark' ? '' : 'light-mode'">
                 <div class="flex items-center q-mb-sm ">
                   <span class="text-bold custom-input-label">Description</span>
@@ -330,7 +322,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="textarea"
                   placeholder="Type something"
                   rows="5"
-                  
                 />
               </div>
               <div data-test="add-alert-row-input tw-w-full">
@@ -377,6 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             
+             </div>
 
 
 
@@ -385,11 +377,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <div
-          style="width: 420px; height: 320px; position: sticky; top: 0 "
+          style="width: 430px; height: 320px; position: sticky; top: 0 "
           class=" col-2"
         >
           <preview-alert
-            style="border: 1px solid #ececec; height: 300px; width: 412px;"
+            style="border: 1px solid #ececec; height: 300px; width: 430px;"
             ref="previewAlertRef"
             :formData="formData"
             :query="previewQuery"
@@ -402,27 +394,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
     </div>
-    <div class="flex justify-end items-center q-px-lg " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: fixed; bottom: 0; left: 0; right: 0; height: 70px !important; z-index: 100;">
-      <q-btn
-        data-test="add-alert-cancel-btn"
-        v-close-popup="true"
-        class="q-mr-md o2-secondary-button tw-h-[36px]"
-        :label="t('alerts.cancel')"
-        no-caps
-        flat
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-        @click="$emit('cancel:hideform')"
-      />
-      <q-btn
-        data-test="add-alert-submit-btn"
-        class="o2-primary-button no-border tw-h-[36px]"
-        :label="t('alerts.save')"
-        type="submit"
-        no-caps
-        flat
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        @click="onSubmit"
-      />
+    <div class="tw-mx-2">
+      <div
+          class="flex justify-end q-px-md full-width tw-py-3 card-container"
+          style="position: sticky; bottom: 0px; z-index: 2"
+        >
+        <q-btn
+          data-test="add-alert-cancel-btn"
+          v-close-popup="true"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
+          :label="t('alerts.cancel')"
+          no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          @click="$emit('cancel:hideform')"
+        />
+        <q-btn
+          data-test="add-alert-submit-btn"
+          class="o2-primary-button no-border tw-h-[36px]"
+          :label="t('alerts.save')"
+          type="submit"
+          no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          @click="onSubmit"
+        />
+      </div>
     </div>
 
   </div>
@@ -453,6 +450,7 @@ import {
   defineComponent,
   ref,
   onMounted,
+  onUnmounted,
   watch,
   type Ref,
   computed,
@@ -469,7 +467,6 @@ import segment from "../../services/segment_analytics";
 import {
   getUUID,
   getTimezoneOffset,
-  b64EncodeUnicode,
   b64DecodeUnicode,
   isValidResourceName,
   getTimezonesByOffset,
@@ -480,15 +477,41 @@ import useStreams from "@/composables/useStreams";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
-import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
+import {
+  generateSqlQuery,
+} from "@/utils/alerts/alertQueryBuilder";
+import {
+  validateInputs as validateInputsUtil,
+  validateSqlQuery as validateSqlQueryUtil,
+  saveAlertJson as saveAlertJsonUtil,
+  type ValidationContext,
+  type JsonValidationContext,
+} from "@/utils/alerts/alertValidation";
+import {
+  getAlertPayload as getAlertPayloadUtil,
+  prepareAndSaveAlert as prepareAndSaveAlertUtil,
+  type PayloadContext,
+  type SaveAlertContext,
+} from "@/utils/alerts/alertPayload";
+import {
+  getParser as getParserUtil,
+  addHavingClauseToQuery,
+  type SqlUtilsContext,
+} from "@/utils/alerts/alertSqlUtils";
 
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
-import cronParser from "cron-parser";
 import AlertsContainer from "./AlertsContainer.vue";
 import JsonEditor from "../common/JsonEditor.vue";
-import { validateAlert } from "@/utils/validateAlerts";
 import { useReo } from "@/services/reodotdev_analytics";
+import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
+import {
+  updateGroup as updateGroupUtil,
+  removeConditionGroup as removeConditionGroupUtil,
+  transformFEToBE as transformFEToBEUtil,
+  retransformBEToFE as retransformBEToFEUtil,
+  type TransformContext,
+} from "@/utils/alerts/alertDataTransforms";
 
 const defaultValue: any = () => {
   return {
@@ -648,9 +671,11 @@ export default defineComponent({
     const vrlFunctionError = ref("");
 
     const showTimezoneWarning = ref(false);
-    
+
     const showJsonEditorDialog = ref(false);
     const validationErrors = ref([]);
+
+    const isLoadingPanelData = ref(false);
 
     const { track } = useReo();
 
@@ -683,37 +708,23 @@ export default defineComponent({
       return formData.value.stream_type && formData.value.stream_name;
     });
 
-    const updateConditions = (e: any) => {
-      try {
-        const ast = parser.astify(e.target.value);
-        if (ast) sqlAST.value = ast;
-        else return;
-
-        // If sqlAST.value.columns is not type of array then return
-        if (!sqlAST.value) return;
-        if (!Array.isArray(sqlAST.value?.columns)) return;
-
-        sqlAST.value.columns.forEach(function (item: any) {
-          let val;
-          if (item["as"] === undefined || item["as"] === null) {
-            val = item["expr"]["column"];
-          } else {
-            val = item["as"];
-          }
-          if (!triggerCols.value.includes(val)) {
-            triggerCols.value.push(val);
-          }
-        });
-      } catch (e) {
-        console.log("Alerts: Error while parsing SQL query");
-      }
-    };
     const editorData = ref("");
     const prefixCode = ref("");
     const suffixCode = ref("");
     const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
-    onMounted(async () => {});
+    onMounted(async () => {
+      // Set up alerts context provider
+      const alertsProvider = createAlertsContextProvider(formData, store, props.isUpdated);
+      contextRegistry.register('alerts', alertsProvider);
+      contextRegistry.setActive('alerts');
+    });
+
+    onUnmounted(() => {
+      // Clean up alerts-specific context provider
+      contextRegistry.unregister('alerts');
+      contextRegistry.setActive('');
+    });
 
     const updateEditorContent = async (stream_name: string) => {
       triggerCols.value = [];
@@ -858,7 +869,7 @@ export default defineComponent({
 
     const previewAlert = async () => {
       if (getSelectedTab.value === "custom"){
-        previewQuery.value = generateSqlQuery();
+        previewQuery.value = generateSqlQueryLocal();
 
       }
       else if (getSelectedTab.value === "sql")
@@ -867,7 +878,7 @@ export default defineComponent({
         previewQuery.value = formData.value.query_condition.promql.trim();
 
       if (formData.value.is_real_time === "true") {
-        previewQuery.value = generateSqlQuery();
+        previewQuery.value = generateSqlQueryLocal();
       }
 
       await nextTick();
@@ -876,174 +887,16 @@ export default defineComponent({
       }
     };
 
-    const getFormattedCondition = (
-      column: string,
-      operator: string,
-      value: number | string,
-    ) => {
-      let condition = "";
-      switch (operator) {
-        case "=":
-        case "<>":
-        case "<":
-        case ">":
-        case "<=":
-        case ">=":
-          condition = column + ` ${operator} ${value}`;
-          break;
-          //this is done because when we get from BE the response includes the operator in lowercase
-          //so we need to handle it separately
-        case "contains":
-          condition = column + ` LIKE '%${value}%'`;
-          break;
-        //this is done because when we get from BE the response includes the operator in lowercase and converted NotContains to not_contains
-        //so we need to handle it separately
-        case "not_contains":
-          condition = column + ` NOT LIKE '%${value}%'`;
-          break;
-          //this is done because in the FE we are not converting the operator to lowercase
-          //so we need to handle it separately
-        case 'Contains':
-          condition = column + ` LIKE '%${value}%'`;
-          break;
-          //this is done because in the FE we are not converting the operator to lowercase
-        case 'NotContains':
-          condition = column + ` NOT LIKE '%${value}%'`;
-          break;
-        default:
-          condition = column + ` ${operator} ${value}`;
-          break;
-      }
-
-      return condition;
-    };
-
-    //this method is used to generate the where clause
-    //for new format of conditions we need to iterate over the items and get the conditions
-    //and then we need to format the conditions
-    // then we need to return the where clause
-
-    function generateWhereClause(group: any, streamFieldsMap: any) {
-      //this method is used to format the value
-      //if the value is a number or a string and the operator is contains or not contains then we need to return the value as it is
-      //else we need to return the value as a string and add single quotes to it
-      function formatValue(column: any, operator: any, value: any) {
-        return streamFieldsMap[column]?.type === "Int64" ||
-          operator === "contains" ||
-          operator === "not_contains" ||
-          operator === "Contains" ||
-          operator === "NotContains"
-          ? value
-          : `'${value}'`;
-      }
-
-      //this method is used to format the condition
-      //if the column and operator and value are present then we need to return the condition
-      //else we need to return an empty string
-      function formatCondition(column: any, operator: any, value: any) {
-        return `${column} ${operator} ${value}`;
-      }
-
-      //this method is used to parse the group
-      //if the group is not present or the items are not present then we need to return an empty string
-      //else we need to iterate over the items and get the conditions
-      //and then we need to return the where clause
-      function parseGroup(groupNode: any) {
-        if (!groupNode || !Array.isArray(groupNode.items)) return "";
-
-        const parts = groupNode.items.map((item: any) => {
-          // Nested group
-          if (item.items && Array.isArray(item.items)) {
-            return `(${parseGroup(item)})`;
-          }
-
-          // Single condition
-          if (item.column && item.operator && item.value !== undefined) {
-            const formattedValue = formatValue(item.column, item.operator, item.value);
-              return getFormattedCondition(item.column, item.operator, formattedValue);
-          }
-
-          return "";
-        }).filter(Boolean);
-
-        return parts.join(` ${groupNode.label.toUpperCase()} `);
-      }
-
-      //this method is used to generate the where clause
-
-      const clause = parseGroup(group);
-      return clause.trim().length ? "WHERE " + clause : "";
-  }
 
 
-    const generateSqlQuery = () => {
-      // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, COUNT(*) as zo_sql_val FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC
 
-      // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, avg(action_error_count) as zo_sql_val, geo_info_city FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key,geo_info_city ORDER BY zo_sql_key ASC;
-      let query = `SELECT histogram(${
+    const generateSqlQueryLocal = () => {
+      return generateSqlQuery(
+        formData.value,
+        streamFieldsMap.value,
+        isAggregationEnabled.value,
         store.state.zoConfig.timestamp_column || "_timestamp"
-      }) AS zo_sql_key,`;
-      //this method is used to generate the where clause
-      //previously it was just iterating over the conditions and getting the where clause
-      //now we are using the new format of conditions and getting the where clause using generateWhereClause method
-      let whereClause = generateWhereClause(formData.value.query_condition.conditions, streamFieldsMap);
-
-      if (!isAggregationEnabled.value) {
-        query +=
-          ` COUNT(*) as zo_sql_val FROM \"${formData.value.stream_name}\" ` +
-          whereClause +
-          " GROUP BY zo_sql_key ORDER BY zo_sql_key ASC";
-      } else {
-        const aggFn = formData.value.query_condition.aggregation.function;
-        const column = formData.value.query_condition.aggregation.having.column;
-
-        const isAggValid = aggFn?.trim()?.length && column?.trim()?.length;
-
-        let groupByAlias = "";
-        let groupByCols: string[] = [];
-        formData.value.query_condition.aggregation.group_by.forEach(
-          (column: any) => {
-            if (column.trim().length) groupByCols.push(column);
-          },
-        );
-
-        let concatGroupBy = "";
-        if (groupByCols.length) {
-          groupByAlias = ", x_axis_2";
-          concatGroupBy = `, concat(${groupByCols.join(
-            ",' : ',",
-          )}) as x_axis_2`;
-        }
-
-        const percentileFunctions: any = {
-          p50: 0.5,
-          p75: 0.75,
-          p90: 0.9,
-          p95: 0.95,
-          p99: 0.99,
-        };
-
-        if (isAggValid) {
-          if (percentileFunctions[aggFn]) {
-            query +=
-              ` approx_percentile_cont(${column}, ${percentileFunctions[aggFn]}) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
-              whereClause +
-              ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
-          } else {
-            query +=
-              ` ${aggFn}(${column}) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
-              whereClause +
-              ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
-          }
-        } else {
-          query +=
-            ` COUNT(*) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
-            whereClause +
-            ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
-        }
-      }
-
-      return query;
+      );
     };
 
     const debouncedPreviewAlert = debounce(previewAlert, 500);
@@ -1054,249 +907,49 @@ export default defineComponent({
       }
     };
     const getParser = (sqlQuery: string) => {
-      try {
-        // As default is a reserved keyword in sql-parser, we are replacing it with default1
-        const regex = /\bdefault\b/g;
-        const columns = parser.astify(
-          sqlQuery.replace(regex, "default1"),
-        ).columns;
-        for (const column of columns) {
-          if (column.expr.column === "*") {
-            sqlQueryErrorMsg.value = "Selecting all columns is not allowed";
-            return false;
-          }
-        }
-        return true;
-      } catch (error) {
-        // In catch block we are returning true, as we just wanted to validate if user have added * in the query to select all columns
-        // select field from default // here default is not wrapped in "" so node sql parser will throw error as default is a reserved keyword. But our Backend supports this query without quotes
-        // Query will be validated in the backend
-        console.log(error);
-        return true;
-      }
+      const sqlUtilsContext: SqlUtilsContext = {
+        parser,
+        sqlQueryErrorMsg,
+      };
+      return getParserUtil(sqlQuery, sqlUtilsContext);
     };
 
     const getAlertPayload = () => {
-      const payload = cloneDeep(formData.value);
-
-      // Deleting uuid from payload as it was added for reference of frontend
-      if (payload.uuid) delete payload.uuid;
-
-      payload.is_real_time = payload.is_real_time === "true";
-
-      payload.context_attributes = {};
-
-      payload.query_condition.type = payload.is_real_time
-        ? "custom"
-        : formData.value.query_condition.type;
-
-      formData.value.context_attributes.forEach((attr: any) => {
-        if (attr.key?.trim() && attr.value?.trim())
-          payload.context_attributes[attr.key] = attr.value;
-      });
-
-      payload.trigger_condition.threshold = parseInt(
-        formData.value.trigger_condition.threshold,
-      );
-
-      payload.trigger_condition.period = parseInt(
-        formData.value.trigger_condition.period,
-      );
-
-      payload.trigger_condition.frequency = parseInt(
-        formData.value.trigger_condition.frequency,
-      );
-
-      payload.trigger_condition.silence = parseInt(
-        formData.value.trigger_condition.silence,
-      );
-
-      payload.description = formData.value.description.trim();
-
-      if (!isAggregationEnabled.value || getSelectedTab.value !== "custom") {
-        payload.query_condition.aggregation = null;
-      }
-
-      if (getSelectedTab.value === "sql" || getSelectedTab.value === "promql")
-        payload.query_condition.conditions = [];
-
-      if (getSelectedTab.value === "sql" || getSelectedTab.value === "custom") {
-        payload.query_condition.promql_condition = null;
-      }
-
-      if (getSelectedTab.value === "promql") {
-        payload.query_condition.sql = "";
-      }
-
-      if (formData.value.query_condition.vrl_function) {
-        payload.query_condition.vrl_function = b64EncodeUnicode(
-          formData.value.query_condition.vrl_function.trim(),
-        );
-      }
-
-      if (beingUpdated) {
-        payload.updatedAt = new Date().toISOString();
-        payload.lastEditedBy = store.state.userInfo.email;
-      } else {
-        payload.createdAt = new Date().toISOString();
-        payload.owner = store.state.userInfo.email;
-        payload.lastTriggeredAt = new Date().getTime();
-        payload.lastEditedBy = store.state.userInfo.email;
-        formData.value.updatedAt = new Date().toISOString();
-      }
-
-      return payload;
+      const payloadContext: PayloadContext = {
+        store,
+        isAggregationEnabled,
+        getSelectedTab,
+        beingUpdated,
+      };
+      return getAlertPayloadUtil(formData.value, payloadContext);
     };
 
     const validateInputs = (input: any, notify: boolean = true) => {
-      if (isNaN(Number(input.trigger_condition.silence))) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Silence Notification should not be empty",
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      if (input.is_real_time) return true;
-
-      if (
-        Number(input.trigger_condition.period) < 1 ||
-        isNaN(Number(input.trigger_condition.period))
-      ) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Period should be greater than 0",
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      if (input.query_condition.aggregation) {
-        if (
-          isNaN(input.trigger_condition.threshold) ||
-          !input.query_condition.aggregation.having.value.toString().trim()
-            .length ||
-          !input.query_condition.aggregation.having.column ||
-          !input.query_condition.aggregation.having.operator
-        ) {
-          notify &&
-            q.notify({
-              type: "negative",
-              message: "Threshold should not be empty",
-              timeout: 1500,
-            });
-          return false;
-        }
-
-        return true;
-      }
-
-      if (
-        isNaN(input.trigger_condition.threshold) ||
-        input.trigger_condition.threshold < 1 ||
-        !input.trigger_condition.operator
-      ) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Threshold should not be empty",
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      if (input.trigger_condition.frequency_type === "cron") {
-        try {
-          cronParser.parseExpression(input.trigger_condition.cron);
-        } catch (err) {
-          console.log(err);
-          scheduledAlertRef.value.cronJobError = "Invalid cron expression!";
-          return;
-        }
-      }
-
-      scheduledAlertRef.value?.validateFrequency(input.trigger_condition);
-
-      if (scheduledAlertRef.value.cronJobError) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: scheduledAlertRef.value.cronJobError,
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      return true;
+      const validationContext: ValidationContext = {
+        q,
+        store,
+        scheduledAlertRef,
+        validateSqlQueryPromise,
+        sqlQueryErrorMsg,
+        vrlFunctionError,
+        buildQueryPayload,
+        getParser,
+      };
+      return validateInputsUtil(input, validationContext, notify);
     };
 
     const validateSqlQuery = async () => {
-      // Delaying the validation by 300ms, as editor has debounce of 300ms. Else old value will be used for validation
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      if (!getParser(formData.value.query_condition.sql)) {
-        return;
-      }
-
-      const query = buildQueryPayload({
-        sqlMode: true,
-        streamName: formData.value.stream_name,
-      });
-
-      delete query.aggs;
-
-      // We get 15 minutes time range for the query, so reducing it by 13 minutes to get 2 minute data
-      query.query.start_time = query.query.start_time + 780000000;
-
-      query.query.sql = formData.value.query_condition.sql;
-
-      if (formData.value.query_condition.vrl_function)
-        query.query.query_fn = b64EncodeUnicode(
-          formData.value.query_condition.vrl_function,
-        );
-
-      validateSqlQueryPromise.value = new Promise((resolve, reject) => {
-        searchService
-          .search({
-            org_identifier: store.state.selectedOrganization.identifier,
-            query,
-            page_type: formData.value.stream_type,
-          })
-          .then((res: any) => {
-            sqlQueryErrorMsg.value = "";
-
-            if (res.data?.function_error) {
-              vrlFunctionError.value = res.data.function_error;
-              q.notify({
-                type: "negative",
-                message: "Invalid VRL Function",
-                timeout: 3000,
-              });
-              reject("function_error");
-            } else vrlFunctionError.value = "";
-
-            resolve("");
-          })
-          .catch((err: any) => {
-            sqlQueryErrorMsg.value = err.response?.data?.message
-              ? err.response?.data?.message
-              : "Invalid SQL Query";
-
-            // Show error only if it is not real time alert
-            // This case happens when user enters invalid query and then switches to real time alert
-            if (formData.value.query_condition.type === "sql")
-              q.notify({
-                type: "negative",
-                message: "Invalid SQL Query : " + err.response?.data?.message,
-                timeout: 3000,
-              });
-
-            reject("sql_error");
-          });
-      });
+      const validationContext: ValidationContext = {
+        q,
+        store,
+        scheduledAlertRef,
+        validateSqlQueryPromise,
+        sqlQueryErrorMsg,
+        vrlFunctionError,
+        buildQueryPayload,
+        getParser,
+      };
+      return validateSqlQueryUtil(formData.value, validationContext);
     };
 
     const updateFunctionVisibility = () => {
@@ -1352,41 +1005,13 @@ export default defineComponent({
 
 
 // Method to handle the emitted changes and update the structure
-//this method is used to update the group
-//we need to update the group if it is changed 
-  function updateGroup(updatedGroup:any) {
-    formData.value.query_condition.conditions.items.forEach((element:any) => {
-      if(element.groupId === updatedGroup.groupId){
-        element.items = updatedGroup.items;
-      }
-    });
-  }
-//this method is used to remove the condition group
-//we need to remove the condition group if it is empty because we cannot simply show empty group in the UI
-  const removeConditionGroup = (targetGroupId: string, currentGroup: any = formData.value.query_condition.conditions) => {
-    if (!currentGroup?.items || !Array.isArray(currentGroup.items)) return;
-
-    // Recursive function to filter empty groups
-    const filterEmptyGroups = (items: any[]): any[] => {
-      return items.filter((item: any) => {
-        // If this is the target group to remove, filter it out
-        if (item.groupId === targetGroupId) {
-          return false;
-        }
-
-        // If it's a group, recursively filter its items
-        if (item.items && Array.isArray(item.items)) {
-          item.items = filterEmptyGroups(item.items);
-          // Remove groups that are empty after filtering
-          return item.items.length > 0;
-        }
-
-        return true;
-      });
-    };
-
-    // Apply the filtering to the root group
-    currentGroup.items = filterEmptyGroups(currentGroup.items);
+  const updateGroup = (updatedGroup: any) => {
+    const transformContext: TransformContext = { formData: formData.value };
+    updateGroupUtil(updatedGroup, transformContext);
+  };
+  const removeConditionGroup = (targetGroupId: string, currentGroup?: any) => {
+    const transformContext: TransformContext = { formData: formData.value };
+    removeConditionGroupUtil(targetGroupId, currentGroup, transformContext);
   };
 
 
@@ -1402,33 +1027,9 @@ export default defineComponent({
   // {
   //   and: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
   // }
-    const transformFEToBE = (node:any) => {
-    if (!node || !node.items || !Array.isArray(node.items)) return {};
-
-    const groupLabel = node.label?.toLowerCase(); // 'or' or 'and'
-    if (!groupLabel || (groupLabel !== 'or' && groupLabel !== 'and')) return {};
-
-    const transformedItems = node.items.map((item:any) => {
-      // If the item has its own groupId and items, it's a nested group
-      //that means the item is a group and we need to iterate over that group to get further conditions
-      if (item.groupId && item.items) {
-        return transformFEToBE(item);
-      }
-
-      //if not its a condition so we can simply return the condition
-      return {
-        column: item.column,
-        operator: item.operator,
-        value: item.value,
-        ignore_case: !!item.ignore_case
-      };
-    });
-
-    //return the transformed items in the format of the backend
-    return {
-      [groupLabel]: transformedItems
-    };
-  }
+  const transformFEToBE = (node: any) => {
+    return transformFEToBEUtil(node);
+  };
 
   // Method to transform the backend data to the frontend format
   //when we get response from the BE we need to transform it to the frontend format
@@ -1442,43 +1043,9 @@ export default defineComponent({
   //   label: 'and',
   //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
   // }
-  const retransformBEToFE = (data:any) => {
-    if(!data) return null;
-    const keys = Object.keys(data);
-    if (keys.length !== 1) return null;
-
-    const label = keys[0]; // 'and' or 'or'
-    const itemsArray = data[label];
-
-    const items = itemsArray.map((item: any) => {
-      if (item.and || item.or) {
-          // Nested group
-          //so we need to iterate over the item and get the conditions and map that to one group
-        return retransformBEToFE(item);
-      } else {
-        //if not its a condition so we can simply return the condition
-        return {
-          column: item.column,
-          operator: item.operator,
-          value: item.value,
-          ignore_case: item.ignore_case,
-          id: getUUID()
-        };
-      }
-    });
-    //here we will return the group with the conditions
-    //the foramt looks like 
-    //{
-    //   groupId: '123',
-    //   label: 'and',
-    //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
-    // }
-    return {
-      groupId:  getUUID(),
-      label,
-      items
-    };
-  }
+  const retransformBEToFE = (data: any) => {
+    return retransformBEToFEUtil(data);
+  };
   const validateFormAndNavigateToErrorField = async (formRef: any) => {
       const isValid = await formRef.validate().then(async (valid: any) => {
         return valid;
@@ -1492,169 +1059,255 @@ export default defineComponent({
 
     const navigateToErrorField = (formRef: any) => {
       const errorField = formRef.$el.querySelector('.q-field--error');
-      if (errorField) { 
+      if (errorField) {
         errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
+
+    const loadPanelDataIfPresent = async () => {
+      const route = router.currentRoute.value;
+
+      if (route.query.fromPanel === "true" && route.query.panelData) {
+        isLoadingPanelData.value = true;
+        try {
+          const panelData = JSON.parse(decodeURIComponent(route.query.panelData as string));
+
+          if (panelData.queries && panelData.queries.length > 0) {
+            const query = panelData.queries[0];
+
+            formData.value.name = `Alert from ${panelData.panelTitle}`;
+
+            // Show notification that query was imported
+            q.notify({
+              type: "positive",
+              message: t("alerts.importedFromPanel", { panelTitle: panelData.panelTitle }),
+              timeout: 3000,
+            });
+
+            if (query.fields?.stream_type) {
+              formData.value.stream_type = query.fields.stream_type;
+            }
+
+            if (query.fields?.stream) {
+              formData.value.stream_name = query.fields.stream;
+              await updateStreams(false);
+              await updateStreamFields(query.fields.stream);
+            }
+
+            // Set query type based on panel (SQL or PromQL)
+            // Always set a specific type - never leave it as empty string to avoid defaulting to quick mode
+            if (panelData.queryType === "sql") {
+              formData.value.query_condition.type = "sql";
+              // Use executedQuery if available (has variables replaced), otherwise use query.query
+              const sourceQuery = panelData.executedQuery || query.query;
+              if (sourceQuery) {
+                let sqlQuery = sourceQuery;
+
+                // If threshold is provided and we have a SQL query with GROUP BY,
+                // add a HAVING clause to filter the aggregated column
+                if (panelData.threshold !== undefined && panelData.condition && panelData.yAxisColumn) {
+                  const threshold = panelData.threshold;
+                  const operator = panelData.condition === 'above' ? '>=' : '<=';
+                  const yAxisColumn = panelData.yAxisColumn;
+
+                  // Use node-sql-parser to properly insert HAVING clause in the correct position
+                  // This handles queries with ORDER BY, LIMIT, OFFSET, etc.
+                  // Ensure parser is initialized first
+                  if (!parser) {
+                    await importSqlParser();
+                  }
+                  sqlQuery = addHavingClauseToQuery(sqlQuery, yAxisColumn, operator, threshold, parser);
+                }
+
+                formData.value.query_condition.sql = sqlQuery;
+              }
+            } else if (panelData.queryType === "promql") {
+              formData.value.query_condition.type = "promql";
+              // Use executedQuery if available (has variables replaced), otherwise use query.query
+              const sourceQuery = panelData.executedQuery || query.query;
+              if (sourceQuery) {
+                formData.value.query_condition.promql = sourceQuery;
+              }
+            } else {
+              // Default to SQL mode if queryType is not specified
+              // This prevents falling back to quick mode
+              formData.value.query_condition.type = "sql";
+            }
+
+            // Handle query builder fields for SQL panels
+            if (panelData.queryType === "sql" && query.customQuery === false && query.fields) {
+              // Enable aggregation for query builder generated SQL
+              isAggregationEnabled.value = true;
+
+              if (query.fields.x && query.fields.x.length > 0) {
+                if (!formData.value.query_condition.aggregation) {
+                  formData.value.query_condition.aggregation = {
+                    group_by: [],
+                    function: "count",
+                    having: {
+                      column: "",
+                      operator: ">=",
+                      value: 1,
+                    },
+                  };
+                }
+                formData.value.query_condition.aggregation.group_by = query.fields.x.map((x: any) => x.alias || x.column);
+              }
+
+              if (query.fields.y && query.fields.y.length > 0) {
+                const yField = query.fields.y[0];
+                if (yField.aggregationFunction) {
+                  if (!formData.value.query_condition.aggregation) {
+                    formData.value.query_condition.aggregation = {
+                      group_by: [""],
+                      function: "count",
+                      having: {
+                        column: "",
+                        operator: ">=",
+                        value: 1,
+                      },
+                    };
+                  }
+                  formData.value.query_condition.aggregation.function = yField.aggregationFunction.toLowerCase();
+                  // Set the having.column to the Y-axis field for threshold comparison
+                  formData.value.query_condition.aggregation.having.column = yField.alias || yField.column;
+                }
+              }
+
+              if (query.fields.filter && query.fields.filter.length > 0) {
+                const conditions: any[] = [];
+                query.fields.filter.forEach((filter: any) => {
+                  if (filter.type === 'list' && filter.values && filter.values.length > 0) {
+                    conditions.push({
+                      column: filter.column,
+                      operator: "=",
+                      value: filter.values[0],
+                      ignore_case: false
+                    });
+                  }
+                });
+
+                if (conditions.length > 0) {
+                  formData.value.query_condition.conditions = {
+                    groupId: getUUID(),
+                    label: 'and',
+                    items: conditions
+                  };
+                }
+              }
+            }
+
+            if (query.vrlFunctionQuery) {
+              showVrlFunction.value = true;
+              formData.value.query_condition.vrl_function = query.vrlFunctionQuery;
+            }
+
+            if (panelData.timeRange?.value_type === "relative") {
+              const relativeValue = panelData.timeRange.relative_value || 15;
+              const relativePeriod = panelData.timeRange.relative_period || "Minutes";
+
+              let periodInMinutes = relativeValue;
+              if (relativePeriod === "Hours") {
+                periodInMinutes = relativeValue * 60;
+              } else if (relativePeriod === "Days") {
+                periodInMinutes = relativeValue * 60 * 24;
+              } else if (relativePeriod === "Weeks") {
+                periodInMinutes = relativeValue * 60 * 24 * 7;
+              }
+
+              formData.value.trigger_condition.period = periodInMinutes;
+            }
+
+            // Handle threshold and condition from context menu
+            if (panelData.threshold !== undefined && panelData.condition) {
+              // For SQL with aggregation: use HAVING clause for value comparison
+              // For PromQL: use promql_condition for value comparison
+              // In both cases, set trigger_condition.threshold to 1 (fire when any row/result is returned)
+
+              if (panelData.queryType === 'promql') {
+                // For PromQL: Set up promql_condition with the threshold
+                if (!formData.value.query_condition.promql_condition) {
+                  formData.value.query_condition.promql_condition = {
+                    operator: '>=',
+                    value: 1,
+                  };
+                }
+                formData.value.query_condition.promql_condition.value = panelData.threshold;
+                formData.value.query_condition.promql_condition.operator =
+                  panelData.condition === 'above' ? '>=' : '<=';
+              } else {
+                // For SQL: Set up aggregation HAVING clause with the threshold
+                // If aggregation is enabled, set the having clause
+                if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+                  if (!formData.value.query_condition.aggregation.having) {
+                    formData.value.query_condition.aggregation.having = {
+                      column: "",
+                      operator: ">=",
+                      value: 1,
+                    };
+                  }
+                  formData.value.query_condition.aggregation.having.value = panelData.threshold;
+                  formData.value.query_condition.aggregation.having.operator =
+                    panelData.condition === 'above' ? '>=' : '<=';
+                }
+              }
+
+              // Set alert trigger threshold to 1 and operator to >=
+              // This means: fire the alert when ANY row is returned from the query
+              // (The actual value comparison is done in HAVING clause for SQL or in PromQL query)
+              formData.value.trigger_condition.threshold = 1;
+              formData.value.trigger_condition.operator = '>=';
+            }
+          }
+        } catch (error) {
+          console.error("Error loading panel data:", error);
+          q.notify({
+            type: "negative",
+            message: "Failed to load panel data",
+            timeout: 2000
+          });
+        } finally {
+          isLoadingPanelData.value = false;
+        }
+      }
+    };
+
 
     const openJsonEditor = () => {
       showJsonEditorDialog.value = true;
     };
 
     const saveAlertJson = async (json: any) => {
-      let jsonPayload = JSON.parse(json);
-      let destinationsList = [];
-      props.destinations.forEach((destination: any) => {
-        destinationsList.push(destination.name);
-      });
-      let streamList = [];
-      if(!streams.value[jsonPayload.stream_type]){
-        try{
-          const response: any = await getStreams(jsonPayload.stream_type,false);
-          streams.value[jsonPayload.stream_type] = response.list;
-        }catch(err: any){
-          if(err.response.status !== 403){
-            q.notify({
-              type: "negative",
-              message: err.response?.data?.message || "Error fetching streams",
-              timeout: 3000,
-            });
-          }
-        }
-      }
-      streams.value[jsonPayload.stream_type].forEach((stream: any) => {
-        streamList.push(stream.name);
-      });
+      const saveContext: SaveAlertContext = {
+        q,
+        store,
+        props,
+        emit,
+        router,
+        isAggregationEnabled,
+        activeFolderId: { value: Array.isArray(activeFolderId.value) ? activeFolderId.value[0] : activeFolderId.value },
+        handleAlertError,
+      };
 
-      const validationResult = validateAlert(jsonPayload,{
-        streamList: streamList,
-        selectedOrgId: store.state.selectedOrganization.identifier,
-        destinationsList: destinationsList
-      });
-      
-      if (!validationResult.isValid) {
-        validationErrors.value = validationResult.errors;
-        return;
-      }
-      
-      // Validate SQL query if type is sql and not real-time
-      if (jsonPayload.is_real_time === false && jsonPayload.query_condition.type === 'sql') {
-        try {
-          // First check if query has SELECT *
-          if (!getParser(jsonPayload.query_condition.sql)) {
-            validationErrors.value = ['Selecting all columns is not allowed. Please specify the columns explicitly'];
-            return;
-          }
+      const prepareAndSaveAlertFunction = (data: any) => prepareAndSaveAlertUtil(data, saveContext);
 
-          // Set up query for validation
-          const query = buildQueryPayload({
-            sqlMode: true,
-            streamName: jsonPayload.stream_name,
-          });
+      const jsonValidationContext: JsonValidationContext = {
+        q,
+        store,
+        streams,
+        getParser,
+        buildQueryPayload,
+        prepareAndSaveAlert: prepareAndSaveAlertFunction,
+      };
 
-          delete query.aggs;
-          query.query.start_time = query.query.start_time + 780000000;
-          query.query.sql = jsonPayload.query_condition.sql;
-
-          if (jsonPayload.query_condition.vrl_function) {
-            query.query.query_fn = b64EncodeUnicode(jsonPayload.query_condition.vrl_function);
-          }
-
-          // Validate SQL query
-          await searchService.search({
-            org_identifier: store.state.selectedOrganization.identifier,
-            query,
-            page_type: jsonPayload.stream_type,
-          });
-
-          // If we get here, SQL is valid
-          showJsonEditorDialog.value = false;
-          formData.value = jsonPayload;
-          await prepareAndSaveAlert(jsonPayload);
-
-        } catch (err: any) {
-          // Handle SQL validation errors
-          const errorMessage = err.response?.data?.message || 'Invalid SQL Query';
-          validationErrors.value = [`SQL validation error: ${errorMessage}`];
-          return;
-        }
-      } else {
-        // If not SQL or is real-time, just close and update
-        showJsonEditorDialog.value = false;
-        formData.value = jsonPayload;
-        await prepareAndSaveAlert(jsonPayload);
-      }
-    };
-    const prepareAndSaveAlert = async (data: any) => {
-      const payload = cloneDeep(data);
-      if(!isAggregationEnabled.value){
-        payload.query_condition.aggregation = null;
-      }
-      if(Array.isArray(payload.context_attributes) && payload.context_attributes.length == 0){
-        payload.context_attributes = {};
-      }
-      
-      // Transform conditions to backend format
-      payload.query_condition.conditions = transformFEToBE(payload.query_condition.conditions);
-      
-      // Convert string boolean to actual boolean
-      payload.is_real_time = payload.is_real_time === "true" || payload.is_real_time === true;
-      
-      // Handle VRL function encoding if present
-      if (payload.query_condition.vrl_function) {
-        payload.query_condition.vrl_function = b64EncodeUnicode(
-          payload.query_condition.vrl_function.trim()
-        );
-      }
-
-      // Set timestamps and metadata
-      if (props.isUpdated) {
-        payload.updatedAt = new Date().toISOString();
-        payload.lastEditedBy = store.state.userInfo.email;
-        payload.folder_id = router.currentRoute.value.query.folder || "default";
-      } else {
-        payload.createdAt = new Date().toISOString();
-        payload.owner = store.state.userInfo.email;
-        payload.lastTriggeredAt = new Date().getTime();
-        payload.lastEditedBy = store.state.userInfo.email;
-        payload.folder_id = activeFolderId.value;
-      }
-
-      try {
-        const dismiss = q.notify({
-          spinner: true,
-          message: "Please wait...",
-          timeout: 2000,
-        });
-
-
-        if (props.isUpdated) {
-          await alertsService.update_by_alert_id(
-            store.state.selectedOrganization.identifier,
-            payload,
-            activeFolderId.value
-          );
-          emit("update:list", activeFolderId.value);
-          q.notify({
-            type: "positive",
-            message: "Alert updated successfully.",
-          });
-        } else {
-          await alertsService.create_by_alert_id(
-            store.state.selectedOrganization.identifier,
-            payload,
-            activeFolderId.value
-          );
-          emit("update:list", activeFolderId.value);
-          q.notify({
-            type: "positive",
-            message: "Alert saved successfully.",
-          });
-        }
-        dismiss();
-      } catch (err: any) {
-        handleAlertError(err);
-      }
+      await saveAlertJsonUtil(
+        json,
+        props,
+        validationErrors,
+        showJsonEditorDialog,
+        formData,
+        jsonValidationContext,
+      );
     };
 
 
@@ -1677,7 +1330,6 @@ export default defineComponent({
       selectedRelativePeriod,
       relativePeriods,
       editorUpdate,
-      updateConditions,
       updateStreamFields,
       updateEditorContent,
       triggerCols,
@@ -1743,20 +1395,33 @@ export default defineComponent({
       saveAlertJson,
       validationErrors,
       originalStreamFields,
-      generateSqlQuery,
-      generateWhereClause,
+      generateSqlQuery: generateSqlQueryLocal,
       track,
+      loadPanelDataIfPresent,
+      isLoadingPanelData,
     };
   },
 
-  created() {
+  async created() {
     // TODO OK: Refactor this code
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
+
+    // Check if this is from a dashboard panel - if so, don't set default query type
+    const route = this.router.currentRoute.value;
+    const isFromPanel = route.query.fromPanel === "true" && route.query.panelData;
+
     if(!this.isUpdated){
       this.formData.is_real_time = this.alertType === 'realTime'? true : false;
     }
       this.formData.is_real_time = this.formData.is_real_time.toString();
+
+    // If from panel, load panel data BEFORE initializing child components
+    // This ensures the correct query type is set before ScheduledAlert initializes
+    if (isFromPanel) {
+      this.formData.query_condition.type = ""; // Temporarily set to empty
+      await this.loadPanelDataIfPresent(); // Load panel data and set correct type
+    }
 
     // Set default frequency to min_auto_refresh_interval
     if (this.store.state?.zoConfig?.min_auto_refresh_interval)
@@ -2179,7 +1844,9 @@ export default defineComponent({
 }
 
 
-
+.o2-alert-tab-border{
+  border-top: 0.0625rem solid var(--o2-border-color);
+}
   
 
 

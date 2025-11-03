@@ -228,8 +228,46 @@ $o2-dark-teal-700: #42B1A4;
 $o2-dark-teal-800: #60C0B5;
 $o2-dark-teal-900: #9BDDD6;
 
+  // --o2-primary: #3f7994;
+  // --o2-secondary: #59b97a;
+  // --o2-accent: #7474e1;
+  // --o2-error: #e66b5a;
+  // --o2-bg-light: #f7f9fb;
+  // --o2-bg-dark: #0d1117;
+
+// $theme-color: #136dfb;
+$theme-color: #3F7994;
+$dark-theme-color: #112027;
+
+$theme-mode: white;
+$dark-theme-mode: $dark-theme-color;
+
+$body-primary-bg: rgba(89, 155, 174, 0.01);
+$body-secondary-bg: rgba(89, 155, 174, 0.4);
+
+$dark-body-primary-bg: rgba(14, 19, 29, 0.01);
+$dark-body-secondary-bg: rgba(14, 19, 29, 0.4);
+
+$menu-gradient-start: rgba(89, 155, 174, 0.04);
+$menu-gradient-end: rgba(89, 155, 174, 0.08);
+$menu-border-color: rgba(89, 155, 174, 0.6);
+
+$dark-menu-gradient-start: rgba(89, 155, 174, 0.04);
+$dark-menu-gradient-end: rgba(158, 215, 231, 0.08);
+
+$actions-column-box-shawdow: rgba(0, 0, 0, 0.1);
+$actions-column-box-shawdow-dark: rgba(125, 125, 125, 0.694);
+
+$body-primary-bg: rgba(89, 155, 174, 0.01);
+$body-secondary-bg: rgba(89, 155, 174, 0.4);
+
+$menu-gradient-start: rgba(89, 155, 174, 0.04);
+$menu-gradient-end: rgba(89, 155, 174, 0.08);
+$menu-border-color: rgba(89, 155, 174, 0.6);
+
 // Semantic Colors - Light Mode
 :root {
+  --o2-theme-mode: #{$theme-mode};
   // Backgrounds
   --o2-primary-background: #{$o2-gray-100};  // White background
   --o2-secondary-background: #{$o2-iris-200}; // Light iris background
@@ -253,37 +291,119 @@ $o2-dark-teal-900: #9BDDD6;
   // Interactive Elements
   --o2-primary-color: #{$o2-iris-1100};     // Primary actions/buttons
   --o2-primary-foreground: #{$o2-gray-100}; // Text on primary color
-  --o2-hover-accent: #{$o2-iris-400};       // Hover state accent
+  --o2-hover-accent: color-mix(in srgb, #{$theme-color} 15%, white);       // Hover state accent
   --o2-destructive-foreground: #{$o2-gray-100}; // Text on destructive buttons
   --o2-focus-ring: #{$o2-iris-1200};        // Focus state indicator
+  --o2-hover-shadow: #dddddd;
+
+  --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
+  --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
+  --o2-scrollbar-thumb-bg: color-mix(in srgb, #{$primary} 20%, white);
+  --o2-scrollbar-thumb-hover-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
+  --o2-scrollbar-thumb-active-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
+
+  --o2-theme-color: #{$theme-color};
+
+  --o2-body-primary-bg: #{$body-primary-bg};
+  --o2-body-secondary-bg: #{$body-secondary-bg};
+
+  --o2-primary-btn-bg: color-mix(in srgb, var(--o2-theme-color) 100%, white);
+  --o2-primary-btn-text: #{$o2-gray-100};
+
+  --o2-toggle-track-bg: color-mix(in srgb, var(--o2-theme-color) 90%, white);
+  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-theme-color) 30%, white);
+
+  --o2-card-bg: rgba(255, 255, 255, 0.8);
+
+  --o2-header-menu-bg: rgba(255, 255, 255, 0.5);
+
+  --o2-border-color: rgba(0, 0, 0, 0.12);
+  --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
+
+  --o2-menu-gradient-start: #{$menu-gradient-start};
+  --o2-menu-gradient-end: #{$menu-gradient-end};
+  --o2-menu-border-color: #{$menu-border-color};
+  --o2-menu-color: #{$theme-color};
+
+  --o2-table-header-bg: color-mix(in srgb, #{$theme-color} 20%, white);
+
+  --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, white);
+  --o2-tab-text-color: #{$o2-gray-1400};
+
+  --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, white);
+
+  --o2-actions-column-shawdow: #{$actions-column-box-shawdow};
+
+  --q-primary: #{$theme-color};
 }
 
 // Semantic Colors - Dark Mode
 .body--dark {
+  --o2-theme-mode: #{$dark-theme-mode};
   // Backgrounds
   --o2-primary-background: #{$o2-dark-gray-1400};  // Dark mode background
   --o2-secondary-background: #{$o2-dark-gray-1300}; // Secondary background
   --o2-muted-background: #{$o2-dark-gray-1100};    // Muted background
   
   // Text Colors
-  --o2-text-primary: #{$o2-dark-gray-300};    // Main text in dark mode
-  --o2-text-secondary: #{$o2-dark-gray-700};  // Secondary text
+  --o2-text-primary: #D3D3D3;    // Main text in dark mode
+  --o2-text-secondary: #D3D3D3;  // Secondary text
   --o2-text-muted: #{$o2-dark-gray-900};      // Muted text
   
   // Component Colors
   --o2-card-background: #{$o2-dark-gray-1300}; // Card background
-  --o2-card-text: #{$o2-dark-gray-300};        // Card text
+  --o2-card-text: #D3D3D3;        // Card text
   --o2-popover-background: #{$o2-dark-gray-1300}; // Popover background
-  --o2-popover-text: #{$o2-dark-gray-300};     // Popover text
+  --o2-popover-text: #D3D3D3;     // Popover text
   
   // Borders & Dividers
-  --o2-border: #{$o2-dark-gray-1200};         // Standard borders
+  --o2-border: #{$o2-dark-gray-800};         // Standard borders
   --o2-border-input: #{$o2-dark-gray-1000};   // Input borders
   
   // Interactive Elements
   --o2-primary-color: #{$o2-dark-iris-1000};  // Primary actions
   --o2-primary-foreground: #{$o2-dark-gray-100}; // Text on primary
-  --o2-hover-accent: #{$o2-dark-iris-1000};   // Hover accents
+  --o2-hover-accent: color-mix(in srgb, #{$theme-color} 25%, rgb(0, 0, 0));   // Hover accents
   --o2-destructive-foreground: #{$o2-dark-gray-100}; // Destructive text
   --o2-focus-ring: #{$o2-dark-iris-600};      // Focus indicators
+  --o2-hover-shadow: rgba(0, 0, 0, 0.6);
+
+  --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
+  --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
+  --o2-scrollbar-thumb-bg: color-mix(in srgb, #{$primary} 20%, white);
+  --o2-scrollbar-thumb-hover-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
+  --o2-scrollbar-thumb-active-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
+
+  --o2-theme-color: #{$dark-theme-color};
+
+  --o2-body-primary-bg: #{$dark-body-primary-bg};
+  --o2-body-secondary-bg: #{$dark-body-secondary-bg};
+
+  --o2-primary-btn-bg: #{$theme-color};
+  --o2-primary-btn-text: #{$o2-gray-100};
+  --q-primary: #{$theme-color};
+
+  --o2-toggle-track-bg: #{$theme-color};
+  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
+
+  --o2-card-bg: #1f2223;
+
+  --o2-header-menu-bg: color-mix(in srgb, var(--o2-theme-color) 90%, white);
+
+
+  --o2-border-color: rgba(255, 255, 255, 0.40);
+  --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
+
+  --o2-menu-gradient-start: #{$dark-menu-gradient-start};
+  --o2-menu-gradient-end: #{$theme-color};
+  --o2-menu-border-color: #{$theme-color};
+  --o2-menu-color: #{$o2-gray-100};
+
+  --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
+
+  --o2-tab-bg: color-mix(in srgb, white 20%, var(--o2-theme-color));
+  --o2-tab-text-color: #{$o2-gray-100};
+
+  --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, #{$dark-theme-color});
+  --o2-actions-column-shawdow: #{$actions-column-box-shawdow-dark};
 }

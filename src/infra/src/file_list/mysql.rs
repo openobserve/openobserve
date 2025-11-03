@@ -872,28 +872,6 @@ SELECT date
             .collect())
     }
 
-    async fn get_min_ts(
-        &self,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-    ) -> Result<i64> {
-        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
-        let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
-            .inc();
-        let ret: Option<i64> = sqlx::query_scalar(
-            r#"SELECT MIN(min_ts) AS num FROM file_list WHERE stream = ? AND min_ts > ?;"#,
-        )
-        .bind(stream_key)
-        .bind(min_ts)
-        .fetch_one(&pool)
-        .await?;
-        Ok(ret.unwrap_or_default())
-    }
-
     async fn get_min_date(
         &self,
         org_id: &str,
@@ -1637,7 +1615,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
                     .entry(org)
                     .or_default()
                     .entry(stream_type)
-                    .and_modify(|e| *e = counts)
+                    .and_modify(|e| *e += counts)
                     .or_insert(counts);
             }
         }

@@ -29,7 +29,9 @@ pub struct Dashboard {
     version: i32,
     #[serde(default)]
     pub dashboard_id: String,
+    #[schema(required)]
     pub title: String,
+    #[schema(required)]
     pub description: String,
     #[serde(default)]
     pub role: String,
@@ -64,6 +66,7 @@ impl From<Dashboard> for super::Dashboard {
             v3: None,
             v4: None,
             v5: Some(value),
+            v6: None,
             version,
             hash,
             updated_at,
@@ -250,6 +253,10 @@ pub struct PanelConfig {
     show_legends: bool,
     legends_position: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    legends_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chart_align: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     unit_custom: Option<String>,
@@ -285,6 +292,8 @@ pub struct PanelConfig {
     line_interpolation: Option<LineInterpolation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     legend_width: Option<LegendWidth>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    legend_height: Option<LegendHeight>,
     base_map: Option<BaseMap>,
     #[serde(skip_serializing_if = "Option::is_none")]
     map_type: Option<MapType>,
@@ -315,6 +324,8 @@ pub struct PanelConfig {
     background: Option<Background>,
     #[serde(skip_serializing_if = "Option::is_none")]
     trellis: Option<Trellis>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    show_gridlines: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -625,6 +636,16 @@ pub struct SizeByValue {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
 pub struct LegendWidth {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    pub value: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+pub struct LegendHeight {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<f64>)]
     pub value: Option<OrdF64>,

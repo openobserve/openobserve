@@ -48,6 +48,7 @@
       "
       no-caps
       data-test="dashboard-addpanel-config-colorBySeries-add-btn"
+      class="el-border"
     />
     <q-dialog v-model="showColorBySeriesPopUp">
       <ColorBySeriesPopUp
@@ -106,6 +107,34 @@ export default defineComponent({
     };
 
     const seriesOptions = computed(() => {
+      const panelType = dashboardPanelData.data.type;
+      const chartOptions = props.colorBySeriesData?.options;
+      // For pie and donut charts, extract series names from data[].name
+      if (
+        (panelType === "pie" || panelType === "donut") &&
+        chartOptions?.series?.[0]?.data
+      ) {
+        const pieDonutSeriesNames = chartOptions.series[0].data
+          .filter((item: any) => item && item.name) // Filter out invalid items
+          .map((item: any) => ({
+            name: item.name,
+          }));
+        return { series: pieDonutSeriesNames };
+      }
+      // For gauge charts, extract series names from each series' data[0].name
+      if (panelType === "gauge" && chartOptions?.series) {
+        const gaugeSeriesNames = chartOptions.series
+          .filter(
+            (series: any) =>
+              series && series.data && series.data[0] && series.data[0].name,
+          ) // Filter out invalid series
+          .map((series: any) => ({
+            name: series.data[0].name,
+          }));
+        return { series: gaugeSeriesNames };
+      }
+
+      // For other chart types, use the existing logic
       return props.colorBySeriesData?.options || { series: [] };
     });
 

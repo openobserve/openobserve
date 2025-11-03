@@ -19,6 +19,8 @@ if (!process.env.ZO_BASE_URL || !process.env.ZO_ROOT_USER_EMAIL || !process.env.
  */
 module.exports = defineConfig({
   testDir: './playwright-tests',
+  /* Output directory for test artifacts */
+  outputDir: './test-results',
   /* Exclude archived tests from all test runs */
   testIgnore: ['**/test-archives/**', '**/*_old.js'],
   /* Global setup and teardown */
@@ -29,11 +31,16 @@ module.exports = defineConfig({
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry failed tests: 2 times on CI, 1 time locally */
-  retries: process.env.CI ? 2 : 1,
+  retries: process.env.CI ? 5 : 1,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 5 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  reporter: process.env.CI
+    ? [['blob']] // Use blob reporter in CI for merging across shards
+    : [
+        ['html', { outputFolder: 'playwright-results/html-report', open: 'never' }], // HTML reporter
+        ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for TestDino
+      ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */

@@ -430,12 +430,8 @@ pub async fn delete_by_date(
 
     // update stream stats retention time
     let mut stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
-    let mut min_ts = infra_file_list::get_min_ts(org_id, stream_type, stream_name)
-        .await
-        .unwrap_or_default();
-    if min_ts == 0 {
-        min_ts = stats.doc_time_min;
-    };
+    // we use date_end as the new min doc time
+    let min_ts = date_end.timestamp_micros();
     infra_file_list::reset_stream_stats_min_ts(
         org_id,
         format!("{org_id}/{stream_type}/{stream_name}").as_str(),
@@ -570,7 +566,7 @@ fn generate_local_dirs(
 ) -> Vec<PathBuf> {
     let cfg = get_config();
     let mut dirs_to_delete = Vec::new();
-    while date_start <= date_end {
+    while date_start < date_end {
         let day_dir = format!(
             "{}files/{org_id}/{stream_type}/{stream_name}/{}",
             cfg.common.data_stream_dir,

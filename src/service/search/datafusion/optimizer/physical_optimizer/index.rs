@@ -111,7 +111,7 @@ impl PhysicalOptimizerRule for IndexRule {
     }
 
     fn name(&self) -> &str {
-        "index"
+        "IndexConditionRule"
     }
 
     fn schema_check(&self) -> bool {
@@ -363,6 +363,7 @@ mod tests {
             Arc::new(MATCH_ALL_UDF.clone()),
             vec![literal(lit)],
             FieldRef::new(Field::new("name", DataType::Utf8, true)),
+            Arc::new(ConfigOptions::default()),
         ))
     }
 
@@ -372,6 +373,7 @@ mod tests {
             Arc::new(STR_MATCH_UDF.clone()),
             vec![column(field), literal(lit)],
             FieldRef::new(Field::new(field, DataType::Utf8, true)),
+            Arc::new(ConfigOptions::default()),
         ))
     }
 

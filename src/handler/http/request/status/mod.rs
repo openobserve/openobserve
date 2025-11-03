@@ -419,11 +419,6 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         }),
     );
 
-    let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();
-    stats.insert(
-        "COMPACT",
-        json::json!({"file_list_offset": last_file_list_offset}),
-    );
     stats.insert(
         "DATAFUSION",
         json::json!({"file_stat_cache": {
@@ -505,8 +500,6 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
     drop(r);
     let r = STREAM_SCHEMAS_LATEST.read().await;
     for (key, schema) in r.iter() {
-        stream_num += 1;
-        stream_schema_num += 1;
         mem_size += std::mem::size_of::<String>() + key.len();
         mem_size += schema.size();
     }
@@ -626,9 +619,15 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                         "is_valid": res.0.is_valid,
                     }))
                     .unwrap();
-                    let url_params = process_token(res).await.map(|(new_user, pending_invites)| {
-                        format!("&new_user_login={new_user}&pending_invites={pending_invites}")
-                    });
+                    let url_params = match process_token(res).await {
+                        Ok(v) => v.map(|(new_user, pending_invites)| {
+                            format!("&new_user_login={new_user}&pending_invites={pending_invites}")
+                        }),
+                        Err(_) => {
+                            return Ok(HttpResponse::Unauthorized()
+                                .json("Email Domain not allowed".to_string()));
+                        }
+                    };
                     login_url = format!(
                         "{}#id_token={}.{}{}",
                         login_data.url,
@@ -841,7 +840,7 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     let conf = get_config();
 
     #[cfg(feature = "enterprise")]
-    let auth_str = extract_auth_str(&req);
+    let auth_str = extract_auth_str(&req).await;
     // Only get the user email from the auth_str, no need to check for permissions and others
     #[cfg(feature = "enterprise")]
     let user_email = get_user_email_from_auth_str(&auth_str).await;

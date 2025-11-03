@@ -57,7 +57,7 @@ pub(crate) static REGEX_MATCHES_UDF: Lazy<ScalarUDF> =
 /// - The function returns a `List` of strings for each input row. If no matches are found, an empty
 ///   list is returned.
 /// - If the input string or pattern is null, the function returns null for that row.
-#[derive(Debug)]
+#[derive(Debug, Hash, Eq, PartialEq)]
 pub struct RegexpMatchesFunc {
     signature: Signature,
 }

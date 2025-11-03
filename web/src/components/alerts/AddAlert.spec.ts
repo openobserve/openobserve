@@ -20,6 +20,7 @@ import { Dialog, Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
 import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
+import { generateWhereClause } from "@/utils/alerts/alertQueryBuilder";
 
 import PreviewAlert from "@/components/alerts/PreviewAlert.vue";
 
@@ -335,7 +336,7 @@ describe("AddAlert Component", () => {
           ]
         };
     
-        const result = wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap);
+        const result = generateWhereClause(group, wrapper.vm.streamFieldsMap);
         expect(result).toBe("WHERE age > '30'");
       });
     
@@ -347,7 +348,7 @@ describe("AddAlert Component", () => {
           ]
         };
     
-        const result = wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap);
+        const result = generateWhereClause(group, wrapper.vm.streamFieldsMap);
         expect(result).toBe("WHERE city = 'delhi'");
       });
     
@@ -359,7 +360,7 @@ describe("AddAlert Component", () => {
           ]
         };
     
-        const result = wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap);
+        const result = generateWhereClause(group, wrapper.vm.streamFieldsMap);
         expect(result).toBe("WHERE city LIKE '%delhi%'");
       });
     
@@ -378,12 +379,12 @@ describe("AddAlert Component", () => {
           ]
         };
     
-        const result = wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap);
+        const result = generateWhereClause(group, wrapper.vm.streamFieldsMap);
         expect(result).toBe("WHERE age > '30' AND (city = 'delhi' OR city = 'mumbai')");
       });
     
       it('returns empty string if group is invalid', () => {
-        const result = wrapper.vm.generateWhereClause(null, wrapper.vm.streamFieldsMap);
+        const result = generateWhereClause(null, wrapper.vm.streamFieldsMap);
         expect(result).toBe("");
       });
     })
@@ -1022,22 +1023,25 @@ describe("AddAlert Component", () => {
     let wrapper: any;
     beforeEach(() => {
       wrapper = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
-      wrapper.vm.streamFieldsMap = { n: { type: 'Int64' }, s: { type: 'String' } };
+      wrapper.vm.originalStreamFields = [
+        { value: 'n', type: 'Int64' },
+        { value: 's', type: 'String' }
+      ];
     });
 
     it('formats numeric types without quotes and string with quotes', () => {
       const group = { label: 'AND', items: [ { column: 'n', operator: '>=', value: 10 }, { column: 's', operator: '=', value: 'x' } ] };
-      expect(wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap)).toBe("WHERE n >= '10' AND s = 'x'");
+      expect(generateWhereClause(group, wrapper.vm.streamFieldsMap)).toBe("WHERE n >= 10 AND s = 'x'");
     });
 
     it('supports not_contains/NotContains variations', () => {
       const group = { label: 'OR', items: [ { column: 's', operator: 'not_contains', value: 'bad' }, { column: 's', operator: 'NotContains', value: 'worse' } ] };
-      expect(wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap)).toBe("WHERE s NOT LIKE '%bad%' OR s NOT LIKE '%worse%'");
+      expect(generateWhereClause(group, wrapper.vm.streamFieldsMap)).toBe("WHERE s NOT LIKE '%bad%' OR s NOT LIKE '%worse%'");
     });
 
     it('returns empty for invalid items', () => {
       const group = { label: 'AND', items: [ { foo: 1 } ] } as any;
-      expect(wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap)).toBe('');
+      expect(generateWhereClause(group, wrapper.vm.streamFieldsMap)).toBe('');
     });
   });
 

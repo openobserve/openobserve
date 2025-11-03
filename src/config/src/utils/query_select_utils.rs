@@ -182,6 +182,7 @@ impl VisitorMut for StringMatchReplacer {
                 operand,
                 conditions,
                 else_result,
+                ..
             } => {
                 if let Some(op) = operand {
                     self.pre_visit_expr(op)?;

@@ -1,12 +1,10 @@
 <template>
-    <div class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
-    :class="store.state.theme === 'dark' ? 'dark-theme-list' : 'light-theme-list'"
+    <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     >
-    <div v-if="!showImportRegexPatternDialog" class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
-      :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
+    <div v-if="!showImportRegexPatternDialog" class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
     >
       <div class="q-table__title tw-font-[600]" data-test="regex-pattern-list-title">
-            {{ t("regex_patterns.header") }}
+            {{ t("regex_patterns.title") }}
           </div>
           <q-input
                 v-model="filterQuery"
@@ -14,15 +12,13 @@
                 dense
                 class="q-ml-auto no-border o2-search-input"
                 :placeholder="t('regex_patterns.search')"
-                :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
               >
                 <template #prepend>
-                  <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                  <q-icon class="o2-search-input-icon"  name="search" />
                 </template>
               </q-input>
           <q-btn
-            class="o2-secondary-button q-ml-md tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            class="o2-secondary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`regex_patterns.import`)"
@@ -31,8 +27,7 @@
           />
           <q-btn
             data-test="regex-pattern-list-add-pattern-btn"
-            class="o2-primary-button q-ml-md tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            class="o2-primary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`regex_patterns.create_pattern`)"
@@ -47,14 +42,15 @@
           :columns="columns"
           row-key="id"
           :pagination="pagination"
-          class="o2-quasar-table o2-quasar-table-header-sticky"
+          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;' 
+            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;' 
             : 'width: 100%'"
-          :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
         >
         <template #no-data>
-          <NoRegexPatterns v-if="!listLoading && filterQuery == ''" @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
+          <div v-if="!listLoading && filterQuery == ''" class="full-width column flex-center q-mt-xs full-height" style="font-size: 1.5rem">
+          <NoRegexPatterns  @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
+          </div>
           <div v-else-if="!listLoading && filterQuery != ''" class="full-width column flex-center q-mt-xs" style="font-size: 1.5rem">
             <NoData />
           </div>
@@ -64,16 +60,18 @@
           </div>
         </template> 
         <template v-slot:header="props">
-          <!-- render the header of the columns -->
-          <q-th
-            v-for="col in props.cols"
-            :key="col.name"
-            :props="props"
-            :class="col.classes"
-            :style="col.style"
-          >
-            {{ col.label }}
-          </q-th>
+         <q-tr :props="props">
+              <!-- render the table headers -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
         </template>
         <template v-slot:body="props">
           <q-tr :props="props">
@@ -84,42 +82,44 @@
               {{ props.row[col.field] }}
             </template>
             <template v-else>
-              <q-btn
-              icon="download"
-              title="Export Regex Pattern"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click.stop="exportRegexPattern(props.row)"
-              :data-test="`regex-pattern-list-${props.row.id}-export-regex-pattern`"
-            ></q-btn>
-              <q-btn
-              :data-test="`regex-pattern-list-${props.row.id}-update-regex-pattern`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('regex_patterns.edit')"
-              @click.stop="editRegexPattern(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`regex-pattern-list-${props.row.id}-delete-regex-pattern`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('regex_patterns.delete')"
-              @click.stop="confirmDeleteRegexPattern(props.row)"
-            ></q-btn>
+              <div class="tw-flex tw-items-center tw-gap-1 tw-justify-center">
+                <q-btn
+                  :data-test="`regex-pattern-list-${props.row.id}-export-regex-pattern`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  icon="download"
+                  title="Export Regex Pattern"
+                  @click.stop="exportRegexPattern(props.row)"
+                >
+                </q-btn>
+                <q-btn
+                  :data-test="`regex-pattern-list-${props.row.id}-update-regex-pattern`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  icon="edit"
+                  :title="t('regex_patterns.edit')"
+                  @click.stop="editRegexPattern(props.row)"
+                >
+                </q-btn>
+                <q-btn
+                  :data-test="`regex-pattern-list-${props.row.id}-delete-regex-pattern`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  :icon="outlinedDelete"
+                  :title="t('regex_patterns.delete')"
+                  @click.stop="confirmDeleteRegexPattern(props.row)"
+                >
+                </q-btn>
+              </div>
             </template>
           </q-td>
                       
@@ -128,7 +128,7 @@
         <template #bottom="scope">
           <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
             <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
-                  {{ resultTotal }} {{ t('regex_patterns.header') }}
+                  {{ resultTotal }} {{ t('regex_patterns.bottom_header') }}
                 </div>
           <QTablePagination
             :scope="scope"
@@ -156,7 +156,7 @@
         <q-dialog v-model="showAddRegexPatternDialog.show" position="right" full-height maximized>
           <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="closeAddRegexPatternDialog" />
         </q-dialog>
-      </div>
+      </q-page>
   </template>
 
 <script lang="ts">
@@ -171,11 +171,11 @@
     import { useStore } from "vuex";
     import NoRegexPatterns from "./NoRegexPatterns.vue";
     import regexPatternsService from "@/services/regex_pattern";
-    import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
     import AddRegexPattern from "./AddRegexPattern.vue";
     import ImportRegexPattern from "./ImportRegexPattern.vue";
     import config from "@/aws-exports";
     import NoData from "@/components/shared/grid/NoData.vue";
+    import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
     export default defineComponent({
         name: "RegexPatternList",
@@ -185,7 +185,7 @@
             ConfirmDialog,
             AddRegexPattern,
             ImportRegexPattern,
-            NoData
+            NoData,
         },
     setup() {
 
@@ -225,7 +225,7 @@
           field: "created_at",
           label: t("regex_patterns.created_at"),
           align: "left",
-          style: "width: 150px",
+          style: "width: 180px",
         },
         {
           name: "updated_at",
@@ -233,7 +233,7 @@
           label: t("regex_patterns.updated_at"),
           align: "left",
           sortable: true,
-          style: "width: 150px",
+          style: "width: 180px",
         },
         {
           name: "actions",
@@ -463,7 +463,6 @@
         changePagination,
         createRegexPattern,
         listLoading,
-        outlinedDelete,
         editRegexPattern,
         deleteRegexPattern,
         deleteDialog,
@@ -476,7 +475,8 @@
         exportRegexPattern,
         closeAddRegexPatternDialog,
         visibleRows,
-        hasVisibleRows
+        hasVisibleRows,
+        outlinedDelete
     }
     }
 })
@@ -484,35 +484,5 @@
 </script>
 
 <style lang="scss">
-.regex-pattern-list-table{
-  th,td {
-    padding: 0px 16px !important;
-    height: 36px !important;
-  };
-  th:last-child,
-  td:last-child {
-    position: sticky;
-    right: 0;
-    z-index: 1;
-  }
-}
 
-
-.dark-theme-regex-pattern-list{
-  th:last-child.actions-column,
-  td:last-child.actions-column {
-    background: var(--q-dark);
-    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
-    width: 120px;
-  }
-}
-
-.light-theme-regex-pattern-list{
-  th:last-child.actions-column,
-  td:last-child.actions-column {
-    background: #ffffff;
-    width: 120px;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
-  }
-}
 </style>

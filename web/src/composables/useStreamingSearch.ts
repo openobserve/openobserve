@@ -188,9 +188,14 @@ const useHttpStreaming = () => {
       ? (window as any).use_cache
       : true;
 
+    // Check if this is a multi-stream request (similar to search.ts logic)
+    const isMultiStream = typeof queryReq.query?.sql !== "string";
+
     //TODO OK: Create method to get the url based on the type
     if (type === "search" || type === "histogram" || type === "pageCount") {
-      url = `/_search_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
+      const streamEndpoint = isMultiStream ? "_multi_search_stream" : "_search_stream";
+      
+      url = `/${streamEndpoint}?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
       if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
       if (meta?.dashboard_name)
         url += `&dashboard_name=${encodeURIComponent(meta?.dashboard_name)}`;
@@ -225,7 +230,7 @@ const useHttpStreaming = () => {
           'Content-Type': 'application/json',
           'traceparent': traceparent,
         },
-        body: JSON.stringify(queryReq),
+        body: JSON.stringify((isMultiStream && type != "values") ? queryReq.query : queryReq),
         signal: abortController.signal,
       });
 
@@ -357,6 +362,11 @@ const useHttpStreaming = () => {
     } catch (error) {
       if ((error as any).name === 'AbortError') {
        // console.error('Stream was canceled');
+      } else if((error as any).status === 401) {
+        store.dispatch("logout");
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.reload();
       } else {
         onError(traceId, error);
       }

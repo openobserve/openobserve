@@ -23,7 +23,7 @@ use crate::{
         meta::{http::HttpResponse as MetaHttpResponse, telemetry},
         utils::auth::UserEmail,
     },
-    handler::http::models::billings::NewUserAttribution,
+    handler::http::{extractors::Headers, models::billings::NewUserAttribution},
 };
 
 /// HandleUserAttributionEvent
@@ -54,7 +54,7 @@ use crate::{
 )]
 #[post("/{org_id}/billings/new_user_attribution")]
 pub async fn handle_new_attribution_event(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     req_body: web::Json<NewUserAttribution>,
 ) -> impl Responder {
     let email = user_email.user_id.as_str();
@@ -77,8 +77,18 @@ pub async fn handle_new_attribution_event(
             json::Value::String(chrono::Local::now().format("%Y-%m-%d").to_string()),
         ),
     ]);
-    telemetry::Telemetry::new()
+    let mut telemetry_instance = telemetry::Telemetry::new();
+    telemetry_instance
         .send_track_event(
+            "OpenObserve - New user attribution",
+            Some(segment_event_data.clone()),
+            false,
+            false,
+        )
+        .await;
+
+    telemetry_instance
+        .send_keyevent_track_event(
             "OpenObserve - New user attribution",
             Some(segment_event_data),
             false,

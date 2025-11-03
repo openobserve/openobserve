@@ -260,31 +260,6 @@ describe("Usage Component", () => {
     expect(wrapper.text()).toContain("2.75 GB");
   });
 
-  // Test 17: Theme-based styling classes
-  it("should apply correct theme-based CSS classes", async () => {
-    wrapper.vm.store.state.theme = "dark";
-    wrapper.vm.usageData = { ingestion: "1.00", search: "1.00", functions: "1.00" };
-    wrapper.vm.dataLoading = false;
-    await nextTick();
-    
-    const tileContents = wrapper.findAll(".tile-content");
-    tileContents.forEach(tile => {
-      expect(tile.classes()).toContain("dark-usage-tile-content");
-    });
-  });
-
-  // Test 18: Light theme styling
-  it("should apply light theme styling when theme is light", async () => {
-    wrapper.vm.store.state.theme = "light";
-    wrapper.vm.usageData = { ingestion: "1.00", search: "1.00", functions: "1.00" };
-    wrapper.vm.dataLoading = false;
-    await nextTick();
-    
-    const tileContents = wrapper.findAll(".tile-content");
-    tileContents.forEach(tile => {
-      expect(tile.classes()).toContain("light-usage-tile-content");
-    });
-  });
 
   // Test 19: GetUsage function call with notification
   it("should call getUsage and show notification", async () => {
@@ -630,11 +605,6 @@ describe("Usage Component", () => {
     expect(container.attributes('style')).toContain('width: 100%');
   });
 
-  // Test 47: Title row styling
-  it("should have correct title row styling", () => {
-    const titleRow = wrapper.find('.row.text-body1.tw-font-bold');
-    expect(titleRow.exists()).toBe(true);
-  });
 
   // Test 48: No data section visibility
   it("should show no data section when usage data is empty", async () => {

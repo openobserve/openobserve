@@ -24,6 +24,8 @@ use datafusion::{
     physical_plan::{ExecutionPlan, aggregates::AggregateExec},
 };
 
+use crate::service::search::datafusion::optimizer::physical_optimizer::index_optimizer::utils::is_complex_plan;
+
 #[rustfmt::skip]
 /// check if the plan is like:
 /// select count(*) from stream
@@ -75,19 +77,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleCountVisitor {
                 self.is_simple_count = false;
                 return Ok(TreeNodeRecursion::Stop);
             }
-        } else if node.name() == "HashJoinExec"
-            || node.name() == "RecursiveQueryExec"
-            || node.name() == "UnionExec"
-            || node.name() == "InterleaveExec"
-            || node.name() == "UnnestExec"
-            || node.name() == "CrossJoinExec"
-            || node.name() == "NestedLoopJoinExec"
-            || node.name() == "SymmetricHashJoinExec"
-            || node.name() == "SortMergeJoinExec"
-            || node.name() == "PartialSortExec"
-            || node.name() == "BoundedWindowAggExec"
-            || node.name() == "WindowAggExec"
-        {
+        } else if is_complex_plan(node) {
             // if encounter complex plan, stop visiting
             self.is_simple_count = false;
             return Ok(TreeNodeRecursion::Stop);

@@ -57,6 +57,7 @@ const SUMMARY_PERCENTILE: &str = "summary_percentile";
 ///     summary_percentile(f2, total_count, 0.5) as f2_median,
 ///     summary_percentile(f3, total_count, 0.5) as f3_median
 /// FROM summary_percentile
+#[derive(Debug, Hash, Eq, PartialEq)]
 pub(crate) struct SummaryPercentile(Signature);
 
 impl SummaryPercentile {
@@ -71,15 +72,6 @@ impl SummaryPercentile {
             ]));
         }
         Self(Signature::one_of(variants, Volatility::Immutable))
-    }
-}
-
-impl std::fmt::Debug for SummaryPercentile {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        f.debug_struct("SummaryPercentile")
-            .field("name", &self.name())
-            .field("signature", &self.0)
-            .finish()
     }
 }
 
@@ -777,23 +769,5 @@ mod test {
     fn test_summary_percentile_name() {
         let sp = SummaryPercentile::new();
         assert_eq!(sp.name(), "summary_percentile");
-    }
-
-    #[test]
-    fn test_accumulator_debug_fmt() {
-        let acc = SummaryPercentileAccumulator::new(0.75, DataType::Float64);
-        let debug_str = format!("{acc:?}");
-        assert!(debug_str.contains("SummaryPercentileAccumulator"));
-        assert!(debug_str.contains("Float64"));
-        assert!(debug_str.contains("0.75"));
-    }
-
-    #[test]
-    fn test_summary_percentile_debug_fmt() {
-        let sp = SummaryPercentile::new();
-        let debug_str = format!("{sp:?}");
-        assert!(debug_str.contains("SummaryPercentile"));
-        assert!(debug_str.contains("name"));
-        assert!(debug_str.contains("signature"));
     }
 }

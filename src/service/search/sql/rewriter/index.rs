@@ -81,7 +81,10 @@ impl IndexVisitor {
         let index_fields = if let Some((_, schema)) = schemas.iter().next() {
             let stream_settings = unwrap_stream_settings(schema.schema());
             let index_fields = get_stream_setting_index_fields(&stream_settings);
-            index_fields.into_iter().collect::<HashSet<_>>()
+            index_fields
+                .into_iter()
+                .filter_map(|v| schema.contains_field(&v).then_some(v))
+                .collect::<HashSet<_>>()
         } else {
             HashSet::new()
         };

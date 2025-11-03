@@ -15,7 +15,12 @@
 
 use std::sync::Arc;
 
+use arrow::{
+    array::{RecordBatch, *},
+    datatypes::DataType,
+};
 use config::{
+    QUERY_WITH_NO_LIMIT, ider,
     meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
     utils::{
         json,
@@ -23,11 +28,18 @@ use config::{
     },
 };
 use infra::{cache::stats, db as infra_db};
+use rayon::prelude::*;
 use vrl::prelude::NotNan;
+#[cfg(feature = "enterprise")]
+use {crate::service::search::SEARCH_SERVER, o2_enterprise::enterprise::search::TaskStatus};
 
 use crate::{
     common::infra::config::ENRICHMENT_TABLES,
-    service::{db as db_service, enrichment::StreamTable, search as SearchService},
+    service::{
+        db as db_service,
+        enrichment::{StreamTable, storage::Values},
+        search::cluster::http as search_cluster,
+    },
 };
 
 /// Will no longer be used as we are using the meta stream stats to store start, end time and size
@@ -37,7 +49,8 @@ pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta
 pub async fn get_enrichment_table_data(
     org_id: &str,
     name: &str,
-) -> Result<Vec<serde_json::Value>, anyhow::Error> {
+    _apply_primary_region_if_specified: bool,
+) -> Result<Values, anyhow::Error> {
     let start_time = get_start_time(org_id, name).await;
     let end_time = now_micros();
 
@@ -45,74 +58,89 @@ pub async fn get_enrichment_table_data(
         sql: format!("SELECT * FROM \"{name}\""),
         start_time,
         end_time,
-        size: -1, // -1 means no limit, enrichment table should not be limited
+        size: QUERY_WITH_NO_LIMIT, // -1 means no limit, enrichment table should not be limited
         ..Default::default()
     };
 
-    let req = config::meta::search::Request {
-        query,
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        local_mode: Some(true),
+    #[cfg(feature = "enterprise")]
+    let regions = {
+        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+        let config = get_o2_config();
+        let enrichment_table_region = config.super_cluster.enrichment_table_get_region.clone();
+        if _apply_primary_region_if_specified
+            && config.super_cluster.enabled
+            && !enrichment_table_region.is_empty()
+        {
+            vec![enrichment_table_region]
+        } else {
+            vec![]
+        }
     };
+    #[cfg(not(feature = "enterprise"))]
+    let regions = vec![];
+
+    let search_query: proto::cluster_rpc::SearchQuery = query.clone().into();
+    let trace_id = ider::generate_trace_id();
+    let request = config::datafusion::request::Request::new(
+        trace_id.clone(),
+        org_id.to_string(),
+        StreamType::EnrichmentTables,
+        0,    // timeout
+        None, // user_id
+        Some((search_query.start_time, search_query.end_time)),
+        None, // search_type
+        query.histogram_interval,
+    );
+
     log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
-    // do search
-    match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
-        Ok(res) => {
-            if !res.hits.is_empty() {
-                Ok(res.hits)
-            } else {
-                Ok(vec![])
-            }
-        }
-        Err(err) => {
-            log::error!("get enrichment table {org_id}/{name} data error: {err:?}");
-            Ok(vec![])
-        }
+
+    #[cfg(feature = "enterprise")]
+    {
+        let sql = Some(query.sql.clone());
+        let start_time = Some(query.start_time);
+        let end_time = Some(query.end_time);
+        // set search task
+        SEARCH_SERVER
+            .insert(
+                trace_id.clone(),
+                TaskStatus::new_leader(
+                    vec![],
+                    true,
+                    None,
+                    Some(org_id.to_string()),
+                    Some(request.stream_type.to_string()),
+                    sql,
+                    start_time,
+                    end_time,
+                    None,
+                    None,
+                ),
+            )
+            .await;
     }
-}
 
-pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let start_time = get_start_time(org_id, name).await;
-    let end_time = now_micros();
+    let result =
+        search_cluster::search_inner(request, search_query, regions, vec![], true, None).await;
 
-    let query = config::meta::search::Query {
-        sql: format!("SELECT * FROM \"{name}\""),
-        start_time,
-        end_time,
-        size: -1, // -1 means no limit, enrichment table should not be limited
-        ..Default::default()
-    };
+    #[cfg(feature = "enterprise")]
+    {
+        let _ = SEARCH_SERVER.remove(&trace_id, false).await;
+    }
 
-    let req = config::meta::search::Request {
-        query,
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        local_mode: Some(true),
-    };
-    log::debug!("get enrichment table {name} data req start time: {start_time}");
-    // do search
-    match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
-        Ok(res) => {
-            if !res.hits.is_empty() {
-                Ok(res.hits.iter().map(convert_to_vrl).collect())
-            } else {
-                Ok(vec![])
-            }
+    // do search using search_inner which returns RecordBatches
+    match result {
+        Ok((batches, _scan_stats, _took_wait, _is_partial, _partial_err)) => {
+            log::info!(
+                "get enrichment table {org_id}/{name} data success with {} rows",
+                batches.iter().map(|b| b.num_rows()).sum::<usize>()
+            );
+            Ok(Values::RecordBatch(batches))
         }
         Err(err) => {
-            log::error!("get enrichment table data error: {err:?}");
-            Ok(vec![])
+            log::error!("get enrichment table {org_id}/{name} data error: {err}",);
+            Err(anyhow::anyhow!(
+                "get enrichment table {org_id}/{name} error: {err}"
+            ))
         }
     }
 }
@@ -140,6 +168,132 @@ pub fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
                 .collect(),
         ),
     }
+}
+
+pub fn convert_from_vrl(value: &vrl::value::Value) -> json::Value {
+    match value {
+        vrl::value::Value::Null => json::Value::Null,
+        vrl::value::Value::Boolean(b) => json::Value::Bool(*b),
+        vrl::value::Value::Integer(i) => json::Value::Number(json::Number::from(*i)),
+        vrl::value::Value::Float(f) => json::Value::Number(
+            json::Number::from_f64(f.into_inner()).unwrap_or(json::Number::from(0)),
+        ),
+        vrl::value::Value::Bytes(b) => json::Value::String(String::from_utf8_lossy(b).to_string()),
+        vrl::value::Value::Array(arr) => {
+            json::Value::Array(arr.iter().map(convert_from_vrl).collect())
+        }
+        vrl::value::Value::Object(obj) => json::Value::Object(
+            obj.iter()
+                .map(|(k, v)| (k.to_string(), convert_from_vrl(v)))
+                .collect(),
+        ),
+        vrl::value::Value::Timestamp(ts) => json::Value::Number(json::Number::from(
+            ts.timestamp_nanos_opt().unwrap_or(0) / 1000,
+        )),
+        vrl::value::Value::Regex(_) => json::Value::String("regex".to_string()),
+    }
+}
+
+/// Convert RecordBatch directly to VRL values without intermediate JSON
+/// Only handles data types supported by convert_json_to_record_batch:
+/// Utf8, Utf8View, LargeUtf8, Int64, UInt64, Float64, Boolean, Binary, Null
+pub fn convert_recordbatch_to_vrl(
+    batches: &[RecordBatch],
+) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(config::get_config().limit.cpu_num)
+        .build()?;
+
+    // Process batches in parallel, collecting rows from each batch
+    let vrl_records: Result<Vec<_>, _> = pool.install(|| {
+        batches
+            .par_iter()
+            .map(|batch| {
+                let schema = batch.schema();
+                let num_rows = batch.num_rows();
+
+                // Process rows within a batch in parallel
+                (0..num_rows)
+                    .into_par_iter()
+                    .map(|row_idx| {
+                        let mut record_map = vrl::value::ObjectMap::new();
+
+                        for (col_idx, field) in schema.fields().iter().enumerate() {
+                            let column = batch.column(col_idx);
+                            let field_name = field.name();
+
+                            if column.is_null(row_idx) {
+                                record_map.insert(field_name.clone().into(), vrl::value::Value::Null);
+                                continue;
+                            }
+
+                            let vrl_value = match field.data_type() {
+                                DataType::Boolean => {
+                                    let array =
+                                        column.as_any().downcast_ref::<BooleanArray>().unwrap();
+                                    vrl::value::Value::Boolean(array.value(row_idx))
+                                }
+                                DataType::Int64 => {
+                                    let array =
+                                        column.as_any().downcast_ref::<Int64Array>().unwrap();
+                                    vrl::value::Value::Integer(array.value(row_idx))
+                                }
+                                DataType::UInt64 => {
+                                    let array =
+                                        column.as_any().downcast_ref::<UInt64Array>().unwrap();
+                                    vrl::value::Value::Integer(array.value(row_idx) as i64)
+                                }
+                                DataType::Float64 => {
+                                    let array =
+                                        column.as_any().downcast_ref::<Float64Array>().unwrap();
+                                    vrl::value::Value::Float(
+                                        NotNan::new(array.value(row_idx))
+                                            .unwrap_or(NotNan::new(0.0).unwrap()),
+                                    )
+                                }
+                                DataType::Utf8 => {
+                                    let array =
+                                        column.as_any().downcast_ref::<StringArray>().unwrap();
+                                    vrl::value::Value::from(array.value(row_idx))
+                                }
+                                DataType::Utf8View => {
+                                    let array =
+                                        column.as_any().downcast_ref::<StringViewArray>().unwrap();
+                                    vrl::value::Value::from(array.value(row_idx))
+                                }
+                                DataType::LargeUtf8 => {
+                                    let array = column
+                                        .as_any()
+                                        .downcast_ref::<LargeStringArray>()
+                                        .unwrap();
+                                    vrl::value::Value::from(array.value(row_idx))
+                                }
+                                DataType::Binary => {
+                                    let array =
+                                        column.as_any().downcast_ref::<BinaryArray>().unwrap();
+                                    vrl::value::Value::Bytes(array.value(row_idx).to_vec().into())
+                                }
+                                DataType::Null => vrl::value::Value::Null,
+                                _ => {
+                                    return Err(anyhow::anyhow!(
+                                        "Unsupported data type for RecordBatch to VRL conversion: {:?}",
+                                        field.data_type()
+                                    ));
+                                }
+                            };
+
+                            record_map.insert(field_name.clone().into(), vrl_value);
+                        }
+
+                        Ok(vrl::value::Value::Object(record_map))
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .collect()
+    });
+
+    // Flatten the nested Vec<Vec<Value>> into Vec<Value>
+    vrl_records.map(|batches| batches.into_iter().flatten().collect())
 }
 
 pub async fn save_enrichment_data_to_db(
@@ -298,7 +452,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), infra::errors::Error
         StreamType::EnrichmentTables,
         name
     );
-    cluster_coordinator.delete(&key, false, false, None).await
+    cluster_coordinator.delete(&key, false, true, None).await
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
@@ -322,13 +476,33 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = keys[0];
                 let stream_name = keys[2];
 
-                let data = match super::super::enrichment::get_enrichment_table(org_id, stream_name)
-                    .await
+                let data = match super::super::enrichment::get_enrichment_table(
+                    org_id,
+                    stream_name,
+                    false,
+                )
+                .await
                 {
                     Ok(data) => data,
                     Err(e) => {
-                        log::error!("[ENRICHMENT::TABLE watch] get enrichment table error: {e}");
-                        vec![]
+                        log::error!(
+                            "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, trying again: {e}"
+                        );
+                        match super::super::enrichment::get_enrichment_table(
+                            org_id,
+                            stream_name,
+                            false,
+                        )
+                        .await
+                        {
+                            Ok(data) => data,
+                            Err(e) => {
+                                log::error!(
+                                    "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, giving up: {e}"
+                                );
+                                Arc::new(vec![])
+                            }
+                        }
                     }
                 };
                 log::info!(
@@ -454,18 +628,8 @@ mod tests {
     async fn test_get_enrichment_table_data() {
         // This will fail in test environment due to missing dependencies,
         // but tests the function structure
-        let result = get_enrichment_table_data("test_org", "test_table").await;
-        assert!(result.is_ok());
-        let data = result.unwrap();
-        assert_eq!(data.len(), 0); // Should return empty vec due to search service failure
-    }
-
-    #[tokio::test]
-    async fn test_get() {
-        let result = get("test_org", "test_table").await;
-        assert!(result.is_ok());
-        let data = result.unwrap();
-        assert_eq!(data.len(), 0); // Should return empty vec due to search service failure
+        let result = get_enrichment_table_data("test_org", "test_table", false).await;
+        assert!(result.is_err());
     }
 
     #[tokio::test]
@@ -484,5 +648,318 @@ mod tests {
     async fn test_get_meta_table_stats() {
         let result = get_meta_table_stats("test_org", "test_table").await;
         assert!(result.is_none()); // Should return None when no stats exist
+    }
+
+    #[test]
+    fn test_json_to_vrl_round_trip() {
+        // Test null
+        let null_json = json::Value::Null;
+        let vrl_value = convert_to_vrl(&null_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(null_json, back_to_json);
+
+        // Test boolean
+        let bool_json = json::Value::Bool(true);
+        let vrl_value = convert_to_vrl(&bool_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(bool_json, back_to_json);
+
+        let bool_json = json::Value::Bool(false);
+        let vrl_value = convert_to_vrl(&bool_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(bool_json, back_to_json);
+
+        // Test integer
+        let int_json = json::Value::Number(json::Number::from(42));
+        let vrl_value = convert_to_vrl(&int_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(int_json, back_to_json);
+
+        // Test negative integer
+        let neg_int_json = json::Value::Number(json::Number::from(-123));
+        let vrl_value = convert_to_vrl(&neg_int_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(neg_int_json, back_to_json);
+
+        // Test float
+        let float_json = json::Value::Number(json::Number::from_f64(1.23).unwrap());
+        let vrl_value = convert_to_vrl(&float_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(float_json, back_to_json);
+
+        // Test string
+        let string_json = json::Value::String("Hello, World!".to_string());
+        let vrl_value = convert_to_vrl(&string_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(string_json, back_to_json);
+
+        // Test empty string
+        let empty_string_json = json::Value::String("".to_string());
+        let vrl_value = convert_to_vrl(&empty_string_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(empty_string_json, back_to_json);
+
+        // Test array
+        let array_json = json::Value::Array(vec![
+            json::Value::Number(json::Number::from(1)),
+            json::Value::String("test".to_string()),
+            json::Value::Bool(true),
+            json::Value::Null,
+        ]);
+        let vrl_value = convert_to_vrl(&array_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(array_json, back_to_json);
+
+        // Test empty array
+        let empty_array_json = json::Value::Array(vec![]);
+        let vrl_value = convert_to_vrl(&empty_array_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(empty_array_json, back_to_json);
+
+        // Test object
+        let mut object = serde_json::Map::new();
+        object.insert("name".to_string(), json::Value::String("John".to_string()));
+        object.insert(
+            "age".to_string(),
+            json::Value::Number(json::Number::from(30)),
+        );
+        object.insert("active".to_string(), json::Value::Bool(true));
+        object.insert(
+            "score".to_string(),
+            json::Value::Number(json::Number::from_f64(98.5).unwrap()),
+        );
+        let object_json = json::Value::Object(object);
+        let vrl_value = convert_to_vrl(&object_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(object_json, back_to_json);
+
+        // Test empty object
+        let empty_object_json = json::Value::Object(serde_json::Map::new());
+        let vrl_value = convert_to_vrl(&empty_object_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(empty_object_json, back_to_json);
+
+        // Test nested structures
+        let nested_json = json::json!({
+            "users": [
+                {
+                    "id": 1,
+                    "name": "Alice",
+                    "preferences": {
+                        "theme": "dark",
+                        "notifications": true
+                    }
+                },
+                {
+                    "id": 2,
+                    "name": "Bob",
+                    "preferences": {
+                        "theme": "light",
+                        "notifications": false
+                    }
+                }
+            ],
+            "metadata": {
+                "version": "1.0",
+                "count": 2
+            }
+        });
+        let vrl_value = convert_to_vrl(&nested_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(nested_json, back_to_json);
+    }
+
+    #[test]
+    fn test_vrl_to_json_round_trip() {
+        use chrono::{DateTime, Utc};
+        use vrl::prelude::NotNan;
+
+        // Test null
+        let null_vrl = vrl::value::Value::Null;
+        let json_value = convert_from_vrl(&null_vrl);
+        let back_to_vrl = convert_to_vrl(&json_value);
+        assert_eq!(null_vrl, back_to_vrl);
+
+        // Test boolean
+        let bool_vrl = vrl::value::Value::Boolean(true);
+        let json_value = convert_from_vrl(&bool_vrl);
+        let back_to_vrl = convert_to_vrl(&json_value);
+        assert_eq!(bool_vrl, back_to_vrl);
+
+        // Test integer
+        let int_vrl = vrl::value::Value::Integer(42);
+        let json_value = convert_from_vrl(&int_vrl);
+        let back_to_vrl = convert_to_vrl(&json_value);
+        assert_eq!(int_vrl, back_to_vrl);
+
+        // Test float
+        let float_vrl = vrl::value::Value::Float(NotNan::new(1.23).unwrap());
+        let json_value = convert_from_vrl(&float_vrl);
+        let back_to_vrl = convert_to_vrl(&json_value);
+        assert_eq!(float_vrl, back_to_vrl);
+
+        // Test bytes (converted to string)
+        let bytes_vrl = vrl::value::Value::Bytes("Hello, World!".as_bytes().into());
+        let json_value = convert_from_vrl(&bytes_vrl);
+        let back_to_vrl = convert_to_vrl(&json_value);
+        // Note: bytes -> string conversion means we expect a string VRL value back
+        let expected_vrl = vrl::value::Value::from("Hello, World!");
+        assert_eq!(expected_vrl, back_to_vrl);
+
+        // Test array
+        let array_vrl = vrl::value::Value::Array(vec![
+            vrl::value::Value::Integer(1),
+            vrl::value::Value::from("test"),
+            vrl::value::Value::Boolean(true),
+            vrl::value::Value::Null,
+        ]);
+        let json_value = convert_from_vrl(&array_vrl);
+        let back_to_vrl = convert_to_vrl(&json_value);
+        assert_eq!(array_vrl, back_to_vrl);
+
+        // Test object
+        let mut object = vrl::value::ObjectMap::new();
+        object.insert("name".into(), vrl::value::Value::from("John"));
+        object.insert("age".into(), vrl::value::Value::Integer(30));
+        object.insert("active".into(), vrl::value::Value::Boolean(true));
+        let object_vrl = vrl::value::Value::Object(object);
+        let json_value = convert_from_vrl(&object_vrl);
+        let back_to_vrl = convert_to_vrl(&json_value);
+        assert_eq!(object_vrl, back_to_vrl);
+
+        // Test timestamp (converted to number)
+        let timestamp = DateTime::parse_from_rfc3339("2023-01-01T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let timestamp_vrl = vrl::value::Value::Timestamp(timestamp);
+        let json_value = convert_from_vrl(&timestamp_vrl);
+        let back_to_vrl = convert_to_vrl(&json_value);
+        // Note: timestamp -> number conversion means we expect an integer VRL value back
+        let expected_microseconds = timestamp.timestamp_nanos_opt().unwrap_or(0) / 1000;
+        let expected_vrl = vrl::value::Value::Integer(expected_microseconds);
+        assert_eq!(expected_vrl, back_to_vrl);
+    }
+
+    #[test]
+    fn test_convert_recordbatch_to_vrl() {
+        use arrow::{
+            array::{BooleanArray, Float64Array, Int64Array, StringArray},
+            datatypes::{DataType, Field, Schema},
+        };
+
+        // Create a simple RecordBatch
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Int64, false),
+            Field::new("score", DataType::Float64, false),
+            Field::new("active", DataType::Boolean, false),
+        ]));
+
+        let name_array = StringArray::from(vec!["Alice", "Bob"]);
+        let age_array = Int64Array::from(vec![30, 25]);
+        let score_array = Float64Array::from(vec![95.5, 88.3]);
+        let active_array = BooleanArray::from(vec![true, false]);
+
+        let batch = arrow::array::RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![
+                Arc::new(name_array),
+                Arc::new(age_array),
+                Arc::new(score_array),
+                Arc::new(active_array),
+            ],
+        )
+        .unwrap();
+
+        // Test RecordBatch -> VRL direct conversion
+        let vrl_data = convert_recordbatch_to_vrl(&[batch]).unwrap();
+        assert_eq!(vrl_data.len(), 2);
+
+        // Verify first record
+        match &vrl_data[0] {
+            vrl::value::Value::Object(obj) => {
+                assert_eq!(obj.get("name"), Some(&vrl::value::Value::from("Alice")));
+                assert_eq!(obj.get("age"), Some(&vrl::value::Value::Integer(30)));
+                assert_eq!(obj.get("active"), Some(&vrl::value::Value::Boolean(true)));
+                // Check score is a float
+                match obj.get("score") {
+                    Some(vrl::value::Value::Float(f)) => {
+                        assert!((f.into_inner() - 95.5).abs() < 0.001);
+                    }
+                    _ => panic!("Expected float value for score"),
+                }
+            }
+            _ => panic!("Expected object value"),
+        }
+
+        // Verify second record
+        match &vrl_data[1] {
+            vrl::value::Value::Object(obj) => {
+                assert_eq!(obj.get("name"), Some(&vrl::value::Value::from("Bob")));
+                assert_eq!(obj.get("age"), Some(&vrl::value::Value::Integer(25)));
+                assert_eq!(obj.get("active"), Some(&vrl::value::Value::Boolean(false)));
+            }
+            _ => panic!("Expected object value"),
+        }
+    }
+
+    #[test]
+    fn test_edge_cases_and_special_values() {
+        // Test zero values
+        let zero_int_json = json::Value::Number(json::Number::from(0));
+        let vrl_value = convert_to_vrl(&zero_int_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(zero_int_json, back_to_json);
+
+        let zero_float_json = json::Value::Number(json::Number::from_f64(0.0).unwrap());
+        let vrl_value = convert_to_vrl(&zero_float_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(zero_float_json, back_to_json);
+
+        // Test very large numbers
+        let large_int_json = json::Value::Number(json::Number::from(i64::MAX));
+        let vrl_value = convert_to_vrl(&large_int_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(large_int_json, back_to_json);
+
+        let large_negative_int_json = json::Value::Number(json::Number::from(i64::MIN));
+        let vrl_value = convert_to_vrl(&large_negative_int_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(large_negative_int_json, back_to_json);
+
+        // Test special float values (but not NaN as it's not supported by NotNan)
+        // Skip infinity test as NotNan doesn't allow it
+
+        // Test strings with special characters
+        let special_chars_json = json::Value::String("Hello\n\r\t\"'\\World!🌍".to_string());
+        let vrl_value = convert_to_vrl(&special_chars_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(special_chars_json, back_to_json);
+
+        // Test unicode strings
+        let unicode_json = json::Value::String("こんにちは世界! 🚀".to_string());
+        let vrl_value = convert_to_vrl(&unicode_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(unicode_json, back_to_json);
+
+        // Test very long string
+        let long_string = "a".repeat(10000);
+        let long_string_json = json::Value::String(long_string);
+        let vrl_value = convert_to_vrl(&long_string_json);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(long_string_json, back_to_json);
+
+        // Test deeply nested structure
+        let mut deeply_nested = json::json!({"level": 1});
+        for i in 2..=10 {
+            deeply_nested = json::json!({"level": i, "nested": deeply_nested});
+        }
+        let vrl_value = convert_to_vrl(&deeply_nested);
+        let back_to_json = convert_from_vrl(&vrl_value);
+        assert_eq!(deeply_nested, back_to_json);
+
+        // Note: Regex conversion is tested separately as it requires specific VRL regex
+        // construction For now, we'll test that our conversion functions handle all other
+        // cases without data loss
     }
 }

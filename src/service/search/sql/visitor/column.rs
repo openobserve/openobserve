@@ -154,22 +154,26 @@ impl VisitorMut for ColumnVisitor<'_> {
             self.is_wildcard = true;
         }
         let mut has_limit = false;
-        if let Some(limit) = query.limit.as_ref()
-            && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
-            && let Value::Number(n, _) = value
-            && let Ok(num) = n.to_string().parse::<i64>()
-            && self.limit.is_none()
+        if let Some(limit_clause) = query.limit_clause.as_ref()
+            && let sqlparser::ast::LimitClause::LimitOffset { limit, offset, .. } = limit_clause
         {
-            has_limit = true;
-            self.limit = Some(num);
-        }
-        if let Some(offset) = query.offset.as_ref()
-            && let Expr::Value(ValueWithSpan { value, span: _ }) = &offset.value
-            && let Value::Number(n, _) = value
-            && let Ok(num) = n.to_string().parse::<i64>()
-            && self.offset.is_none()
-        {
-            self.offset = Some(num);
+            if let Some(limit) = limit.as_ref()
+                && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
+                && let Value::Number(n, _) = value
+                && let Ok(num) = n.to_string().parse::<i64>()
+                && self.limit.is_none()
+            {
+                has_limit = true;
+                self.limit = Some(num);
+            }
+            if let Some(offset) = offset.as_ref()
+                && let Expr::Value(ValueWithSpan { value, span: _ }) = &offset.value
+                && let Value::Number(n, _) = value
+                && let Ok(num) = n.to_string().parse::<i64>()
+                && self.offset.is_none()
+            {
+                self.offset = Some(num);
+            }
         }
         if has_limit && self.offset.is_none() {
             self.offset = Some(0);

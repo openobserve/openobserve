@@ -33,14 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="col-auto">
           <q-input
             v-model="newDomain"
-            :label="t('settings.domainPlaceholder')"
             :hint="t('settings.domainHint', { 'at_sign': '@' })"
-            color="input-border"
-            bg-color="input-bg"
             class="domain-input"
-            outlined
+            borderless
+            hide-bottom-space
             dense
             @keydown.enter="addDomain"
+            :placeholder="t('settings.domainPlaceholder')"
             :rules="[
               (val) => isValidDomain(val) || t('settings.invalidDomain')
             ]"
@@ -172,18 +171,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Action Buttons -->
-    <div class="row q-gutter-md">
+    <div class="flex justify-end q-px-lg q-py-lg full-width tw-absolute tw-bottom-0">
       <q-btn
         :label="t('common.cancel')"
-        class="text-bold text-capitalize no-border"
-        flat
-        color="grey-7"
+        class="q-mr-md o2-secondary-button tw-h-[36px]"
         @click="resetForm"
       />
       <q-btn
         :label="t('settings.saveChanges')"
-        color="secondary"
-        class="text-bold text-capitalize no-border"
+        class="o2-primary-button no-border tw-h-[36px] q-mr-md"
         unelevated
         @click="saveChanges"
         :loading="saving"

@@ -13,82 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::Path, time::Duration};
+use std::path::Path;
 
 use config::{
     get_config,
     meta::{cluster::Role, stream::StreamType},
-    metrics::{self, NAMESPACE, SPAN_METRICS_BUCKET},
+    metrics::{self},
     utils::async_file::scan_files,
 };
 use hashbrown::HashMap;
 use infra::{cache, db::get_db};
-use once_cell::sync::Lazy;
-use opentelemetry::{KeyValue, global, metrics::Histogram};
-use opentelemetry_sdk::{
-    Resource,
-    metrics::{
-        Aggregation, Instrument, PeriodicReader, SdkMeterProvider, Stream, new_view,
-        reader::DefaultTemporalitySelector,
-    },
-    runtime,
-};
-use tokio::{sync::Mutex, time};
+use tokio::time;
 
 use crate::{
     common::infra::{
         cluster::get_cached_online_nodes,
         config::{ORG_USERS, USERS},
     },
-    service::{
-        db,
-        exporter::otlp_metrics_exporter::{O2MetricsClient, O2MetricsExporter},
-    },
+    service::db,
 };
-
-#[derive(Debug)]
-pub struct TraceMetricsItem {
-    pub organization: String,
-    pub traces_stream_name: String,
-    pub service_name: String,
-    pub span_name: String,
-    pub span_status: String,
-    pub span_kind: String,
-    pub duration: f64,
-    pub span_id: String,
-}
-
-pub type TraceMetricsChan = (
-    tokio::sync::mpsc::Sender<TraceMetricsItem>,
-    Mutex<tokio::sync::mpsc::Receiver<TraceMetricsItem>>,
-);
-
-pub static TRACE_METRICS_CHAN: Lazy<TraceMetricsChan> = Lazy::new(|| {
-    let (tx, rx) =
-        tokio::sync::mpsc::channel(get_config().common.traces_span_metrics_channel_buffer);
-    (tx, Mutex::new(rx))
-});
-
-pub static TRACE_METRICS_SPAN_HISTOGRAM: Lazy<Histogram<f64>> = Lazy::new(|| {
-    let meter = opentelemetry::global::meter("o2");
-    meter
-        .f64_histogram(format!("{NAMESPACE}_span_duration_milliseconds"))
-        .with_unit("ms")
-        .with_description("span duration milliseconds")
-        .init()
-});
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // load metrics
     load_query_cache_limit_bytes().await?;
     load_ingest_wal_used_bytes().await?;
-    if config::cluster::LOCAL_NODE.is_ingester() {
-        tokio::spawn(async {
-            if let Err(e) = traces_metrics_collect().await {
-                log::error!("Error traces_metrics_collect metrics: {e}");
-            }
-        });
-    }
 
     // update metrics every 60 seconds
     loop {
@@ -113,10 +61,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn load_query_cache_limit_bytes() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     metrics::QUERY_MEMORY_CACHE_LIMIT_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(cfg.memory_cache.max_size as i64);
     metrics::QUERY_DISK_CACHE_LIMIT_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set((cfg.disk_cache.max_size * cfg.disk_cache.bucket_num) as i64);
     Ok(())
 }
@@ -169,10 +117,10 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     let db = get_db().await;
     let stats = db.stats().await?;
     metrics::META_STORAGE_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(stats.bytes_len);
     metrics::META_STORAGE_KEYS
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(stats.keys_count);
 
     if get_config().common.local_mode {
@@ -214,14 +162,14 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     let stream_types = [StreamType::Logs, StreamType::Metrics, StreamType::Traces];
     let orgs = db::schema::list_organizations_from_cache().await;
     metrics::META_NUM_ORGANIZATIONS
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(orgs.len() as i64);
     for org_id in &orgs {
         for stream_type in stream_types {
             let streams = db::schema::list_streams_from_cache(org_id, stream_type).await;
             if !streams.is_empty() {
                 metrics::META_NUM_STREAMS
-                    .with_label_values(&[org_id.as_str(), stream_type.as_str()])
+                    .with_label_values::<&str>(&[org_id.as_str(), stream_type.as_str()])
                     .set(streams.len() as i64);
             }
         }
@@ -231,7 +179,7 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     let users = USERS.len();
 
     metrics::META_NUM_USERS_TOTAL
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(users as i64);
     for org_id in &orgs {
         let mut count: i64 = 0;
@@ -320,66 +268,16 @@ async fn update_parquet_metrics() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
-    let exporter = O2MetricsExporter::new(
-        O2MetricsClient::new(),
-        Box::new(DefaultTemporalitySelector::new()),
-    );
-    let reader = PeriodicReader::builder(exporter, runtime::Tokio)
-        .with_interval(Duration::from_secs(
-            get_config().common.traces_span_metrics_export_interval,
-        ))
-        .build();
-    let provider = SdkMeterProvider::builder()
-        .with_reader(reader)
-        .with_resource(Resource::new(vec![KeyValue::new(
-            "service.name",
-            "openobserve",
-        )]))
-        .with_view(new_view(
-            Instrument::new().name(format!("{NAMESPACE}_span_duration_milliseconds")),
-            Stream::new().aggregation(Aggregation::ExplicitBucketHistogram {
-                boundaries: SPAN_METRICS_BUCKET.to_vec(),
-                record_min_max: false,
-            }),
-        )?)
-        .build();
-    global::set_meter_provider(provider.clone());
-    Ok(provider)
-}
-
-async fn traces_metrics_collect() -> Result<(), anyhow::Error> {
-    let mut receiver = TRACE_METRICS_CHAN.1.lock().await;
-
-    while let Some(item) = receiver.recv().await {
-        // Record measurements using the histogram instrument.
-        // log::info!("receive span metrics: {}", item.span_id);
-        TRACE_METRICS_SPAN_HISTOGRAM.record(
-            item.duration,
-            &[
-                KeyValue::new("organization", item.organization),
-                KeyValue::new("traces_stream_name", item.traces_stream_name),
-                KeyValue::new("service_name", item.service_name),
-                KeyValue::new("operation_name", item.span_name),
-                KeyValue::new("status_code", item.span_status),
-                KeyValue::new("span_kind", item.span_kind),
-            ],
-        );
-    }
-
-    Ok(())
-}
-
 async fn update_parquet_metadata_cache_metrics() -> Result<(), anyhow::Error> {
     let file_num =
         crate::service::search::datafusion::storage::file_statistics_cache::GLOBAL_CACHE.len();
     let mem_size = crate::service::search::datafusion::storage::file_statistics_cache::GLOBAL_CACHE
         .memory_size();
     metrics::QUERY_PARQUET_METADATA_CACHE_FILES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(file_num as i64);
     metrics::QUERY_PARQUET_METADATA_CACHE_USED_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(mem_size as i64);
     Ok(())
 }

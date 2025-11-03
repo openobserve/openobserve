@@ -30,12 +30,12 @@ use datafusion::{
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
-        metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet},
+        metrics::{ExecutionPlanMetricsSet, MetricsSet},
         stream::RecordBatchStreamAdapter,
     },
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
-use flight::common::Metrics;
+use flight::common::{Metrics, RemoteScanMetrics};
 use futures::{StreamExt, TryStreamExt};
 use futures_util::pin_mut;
 use parking_lot::Mutex;
@@ -73,7 +73,7 @@ impl RemoteScanExec {
         let cache = Self::compute_properties(Arc::clone(&input.schema()), output_partitions);
 
         // serialize the input plan and set it as the plan for the remote scan node
-        let proto = get_physical_extension_codec();
+        let proto = get_physical_extension_codec(remote_scan_node.query_identifier.org_id.clone());
         let physical_plan_bytes =
             physical_plan_to_bytes_with_extension_codec(input.clone(), &proto)?;
         remote_scan_node.set_plan(physical_plan_bytes.to_vec());
@@ -86,7 +86,7 @@ impl RemoteScanExec {
             .filter_map(|(idx, n)| if n.is_querier() { Some(idx) } else { None })
             .collect::<Vec<_>>();
         // random shuffle the node ids
-        node_ids.shuffle(&mut rand::thread_rng());
+        node_ids.shuffle(&mut rand::rng());
         let enrich_mode_node_idx = node_ids.pop().unwrap_or_default();
 
         Ok(RemoteScanExec {
@@ -129,6 +129,11 @@ impl RemoteScanExec {
         self
     }
 
+    pub fn with_metrics(mut self, metrics: ExecutionPlanMetricsSet) -> Self {
+        self.metrics = metrics;
+        self
+    }
+
     fn output_partitioning_helper(n_partitions: usize) -> Partitioning {
         Partitioning::UnknownPartitioning(n_partitions)
     }
@@ -161,6 +166,15 @@ impl RemoteScanExec {
     #[cfg(test)]
     pub fn analyze(&self) -> bool {
         self.remote_scan_node.search_infos.is_analyze
+    }
+
+    #[cfg(test)]
+    pub fn index_optimize_mode(&self) -> Option<IndexOptimizeMode> {
+        self.remote_scan_node
+            .index_info
+            .index_optimize_mode
+            .clone()
+            .map(|x| x.into())
     }
 }
 
@@ -206,7 +220,8 @@ impl ExecutionPlan for RemoteScanExec {
         let remote_scan = Self::new(children[0].clone(), self.remote_scan_node.clone())?
             .with_scan_stats(self.scan_stats.clone())
             .with_partial_err(self.partial_err.clone())
-            .with_cluster_metrics(self.cluster_metrics.clone());
+            .with_cluster_metrics(self.cluster_metrics.clone())
+            .with_metrics(self.metrics.clone());
         Ok(Arc::new(remote_scan))
     }
 
@@ -215,7 +230,7 @@ impl ExecutionPlan for RemoteScanExec {
         partition: usize,
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
-        let baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
+        let baseline_metrics = RemoteScanMetrics::new(partition, &self.metrics);
         let fut = get_remote_batch(
             self.remote_scan_node.clone(),
             partition,
@@ -251,7 +266,7 @@ async fn get_remote_batch(
     scan_stats: Arc<Mutex<ScanStats>>,
     partial_err: Arc<Mutex<String>>,
     cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
-    metrics: BaselineMetrics,
+    metrics: RemoteScanMetrics,
 ) -> Result<SendableRecordBatchStream> {
     let start = std::time::Instant::now();
     let cfg = config::get_config();
@@ -333,7 +348,15 @@ async fn get_remote_batch(
     let stream = match client.do_get(request).await {
         Ok(stream) => stream,
         Err(e) => {
-            if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded {
+            let is_parquet_file_not_found = e.code() == tonic::Code::Internal && {
+                let msg = e.message();
+                msg.find('{')
+                    .and_then(|start| msg.rfind('}').map(|end| &msg[start..=end]))
+                    .and_then(|json_part| infra::errors::ErrorCodes::from_json(json_part).ok())
+                    .map(|err_code| err_code.get_code() == infra::errors::ErrorCodes::SearchParquetFileNotFound.get_code())
+                    .unwrap_or(false)
+            };
+            if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found {
                 return Ok(get_empty_stream(empty_stream.with_error(e)));
             }
             log::error!(

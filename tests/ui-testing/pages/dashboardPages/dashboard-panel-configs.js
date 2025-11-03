@@ -82,6 +82,18 @@ export default class DashboardPanelConfigs {
 
     //Map locators
     this.mapType = page.locator('[data-test="dashboard-config-map-type"]');
+
+    // Override config locators
+    this.overrideColumnSelect = page.locator(
+      '[data-test="dashboard-addpanel-config-unit-config-select-column-0"]'
+    );
+    this.overrideTypeSelect = page.locator(
+      '[data-test="dashboard-addpanel-config-type-select-0"]'
+    );
+    this.sidebarScrollContainer = page.locator('.sidebar-content.scroll');
+    this.connectNullValuesToggle = page.locator(
+      '[data-test="dashboard-config-connect-null-values"]'
+    );
   }
   /// Open the config panel
   async openConfigPanel() {
@@ -279,6 +291,65 @@ export default class DashboardPanelConfigs {
     await this.overrideConfig.click();
   }
 
+  // Add and configure override with dynamic column and type
+  async configureOverride({ columnName, typeName, enableTypeCheckbox = true }) {
+    // Ensure the override button is visible by scrolling the sidebar
+    await this.scrollDownSidebarUntilOverrideVisible();
+    await this.overrideConfig.click();
+
+    // Select column
+    await this.overrideColumnSelect.waitFor({ state: "visible" });
+    await this.overrideColumnSelect.click();
+    const columnOption = this.page.getByRole("option", { name: columnName }).first();
+    await columnOption.waitFor({ state: "visible" });
+    await columnOption.click();
+
+    // Select type
+    await this.overrideTypeSelect.waitFor({ state: "visible" });
+    await this.overrideTypeSelect.click();
+    const typeOption = this.page.getByRole("option", { name: typeName }).first();
+    await typeOption.waitFor({ state: "visible" });
+    await typeOption.click();
+
+    // Optionally enable checkbox corresponding to the selected type
+    if (enableTypeCheckbox) {
+      const typeCheckbox = this.page.getByRole("checkbox", { name: typeName });
+      await typeCheckbox.waitFor({ state: "visible" });
+      await typeCheckbox.click();
+    }
+      const saveBtn = this.page.getByRole('button', { name: 'Save' });
+      await saveBtn.waitFor({ state: "visible", timeout: 5000 });
+      await saveBtn.click();
+  } 
+  // Click-hold on the sidebar and scroll down until the Override button is visible
+  async scrollDownSidebarUntilOverrideVisible() {
+    const sidebar = this.page.locator('.sidebar-content');
+    await sidebar.waitFor({ state: "visible" });
+
+    // Bring sidebar into view and hover so wheel events target it
+    await sidebar.scrollIntoViewIfNeeded();
+    await sidebar.hover();
+
+    // Press and hold mouse, then wheel scroll in chunks while checking visibility
+    await this.page.mouse.down();
+    for (let i = 0; i < 12; i++) {
+      if (await this.overrideConfig.isVisible().catch(() => false)) break;
+      await this.page.mouse.wheel(0, 900);
+    }
+    await this.page.mouse.up();
+
+    // If still not visible, do a final programmatic scroll as a safe fallback
+    if (!(await this.overrideConfig.isVisible().catch(() => false))) {
+      await this.page.evaluate((selector) => {
+        const el = document.querySelector(selector);
+        if (el) el.scrollTop = el.scrollHeight;
+      }, ".sidebar-content");
+    }
+
+    // Ensure the button is actually visible before proceeding
+    await this.overrideConfig.scrollIntoViewIfNeeded();
+    await this.overrideConfig.waitFor({ state: "visible" });
+  }
   //Metric Text
   //BG color
   async selectBGColor(color) {
@@ -299,4 +370,31 @@ export default class DashboardPanelConfigs {
     await this.gaugeMax.click();
     await this.gaugeMax.fill(max);
   }
+
+  // Get connect null values toggle state
+  async getConnectNullValuesState() {
+    await this.connectNullValuesToggle.waitFor({ state: "visible", timeout: 10000 });
+
+    // Check aria-checked attribute - this is the most reliable indicator
+    let ariaChecked = await this.connectNullValuesToggle.getAttribute("aria-checked");
+    if (ariaChecked === null) {
+      ariaChecked = await this.connectNullValuesToggle.getAttribute("aria-pressed");
+    }
+
+    return ariaChecked === "true";
+  }
+
+  // Verify connect null values toggle state
+  async verifyConnectNullValuesToggle(expectedState = true) {
+    const isChecked = await this.getConnectNullValuesState();
+
+    if (expectedState !== isChecked) {
+      throw new Error(
+        `Expected connect null values to be ${expectedState} but actual state is ${isChecked}`
+      );
+    }
+
+    return isChecked;
+  }
+
 }

@@ -160,16 +160,6 @@ pub struct ExecutablePipelineBulkInputs {
     originals: Vec<Option<String>>,
 }
 
-#[derive(Debug)]
-pub struct ExecutablePipelineTraceInputs {
-    records: Vec<Value>,
-    services: Vec<String>,
-    span_names: Vec<String>,
-    span_status_for_spanmetrics: Vec<String>,
-    span_kinds: Vec<String>,
-    span_durations: Vec<f64>,
-}
-
 impl ExecutablePipeline {
     pub async fn new(pipeline: &Pipeline) -> Result<Self> {
         let node_map = pipeline
@@ -508,65 +498,6 @@ impl ExecutablePipelineBulkInputs {
 }
 
 impl Default for ExecutablePipelineBulkInputs {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ExecutablePipelineTraceInputs {
-    pub fn new() -> Self {
-        Self {
-            records: Vec::new(),
-            services: Vec::new(),
-            span_names: Vec::new(),
-            span_status_for_spanmetrics: Vec::new(),
-            span_kinds: Vec::new(),
-            span_durations: Vec::new(),
-        }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn add_input(
-        &mut self,
-        record: Value,
-        service: String,
-        span_name: String,
-        span_status_for_spanmetric: String,
-        span_kind: String,
-        duration: f64,
-    ) {
-        self.records.push(record);
-        self.services.push(service);
-        self.span_names.push(span_name);
-        self.span_status_for_spanmetrics
-            .push(span_status_for_spanmetric);
-        self.span_kinds.push(span_kind);
-        self.span_durations.push(duration);
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn into_parts(
-        self,
-    ) -> (
-        Vec<Value>,
-        Vec<String>,
-        Vec<String>,
-        Vec<String>,
-        Vec<String>,
-        Vec<f64>,
-    ) {
-        (
-            self.records,
-            self.services,
-            self.span_names,
-            self.span_status_for_spanmetrics,
-            self.span_kinds,
-            self.span_durations,
-        )
-    }
-}
-
-impl Default for ExecutablePipelineTraceInputs {
     fn default() -> Self {
         Self::new()
     }
@@ -1257,7 +1188,12 @@ async fn get_transforms(org_id: &str, fn_name: &str) -> Result<Transform> {
 
 fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
     // Fast path: if it's a complete pattern like "{field}", avoid regex
-    if haystack.starts_with("{") && haystack.ends_with("}") {
+    // Check for no inner braces to avoid matching composite patterns like "{level}_{job}"
+    if haystack.starts_with("{")
+        && haystack.ends_with("}")
+        && !haystack[1..haystack.len() - 1].contains('{')
+        && !haystack[1..haystack.len() - 1].contains('}')
+    {
         let field_name = &haystack[1..haystack.len() - 1];
         return match record.get(field_name) {
             Some(stream_name) => Ok(get_string_value(stream_name)),
@@ -1309,6 +1245,9 @@ mod tests {
             ("abc-{container_name}-xyz", "abc-compactor-xyz"),
             ("abc-{value}-xyz", "abc-123-xyz"),
             ("{value}", "123"),
+            // Test composite patterns with multiple field references
+            ("{app_name}_{container_name}", "o2_compactor"),
+            ("{app_name}-{value}-{container_name}", "o2-123-compactor"),
         ];
         for (test, expected) in ok_cases {
             let result = resolve_stream_name(test, &record);
@@ -1396,100 +1335,6 @@ mod tests {
         assert_eq!(records[0], record);
         assert_eq!(doc_ids[0], doc_id);
         assert_eq!(originals[0], original);
-    }
-
-    // Test ExecutablePipelineTraceInputs
-    #[test]
-    fn test_executable_pipeline_trace_inputs_new() {
-        let inputs = ExecutablePipelineTraceInputs::new();
-        assert!(inputs.records.is_empty());
-        assert!(inputs.services.is_empty());
-        assert!(inputs.span_names.is_empty());
-        assert!(inputs.span_status_for_spanmetrics.is_empty());
-        assert!(inputs.span_kinds.is_empty());
-        assert!(inputs.span_durations.is_empty());
-    }
-
-    #[test]
-    fn test_executable_pipeline_trace_inputs_default() {
-        let inputs = ExecutablePipelineTraceInputs::default();
-        assert!(inputs.records.is_empty());
-        assert!(inputs.services.is_empty());
-        assert!(inputs.span_names.is_empty());
-        assert!(inputs.span_status_for_spanmetrics.is_empty());
-        assert!(inputs.span_kinds.is_empty());
-        assert!(inputs.span_durations.is_empty());
-    }
-
-    #[test]
-    fn test_executable_pipeline_trace_inputs_add_input() {
-        let mut inputs = ExecutablePipelineTraceInputs::new();
-        let record = json::json!({"trace": "data"});
-        let service = "test-service".to_string();
-        let span_name = "test-span".to_string();
-        let span_status = "OK".to_string();
-        let span_kind = "CLIENT".to_string();
-        let duration = 123.45;
-
-        inputs.add_input(
-            record.clone(),
-            service.clone(),
-            span_name.clone(),
-            span_status.clone(),
-            span_kind.clone(),
-            duration,
-        );
-
-        assert_eq!(inputs.records.len(), 1);
-        assert_eq!(inputs.services.len(), 1);
-        assert_eq!(inputs.span_names.len(), 1);
-        assert_eq!(inputs.span_status_for_spanmetrics.len(), 1);
-        assert_eq!(inputs.span_kinds.len(), 1);
-        assert_eq!(inputs.span_durations.len(), 1);
-
-        assert_eq!(inputs.records[0], record);
-        assert_eq!(inputs.services[0], service);
-        assert_eq!(inputs.span_names[0], span_name);
-        assert_eq!(inputs.span_status_for_spanmetrics[0], span_status);
-        assert_eq!(inputs.span_kinds[0], span_kind);
-        assert_eq!(inputs.span_durations[0], duration);
-    }
-
-    #[test]
-    fn test_executable_pipeline_trace_inputs_into_parts() {
-        let mut inputs = ExecutablePipelineTraceInputs::new();
-        let record = json::json!({"test": "trace"});
-        let service = "test-service".to_string();
-        let span_name = "test-span".to_string();
-        let span_status = "OK".to_string();
-        let span_kind = "INTERNAL".to_string();
-        let duration = 42.0;
-
-        inputs.add_input(
-            record.clone(),
-            service.clone(),
-            span_name.clone(),
-            span_status.clone(),
-            span_kind.clone(),
-            duration,
-        );
-
-        let (records, services, span_names, span_statuses, span_kinds, durations) =
-            inputs.into_parts();
-
-        assert_eq!(records.len(), 1);
-        assert_eq!(services.len(), 1);
-        assert_eq!(span_names.len(), 1);
-        assert_eq!(span_statuses.len(), 1);
-        assert_eq!(span_kinds.len(), 1);
-        assert_eq!(durations.len(), 1);
-
-        assert_eq!(records[0], record);
-        assert_eq!(services[0], service);
-        assert_eq!(span_names[0], span_name);
-        assert_eq!(span_statuses[0], span_status);
-        assert_eq!(span_kinds[0], span_kind);
-        assert_eq!(durations[0], duration);
     }
 
     // Test ExecutableNode

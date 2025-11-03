@@ -59,7 +59,7 @@ pub async fn process_token(
         TokenValidationResponse,
         Option<TokenData<HashMap<String, Value>>>,
     ),
-) -> Option<(bool, bool)> {
+) -> Result<Option<(bool, bool)>, anyhow::Error> {
     let dec_token = res.1.unwrap();
 
     let user_email = res.0.user_email.to_owned();
@@ -71,7 +71,7 @@ pub async fn process_token(
 
     #[cfg(feature = "cloud")]
     {
-        Some(check_and_add_to_org(&user_email, &name).await)
+        Ok(Some(check_and_add_to_org(&user_email, &name).await?))
     }
 
     #[cfg(not(feature = "cloud"))]
@@ -131,7 +131,7 @@ pub async fn process_token(
         // Assign users custom roles in RBAC
         if openfga_cfg.map_group_to_role {
             map_group_to_custom_role(&user_email, &name, custom_roles, res.0.user_role).await;
-            return None;
+            return Ok(None);
         }
 
         // Check if the user exists in the database
@@ -146,7 +146,7 @@ pub async fn process_token(
                 .is_some_and(|r| r.eq(&UserRole::ServiceAccount))
             {
                 log::info!("User is service account and skipping the role update");
-                return None;
+                return Ok(None);
             }
 
             log::info!("User exists in the database perform check for role change");
@@ -297,7 +297,7 @@ pub async fn process_token(
                     }
                 }
             }
-            None
+            Ok(None)
         } else {
             log::info!("User does not exist in the database");
 
@@ -350,11 +350,11 @@ pub async fn process_token(
                             }
                         }
                     }
-                    None
+                    Ok(None)
                 }
                 Err(e) => {
                     log::error!("Error adding user to the database: {e}");
-                    None
+                    Ok(None)
                 }
             }
         }
@@ -561,7 +561,10 @@ pub fn format_role_name_only(role: &str) -> String {
 }
 
 #[cfg(feature = "cloud")]
-pub async fn check_and_add_to_org(user_email: &str, name: &str) -> (bool, bool) {
+pub async fn check_and_add_to_org(
+    user_email: &str,
+    name: &str,
+) -> Result<(bool, bool), anyhow::Error> {
     use config::{ider, utils::json};
     use o2_enterprise::enterprise::cloud::OrgInviteStatus;
     use o2_openfga::authorizer::authz::save_org_tuples;
@@ -586,6 +589,10 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> (bool, bool) 
         .any(|invite| invite.status == OrgInviteStatus::Pending && invite.expires_at > now);
     if db_user.is_none() {
         is_new_user = true;
+        if let Err(e) = o2_enterprise::enterprise::cloud::email::check_email(user_email).await {
+            log::info!("blocking user with email {user_email} as domain blocked with : {e}",);
+            return Err(anyhow::anyhow!("Email Domain not allowed"));
+        }
         match create_new_user(DBUser {
             email: user_email.to_owned(),
             first_name: first_name.to_owned(),
@@ -606,7 +613,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> (bool, bool) 
             }
             Err(e) => {
                 log::error!("Error adding user to the database: {}", e);
-                return (is_new_user, pending_invites);
+                return Ok((is_new_user, pending_invites));
             }
         }
     }
@@ -624,7 +631,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> (bool, bool) 
         ),
         // if there are some pending invites, we do not want to create any orgs for the user
         _ if pending_invites => {
-            return (is_new_user, pending_invites);
+            return Ok((is_new_user, pending_invites));
         }
         _ => {
             // Create a default org for the user
@@ -703,8 +710,18 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> (bool, bool) 
             ),
             ("role".to_string(), json::Value::String(role)),
         ]);
-        telemetry::Telemetry::new()
+        let mut telemetry_instance = telemetry::Telemetry::new();
+        telemetry_instance
             .send_track_event(
+                "OpenObserve - New user registered",
+                Some(segment_event_data.clone()),
+                false,
+                false,
+            )
+            .await;
+
+        telemetry_instance
+            .send_keyevent_track_event(
                 "OpenObserve - New user registered",
                 Some(segment_event_data),
                 false,
@@ -713,7 +730,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> (bool, bool) 
             .await;
     }
 
-    (is_new_user, pending_invites)
+    Ok((is_new_user, pending_invites))
 }
 
 #[cfg(feature = "enterprise")]
@@ -822,7 +839,9 @@ mod tests {
             claims,
         };
 
-        let result = process_token((validation_response, Some(token_data))).await;
+        let result = process_token((validation_response, Some(token_data)))
+            .await
+            .unwrap();
         assert!(result.is_none() || result == Some((false, false)));
     }
 
@@ -906,7 +925,7 @@ mod tests {
 
         for dn in test_cases {
             let result = parse_dn(dn);
-            assert!(result.is_some(), "Failed to parse DN: {}", dn);
+            assert!(result.is_some(), "Failed to parse DN: {dn}");
         }
     }
 
@@ -918,7 +937,7 @@ mod tests {
         let formatted_role = format_role_name_only(role);
         let full_role_name = format_role_name(org, role);
 
-        assert_eq!(full_role_name, format!("{}/{}", org, formatted_role));
+        assert_eq!(full_role_name, format!("{org}/{formatted_role}"));
         assert!(!full_role_name.contains("-"));
         assert!(!full_role_name.contains("@"));
     }

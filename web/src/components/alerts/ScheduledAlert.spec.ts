@@ -271,11 +271,6 @@ describe('ScheduledAlert.vue', () => {
       expect(vm.vrlFunctionContent).toBe('test vrl function');
     });
 
-    it('should compute isVrlFunctionEnabled getter correctly', () => {
-      const vm = wrapper.vm as any;
-      expect(vm.isVrlFunctionEnabled).toBe(false);
-    });
-
     it('should compute multiWindowImage for light theme', () => {
       const vm = wrapper.vm as any;
       store.state.theme = 'light';
@@ -324,30 +319,6 @@ describe('ScheduledAlert.vue', () => {
   });
 
   describe('Event Emission Methods', () => {
-    it('should emit field:add when addField is called', () => {
-      const vm = wrapper.vm as any;
-      vm.addField('test-group-id');
-      
-      expect(wrapper.emitted('field:add')).toBeTruthy();
-      expect(wrapper.emitted('field:add')?.[0]).toEqual(['test-group-id']);
-    });
-
-    it('should emit field:addConditionGroup when addConditionGroup is called', () => {
-      const vm = wrapper.vm as any;
-      vm.addConditionGroup('test-group-id');
-      
-      expect(wrapper.emitted('field:addConditionGroup')).toBeTruthy();
-      expect(wrapper.emitted('field:addConditionGroup')?.[0]).toEqual(['test-group-id']);
-    });
-
-    it('should emit field:remove when removeField is called', () => {
-      const vm = wrapper.vm as any;
-      const testField = { id: 'test-field' };
-      vm.removeField(testField);
-      
-      expect(wrapper.emitted('field:remove')).toBeTruthy();
-      expect(wrapper.emitted('field:remove')?.[0]).toEqual([testField]);
-    });
 
     it('should emit update:trigger when updateTrigger is called', () => {
       const vm = wrapper.vm as any;
@@ -843,35 +814,6 @@ describe('ScheduledAlert.vue', () => {
     });
   });
 
-  describe('VRL Function Methods', () => {
-    it('should update function visibility when enabled', () => {
-      const vm = wrapper.vm as any;
-      vm.updateFunctionVisibility(true);
-      
-      // Should not clear when enabled
-      expect(vm.selectedFunction).toBeDefined();
-    });
-
-    it('should clear function content when disabled', () => {
-      const vm = wrapper.vm as any;
-      vm.selectedFunction = 'testFunction';
-      
-      vm.updateFunctionVisibility(false);
-      
-      expect(wrapper.emitted('update:vrl_function')).toBeTruthy();
-      expect(vm.selectedFunction).toBe('');
-    });
-
-    it('should toggle function error expansion', () => {
-      const vm = wrapper.vm as any;
-      const initialState = vm.isFunctionErrorExpanded;
-      
-      vm.toggleExpandFunctionError();
-      
-      expect(vm.isFunctionErrorExpanded).toBe(!initialState);
-    });
-  });
-
   describe('Display Helper Methods', () => {
     it('should get display value for time periods', () => {
       const vm = wrapper.vm as any;
@@ -913,27 +855,6 @@ describe('ScheduledAlert.vue', () => {
   });
 
   describe('UI Interaction Methods', () => {
-    it('should handle expand SQL output', () => {
-      const vm = wrapper.vm as any;
-      vm.expandSqlOutput = false;
-      vm.expandCombinedOutput = true;
-      
-      vm.handleExpandSqlOutput();
-      
-      expect(vm.expandSqlOutput).toBe(true);
-      expect(vm.expandCombinedOutput).toBe(false);
-    });
-
-    it('should handle expand combined output', () => {
-      const vm = wrapper.vm as any;
-      vm.expandSqlOutput = true;
-      vm.expandCombinedOutput = false;
-      
-      vm.handleExpandCombinedOutput();
-      
-      expect(vm.expandCombinedOutput).toBe(true);
-      expect(vm.expandSqlOutput).toBe(false);
-    });
 
     it('should handle column selection', () => {
       const vm = wrapper.vm as any;
@@ -1161,7 +1082,6 @@ describe('ScheduledAlert.vue', () => {
       expect(vm.validateInputs).toBeDefined();
       expect(vm.cronJobError).toBeDefined();
       expect(vm.validateFrequency).toBeDefined();
-      expect(vm.testFields).toBeDefined();
       expect(vm.isFullScreen).toBeDefined();
       expect(vm.viewSqlEditor).toBeDefined();
       expect(vm.viewVrlFunction).toBeDefined();

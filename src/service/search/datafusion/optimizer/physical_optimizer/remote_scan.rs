@@ -35,13 +35,15 @@ use proto::cluster_rpc::{self, KvItem};
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::datafusion::optimizer::physical_optimizer::broadcast_join::broadcast_join_rewrite,
+    crate::service::search::datafusion::optimizer::physical_optimizer::enrichment::enrichment_broadcast_join_rewrite,
+    crate::service::search::datafusion::optimizer::physical_optimizer::enrichment::should_use_enrichment_broadcast_join,
     o2_enterprise::enterprise::search::datafusion::optimizer::broadcast_join::should_use_broadcast_join,
 };
 
 use crate::service::search::{
     datafusion::{
         distributed_plan::{
-            empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
+            empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan_exec::RemoteScanExec,
         },
         optimizer::{context::RemoteScanContext, utils::is_place_holder_or_empty},
     },
@@ -89,6 +91,7 @@ pub fn generate_remote_scan_rules(
 #[derive(Debug)]
 pub struct RemoteScanRule {
     remote_scan_nodes: Arc<RemoteScanNodes>,
+    single_node_optimizer_enable: bool,
 }
 
 impl RemoteScanRule {
@@ -110,7 +113,33 @@ impl RemoteScanRule {
             opentelemetry_context,
         );
         let remote_scan_nodes = Arc::new(remote_scan_nodes);
-        Self { remote_scan_nodes }
+        Self {
+            remote_scan_nodes,
+            single_node_optimizer_enable: config::get_config()
+                .common
+                .feature_single_node_optimize_enabled,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_test(
+        file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
+        single_node_optimizer_enable: bool,
+    ) -> Self {
+        use tracing_opentelemetry::OpenTelemetrySpanExt;
+        let remote_scan_nodes = RemoteScanNodes::new(
+            Request::default(),
+            vec![],
+            file_id_lists,
+            HashMap::new(),
+            false,
+            tracing::Span::current().context(),
+        );
+        let remote_scan_nodes = Arc::new(remote_scan_nodes);
+        Self {
+            remote_scan_nodes,
+            single_node_optimizer_enable,
+        }
     }
 }
 
@@ -127,6 +156,15 @@ impl PhysicalOptimizerRule for RemoteScanRule {
         }
 
         #[cfg(feature = "enterprise")]
+        if config::get_config()
+            .common
+            .feature_enrichment_broadcast_join_enabled
+            && should_use_enrichment_broadcast_join(&plan)
+        {
+            return enrichment_broadcast_join_rewrite(plan, self.remote_scan_nodes.clone());
+        }
+
+        #[cfg(feature = "enterprise")]
         if config::get_config().common.feature_broadcast_join_enabled
             && should_use_broadcast_join(&plan)
         {
@@ -134,7 +172,7 @@ impl PhysicalOptimizerRule for RemoteScanRule {
         }
 
         // if single node and can optimize, add remote scan to top
-        if is_single_node_optimize(&plan) {
+        if self.single_node_optimizer_enable && is_single_node_optimize(&plan) {
             return remote_scan_to_top_if_needed(plan, self.remote_scan_nodes.clone());
         }
 

@@ -149,7 +149,7 @@ impl Label {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Sample {
     /// Time in microseconds
     pub timestamp: i64,
@@ -313,7 +313,7 @@ impl<'de> Deserialize<'de> for Exemplar {
 
 impl From<&json::Map<String, json::Value>> for Exemplar {
     fn from(data: &json::Map<String, json::Value>) -> Self {
-        let timestamp = data.get("_timestamp").map(|v| v.as_i64().unwrap_or(0));
+        let timestamp = data.get("_timestamp").and_then(json::Value::as_i64);
         let value = data.get("value").map(|v| v.as_f64().unwrap_or(0.0));
         let mut labels = vec![];
         for (k, v) in data.iter() {
@@ -790,7 +790,7 @@ pub fn signature(labels: &Labels) -> u64 {
 /// matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 {
-    let mut hasher = std::hash::DefaultHasher::new();
+    let mut hasher = config::utils::hash::gxhash::new_hasher();
     labels
         .iter()
         .filter(|item| !exclude_names.contains(&item.name.as_str()))
@@ -834,13 +834,21 @@ mod tests {
     fn test_signature_without_labels() {
         let labels: Labels = generate_test_labels();
 
-        let sig = signature(&labels);
-        assert_eq!(sig, 17855692611899080986);
+        let sig_all = signature(&labels);
+        let sig_without_ac = signature_without_labels(&labels, &["a", "c"]);
 
-        let sig = signature_without_labels(&labels, &["a", "c"]);
-        assert_eq!(sig, 2422580394001170964);
+        // Signatures should be different when excluding labels
+        assert_ne!(sig_all, sig_without_ac);
 
+        // Signature with empty exclusion list should match full signature
         assert_eq!(signature(&labels), signature_without_labels(&labels, &[]));
+
+        // Same labels should produce same signature (deterministic)
+        assert_eq!(sig_all, signature(&labels));
+        assert_eq!(
+            sig_without_ac,
+            signature_without_labels(&labels, &["a", "c"])
+        );
     }
 
     #[test]

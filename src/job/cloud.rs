@@ -69,8 +69,18 @@ async fn report_no_ingestion_to_segment(org_id: &str, duration: &str) {
             json::Value::String(duration.to_string()),
         ),
     ]);
-    telemetry::Telemetry::new()
+    let mut telemetry_instance = telemetry::Telemetry::new();
+    telemetry_instance
         .send_track_event(
+            "OpenObserve - No ingestion after creation",
+            Some(segment_event_data.clone()),
+            false,
+            false,
+        )
+        .await;
+
+    telemetry_instance
+        .send_keyevent_track_event(
             "OpenObserve - No ingestion after creation",
             Some(segment_event_data),
             false,

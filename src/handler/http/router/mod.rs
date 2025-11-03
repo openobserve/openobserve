@@ -245,6 +245,10 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
     #[cfg(feature = "cloud")]
     svc.service(web::scope("/webhook").service(cloud::billings::handle_stripe_event));
 
+    // OAuth 2.0 Authorization Server Metadata endpoint (RFC 8414)
+    // Must be publicly accessible (no auth) at root per MCP spec
+    svc.service(mcp::oauth_authorization_server_metadata);
+
     svc.service(
         web::scope("/auth")
             .wrap(cors.clone())
@@ -408,6 +412,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(stream::schema)
         .service(stream::create)
         .service(stream::update_settings)
+        .service(stream::update_fields)
         .service(stream::delete_fields)
         .service(stream::delete)
         .service(stream::list)
@@ -502,6 +507,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::enable_alert_bulk)
         .service(alerts::trigger_alert)
         .service(alerts::move_alerts)
+        .service(alerts::history::get_alert_history)
         .service(alerts::deprecated::save_alert)
         .service(alerts::deprecated::update_alert)
         .service(alerts::deprecated::get_alert)
@@ -551,7 +557,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(pipeline::delete_pipeline)
         .service(pipeline::enable_pipeline)
         .service(pipeline::enable_pipeline_bulk)
+        .service(pipelines::history::get_pipeline_history)
         .service(search::multi_streams::search_multi)
+        .service(search::multi_streams::search_multi_stream)
         .service(search::multi_streams::_search_partition_multi)
         .service(search::multi_streams::around_multi)
         .service(stream::delete_stream_cache)
@@ -561,7 +569,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(service_accounts::save)
         .service(service_accounts::delete)
         .service(service_accounts::update)
-        .service(service_accounts::get_api_token);
+        .service(service_accounts::get_api_token)
+        .service(mcp::handle_mcp_post)
+        .service(mcp::handle_mcp_get);
 
     #[cfg(feature = "enterprise")]
     let service = service
@@ -604,7 +614,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(re_pattern::delete)
         .service(re_pattern::test)
         .service(domain_management::get_domain_management_config)
-        .service(domain_management::set_domain_management_config);
+        .service(domain_management::set_domain_management_config)
+        .service(traces::get_service_graph_metrics)
+        .service(traces::get_store_stats);
 
     #[cfg(feature = "cloud")]
     let service = service

@@ -31,7 +31,10 @@ use config::{
         stream::{FileKey, StreamType},
     },
 };
-use datafusion::{common::TableReference, physical_optimizer::PhysicalOptimizerRule};
+use datafusion::{
+    common::TableReference,
+    physical_optimizer::{PhysicalOptimizerRule, filter_pushdown::FilterPushdown},
+};
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
 use infra::{
@@ -93,7 +96,7 @@ pub async fn search(
     datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
-    let proto = get_physical_extension_codec();
+    let proto = get_physical_extension_codec(org_id.clone());
     let physical_plan =
         physical_plan_from_bytes_with_extension_codec(&req.search_info.plan, &ctx, &proto)?;
 
@@ -196,7 +199,8 @@ pub async fn search(
         work_group: work_group.clone(),
         use_inverted_index: index_condition.is_some()
             && cfg.common.inverted_index_enabled
-            && !index_condition.as_ref().unwrap().is_condition_all(),
+            && (!index_condition.as_ref().unwrap().is_condition_all()
+                || idx_optimize_rule.is_some()),
     });
 
     log::info!(
@@ -320,33 +324,11 @@ pub async fn search(
         scan_stats.add(&stats);
     }
 
-    // search in WAL parquet
+    // search in WAL memory first to capture the snapshot_time
+    let mut snapshot_time = None;
     if LOCAL_NODE.is_ingester() {
-        let (tbls, stats) = match super::wal::search_parquet(
-            query_params.clone(),
-            latest_schema.clone(),
-            &search_partition_keys,
-            empty_exec.sorted_by_time(),
-            file_stats_cache.clone(),
-            index_condition.clone(),
-            fst_fields.clone(),
-        )
-        .await
-        {
-            Ok(v) => v,
-            Err(e) => {
-                // clear session data
-                super::super::datafusion::storage::file_list::clear(&trace_id);
-                log::error!("[trace_id {trace_id}] flight->search: search wal parquet error: {e}");
-                return Err(e);
-            }
-        };
-        tables.extend(tbls);
-        scan_stats.add(&stats);
-    }
-
-    // search in WAL memory
-    if LOCAL_NODE.is_ingester() {
+        // Set snapshot_time before searching memtable to avoid duplicates with parquet
+        snapshot_time = Some(config::utils::time::now_micros());
         let (tbls, stats) = match super::wal::search_memtable(
             query_params.clone(),
             latest_schema.clone(),
@@ -362,6 +344,32 @@ pub async fn search(
                 log::error!(
                     "[trace_id {trace_id}] flight->search: search wal memtable error: {e:?}"
                 );
+                return Err(e);
+            }
+        };
+        tables.extend(tbls);
+        scan_stats.add(&stats);
+    }
+
+    // Now search in WAL parquet with snapshot_time filter
+    if LOCAL_NODE.is_ingester() {
+        let (tbls, stats) = match super::wal::search_parquet(
+            query_params.clone(),
+            latest_schema.clone(),
+            &search_partition_keys,
+            empty_exec.sorted_by_time(),
+            file_stats_cache.clone(),
+            index_condition.clone(),
+            fst_fields.clone(),
+            snapshot_time,
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                // clear session data
+                super::super::datafusion::storage::file_list::clear(&trace_id);
+                log::error!("[trace_id {trace_id}] flight->search: search wal parquet error: {e}");
                 return Err(e);
             }
         };
@@ -440,6 +448,12 @@ pub async fn search(
                 .build()
         )
     );
+
+    if cfg.common.feature_dynamic_pushdown_filter_enabled {
+        // pushdown filter
+        let pushdown_filter = FilterPushdown::new_post_optimization();
+        physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
+    }
 
     if !tantivy_file_list.is_empty() {
         let tantivy_start = std::time::Instant::now();
@@ -528,6 +542,15 @@ fn optimizer_physical_plan(
             .collect(),
     );
     let plan = rewrite_match_rule.optimize(plan, ctx.state().config_options())?;
+
+    // reset the index_condition if index_optimizer_rule is none and index_condition is all
+    let index_condition = index_condition_ref.lock().clone();
+    if index_condition.is_some()
+        && index_condition.as_ref().unwrap().is_condition_all()
+        && index_optimizer_rule_ref.lock().is_none()
+    {
+        index_condition_ref.lock().take();
+    }
 
     Ok(plan)
 }

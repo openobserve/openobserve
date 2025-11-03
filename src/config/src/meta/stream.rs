@@ -411,14 +411,17 @@ impl StreamStats {
     pub fn add_file_meta(&mut self, meta: &FileMeta) {
         self.file_num += 1;
         self.doc_num = max(0, self.doc_num + meta.records);
-        self.doc_time_min = self.doc_time_min.min(meta.min_ts);
+        self.doc_time_min = if self.doc_time_min == 0 {
+            meta.min_ts
+        } else if meta.min_ts == 0 {
+            self.doc_time_min
+        } else {
+            self.doc_time_min.min(meta.min_ts)
+        };
         self.doc_time_max = self.doc_time_max.max(meta.max_ts);
         self.storage_size += meta.original_size as f64;
         self.compressed_size += meta.compressed_size as f64;
         self.index_size += meta.index_size as f64;
-        if self.doc_time_min == 0 {
-            self.doc_time_min = meta.min_ts;
-        }
         if self.storage_size < 0.0 {
             self.storage_size = 0.0;
         }
@@ -436,16 +439,25 @@ impl StreamStats {
         self.storage_size = stats.storage_size;
         self.compressed_size = stats.compressed_size;
         self.index_size = stats.index_size;
-        self.doc_time_min = self.doc_time_min.min(stats.doc_time_min);
+        self.doc_time_min = if self.doc_time_min == 0 {
+            stats.doc_time_min
+        } else if stats.doc_time_min == 0 {
+            self.doc_time_min
+        } else {
+            self.doc_time_min.min(stats.doc_time_min)
+        };
         self.doc_time_max = self.doc_time_max.max(stats.doc_time_max);
-        if self.doc_time_min == 0 {
-            self.doc_time_min = stats.doc_time_min;
-        }
     }
 
     pub fn merge(&mut self, other: &StreamStats) {
         self.created_at = self.created_at.min(other.created_at);
-        self.doc_time_min = self.doc_time_min.min(other.doc_time_min);
+        self.doc_time_min = if self.doc_time_min == 0 {
+            other.doc_time_min
+        } else if other.doc_time_min == 0 {
+            self.doc_time_min
+        } else {
+            self.doc_time_min.min(other.doc_time_min)
+        };
         self.doc_time_max = self.doc_time_max.max(other.doc_time_max);
         self.doc_num += other.doc_num;
         self.file_num += other.file_num;
@@ -974,16 +986,16 @@ impl From<&str> for StreamSettings {
             defined_schema_fields = fields;
         }
 
-        let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());
+        let flatten_level = settings.get("flatten_level").and_then(Value::as_i64);
 
         let store_original_data = settings
             .get("store_original_data")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
 
         let approx_partition = settings
             .get("approx_partition")
-            .and_then(|v| v.as_bool())
+            .and_then(Value::as_bool)
             .unwrap_or(
                 get_config()
                     .common
@@ -1001,7 +1013,7 @@ impl From<&str> for StreamSettings {
 
         let index_updated_at = settings
             .get("index_updated_at")
-            .and_then(|v| v.as_i64())
+            .and_then(Value::as_i64)
             .unwrap_or_default();
 
         let mut extended_retention_days = vec![];
@@ -1012,26 +1024,26 @@ impl From<&str> for StreamSettings {
             for item in values {
                 let start = item
                     .get("start")
-                    .and_then(|v| v.as_i64())
+                    .and_then(Value::as_i64)
                     .unwrap_or_default();
-                let end = item.get("end").and_then(|v| v.as_i64()).unwrap_or_default();
+                let end = item.get("end").and_then(Value::as_i64).unwrap_or_default();
                 extended_retention_days.push(TimeRange::new(start, end));
             }
         }
 
         let index_original_data = settings
             .get("index_original_data")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
 
         let index_all_values = settings
             .get("index_all_values")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
         let enable_distinct_fields = settings
             .get("enable_distinct_fields")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(true);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
         Self {
             partition_time_level,
             partition_keys,

@@ -33,6 +33,7 @@ mod engine;
 mod exec;
 mod functions;
 pub mod name_visitor;
+mod rewrite;
 pub mod search;
 pub mod selector_visitor;
 mod utils;
@@ -45,7 +46,6 @@ pub(crate) const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s
 pub(crate) const MAX_DATA_POINTS: i64 = 256; // Width of panel: window.innerWidth / 4
 pub(crate) const DEFAULT_MAX_POINTS_PER_SERIES: usize = 30000; // Maximum number of points per series
-const DEFAULT_MAX_SERIES_PER_QUERY: usize = 30000; // Maximum number of series in a single query
 const DEFAULT_STEP: Duration = Duration::from_secs(15); // default step in seconds
 const MIN_TIMESERIES_POINTS_FOR_TIME_ROUNDING: i64 = 10; // Adjust this value as needed
 
@@ -69,7 +69,7 @@ pub struct MetricsQueryRequest {
     pub end: i64,
     pub step: i64,
     pub query_exemplars: bool,
-    pub no_cache: Option<bool>,
+    pub use_cache: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]

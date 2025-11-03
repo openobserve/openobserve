@@ -224,7 +224,7 @@ fn clean_non_meta_escapes(pattern: &str) -> String {
 /// The number of arguments and data types of arguments are implemented the same as
 /// the native REGEXP_MATCH() function. They can be used the same way, but to get results
 /// back in different formats.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 struct RegxpMatchToFields {
     signature: Signature,
     aliases: Vec<String>,

@@ -24,9 +24,12 @@ use config::{
 };
 use futures::future::join_all;
 use hashbrown::HashMap;
-use infra::table::{
-    self,
-    distinct_values::{DistinctFieldRecord, OriginType},
+use infra::{
+    schema::get_stream_setting_fts_fields,
+    table::{
+        self,
+        distinct_values::{DistinctFieldRecord, OriginType},
+    },
 };
 
 use super::{db::distinct_values, folders, stream::save_stream_settings};
@@ -192,9 +195,10 @@ async fn update_distinct_variables(
                 .unwrap_or_default();
             let mut _new_added = false;
 
+            let _fts = get_stream_setting_fts_fields(&Some(stream_settings.clone()));
             for f in fields.iter() {
                 // we ignore full text search no matter what
-                if stream_settings.full_text_search_keys.contains(f) {
+                if _fts.contains(f) {
                     continue;
                 }
 
@@ -288,8 +292,12 @@ pub fn get_query_variables(
             let dash = dashboard.v5.as_ref().unwrap();
             _get_variables!(map, dash);
         }
+        6 => {
+            let dash = dashboard.v6.as_ref().unwrap();
+            _get_variables!(map, dash);
+        }
         _ => {
-            unreachable!("we only have 5 dashboard versions")
+            unreachable!("we only have 6 dashboard versions")
         }
     }
     map

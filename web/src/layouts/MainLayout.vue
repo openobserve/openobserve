@@ -19,10 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     view="hHh Lpr lff"
     :class="[store.state.printMode === true ? 'printMode' : '']"
   >
-    <q-header
-      :class="[store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white']"
-    >
-      <q-toolbar class="o2-bg-color">
+    <q-header>
+      <q-toolbar>
         <div
           class="flex relative-position q-mr-sm"
           v-if="
@@ -53,28 +51,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             style="max-width: 150px; max-height: 31px"
           />
-          <img
+          <div
             v-if="store.state.zoConfig.custom_hide_self_logo == false"
-            class="appLogo"
-            loading="lazy"
-            :src="
-              store?.state?.theme == 'dark'
-                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-                : getImageURL('images/common/openobserve_latest_light_2.svg')
-            "
-            @click="goToHome"
-          />
+            class="logo-container"
+          >
+            <img
+              class="openobserve-logo cursor-pointer"
+              :src="getImageURL(
+                store.state.theme === 'dark'
+                  ? 'images/common/openobserve_latest_dark_2.svg'
+                  : 'images/common/openobserve_latest_light_2.svg'
+              )"
+              @click="goToHome"
+              alt="OpenObserve"
+            />
+          </div>
         </div>
-        <div v-else class="flex relative-position q-mr-sm">
+        <div v-else class="flex relative-position q-mr-sm logo-container">
           <img
-            class="appLogo"
-            loading="lazy"
-            :src="
-              store?.state?.theme == 'dark'
-                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-                : getImageURL('images/common/openobserve_latest_light_2.svg')
-            "
+            class="openobserve-logo cursor-pointer"
+            :src="getImageURL(
+              store.state.theme === 'dark'
+                ? 'images/common/openobserve_latest_dark_2.svg'
+                : 'images/common/openobserve_latest_light_2.svg'
+            )"
             @click="goToHome"
+            alt="OpenObserve"
           />
         </div>
 
@@ -89,7 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning" size="xs"
+class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -105,411 +108,371 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >Upgrade to PRO Plan</q-btn
           >
         </div>
-        <q-btn
-          v-if="
-            config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
-          "
-          :ripple="false"
-          @click="toggleAIChat"
-          data-test="menu-link-ai-item"
-          no-caps
-          :borderless="true"
-          flat
-          dense
-          class="o2-button ai-hover-btn q-px-sm q-py-sm"
-          :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-          style="border-radius: 100%"
-          @mouseenter="isHovered = true"
-          @mouseleave="isHovered = false"
-        >
-          <div class="row items-center no-wrap tw-gap-2">
-            <img :src="getBtnLogo" class="header-icon ai-icon" />
-          </div>
-        </q-btn>
-        <div data-test="navbar-organizations-select" class="q-mx-sm row">
+        <div class="header-menu">
           <q-btn
-            style="max-width: 250px"
-            dense
+            v-if="
+              config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
+            "
+            :ripple="false"
+            @click="toggleAIChat"
+            data-test="menu-link-ai-item"
             no-caps
+            :borderless="true"
             flat
-            class="tw-text-ellipsis tw-overflow-hidden"
+            dense
+            class="o2-button ai-hover-btn q-px-sm q-py-sm"
+            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+            style="border-radius: 100%"
+            @mouseenter="isHovered = true"
+            @mouseleave="isHovered = false"
           >
-            <div class="row items-center no-wrap full-width">
-              <div class="col tw-truncate">
-                {{ userClickedOrg?.label || "" }}
-              </div>
-              <q-icon name="arrow_drop_down" class="q-ml-xs" />
+            <div class="row items-center no-wrap tw-gap-2">
+              <img :src="getBtnLogo" class="header-icon ai-icon" />
             </div>
-            <q-menu
-              anchor="bottom middle"
-              self="top middle"
-              class="organization-menu-o2"
+          </q-btn>
+          <div data-test="navbar-organizations-select" class="q-mx-sm row">
+            <q-btn
+              style="max-width: 250px"
+              dense
+              no-caps
+              flat
+              class="tw-text-ellipsis tw-overflow-hidden"
             >
-              <q-list data-test="organization-menu-list" style="width: 470px">
-                <q-item data-test="organization-menu-item" style="padding: 0">
-                  <q-item-section
-                    data-test="organization-menu-item-section"
-                    class="column"
-                    style="padding: 0px"
-                  >
-                    <q-table
-                      data-test="organization-menu-table"
-                      :rows="filteredOrganizations"
-                      :row-key="(row) => 'org_' + row.identifier"
-                      :visible-columns="['label']"
-                      hide-header
-                      :pagination="{ rowsPerPage }"
-                      :rows-per-page-options="[]"
-                      class="org-table"
-                    >
-                      <template #top>
-                        <div class="full-width">
-                          <q-input
-                            data-test="organization-search-input"
-                            v-model="searchQuery"
-                            data-cy="index-field-search-input"
-                            filled
-                            borderless
-                            dense
-                            clearable
-                            debounce="1"
-                            :placeholder="'Search Organization'"
-                          >
-                            <template #prepend>
-                              <q-icon name="search" />
-                            </template>
-                          </q-input>
-                        </div>
-                      </template>
+              <div class="row items-center no-wrap full-width">
+                <div class="col tw-truncate">
+                  {{ userClickedOrg?.label || "" }}
+                </div>
+                <q-icon name="arrow_drop_down" class="q-ml-xs" />
+              </div>
+              <q-menu
+                anchor="bottom middle"
+                self="top middle"
+                class="organization-menu-o2"
+              >
+                <q-table
+                  data-test="organization-menu-table"
+                  :rows="filteredOrganizations"
+                  :row-key="(row) => 'org_' + row.identifier"
+                  :columns="[{ name: 'label', field: 'label', align: 'left' }]"
+                  :visible-columns="['label']"
+                  hide-header
+                  :pagination="{ rowsPerPage }"
+                  :rows-per-page-options="[]"
+                  class="org-table"
+                  style="width: 470px"
+                >
+                  <template #top>
+                    <div class="full-width">
+                      <q-input
+                        data-test="organization-search-input"
+                        v-model="searchQuery"
+                        data-cy="index-field-search-input"
+                        borderless
+                        dense
+                        clearable
+                        debounce="1"
+                        autofocus
+                        :placeholder="'Search Organization'"
+                      >
+                        <template #prepend>
+                          <q-icon name="search" />
+                        </template>
+                      </q-input>
+                    </div>
+                  </template>
 
-                      <template v-slot:body-cell-label="props">
-                        <q-td
-                          data-test="organization-menu-item-label"
-                          :props="props"
-                          class="org-list-item"
+                  <template v-slot:body-cell-label="props">
+                    <q-td
+                      :props="props"
+                      class="org-list-item-cell"
+                      @click="
+                        selectedOrg = props.row;
+                        updateOrganization();
+                      "
+                    >
+                      <div
+                        class="org-menu-item"
+                        v-close-popup
+                        data-test="organization-menu-item-label-item-label"
+                        :class="{
+                          'org-menu-item--active':
+                            props.row.identifier === userClickedOrg?.identifier,
+                        }"
+                      >
+                        {{
+                          props.row.label.length > 30
+                            ? props.row.label.substring(0, 30) +
+                              "... | " +
+                              props.row.identifier
+                            : props.row.label + " | " + props.row.identifier
+                        }}
+                        <q-tooltip
+                          v-if="props.row.label.length > 30"
+                          anchor="bottom middle"
+                          self="top start"
                         >
-                          <q-item
-                            data-test="organization-menu-item-label-item"
-                            clickable
-                            v-close-popup
-                            dense
-                            :class="{
-                              'text-primary':
-                                props.row.identifier ===
-                                userClickedOrg?.identifier,
-                            }"
-                            @click="
-                              selectedOrg = props.row;
-                              updateOrganization();
-                            "
-                          >
-                            <q-item-section>
-                              <q-item-label
-                                  data-test="organization-menu-item-label-item-label"
-                                  class="tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis tw-max-w-[450px]"
-                                >
-                                  {{ props.row.label.length > 30 ? props.row.label.substring(0, 30) + '... | ' + props.row.identifier : props.row.label + ' | ' + props.row.identifier }}
-                                  <q-tooltip v-if="props.row.label.length > 30"  anchor="bottom middle" self="top start">
-                                    {{ props.row.label }}
-                                  </q-tooltip>
-                                </q-item-label>
-                            </q-item-section>
-                          </q-item>
-                        </q-td>
-                      </template>
-                      <template v-slot:no-data>
-                        <div
-                          data-test="organization-menu-no-data"
-                          class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center"
+                          {{ props.row.label }}
+                        </q-tooltip>
+                      </div>
+                    </q-td>
+                  </template>
+
+                  <template v-slot:no-data>
+                    <div
+                      data-test="organization-menu-no-data"
+                      class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center"
+                    >
+                      No organizations found
+                    </div>
+                  </template>
+                </q-table>
+              </q-menu>
+            </q-btn>
+          </div>
+
+          <ThemeSwitcher></ThemeSwitcher>
+
+          <q-btn
+            round
+            flat
+            dense
+            :ripple="false"
+            @click="openSlack"
+            data-test="menu-link-slack-item"
+          >
+            <div class="row items-center no-wrap">
+              <q-icon
+                ><component :is="slackIcon"
+size="32px" class="header-icon"
+              /></q-icon>
+            </div>
+            <q-tooltip anchor="top middle" self="bottom middle">
+              {{ t("menu.slack") }}
+            </q-tooltip>
+          </q-btn>
+          <q-btn
+            round
+            flat
+            dense
+            :ripple="false"
+            data-test="menu-link-help-item"
+          >
+            <div class="row items-center no-wrap">
+              <q-icon name="help_outline" class="header-icon"></q-icon>
+              <q-tooltip anchor="top middle" self="bottom middle">
+                {{ t("menu.help") }}
+              </q-tooltip>
+            </div>
+
+            <q-menu
+              fit
+              anchor="bottom right"
+              self="top right"
+              transition-show="jump-down"
+              transition-hide="jump-up"
+              class="header-menu-bar"
+            >
+              <q-list style="min-width: 250px">
+                <div
+                  v-if="
+                    config.isCloud !== 'true' &&
+                    !store.state.zoConfig?.custom_hide_menus
+                      ?.split(',')
+                      ?.includes('openapi')
+                  "
+                >
+                  <q-item clickable @click="navigateToOpenAPI(zoBackendUrl)">
+                    <q-item-section>
+                      <q-item-label>
+                        {{ t(`menu.openapi`) }}
+                      </q-item-label>
+                    </q-item-section>
+                  </q-item>
+                  <q-separator />
+                </div>
+                <q-item clickable @click="navigateToDocs()">
+                  <q-item-section>
+                    <q-item-label>
+                      {{ t(`menu.docs`) }}
+                    </q-item-label>
+                  </q-item-section>
+                </q-item>
+                <q-separator />
+                <q-item to="/about" data-test="menu-link-about-item">
+                  <q-item-section>
+                    <q-item-label>
+                      {{ t(`menu.about`) }}
+                    </q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-menu>
+          </q-btn>
+
+          <q-btn
+            data-test="menu-link-settings-item"
+            round
+            flat
+            dense
+            :ripple="false"
+            @click="router.push({ name: 'settings' })"
+          >
+            <div class="row items-center no-wrap">
+              <q-icon :name="outlinedSettings" class="header-icon"></q-icon>
+            </div>
+            <q-tooltip anchor="top middle" self="bottom middle">
+              {{ t("menu.settings") }}
+            </q-tooltip>
+          </q-btn>
+
+          <q-btn
+            round
+            flat
+            dense
+            :ripple="false"
+            data-test="header-my-account-profile-icon"
+          >
+            <div class="row items-center no-wrap">
+              <q-icon
+                :name="user.picture ? user.picture : 'person'"
+                class="header-icon"
+              ></q-icon>
+              <q-tooltip anchor="top middle" self="bottom middle">
+                {{
+                  user.given_name
+                    ? user.given_name + " " + user.family_name
+                    : user.email
+                }}</q-tooltip
+              >
+            </div>
+
+            <q-menu
+              fit
+              anchor="bottom right"
+              self="top right"
+              transition-show="jump-down"
+              transition-hide="jump-up"
+              class="header-menu-bar"
+            >
+              <q-list style="min-width: 250px">
+                <q-item>
+                  <q-item-section avatar>
+                    <q-icon
+                      :name="user.picture ? user.picture : 'person'"
+                      size="xs"
+                    ></q-icon>
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label>{{
+                      user.given_name
+                        ? user.given_name + " " + user.family_name
+                        : user.email
+                    }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+                <q-separator />
+                <q-item clickable>
+                  <q-item-section avatar>
+                    <q-icon size="xs" name="language"
+class="padding-none" />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label class="tw-max-w-[150px]">{{
+                      t("menu.language")
+                    }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section></q-item-section>
+                  <q-item-section side>
+                    <div class="q-gutter-xs">
+                      <q-icon
+                        size="xs"
+                        :name="selectedLanguage.icon"
+                        class="padding-none"
+                      />
+                      <span
+                        class="cursor-pointer vertical-bottom q-mt-sm selected-lang-label"
+                        >{{ selectedLanguage.label }}</span
+                      >
+                    </div>
+                  </q-item-section>
+                  <q-item-section side style="padding-left: 0px">
+                    <q-icon
+                      class="icon-ley-arrow-right"
+                      name="keyboard_arrow_right"
+                    />
+                  </q-item-section>
+
+                  <q-menu
+                    auto-close
+                    anchor="top end"
+                    self="top start"
+                    data-test="language-dropdown-item"
+                    class="header-menu-bar"
+                  >
+                    <q-list>
+                      <q-item
+                        v-for="lang in langList"
+                        :key="lang.code"
+                        v-bind="lang"
+                        dense
+                        clickable
+                        @click="changeLanguage(lang)"
+                      >
+                        <q-item-section avatar>
+                          <q-icon
+                            size="xs"
+                            :name="lang.icon"
+                            class="padding-none"
+                          />
+                        </q-item-section>
+
+                        <q-item-section
+                          :data-test="`language-dropdown-item-${lang.code}`"
                         >
-                          No organizations found
-                        </div>
-                      </template>
-                    </q-table>
+                          <q-item-label>{{ lang.label }}</q-item-label>
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </q-menu>
+                </q-item>
+                <q-separator />
+                <q-item
+                  data-test="menu-link-logout-item"
+                  v-ripple="true"
+                  v-close-popup="true"
+                  clickable
+                  @click="signout"
+                >
+                  <q-item-section avatar>
+                    <q-icon size="xs" name="exit_to_app"
+class="padding-none" />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label>{{ t("menu.signOut") }}</q-item-label>
                   </q-item-section>
                 </q-item>
               </q-list>
             </q-menu>
           </q-btn>
         </div>
-        <!-- <div>
-          <q-btn-dropdown
-            data-test="language-dropdown"
-            unelevated
-            no-caps
-            dense
-            flat
-            class="q-pa-xs q-ma-none"
-            :icon="selectedLanguage.icon"
-          >
-            <q-list class="languagelist q-pa-none">
-              <q-item
-                data-test="language-dropdown-item"
-                v-for="lang in langList"
-                :key="lang.code"
-                v-ripple="true"
-                v-close-popup="true"
-                clickable
-                dense
-                v-bind="lang"
-                active-class="activeLang"
-                @click="changeLanguage(lang)"
-              >
-                <q-item-section avatar>
-                  <q-icon size="xs" :name="lang.icon"
-class="padding-none" />
-                </q-item-section>
-
-                <q-item-section
-                  :data-test="`language-dropdown-item-${lang.code}`"
-                >
-                  <q-item-label>{{ lang.label }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
-        </div> -->
-
-        <ThemeSwitcher></ThemeSwitcher>
-
-        <q-btn
-          round
-          flat
-          dense
-          :ripple="false"
-          @click="openSlack"
-          data-test="menu-link-slack-item"
-        >
-          <div class="row items-center no-wrap">
-            <q-icon
-              ><component :is="slackIcon" size="25px" class="header-icon"
-            /></q-icon>
-          </div>
-          <q-tooltip anchor="top middle" self="bottom middle">
-            {{ t("menu.slack") }}
-          </q-tooltip>
-        </q-btn>
-        <q-btn round flat dense :ripple="false" data-test="menu-link-help-item">
-          <div class="row items-center no-wrap">
-            <q-icon
-              name="help_outline"
-              size="25px"
-              class="header-icon"
-            ></q-icon>
-            <q-tooltip anchor="top middle" self="bottom middle">
-              {{ t("menu.help") }}
-            </q-tooltip>
-          </div>
-
-          <q-menu
-            fit
-            anchor="bottom right"
-            self="top right"
-            transition-show="jump-down"
-            transition-hide="jump-up"
-            class="header-menu-bar"
-          >
-            <q-list style="min-width: 250px">
-              <div
-                v-if="
-                  config.isCloud !== 'true' &&
-                  !store.state.zoConfig?.custom_hide_menus
-                    ?.split(',')
-                    ?.includes('openapi')
-                "
-              >
-                <q-item clickable @click="navigateToOpenAPI(zoBackendUrl)">
-                  <q-item-section>
-                    <q-item-label>
-                      {{ t(`menu.openapi`) }}
-                    </q-item-label>
-                  </q-item-section>
-                </q-item>
-                <q-separator />
-              </div>
-              <q-item clickable @click="navigateToDocs()">
-                <q-item-section>
-                  <q-item-label>
-                    {{ t(`menu.docs`) }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-              <q-separator />
-              <q-item to="/about" data-test="menu-link-about-item">
-                <q-item-section>
-                  <q-item-label>
-                    {{ t(`menu.about`) }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-menu>
-        </q-btn>
-
-        <q-btn
-          data-test="menu-link-settings-item"
-          round
-          flat
-          dense
-          :ripple="false"
-          @click="router.push({ name: 'settings' })"
-        >
-          <div class="row items-center no-wrap">
-            <q-icon
-              :name="outlinedSettings"
-              size="25px"
-              class="header-icon"
-            ></q-icon>
-          </div>
-          <q-tooltip anchor="top middle" self="bottom middle">
-            {{ t("menu.settings") }}
-          </q-tooltip>
-        </q-btn>
-
-        <q-btn
-          round
-          flat
-          dense
-          :ripple="false"
-          data-test="header-my-account-profile-icon"
-        >
-          <div class="row items-center no-wrap">
-            <q-icon
-              :name="user.picture ? user.picture : 'person'"
-              size="25px"
-              class="header-icon"
-            ></q-icon>
-            <q-tooltip anchor="top middle" self="bottom middle">
-              {{
-                user.given_name
-                  ? user.given_name + " " + user.family_name
-                  : user.email
-              }}</q-tooltip
-            >
-          </div>
-
-          <q-menu
-            fit
-            anchor="bottom right"
-            self="top right"
-            transition-show="jump-down"
-            transition-hide="jump-up"
-            class="header-menu-bar"
-          >
-            <q-list style="min-width: 250px">
-              <q-item>
-                <q-item-section avatar>
-                  <q-icon
-                    :name="user.picture ? user.picture : 'person'"
-                    size="xs"
-                  ></q-icon>
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>{{
-                    user.given_name
-                      ? user.given_name + " " + user.family_name
-                      : user.email
-                  }}</q-item-label>
-                </q-item-section>
-              </q-item>
-              <q-separator />
-              <q-item clickable>
-                <q-item-section avatar>
-                  <q-icon size="xs" name="language" class="padding-none" />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="tw-max-w-[150px]">{{
-                    t("menu.language")
-                  }}</q-item-label>
-                </q-item-section>
-                <q-item-section></q-item-section>
-                <q-item-section side>
-                  <div class="q-gutter-xs">
-                    <q-icon
-                      size="xs"
-                      :name="selectedLanguage.icon"
-                      class="padding-none"
-                    />
-                    <span
-                      class="cursor-pointer vertical-bottom q-mt-sm selected-lang-label"
-                      >{{ selectedLanguage.label }}</span
-                    >
-                  </div>
-                </q-item-section>
-                <q-item-section side style="padding-left: 0px">
-                  <q-icon
-                    class="icon-ley-arrow-right"
-                    name="keyboard_arrow_right"
-                  />
-                </q-item-section>
-
-                <q-menu
-                  auto-close
-                  anchor="top end"
-                  self="top start"
-                  data-test="language-dropdown-item"
-                  class="header-menu-bar"
-                >
-                  <q-list>
-                    <q-item
-                      v-for="lang in langList"
-                      :key="lang.code"
-                      v-bind="lang"
-                      dense
-                      clickable
-                      @click="changeLanguage(lang)"
-                    >
-                      <q-item-section avatar>
-                        <q-icon
-                          size="xs"
-                          :name="lang.icon"
-                          class="padding-none"
-                        />
-                      </q-item-section>
-
-                      <q-item-section
-                        :data-test="`language-dropdown-item-${lang.code}`"
-                      >
-                        <q-item-label>{{ lang.label }}</q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </q-menu>
-              </q-item>
-              <q-separator />
-              <q-item
-                data-test="menu-link-logout-item"
-                v-ripple="true"
-                v-close-popup="true"
-                clickable
-                @click="signout"
-              >
-                <q-item-section avatar>
-                  <q-icon size="xs" name="exit_to_app" class="padding-none" />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>{{ t("menu.signOut") }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-menu>
-        </q-btn>
       </q-toolbar>
     </q-header>
 
     <q-drawer
       v-model="drawer"
       show-if-above
-      :width="80"
+      :width="84"
       :breakpoint="500"
-      bordered
-      class="o2-bg-color"
+      role="navigation"
+      aria-label="Main navigation"
+      class="card-container q-mt-xs tw-mb-[0.675rem]"
     >
       <q-list class="leftNavList">
         <menu-link
-          v-for="nav in linksList"
+          v-for="(nav, index) in linksList"
           :key="nav.title"
           :link-name="nav.name"
+          :animation-index="index"
           v-bind="{ ...nav, mini: miniMode }"
         />
       </q-list>
@@ -549,7 +512,8 @@ class="padding-none" />
         />
       </div>
     </div>
-    <q-dialog v-model="showGetStarted" maximized full-height>
+    <q-dialog v-model="showGetStarted" maximized
+full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
   </q-layout>
@@ -628,6 +592,8 @@ import {
   outlinedManageAccounts,
   outlinedDescription,
   outlinedCode,
+  outlinedDevices,
+  outlinedBubbleChart,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -716,6 +682,7 @@ export default defineComponent({
     const miniMode = ref(false);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
+
     const { getStreams, resetStreams } = useStreams();
     const { closeSocket } = useSearchWebSocket();
 
@@ -730,13 +697,15 @@ export default defineComponent({
 
     const filteredOrganizations = computed(() => {
       //we will return all organizations if searchQuery is empty
-      //else we will search based upon label or identifier that we get from the search query 
+      //else we will search based upon label or identifier that we get from the search query
       //if anyone of the orgs matches either label or identifier then we will return that orgs
       if (!searchQuery.value) return orgOptions.value;
       const toBeSearched = searchQuery.value.toLowerCase().trim();
       return orgOptions.value.filter((org: any) => {
         const labelMatch = org.label?.toLowerCase().includes(toBeSearched);
-        const identifierMatch = org.identifier?.toLowerCase().includes(toBeSearched);
+        const identifierMatch = org.identifier
+          ?.toLowerCase()
+          .includes(toBeSearched);
         return labelMatch || identifierMatch;
       });
     });
@@ -778,69 +747,76 @@ export default defineComponent({
     let user = store.state.userInfo;
 
     var linksList = ref([
-      {
-        title: t("menu.home"),
-        icon: outlinedHome,
-        link: "/",
-        exact: true,
-        name: "home",
-      },
-      {
-        title: t("menu.search"),
-        icon: outlinedSearch,
-        link: "/logs",
-        name: "logs",
-      },
-      {
-        title: t("menu.metrics"),
-        icon: outlinedBarChart,
-        link: "/metrics",
-        name: "metrics",
-      },
-      {
-        title: t("menu.traces"),
-        icon: outlinedAccountTree,
-        link: "/traces",
-        name: "traces",
-      },
-      {
-        title: t("menu.rum"),
-        icon: "devices",
-        link: "/rum",
-        name: "rum",
-      },
-      {
-        title: t("menu.dashboard"),
-        icon: outlinedDashboard,
-        link: "/dashboards",
-        name: "dashboards",
-      },
-      {
-        title: t("menu.index"),
-        icon: outlinedWindow,
-        link: "/streams",
-        name: "streams",
-      },
-      {
-        title: t("menu.alerts"),
-        icon: outlinedReportProblem,
-        link: "/alerts",
-        name: "alertList",
-      },
-      {
-        title: t("menu.ingestion"),
-        icon: outlinedFilterAlt,
-        link: "/ingestion",
-        name: "ingestion",
-      },
-      {
-        title: t("menu.iam"),
-        icon: outlinedManageAccounts,
-        link: "/iam",
-        display: store.state?.currentuser?.role == "admin" ? true : false,
-        name: "iam",
-      },
-    ]);
+        {
+          title: t("menu.home"),
+          icon: outlinedHome,
+          link: "/",
+          exact: true,
+          name: "home",
+        },
+        {
+          title: t("menu.search"),
+          icon: outlinedSearch,
+          link: "/logs",
+          name: "logs",
+        },
+        {
+          title: t("menu.metrics"),
+          icon: outlinedBarChart,
+          link: "/metrics",
+          name: "metrics",
+        },
+        {
+          title: t("menu.traces"),
+          icon: outlinedAccountTree,
+          link: "/traces",
+          name: "traces",
+        },
+        {
+          title: "Service Graph",
+          icon: outlinedBubbleChart,
+          link: "/service-graph",
+          name: "serviceGraph",
+        },
+        {
+          title: t("menu.rum"),
+          icon: outlinedDevices,
+          link: "/rum",
+          name: "rum",
+        },
+        {
+          title: t("menu.dashboard"),
+          icon: outlinedDashboard,
+          link: "/dashboards",
+          name: "dashboards",
+        },
+        {
+          title: t("menu.index"),
+          icon: outlinedWindow,
+          link: "/streams",
+          name: "streams",
+        },
+        {
+          title: t("menu.alerts"),
+          icon: outlinedReportProblem,
+          link: "/alerts",
+          name: "alertList",
+        },
+        {
+          title: t("menu.ingestion"),
+          icon: outlinedFilterAlt,
+          link: "/ingestion",
+          name: "ingestion",
+        },
+        {
+          title: t("menu.iam"),
+          icon: outlinedManageAccounts,
+          link: "/iam",
+          display: store.state?.currentuser?.role == "admin" ? true : false,
+          name: "iam",
+        },
+      ]);
+
 
     const langList = [
       {
@@ -1534,8 +1510,35 @@ export default defineComponent({
 
 <style lang="scss">
 @import "../styles/app.scss";
+@import "../styles/menu-variables";
+@import "../styles/menu-animations";
+
+// Logo container
+.logo-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  min-width: 150px;
+}
+
+// OpenObserve logo styling
+.openobserve-logo {
+  height: 32px;
+  width: auto;
+  max-width: 150px;
+  display: block;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
 
 .printMode {
+  body {
+    overflow: auto !important;
+  }
   .q-header {
     display: none;
   }
@@ -1547,6 +1550,18 @@ export default defineComponent({
   .q-page-container {
     padding-left: 0px !important;
   }
+}
+
+@media print {
+  .tw-h-full,
+  .tw-h-\[calc\(100vh-105px\)\],
+  .tw-overflow-y-auto {
+    overflow: visible !important;
+  }
+}
+
+.q-drawer {
+  border-radius: 0.625rem;
 }
 
 .warning-msg {
@@ -1567,7 +1582,6 @@ export default defineComponent({
 
 .q-header {
   color: unset;
-  @extend .border-bottom;
 
   .beta-text {
     font-size: 11px;
@@ -1605,28 +1619,29 @@ export default defineComponent({
 
 .q-item {
   min-height: 30px;
-  padding: 8px 8px;
+  padding: 3px 8px;
 }
 
 .o2-bg-color {
-  background-color: rgba(89, 96, 178, 0.08);
+  // background-color: rgba(89, 96, 178, 0.08);
+  background: transparent;
 }
 
 .q-list {
   &.leftNavList {
-    padding-bottom: 0px;
+    padding: 4px 0px 0px 0px;
 
     .q-item {
-      margin: 5px 5px 5px 5px;
+      margin: 0px 5px;
       display: list-item;
       text-align: center;
       list-style: none;
-      padding: 5px 2px;
+      padding: 2px 2px;
       border-radius: 5px;
 
       .q-icon {
-        height: 1.5rem;
-        width: 1.5rem;
+        height: 1.3rem;
+        width: 1.3rem;
       }
 
       &.q-router-link--active {
@@ -1635,15 +1650,29 @@ export default defineComponent({
         }
 
         .q-item__label {
-          color: white;
+          color: var(--o2-menu-color);
+
+          // Light mode: make text blue for readability
+          body.body--light & {
+            color: var(--o2-menu-color) !important;
+          }
         }
-        color: white;
+        color: var(--o2-menu-color);
+
+        // Light mode: make item text blue
+        body.body--light & {
+          color: var(--o2-menu-color) !important;
+
+          .q-icon {
+            color: var(--o2-menu-color) !important;
+          }
+        }
       }
 
       &__label {
         font-size: 12px;
         font-weight: 600;
-        color: grey;
+        color: var(--o2-text-secondary);
       }
     }
   }
@@ -1709,20 +1738,20 @@ export default defineComponent({
   }
 }
 .q-list {
-  &.leftNavList {
-    .q-item {
-      .q-icon {
-        height: 1.5rem;
-        width: 1.5rem;
-      }
+  // &.leftNavList {
+  //   .q-item {
+  //     .q-icon {
+  //       height: 1rem;
+  //       width: 1rem;
+  //     }
 
-      &.q-router-link--active {
-        .q-icon img {
-          filter: brightness(100);
-        }
-      }
-    }
-  }
+  //     &.q-router-link--active {
+  //       .q-icon img {
+  //         filter: brightness(100);
+  //       }
+  //     }
+  //   }
+  // }
 
   .flagIcon img {
     border-radius: 3px;
@@ -1800,6 +1829,30 @@ export default defineComponent({
   width: 80px !important;
 }
 
+.header-menu {
+  .q-btn {
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+    }
+
+    // Skip bounce effect for AI button and org selector
+    &.ai-hover-btn {
+      &:hover {
+        transform: none;
+      }
+    }
+  }
+
+  // Skip bounce for org selector (inside div)
+  [data-test="navbar-organizations-select"] .q-btn {
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
 .header-icon {
   opacity: 0.7;
 }
@@ -1823,20 +1876,22 @@ body.ai-chat-open {
 }
 .dark-mode-chat-container {
   border-left: 1.5px solid #232323ff;
+  box-shadow: -0rem 0.1rem 0.3rem var(--hover-shadow);
 }
 .light-mode-chat-container {
   border-left: 1.5px solid #f7f7f7;
+  box-shadow: -0rem 0.1rem 0.3rem var(--hover-shadow);
 }
 
 .ai-btn-active {
-  background-color: #5960b2 !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
 }
 .ai-hover-btn {
-  transition: background-color 1s ease;
+  transition: background 0.3s ease;
 }
 
 .ai-hover-btn:hover {
-  background-color: #5960b2;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
 }
 
 .ai-icon {
@@ -1844,68 +1899,25 @@ body.ai-chat-open {
 }
 
 .ai-hover-btn:hover .ai-icon {
-  transform: rotate(-180deg);
+  transform: rotate(180deg);
 }
 
 .organization-menu-o2 {
   .org-table {
+    // Disable global table row hover
+    tbody .q-tr:hover {
+      background: transparent !important;
+    }
+
     td {
-      padding: 0;
-      height: 25px !important;
-      min-height: 25px !important;
-    }
-
-    .q-table__control {
-      margin: 0px !important;
-      width: 100% !important;
-      text-align: right;
-    }
-
-    .q-table__bottom {
-      padding: 0px !important;
-      min-height: 35px;
-
-      .q-table__control {
-        padding: 0px 10px !important;
-      }
+      padding: 0 !important;
+      height: 32px !important;
+      min-height: 32px !important;
     }
 
     .q-table__top {
-      padding: 0px !important;
-      margin: 0px !important;
-      left: 0px;
-      width: 100%;
+      padding: 10px !important;
 
-      .q-table__separator {
-        display: none;
-      }
-
-      .q-table__control {
-        padding: 0px !important;
-      }
-    }
-
-    .q-field--filled .q-field__control {
-      padding: 0px 5px !important;
-    }
-
-    .saved-view-item {
-      padding: 4px 5px 4px 10px !important;
-    }
-
-    .q-item__section--main ~ .q-item__section--side {
-      padding-left: 5px !important;
-    }
-    .org-table {
-      .text-primary {
-        color: var(--q-primary) !important;
-        font-weight: 500;
-        background: rgba(89, 96, 178, 0.08);
-      }
-    }
-  }
-  .q-menu {
-    .q-input {
       .q-field__control {
         height: 40px;
       }
@@ -1914,6 +1926,67 @@ body.ai-chat-open {
         font-size: 14px;
       }
     }
+
+    .q-table__bottom {
+      padding: 8px 12px !important;
+      min-height: 40px;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+
+      .q-table__control {
+        display: flex !important;
+        align-items: center !important;
+      }
+
+      // Ensure pagination arrows are visible
+      .q-btn {
+        display: inline-flex !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+      }
+    }
+
+    // Table cell with no padding
+    .org-list-item-cell {
+      padding: 0 !important;
+      cursor: pointer;
+    }
+
+    // Individual org menu item
+    .org-menu-item {
+      padding: 6px 12px;
+      width: 100%;
+      display: block;
+      transition: background-color 0.2s ease;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+
+      // Hover effect only on the div
+      &:hover {
+        background: color-mix(
+          in srgb,
+          var(--o2-theme-color) 5%,
+          var(--o2-theme-mode) 90%
+        ) !important;
+      }
+
+      // Active/selected state
+      &--active {
+        color: var(--q-primary) !important;
+        font-weight: 500;
+        background: rgba(89, 96, 178, 0.08);
+
+        &:hover {
+          background: rgba(89, 96, 178, 0.12) !important;
+        }
+      }
+    }
   }
+}
+.q-drawer {
+  margin-bottom: 0.675rem;
 }
 </style>

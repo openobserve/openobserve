@@ -83,7 +83,8 @@
     "favourite": "Favorite",
     "refresh": "Refresh",
     "contactUs": "Contact Us",
-    "addFolder": "Add Folder"
+    "addFolder": "Add Folder",
+    "status": "Status"
   },
   "search": {
     "resetFields": "Reset selected table fields",
@@ -173,7 +174,32 @@
     "downloadCSV": "CSV",
     "downloadJSON": "JSON",
     "fileType": "File Type",
-    "showOnlyInterestingFields": "Interesting Fields"
+    "showOnlyInterestingFields": "Interesting Fields",
+    "explainQuery": "Explain Query",
+    "explainTooltip": "Show query execution plan",
+    "queryPlan": "Query Plan",
+    "analyze": "Analyze",
+    "analyzeTooltip": "Run query with execution metrics",
+    "analyzeResults": "Analyze Results",
+    "explainResults": "Explain Results",
+    "executionMetrics": "Execution Metrics",
+    "executionPlan": "Execution Plan",
+    "verbose": "Verbose",
+    "loadingPlan": "Loading query plan...",
+    "runningAnalyze": "Running analyze...",
+    "noPlanFound": "No query plan found",
+    "noAnalyzePlanFound": "No analyze plan found",
+    "errorFetchingPlan": "Error fetching query plan",
+    "errorRunningAnalyze": "Error running analyze",
+    "noLogicalPlan": "No logical plan available",
+    "noLogicalPlanAnalyze": "EXPLAIN ANALYZE only shows physical execution plan with metrics",
+    "noPhysicalPlan": "No physical plan available",
+    "executionSummary": "Execution Summary",
+    "logicalPlan": "Logical Plan",
+    "physicalPlan": "Physical Plan",
+    "totalTime": "Total Time",
+    "totalRows": "Total Rows",
+    "peakMemory": "Peak Memory"
   },
   "menu": {
     "home": "Home",
@@ -378,7 +404,9 @@
     "serviceAccounts": "Service Accounts",
     "serviceAccountsName": "Service Accounts Name",
     "basicUsers": "Users",
-    "quota": "Quotas"
+    "quota": "Quotas",
+    "externalUserWarningTitle": "External user warning",
+    "externalUserWarningMessage": "Adding external users directly to roles won't grant permissions. Add them to User Groups instead."
   },
   "ticket": {
     "header": "Support Tickets",
@@ -500,8 +528,9 @@
     "indexSize": "Index Size",
     "extendedStartDate": "Start Date",
     "extendedEndDate": "End Date",
-    "regexPatterns": "Regex Patterns",
-    "envQuickModeMsg": "Environment quick mode field"
+    "regexPatterns": "SDR",
+    "envQuickModeMsg": "Environment quick mode field",
+    "sdr": "Sensitive Data Redaction"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -527,7 +556,9 @@
     "edit": "Edit",
     "delete": "Delete",
     "view": "View",
-    "delay": "Delay"
+    "delay": "Delay",
+    "history": "Pipeline History",
+    "searchHistory": "Enter Pipeline Name"
   },
   "function": {
     "header": "Functions",
@@ -566,7 +597,8 @@
     "streamPipeline": "Pipelines",
     "streamRouting": "Stream Routing",
     "testFunction": "Test Function",
-    "errorDetails": "Error"
+    "errorDetails": "Error",
+    "function_definition": "Function Definition"
   },
   "confirmDialog": {
     "cancel": "Cancel",
@@ -877,6 +909,28 @@
     "typeHolder": "Enter Type Description of New Panel",
     "editPanel": "Edit Panel",
     "addPanel": "Add Panel",
+    "createAlert": "Create Alert",
+    "fullScreen": "Full screen",
+    "refreshPanel": "Refresh Panel",
+    "refreshToApplyVariables": "Refresh to apply latest variable changes",
+    "refresh": "Refresh",
+    "editLayout": "Edit Layout",
+    "duplicate": "Duplicate",
+    "deletePanel": "Delete Panel",
+    "queryInspector": "Query Inspector",
+    "downloadAsCSV": "Download as CSV",
+    "downloadAsJSON": "Download as JSON",
+    "goToLogs": "Go To Logs",
+    "moveToAnotherTab": "Move To Another Tab",
+    "deletePanelTitle": "Delete Panel",
+    "deletePanelMessage": "Are you sure you want to delete this Panel?",
+    "movePanelTitle": "Move Panel to Another Tab",
+    "movePanelMessage": "Select destination tab",
+    "noQueriesToCreateAlert": "This panel has no queries to create an alert from",
+    "panelQueryMustHaveStream": "Panel query must have a stream configured",
+    "unsupportedPanelTypeAlert": "Creating alerts from {type} panels may not work as expected",
+    "panelDuplicatedSuccessfully": "Panel Duplicated Successfully",
+    "panelDuplicationFailed": "Panel duplication failed",
     "firstColumn": "First Column",
     "zAxis": "Z-Axis",
     "yAxis": "Y-Axis (Columns)",
@@ -1044,6 +1098,7 @@
     "preview": "Preview",
     "crontitle": "Enable Cron",
     "lastTriggered": "Last Triggered At",
+    "importedFromPanel": "Query imported from dashboard panel: \"{panelTitle}\"",
     "lastSatisfied": "Last Satisfied At",
     "owner": "Owner",
     "title": "Title",
@@ -1059,7 +1114,32 @@
     "webhook": "Web Hook",
     "email": "Email",
     "action": "Action",
-    "all": "All"
+    "all": "All",
+    "history": "Alert History",
+    "searcHistory": "Enter Alert Name",
+    "deduplication": {
+      "title": "Alert Deduplication",
+      "subtitle": "Prevent duplicate alerts by configuring fingerprint-based deduplication.",
+      "enable": "Enable Deduplication",
+      "fingerprintFields": "Fingerprint Fields",
+      "fingerprintFieldsHint": "Select fields to use for deduplication. Leave empty for auto-detection based on query type.",
+      "fingerprintFieldsTooltip": "Fields used to create unique fingerprints for alert deduplication. Fingerprints include alert name + metric/condition + selected fields, ensuring different alert types (e.g., High CPU vs High Memory) are never deduplicated together, even if they monitor the same entities. Leave empty for auto-detection: SQL queries use WHERE clause columns + GROUP BY columns, PromQL uses metric name + label dimensions, Custom queries use condition fields.",
+      "timeWindow": "Time Window (minutes)",
+      "timeWindowHint": "How long to track alert fingerprints. Leave empty to use alert period.",
+      "timeWindowTooltip": "Duration to track and deduplicate alert fingerprints. If an alert with the same fingerprint occurs within this window, it will be suppressed. Leave empty to use the alert evaluation period.",
+      "advancedGrouping": "Advanced Grouping Options",
+      "enableGrouping": "Enable Grouping",
+      "maxGroupSize": "Max Group Size",
+      "maxGroupSizeTooltip": "Maximum number of deduplicated alerts to group together before sending a notification. Prevents overwhelming notifications when many similar alerts fire simultaneously.",
+      "sendStrategy": "Send Strategy",
+      "sendStrategyTooltip": "How to send grouped alerts:<br/>• First with count: Send first alert with total count<br/>• Summary: Send aggregated summary<br/>• All: Send all alerts in one notification",
+      "sendStrategyFirstWithCount": "First with count",
+      "sendStrategySummary": "Summary",
+      "sendStrategyAll": "All",
+      "groupWaitTime": "Group Wait Time (seconds)",
+      "groupWaitTimeTooltip": "Time to wait and collect similar alerts before sending a grouped notification. Allows batching of alerts that occur in quick succession."
+    },
+    "noHistory": "No alert history found"
   },
   "alert_templates": {
     "header": "Templates",
@@ -1173,7 +1253,7 @@
     "allUsersAllowedMessage": "All users with email addresses ending in {domain} will be allowed to login.",
     "emailPlaceholder": "e.g. user{domain}",
     "addEmail": "Add Email",
-    "saveChanges": "Save Changes",
+    "saveChanges": "Save",
     "invalidDomain": "Please enter a valid domain name",
     "invalidEmail": "Please enter a valid email address for this domain",
     "domainAlreadyExists": "This domain has already been added",
@@ -1225,7 +1305,7 @@
     "status": "Status",
     "cancelQuery": "Cancel Query",
     "queryRange": "Query Range",
-    "refreshQuery": "Refresh Query",
+    "refreshQuery": "Refresh",
     "queryType": "Query Type",
     "numOfQueries": "Number of Queries",
     "totalDuration": "Total Exec. Duration",
@@ -1235,7 +1315,9 @@
   },
   "traces": {
     "viewLogs": "View Logs",
-    "backToLogs": "Back to Logs"
+    "backToLogs": "Back to Logs",
+    "RedMetrics": "RED Metrics",
+    "loadingStream": "Loading Stream..."
   },
   "actions": {
     "testAction": "Test Action",
@@ -1323,9 +1405,10 @@
     "searchRegion": "Search Region"
   },
   "regex_patterns": {
+    "title": "Sensitive Data Redaction",
     "header": "Regex Patterns",
-    "create_pattern": "Create Pattern",
-    "search": "Search Regex Pattern",
+    "create_pattern": "Add Pattern",
+    "search": "Search Pattern",
     "no_data": "No Patterns in the Library",
     "name": "Name",
     "pattern": "Pattern",
@@ -1334,14 +1417,15 @@
     "actions": "Actions",
     "edit": "Edit",
     "delete": "Delete",
-    "create_regex_pattern": "Create New Regex Pattern",
-    "create_close":"Create and Close",
-    "cancel":"Cancel",
-    "edit_regex_pattern": "Edit Regex Pattern",
+    "create_regex_pattern": "Create Pattern",
+    "create_close": "Create and Close",
+    "cancel": "Cancel",
+    "edit_regex_pattern": "Edit Pattern",
     "update_close": "Update and Close",
     "description": "Description",
     "create_regex_pattern_field": "Redact / Drop using Regex",
     "import": "Import",
-    "import_title": "Import Regex Pattern"
+    "import_title": "Import Pattern",
+    "bottom_header": "Pattern(s)"
   }
 }

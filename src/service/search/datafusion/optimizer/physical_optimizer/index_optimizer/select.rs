@@ -24,8 +24,9 @@ use datafusion::{
     physical_plan::{ExecutionPlan, sorts::sort_preserving_merge::SortPreservingMergeExec},
 };
 
-use crate::service::search::datafusion::optimizer::physical_optimizer::utils::{
-    get_column_name, is_column,
+use crate::service::search::datafusion::optimizer::physical_optimizer::{
+    index_optimizer::utils::is_complex_plan,
+    utils::{get_column_name, is_column},
 };
 
 #[rustfmt::skip]
@@ -77,23 +78,10 @@ impl<'n> TreeNodeVisitor<'n> for SimpleSelectVisitor {
                     return Ok(TreeNodeRecursion::Continue);
                 }
             }
-            // if not simple distinct, stop visiting
+            // if not simple select, stop visiting
             self.is_simple_select = None;
             return Ok(TreeNodeRecursion::Stop);
-        } else if node.name() == "HashJoinExec"
-            || node.name() == "RecursiveQueryExec"
-            || node.name() == "UnionExec"
-            || node.name() == "InterleaveExec"
-            || node.name() == "UnnestExec"
-            || node.name() == "CrossJoinExec"
-            || node.name() == "NestedLoopJoinExec"
-            || node.name() == "SymmetricHashJoinExec"
-            || node.name() == "SortMergeJoinExec"
-            || node.name() == "PartialSortExec"
-            || node.name() == "BoundedWindowAggExec"
-            || node.name() == "WindowAggExec"
-            || node.name() == "AggregateExec"
-        {
+        } else if is_complex_plan(node) || node.name() == "AggregateExec" {
             // if encounter complex plan, stop visiting
             self.is_simple_select = None;
             return Ok(TreeNodeRecursion::Stop);

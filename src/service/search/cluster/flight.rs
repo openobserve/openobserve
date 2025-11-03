@@ -65,7 +65,7 @@ use crate::{
             },
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             sql::Sql,
-            utils::{AsyncDefer, ScanStatsVisitor},
+            utils::{AsyncDefer, ScanStatsVisitor, check_query_default_limit_exceeded},
         },
     },
 };
@@ -138,15 +138,19 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
 
     // 3. get nodes
     let get_node_start = std::time::Instant::now();
-    let role_group = req
-        .search_event_type
-        .as_ref()
-        .map(|v| {
-            SearchEventType::try_from(v.as_str())
-                .ok()
-                .map(RoleGroup::from)
-        })
-        .unwrap_or(Some(RoleGroup::Interactive));
+    let is_local_mode = req.local_mode.unwrap_or_default();
+    let role_group = if is_local_mode {
+        None
+    } else {
+        req.search_event_type
+            .as_ref()
+            .map(|v| {
+                SearchEventType::try_from(v.as_str())
+                    .ok()
+                    .map(RoleGroup::from)
+            })
+            .unwrap_or(Some(RoleGroup::Interactive))
+    };
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
@@ -455,8 +459,15 @@ pub async fn run_datafusion(
         let mut scan_stats = visit.scan_stats;
         // Update scan stats to include aggregation cache ratio
         scan_stats.aggs_cache_ratio = aggs_cache_ratio;
-        ret.map(|data| (data, scan_stats, visit.partial_err))
-            .map_err(|e| e.into())
+        ret.map(|data| {
+            check_query_default_limit_exceeded(
+                data.iter().fold(0, |acc, batch| acc + batch.num_rows()),
+                &mut visit.partial_err,
+                &sql,
+            );
+            (data, visit.scan_stats, visit.partial_err)
+        })
+        .map_err(|e| e.into())
     }
 }
 
@@ -638,13 +649,13 @@ pub async fn partition_file_lists(
 ) -> Result<HashMap<TableReference, Vec<Vec<i64>>>> {
     let mut file_partitions = HashMap::with_capacity(file_id_lists.len());
     for (stream_name, file_id_list) in file_id_lists {
-        let partitions = partition_filt_list(file_id_list, nodes, group).await?;
+        let partitions = partition_file_list(file_id_list, nodes, group).await?;
         file_partitions.insert(stream_name, partitions);
     }
     Ok(file_partitions)
 }
 
-pub async fn partition_filt_list(
+pub async fn partition_file_list(
     file_id_list: Vec<FileId>,
     nodes: &[Node],
     group: Option<RoleGroup>,

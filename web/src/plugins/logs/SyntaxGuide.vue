@@ -17,12 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-btn
     data-cy="syntax-guide-button"
-    size="sm"
     dense
     flat
     class="q-ml-xs q-pa-xs"
-    :class="[sqlmode ? 'sql-mode' : 'normal-mode',
-      !store.state.isAiChatEnabled ? 'syntax-guide-button' : ''
+    :class="[
+      sqlmode ? 'sql-mode' : 'normal-mode',
+      !store.state.isAiChatEnabled ? 'syntax-guide-button' : '',
+      store.state.theme == 'dark' && !sqlmode ? 'syntax-guide-button-dark' : ''
     ]"
     icon="help"
   >
@@ -223,6 +224,8 @@ export default defineComponent({
       default: false,
     },
   },
+  components:{
+  },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -235,68 +238,5 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.guide-list {
-  padding: 0 10px;
-  margin: 10px 0 0 0;
-}
-
-.guide-list li {
-  font-size: 14px;
-  line-height: 23px;
-}
-
-.q-btn:before {
-  border: 0px solid #d5d5d5;
-}
-
-.syntax-guide-button {
-  cursor: pointer;
-  text-transform: capitalize;
-  width: 32px;
-  height: 32px;
-  font-weight: bold;
-  border: 1px solid rgba(89, 96, 178, 0.3);
-}
-
-.sql-mode {
-  background-color: rgba(89, 96, 178, 0.8);
-  color: #ffffff;
-}
-
-.syntax-guide-title {
-  width: 420px;
-
-  .label {
-    font-size: 15px;
-    font-weight: bold;
-  }
-}
-
-.syntax-guide-sub-title {
-  color: $primary;
-  font-size: 15px;
-  margin-left: 5px;
-}
-
-.syntax-guide-text {
-  font-size: 12px;
-  margin-left: 5px;
-}
-
-.syntax-section {
-  margin-bottom: 5px;
-}
-
-.bg-highlight {
-  padding-left: 5px;
-  padding-right: 5px;
-}
-
-.theme-dark .bg-highlight {
-  background-color: #747474;
-}
-
-.theme-light .bg-highlight {
-  background-color: #e7e6e6;
-}
+@import "@/styles/logs/syntax-guide.scss";
 </style>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-center items-baseline">
+  <div class="flex justify-center items-start">
     <!-- select new folder -->
     <q-select
       v-model="selectedFolder"
@@ -24,11 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="index-dropdown-stream_type"
       input-debounce="0"
       behavior="menu"
-      filled
       borderless
       dense
-      class="q-mb-xs showLabelOnTop"
-      style="width: calc(100% - 40px)"
+      class="showLabelOnTop no-case tw-mr-1 tw-mt-[1px] o2-custom-select-dashboard"
+      style="width: calc(100% - 44px)"
     >
       <template #no-option>
         <q-item>
@@ -38,18 +37,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-select>
 
     <q-btn
-      class="q-mb-md text-bold"
+      class="q-mb-md add-folder-btn"
       data-test="dashboard-folder-move-new-add"
-      label="+"
-      text-color="light-text"
-      style="width: 40px; height: 42px"
+      style="width: 40px;"
+      :style="computedStyle"
       no-caps
+      dense
       @click="
         () => {
           showAddFolderDialog = true;
         }
       "
-    />
+    >
+      <q-icon name="add" size="xs" />
+    </q-btn>
   </div>
   <!-- add folder -->
   <q-dialog
@@ -64,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch } from "vue";
+import { defineComponent, onActivated, ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
@@ -117,6 +118,10 @@ export default defineComponent({
       }
     };
 
+    const computedStyle = computed(() => {
+      return 'height: 35px; margin-top: 13px';
+    });
+
     onActivated(() => {
       // refresh selected folder
       selectedFolder.value = getInitialFolderValue();
@@ -143,7 +148,15 @@ export default defineComponent({
       selectedFolder,
       updateFolderList,
       showAddFolderDialog,
+      computedStyle,
     };
   },
 });
 </script>
+
+<style scoped lang="scss">
+.q-select .q-field__control-container .q-field__native {
+  height: 1rem !important;
+  min-height: 1rem !important;
+}
+</style>

@@ -47,6 +47,7 @@ export const logsUtils = () => {
   const q = useQuasar();
   const router = useRouter();
   const store = useStore();
+  const timestampColumnName = store.state.zoConfig.timestamp_column;
 
   const DEFAULT_PARSED_RESULT: ParsedSQLResult = {
     columns: [],
@@ -379,11 +380,6 @@ export const logsUtils = () => {
    * addTraceId("trace-123-456-789");
    * console.log(searchObj.data.searchRequestTraceIds); // ["trace-123-456-789"]
    *
-   * // Add trace ID for WebSocket communication
-   * searchObj.communicationMethod = "ws";
-   * addTraceId("ws-trace-456-789");
-   * console.log(searchObj.data.searchWebSocketTraceIds); // ["ws-trace-456-789"]
-   *
    * // Attempting to add duplicate trace ID (no-op)
    * addTraceId("trace-123-456-789"); // Won't add duplicate
    * ```
@@ -398,10 +394,7 @@ export const logsUtils = () => {
     }
 
     // Determine target array based on communication method
-    const isWebSocket = searchObj.communicationMethod === "ws";
-    const targetTraceIds = isWebSocket
-      ? searchObj.data.searchWebSocketTraceIds
-      : searchObj.data.searchRequestTraceIds;
+    const targetTraceIds = searchObj.data.searchRequestTraceIds;
 
     // Early return if trace ID already exists (prevent duplicates)
     if (targetTraceIds.includes(traceId)) {
@@ -432,12 +425,6 @@ export const logsUtils = () => {
    * removeTraceId("trace-123");
    * console.log(searchObj.data.searchRequestTraceIds); // ["trace-456"]
    *
-   * // Remove trace ID from WebSocket communication
-   * searchObj.communicationMethod = "ws";
-   * searchObj.data.searchWebSocketTraceIds = ["ws-123", "ws-456"];
-   * removeTraceId("ws-123");
-   * console.log(searchObj.data.searchWebSocketTraceIds); // ["ws-456"]
-   *
    * // Attempting to remove non-existent trace ID (no effect)
    * removeTraceId("non-existent-id"); // Array remains unchanged
    * ```
@@ -450,23 +437,11 @@ export const logsUtils = () => {
       console.error("removeTraceId: traceId must be a non-empty string");
       return;
     }
-
-    // Determine which trace ID collection to modify based on communication method
-    const isWebSocket = searchObj.communicationMethod === "ws";
-
-    if (isWebSocket) {
-      // Remove trace ID from WebSocket trace IDs array
-      searchObj.data.searchWebSocketTraceIds =
-        searchObj.data.searchWebSocketTraceIds.filter(
-          (existingTraceId: string) => existingTraceId !== traceId,
-        );
-    } else {
-      // Remove trace ID from HTTP request trace IDs array
-      searchObj.data.searchRequestTraceIds =
-        searchObj.data.searchRequestTraceIds.filter(
-          (existingTraceId: string) => existingTraceId !== traceId,
-        );
-    }
+    // Remove trace ID from HTTP request trace IDs array
+    searchObj.data.searchRequestTraceIds =
+      searchObj.data.searchRequestTraceIds.filter(
+        (existingTraceId: string) => existingTraceId !== traceId,
+      );
   };
 
   const shouldAddFunctionToSearch = () => {
@@ -709,6 +684,40 @@ export const logsUtils = () => {
     return false;
   }
 
+  // validate if timestamp column alias is used for any field
+  const checkTimestampAlias = (query: string): boolean => {
+    const parsedSQL = fnParsedSQL(query);
+
+    const columns = parsedSQL?.columns;
+    if (Array.isArray(columns)) {
+      const invalid = columns.some(
+        (field: any) => field.as === timestampColumnName,
+      );
+      if (invalid) {
+        return false;
+      }
+    }
+
+    // Escape special regex characters in timestamp column name
+    const escapedTimestamp = timestampColumnName.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      "\\$&",
+    );
+
+    // Patterns for alias check
+    const patterns = [
+      new RegExp(`\\bas\\s*'${escapedTimestamp}'`, "i"), // AS '_timestamp'
+      new RegExp(`\\bas\\s*"${escapedTimestamp}"`, "i"), // AS "_timestamp"
+      new RegExp(`\\bas\\s+${escapedTimestamp}\\b`, "i"), // AS _timestamp (unquoted)
+    ];
+
+    if (patterns.some((p) => p.test(query))) {
+      return false;
+    }
+
+    return true;
+  };
+
   return {
     fnParsedSQL,
     fnUnparsedSQL,
@@ -729,6 +738,7 @@ export const logsUtils = () => {
     isNonAggregatedSQLMode,
     updatedLocalLogFilterField,
     isTimestampASC,
+    checkTimestampAlias,
   };
 };
 

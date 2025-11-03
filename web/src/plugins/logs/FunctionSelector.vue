@@ -14,16 +14,20 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-toggle
-    data-test="logs-search-bar-show-query-toggle-btn"
-    v-model="searchObj.meta.showTransformEditor"
-    :icon="functionToggleIcon"
-    title="Toggle Function Editor"
-    class="float-left"
-    size="32px"
-  />
+    <div class="toolbar-toggle-container float-left tw-mr-1">
+    <q-toggle
+      data-test="logs-search-bar-show-query-toggle-btn"
+      v-model="searchObj.meta.showTransformEditor"
+      title="Toggle Function Editor"
+      class="float-left tw-cursor-pointer o2-toggle-button-xs tw-flex tw-items-center tw-justify-center element-box-shadow"
+      size="xs"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
+      >
+      <q-icon :name="functionToggleIcon" class="toolbar-icon-in-toggle" />
+    </q-toggle>
+  </div>
   <q-btn-group
-    class="no-outline q-pa-none no-border float-left q-mr-xs"
+    class="no-outline q-pa-none no-border float-left function-selector element-box-shadow tw-h-[32px]"
     :disable="!searchObj.meta.showTransformEditor"
   >
     <q-btn-dropdown
@@ -34,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :icon-right="iconRight"
       :title="t('search.functionPlaceholder')"
       split
-      class="no-outline saved-views-dropdown no-border btn-function"
+      class="saved-views-dropdown btn-function el-border"
       @click="fnSavedFunctionDialog"
     >
       <q-list data-test="logs-search-saved-function-list">
@@ -107,11 +111,9 @@ const store = useStore();
 const functionToggleIcon = computed(() => {
   return (
     "img:" +
-    getImageURL(
-      searchObj.meta.showTransformEditor
-        ? "images/common/function_dark.svg"
-        : "images/common/function.svg",
-    )
+    (store.state.theme == 'dark' ?
+      getImageURL("images/common/function_dark.svg") :
+      getImageURL("images/common/function.svg"))
   );
 });
 
@@ -149,4 +151,6 @@ const applyFunction = (
 };
 </script>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+@import '@/styles/logs/function-selector.scss';
+</style>

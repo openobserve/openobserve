@@ -13,16 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use rand::distributions::{Alphanumeric, DistString};
+use rand::{
+    Rng,
+    distr::{Alphanumeric, SampleString},
+};
 
 pub fn get_rand_element<T>(arr: &[T]) -> &T {
     let mut buf = [0u8; 1];
-    getrandom::getrandom(&mut buf).unwrap();
+    rand::rng().fill(&mut buf);
     &arr[buf[0] as usize % arr.len()]
 }
 
 pub fn generate_random_string(len: usize) -> String {
-    Alphanumeric.sample_string(&mut rand::thread_rng(), len)
+    Alphanumeric.sample_string(&mut rand::rng(), len)
 }
 
 /// Generate random number within the given range
@@ -31,18 +34,20 @@ pub fn get_rand_num_within(min: u64, max: u64) -> u64 {
         return min;
     }
     let mut buf = [0u8; 1];
-    getrandom::getrandom(&mut buf).unwrap();
+    rand::rng().fill(&mut buf);
     min + buf[0] as u64 % (max - min)
 }
 
-pub fn get_rand_u128() -> Option<u128> {
+pub fn get_rand_u128() -> u128 {
     let mut buf = [0u8; 16];
-    getrandom::getrandom(&mut buf).ok()?;
-    Some(u128::from_le_bytes(buf))
+    rand::rng().fill(&mut buf);
+    u128::from_le_bytes(buf)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
 
     #[test]
@@ -77,18 +82,13 @@ mod tests {
     #[test]
     fn test_get_rand_u128() {
         let num = get_rand_u128();
-        assert!(num.is_some());
-        let num = num.unwrap();
         assert!(num > 0);
     }
 
     #[test]
     fn test_random_distribution() {
         // Test that we get different values on multiple calls
-        let mut values = std::collections::HashSet::new();
-        for _ in 0..100 {
-            values.insert(get_rand_u128().unwrap());
-        }
+        let values: HashSet<u128> = HashSet::from_iter((0..100).map(|_| get_rand_u128()));
         // We should have at least 90 different values out of 100 calls
         assert!(values.len() > 90);
     }

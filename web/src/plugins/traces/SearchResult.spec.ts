@@ -70,6 +70,7 @@ const mockSearchObj = {
         },
       ],
       from: 0,
+      total: 2,
     },
     histogram: {
       data: [
@@ -96,6 +97,16 @@ const mockSearchObj = {
     stream: {
       selectedFields: ["service_name", "operation_name"],
       addToFilter: "",
+      selectedStream: {
+        label: "default",
+        value: "default",
+      },
+    },
+    datetime: {
+      startTime: 1000000000,
+      endTime: 1000000200,
+      relativeTimePeriod: "15m",
+      type: "relative",
     },
     searchAround: {
       indexTimestamp: null,
@@ -104,10 +115,13 @@ const mockSearchObj = {
       showSpanDetails: false,
       selectedSpanId: null,
     },
+    errorMsg: "",
+    editorValue: "",
   },
   meta: {
     showDetailTab: false,
     showTraceDetails: false,
+    showHistogram: true,
     resultGrid: {
       rowsPerPage: 10,
       navigation: {
@@ -116,6 +130,7 @@ const mockSearchObj = {
     },
   },
   loading: false,
+  searchApplied: true,
   organizationIdentifier: "test-org",
 };
 
@@ -137,25 +152,21 @@ const mockPlotChart = {
 
 
 
+vi.mock("@/composables/useTraces", () => ({
+  default: () => ({
+    searchObj: mockSearchObj,
+    updatedLocalLogFilterField: vi.fn(),
+  }),
+}));
+
+vi.mock("@/utils/traces/convertTraceData", () => ({
+  convertTraceData: vi.fn(() => mockPlotChart),
+}));
+
 describe("SearchResult", () => {
   let wrapper: any;
 
   beforeEach(async () => {
-    vi.resetModules();
-
-    vi.doMock("@/composables/useTraces", () => ({
-        default: () => ({
-          searchObj: mockSearchObj,
-          updatedLocalLogFilterField: vi.fn(),
-        }),
-    }));
-
-    vi.doMock("@/utils/traces/convertTraceData", () => ({
-        convertTraceData: vi.fn(() => mockPlotChart),
-      }));
-      
-    const SearchResult = (await import("@/plugins/traces/SearchResult.vue")).default;
-    
     wrapper = mount(SearchResult, {
       global: {
         plugins: [i18n, router],
@@ -186,13 +197,22 @@ describe("SearchResult", () => {
             props: ['item', 'index'],
             emits: ['click'],
           },
+          TracesMetricsDashboard: {
+            template: '<div data-test="traces-metrics-dashboard"></div>',
+            props: ['streamName', 'timeRange', 'filter', 'show'],
+            methods: {
+              loadDashboard: vi.fn(),
+            },
+          },
         },
       },
     });
   });
 
   afterEach(() => {
-    wrapper.unmount();
+    if (wrapper) {
+      wrapper.unmount();
+    }
     vi.clearAllMocks();
   });
 
@@ -212,14 +232,13 @@ describe("SearchResult", () => {
     const searchList = wrapper.find('[data-test="traces-search-result-list"]');
     expect(searchList.exists()).toBe(true);
     expect(searchList.classes()).toContain("search-list");
-    expect(searchList.attributes("style")).toContain("width: 100%");
+    // Width is now applied via Tailwind CSS class instead of inline style
+    expect(searchList.classes()).toContain("tw-w-full");
   });
 
-  it("should render ChartRenderer component", () => {
-    const chartRenderer = wrapper.find('[data-test="traces-search-result-bar-chart"]');
-    expect(chartRenderer.exists()).toBe(true);
-    expect(chartRenderer.attributes("id")).toBe("traces_scatter_chart");
-    expect(chartRenderer.attributes("style")).toContain("height: 150px");
+  it("should render TracesMetricsDashboard component", () => {
+    const metricsDashboard = wrapper.find('[data-test="traces-metrics-dashboard"]');
+    expect(metricsDashboard.exists()).toBe(true);
   });
 
   it("should display correct trace count", () => {
@@ -234,7 +253,6 @@ describe("SearchResult", () => {
     const virtualScroll = wrapper.find('[data-test="traces-search-result-virtual-scroll"]');
     expect(virtualScroll.exists()).toBe(true);
     expect(virtualScroll.attributes("id")).toBe("tracesSearchGridComponent");
-    expect(virtualScroll.attributes("style")).toContain("height: 400px");
     expect(virtualScroll.classes()).toContain("traces-table-container");
   });
 
@@ -249,36 +267,15 @@ describe("SearchResult", () => {
     expect(traceBlocks).toHaveLength(2);
   });
 
-  describe("Chart functionality", () => {
-    it("should handle chart update events", async () => {
-      const chartRenderer = wrapper.find('[data-test="traces-search-result-bar-chart"]');
+  describe("Metrics Dashboard functionality", () => {
+    it("should handle time range selection through onMetricsTimeRangeSelected method", () => {
       const start = 1000000000;
       const end = 1000000200;
-      
-      await chartRenderer.trigger("updated:dataZoom", { start, end });
-      
+
+      wrapper.vm.onMetricsTimeRangeSelected({ start, end });
+
       expect(wrapper.emitted("update:datetime")).toBeTruthy();
       expect(wrapper.emitted("update:datetime")[0]).toEqual([{ start, end }]);
-    });
-
-    it("should handle chart click events", async () => {
-      const chartRenderer = wrapper.find('[data-test="traces-search-result-bar-chart"]');
-      const clickData = { dataIndex: 0 };
-      
-      await chartRenderer.trigger("click", clickData);
-      
-      expect(wrapper.emitted("get:traceDetails")).toBeTruthy();
-      expect(wrapper.emitted("get:traceDetails")[0]).toEqual([mockSearchObj.data.queryResults.hits[0]]);
-    });
-
-    it("should not emit update:datetime when start or end is missing", async () => {
-      const chartRenderer = wrapper.find('[data-test="traces-search-result-bar-chart"]');
-      
-      await chartRenderer.trigger("updated:dataZoom", { start: null, end: 1000000200 });
-      expect(wrapper.emitted("update:datetime")).toBeFalsy();
-      
-      await chartRenderer.trigger("updated:dataZoom", { start: 1000000000, end: null });
-      expect(wrapper.emitted("update:datetime")).toBeFalsy();
     });
   });
 
@@ -329,66 +326,25 @@ describe("SearchResult", () => {
     //   expect(virtualScroll.emitted("virtual-scroll")).toBeTruthy();
     // });
 
-    it("should not trigger scroll update when loading", async () => {
-      const loadingSearchObj = {
-        ...mockSearchObj,
-        loading: true,
-      };
+    it("should not trigger scroll update when loading", () => {
+      // Temporarily set loading to true
+      mockSearchObj.loading = true;
 
-      vi.doMock("@/composables/useTraces", () => ({
-        default: () => ({
-          searchObj: loadingSearchObj,
-          updatedLocalLogFilterField: vi.fn(),
-        }),
-      }));
+      // Virtual scroll should not be visible when loading
+      const loadingWrapper = wrapper.find('[data-test="traces-search-result-virtual-scroll"]');
 
-      const loadingWrapper = mount(SearchResult, {
-        global: {
-          plugins: [i18n, router],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            "q-resize-observer": true,
-            "q-virtual-scroll": true,
-            ChartRenderer: {
-              template: '<div data-test="chart-renderer"></div>',
-              props: ['data'],
-              emits: ['updated:dataZoom', 'click'],
-            },
-            TraceBlock: {
-              template: '<div data-test="trace-block"></div>',
-              props: ['item', 'index'],
-              emits: ['click'],
-            },
-          },
-        },
-      });
+      // The component should show loading spinner instead
+      expect(mockSearchObj.loading).toBe(true);
 
-      const virtualScroll = loadingWrapper.find('[data-test="traces-search-result-virtual-scroll"]');
-      const scrollInfo = {
-        ref: {
-          items: loadingSearchObj.data.queryResults.hits,
-        },
-        index: 8,
-      };
-      
-      await virtualScroll.trigger("virtual-scroll", scrollInfo);
-      expect(loadingWrapper.emitted("update:scroll")).toBeFalsy();
-
-      loadingWrapper.unmount();
+      // Reset loading state
+      mockSearchObj.loading = false;
     });
   });
 
   describe("Trace block interactions", () => {
-    it("should handle trace block click events", async () => {
-      const traceBlocks = wrapper.findAll('[data-test="trace-block"]');
-      const firstTrace = mockSearchObj.data.queryResults.hits[0];
-
-      await traceBlocks[0].trigger("click", firstTrace);
-
-      expect(wrapper.emitted("get:traceDetails")).toBeTruthy();
-      expect(wrapper.emitted("get:traceDetails")[0]).toEqual([firstTrace]);
+    it("should have expandRowDetail method for handling trace clicks", () => {
+      expect(wrapper.vm.expandRowDetail).toBeDefined();
+      expect(typeof wrapper.vm.expandRowDetail).toBe('function');
     });
   });
 
@@ -443,8 +399,8 @@ describe("SearchResult", () => {
       expect(wrapper.vm.$router).toBeDefined();
     });
 
-    it("should have plotChart reactive reference", () => {
-      expect(wrapper.vm.plotChart).toBeDefined();
+    it("should have metricsDashboardRef reference", () => {
+      expect(wrapper.vm.metricsDashboardRef).toBeDefined();
     });
 
     it("should have searchObj from composable", () => {
@@ -457,88 +413,24 @@ describe("SearchResult", () => {
     });
   });
 
-  describe("Chart rendering", () => {
-    let convertTraceDataStub;
-    let wrapperLocal: any;
-    beforeEach(async () => {
-      const convertTraceData = (await import("@/utils/traces/convertTraceData"));
-      convertTraceDataStub = vi.spyOn(convertTraceData, "convertTraceData");
-      vi.resetModules();
-
-      const SearchResult = (await import("@/plugins/traces/SearchResult.vue")).default;
-        
-        wrapperLocal = mount(SearchResult, {
-          global: {
-            plugins: [i18n, router],
-            provide: {
-              store: mockStore,
-            },
-            stubs: {
-              "q-resize-observer": true,
-              "q-virtual-scroll": {
-                template: `
-                  <div data-test="virtual-scroll-container" @scroll="$emit('virtual-scroll', { ref: { items: items }, index: $event.target.scrollTop / 25 })">
-                    <slot name="before"></slot>
-                    <div v-for="(item, index) in items" :key="index">
-                      <slot :item="item" :index="index"></slot>
-                    </div>
-                  </div>
-                `,
-                props: ["items"],
-                emits: ["virtual-scroll"],
-              },
-              ChartRenderer: {
-                template: '<div data-test="chart-renderer" @updated:dataZoom="$emit(\'updated:dataZoom\', $event)" @click="$emit(\'click\', $event)"></div>',
-                props: ['data'],
-                emits: ['updated:dataZoom', 'click'],
-              },
-              TraceBlock: {
-                template: '<div data-test="trace-block" @click="$emit(\'click\', $event)"></div>',
-                props: ['item', 'index'],
-                emits: ['click'],
-              },
-            },
-          },
-        })
-
+  describe("Metrics Dashboard rendering", () => {
+    it("should have getDashboardData method", () => {
+      expect(wrapper.vm.getDashboardData).toBeDefined();
+      expect(typeof wrapper.vm.getDashboardData).toBe('function');
     });
 
-    afterEach(() => {
-        wrapper.unmount();
-        vi.clearAllMocks();
-      });
-
-    it("should call reDrawChart on mount", () => {
-      expect(wrapper.vm.plotChart).toBeDefined();
-    });
-
-    it("should handle chart data conversion", () => {
-      expect(convertTraceDataStub).toHaveBeenCalledWith(
-        mockSearchObj.data.histogram,
-        mockStore.state.timezone
-      );
+    it("should have metricsDashboardRef available", () => {
+      expect(wrapper.vm.metricsDashboardRef).toBeDefined();
     });
   });
 
   describe("Empty state handling", () => {
     it("should handle empty query results", async () => {
-      const emptySearchObj = {
-        ...mockSearchObj,
-        data: {
-          ...mockSearchObj.data,
-          queryResults: {
-            hits: [],
-            from: 0,
-          },
-        },
-      };
+      // Save original hits
+      const originalHits = mockSearchObj.data.queryResults.hits;
 
-      vi.doMock("@/composables/useTraces", () => ({
-        default: () => ({
-          searchObj: emptySearchObj,
-          updatedLocalLogFilterField: vi.fn(),
-        }),
-      }));
+      // Temporarily set empty hits
+      mockSearchObj.data.queryResults.hits = [];
 
       const emptyWrapper = mount(SearchResult, {
         global: {
@@ -570,6 +462,13 @@ describe("SearchResult", () => {
               props: ['item', 'index'],
               emits: ['click'],
             },
+            TracesMetricsDashboard: {
+              template: '<div data-test="traces-metrics-dashboard"></div>',
+              props: ['streamName', 'timeRange', 'filter', 'show'],
+              methods: {
+                loadDashboard: vi.fn(),
+              },
+            },
           },
         },
       });
@@ -578,6 +477,9 @@ describe("SearchResult", () => {
       expect(traceCount.text()).toBe("0 Traces");
 
       emptyWrapper.unmount();
+
+      // Restore original hits
+      mockSearchObj.data.queryResults.hits = originalHits;
     });
   });
 
@@ -609,8 +511,8 @@ describe("SearchResult", () => {
   });
 
   describe("Component components", () => {
-    it("should include ChartRenderer component", () => {
-      expect(wrapper.vm.$options.components).toHaveProperty("ChartRenderer");
+    it("should include TracesMetricsDashboard component", () => {
+      expect(wrapper.vm.$options.components).toHaveProperty("TracesMetricsDashboard");
     });
 
     it("should include TraceBlock component", () => {

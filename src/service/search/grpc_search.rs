@@ -23,7 +23,7 @@ use infra::{
     client::grpc::make_grpc_search_client,
     errors::{Error, ErrorCodes},
 };
-use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
+use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
 use tracing::{Instrument, info_span};
 
 use crate::{common::infra::cluster as infra_cluster, service::search::server_internal_error};
@@ -48,7 +48,7 @@ pub async fn grpc_search(
         return Err(server_internal_error("no querier node online"));
     }
 
-    let mut rng = StdRng::from_entropy();
+    let mut rng = StdRng::seed_from_u64(rand::random());
     let node = nodes.choose(&mut rng).unwrap().clone();
 
     // make cluster request
@@ -120,7 +120,7 @@ pub async fn grpc_search_multi(
         return Err(server_internal_error("no querier node online"));
     }
 
-    let mut rng = StdRng::from_entropy();
+    let mut rng = StdRng::seed_from_u64(rand::random());
     let node = nodes.choose(&mut rng).unwrap().clone();
 
     // make cluster request
@@ -172,8 +172,6 @@ pub async fn grpc_search_multi(
     Ok(response)
 }
 
-// Not sure why it's generating a warning, no time to debug right now
-#[allow(dead_code)]
 #[tracing::instrument(name = "service:search:grpc_search_partition", skip_all)]
 pub async fn grpc_search_partition(
     trace_id: &str,
@@ -194,7 +192,7 @@ pub async fn grpc_search_partition(
         return Err(server_internal_error("no querier node online"));
     }
 
-    let mut rng = StdRng::from_entropy();
+    let mut rng = StdRng::seed_from_u64(rand::random());
     let node = nodes.choose(&mut rng).unwrap().clone();
 
     // make cluster request

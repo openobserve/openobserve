@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="drag-allow">
       <q-bar
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'transparent'"
         dense
         class="q-px-xs"
         style="border-top-left-radius: 3px; border-top-right-radius: 3px"
@@ -46,7 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer"
           data-test="dashboard-panel-description-info"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right"
+self="top right" max-width="220px">
             <div style="white-space: pre-wrap">
               {{ props.data.description }}
             </div>
@@ -59,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           padding="1px"
           @click="onPanelModifyClick('ViewPanel')"
-          title="Full screen"
+          :title="t('panel.fullScreen')"
           data-test="dashboard-panel-fullscreen-btn"
         />
         <q-btn
@@ -71,7 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="showViewPanel = true"
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right"
+self="top right" max-width="220px">
             Some dynamic variables are not applied because the field is not
             present in the query's stream. Open Query Inspector to see all the
             details of the variables and queries executed to render this panel
@@ -88,14 +90,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-error-data"
           class="warning"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right"
+self="top right" max-width="220px">
             <div style="white-space: pre-wrap">
               {{ errorData }}
             </div>
           </q-tooltip>
         </q-btn>
         <q-btn
-          v-if="maxQueryRange.length > 0"
+          v-if="maxQueryRangeWarning"
           :icon="outlinedWarning"
           flat
           size="xs"
@@ -103,9 +106,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-max-duration-warning"
           class="warning"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right"
+self="top right" max-width="220px">
             <div style="white-space: pre-wrap">
-              {{ maxQueryRange.join("\n\n") }}
+              {{ maxQueryRangeWarning }}
             </div>
           </q-tooltip>
         </q-btn>
@@ -174,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           padding="1px"
           @click="onRefreshPanel"
-          title="Refresh Panel"
+          :title="t('panel.refreshPanel')"
           data-test="dashboard-panel-refresh-panel-btn"
           :color="variablesDataUpdated ? 'warning' : ''"
           :disable="isPanelLoading"
@@ -182,8 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tooltip>
             {{
               variablesDataUpdated
-                ? "Refresh to apply latest variable changes"
-                : "Refresh"
+                ? t("panel.refreshToApplyVariables")
+                : t("panel.refresh")
             }}
           </q-tooltip>
         </q-btn>
@@ -202,8 +206,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onPanelModifyClick('EditPanel')"
             >
               <q-item-section>
-                <q-item-label data-test="dashboard-edit-panel" class="q-pa-sm"
-                  >Edit Panel</q-item-label
+                <q-item-label
+                  data-test="dashboard-edit-panel"
+                  class="q-pa-sm"
+                  >{{ t("panel.editPanel") }}</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -213,8 +219,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onPanelModifyClick('EditLayout')"
             >
               <q-item-section>
-                <q-item-label data-test="dashboard-edit-layout" class="q-pa-sm"
-                  >Edit Layout</q-item-label
+                <q-item-label
+                  data-test="dashboard-edit-layout"
+                  class="q-pa-sm"
+                  >{{ t("panel.editLayout") }}</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -227,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item-label
                   data-test="dashboard-duplicate-panel"
                   class="q-pa-sm"
-                  >Duplicate</q-item-label
+                  >{{ t("panel.duplicate") }}</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -237,8 +245,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onPanelModifyClick('DeletePanel')"
             >
               <q-item-section>
-                <q-item-label data-test="dashboard-delete-panel" class="q-pa-sm"
-                  >Delete Panel</q-item-label
+                <q-item-label
+                  data-test="dashboard-delete-panel"
+                  class="q-pa-sm"
+                  >{{ t("panel.deletePanel") }}</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -252,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item-label
                   data-test="dashboard-query-inspector-panel"
                   class="q-pa-sm"
-                  >Query Inspector</q-item-label
+                  >{{ t("panel.queryInspector") }}</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -268,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item-label
                   data-test="dashboard-panel-download-as-csv-btn"
                   class="q-pa-sm"
-                  >Download as CSV</q-item-label
+                  >{{ t("panel.downloadAsCSV") }}</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -284,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item-label
                   data-test="dashboard-panel-download-as-json-btn"
                   class="q-pa-sm"
-                  >Download as JSON</q-item-label
+                  >{{ t("panel.downloadAsJSON") }}</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -299,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item-label
                   data-test="dashboard-move-to-logs-module"
                   class="q-pa-sm"
-                  >Go To Logs</q-item-label
+                  >{{ t("panel.goToLogs") }}</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -312,7 +322,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item-label
                   data-test="dashboard-move-to-another-panel"
                   class="q-pa-sm"
-                  >Move To Another Tab</q-item-label
+                  >{{ t("panel.moveToAnotherTab") }}</q-item-label
+                >
+              </q-item-section>
+            </q-item>
+            <q-item
+              clickable
+              v-if="metaData && metaData.queries?.length > 0"
+              v-close-popup="true"
+              @click="onPanelModifyClick('CreateAlert')"
+            >
+              <q-item-section>
+                <q-item-label
+                  data-test="dashboard-create-alert-from-panel"
+                  class="q-pa-sm"
+                  >{{ t("panel.createAlert") }}</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -336,6 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :tabName="props.tabName"
       :dashboardName="props.dashboardName"
       :folderName="props.folderName"
+      :viewOnly="viewOnly"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @limit-number-of-series-warning-message-update="
@@ -352,24 +377,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       @error="onError"
       @is-partial-data-update="handleIsPartialDataUpdate"
+      @contextmenu="$emit('contextmenu', $event)"
       ref="PanleSchemaRendererRef"
       :allowAnnotationsAdd="true"
+      :allowAlertCreation="allowAlertCreation"
     ></PanelSchemaRenderer>
     <q-dialog v-model="showViewPanel">
       <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
     </q-dialog>
 
     <ConfirmDialog
-      title="Delete Panel"
-      message="Are you sure you want to delete this Panel?"
+      :title="t('panel.deletePanelTitle')"
+      :message="t('panel.deletePanelMessage')"
       @update:ok="deletePanelDialog"
       @update:cancel="confirmDeletePanelDialog = false"
       v-model="confirmDeletePanelDialog"
     />
 
     <SinglePanelMove
-      title="Move Panel to Another Tab"
-      message="Select destination tab"
+      :title="t('panel.movePanelTitle')"
+      :message="t('panel.movePanelMessage')"
       @update:ok="movePanelDialog"
       :key="confirmMovePanelDialog"
       @update:cancel="confirmMovePanelDialog = false"
@@ -404,11 +431,12 @@ import {
 } from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
-import { getFunctionErrorMessage, getUUID } from "@/utils/zincutils";
+import { getFunctionErrorMessage, getUUID, processQueryMetadataErrors } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
+import { useI18n } from "vue-i18n";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -446,6 +474,7 @@ export default defineComponent({
     "tabName",
     "dashboardName",
     "folderName",
+    "allowAlertCreation",
   ],
   components: {
     PanelSchemaRenderer,
@@ -459,6 +488,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const $q = useQuasar();
+    const { t } = useI18n();
     const metaData = ref();
     const showViewPanel = ref(false);
     const confirmDeletePanelDialog = ref(false);
@@ -472,33 +502,15 @@ export default defineComponent({
       metaData.value = metadata;
     };
 
-    const maxQueryRange: any = ref([]);
+    const maxQueryRangeWarning = ref("");
 
     const limitNumberOfSeriesWarningMessage = ref("");
 
     const handleResultMetadataUpdate = (metadata: any) => {
-      const combinedWarnings: any[] = [];
-      metadata.forEach((query: any) => {
-        if (
-          query?.function_error &&
-          query?.new_start_time &&
-          query?.new_end_time
-        ) {
-          const combinedMessage = getFunctionErrorMessage(
-            query.function_error,
-            query.new_start_time,
-            query.new_end_time,
-            store.state.timezone,
-          );
-          combinedWarnings.push(combinedMessage);
-        } else if (query?.function_error) {
-          combinedWarnings.push(query.function_error);
-        }
-      });
-
-      // NOTE: for multi query, just show the first query warning
-      maxQueryRange.value =
-        combinedWarnings.length > 0 ? [combinedWarnings[0]] : [];
+      maxQueryRangeWarning.value = processQueryMetadataErrors(
+        metadata,
+        store.state.timezone,
+      );
     };
 
     // to store and show when the panel was last loaded
@@ -611,9 +623,12 @@ export default defineComponent({
         "org_identifier",
         store.state.selectedOrganization.identifier,
       );
-      logsUrl.searchParams.set("quick_mode", "false");
+      if (store.state.zoConfig.quick_mode_enabled) {
+        logsUrl.searchParams.set("quick_mode", "true");
+      } else {
+        logsUrl.searchParams.set("quick_mode", "false");
+      }
       logsUrl.searchParams.set("show_histogram", "false");
-
       return logsUrl;
     };
 
@@ -706,7 +721,7 @@ export default defineComponent({
         );
 
         // Show a success notification.
-        showPositiveNotification("Panel Duplicated Successfully");
+        showPositiveNotification(t("panel.panelDuplicatedSuccessfully"));
 
         // Navigate to the new panel.
         router.push({
@@ -727,10 +742,12 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Panel duplication failed",
+              t("panel.panelDuplicationFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Panel duplication failed");
+          showErrorNotification(
+            error?.message ?? t("panel.panelDuplicationFailed"),
+          );
         }
       }
       // Hide the loading spinner notification.
@@ -885,7 +902,7 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange,
       handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
       lastTriggeredAt,
-      maxQueryRange,
+      maxQueryRangeWarning,
       metaData,
       showViewPanel,
       dependentAdHocVariable,
@@ -904,6 +921,7 @@ export default defineComponent({
       handleLimitNumberOfSeriesWarningMessageUpdate,
       isPartialData,
       handleIsPartialDataUpdate,
+      t,
     };
   },
   methods: {
@@ -920,8 +938,61 @@ export default defineComponent({
         this.confirmMovePanelDialog = true;
       } else if (evt == "EditLayout") {
         this.$emit("onEditLayout", this.props.data.id);
+      } else if (evt == "CreateAlert") {
+        this.createAlertFromPanel();
       } else {
       }
+    },
+    createAlertFromPanel() {
+      if (!this.props.data.queries || this.props.data.queries.length === 0) {
+        this.$q.notify({
+          type: "negative",
+          message: this.t("panel.noQueriesToCreateAlert"),
+          timeout: 2000,
+        });
+        return;
+      }
+
+      const query = this.props.data.queries[0];
+      if (!query.fields?.stream) {
+        this.$q.notify({
+          type: "negative",
+          message: this.t("panel.panelQueryMustHaveStream"),
+          timeout: 2000,
+        });
+        return;
+      }
+
+      const unsupportedTypes = ["markdown", "html", "geomap", "sankey"];
+      if (unsupportedTypes.includes(this.props.data.type)) {
+        this.$q.notify({
+          type: "warning",
+          message: this.t("panel.unsupportedPanelTypeAlert", {
+            type: this.props.data.type,
+          }),
+          timeout: 3000,
+        });
+      }
+
+      const panelData = {
+        panelTitle: this.props.data.title,
+        panelType: this.props.data.type,
+        queries: this.props.data.queries || [],
+        queryType: this.props.data.queryType,
+        metadata: this.metaData,
+        timeRange: this.props.selectedTimeDate,
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+      this.$router.push({
+        name: "addAlert",
+        query: {
+          org_identifier: this.store.state.selectedOrganization.identifier,
+          folder: "default",
+          fromPanel: "true",
+          panelData: encodedData,
+        },
+      });
     },
   },
 });

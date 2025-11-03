@@ -510,6 +510,10 @@ export const formatTimeWithSuffix = (us: number) => {
     return "0us";
   }
 
+  if (us >= 1000 * 1000 * 60) {
+    return `${(us / 1000 / 1000 / 60).toFixed(2)}m`;
+  }
+
   if (us >= 1000 * 1000) {
     return `${(us / 1000 / 1000).toFixed(2)}s`;
   }
@@ -1094,27 +1098,11 @@ export const getWebSocketUrl = (
 };
 
 export const isWebSocketEnabled = (data: any) => {
-  if (!data.zoConfig?.websocket_enabled) {
-    return false;
-  }
-
-  if ((window as any).use_web_socket === undefined) {
-    return data.organizationData?.organizationSettings?.enable_websocket_search;
-  } else {
-    return (window as any).use_web_socket;
-  }
+  return false;
 };
 
 export const isStreamingEnabled = (data: any) => {
-  if (!data.zoConfig?.streaming_enabled) {
-    return false;
-  }
-
-  if ((window as any).use_streaming === undefined) {
-    return data.organizationData?.organizationSettings?.enable_streaming_search;
-  } else {
-    return (window as any).use_streaming;
-  }
+  return true;
 };
 
 export const maxLengthCharValidation = (
@@ -1259,3 +1247,62 @@ export const getDuration = (createdAt: number) => {
   };
 };
 
+
+export const mergeAndRemoveDuplicates = (arr1: string[], arr2: string[]): string[] => {
+  // Merge both arrays, then remove duplicates using Set
+  return [...new Set([...arr1, ...arr2])];
+};
+
+/**
+ * Process query metadata and extract error messages with deduplication
+ * Handles both multi-query format (array of arrays) and single query format
+ *
+ * @param metadata - Query metadata containing potential function errors
+ * @param timezone - Timezone for formatting time in error messages (default: "UTC")
+ * @returns Joined string of deduplicated error messages
+ */
+export const processQueryMetadataErrors = (
+  metadata: any,
+  timezone: string = "UTC"
+): string => {
+  if (!metadata || metadata.length === 0) {
+    return "";
+  }
+
+  const combinedWarnings: string[] = [];
+
+  // Handle multi-query format (array of arrays)
+  if (Array.isArray(metadata[0])) {
+    metadata[0].forEach((query: any) => {
+      if (query?.function_error && query?.new_start_time && query?.new_end_time) {
+        const combinedMessage = getFunctionErrorMessage(
+          query.function_error,
+          query.new_start_time,
+          query.new_end_time,
+          timezone,
+        );
+        combinedWarnings.push(combinedMessage);
+      } else if (query?.function_error) {
+        combinedWarnings.push(...query.function_error);
+      }
+    });
+  } else {
+    // Handle single query format (backward compatibility)
+    const query = metadata[0];
+    if (query?.function_error && query?.new_start_time && query?.new_end_time) {
+      const combinedMessage = getFunctionErrorMessage(
+        query.function_error,
+        query.new_start_time,
+        query.new_end_time,
+        timezone,
+      );
+      combinedWarnings.push(combinedMessage);
+    } else if (query?.function_error) {
+      combinedWarnings.push(query.function_error);
+    }
+  }
+
+  // Deduplicate using mergeAndRemoveDuplicates (pass empty array as second param)
+  const dedupedWarnings = mergeAndRemoveDuplicates(combinedWarnings, []);
+  return dedupedWarnings.join(", ");
+};

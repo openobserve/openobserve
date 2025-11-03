@@ -1,13 +1,9 @@
 <template>
   <div
-    :class="
-      store.state.theme === 'dark'
-        ? 'dark-theme-history-page dark-theme'
-        : 'light-theme-history-page light-theme'
-    "
+   class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs"
   >
-    <div v-if="!showSearchResults">
-      <div class="flex tw-justify-between tw-items-center tw-h-[71px]">
+    <div v-if="!showSearchResults" class="tw-h-full">
+       <div class="flex tw-justify-between tw-items-center tw-h-[68px] card-container tw-mb-[0.625rem]">
         <div class="flex items-center q-py-sm q-pl-md">
           <div
             data-test="search-scheduler-back-btn"
@@ -32,7 +28,7 @@
             <q-btn
               label="Get Jobs"
               @click="fetchSearchHistory"
-              class="q-ml-md o2-primary-button tw-h-[36px]"
+              class="q-ml-md o2-primary-button tw-h-[36px] tw-rounded-md"
               :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               no-caps
               flat
@@ -43,7 +39,8 @@
         </div>
       </div>
 
-      <div>
+   <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+      <div class=" tw-h-[calc(100vh-128px)] card-container">
           <q-table
             data-test="search-scheduler-table"
             ref="qTableSchedule"
@@ -53,9 +50,8 @@
             :pagination="pagination"
             row-key="trace_id"
             :rows-per-page-options="[]"
-            class="o2-quasar-table o2-quasar-table-header-sticky"
-            :class="store.state.theme == 'dark' ? ' o2-quasar-table-dark o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light'"
-            :style="dataToBeLoaded.length > 0 ? 'width: 100%; height: calc(100vh - 118px)'  : 'width: 100%'"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+            :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh - 128px); overflow-y: auto;' : 'height: 0px'"
             :sort-method="sortMethod"
           >
             <template v-slot:body="props">
@@ -345,6 +341,7 @@
           @update:cancel="confirmCancel = false"
           v-model="confirmCancel"
         />
+      </div>
       </div>
     </div>
   </div>
@@ -1059,140 +1056,5 @@ export default defineComponent({
 });
 </script>
 <style lang="scss" scoped>
-.expanded-content {
-  padding: 0 1rem;
-  min-width: calc(90vw - 20px);
-  max-height: 100vh; /* Set a fixed height for the container */
-  overflow: hidden; /* Hide overflow by default */
-}
-
-.scrollable-content {
-  width: 100%; /* Use the full width of the parent */
-  overflow-y: auto; /* Enable vertical scrolling for long content */
-  padding: 10px; /* Optional: padding for aesthetics */
-  border: 1px solid #ddd; /* Optional: border for visibility */
-  height: 100%;
-  max-height: 200px;
-  /* Use the full height of the parent */
-  text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
-}
-
-.q-td {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.custom-table .q-tr > .q-td:nth-child(2) {
-  text-align: left;
-}
-
-.copy-btn-sql {
-  border: #7a54a2 1px solid;
-  color: #7a54a2;
-}
-
-.copy-btn-function {
-  border: #0a7ebc 1px solid;
-  color: #0a7ebc;
-}
-
-.warning-text {
-  color: #f5a623;
-  border: 1px solid #f5a623;
-  border-radius: 2px;
-}
-.expanded-sql {
-  border-left: #7a54a2 3px solid;
-}
-.expanded-function {
-  border-left: #0a7ebc 3px solid;
-}
-
-.search-job-list-table {
-  th:last-child,
-  td:last-child {
-    position: sticky;
-    right: 0;
-    z-index: 1;
-    background: #ffffff;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
-  }
-}
-td:nth-child(2) {
-  text-align: center !important;
-}
-th:first-child,
-td:first-child {
-  width: 50px;
-}
-
-.dark-theme {
-  th:last-child,
-  td:last-child {
-    background: var(--q-dark);
-    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
-  }
-}
-
-.light-theme {
-  th:last-child,
-  td:last-child {
-    background: #ffffff;
-  }
-}
-.search-job-exapnded-table {
-}
-.dark-theme {
-  background-color: $dark-page;
-
-  .report-list-tabs {
-    height: fit-content;
-
-    :deep(.rum-tabs) {
-      border: 1px solid #464646;
-    }
-
-    :deep(.rum-tab) {
-      &:hover {
-        background: #464646;
-      }
-
-      &.active {
-        background: #5960b2;
-        color: #ffffff !important;
-      }
-    }
-  }
-}
-
-.report-list-tabs {
-  padding: 0 1rem;
-  height: fit-content;
-  width: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
+@import "@/styles/logs/search-schedulerlist.scss";
 </style>

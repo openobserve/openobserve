@@ -16,19 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <div
-      class="full-width column flex-center q-gutter-sm q-mt-xs"
+      class="full-width column flex-center q-gutter-sm q-mt-xs tw-h-full"
       style="font-size: 1.5rem"
-      :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
     >
       <q-img
         :src="getImageURL('images/regex_pattern/no_data_regex_pattern.svg')"
         style="width: 125px; margin: 20vh auto 1rem"
       />
       <span class="title-text">{{ t("regex_patterns.no_data") }}</span>
-        <span class="subtitle-text">Import Regex patterns from your Library or <span class="create-new-text" @click="createNewRegexPattern">Create New</span></span>
+        <span class="subtitle-text">Import patterns from your Library or <span class="create-new-text" @click="createNewRegexPattern">Create New</span></span>
         <div class="import-button-container">
             <q-btn no-caps class="q-mt-sm" @click="importRegexPattern">
-              <span class="import-button-text">Import Regex Pattern</span>
+              <span class="import-button-text">{{ t("regex_patterns.import_title") }}</span>
             </q-btn>
         </div>    
     </div>
@@ -89,13 +88,5 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     color: #5960b2;
     font-weight: 700;
     cursor: pointer;
-  }
-  .dark-mode{
-    .title-text{
-        color: #ffffff;
-    }
-    .subtitle-text{
-        color: #ffffff;
-    }
   }
   </style>

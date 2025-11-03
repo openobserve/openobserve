@@ -38,7 +38,7 @@ pub(crate) static STR_MATCH_UDF: Lazy<ScalarUDF> =
 pub(crate) static STR_MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> =
     Lazy::new(|| ScalarUDF::from(StrMatchIgnoreCaseUdf::new()));
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 struct StrMatchUdf {
     signature: Signature,
 }
@@ -79,7 +79,7 @@ impl ScalarUDFImpl for StrMatchUdf {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 struct StrMatchIgnoreCaseUdf {
     signature: Signature,
 }
