@@ -1131,6 +1131,46 @@ pub static TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS: Lazy<HistogramVec> = Lazy::ne
     .expect("Metric created")
 });
 
+// self-reporting metrics
+pub static SELF_REPORTING_DROPPED_TRIGGERS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "self_reporting_dropped_triggers_total",
+            "Total number of trigger usage events dropped due to full queue",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static SELF_REPORTING_TIMEOUT_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "self_reporting_timeout_errors_total",
+            "Total number of error data publish timeouts",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static SELF_REPORTING_QUEUE_DEPTH: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "self_reporting_queue_depth",
+            "Current depth of self-reporting queues (pending items waiting to be processed)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["queue_type"], // "usage" or "error"
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1425,6 +1465,17 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS.clone()))
+        .expect("Metric registered");
+
+    // self-reporting metrics
+    registry
+        .register(Box::new(SELF_REPORTING_DROPPED_TRIGGERS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SELF_REPORTING_TIMEOUT_ERRORS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SELF_REPORTING_QUEUE_DEPTH.clone()))
         .expect("Metric registered");
 }
 

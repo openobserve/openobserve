@@ -995,6 +995,12 @@ pub struct Common {
     )]
     // in seconds
     pub usage_publish_interval: i64,
+    #[env_config(
+        name = "ZO_ERROR_PUBLISH_TIMEOUT_SECS",
+        default = 2,
+        help = "timeout in seconds for publishing error data to self-reporting queue"
+    )]
+    pub error_publish_timeout_secs: u64,
     // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,

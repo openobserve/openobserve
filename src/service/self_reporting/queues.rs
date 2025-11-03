@@ -118,6 +118,7 @@ async fn self_reporting_ingest_job(
                         // process any remaining data before shutting down
                         if !reporting_runner.pending.is_empty() {
                             let buffered = reporting_runner.take_batch();
+                            update_queue_depth_metrics(&buffered);
                             ingest_buffered_data(thread_id, buffered).await;
                         }
                         res_sender.send(()).ok();
@@ -125,8 +126,12 @@ async fn self_reporting_ingest_job(
                     }
                     Some(ReportingMessage::Data(reporting_data)) => {
                         reporting_runner.push(reporting_data);
+                        // Update queue depth metric after adding data
+                        update_queue_depth_metric_for_runner(&reporting_runner);
+
                         if reporting_runner.should_process() {
                             let buffered = reporting_runner.take_batch();
+                            update_queue_depth_metrics(&buffered);
                             ingest_buffered_data(thread_id, buffered).await;
                         }
                     }
@@ -136,11 +141,53 @@ async fn self_reporting_ingest_job(
             _ = interval.tick() => {
                 if reporting_runner.should_process() {
                     let buffered = reporting_runner.take_batch();
+                    update_queue_depth_metrics(&buffered);
                     ingest_buffered_data(thread_id, buffered).await;
                 }
             }
         }
     }
+}
+
+/// Update queue depth metrics based on pending data in the runner
+fn update_queue_depth_metric_for_runner(runner: &ReportingRunner) {
+    let mut usage_count = 0;
+    let mut error_count = 0;
+
+    for data in &runner.pending {
+        match data {
+            ReportingData::Usage(_) | ReportingData::Trigger(_) => usage_count += 1,
+            ReportingData::Error(_) => error_count += 1,
+        }
+    }
+
+    config::metrics::SELF_REPORTING_QUEUE_DEPTH
+        .with_label_values(&["usage"])
+        .set(usage_count);
+    config::metrics::SELF_REPORTING_QUEUE_DEPTH
+        .with_label_values(&["error"])
+        .set(error_count);
+}
+
+/// Update queue depth metrics after taking a batch (decrement)
+fn update_queue_depth_metrics(batch: &[ReportingData]) {
+    let mut usage_count = 0;
+    let mut error_count = 0;
+
+    for data in batch {
+        match data {
+            ReportingData::Usage(_) | ReportingData::Trigger(_) => usage_count += 1,
+            ReportingData::Error(_) => error_count += 1,
+        }
+    }
+
+    // Decrement the gauge by the batch size
+    config::metrics::SELF_REPORTING_QUEUE_DEPTH
+        .with_label_values(&["usage"])
+        .sub(usage_count);
+    config::metrics::SELF_REPORTING_QUEUE_DEPTH
+        .with_label_values(&["error"])
+        .sub(error_count);
 }
 
 async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {

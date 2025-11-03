@@ -320,7 +320,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     }
 
     for trigger_data_stream in trigger_usage_reports {
-        publish_triggers_usage(trigger_data_stream).await;
+        publish_triggers_usage(trigger_data_stream);
     }
 }
 

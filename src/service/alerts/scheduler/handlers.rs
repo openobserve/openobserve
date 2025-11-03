@@ -223,8 +223,7 @@ async fn handle_alert_triggers(
                     query_took: None,
                     success_response: None,
                     is_partial: None,
-                })
-                .await;
+                });
                 return Err(anyhow::anyhow!("Alert not found"));
             }
             Err(e) => {
@@ -273,8 +272,7 @@ async fn handle_alert_triggers(
                     query_took: None,
                     success_response: None,
                     is_partial: None,
-                })
-                .await;
+                });
                 return Err(anyhow::anyhow!("Error getting alert by id: {}", e));
             }
         }
@@ -476,8 +474,7 @@ async fn handle_alert_triggers(
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 time_in_queue_ms: Some(time_in_queue),
                 skipped_alerts_count: Some(skipped_alerts_count as i64),
-            })
-            .await;
+            });
         }
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] alert {} skipped due to delay: {}",
@@ -587,7 +584,7 @@ async fn handle_alert_triggers(
             )
             .await?;
         }
-        publish_triggers_usage(trigger_data_stream).await;
+        publish_triggers_usage(trigger_data_stream);
 
         // [ENTERPRISE] Mark completion even on failure
         // #[cfg(feature = "enterprise")]
@@ -668,7 +665,7 @@ async fn handle_alert_triggers(
                         };
                         new_trigger.data = json::to_string(&trigger_data).unwrap();
                         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                        publish_triggers_usage(trigger_data_stream).await;
+                        publish_triggers_usage(trigger_data_stream);
                         return Ok(());
                     }
                     deduplicated_data
@@ -847,7 +844,7 @@ async fn handle_alert_triggers(
         &trigger_data_stream.key
     );
     // publish the triggers as stream
-    publish_triggers_usage(trigger_data_stream).await;
+    publish_triggers_usage(trigger_data_stream);
 
     // [ENTERPRISE] Mark alert completed and process batch if this was the last alert
     // #[cfg(feature = "enterprise")]
@@ -1014,8 +1011,7 @@ async fn handle_report_triggers(
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
                 skipped_alerts_count: None,
-            })
-            .await;
+            });
             return Err(anyhow::anyhow!(
                 "Error getting report: {report_id}, error: {e}"
             ));
@@ -1210,7 +1206,7 @@ async fn handle_report_triggers(
         "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for report: {}",
         &trigger_data_stream.key
     );
-    publish_triggers_usage(trigger_data_stream).await;
+    publish_triggers_usage(trigger_data_stream);
 
     Ok(())
 }
@@ -1313,7 +1309,7 @@ async fn handle_derived_stream_triggers(
                 new_trigger_data.reset();
                 new_trigger.data = new_trigger_data.to_json_string();
                 db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                publish_triggers_usage(trigger_data_stream).await;
+                publish_triggers_usage(trigger_data_stream);
                 return Err(anyhow::anyhow!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] {}",
                     err_msg
@@ -1382,7 +1378,7 @@ async fn handle_derived_stream_triggers(
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-        publish_triggers_usage(trigger_data_stream).await;
+        publish_triggers_usage(trigger_data_stream);
         return Ok(());
     }
 
@@ -1421,7 +1417,7 @@ async fn handle_derived_stream_triggers(
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-        publish_triggers_usage(trigger_data_stream).await;
+        publish_triggers_usage(trigger_data_stream);
         return Err(anyhow::anyhow!(
             "[SCHEDULER trace_id {scheduler_trace_id}] {}",
             err_msg
@@ -1583,7 +1579,7 @@ async fn handle_derived_stream_triggers(
             "Invalid timerange - start: {start_time}, end: {end}, should be fixed in the next run"
         ));
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-        publish_triggers_usage(trigger_data_stream).await;
+        publish_triggers_usage(trigger_data_stream);
         return Ok(());
     }
 
@@ -1880,7 +1876,7 @@ async fn handle_derived_stream_triggers(
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
     // publish the triggers as stream
-    publish_triggers_usage(trigger_data_stream).await;
+    publish_triggers_usage(trigger_data_stream);
 
     // If it reaches max retries, go to the next nun at, but use the same trigger start time
     if new_trigger.retries >= max_retries {
