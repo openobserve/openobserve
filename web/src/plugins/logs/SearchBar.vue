@@ -961,7 +961,8 @@ class="q-pr-sm q-pt-xs" />
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button tw-w-[90px] element-box-shadow"
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -971,13 +972,9 @@ class="q-pr-sm q-pt-xs" />
                 dense
                 flat
                 :title="t('search.runQuery')"
-                class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
+                class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 no-caps
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-primary-button-dark'
-                    : 'o2-primary-button-light'
-                "
                 @click="handleRunQueryFn"
                 :disable="disable"
                 >{{ t("search.runQuery") }}</q-btn
@@ -989,9 +986,9 @@ class="q-pr-sm q-pt-xs" />
                 :class="[
                   config.isEnterprise == 'true' &&
                   visualizeSearchRequestTraceIds.length
-                    ? 'tw-bg-[#ec1414]'
-                    : 'tw-bg-[#575FC5] tw-text-white',
-                    config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-dropdown-normal-border-radius'
+                    ? 'o2-color-cancel'
+                    : 'o2-color-primary',
+                    config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-normal-border-radius'
               ]"
                 unelevated
                 dense
@@ -1028,9 +1025,9 @@ class="q-pr-sm q-pt-xs" />
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button tw-w-[90px] element-box-shadow"
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -1040,14 +1037,9 @@ class="q-pr-sm q-pt-xs" />
                 data-cy="search-bar-refresh-button"
                 dense
                 :title="t('search.runQuery')"
-                class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
-                style="font-size: 11px"
+                class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 no-caps
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-primary-button-dark'
-                    : 'o2-primary-button-light'
-                "
                 @click="handleRunQueryFn"
                 :disable="
                   searchObj.loading == true ||
@@ -1062,8 +1054,8 @@ class="q-pr-sm q-pt-xs" />
                   (!!searchObj.data.searchRequestTraceIds.length ||
                     !!searchObj.data.searchWebSocketTraceIds.length) &&
                   (searchObj.loading == true ||
-                    searchObj.loadingHistogram == true) ? 'tw-bg-[#f67a7a]' : 'tw-bg-[#575FC5] tw-text-white',
-              config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-dropdown-normal-border-radius'
+                    searchObj.loadingHistogram == true) ? 'o2-color-cancel' : 'o2-color-primary',
+              config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-normal-border-radius'
               ]"
                unelevated dense >
                     <q-btn
@@ -1073,13 +1065,8 @@ class="q-pr-sm q-pt-xs" />
                       flat
                       no-caps
                       :title="'Refresh Cache & Run Query'"
-                      class="q-pa-sm search-button-dropdown tw-text-[12px] "
-                      :class="
-                    config.isEnterprise == 'true' &&
-                    visualizeSearchRequestTraceIds.length
-                      ? 'tw-bg-[#ec1414]'
-                      : 'tw-bg-[#5ca380]'
-                  "
+                      class="q-pa-sm tw-text-[12px] "
+      
                       @click="handleRunQueryFn(true)"
                       :disable="
                         searchObj.loading == true ||
@@ -4527,4 +4514,35 @@ export default defineComponent({
 .q-dark .group-menu-btn {
   border: 0.0625rem solid var(--o2-border-color) !important;
 }
+.o2-run-query-button{
+  font-size: 11px;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  padding: 0px 12px !important;
+  width: 92px !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  /* subtle default glow */
+  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
+}
+.o2-color-primary{
+    background-color: var(--o2-primary-btn-bg);
+    color: var(--o2-primary-btn-text);
+    &:hover {
+    opacity: 0.9;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
+  }
+}
+ .search-button-enterprise-border-radius{
+      border-radius: 0.375rem 0px 0px 0.375rem !important;
+  }
+  .search-button-normal-border-radius{
+      border-radius: 0.375rem;
+  }
+  .search-button-dropdown-enterprise-border-radius{
+          border-radius: 0px 0.375rem 0.375rem  0px !important;
+  }
+  .o2-color-cancel{
+    background-color:#f67a7a;
+    color: var(--o2-primary-btn-text);
+  }
 </style>
