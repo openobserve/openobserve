@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn
         square
         icon="unfold_less"
-        class="collapse-button rotate-90"
+        class="collapse-button rotate-90 el-border"
         @click="toggleSidebar"
         data-test="dashboard-sidebar-collapse-btn"
       />

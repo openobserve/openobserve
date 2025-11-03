@@ -283,11 +283,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="col-2">
           <q-btn
             data-test="log-detail-previous-detail-btn"
-            class="text-bold"
-            text-color="light-text"
+            class="o2-secondary-button tw-h-[36px]"
             no-caps
             :disabled="currentIndex <= 0"
-            outline
             @click="$emit('showPrevDetail', false, true)"
             icon="navigate_before"
             :label="t('common.previous')"
@@ -315,10 +313,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="">
             <q-btn
               data-test="logs-detail-table-search-around-btn"
-              class="text-bold"
+              class="o2-secondary-button tw-h-[36px]"
               text-color="light-text"
               no-caps
-              outline
+              flat
               :label="t('common.searchAround')"
               @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))"
               padding="sm md"
@@ -328,11 +326,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="col-2 items-end">
           <q-btn
             data-test="log-detail-next-detail-btn"
-            class="text-bold"
+            class="o2-secondary-button tw-h-[36px]"
             text-color="light-text"
-            no-caps
             :disabled="currentIndex >= totalLength - 1"
-            outline
             @click="$emit('showNextDetail', true, false)"
             icon-right="navigate_next"
             :label="t('common.next')"

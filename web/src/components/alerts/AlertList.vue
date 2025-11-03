@@ -654,11 +654,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 class="showLabelOnTop no-case tw-mt-[1px] q-mb-sm"
               />
-              <SelectFolderDropDown
+              <div class="q-mb-lg">
+                <SelectFolderDropDown
                   :type="'alerts'"
                   @folder-selected="updateFolderIdToBeCloned"
                   :activeFolderId="folderIdToBeCloned"
-                  />
+                />
+              </div>
               <div class="flex justify-center q-mt-sm">
                 <q-btn
                   data-test="clone-alert-cancel-btn"
