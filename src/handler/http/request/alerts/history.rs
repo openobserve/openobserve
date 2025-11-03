@@ -28,6 +28,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::auth::validator::list_objects_for_user;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -150,8 +152,75 @@ pub async fn get_alert_history(
         ));
     }
 
+    // RBAC: Check permissions and filter by accessible alerts
+    #[cfg(feature = "enterprise")]
+    let mut permitted_alert_names = alert_names;
+    #[cfg(not(feature = "enterprise"))]
+    let permitted_alert_names = alert_names;
+
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = &user_email.user_id;
+
+        // If specific alert_name is requested, validate access to it
+        if let Some(ref alert_name) = query.alert_name {
+            // Check if user has permission to view this specific alert
+            match list_objects_for_user(&org_id, user_id, "GET", "alerts").await {
+                Ok(Some(permitted)) => {
+                    // User has limited access - check if this alert is in the permitted list
+                    if !permitted.contains(alert_name) {
+                        return MetaHttpResponse::forbidden(format!(
+                            "Access denied to alert '{alert_name}'"
+                        ));
+                    }
+                }
+                Ok(None) => {
+                    // No filtering needed (root user or RBAC disabled)
+                }
+                Err(e) => {
+                    return MetaHttpResponse::forbidden(e.to_string());
+                }
+            }
+        } else {
+            // List all history - filter by permitted alerts
+            match list_objects_for_user(&org_id, user_id, "GET", "alerts").await {
+                Ok(Some(permitted)) => {
+                    // Filter alert_names to only include permitted ones
+                    permitted_alert_names.retain(|name| permitted.contains(name));
+
+                    // If user has no access to any alerts, return empty result
+                    if permitted_alert_names.is_empty() {
+                        return MetaHttpResponse::json(AlertHistoryResponse {
+                            total: 0,
+                            from,
+                            size,
+                            hits: vec![],
+                        });
+                    }
+                }
+                Ok(None) => {
+                    // No filtering needed (root user or RBAC disabled)
+                }
+                Err(e) => {
+                    return MetaHttpResponse::forbidden(e.to_string());
+                }
+            }
+        }
+    }
+
+    // Build SQL query for the _meta organization's triggers stream
+    let mut sql = format!(
+        "SELECT _timestamp, org, key, status, is_realtime, is_silenced, \
+         start_time, end_time, retries, \
+         delay_in_secs, evaluation_took_in_secs, \
+         source_node, query_took \
+         FROM \"{TRIGGERS_STREAM}\" \
+         WHERE module = 'alert' AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+    );
+
     // Helper function to escape alert names for SQL LIKE patterns
-    fn escape_like(input: &str) -> String {
+    fn escape_like(input: impl AsRef<str>) -> String {
+        let input = input.as_ref();
         let mut escaped = String::with_capacity(input.len());
         for c in input.chars() {
             match c {
@@ -175,17 +244,18 @@ pub async fn get_alert_history(
     if let Some(ref alert_name) = query.alert_name {
         // We need to filter where key starts with the alert name
         let escaped_name = escape_like(alert_name);
-        where_clause.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
-    } else if !alert_names.is_empty() {
-        // Filter by all alerts in the organization
-        let alert_filter = alert_names
+        sql.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
+    } else if !permitted_alert_names.is_empty() {
+        // Filter by permitted alerts only
+        let alert_filter = permitted_alert_names
             .iter()
+            .map(escape_like)
             .map(|name| format!("key LIKE '{}/%'", name.replace("'", "''")))
             .collect::<Vec<_>>()
             .join(" OR ");
         where_clause.push_str(&format!(" AND ({alert_filter})"));
     } else {
-        // No alerts in the organization, return empty result
+        // No accessible alerts, return empty result
         return MetaHttpResponse::json(AlertHistoryResponse {
             total: 0,
             from,
