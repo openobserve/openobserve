@@ -194,12 +194,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #body-cell-is_silenced="props">
           <q-td :props="props">
             <q-icon
-              v-if="props.row.is_silenced"
-              name="volume_off"
-              color="warning"
+              :name="props.row.is_silenced ? 'volume_off' : 'volume_up'"
+              :color="props.row.is_silenced ? 'warning' : 'positive'"
               size="sm"
             >
-              <q-tooltip>Silenced</q-tooltip>
+              <q-tooltip>
+                {{ props.row.is_silenced ? "Silenced" : "Not Silenced" }}
+              </q-tooltip>
             </q-icon>
           </q-td>
         </template>

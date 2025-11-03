@@ -199,9 +199,8 @@ pub async fn get_pipeline_history(
 
     // Step 1: Get the total count of matching records
     // Build count query (no LIMIT/OFFSET, will be rewritten to COUNT(*) by track_total_hits)
-    let count_sql = format!(
-        "SELECT _timestamp FROM \"{TRIGGERS_USAGE_STREAM}\" WHERE {where_clause}"
-    );
+    let count_sql =
+        format!("SELECT _timestamp FROM \"{TRIGGERS_USAGE_STREAM}\" WHERE {where_clause}");
 
     let count_req = SearchRequest {
         query: Query {
@@ -209,7 +208,7 @@ pub async fn get_pipeline_history(
             start_time,
             end_time,
             from: 0,
-            size: 1, // We only need the count, not the actual records
+            size: 1,                // We only need the count, not the actual records
             track_total_hits: true, // This triggers the COUNT(*) rewrite
             ..Default::default()
         },
@@ -304,7 +303,7 @@ pub async fn get_pipeline_history(
         // Extract pipeline name from key field (format: "pipeline_name/pipeline_id")
         let key = hit.get("key").and_then(|v| v.as_str()).unwrap_or("");
 
-        let mut pipeline_name = key.split('/').skip(2).next().unwrap_or("").to_string();
+        let mut pipeline_name = key.split('/').nth(2).unwrap_or("").to_string();
 
         // Skip if pipeline_name is empty
         if pipeline_name.is_empty() {

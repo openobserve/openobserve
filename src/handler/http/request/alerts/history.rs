@@ -199,9 +199,8 @@ pub async fn get_alert_history(
 
     // Step 1: Get the total count of matching records
     // Build count query (no LIMIT/OFFSET, will be rewritten to COUNT(*) by track_total_hits)
-    let count_sql = format!(
-        "SELECT _timestamp FROM \"{TRIGGERS_USAGE_STREAM}\" WHERE {where_clause}"
-    );
+    let count_sql =
+        format!("SELECT _timestamp FROM \"{TRIGGERS_USAGE_STREAM}\" WHERE {where_clause}");
 
     let count_req = SearchRequest {
         query: Query {
@@ -209,7 +208,7 @@ pub async fn get_alert_history(
             start_time,
             end_time,
             from: 0,
-            size: 1, // We only need the count, not the actual records
+            size: 1,                // We only need the count, not the actual records
             track_total_hits: true, // This triggers the COUNT(*) rewrite
             ..Default::default()
         },
