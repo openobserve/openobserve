@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-center items-baseline">
+  <div class="flex justify-center items-start">
     <!-- select new dashboard -->
     <q-select
       v-model="selectedDashboard"
@@ -26,10 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       behavior="menu"
       borderless
       dense
-      class="q-mb-xs showLabelOnTop"
-      style="width: calc(100% - 40px)"
+      class="q-mb-xs showLabelOnTop o2-custom-select-dashboard"
+      style="width: calc(100% - 44px)"
       :loading="getDashboardList.isLoading.value"
-     hide-bottom-space>
+      hide-bottom-space
+    >
       <template #no-option>
         <q-item>
           <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -38,18 +39,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-select>
 
     <q-btn
-      class="q-mb-md text-bold"
+      class="q-mb-md add-folder-btn q-ml-xs"
       data-test="dashboard-dashboard-new-add"
-      label="+"
-      text-color="light-text"
-      style="width: 40px; height: 42px"
+      style="width: 40px"
+      :style="computedStyle"
       no-caps
+      dense
       @click="
         () => {
           showAddDashboardDialog = true;
         }
       "
-    />
+    >
+      <q-icon name="add" size="xs" />
+    </q-btn>
   </div>
   <!-- add dashboard -->
   <q-dialog
@@ -68,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch } from "vue";
+import { defineComponent, onActivated, ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
@@ -93,6 +96,10 @@ export default defineComponent({
     const showAddDashboardDialog: any = ref(false);
     const dashboardList: any = ref([]);
 
+    const computedStyle = computed(() => {
+      return "height: 35px; margin-top: 13px";
+    });
+
     //dropdown selected dashboard
     const selectedDashboard: any = ref(null);
     const { t } = useI18n();
@@ -116,14 +123,14 @@ export default defineComponent({
 
       const allDashboardDataByFolderId = await getAllDashboardsByFolderId(
         store,
-        props.folderId
+        props.folderId,
       );
 
       dashboardList.value = allDashboardDataByFolderId?.map(
         (dashboard: any) => ({
           label: dashboard.title,
           value: dashboard.dashboardId,
-        })
+        }),
       );
 
       // select first dashboard
@@ -152,14 +159,14 @@ export default defineComponent({
       () => [props.folderId],
       () => {
         getDashboardList.execute();
-      }
+      },
     );
 
     watch(
       () => selectedDashboard.value,
       () => {
         emit("dashboard-selected", selectedDashboard.value);
-      }
+      },
     );
 
     return {
@@ -170,6 +177,7 @@ export default defineComponent({
       showAddDashboardDialog,
       dashboardList,
       getDashboardList,
+      computedStyle,
     };
   },
 });
