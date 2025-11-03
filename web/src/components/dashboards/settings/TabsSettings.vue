@@ -22,11 +22,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <DashboardHeader :title="t('dashboard.tabSettingsTitle')">
       <template #right>
         <q-btn
-          class="text-bold no-border q-ml-md"
+          class="text-bold no-border q-ml-md o2-primary-button"
           no-caps
           no-outline
           rounded
-          color="secondary"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-primary-button-dark'
+              : 'o2-primary-button-light'
+          "
           :label="t(`dashboard.newTab`)"
           @click.stop="addNewItem"
           data-test="dashboard-tab-settings-add-tab"
@@ -476,5 +480,12 @@ export default defineComponent({
   display: flex;
   justify-content: flex-end;
   gap: 4px;
+}
+.q-btn {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
 }
 </style>

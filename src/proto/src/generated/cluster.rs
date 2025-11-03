@@ -496,7 +496,7 @@ pub struct MetricsQueryRequest {
     #[prost(int64, tag = "8")]
     pub timeout: i64,
     #[prost(bool, tag = "9")]
-    pub no_cache: bool,
+    pub use_cache: bool,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]

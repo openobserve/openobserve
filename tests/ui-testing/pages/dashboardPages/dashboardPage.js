@@ -25,8 +25,10 @@ export class DashboardPage {
   async navigateToDashboards() {
     await this.page.waitForSelector('[data-test="menu-link-\\/dashboards-item"]');
     await this.dashboardsMenuItem.click();
-    await this.page.waitForTimeout(5000);
-    await expect(this.page.getByRole('main')).toContainText('Dashboards');
+    // Wait for navigation to complete by checking URL
+    await this.page.waitForURL('**/dashboards**', { timeout: 10000 });
+    // Wait for the dashboard page to load by checking for a key element
+    await this.page.waitForSelector('[data-test="dashboard-add"]', { timeout: 10000 });
   }
   async createDashboard() {
     await this.page.waitForSelector('[data-test="dashboard-add"]');

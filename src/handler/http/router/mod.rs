@@ -557,7 +557,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(pipeline::delete_pipeline)
         .service(pipeline::enable_pipeline)
         .service(pipeline::enable_pipeline_bulk)
+        .service(pipelines::history::get_pipeline_history)
         .service(search::multi_streams::search_multi)
+        .service(search::multi_streams::search_multi_stream)
         .service(search::multi_streams::_search_partition_multi)
         .service(search::multi_streams::around_multi)
         .service(stream::delete_stream_cache)
@@ -612,7 +614,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(re_pattern::delete)
         .service(re_pattern::test)
         .service(domain_management::get_domain_management_config)
-        .service(domain_management::set_domain_management_config);
+        .service(domain_management::set_domain_management_config)
+        .service(traces::get_service_graph_metrics)
+        .service(traces::get_store_stats);
 
     #[cfg(feature = "cloud")]
     let service = service

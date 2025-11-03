@@ -24,13 +24,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-dropdown-tab-selection"
       input-debounce="0"
       behavior="menu"
-      filled
       borderless
       dense
       class="q-mb-xs showLabelOnTop"
       style="width: calc(100% - 40px)"
       :loading="getTabList.isLoading.value"
-    >
+     hide-bottom-space>
       <template #no-option>
         <q-item>
           <q-item-section> {{ t("search.noResult") }}</q-item-section>

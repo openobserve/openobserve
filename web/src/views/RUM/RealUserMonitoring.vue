@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div :style="{ height: 'calc(100vh - 57px)', overflow: 'hidden' }">
+  <div :style="{ height: 'calc(100vh - 41px)', overflow: 'hidden' }">
     <template v-if="isLoading.length">
       <div
-        class="q-pb-lg flex items-center justify-center text-center"
+        class="q-pb-lg flex items-center justify-center text-center q-pt-xs"
         style="height: calc(100vh - 190px)"
       >
         <div>
@@ -34,15 +34,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <AppTabs
-        :show="showTabs"
-        :tabs="tabs"
-        v-model:active-tab="activeTab"
-        @update:active-tab="changeTab"
-      />
+      <div class="tw-pb-[0.625rem] tw-px-[0.625rem] q-pt-xs">
+        <AppTabs
+          :show="showTabs"
+          :tabs="tabs"
+          class="card-container"
+          v-model:active-tab="activeTab"
+          @update:active-tab="changeTab"
+        />
+      </div>
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
-          <keep-alive>
+          <keep-alive class="tw-h-full">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -51,38 +54,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </keep-alive>
         </template>
         <template v-else>
-          <component
-            :is="Component"
-            :isRumEnabled="isRumEnabled"
-            :isSessionReplayEnabled="isSessionReplayEnabled"
-          />
+          <div class="tw-h-full">
+            <component
+              :is="Component"
+              :isRumEnabled="isRumEnabled"
+              :isSessionReplayEnabled="isSessionReplayEnabled"
+            />
+          </div>
         </template>
       </router-view>
     </template>
     <template v-else>
-      <div class="q-pa-lg enable-rum">
-        <div class="q-pb-lg">
-          <div class="text-left text-h6 text-bold q-pb-md">
-            {{ t("rum.aboutRUMTitle") }}
+      <div class="q-pt-xs">
+        <div class="q-pa-lg tw-mx-[0.625rem] enable-rum card-container">
+          <div class="q-pb-lg">
+            <div class="text-left text-h6 text-bold q-pb-md">
+              {{ t("rum.aboutRUMTitle") }}
+            </div>
+            <div class="text-subtitle1">
+              {{ t("rum.aboutRUMMessage") }}
+            </div>
+            <div>
+              <div></div>
+            </div>
           </div>
-          <div class="text-subtitle1">
-            {{ t("rum.aboutRUMMessage") }}
-          </div>
-          <div>
-            <div></div>
-          </div>
+          <q-btn
+            class="o2-primary-button tw-h-[36px]"
+            flat
+            no-caps
+            :title="t('rum.getStartedTitle')"
+            @click="getStarted"
+          >
+            {{ t("rum.getStartedLabel") }}
+            <q-icon name="arrow_forward" size="20px"
+  class="q-ml-xs" />
+          </q-btn>
         </div>
-        <q-btn
-          class="o2-primary-button tw-h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          flat
-          no-caps
-          :title="t('rum.getStartedTitle')"
-          @click="getStarted"
-        >
-          {{ t("rum.getStartedLabel") }}
-          <q-icon name="arrow_forward" size="20px" class="q-ml-xs" />
-        </q-btn>
       </div>
     </template>
   </div>
@@ -190,7 +197,7 @@ onActivated(async () => {
 
 watch(
   () => routeName.value,
-  () => updateTabOnRouteChange()
+  () => updateTabOnRouteChange(),
 );
 
 const updateTabOnRouteChange = () => {
@@ -264,7 +271,7 @@ const changeTab = (tab: string) => {
       name: "ErrorTracking",
       query: getQueryParams(
         performanceState.data.datetime,
-        errorTrackingState.data.editorValue
+        errorTrackingState.data.editorValue,
       ),
     });
     return;
@@ -275,7 +282,7 @@ const changeTab = (tab: string) => {
       name: "Sessions",
       query: getQueryParams(
         performanceState.data.datetime,
-        sessionState.data.editorValue
+        sessionState.data.editorValue,
       ),
     });
     return;
@@ -356,6 +363,8 @@ const getRumDataFields = () => {
 }
 
 .enable-rum {
-  max-width: 1024px;
+  max-width: 100%;
+  max-height: 100%;
+  height: calc(100vh - 50px);
 }
 </style>

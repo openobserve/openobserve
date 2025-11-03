@@ -15,59 +15,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-mt-md full-width">
-    <div class="flex q-mx-md items-center no-wrap">
-      <div class="col">
-        <div class="flex">
+  <div class="o2-custom-bg" style="height: calc(100vh - 50px);">
+    <div class="card-container tw-mb-[0.625rem] ">
+      <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]">
+        <div class="col">
+          <div class="flex">
+            <q-btn
+              no-caps
+              padding="xs"
+              outline
+              @click="arrowBackFn"
+              icon="arrow_back_ios_new"
+              data-test="destination-import-back-btn"
+            />
+            <div class="text-h6 q-ml-md">Import Destination</div>
+          </div>
+        </div>
+        <div class="flex justify-center">
           <q-btn
+            v-close-popup
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
+            :label="t('function.cancel')"
             no-caps
-            padding="xs"
-            outline
-            @click="arrowBackFn"
-            icon="arrow_back_ios_new"
-            data-test="destination-import-back-btn"
+            flat
+            @click="router.back()"
+            data-test="destination-import-cancel-btn"
           />
-          <div class="text-h6 q-ml-md">Import Destination</div>
+          <q-btn
+            class="o2-primary-button no-border tw-h-[36px]"
+            :label="t('dashboard.import')"
+            type="submit"
+            no-caps
+            flat
+            @click="importJson"
+            data-test="destination-import-json-btn"
+          />
         </div>
       </div>
-      <div class="flex justify-center">
-        <q-btn
-          v-close-popup
-          class="q-mr-md o2-secondary-button tw-h-[36px]"
-          :label="t('function.cancel')"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          @click="router.back()"
-          data-test="destination-import-cancel-btn"
-        />
-        <q-btn
-          class="o2-primary-button no-border tw-h-[36px]"
-          :label="t('dashboard.import')"
-          type="submit"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          @click="importJson"
-          data-test="destination-import-json-btn"
-        />
-      </div>
-    </div>
-
-    <q-separator class="q-my-sm q-mx-md" />
   </div>
   <div class="flex">
-    <div class="report-list-tabs flex items-center justify-center q-mx-md">
-      <app-tabs
-        data-test="destination-import-tabs"
-        class="q-mr-md"
-        :tabs="tabs"
-        v-model:active-tab="activeTab"
-        @update:active-tab="updateActiveTab"
-      />
-    </div>
 
-    <div class="flex" style="width: 100%">
+    <div class="flex" style="width: calc(100vw - 1px)">
       <q-splitter
         class="logs-search-splitter"
         no-scroll
@@ -78,106 +66,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
       >
         <template #before>
-          <div
-            v-if="activeTab == 'import_json_url'"
-            class="editor-container-url"
-          >
-            <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: 100%" class="q-mb-md">
-                <q-input
-                  v-model="url"
-                  :label="t('dashboard.addURL')"
-                  color="input-border"
-                  bg-color="input-bg"
-                  stack-label
-                  filled
-                  label-slot
-                  data-test="destination-import-url-input"
+          <div class="tw-w-full tw-h-full ">
+            <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
+              <div class="app-tabs-container tw-h-[36px] tw-w-fit">
+              <app-tabs
+                data-test="destination-import-tabs"
+                class="tabs-selection-container"
+                :tabs="tabs"
+                v-model:active-tab="activeTab"
+                @update:active-tab="updateActiveTab"
+              />
+            </div>
+            </div>
+            <div
+              v-if="activeTab == 'import_json_url'"
+              class="editor-container-url card-container tw-py-1 "
+            >
+              <q-form class="q-mt-md tw-pb-2" @submit="onSubmit">
+                <div style="width: 100%" class="q-mb-md tw-px-2">
+                  <q-input
+                    v-model="url"
+                    :label="t('dashboard.addURL')"
+                    color="input-border"
+                    bg-color="input-bg"
+                    stack-label
+                    filled
+                    label-slot
+                    data-test="destination-import-url-input"
+                  />
+                </div>
+                <query-editor
+                  data-test="destination-import-sql-editor"
+                  ref="queryEditorRef"
+                  editor-id="destination-import-query-editor"
+                  class="monaco-editor tw-mx-2"
+                  :debounceTime="300"
+                  v-model:query="jsonStr"
+                  language="json"
+                  :class="
+                    jsonStr == '' && queryEditorPlaceholderFlag
+                      ? 'empty-query'
+                      : ''
+                  "
+                  @focus="queryEditorPlaceholderFlag = false"
+                  @blur="queryEditorPlaceholderFlag = true"
                 />
-              </div>
-              <query-editor
-                data-test="destination-import-sql-editor"
-                ref="queryEditorRef"
-                editor-id="destination-import-query-editor"
-                class="monaco-editor"
-                :debounceTime="300"
-                v-model:query="jsonStr"
-                language="json"
-                :class="
-                  jsonStr == '' && queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="queryEditorPlaceholderFlag = true"
-              />
 
-              <div></div>
-            </q-form>
-          </div>
-          <div
-            v-if="activeTab == 'import_json_file'"
-            class="editor-container-json"
-          >
-            <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: 100%" class="q-mb-md">
-                <q-file
-                  v-model="jsonFiles"
-                  filled
-                  bottom-slots
-                  :label="t('dashboard.dropFileMsg')"
-                  accept=".json"
-                  multiple
-                  data-test="destination-import-file-input"
-                >
-                  <template v-slot:prepend>
-                    <q-icon name="cloud_upload" @click.stop.prevent />
-                  </template>
-                  <template v-slot:append>
-                    <q-icon
-                      name="close"
-                      @click.stop.prevent="jsonFiles = null"
-                      class="cursor-pointer"
-                      data-test="destination-import-file-close-btn"
-                    />
-                  </template>
-                  <template v-slot:hint> .json files only </template>
-                </q-file>
-              </div>
-              <query-editor
-                data-test="destination-import-sql-editor"
-                ref="queryEditorRef"
-                editor-id="destination-import-query-editor"
-                class="monaco-editor"
-                :debounceTime="300"
-                v-model:query="jsonStr"
-                language="json"
-                :class="
-                  jsonStr == '' && queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="queryEditorPlaceholderFlag = true"
-              />
+                <div></div>
+              </q-form>
+            </div>
+            <div
+              v-if="activeTab == 'import_json_file'"
+              class="editor-container-json card-container tw-py-1 "
+            >
+              <q-form class="q-mt-md tw-pb-2" @submit="onSubmit">
+                <div style="width: 100%" class="q-mb-md tw-px-2">
+                  <q-file
+                    v-model="jsonFiles"
+                    bottom-slots
+                    :label="t('dashboard.dropFileMsg')"
+                    accept=".json"
+                    multiple
+                    data-test="destination-import-file-input"
+                  >
+                    <template v-slot:prepend>
+                      <q-icon name="cloud_upload" @click.stop.prevent />
+                    </template>
+                    <template v-slot:append>
+                      <q-icon
+                        name="close"
+                        @click.stop.prevent="jsonFiles = null"
+                        class="cursor-pointer"
+                        data-test="destination-import-file-close-btn"
+                      />
+                    </template>
+                    <template v-slot:hint> .json files only </template>
+                  </q-file>
+                </div>
+                <query-editor
+                  data-test="destination-import-sql-editor"
+                  ref="queryEditorRef"
+                  editor-id="destination-import-query-editor"
+                  class="monaco-editor tw-mx-2"
+                  :debounceTime="300"
+                  v-model:query="jsonStr"
+                  language="json"
+                  :class="
+                    jsonStr == '' && queryEditorPlaceholderFlag
+                      ? 'empty-query'
+                      : ''
+                  "
+                  @focus="queryEditorPlaceholderFlag = false"
+                  @blur="queryEditorPlaceholderFlag = true"
+                />
 
-              <div></div>
-            </q-form>
+                <div></div>
+              </q-form>
+            </div>
           </div>
         </template>
 
         <template #after>
           <div
             data-test="destination-import-output-editor"
-            style="width: 100%; height: 100%"
+            style="width: calc(100% - 10px); height: 100%"
+             class="card-container tw-ml-[0.625rem] tw-h-full"
           >
             <div
               v-if="destinationErrorsToDisplay.length > 0"
-              class="text-center text-h6"
+              class="text-center text-h6 tw-py-2"
             >
               Error Validations
             </div>
-            <div v-else class="text-center text-h6">Output Messages</div>
+            <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
             <q-separator class="q-mx-md q-mt-md" />
             <div class="error-report-container">
               <!-- Destination Errors Section -->
@@ -502,6 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
+  </div>
   </div>
 </template>
 
@@ -1178,22 +1180,26 @@ export default defineComponent({
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(66vh - 8px) !important; /* Total editor height */
+    height: calc(100vh - 276px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .editor-container-json {
   .monaco-editor {
-    height: calc(65vh - 20px) !important; /* Total editor height */
+    height: calc(100vh - 315px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .monaco-editor {
-  height: calc(60vh - 14px) !important; /* Total editor height */
+  height: calc(100vh - 14px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none; /* Remove resize behavior */
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
+  padding-top: 0.3rem;
+
 }
 .error-report-container {
   height: calc(70vh - 8px) !important; /* Total editor height */

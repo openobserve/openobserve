@@ -15,90 +15,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-mt-md full-width">
-    <div class="flex q-mx-md items-center no-wrap">
-      <div class="col">
-        <div class="flex">
+  <div class="tw-w-full tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs">
+    <div class="card-container">
+      <div class="flex tw-py-3 tw-px-4 items-center no-wrap tw-h-[68px]">
+        <div class="col">
+          <div class="flex">
+            <q-btn
+              no-caps
+              padding="xs"
+              outline
+              @click="router.back()"
+              icon="arrow_back_ios_new"
+              data-test="alert-import-back-btn"
+            />
+            <div class="tw-font-[600] tw-text-[20px] q-ml-md">Import Alert</div>
+          </div>
+        </div>
+        <div class="flex justify-center">
           <q-btn
+            v-close-popup
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
+            :label="t('function.cancel')"
             no-caps
-            padding="xs"
-            outline
+            flat
             @click="router.back()"
-            icon="arrow_back_ios_new"
-            data-test="alert-import-back-btn"
+            data-test="alert-import-cancel-btn"
           />
-          <div class="tw-font-[600] tw-text-[20px] q-ml-md">Import Alert</div>
+          <q-btn
+            class="o2-primary-button no-border tw-h-[36px]"
+            :label="t('dashboard.import')"
+            type="submit"
+            padding="sm xl"
+            no-caps
+            @click="importJson"
+            :loading="isAlertImporting"
+            :disable="isAlertImporting"
+            data-test="alert-import-json-btn"
+          />
         </div>
       </div>
-      <div class="flex justify-center">
-        <q-btn
-          v-close-popup
-          class="q-mr-md o2-secondary-button tw-h-[36px]"
-          :label="t('function.cancel')"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          @click="router.back()"
-          data-test="alert-import-cancel-btn"
-        />
-        <q-btn
-          class="o2-primary-button no-border tw-h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          :label="t('dashboard.import')"
-          type="submit"
-          padding="sm xl"
-          no-caps
-          @click="importJson"
-          :loading="isAlertImporting"
-          :disable="isAlertImporting"
-          data-test="alert-import-json-btn"
-        />
-      </div>
     </div>
-
-    <q-separator class="q-my-sm q-mx-md" />
   </div>
-  <div class="flex">
-    <div class="report-list-tabs flex items-center justify-center q-mx-md">
-      <app-tabs
-        data-test="alert-import-tabs"
-        class="q-mr-md"
-        :tabs="tabs"
-        v-model:active-tab="activeTab"
-        @update:active-tab="updateActiveTab"
-      />
-    </div>
+  <div class="flex tw-mx-2">
 
     <div class="flex">
       <q-splitter
         class="logs-search-splitter"
         no-scroll
         v-model="splitterModel"
-        style="width: calc(95vw - 20px); height: 100%"
+        style="width: calc(100vw - 100px);"
       >
+      
         <template #before>
+              <div class="tw-w-full tw-h-full ">
+          <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
+                   <div class="app-tabs-container tw-h-[36px] tw-w-fit">
+            <app-tabs
+              data-test="alert-import-tabs"
+              class="tabs-selection-container"
+              :tabs="tabs"
+              v-model:active-tab="activeTab"
+              @update:active-tab="updateActiveTab"
+            />
+            </div>
+           </div>
           <div
             v-if="activeTab == 'import_json_url'"
-            class="editor-container-url"
+            class="editor-container-url card-container tw-py-1"
           >
-            <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: calc(100% - 10px)" class="q-mb-md flex">
+            <q-form class="tw-mx-2 tw-pb-2" @submit="onSubmit">
+              <div class="flex tw-mt-[0.725rem] tw-h-[64px]">
                 <div style="width: calc(69%)" class="q-pr-sm">
                   <q-input
                     data-test="alert-import-url-input"
                     v-model="url"
                     :label="t('dashboard.addURL')"
-                    color="input-border"
-                    bg-color="input-bg"
                     stack-label
-                    filled
+                    borderless
                     label-slot
+                    style="padding: 10px 0px;"
                   />
                 </div>
 
                 <div
-                  style="width: calc(30%)"
-                  class="alert-folder-dropdown"
+                  style="width: calc(30%); position: relative; top:10px;"
                   data-test="alert-folder-dropdown"
                 >
                   <SelectFolderDropDown
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-import-sql-editor"
                 ref="queryEditorRef"
                 editor-id="alert-import-query-editor"
-                class="monaco-editor"
+                class="monaco-editor tw-mx-2"
                 :debounceTime="300"
                 v-model:query="jsonStr"
                 language="json"
@@ -130,10 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="activeTab == 'import_json_file'"
-            class="editor-container-json"
+            class="editor-container-json card-container tw-py-1"
           >
-            <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div style="width: calc(100% - 10px)" class="q-mb-md flex">
+            <q-form class="tw-mx-2 q-mt-md tw-pb-2" @submit="onSubmit">
+              <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
                 <div style="width: calc(69%)" class="q-pr-sm">
                   <q-file
                     data-test="alert-import-json-file-input"
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-slot:hint> .json files only </template>
                   </q-file>
                 </div>
-                <div style="width: calc(30%)" class="alert-folder-dropdown">
+                <div style="width: calc(30%); position: relative;">
                   <SelectFolderDropDown
                     :type="'alerts'"
                     @folder-selected="updateActiveFolderId"
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-import-sql-editor"
                 ref="queryEditorRef"
                 editor-id="alert-import-query-editor"
-                class="monaco-editor"
+                class="monaco-editor tw-mx-2"
                 :debounceTime="300"
                 v-model:query="jsonStr"
                 language="json"
@@ -185,11 +185,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div></div>
             </q-form>
           </div>
+        </div>
         </template>
         <template #after>
           <div
             data-test="alert-import-output-editor"
-            style="width: 100%; height: 100%"
+            class="card-container tw-mb-[0.625rem] tw-h-[calc(100vh-130px)]"
           >
             <div
               v-if="alertErrorsToDisplay.length > 0"
@@ -197,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               Error Validations
             </div>
-            <div v-else class="text-center text-h6">Output Messages</div>
+            <div v-else class="text-center text-h6 tw-py-2 ">Output Messages</div>
             <q-separator class="q-mx-md q-mt-md" />
             <div class="error-report-container">
               <!-- Alert Errors Section -->
@@ -1440,7 +1441,7 @@ export default defineComponent({
 
 .alert-folder-dropdown {
   :deep(.q-field--labeled.showLabelOnTop) {
-    padding-top: 12px; /* Example override */
+    padding-top: 10px; /* Example override */
   }
 }
 
@@ -1450,39 +1451,46 @@ export default defineComponent({
   background-size: 170px;
 }
 .editor-container {
-  height: calc(78vh - 20px) !important;
+  height: calc(75vh - 20px) !important;
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(70vh - 16px) !important; /* Total editor height */
+    height: calc(100vh - 286px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
+    padding-top: 12px;
   }
 }
+
 .editor-container-json {
   .monaco-editor {
-    height: calc(70vh - 22px) !important; /* Total editor height */
+    height: calc(100vh - 314px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
+    padding-top: 12px;
   }
 }
+
 .monaco-editor {
-  height: calc(81vh - 14px) !important; /* Total editor height */
+  height: calc(100vh - 14px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none; /* Remove resize behavior */
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
 }
+
 .error-report-container {
-  height: calc(78vh - 24px) !important; /* Total editor height */
+  height: calc(100vh - 192px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none;
 }
+
 .error-container {
   display: flex;
   overflow-y: auto;
-
   flex-direction: column;
   border: 1px solid #ccc;
-  height: calc(100% - 100px) !important; /* Total container height */
+  height: calc(100% - 80px) !important; /* Total container height */
 }
 
 .error-section {

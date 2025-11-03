@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="height: 100%; width: 100%">
-    <q-separator></q-separator>
     <div class="row" style="height: 100%">
+      <div class="tw-pl-[0.625rem]" style="overflow-y: auto;">
       <div
-        class="col scroll"
+        class="col scroll card-container tw-mr-[0.625rem]"
         style="
           overflow-y: auto;
           height: 100%;
@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-chart-type="handleChartTypeChange"
         />
       </div>
+      </div>
       <q-separator vertical />
       <!-- for query related chart only -->
       <div
@@ -55,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- collapse field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="field-list-sidebar-header-collapsed"
+          class="field-list-sidebar-header-collapsed card-container"
           @click="collapseFieldList"
           style="width: 50px; height: 100%"
         >
@@ -73,7 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; height: 100%"
         >
           <template #before>
-            <div class="col scroll" style="height: 100%; overflow-y: auto">
+            <div class="tw-w-full tw-h-full">
+            <div class="col scroll card-container" style="height: 100%; overflow-y: auto">
               <div class="column" style="height: 100%">
                 <div class="col-auto q-pa-sm">
                   <span class="text-weight-bold">{{ t("panel.fields") }}</span>
@@ -82,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <FieldList :editMode="true" :hideAllFieldsSelection="true" />
                 </div>
               </div>
+            </div>
             </div>
           </template>
           <template #separator>
@@ -102,12 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div
-              class="row"
+              class="row card-container"
               :style="{
                 height: '100%',
                 width: dashboardPanelData.layout.showFieldList
                   ? '100%'
-                  : 'calc(100% - 50px)',
+                  : 'calc(100% - 58px)',
               }"
             >
               <div class="col" style="height: 100%">
