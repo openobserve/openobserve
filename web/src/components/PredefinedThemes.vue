@@ -15,8 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="dialogOpen" position="right" maximized seamless>
-    <q-card class="predefined-theme-card" style="width: 400px; max-width: 90vw;">
+  <q-dialog
+    v-model="dialogOpen"
+    position="right"
+    maximized
+    seamless
+    transition-show="slide-left"
+    transition-hide="slide-right"
+  >
+    <q-card
+      class="predefined-theme-card"
+      style="width: 400px; max-width: 90vw;"
+    >
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">Predefined Themes</div>
         <q-space />
@@ -30,6 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tooltip>Copy Applied Theme Configuration</q-tooltip>
         </q-btn>
         <q-btn icon="close" flat round dense v-close-popup />
+      </q-card-section>
+
+      <q-card-section class="q-pt-xs q-pb-sm tw-flex">
+        <div class="text-caption text-grey-7 tw-flex  q-gutter-xs">
+          <q-icon name="info" size="16px" />
+          <span>Panel auto-hides when you click away. Hover over the edge to bring it back.</span>
+        </div>
       </q-card-section>
 
       <q-card-section class="q-pt-none">

@@ -137,6 +137,7 @@ class="warning" />{{
             :ripple="false"
             @click="openPredefinedThemes"
             data-test="menu-link-predefined-themes-item"
+            :class="{ 'theme-btn-active': isPredefinedThemesOpen }"
           >
             <div class="row items-center no-wrap">
               <q-icon name="color_lens" class="header-icon"></q-icon>
@@ -152,6 +153,7 @@ class="warning" />{{
             :ripple="false"
             @click="openThemeCustomizer"
             data-test="menu-link-theme-customizer-item"
+            :class="{ 'theme-btn-active': isThemeCustomizerOpen }"
           >
             <div class="row items-center no-wrap">
               <q-icon name="format_color_fill" class="header-icon"></q-icon>
@@ -723,8 +725,8 @@ export default defineComponent({
 
     const { getStreams, resetStreams } = useStreams();
     const { closeSocket } = useSearchWebSocket();
-    const { toggleCustomizer } = useThemeCustomizer();
-    const { toggleThemes } = usePredefinedThemes();
+    const { isOpen: isThemeCustomizerOpen, toggleCustomizer } = useThemeCustomizer();
+    const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
 
     const isMonacoEditorLoaded = ref(false);
     const showGetStarted = ref(
@@ -1503,6 +1505,8 @@ export default defineComponent({
       setRumUser,
       openThemeCustomizer,
       openPredefinedThemes,
+      isThemeCustomizerOpen,
+      isPredefinedThemesOpen,
     };
   },
   computed: {
@@ -1950,6 +1954,19 @@ body.ai-chat-open {
 
 .ai-hover-btn:hover .ai-icon {
   transform: rotate(180deg);
+}
+
+.theme-btn-active {
+  background: color-mix(
+    in srgb,
+    var(--o2-theme-color) 15%,
+    transparent 85%
+  ) !important;
+
+  .header-icon {
+    opacity: 1 !important;
+    color: var(--o2-theme-color) !important;
+  }
 }
 
 .organization-menu-o2 {
