@@ -328,6 +328,18 @@ const useRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
+            {
+              path: "history",
+              name: "pipelineHistory",
+              component: () =>
+                import("@/components/pipelines/PipelineHistory.vue"),
+              meta: {
+                title: "Pipeline History",
+              },
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
           ],
         },
       ],

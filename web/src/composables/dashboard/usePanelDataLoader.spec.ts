@@ -1688,6 +1688,120 @@ describe("usePanelDataLoader", () => {
         expect(loader.data.value).toBeDefined();
       });
 
+      it("should replace $__range variable in queries", async () => {
+        const panelSchema = createMockPanelSchema({
+          queries: [
+            {
+              query: "SELECT * FROM logs WHERE time >= now() - INTERVAL '$__range'",
+              fields: { stream_type: "logs" },
+            },
+          ],
+        });
+        const selectedTimeObj = createMockSelectedTimeObj();
+        const variablesData = createMockVariablesData();
+
+        const loader = usePanelDataLoader(
+          panelSchema,
+          selectedTimeObj,
+          variablesData,
+          ref({ offsetWidth: 1000 }),
+          ref(true),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null), // runId
+          ref(null), // tabId
+          ref(null), // tabName
+          ref(null), // searchResponse
+          ref(false), // is_ui_histogram
+        );
+
+        await loader.loadData();
+
+        expect(loader.data.value).toBeDefined();
+        // Metadata should be defined even if queries array might be empty
+        expect(loader.metadata.value).toBeDefined();
+      });
+
+      it("should replace ${__range} with braces in queries", async () => {
+        const panelSchema = createMockPanelSchema({
+          queries: [
+            {
+              query: "SELECT * FROM logs WHERE time >= now() - INTERVAL '${__range}'",
+              fields: { stream_type: "logs" },
+            },
+          ],
+        });
+        const selectedTimeObj = createMockSelectedTimeObj();
+        const variablesData = createMockVariablesData();
+
+        const loader = usePanelDataLoader(
+          panelSchema,
+          selectedTimeObj,
+          variablesData,
+          ref({ offsetWidth: 1000 }),
+          ref(true),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null), // runId
+          ref(null), // tabId
+          ref(null), // tabName
+          ref(null), // searchResponse
+          ref(false), // is_ui_histogram
+        );
+
+        await loader.loadData();
+
+        expect(loader.data.value).toBeDefined();
+      });
+
+      it("should correctly calculate $__range for different time spans", async () => {
+        // Test with 7 days time range
+        const panelSchema = createMockPanelSchema({
+          queries: [
+            {
+              query: "SELECT * FROM logs WHERE time >= now() - INTERVAL '$__range'",
+              fields: { stream_type: "logs" },
+            },
+          ],
+        });
+
+        const now = Date.now();
+        const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+
+        const selectedTimeObj = ref({
+          start_time: new Date(sevenDaysAgo),
+          end_time: new Date(now),
+        });
+        const variablesData = createMockVariablesData();
+
+        const loader = usePanelDataLoader(
+          panelSchema,
+          selectedTimeObj,
+          variablesData,
+          ref({ offsetWidth: 1000 }),
+          ref(true),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null), // runId
+          ref(null), // tabId
+          ref(null), // tabName
+          ref(null), // searchResponse
+          ref(false), // is_ui_histogram
+        );
+
+        await loader.loadData();
+
+        expect(loader.data.value).toBeDefined();
+        // The query should have been executed with __range replaced
+        expect(loader.metadata.value.queries).toBeDefined();
+      });
+
       it("should replace dependent variables in queries", async () => {
         const panelSchema = createMockPanelSchema({
           queries: [

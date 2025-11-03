@@ -4,11 +4,14 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AppPerformance from "./AppPerformance.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+
+// Install Quasar globally for all tests
+installQuasar();
 
 // Mock the composables
 const mockPerformanceState = {
@@ -154,7 +157,7 @@ describe("AppPerformance.vue", () => {
 
     wrapper = mount(AppPerformance, {
       global: {
-        plugins: [store, router, i18n, Quasar],
+        plugins: [store, router, i18n],
         stubs: {
           QPage: {
             template: '<div class="q-page" v-bind="$attrs"><slot /></div>',
@@ -280,7 +283,7 @@ describe("AppPerformance.vue", () => {
         
         const newWrapper = mount(AppPerformance, {
           global: {
-            plugins: [store, router, i18n, Quasar],
+            plugins: [store, router, i18n],
             stubs: {
               QPage: { template: '<div class="q-page"><slot /></div>' },
               QSeparator: { template: '<hr />' },

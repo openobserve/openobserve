@@ -468,6 +468,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     e
                 )
             });
+            log::info!("[QUERY_RECOMMENDATIONS] Setup the initial trigger.");
         }
     };
 

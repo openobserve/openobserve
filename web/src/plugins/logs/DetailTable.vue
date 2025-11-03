@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dialog-box"
     :style="{ borderTop: `4px solid ${statusColor}` }"
   >
-    <q-card-section class="q-pa-md q-pb-md">
+    <q-card-section class="q-px-md q-pb-sm">
       <div class="row items-center no-wrap">
         <div class="col">
           <div class="text-body1 text-bold" data-test="log-detail-title-text">
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
     <q-separator />
-    <div class="row justify-between">
+    <div class="row justify-between q-pt-sm">
       <div class="col-10">
         <q-tabs v-model="tab" shrink align="left">
           <q-tab
@@ -109,55 +109,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tab-panel>
       <q-tab-panel name="table" class="q-pa-none">
         <q-card-section
-          class="q-pa-none q-mb-lg"
+          class="tw-p-[0.675rem] q-mb-lg"
           data-test="log-detail-table-content"
         >
           <div v-if="rowData.length == 0" class="q-pt-md tw-max-w-[350px]">
             No data available.
           </div>
-          <div v-else class="indexDetailsContainer">
-            <q-list separator class="q-px-none q-py-none detail-table-list">
-              <q-item class="list-head">
-                <q-item-section class="text-bold col-3">
-                  {{ t("search.sourceName") }}
-                </q-item-section>
-                <q-item-section class="text-bold col-9">
-                  {{ t("search.sourceValue") }}
-                </q-item-section>
-              </q-item>
-
-              <q-item
-                v-for="(key, value) in rowData"
-                :key="'field_' + value"
-                class="list-item"
+          <q-table
+            v-else
+            ref="qTable"
+            data-test="log-detail-table"
+            :rows="tableRows"
+            :columns="tableColumns"
+            :row-key="(row) => 'field_' + row.field"
+            :rows-per-page-options="[0]"
+            class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+            dense
+          >
+            <template v-slot:body-cell-field="props">
+              <q-td
+                :data-test="`log-detail-${props.row.field}-key`"
+                class="text-left"
+                :class="store.state.theme == 'dark' ? 'tw-text-[#f67a7aff]' : 'tw-text-[#B71C1C]'"
               >
-                <q-item-section
-                  :data-test="`log-detail-${value}-key`"
-                  class="col-3 text-weight-regular"
-                  :class="store.state.theme == 'dark' ? 'tw-text-[#f67a7aff]' : 'tw-text-[#B71C1C]'"
-                  >{{ value }}</q-item-section
-                >
-                <q-item-section
-                  class="col-9 tw-inline tw-relative"
-                  :class="!shouldWrapValues ? 'ellipsis' : ''"
-                >
+                {{ props.row.field }}
+              </q-td>
+            </template>
+
+            <template v-slot:body-cell-value="props">
+              <q-td
+                class="text-left"
+                :class="!shouldWrapValues ? 'ellipsis' : ''"
+              >
+                <div class="tw-flex tw-items-start tw-gap-2">
                   <q-btn-dropdown
-                    :data-test="`log-details-include-exclude-field-btn-${value}`"
+                    :data-test="`log-details-include-exclude-field-btn-${props.row.field}`"
                     size="6px"
                     outlined
                     filled
                     dense
-                    class="q-mr-sm pointer"
+                    class="pointer"
                     name="'img:' + getImageURL('images/common/add_icon.svg')"
                   >
-                    <q-list data-test="field-list-modal">
+                    <q-list data-test="field-list-modal" class="logs-table-list">
                       <q-item
                         clickable
                         v-close-popup="true"
                         v-if="
                           searchObj.data.stream.selectedStreamFields.some(
                             (item: any) =>
-                              item.name === value ? item.isSchemaField : '',
+                              item.name === props.row.field ? item.isSchemaField : '',
                           )
                         "
                       >
@@ -165,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             data-test="log-details-include-field-btn"
                             @click="
-                              toggleIncludeSearchTerm(value, key, 'include')
+                              toggleIncludeSearchTerm(props.row.field, props.row.value, 'include')
                             "
                             ><q-btn
                               title="Add to search query"
@@ -187,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="
                           searchObj.data.stream.selectedStreamFields.some(
                             (item: any) =>
-                              item.name === value ? item.isSchemaField : '',
+                              item.name === props.row.field ? item.isSchemaField : '',
                           )
                         "
                       >
@@ -195,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             data-test="log-details-exclude-field-btn"
                             @click="
-                              toggleExcludeSearchTerm(value, key, 'exclude')
+                              toggleExcludeSearchTerm(props.row.field, props.row.value, 'exclude')
                             "
                             ><q-btn
                               title="Add to search query"
@@ -214,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-item
                         v-if="
                           !searchObj.data.stream.selectedFields.includes(
-                            value.toString(),
+                            props.row.field.toString(),
                           )
                         "
                         clickable
@@ -223,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-section>
                           <q-item-label
                             data-test="log-details-include-field-btn"
-                            @click="addFieldToTable(value.toString())"
+                            @click="addFieldToTable(props.row.field.toString())"
                             ><q-btn
                               title="Add to table"
                               size="6px"
@@ -241,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-section>
                           <q-item-label
                             data-test="log-details-include-field-btn"
-                            @click="addFieldToTable(value.toString())"
+                            @click="addFieldToTable(props.row.field.toString())"
                             ><q-btn
                               title="Remove from table "
                               size="6px"
@@ -260,18 +261,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-list>
                   </q-btn-dropdown>
                   <pre
-                    :data-test="`log-detail-${value}-value`"
-                    class="table-pre"
+                    :data-test="`log-detail-${props.row.field}-value`"
+                    class="table-pre tw-flex-1"
                     :class="
                       !shouldWrapValues
                         ? 'tw-whitespace-nowrap'
                         : 'tw-whitespace-pre-wrap'
                     "
-                  ><LogsHighLighting :data="key" :show-braces="false" :query-string="highlightQuery" /></pre>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </div>
+                  ><LogsHighLighting :data="props.row.value" :show-braces="false" :query-string="highlightQuery" /></pre>
+                </div>
+              </q-td>
+            </template>
+          </q-table>
         </q-card-section>
       </q-tab-panel>
     </q-tab-panels>
@@ -436,6 +437,35 @@ export default defineComponent({
     const {fnParsedSQL, hasAggregation} = logsUtils();
 
     const $q = useQuasar();
+
+    // Table columns for q-table
+    const tableColumns = [
+      {
+        name: "field",
+        label: t("search.sourceName"),
+        field: "field",
+        align: "left" as const,
+        headerClasses: "!tw-text-left",
+      },
+      {
+        name: "value",
+        label: t("search.sourceValue"),
+        field: "value",
+        align: "left" as const,
+        headerClasses: "!tw-text-left",
+      },
+    ];
+
+    // Transform rowData object into array of rows for q-table
+    const tableRows = computed(() => {
+      return Object.entries(rowData.value).map(([field, value]) => ({
+        field,
+        value,
+      }));
+    });
+
+    // Pagination settings for q-table (show all rows)
+    const tablePagination = ref({ rowsPerPage: 0 });
     let multiStreamFields: any = ref([]);
     let hasAggregationQuery: any = computed(() => {
       let parsedSQL = fnParsedSQL();
@@ -532,7 +562,10 @@ export default defineComponent({
       hasAggregationQuery,
       sendToAiChat,
       closeTable,
-      statusColor
+      statusColor,
+      tableColumns,
+      tableRows,
+      tablePagination,
     };
   },
   async created() {

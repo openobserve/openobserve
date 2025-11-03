@@ -27,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       inline-label
       outside-arrows
       mobile-arrows
-      active-color="primary"
       @click.stop
       style="max-width: calc(100% - 40px)"
       data-test="dashboard-tab-list"

@@ -428,7 +428,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
 
   test.afterEach(async () => {
     try {
-      await pageManager.commonActions.flipStreaming();
+      // await pageManager.commonActions.flipStreaming();
       testLogger.info('Streaming flipped after test');
     } catch (error) {
       testLogger.warn('Streaming flip failed', { error: error.message });

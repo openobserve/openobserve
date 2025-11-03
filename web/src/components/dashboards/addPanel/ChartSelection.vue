@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'bg-grey-5'
                 : 'bg-grey-3'
               : '',
-            store.state.theme === 'dark' ? 'darkModeBorder' : 'whiteModeBorder',
           ]"
+          class="dashboard-chart-border"
           v-for="(item, index) in ChartsArray"
           :disable="
             (promqlMode &&
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               color="primary"
               :name="item.image"
-              class="q-mx-auto q-mb-sm"
+              class="q-mx-auto q-my-sm"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
             <!-- <q-item-label
@@ -222,11 +222,4 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.darkModeBorder {
-  border: 0.5px solid rgba(255, 255, 255, 0.28);
-}
-
-.whiteModeBorder {
-  border: 0.5px solid rgba(0, 0, 0, 0.12);
-}
 </style>

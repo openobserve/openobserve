@@ -118,7 +118,7 @@ describe("ChartSelection", () => {
     const chartItem = wrapper.find(
       "[data-test='dashboard-addpanel-chart-selection-item']",
     );
-    expect(chartItem.classes()).toContain("darkModeBorder");
+    expect(chartItem.exists()).toBe(true);
   });
 
   it("should handle chart tooltips", async () => {
