@@ -108,9 +108,22 @@ export const convertLogData = (
         itemStyle: params.itemStyle
           ? params.itemStyle
           : {
-              color: getComputedStyle(document.documentElement)
-                .getPropertyValue("--o2-theme-color")
-                .trim(),
+              color: (() => {
+                // Check if dark mode is active
+                const isDarkMode = document.body.classList.contains('body--dark');
+
+                if (isDarkMode) {
+                  // In dark mode, read from body
+                  return getComputedStyle(document.body)
+                    .getPropertyValue("--o2-dark-theme-color")
+                    .trim();
+                } else {
+                  // In light mode, read from root
+                  return getComputedStyle(document.documentElement)
+                    .getPropertyValue("--o2-theme-color")
+                    .trim();
+                }
+              })(),
             },
       },
     ],
