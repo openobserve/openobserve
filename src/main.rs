@@ -813,8 +813,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
             .wrap(middlewares::Compress::default())
-            .wrap(middleware::Logger::new(
-                r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
+            .wrap(middleware::Logger::new(&get_http_access_log_format()
             ))
             .wrap(RequestTracing::new())
     })
@@ -920,8 +919,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
             .wrap(middlewares::Compress::default())
-            .wrap(middleware::Logger::new(
-                r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
+            .wrap(middleware::Logger::new(&get_http_access_log_format()
             ))
     })
     .keep_alive(if cfg.limit.http_keep_alive_disabled {
@@ -1378,8 +1376,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
             .wrap(middlewares::Compress::default())
-            .wrap(middleware::Logger::new(
-                r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
+            .wrap(middleware::Logger::new(&get_http_access_log_format()
             ))
             .wrap(RequestTracing::new())
     })
@@ -1492,6 +1489,33 @@ fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::
         ));
     }
     Ok(())
+}
+
+/// Get the HTTP access log format from configuration, or return the default if not set
+///
+/// %a - Remote IP address
+/// %t - Time when the request was received
+/// %r - First line of request
+/// %s - Response status code
+/// %b - Size of response in bytes, excluding HTTP headers
+/// %U - URL path requested
+/// %T - Time taken to serve the request, in seconds
+/// %D - Time taken to serve the request, in microseconds
+/// %i - Header line(s) from request
+/// %o - Header line(s) from response
+/// %{Content-Length}i - Size of request payload in bytes
+/// %{Referer}i - Referer header
+/// %{User-Agent}i - User-Agent header
+fn get_http_access_log_format() -> String {
+    let log_format = get_config().http.access_log_format.to_string();
+    if log_format.is_empty() {
+        r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#.to_string()
+    } else if log_format.to_lowercase() == "json" {
+        r#"{ "remote_ip": "%a", "request": "%r", "status": %s, "response_size": %b, "request_size": "%{Content-Length}i", "referer": "%{Referer}i", "user_agent": "%{User-Agent}i", "response_time_secs": %T }"#
+            .to_string()
+    } else {
+        log_format
+    }
 }
 
 #[cfg(test)]
@@ -1675,7 +1699,7 @@ mod tests {
     #[test]
     fn test_log_formatting_patterns() {
         // Test the log format string used in HTTP server setup
-        let log_format = r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#;
+        let log_format = get_http_access_log_format();
 
         assert!(log_format.contains("%a")); // Remote IP
         assert!(log_format.contains("%r")); // Request line

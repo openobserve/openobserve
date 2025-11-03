@@ -527,7 +527,7 @@ pub struct ReportServer {
     pub port: u16,
     #[env_config(name = "ZO_REPORT_SERVER_HTTP_ADDR", default = "127.0.0.1")]
     pub addr: String,
-    #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
+    #[env_config(name = "ZO_REPORT_SERVER_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
 }
 
@@ -669,6 +669,12 @@ pub struct Http {
         help = "this value must use webpki or native. it means use standard root certificates from webpki-roots or native-roots as a rustls certificate store"
     )]
     pub tls_root_certificates: String,
+    #[env_config(
+        name = "ZO_HTTP_ACCESS_LOG_FORMAT",
+        default = "",
+        help = "Custom access log format, leave empty to use default format, shortcut: common, json"
+    )]
+    pub access_log_format: String,
 }
 
 #[derive(EnvConfig, Default)]
