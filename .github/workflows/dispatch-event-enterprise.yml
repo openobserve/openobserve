@@ -27,6 +27,7 @@ jobs:
         run: |
           unset SHORT_COMMIT_ID
           echo "SHORT_COMMIT_ID=${GITHUB_HEAD_SHA:0:7}" >> $GITHUB_ENV
+          echo "COMMIT_ID=${GITHUB_HEAD_SHA}" >> $GITHUB_ENV
 
       - name: Confirm git commit SHA output
         run: echo ${{ env.SHORT_COMMIT_ID }}
@@ -40,4 +41,4 @@ jobs:
           token: ${{ env.TOKEN }} # GitHub App installation access token
           repository: openobserve/o2-enterprise
           event-type: initiate-enterprise-build
-          client-payload: '{"o2_enterprise_repo": "${{ env.BRANCH_NAME }}", "o2_opensource_repo": "${{ env.BRANCH_NAME }}" ,"o2_commit_id": "${{ env.SHORT_COMMIT_ID }}"}'
+          client-payload: '{"o2_enterprise_repo": "${{ env.BRANCH_NAME }}", "o2_opensource_repo": "${{ env.BRANCH_NAME }}" ,"o2_commit_id": "${{ env.SHORT_COMMIT_ID }}", "o2_full_commit":"${{env.COMMIT_ID}}"}'
