@@ -474,11 +474,46 @@ impl Engine {
             .selector_load_data_owned(&selector, Some(range))
             .await?;
 
-        // TODO: add offset back here
         let values = match data.get_range_values() {
             Some(v) => v,
             None => return Ok(vec![]),
         };
+
+        let mut offset_modifier = 0;
+        if let Some(offset) = selector.offset {
+            match offset {
+                Offset::Pos(offset) => {
+                    offset_modifier = micros(offset);
+                }
+                Offset::Neg(offset) => {
+                    offset_modifier = -micros(offset);
+                }
+            }
+        };
+
+        // TODO: optimize this part
+        if offset_modifier != 0 {
+            let adjusted_values = values
+                .into_iter()
+                .map(|rv| {
+                    let adjusted_samples = rv
+                        .samples
+                        .into_iter()
+                        .map(|s| Sample {
+                            timestamp: s.timestamp + offset_modifier,
+                            value: s.value,
+                        })
+                        .collect();
+                    RangeValue {
+                        labels: rv.labels,
+                        samples: adjusted_samples,
+                        exemplars: rv.exemplars,
+                        time_window: rv.time_window,
+                    }
+                })
+                .collect();
+            return Ok(adjusted_values);
+        }
 
         Ok(values)
     }
