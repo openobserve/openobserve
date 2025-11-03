@@ -404,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 icon="add"
                 no-outline
-                class="q-mt-md"
+                class="q-mt-md el-border"
                 @click="addField()"
                 >Add Option</q-btn
               >
