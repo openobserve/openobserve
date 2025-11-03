@@ -28,12 +28,14 @@ use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::auth::validator::list_objects_for_user;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::{auth::UserEmail, http::get_or_create_trace_id},
     },
-    handler::http::extractors::Headers,
+    handler::http::{extractors::Headers, request::alerts::history::escape_like},
     service::{
         db::pipeline::list_by_org as list_pipelines,
         search::{self as SearchService},
@@ -150,20 +152,71 @@ pub async fn get_pipeline_history(
         ));
     }
 
-    // Helper function to escape pipeline names for SQL LIKE patterns
-    fn escape_like(input: &str) -> String {
-        let mut escaped = String::with_capacity(input.len());
-        for c in input.chars() {
-            match c {
-                '\\' => escaped.push_str(r"\\"),
-                '%' => escaped.push_str(r"\%"),
-                '_' => escaped.push_str(r"\_"),
-                '\'' => escaped.push_str("''"),
-                _ => escaped.push(c),
+    // RBAC: Check permissions and filter by accessible pipelines
+    #[cfg(feature = "enterprise")]
+    let mut permitted_pipeline_names = pipeline_names;
+    #[cfg(not(feature = "enterprise"))]
+    let permitted_pipeline_names = pipeline_names;
+
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = &user_email.user_id;
+
+        // If specific pipeline_name is requested, validate access to it
+        if let Some(ref pipeline_name) = query.pipeline_name {
+            // Check if user has permission to view this specific pipeline
+            match list_objects_for_user(&org_id, user_id, "GET", "pipelines").await {
+                Ok(Some(permitted)) => {
+                    // User has limited access - check if this pipeline is in the permitted list
+                    if !permitted.contains(pipeline_name) {
+                        return MetaHttpResponse::forbidden(format!(
+                            "Access denied to pipeline '{pipeline_name}'"
+                        ));
+                    }
+                }
+                Ok(None) => {
+                    // No filtering needed (root user or RBAC disabled)
+                }
+                Err(e) => {
+                    return MetaHttpResponse::forbidden(e.to_string());
+                }
+            }
+        } else {
+            // List all history - filter by permitted pipelines
+            match list_objects_for_user(&org_id, user_id, "GET", "pipelines").await {
+                Ok(Some(permitted)) => {
+                    // Filter pipeline_names to only include permitted ones
+                    permitted_pipeline_names.retain(|name| permitted.contains(name));
+
+                    // If user has no access to any pipelines, return empty result
+                    if permitted_pipeline_names.is_empty() {
+                        return MetaHttpResponse::json(PipelineHistoryResponse {
+                            total: 0,
+                            from,
+                            size,
+                            hits: vec![],
+                        });
+                    }
+                }
+                Ok(None) => {
+                    // No filtering needed (root user or RBAC disabled)
+                }
+                Err(e) => {
+                    return MetaHttpResponse::forbidden(e.to_string());
+                }
             }
         }
-        escaped
     }
+
+    // Build SQL query for the _meta organization's triggers stream
+    let mut sql = format!(
+        "SELECT _timestamp, org, key, status, is_realtime, is_silenced, \
+         start_time, end_time, retries, \
+         delay_in_secs, evaluation_took_in_secs, \
+         source_node, query_took \
+         FROM \"{TRIGGERS_STREAM}\" \
+         WHERE (module in ('derived_stream', 'pipeline')) AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+    );
 
     // Build base SQL WHERE clause
     let mut where_clause = format!(
@@ -175,17 +228,18 @@ pub async fn get_pipeline_history(
     if let Some(ref pipeline_name) = query.pipeline_name {
         // We need to filter where key starts with the pipeline name
         let escaped_name = escape_like(pipeline_name);
-        where_clause.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
-    } else if !pipeline_names.is_empty() {
-        // Filter by all pipelines in the organization
-        let pipeline_filter = pipeline_names
+        sql.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
+    } else if !permitted_pipeline_names.is_empty() {
+        // Filter by permitted pipelines only
+        let pipeline_filter = permitted_pipeline_names
             .iter()
+            .map(escape_like)
             .map(|name| format!("key LIKE '%{}%'", name.replace("'", "''")))
             .collect::<Vec<_>>()
             .join(" OR ");
         where_clause.push_str(&format!(" AND ({pipeline_filter})"));
     } else {
-        // No pipelines in the organization, return empty result
+        // No accessible pipelines, return empty result
         return MetaHttpResponse::json(PipelineHistoryResponse {
             total: 0,
             from,

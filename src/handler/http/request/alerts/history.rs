@@ -84,6 +84,22 @@ pub struct AlertHistoryResponse {
     pub hits: Vec<AlertHistoryEntry>,
 }
 
+// Helper function to escape alert names for SQL LIKE patterns
+pub fn escape_like(input: impl AsRef<str>) -> String {
+    let input = input.as_ref();
+    let mut escaped = String::with_capacity(input.len());
+    for c in input.chars() {
+        match c {
+            '\\' => escaped.push_str(r"\\"),
+            '%' => escaped.push_str(r"\%"),
+            '_' => escaped.push_str(r"\_"),
+            '\'' => escaped.push_str("''"),
+            _ => escaped.push(c),
+        }
+    }
+    escaped
+}
+
 /// GetAlertHistory
 #[utoipa::path(
     context_path = "/api",
@@ -217,22 +233,6 @@ pub async fn get_alert_history(
          FROM \"{TRIGGERS_STREAM}\" \
          WHERE module = 'alert' AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
-
-    // Helper function to escape alert names for SQL LIKE patterns
-    fn escape_like(input: impl AsRef<str>) -> String {
-        let input = input.as_ref();
-        let mut escaped = String::with_capacity(input.len());
-        for c in input.chars() {
-            match c {
-                '\\' => escaped.push_str(r"\\"),
-                '%' => escaped.push_str(r"\%"),
-                '_' => escaped.push_str(r"\_"),
-                '\'' => escaped.push_str("''"),
-                _ => escaped.push(c),
-            }
-        }
-        escaped
-    }
 
     // Build base SQL WHERE clause
     let mut where_clause = format!(
