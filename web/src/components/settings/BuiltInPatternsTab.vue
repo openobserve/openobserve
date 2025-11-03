@@ -15,21 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="built-in-patterns-container">
+  <div class="built-in-patterns-container card-container">
     <!-- Search and Filter Bar -->
     <div class="filters-bar q-pa-md">
       <div class="row q-col-gutter-md">
         <div class="col-12 col-md-6">
           <q-input
             v-model="searchQuery"
-            :label="t('regex_patterns.search')"
-            outlined
+            :placeholder="t('regex_patterns.search')"
+            borderless
             dense
+            flat
             clearable
+            class="no-border tw-w-full"
             data-test="built-in-pattern-search"
           >
             <template v-slot:prepend>
-              <q-icon name="search" />
+             <q-icon class="o2-search-input-icon" name="search" />
             </template>
           </q-input>
         </div>
@@ -38,20 +40,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="selectedTags"
             :options="availableTags"
             :label="t('regex_patterns.filter_by_tag')"
-            outlined
             dense
             multiple
             use-chips
             clearable
+            borderless
             data-test="built-in-pattern-tag-filter"
           />
         </div>
         <div class="col-12 col-md-2">
           <q-btn
-            outline
-            color="primary"
             :label="t('regex_patterns.refresh')"
             icon="refresh"
+            flat
+            class="o2-secondary-button tw-w-[120px]"
             @click="refreshPatterns"
             :loading="loading"
             data-test="built-in-pattern-refresh-btn"

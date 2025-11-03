@@ -740,7 +740,7 @@ export default defineComponent({
 }
 .editor-container-built-in {
   width: 100%;
-  height: calc(100vh - 220px); /* Account for header, tabs, and padding */
+  height: calc(100vh - 128px); /* Account for header, tabs, and padding */
   overflow: hidden;
   display: flex;
   flex-direction: column;
