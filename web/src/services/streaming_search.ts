@@ -122,6 +122,35 @@ const stream = {
     return http().post(url, query);
   },
   
+  // Start a streaming multi-stream search request
+  searchMulti: (
+    {
+      org_identifier,
+      query,
+      page_type = "logs",
+      search_type = "ui",
+      traceId,
+    }: {
+      org_identifier: string;
+      query: any;
+      page_type: string;
+      search_type?: string;
+      traceId?: string;
+    }
+  ) => {
+    if (!traceId) {
+      traceId = generateTraceContext()?.traceId;
+    }
+    
+    const use_cache: boolean =
+      (window as any).use_cache !== undefined
+        ? (window as any).use_cache
+        : true;
+        
+    const url = `/api/${org_identifier}/_multi_search_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}`;
+    return http().post(url, query);
+  },
+  
   // Start a streaming histogram request
   histogram: (
     {

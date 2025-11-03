@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// Allow enterprise feature cfg check (defined at workspace level)
+#![allow(unexpected_cfgs)]
+
 use config::meta::meta_store::MetaStore;
 pub use sea_orm_migration::prelude::*;
 
@@ -66,6 +69,7 @@ mod m20250801_000001_create_system_prompts_table;
 mod m20250822_093713_add_updated_at_for_file_list_table;
 mod m20250923_000001_update_enrichment_table_data_size;
 mod m20250930_000001_create_pipeline_last_errors_table;
+mod m20251024_000001_add_alert_deduplication;
 
 pub struct Migrator;
 
@@ -124,6 +128,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250822_093713_add_updated_at_for_file_list_table::Migration),
             Box::new(m20250923_000001_update_enrichment_table_data_size::Migration),
             Box::new(m20250930_000001_create_pipeline_last_errors_table::Migration),
+            Box::new(m20251024_000001_add_alert_deduplication::Migration),
         ]
     }
 }

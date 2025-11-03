@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column index-menu">
+  <div class="column index-menu !tw-p-[0.375rem]">
     <q-select
       data-test="log-search-index-list-select-stream"
       v-model="searchObj.data.stream.selectedStream"
@@ -28,12 +28,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-cy="index-dropdown"
       input-debounce="0"
       behavior="menu"
-      filled
       borderless
       dense
       use-input
       hide-selected
       fill-input
+      class="tw-mb-[0.375rem]"
       @filter="filterStreamFn"
       @update:model-value="onStreamChange"
     >
@@ -43,7 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-item>
       </template>
     </q-select>
-    <div class="index-table q-mt-xs">
+    <!-- <div
+      class="tw-w-full tw-h-[1px] tw-bg-[var(--o2-border-color)] tw-mb-[0.375rem]"
+    ></div> -->
+    <div class="index-table">
       <q-table
         data-test="log-search-index-list-fields-table"
         v-model="searchObj.data.stream.selectedFields"
@@ -56,11 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hide-header
         hide-bottom
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-        class="traces-field-table"
+        class="tw-w-full tw-h-[calc(100vh-13.175rem)]"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
-          <q-tr :props="props">
+          <q-tr :props="props" class="hover:!tw-bg-[var(--o2-hover-accent)]">
             <q-td
               :props="props"
               class="field_list"
@@ -73,25 +76,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
-                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
+                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm hover:!tw-bg-[var(--o2-hover-accent)]"
                 :title="props.row.label || props.row.name"
               >
                 <div class="field_label ellipsis" style="font-size: 14px">
                   {{ props.row.label || props.row.name }}
                 </div>
                 <div
-                  class="field_overlay"
-                  :style="{
-                    background:
-                      store.state.theme === 'dark' ? '#414345' : '#e8e8e8',
-                  }"
+                  class="field_overlay hover:!tw-bg-[var(--o2-hover-accent)]"
                 >
                   <q-btn
                     :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
                     size="0.4rem"
-                    class="q-mr-sm"
+                    class="q-mr-sm !tw-text-[var(--o2-text-primary)]"
                     @click.stop="addToFilter(`${props.row.name}=''`)"
                     round
                   />
@@ -103,20 +102,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #top-right>
           <q-input
+            v-show="searchObj.data.stream?.selectedStream?.value"
             data-test="log-search-index-list-field-search-input"
             v-model="searchObj.data.stream.filterField"
             data-cy="index-field-search-input"
-            filled
             borderless
             dense
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
+            class="tw-p-0 tw-pb-[0.375rem]"
           >
             <template #prepend>
               <q-icon name="search" />
             </template>
           </q-input>
+          <q-tr
+            v-if="searchObj.loadingStream"
+            class="tw-flex tw-items-center tw-justify-center tw-w-full tw-pt-[2rem]"
+          >
+            <q-td colspan="100%" class="text-bold"
+style="opacity: 0.7">
+              <div
+                class="text-subtitle2 text-weight-bold tw-w-fit tw-mx-auto tw-my-0 tw-flex-col tw-justify-items-center"
+              >
+                <q-spinner-hourglass size="1.8rem" color="primary" />
+                {{ t("traces.loadingStream") }}
+              </div>
+            </q-td>
+          </q-tr>
         </template>
       </q-table>
     </div>
@@ -239,9 +253,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.traces-field-table {
-  height: calc(100vh - 184px) !important;
-}
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
@@ -302,9 +313,6 @@ export default defineComponent({
       border-bottom: unset;
     }
   }
-  .traces-field-table {
-    width: 100%;
-  }
 
   .field_list {
     padding: 0px;
@@ -347,18 +355,23 @@ export default defineComponent({
 
     &.selected {
       .field_overlay {
-        background-color: rgba(89, 96, 178, 0.3);
+        background-color: var(--o2-hover-accent);
 
         .field_icons {
           opacity: 0;
         }
       }
     }
-    &:hover {
-      .field-container {
-        background-color: #e8e8e8;
-      }
-    }
+    // &:hover {
+    //   .field-container {
+    //     background-color: #e8e8e8;
+    //   }
+    //   body.body--dark {
+    //     .field-container {
+    //       background-color: #424242;
+    //     }
+    //   }
+    // }
   }
 }
 

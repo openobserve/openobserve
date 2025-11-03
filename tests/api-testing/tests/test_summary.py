@@ -337,11 +337,12 @@ def base_url_sc():
     return ZO_BASE_URL_SC
 
 @pytest.mark.order(2)
-def test_summary(create_session, base_url_sc, org_id):
+def test_summary(create_session, base_url, base_url_sc, org_id):
     """Run an E2E test for summary mode."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)  # Add this line
-    url_sc = base_url_sc
+    # Use base_url_sc if available, otherwise fall back to base_url
+    url_sc = base_url_sc if base_url_sc is not None else base_url
     print("URL for super cluster:", url_sc) 
     time.sleep(5)  # Increase this time if necessary
     res_summary_sc = session.get(f"{url_sc}api/{org_id}/summary")
@@ -430,47 +431,63 @@ def test_summary(create_session, base_url_sc, org_id):
         alert_id = alert.get("alert_id")
         assert alert_id, f"Alert ID is missing for alert: {alert}"
         print(f"Extracted alert_id: {alert_id}")
-    # Validate the alert existence first
+            # Validate the alert existence first
         resp_check_alert = session.get(f"{url_sc}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
         print(f"Alert {alert_id} exists and is retrievable.")
-    # Proceed to delete the alert
+            # Proceed to delete the alert
         resp_delete_alertnew = session.delete(f"{url_sc}api/v2/{org_id}/alerts/{alert_id}")
         print(f"Deleted Alert Response: {resp_delete_alertnew.text}")
         assert resp_delete_alertnew.status_code == 200, f"Failed to delete alert {alert_id}"
         print(f"Successfully deleted alert {alert_id}")
 
     # Proceed to delete the function
-        resp_delete_function = session.delete(
-            f"{url_sc}api/{org_id}/functions/pytestfunction"
-        )
-        assert (
+    resp_delete_function = session.delete(
+        f"{url_sc}api/{org_id}/functions/pytestfunction"
+    )
+    assert (
         resp_delete_function.status_code == 200
-        ), f"Deleting this function, but got {resp_delete_function.status_code} {resp_delete_function.content}"
-        print(f"Function deleted successfully")
+    ), f"Deleting this function, but got {resp_delete_function.status_code} {resp_delete_function.content}"
+    print(f"Function deleted successfully")
 
     # Proceed to delete the dashboard
-        resp_get_alldashboards = session.get(f"{url_sc}api/{org_id}/dashboards")
-        assert resp_get_alldashboards.status_code == 200, f"Expected status code 200 but got {resp_get_alldashboards.status_code}"
+    resp_get_alldashboards = session.get(f"{url_sc}api/{org_id}/dashboards")
+    assert resp_get_alldashboards.status_code == 200, f"Expected status code 200 but got {resp_get_alldashboards.status_code}"
     # Parse the response JSON
-        dashboards_response = resp_get_alldashboards.json()
-        print(f"Dashboard list response: {dashboards_response}")
-    # Extract the dashboard ID
-        dashboard_id = dashboards_response['dashboards'][0]['v1']['dashboardId']  # Corrected line
+    dashboards_response = resp_get_alldashboards.json()
+    print(f"Dashboard list response: {dashboards_response}")
+    # Extract the dashboard ID - handle both v5 and v6 schemas
+    dashboards = dashboards_response.get('dashboards', [])
+    if dashboards:
+        dashboard = dashboards[0]
+        # Try v6 first, then v5
+        dashboard_id = None
+        if dashboard.get('v6'):
+            dashboard_id = dashboard['v6']['dashboardId']
+        elif dashboard.get('v5'):
+            dashboard_id = dashboard['v5']['dashboardId']
+        else:
+            raise AssertionError(f"Dashboard schema version not supported: {dashboard}")
+
         print(f"Extracted Dashboard ID: {dashboard_id}")
-    # Now you can delete the dashboard using the extracted ID
+        # Now you can delete the dashboard using the extracted ID
         resp_delete_dashboard = session.delete(
-        f"{url_sc}api/{org_id}/dashboards/{dashboard_id}"
+            f"{url_sc}api/{org_id}/dashboards/{dashboard_id}"
         )
-    # Assert that the deletion was successful
+        # Assert that the deletion was successful
         assert resp_delete_dashboard.status_code == 200, f"Failed to delete dashboard, status code: {resp_delete_dashboard.status_code}"
         print(f"Successfully deleted dashboard with ID: {dashboard_id}")
+    else:
+        print("No dashboards found to delete")
+
+    # Wait for deletion to propagate
+    time.sleep(3)
 
     # Proceed to delete the stream
-        resp_delete_stream= session.delete(f"{url_sc}api/{org_id}/streams/{stream_name}?type=logs")
-        print(f"Deleted Stream Response: {resp_delete_stream.text}")
-        assert resp_delete_stream.status_code == 200, f"Failed to delete  {stream_name}"
-        print(f"Successfully deleted stream {stream_name}")
+    resp_delete_stream= session.delete(f"{url_sc}api/{org_id}/streams/{stream_name}?type=logs")
+    print(f"Deleted Stream Response: {resp_delete_stream.text}")
+    assert resp_delete_stream.status_code == 200, f"Failed to delete  {stream_name}"
+    print(f"Successfully deleted stream {stream_name}")
 
 @pytest.mark.order(3)
 def test_summary_validate(create_session, base_url, org_id):

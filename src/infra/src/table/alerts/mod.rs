@@ -21,6 +21,7 @@ use config::meta::{
         ConditionList, QueryCondition as MetaQueryCondition,
         TriggerCondition as MetaTriggerCondition,
         alert::{Alert as MetaAlert, ListAlertsParams},
+        deduplication::DeduplicationConfig as MetaDeduplicationConfig,
     },
     folder::{Folder as MetaFolder, FolderType},
     stream::StreamType as MetaStreamType,
@@ -142,6 +143,16 @@ impl TryFrom<alerts::Model> for MetaAlert {
         };
         alert.set_last_satisfied_at(value.last_satisfied_at);
         alert.set_last_triggered_at(value.last_triggered_at);
+
+        // Load deduplication configuration if enabled
+        if value.dedup_enabled {
+            let dedup_config_json = value.dedup_config.unwrap_or_else(|| serde_json::json!({}));
+            let mut dedup_config: MetaDeduplicationConfig =
+                serde_json::from_value(dedup_config_json)?;
+            dedup_config.enabled = true;
+            dedup_config.time_window_minutes = value.dedup_time_window_minutes.map(|v| v as i64);
+            alert.deduplication = Some(dedup_config);
+        }
 
         Ok(alert)
     }
@@ -649,6 +660,21 @@ fn update_mutable_fields(
     let align_time = alert.trigger_condition.align_time;
     let updated_at: i64 = chrono::Utc::now().timestamp_micros();
 
+    // Handle deduplication configuration
+    // Note: time_window_minutes is stored in a separate column, not in the JSON config
+    let (dedup_enabled, dedup_time_window_minutes, dedup_config) =
+        if let Some(mut dedup) = alert.deduplication {
+            let dedup_enabled = dedup.enabled;
+            let time_window = dedup.time_window_minutes.map(|v| v as i32);
+            // Remove time_window_minutes from the config before serializing to avoid redundancy
+            dedup.time_window_minutes = None;
+
+            let dedup_config_json = serde_json::to_value(dedup)?;
+            (dedup_enabled, time_window, Some(dedup_config_json))
+        } else {
+            (false, None, None)
+        };
+
     alert_am.is_real_time = Set(is_real_time);
     alert_am.destinations = Set(destinations);
     alert_am.context_attributes = Set(context_attributes);
@@ -680,6 +706,9 @@ fn update_mutable_fields(
     alert_am.last_edited_by = Set(last_edited_by);
     alert_am.updated_at = Set(Some(updated_at));
     alert_am.align_time = Set(align_time);
+    alert_am.dedup_enabled = Set(dedup_enabled);
+    alert_am.dedup_time_window_minutes = Set(dedup_time_window_minutes);
+    alert_am.dedup_config = Set(dedup_config);
     Ok(())
 }
 

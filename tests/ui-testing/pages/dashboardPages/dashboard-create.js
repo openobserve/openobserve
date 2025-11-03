@@ -56,7 +56,7 @@ export default class DashboardCreate {
       .waitFor({ state: "visible" });
     const dashboardRow = this.page.locator('[data-test="dashboard-table"]');
     await dashboardRow.waitFor({ state: "visible" });
-    await dashboardRow.locator('[data-test="dashboard-delete"]').click();
+    await dashboardRow.locator('[data-test="dashboard-delete"]').first().click();
     const confirmDialog = this.page.locator(
       '[data-test="dashboard-confirm-dialog"]'
     );

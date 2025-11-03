@@ -22,6 +22,8 @@ use crate::{
     handler::http::models::destinations::Destination,
     service::{alerts::destinations, db::alerts::destinations::DestinationError},
 };
+#[cfg(feature = "enterprise")]
+use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 impl From<DestinationError> for HttpResponse {
     fn from(value: DestinationError) -> Self {
@@ -184,6 +186,7 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
 async fn list_destinations(
     path: web::Path<String>,
     req: HttpRequest,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
@@ -193,10 +196,10 @@ async fn list_destinations(
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = req.headers().get("user_id").unwrap();
+        let user_id = &user_email.user_id;
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
-            user_id.to_str().unwrap(),
+            user_id,
             "GET",
             "destination",
         )

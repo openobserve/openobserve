@@ -11,7 +11,8 @@
           stack-label
           class="q-py-md showLabelOnTop"
           dense
-          outlined
+          borderless
+          hide-bottom-space
           style="margin-bottom: 10px"
           :rules="[(val) => !!val || 'Title is required.']"
         />
@@ -21,9 +22,10 @@
           stack-label
           class="q-py-md showLabelOnTop"
           dense
-          outlined
           type="textarea"
           :rows="3"
+          borderless
+          hide-bottom-space
         />
 
         <div class="q-mt-md">
@@ -38,8 +40,6 @@
             @update:model-value="updateSelectedPanels"
             :display-value="displayValue"
             style="min-width: 150px"
-            filled
-            outlined
             dense
             label="Select Panels"
             input-debounce="0"
@@ -48,6 +48,8 @@
             class="textbox col no-case showLabelOnTop"
             popup-no-route-dismiss
             popup-content-style="z-index: 10001"
+            borderless
+            hide-bottom-space
           >
             <template v-slot:option="{ opt, selected, toggleOption }">
               <q-item
@@ -87,9 +89,24 @@
             @click="handleDeleteWithConfirm"
           />
           <div class="tw-flex-1"></div>
-          <q-btn flat label="Cancel" @click="handleClose" />
           <q-btn
-            color="primary"
+            flat
+            label="Cancel"
+            @click="handleClose"
+            class="o2-secondary-button tw-h-[36px] q-ml-md"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
+          />
+          <q-btn
+            class="o2-primary-button tw-h-[36px] q-ml-md"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             :label="annotationData.annotation_id ? 'Update' : 'Save'"
             @click="saveAnnotation.execute()"
             :loading="saveAnnotation.isLoading?.value"

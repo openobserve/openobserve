@@ -925,7 +925,7 @@ mod tests {
 
         for dn in test_cases {
             let result = parse_dn(dn);
-            assert!(result.is_some(), "Failed to parse DN: {}", dn);
+            assert!(result.is_some(), "Failed to parse DN: {dn}");
         }
     }
 
@@ -937,7 +937,7 @@ mod tests {
         let formatted_role = format_role_name_only(role);
         let full_role_name = format_role_name(org, role);
 
-        assert_eq!(full_role_name, format!("{}/{}", org, formatted_role));
+        assert_eq!(full_role_name, format!("{org}/{formatted_role}"));
         assert!(!full_role_name.contains("-"));
         assert!(!full_role_name.contains("@"));
     }

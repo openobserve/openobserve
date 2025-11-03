@@ -16,7 +16,10 @@
 use std::{cmp::Ordering, io::Error};
 
 use actix_web::{
-    HttpRequest, HttpResponse, Responder, delete, get, http, http::StatusCode, post, put, web,
+    HttpRequest, HttpResponse, Responder, delete, get,
+    http::{self, StatusCode},
+    post, put,
+    web::{self, Query},
 };
 use chrono::{TimeZone, Utc};
 use config::{
@@ -34,11 +37,16 @@ use crate::{
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
-            stream::{ListStream, StreamCreate, StreamDeleteFields},
+            stream::{ListStream, StreamCreate, StreamDeleteFields, StreamUpdateFields},
         },
-        utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
+        utils::{
+            auth::UserEmail,
+            http::{get_stream_type_from_request, get_ts_from_request_with_key},
+        },
     },
-    handler::http::request::search::error_utils::map_error_to_http_response,
+    handler::http::{
+        extractors::Headers, request::search::error_utils::map_error_to_http_response,
+    },
     service::stream,
 };
 
@@ -231,6 +239,56 @@ async fn update_settings(
         .await
 }
 
+/// UpdateStreamFields
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"update"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Streams",
+    operation_id = "UpdateStreamFields",
+    security(("Authorization"= [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("type" = String, Query, description = "Stream type"),
+    ),
+    request_body(content = StreamUpdateFields, description = "Update stream fields to a specific data type", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = Object),
+    )
+)]
+#[put("/{org_id}/streams/{stream_name}/update_fields")]
+async fn update_fields(
+    path: web::Path<(String, String)>,
+    payload: web::Json<StreamUpdateFields>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = get_stream_type_from_request(&query);
+    let payload = payload.into_inner();
+    if payload.fields.is_empty() {
+        return Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK,
+            "no fields to update".to_string(),
+        )));
+    }
+    match stream::update_fields_type(&org_id, &stream_name, stream_type, &payload.fields).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK,
+            "fields updated".to_string(),
+        ))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST,
+            e.to_string(),
+        ))),
+    }
+}
+
 /// DeleteStreamFields
 
 #[utoipa::path(
@@ -363,8 +421,11 @@ async fn delete(
     )
 )]
 #[get("/{org_id}/streams")]
-async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+async fn list(
+    org_id: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
+    Query(query): Query<HashMap<String, String>>,
+) -> impl Responder {
     let stream_type = get_stream_type_from_request(&query);
 
     let fetch_schema = match query.get("fetchSchema") {
@@ -385,12 +446,11 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        let user_id = req.headers().get("user_id").unwrap();
         if let Some(s_type) = &stream_type {
             let stream_type_str = s_type.to_string();
             match crate::handler::http::auth::validator::list_objects_for_user(
                 &org_id,
-                user_id.to_str().unwrap(),
+                &_user_email.user_id,
                 "GET",
                 OFGA_MODELS
                     .get(stream_type_str.as_str())
