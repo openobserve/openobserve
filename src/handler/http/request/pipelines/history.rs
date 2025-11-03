@@ -304,11 +304,11 @@ pub async fn get_pipeline_history(
         // Extract pipeline name from key field (format: "pipeline_name/pipeline_id")
         let key = hit.get("key").and_then(|v| v.as_str()).unwrap_or("");
 
-        let pipeline_name = key.split('/').next().unwrap_or("").to_string();
+        let mut pipeline_name = key.split('/').skip(2).next().unwrap_or("").to_string();
 
         // Skip if pipeline_name is empty
         if pipeline_name.is_empty() {
-            continue;
+            pipeline_name = key.to_string();
         }
 
         entries.push(PipelineHistoryEntry {
