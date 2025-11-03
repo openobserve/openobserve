@@ -423,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="dashboardPanelData.data.type == 'html'"
           class="col column"
-          style="width: 100%; height: 100%; flex: 1"
+          style="width: 100%; height: calc(100vh - 99px); flex: 1"
         >
           <div class="card-container tw-h-full tw-flex tw-flex-col">
             <VariablesValueSelector
@@ -434,21 +434,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selectedTimeDate="dashboardPanelData.meta.dateTime"
               @variablesData="variablesDataUpdated"
               :initialVariableValues="initialVariableValues"
-              class="q-mb-sm"
+              class="tw-flex-shrink-0 q-mb-sm"
             />
             <CustomHTMLEditor
               v-model="dashboardPanelData.data.htmlContent"
-              style="width: 100%; height: 100%"
-              class="col"
+              style="flex: 1; min-height: 0"
               :initialVariableValues="updatedVariablesData"
             />
-            <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+            <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
           </div>
         </div>
         <div
           v-if="dashboardPanelData.data.type == 'markdown'"
           class="col column"
-          style="width: 100%; height: 100%; flex: 1"
+          style="width: 100%; height: calc(100vh - 99px); flex: 1"
         >
           <div class="card-container tw-h-full tw-flex tw-flex-col">
             <VariablesValueSelector
@@ -459,15 +458,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selectedTimeDate="dashboardPanelData.meta.dateTime"
               @variablesData="variablesDataUpdated"
               :initialVariableValues="initialVariableValues"
-              class="q-mb-sm"
+              class="tw-flex-shrink-0 q-mb-sm"
             />
             <CustomMarkdownEditor
               v-model="dashboardPanelData.data.markdownContent"
-              style="width: 100%; height: 100%"
-              class="col"
+              style="flex: 1; min-height: 0"
               :initialVariableValues="updatedVariablesData"
             />
-            <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+            <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
           </div>
         </div>
         <div
