@@ -1010,6 +1010,7 @@ class="q-pr-sm q-pt-xs" />
                   no-caps
                   :title="'Refresh Cache & Run Query'"
                   class="q-pa-sm search-button-dropdown tw-text-[12px]"
+                  v-close-popup
                   @click="handleRunQueryFn(true)"
                   :disable="
                     config.isEnterprise == 'true' &&
@@ -1093,7 +1094,7 @@ class="q-pr-sm q-pt-xs" />
                       no-caps
                       :title="'Refresh Cache & Run Query'"
                       class="q-pa-sm tw-text-[12px] "
-      
+                      v-close-popup
                       @click="handleRunQueryFn(true)"
                       :disable="
                         searchObj.loading == true ||
