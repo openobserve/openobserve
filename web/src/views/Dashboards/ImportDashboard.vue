@@ -107,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     style="width: calc(30%);position: relative;"
                     data-test="dashboard-folder-dropdown"
+                    class="import-folder-dropdown-container"
                   >
                     <select-folder-dropdown
                       @folder-selected="selectedFolder = $event"
