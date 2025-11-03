@@ -35,7 +35,7 @@ use super::{
 };
 use crate::{
     common::meta::search::{QueryDelta, SearchResultType},
-    service::search::{self as SearchService, cache::cacher::delete_cache},
+    service::search::{self as SearchService},
 };
 
 /// Do partitioned search without cache

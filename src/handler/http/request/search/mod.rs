@@ -1131,7 +1131,7 @@ async fn values_v1(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: default_use_cache(),
-        clear_cache: get_clear_cache_from_request(&query),
+        clear_cache: get_clear_cache_from_request(query),
         local_mode: None,
     };
 
