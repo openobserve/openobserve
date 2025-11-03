@@ -357,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="col tw-mr-[0.625rem]"
           style="
             height: calc(100vh - 106px);
-            overflow-y: auto;
+            overflow-y: hidden;
             display: flex;
             flex-direction: row;
             overflow-x: hidden;
