@@ -1917,11 +1917,31 @@ export default defineComponent({
     };
 
     const updateDefinedSchemaFields = () => {
-      markFormDirty();
-
       const selectedFieldsSet = new Set(
         selectedFields.value.map((field) => field.name),
       );
+
+      //  Check max limit when adding fields
+      //  We need to check store.state.zoConfig.user_defined_schema_max_fields this config value before adding to UDS 
+      //  Because it should not exceed this value
+      if (activeTab.value !== "schemaFields") {
+        const maxFieldsLength = store.state.zoConfig?.user_defined_schema_max_fields;
+        const currentDefinedSchemaLength = indexData.value.defined_schema_fields.length;
+        const newSchemaFieldLength = currentDefinedSchemaLength + selectedFieldsSet.size;
+
+        if (maxFieldsLength && newSchemaFieldLength > maxFieldsLength) {
+          q.notify({
+            type: "negative",
+            message: `Cannot add fields. Maximum allowed fields in User Defined Schema is ${maxFieldsLength}. Current: ${currentDefinedSchemaLength}, Attempting to add: ${selectedFieldsSet.size}`,
+            timeout: 3000,
+          });
+          selectedFields.value = [];
+          return;
+        }
+      };
+
+      markFormDirty();
+
 
       if (selectedFieldsSet.has(allFieldsName.value))
         selectedFieldsSet.delete(allFieldsName.value);
