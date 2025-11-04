@@ -385,6 +385,7 @@ import {
   createDashboardsContextProvider,
   contextRegistry,
 } from "@/composables/contextProviders";
+import { encodeVariableToUrl, decodeVariablesFromUrl } from "@/utils/dashboard/variables/variablesUrlUtils";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -561,8 +562,10 @@ export default defineComponent({
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
       const variableObj = {};
+
       data.values?.forEach((variable) => {
         if (variable.type === "dynamic_filters") {
+          // Keep existing dynamic filters logic
           const filters = (variable.value || []).filter(
             (item: any) => item.name && item.operator && item.value,
           );
@@ -575,9 +578,21 @@ export default defineComponent({
             JSON.stringify(encodedFilters),
           );
         } else {
-          variableObj[`var-${variable.name}`] = variable.value;
+          // Use scope-aware encoding for all other variable types
+          const encoded = encodeVariableToUrl(
+            {
+              name: variable.name,
+              scope: variable.scope || 'global',
+              value: variable.value,
+              _isCurrentLevel: variable._isCurrentLevel,
+            },
+            selectedTabId.value,  // Current tab context
+            undefined  // Panel context not available at this level
+          );
+          Object.assign(variableObj, encoded);
         }
       });
+
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
@@ -624,12 +639,49 @@ export default defineComponent({
     // ======= [START] default variable values
 
     const initialVariableValues = { value: {} };
-    Object.keys(route.query).forEach((key) => {
-      if (key.startsWith("var-")) {
-        const newKey = key.slice(4);
-        initialVariableValues.value[newKey] = route.query[key];
+
+    // Decode all scoped variables from URL
+    const decodedVariables = decodeVariablesFromUrl(route.query);
+
+    // Convert decoded variables to flat format expected by components
+    Object.keys(decodedVariables).forEach((varName) => {
+      const variable = decodedVariables[varName];
+
+      if (variable.scope === 'global') {
+        // Global: store direct value
+        initialVariableValues.value[varName] = variable.value;
+      } else if (variable.scope === 'tabs') {
+        // Tab: Find value for current tab or store all
+        const currentTabId = route.query.tab;
+        if (currentTabId && Array.isArray(variable.value)) {
+          const tabValue = variable.value.find((tv: any) => tv.tabId === currentTabId);
+          if (tabValue) {
+            initialVariableValues.value[varName] = tabValue.value;
+          }
+        }
+        // Also store full array for tab-level component initialization
+        if (Array.isArray(variable.value) && variable.value.length > 0) {
+          initialVariableValues.value[`${varName}__tabs`] = variable.value;
+        }
+      } else if (variable.scope === 'panels') {
+        // Panel: Store all panel values for later lookup by panel components
+        if (Array.isArray(variable.value) && variable.value.length > 0) {
+          initialVariableValues.value[`${varName}__panels`] = variable.value;
+        }
       }
     });
+
+    // Backward compatibility: Also handle old URL format (var-name=value)
+    Object.keys(route.query).forEach((key) => {
+      if (key.startsWith("var-") && !key.includes(".t.") && !key.includes(".p.")) {
+        const varName = key.slice(4);
+        // Only set if not already decoded from new format
+        if (!initialVariableValues.value.hasOwnProperty(varName)) {
+          initialVariableValues.value[varName] = route.query[key];
+        }
+      }
+    });
+
     // ======= [END] default variable values
 
     onMounted(async () => {
