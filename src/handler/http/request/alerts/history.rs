@@ -24,12 +24,12 @@ use config::{
     },
     utils::time::now_micros,
 };
+#[cfg(feature = "enterprise")]
+use o2_openfga::{config::get_config as get_openfga_config, meta::mapping::OFGA_MODELS};
 use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
-#[cfg(feature = "enterprise")]
-use o2_openfga::{config::get_config as get_openfga_config, meta::mapping::OFGA_MODELS};
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -106,7 +106,8 @@ pub fn escape_like(input: impl AsRef<str>) -> String {
 /// The `user_id` header used by the `UserEmail` extractor is set by the authentication
 /// middleware after validating the user's credentials (token/session/basic auth).
 /// See `src/handler/http/auth/validator.rs::validator()` for the middleware implementation.
-/// This prevents header forgery attacks as the header is populated server-side after authentication.
+/// This prevents header forgery attacks as the header is populated server-side after
+/// authentication.
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -198,19 +199,11 @@ pub async fn get_alert_history(
 
             // If specific alert_name is requested, check access to it
             if let Some(ref alert_name) = query.alert_name {
-                let alert_obj = format!(
-                    "{}:{}",
-                    OFGA_MODELS.get("alerts").unwrap().key,
-                    alert_name
-                );
+                let alert_obj =
+                    format!("{}:{}", OFGA_MODELS.get("alerts").unwrap().key, alert_name);
 
                 let has_permission = o2_openfga::authorizer::authz::is_allowed(
-                    &org_id,
-                    user_id,
-                    "GET",
-                    &alert_obj,
-                    "",
-                    &role,
+                    &org_id, user_id, "GET", &alert_obj, "", &role,
                 )
                 .await;
 
@@ -226,19 +219,11 @@ pub async fn get_alert_history(
                 let mut accessible_alerts = Vec::new();
 
                 for alert_name in &alert_names {
-                    let alert_obj = format!(
-                        "{}:{}",
-                        OFGA_MODELS.get("alerts").unwrap().key,
-                        alert_name
-                    );
+                    let alert_obj =
+                        format!("{}:{}", OFGA_MODELS.get("alerts").unwrap().key, alert_name);
 
                     let has_permission = o2_openfga::authorizer::authz::is_allowed(
-                        &org_id,
-                        user_id,
-                        "GET",
-                        &alert_obj,
-                        "",
-                        &role,
+                        &org_id, user_id, "GET", &alert_obj, "", &role,
                     )
                     .await;
 
@@ -265,17 +250,7 @@ pub async fn get_alert_history(
         }
     };
 
-    // Build SQL query for the _meta organization's triggers stream
-    let mut sql = format!(
-        "SELECT _timestamp, org, key, status, is_realtime, is_silenced, \
-         start_time, end_time, retries, \
-         delay_in_secs, evaluation_took_in_secs, \
-         source_node, query_took \
-         FROM \"{TRIGGERS_STREAM}\" \
-         WHERE module = 'alert' AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
-    );
-
-    // Build base SQL WHERE clause
+    // Build SQL WHERE clause for the _meta organization's triggers stream
     let mut where_clause = format!(
         "module = 'alert' AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
@@ -285,13 +260,15 @@ pub async fn get_alert_history(
     if let Some(ref alert_name) = query.alert_name {
         // We need to filter where key starts with the alert name
         let escaped_name = escape_like(alert_name);
-        sql.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
+        where_clause.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
     } else if !permitted_alert_names.is_empty() {
         // Filter by permitted alerts only
         let alert_filter = permitted_alert_names
             .iter()
-            .map(escape_like)
-            .map(|name| format!("key LIKE '{}/%'", name.replace("'", "''")))
+            .map(|name| {
+                let escaped_name = escape_like(name);
+                format!("key LIKE '{}/%'", escaped_name.replace("'", "''"))
+            })
             .collect::<Vec<_>>()
             .join(" OR ");
         where_clause.push_str(&format!(" AND ({alert_filter})"));
