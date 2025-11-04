@@ -668,12 +668,92 @@ export default defineComponent({
       },
     );
 
+    // Aggregate all variables from all levels for URL syncing
+    const aggregatedVariablesForUrl = computed(() => {
+      if (!props.dashboardData?.variables?.list) {
+        return { isVariablesLoading: false, values: [] };
+      }
+
+      const allVars = props.dashboardData.variables.list;
+      const aggregatedValues: any[] = [];
+
+      // Add global variables
+      allVars.forEach((varConfig: any) => {
+        const scope = getScopeType(varConfig);
+        const varName = varConfig.name;
+
+        if (scope === 'global') {
+          // Global variable - get value from mergedVariablesValues
+          const value = mergedVariablesValues.value[varName];
+          if (value !== undefined) {
+            aggregatedValues.push({
+              ...varConfig,
+              scope: 'global',
+              value,
+              _isCurrentLevel: true,
+            });
+          }
+        } else if (scope === 'tabs') {
+          // Tab variable - collect values for all relevant tabs
+          const tabValues: any[] = [];
+          if (varConfig.tabs && Array.isArray(varConfig.tabs)) {
+            varConfig.tabs.forEach((tabId: string) => {
+              const value = mergedVariablesValues.value[varName];
+              if (value !== undefined) {
+                tabValues.push({ tabId, value });
+              }
+            });
+          }
+          if (tabValues.length > 0) {
+            aggregatedValues.push({
+              ...varConfig,
+              scope: 'tabs',
+              value: tabValues,
+              _isCurrentLevel: false,
+            });
+          }
+        } else if (scope === 'panels') {
+          // Panel variable - collect values for all relevant panels
+          const panelValues: any[] = [];
+          if (varConfig.panels && Array.isArray(varConfig.panels)) {
+            varConfig.panels.forEach((panelId: string) => {
+              const value = mergedVariablesValues.value[varName];
+              if (value !== undefined) {
+                panelValues.push({ panelId, value });
+              }
+            });
+          }
+          if (panelValues.length > 0) {
+            aggregatedValues.push({
+              ...varConfig,
+              scope: 'panels',
+              value: panelValues,
+              _isCurrentLevel: false,
+            });
+          }
+        }
+      });
+
+      return {
+        isVariablesLoading: variablesData.value?.isVariablesLoading || false,
+        values: aggregatedValues,
+      };
+    });
+
+    // Emit aggregated variables when they change
+    watch(
+      aggregatedVariablesForUrl,
+      (newValue) => {
+        emit("variablesData", newValue);
+      },
+      { deep: true },
+    );
+
+    // Keep the old watcher for backward compatibility
     watch(
       () => currentVariablesDataRef.value,
       () => {
-        if (currentVariablesDataRef.value?.__global) {
-          emit("variablesData", currentVariablesDataRef.value?.__global);
-        }
+        // This is now handled by aggregatedVariablesForUrl watcher above
       },
       { deep: true },
     );
