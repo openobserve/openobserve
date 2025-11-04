@@ -52,13 +52,16 @@ pub async fn read_from_immutable(
     time_range: Option<(i64, i64)>,
     partition_filters: &[(String, Vec<String>)],
 ) -> Result<Vec<ReadRecordBatchEntry>> {
+    let shared_memtable = config::get_config().common.feature_shared_memtable_enabled;
     let r = IMMUTABLES.read().await;
     let mut batches = Vec::with_capacity(r.len());
     for (_, i) in r.iter() {
-        if org_id == i.key.org_id.as_ref() && stream_type == i.key.stream_type.as_ref() {
+        if stream_type == i.key.stream_type.as_ref()
+            && (shared_memtable || org_id == i.key.org_id.as_ref())
+        {
             batches.extend(
                 i.memtable
-                    .read(stream_name, time_range, partition_filters)?,
+                    .read(org_id, stream_name, time_range, partition_filters)?,
             );
         }
     }
