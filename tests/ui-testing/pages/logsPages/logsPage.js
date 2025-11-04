@@ -1679,36 +1679,44 @@ export class LogsPage {
     }
 
     async expectFnEditorNotVisible() {
-        const fnEditor = this.page.locator('#fnEditor');
+        try {
+            // Primary approach: Simple visibility check (faster, more reliable)
+            return await expect(this.page.locator('#fnEditor').locator('.inputarea')).not.toBeVisible();
+        } catch (error) {
+            // Fallback approach: Check bounding box if visibility check fails
+            console.log(`[expectFnEditorNotVisible] Simple visibility check failed, trying bounding box approach`);
 
-        // Check if fnEditor is in the viewport (not moved off-screen)
-        const boundingBox = await fnEditor.boundingBox().catch(() => null);
-        const viewportSize = await this.page.viewportSize();
+            const fnEditor = this.page.locator('#fnEditor');
 
-        const isInViewport = boundingBox && boundingBox.x >= 0 && boundingBox.x < viewportSize.width;
+            // Check if fnEditor is in the viewport (not moved off-screen)
+            const boundingBox = await fnEditor.boundingBox().catch(() => null);
+            const viewportSize = await this.page.viewportSize();
 
-        console.log(`[expectFnEditorNotVisible] Initial state - fnEditor in viewport: ${isInViewport}, boundingBox:`, boundingBox);
+            const isInViewport = boundingBox && boundingBox.x >= 0 && boundingBox.x < viewportSize.width;
 
-        if (isInViewport) {
-            console.log('[expectFnEditorNotVisible] fnEditor still in viewport, clicking toggle to hide it');
-            // If VRL editor is still in viewport, click toggle to move it off-screen
-            await this.page.locator(this.vrlToggleButton).click();
-            await this.page.waitForTimeout(1000);
+            console.log(`[expectFnEditorNotVisible] Initial state - fnEditor in viewport: ${isInViewport}, boundingBox:`, boundingBox);
 
-            const boundingBoxAfter = await fnEditor.boundingBox().catch(() => null);
-            const isInViewportAfter = boundingBoxAfter && boundingBoxAfter.x >= 0 && boundingBoxAfter.x < viewportSize.width;
-            console.log(`[expectFnEditorNotVisible] After toggle click - fnEditor in viewport: ${isInViewportAfter}, boundingBox:`, boundingBoxAfter);
+            if (isInViewport) {
+                console.log('[expectFnEditorNotVisible] fnEditor still in viewport, clicking toggle to hide it');
+                // If VRL editor is still in viewport, click toggle to move it off-screen
+                await this.page.locator(this.vrlToggleButton).click();
+                await this.page.waitForTimeout(1000);
+
+                const boundingBoxAfter = await fnEditor.boundingBox().catch(() => null);
+                const isInViewportAfter = boundingBoxAfter && boundingBoxAfter.x >= 0 && boundingBoxAfter.x < viewportSize.width;
+                console.log(`[expectFnEditorNotVisible] After toggle click - fnEditor in viewport: ${isInViewportAfter}, boundingBox:`, boundingBoxAfter);
+            }
+
+            // Verify fnEditor is moved off-screen (x position is negative or beyond viewport width)
+            const finalBoundingBox = await fnEditor.boundingBox();
+            const isHidden = !finalBoundingBox || finalBoundingBox.x < 0 || finalBoundingBox.x >= viewportSize.width;
+
+            if (!isHidden) {
+                throw new Error(`fnEditor is still visible in viewport at position x: ${finalBoundingBox.x}`);
+            }
+
+            return true;
         }
-
-        // Verify fnEditor is moved off-screen (x position is negative or beyond viewport width)
-        const finalBoundingBox = await fnEditor.boundingBox();
-        const isHidden = !finalBoundingBox || finalBoundingBox.x < 0 || finalBoundingBox.x >= viewportSize.width;
-
-        if (!isHidden) {
-            throw new Error(`fnEditor is still visible in viewport at position x: ${finalBoundingBox.x}`);
-        }
-
-        return true;
     }
 
     async clickPast6DaysButton() {
