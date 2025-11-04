@@ -1,7 +1,6 @@
 <template>
-  <div class="service-graph-container">
-    <q-card flat class="full-height">
-      <q-card-section class="q-pa-md">
+    <q-card flat class="tw-h-full">
+      <q-card-section class="tw-p-[0.675rem] tw-h-full">
         <div class="row items-center justify-between q-mb-md">
           <div class="col">
             <div class="text-h5 text-bold">Service Graph</div>
@@ -58,7 +57,7 @@
         <div class="row q-col-gutter-md q-mb-md" v-if="stats">
           <div class="col-12 col-md-2">
             <q-card flat bordered class="stat-card">
-              <q-card-section class="q-pa-md">
+              <q-card-section class="tw-p-[0.675rem]">
                 <div class="row items-center">
                   <q-icon name="hub" size="32px" color="primary" class="q-mr-sm" />
                   <div>
@@ -71,7 +70,7 @@
           </div>
           <div class="col-12 col-md-2">
             <q-card flat bordered class="stat-card">
-              <q-card-section class="q-pa-md">
+              <q-card-section class="tw-p-[0.675rem]">
                 <div class="row items-center">
                   <q-icon name="share" size="32px" color="blue" class="q-mr-sm" />
                   <div>
@@ -84,7 +83,7 @@
           </div>
           <div class="col-12 col-md-3">
             <q-card flat bordered class="stat-card">
-              <q-card-section class="q-pa-md">
+              <q-card-section class="tw-p-[0.675rem]">
                 <div class="row items-center">
                   <q-icon name="speed" size="32px" color="orange" class="q-mr-sm" />
                   <div>
@@ -97,7 +96,7 @@
           </div>
           <div class="col-12 col-md-3">
             <q-card flat bordered class="stat-card">
-              <q-card-section class="q-pa-md">
+              <q-card-section class="tw-p-[0.675rem]">
                 <div class="row items-center">
                   <q-icon name="error_outline" size="32px" :color="stats.errorRate > 5 ? 'negative' : 'grey-5'" class="q-mr-sm" />
                   <div>
@@ -112,7 +111,7 @@
           </div>
           <div class="col-12 col-md-2">
             <q-card flat bordered class="stat-card">
-              <q-card-section class="q-pa-md">
+              <q-card-section class="tw-p-[0.675rem]">
                 <div class="row items-center">
                   <q-icon name="check_circle" size="32px" :color="storeStats?.enabled ? 'positive' : 'grey'" class="q-mr-sm" />
                   <div>
@@ -132,47 +131,38 @@
           <div class="col-12 col-md-4">
             <q-input
               v-model="searchFilter"
+              borderless
               dense
-              outlined
+              class="no-border tw-h-[36px]"
               placeholder="Search services..."
+              debounce="300"
               @update:model-value="applyFilters"
             >
-              <template v-slot:prepend>
-                <q-icon name="search" />
-              </template>
-              <template v-slot:append v-if="searchFilter">
-                <q-icon name="close" @click="searchFilter = ''; applyFilters()" class="cursor-pointer" />
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
           </div>
           <div class="col-12 col-md-8">
-            <q-btn-toggle
-              v-model="connectionTypeFilter"
-              toggle-color="primary"
-              size="sm"
-              no-caps
-              dense
-              @update:model-value="applyFilters"
-              :options="[
-                {label: 'All', value: 'all'},
-                {label: 'Standard', value: 'standard'},
-                {label: 'Database', value: 'database'},
-                {label: 'Messaging', value: 'messaging'},
-                {label: 'Virtual', value: 'virtual'},
-              ]"
-            />
+            <div class="app-tabs-container tw-h-[36px] tw-w-fit">
+              <app-tabs
+                class="tabs-selection-container"
+                :tabs="connectionTypeTabs"
+                :activeTab="connectionTypeFilter"
+                @update:activeTab="connectionTypeFilter = $event; applyFilters()"
+              />
+            </div>
           </div>
         </div>
 
         <!-- Graph Visualization -->
-        <q-card flat bordered class="graph-card">
-          <q-card-section class="q-pa-none" style="height: 100%;">
+        <q-card flat bordered class="graph-card  tw-h-[calc(100%-162px)]">
+          <q-card-section class="q-pa-none tw-h-full" style="height: 100%;">
             <div
               ref="graphContainer"
-              class="graph-container"
-              :style="{ height: graphHeight + 'px', minHeight: graphHeight + 'px' }"
+              class="graph-container tw-h-full tw-bg-[var(--o2-bg)]"
             >
-              <div v-if="loading" class="flex flex-center full-height">
+              <div v-if="loading" class="flex flex-center tw-h-full">
                 <div class="text-center">
                   <q-spinner-grid color="primary" size="4em" />
                   <div class="text-subtitle1 q-mt-md text-grey-7">Loading service graph...</div>
@@ -180,11 +170,11 @@
               </div>
               <div
                 v-else-if="error"
-                class="flex flex-center full-height text-center q-pa-md"
+                class="flex flex-center tw-h-full text-center tw-p-[0.675rem]"
               >
                 <div>
                   <q-icon name="error_outline" size="4em" color="negative" />
-                  <div class="text-h6 q-mt-md">{{ error }}</div>
+                  <div class="text-h6 q-mt-md tw-text-[var(--o2-text-primary)]">{{ error }}</div>
                   <q-btn
                     outline
                     color="primary"
@@ -196,7 +186,7 @@
               </div>
               <div
                 v-else-if="!graphData.nodes.length"
-                class="flex flex-center full-height text-center q-pa-md"
+                class="flex flex-center tw-h-full text-center tw-p-[0.675rem]"
               >
                 <div>
                   <q-icon name="hub" size="5em" color="grey-4" />
@@ -224,7 +214,7 @@
                   flat
                   bordered
                 >
-                  <q-card-section class="q-pa-md">
+                  <q-card-section class="tw-p-[0.675rem]">
                     <div class="row items-center justify-between q-mb-sm">
                       <div class="text-h6">{{ selectedNode.label }}</div>
                       <q-btn
@@ -262,22 +252,22 @@
           <div class="col">
             <div class="row q-col-gutter-sm">
               <div class="col-auto">
-                <q-chip dense square color="blue" text-color="white" icon="sync_alt">
+                <q-chip dense square color="blue" text-color="white" icon="sync_alt" class="tw-px-[0.6rem] !tw-py-[0.8rem]">
                   Standard
                 </q-chip>
               </div>
               <div class="col-auto">
-                <q-chip dense square color="purple" text-color="white" icon="message">
+                <q-chip dense square color="purple" text-color="white" icon="message" class="tw-px-[0.6rem] !tw-py-[0.8rem]">
                   Messaging
                 </q-chip>
               </div>
               <div class="col-auto">
-                <q-chip dense square color="orange" text-color="white" icon="storage">
+                <q-chip dense square color="orange" text-color="white" icon="storage" class="tw-px-[0.6rem] !tw-py-[0.8rem]">
                   Database
                 </q-chip>
               </div>
               <div class="col-auto">
-                <q-chip dense square color="grey" text-color="white" icon="cloud">
+                <q-chip dense square color="grey" text-color="white" icon="cloud" class="tw-px-[0.6rem] !tw-py-[0.8rem]">
                   Virtual/External
                 </q-chip>
               </div>
@@ -336,7 +326,6 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
-  </div>
 </template>
 
 <script lang="ts">
@@ -344,9 +333,13 @@ import { defineComponent, ref, onMounted, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import serviceGraphService from "@/services/service_graph";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 export default defineComponent({
   name: "ServiceGraph",
+  components: {
+    AppTabs,
+  },
   setup() {
     const store = useStore();
     const $q = useQuasar();
@@ -365,6 +358,15 @@ export default defineComponent({
     const searchFilter = ref("");
     const connectionTypeFilter = ref("all");
     const selectedNode = ref<any>(null);
+
+    // Connection type tabs configuration
+    const connectionTypeTabs = [
+      { label: 'All', value: 'all' },
+      { label: 'Standard', value: 'standard' },
+      { label: 'Database', value: 'database' },
+      { label: 'Messaging', value: 'messaging' },
+      { label: 'Virtual', value: 'virtual' },
+    ];
 
     const graphData = ref<any>({
       nodes: [],
@@ -913,6 +915,7 @@ export default defineComponent({
       lastUpdated,
       searchFilter,
       connectionTypeFilter,
+      connectionTypeTabs,
       selectedNode,
       loadServiceGraph,
       formatNumber,
@@ -935,7 +938,6 @@ export default defineComponent({
 .service-graph-container {
   height: 100%;
   padding: 16px;
-  background: #f5f5f5;
 }
 
 .stat-card {
@@ -948,7 +950,6 @@ export default defineComponent({
 }
 
 .graph-card {
-  background: white;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
@@ -956,7 +957,6 @@ export default defineComponent({
 .graph-container {
   position: relative;
   width: 100%;
-  background: #fafafa;
   border-radius: 4px;
   overflow: hidden;
 }
