@@ -379,9 +379,9 @@ pub async fn write_file(
             if entry.records.is_empty() {
                 None
             } else {
-                let key = format!("{org_id}/{stream_name}");
                 Some(ingester::Entry {
-                    stream: Arc::from(key.as_str()),
+                    org_id: Arc::from(org_id),
+                    stream: Arc::from(stream_name),
                     schema: Some(entry.schema),
                     schema_key: Arc::from(entry.schema_key.as_str()),
                     partition_key: Arc::from(hour_key.as_str()),

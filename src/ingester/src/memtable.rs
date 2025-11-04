@@ -56,12 +56,10 @@ impl MemTable {
         entry: Entry,
         batch: Arc<RecordBatchEntry>,
     ) -> Result<()> {
-        let partitions = match self.streams.get_mut(&entry.stream) {
+        let key = Arc::from(format!("{}/{}", entry.org_id, entry.stream));
+        let partitions = match self.streams.get_mut(&key) {
             Some(v) => v,
-            None => self
-                .streams
-                .entry(entry.stream.clone())
-                .or_insert_with(Stream::new),
+            None => self.streams.entry(key.clone()).or_insert_with(Stream::new),
         };
         let json_size = entry.data_size;
         let arrow_size = partitions.write(schema, entry, batch)?;

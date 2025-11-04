@@ -179,17 +179,16 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
             total += entry.data.len();
 
             // Use Entry org_id if available, otherwise fall back to file path
-            let (org_id, stream_name) = if entry.stream.contains('/') {
-                let parts: Vec<&str> = entry.stream.splitn(2, '/').collect();
-                (parts[0], parts[1])
+            let org_id = if !entry.org_id.is_empty() {
+                entry.org_id.as_ref()
             } else {
-                (org_id, entry.stream.as_ref())
+                org_id
             };
 
             let infer_schema =
                 infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
                     .context(InferJsonSchemaSnafu)?;
-            let latest_schema = infra::schema::get_cache(org_id, stream_name, stream_type.into())
+            let latest_schema = infra::schema::get_cache(org_id, &entry.stream, stream_type.into())
                 .await
                 .map_err(|e| Error::ExternalError {
                     source: Box::new(e),
