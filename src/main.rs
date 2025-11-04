@@ -34,10 +34,6 @@ use config::{
     utils::size::bytes_to_human_readable,
 };
 use log::LevelFilter;
-#[cfg(feature = "enterprise")]
-use openobserve::handler::http::{
-    auth::script_server::validator as script_server_validator, request::script_server,
-};
 use openobserve::{
     cli::basic::cli,
     common::{
@@ -100,7 +96,14 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
 #[cfg(feature = "enterprise")]
-use {config::Config, o2_enterprise::enterprise::common::config::O2Config};
+use {
+    config::Config,
+    o2_enterprise::enterprise::{ai, common::config::O2Config},
+    openobserve::handler::http::{
+        auth::script_server::validator as script_server_validator, request::script_server,
+    },
+    utoipa::OpenApi,
+};
 
 #[cfg(all(feature = "mimalloc", not(feature = "jemalloc")))]
 #[global_allocator]
@@ -1294,7 +1297,7 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
     tracer_builder = tracer_builder.with_id_generator({
         #[cfg(feature = "enterprise")]
         {
-            o2_enterprise::enterprise::ai::tracing::UuidV7IdGenerator
+            ai::agent::tracing::UuidV7IdGenerator
         }
         #[cfg(not(feature = "enterprise"))]
         {
@@ -1453,6 +1456,14 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         log::info!("init super cluster");
         o2_enterprise::enterprise::super_cluster::kv::init().await?;
         openobserve::super_cluster_queue::init().await?;
+    }
+
+    // Initialize OpenAPI spec for AI and MCP modules
+    let api = openapi::ApiDoc::openapi();
+    if let Err(e) = o2_enterprise::enterprise::ai::init_ai_components(api) {
+        log::error!("Failed to init AI/MCP: {e}");
+    } else {
+        log::info!("Initialized AI and MCP");
     }
 
     // check ratelimit config

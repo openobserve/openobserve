@@ -118,7 +118,7 @@ pub async fn list(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = ServiceAccountRequest, description = "ServiceAccount data", content_type = "application/json"),
+    request_body(content = inline(ServiceAccountRequest), description = "ServiceAccount data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
@@ -168,7 +168,7 @@ pub async fn save(
         ("org_id" = String, Path, description = "Organization name"),
         ("email_id" = String, Path, description = "Service Account email id"),
     ),
-    request_body(content = UpdateServiceAccountRequest, description = "Service Account data", content_type = "application/json"),
+    request_body(content = inline(UpdateServiceAccountRequest), description = "Service Account data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
@@ -290,7 +290,7 @@ pub async fn delete(
         ("email_id" = String, Path, description = "Service Account email id"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = APIToken),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(APIToken)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(

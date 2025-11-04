@@ -73,7 +73,7 @@ impl From<FolderError> for HttpResponse {
         ("folder_type" = FolderType, Path, description = "Type of data the folder can contain"),
     ),
     request_body(
-        content = CreateFolderRequestBody,
+        content = inline(CreateFolderRequestBody),
         description = "Folder details",
         example = json!({
             "name": "Infrastructure",
@@ -81,7 +81,7 @@ impl From<FolderError> for HttpResponse {
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Folder created", body = CreateFolderResponseBody),
+        (status = StatusCode::OK, description = "Folder created", body = inline(CreateFolderResponseBody)),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
@@ -120,7 +120,7 @@ pub async fn create_folder(
         ("folder_id" = String, Path, description = "Folder name"),
     ),
     request_body(
-        content = Folder,
+        content = inline(Folder),
         description = "Folder details",
         example = json!({
             "title": "Infra",
@@ -163,7 +163,7 @@ pub async fn update_folder(
         ("folder_type" = FolderType, Path, description = "Type of data the folder can contain"),
     ),
     responses(
-        (status = StatusCode::OK, body = ListFoldersResponseBody),
+        (status = StatusCode::OK, body = inline(ListFoldersResponseBody)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"}))
@@ -208,7 +208,7 @@ pub async fn list_folders(
         ("folder_id" = String, Path, description = "Folder ID"),
     ),
     responses(
-        (status = StatusCode::OK, body = GetFolderResponseBody),
+        (status = StatusCode::OK, body = inline(GetFolderResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
     ),
     extensions(
@@ -243,7 +243,7 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
         ("folder_name" = String, Path, description = "Folder Name"),
     ),
     responses(
-        (status = StatusCode::OK, body = GetFolderResponseBody),
+        (status = StatusCode::OK, body = inline(GetFolderResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
     ),
     extensions(
@@ -314,7 +314,7 @@ pub mod deprecated {
             ("org_id" = String, Path, description = "Organization name"),
         ),
         request_body(
-            content = CreateFolderRequestBody,
+            content = inline(CreateFolderRequestBody),
             description = "Folder details",
             example = json!({
                 "name": "Infrastructure",
@@ -322,7 +322,7 @@ pub mod deprecated {
             }),
         ),
         responses(
-            (status = StatusCode::OK, description = "Folder created", body = CreateFolderResponseBody),
+            (status = StatusCode::OK, description = "Folder created", body = inline(CreateFolderResponseBody)),
             (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
         ),
         extensions(
@@ -362,7 +362,7 @@ pub mod deprecated {
             ("folder_id" = String, Path, description = "Folder name"),
         ),
         request_body(
-            content = Folder,
+            content = inline(Folder),
             description = "Folder details",
             example = json!({
                 "title": "Infra",
@@ -406,7 +406,7 @@ pub mod deprecated {
             ("org_id" = String, Path, description = "Organization name"),
         ),
         responses(
-            (status = StatusCode::OK, body = ListFoldersResponseBody),
+            (status = StatusCode::OK, body = inline(ListFoldersResponseBody)),
         ),
         extensions(
             ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"}))
@@ -452,7 +452,7 @@ pub mod deprecated {
             ("folder_id" = String, Path, description = "Folder ID"),
         ),
         responses(
-            (status = StatusCode::OK, body = GetFolderResponseBody),
+            (status = StatusCode::OK, body = inline(GetFolderResponseBody)),
             (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
         ),
         extensions(
@@ -488,7 +488,7 @@ pub mod deprecated {
             ("folder_name" = String, Path, description = "Folder Name"),
         ),
         responses(
-            (status = StatusCode::OK, body = GetFolderResponseBody),
+            (status = StatusCode::OK, body = inline(GetFolderResponseBody)),
             (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
         ),
         extensions(
