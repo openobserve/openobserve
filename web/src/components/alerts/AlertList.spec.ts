@@ -543,8 +543,14 @@ describe("AlertList - row actions", () => {
 describe("AlertList - router query behaviors", () => {
   it("when action=import, opens ImportAlert dialog after fetch", async () => {
     const wrapper: any = await mountAlertList();
-    wrapper.vm.router.currentRoute.value.query = { action: "import" };
     await waitData(wrapper);
+    // Use router.push to trigger the watcher properly
+    await router.push({
+      name: "alertList",
+      query: { action: "import" }
+    });
+    await flushPromises();
+    await wrapper.vm.$nextTick();
     expect(wrapper.vm.showImportAlertDialog).toBe(true);
   });
 

@@ -2406,6 +2406,9 @@ pub enum StreamResponses {
         message: String,
         error_detail: Option<String>,
     },
+    PatternExtractionResult {
+        patterns: json::Value,
+    },
     Done,
     Cancelled,
 }
@@ -2573,6 +2576,17 @@ impl StreamResponses {
             StreamResponses::Error { .. } => {
                 let data = serde_json::to_string(self).unwrap_or_default();
                 let bytes = format_event("error", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::PatternExtractionResult { patterns } => {
+                let data = serde_json::to_string(patterns).unwrap_or_else(|_| {
+                    log::error!("Failed to serialize pattern extraction result: {patterns:?}");
+                    String::new()
+                });
+                let bytes = format_event("pattern_extraction_result", &data);
                 StreamResponseChunks {
                     chunks_iter: None,
                     single_chunk: Some(Ok(bytes)),
