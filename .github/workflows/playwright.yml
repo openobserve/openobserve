@@ -358,7 +358,7 @@ jobs:
           ls -lh playwright-results/report.json
 
       - name: Upload to TestDino
-        if: ${{ always() && env.UPLOAD_TO_TESTDINO == 'true' }}
+        if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
           npx --yes tdpw upload playwright-results \
