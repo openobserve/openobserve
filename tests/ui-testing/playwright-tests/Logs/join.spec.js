@@ -18,7 +18,7 @@ test.describe("Join for logs", () => {
     await navigateToBase(page);
     pm = new PageManager(page);
     
-    // Strategic 500ms wait for post-authentication stabilization - this is functionally necessary
+    // Strategic 500ms wait for post-authentication stabilization - this is functionally necessary 
     await page.waitForTimeout(500);
     
     // Data ingestion for join testing (preserve exact logic)
