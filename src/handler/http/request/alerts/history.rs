@@ -101,7 +101,7 @@ pub struct AlertHistoryResponse {
         ("size" = Option<i64>, Query, description = "Number of results to return (default: 100, max: 1000)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = AlertHistoryResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(AlertHistoryResponse)),
         (status = 400, description = "Bad Request", content_type = "application/json"),
         (status = 403, description = "Forbidden", content_type = "application/json"),
         (status = 500, description = "Internal Server Error", content_type = "application/json"),

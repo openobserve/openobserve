@@ -37,7 +37,7 @@ use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Transform, description = "Function data", content_type = "application/json"),
+    request_body(content = inline(Transform), description = "Function data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -76,7 +76,7 @@ pub async fn save_function(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = FunctionList),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(FunctionList)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "list"}))
@@ -165,7 +165,7 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
         ("org_id" = String, Path, description = "Organization name"),
         ("name" = String, Path, description = "Function name"),
     ),
-    request_body(content = Transform, description = "Function data", content_type = "application/json"),
+    request_body(content = inline(Transform), description = "Function data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -206,7 +206,7 @@ pub async fn update_function(
         ("name" = String, Path, description = "Function name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = FunctionList),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(FunctionList)),
         (status = 404, description = "Function not found", content_type = "application/json", body = ()),
         (status = 500, description = "Internal server error", content_type = "application/json", body = ()),
     ),
@@ -238,7 +238,7 @@ pub async fn list_pipeline_dependencies(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = TestVRLRequest, description = "Test run function", content_type = "application/json"),
+    request_body(content = inline(TestVRLRequest), description = "Test run function", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
