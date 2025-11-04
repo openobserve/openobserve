@@ -1036,6 +1036,7 @@ export default defineComponent({
           }
 
           if (isLogsTab()) {
+            searchObj.loading = true;
             loadLogsData();
           } else if (searchObj.meta.logsVisualizeToggle === "patterns") {
             await loadPatternsData();
