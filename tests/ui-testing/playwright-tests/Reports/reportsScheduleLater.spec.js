@@ -30,7 +30,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.dashboardPage.createDashboard();
         await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
         await pageManager.reportsPage.createReportAddReportButton();
         await pageManager.reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
         await pageManager.reportsPage.createReportFolderInput();
@@ -44,6 +44,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.reportsPage.createReportContinueButtonStep2();
         await pageManager.reportsPage.createReportFillDetail();
         await pageManager.reportsPage.createReportSaveButton();
+        await pageManager.reportsPage.verifyReportCreated(TEST_REPORT_NAME);
         await pageManager.reportsPage.signOut();
         await waitUtils.smartWait(page, 4000, 'login sequence wait');
         await pageManager.loginPage.gotoLoginPageSC();
@@ -53,7 +54,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
         await expect(page).toHaveURL(/.*\/reports/);
         await pageManager.reportsPage.deleteReport(TEST_REPORT_NAME);
         await pageManager.dashboardPage.navigateToDashboards();
@@ -67,7 +68,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.loginPage.login();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.dashboardPage.notAvailableDashboard();
 
@@ -78,7 +79,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.dashboardPage.createDashboard();
         await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
         await pageManager.reportsPage.createReportAddReportButton();
         await pageManager.reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
         await pageManager.reportsPage.createReportFolderInput();
@@ -92,6 +93,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.reportsPage.createReportContinueButtonStep2();
         await pageManager.reportsPage.createReportFillDetail();
         await pageManager.reportsPage.createReportSaveButton();
+        await pageManager.reportsPage.verifyReportCreated(TEST_REPORT_NAME);
         await pageManager.reportsPage.signOut();
         await waitUtils.smartWait(page, 4000, 'login sequence wait');
         await pageManager.loginPage.gotoLoginPageSC();
@@ -101,7 +103,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
         await expect(page).toHaveURL(/.*\/reports/);
         await pageManager.reportsPage.deleteReport(TEST_REPORT_NAME);
         await pageManager.dashboardPage.navigateToDashboards();
@@ -115,7 +117,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.loginPage.login();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.dashboardPage.notAvailableDashboard();
 
@@ -126,7 +128,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.dashboardPage.createDashboard();
         await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
         await pageManager.reportsPage.createReportAddReportButton();
         await pageManager.reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
         await pageManager.reportsPage.createReportFolderInput();
@@ -140,6 +142,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.reportsPage.createReportContinueButtonStep2();
         await pageManager.reportsPage.createReportFillDetail();
         await pageManager.reportsPage.createReportSaveButton();
+        await pageManager.reportsPage.verifyReportCreated(TEST_REPORT_NAME);
         await pageManager.reportsPage.signOut();
         await waitUtils.smartWait(page, 4000, 'login sequence wait');
         await pageManager.loginPage.gotoLoginPageSC();
@@ -149,7 +152,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
         await expect(page).toHaveURL(/.*\/reports/);
         await pageManager.reportsPage.deleteReport(TEST_REPORT_NAME);
         await pageManager.dashboardPage.navigateToDashboards();
@@ -163,7 +166,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.loginPage.login();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.dashboardPage.notAvailableDashboard();
 
@@ -174,7 +177,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.dashboardPage.createDashboard();
         await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
         await pageManager.reportsPage.createReportAddReportButton();
         await pageManager.reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
         await pageManager.reportsPage.createReportFolderInput();
@@ -188,6 +191,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.reportsPage.createReportContinueButtonStep2();
         await pageManager.reportsPage.createReportFillDetail();
         await pageManager.reportsPage.createReportSaveButton();
+        await pageManager.reportsPage.verifyReportCreated(TEST_REPORT_NAME);
         await pageManager.reportsPage.signOut();
         await waitUtils.smartWait(page, 4000, 'login sequence wait');
         await pageManager.loginPage.gotoLoginPageSC();
@@ -197,7 +201,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
         await expect(page).toHaveURL(/.*\/reports/);
         await pageManager.reportsPage.deleteReport(TEST_REPORT_NAME);
         await pageManager.dashboardPage.navigateToDashboards();
@@ -211,7 +215,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.loginPage.login();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.dashboardPage.notAvailableDashboard();
 
@@ -222,7 +226,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.dashboardPage.createDashboard();
         await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
         await pageManager.reportsPage.createReportAddReportButton();
         await pageManager.reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
         await pageManager.reportsPage.createReportFolderInput();
@@ -236,6 +240,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.reportsPage.createReportContinueButtonStep2();
         await pageManager.reportsPage.createReportFillDetail();
         await pageManager.reportsPage.createReportSaveButton();
+        await pageManager.reportsPage.verifyReportCreated(TEST_REPORT_NAME);
         await pageManager.reportsPage.signOut();
         await waitUtils.smartWait(page, 4000, 'login sequence wait');
         await pageManager.loginPage.gotoLoginPageSC();
@@ -245,7 +250,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
         await expect(page).toHaveURL(/.*\/reports/);
         await pageManager.reportsPage.deleteReport(TEST_REPORT_NAME);
         await pageManager.dashboardPage.navigateToDashboards();
@@ -259,7 +264,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.loginPage.login();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.dashboardPage.notAvailableDashboard();
 
@@ -270,7 +275,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.dashboardPage.createDashboard();
         await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
         await pageManager.reportsPage.createReportAddReportButton();
         await pageManager.reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
         await pageManager.reportsPage.createReportFolderInput();
@@ -284,6 +289,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.reportsPage.createReportContinueButtonStep2();
         await pageManager.reportsPage.createReportFillDetail();
         await pageManager.reportsPage.createReportSaveButton();
+        await pageManager.reportsPage.verifyReportCreated(TEST_REPORT_NAME);
         await pageManager.reportsPage.signOut();
         await waitUtils.smartWait(page, 4000, 'login sequence wait');
         await pageManager.loginPage.gotoLoginPageSC();
@@ -293,7 +299,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
         await expect(page).toHaveURL(/.*\/reports/);
         await pageManager.reportsPage.deleteReport(TEST_REPORT_NAME);
         await pageManager.dashboardPage.navigateToDashboards();
@@ -307,7 +313,7 @@ test.describe("Report test cases Updated", () => {
         await pageManager.loginPage.login();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.dashboardPage.notAvailableDashboard();
 
