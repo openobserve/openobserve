@@ -1091,6 +1091,7 @@ pub async fn search_partition(
         req.end_time,
         step,
         sql_order_by,
+        is_aggregate,
         is_streaming_aggregate,
         streaming_interval_micros,
         add_mini_partition,
