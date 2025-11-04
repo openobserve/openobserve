@@ -63,6 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="width: 100%; height: 100%"
             class="col"
             :variablesData="variablesData"
+            :tabId="tabId"
+            :panelId="panelSchema.id"
           />
         </div>
         <div
@@ -75,6 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="width: 100%; height: 100%"
             class="col"
             :variablesData="variablesData"
+            :tabId="tabId"
+            :panelId="panelSchema.id"
           />
         </div>
 
