@@ -3,9 +3,9 @@ use actix_web::{
     dev::{ServiceRequest, ServiceResponse},
     middleware,
 };
-use config::get_config;
 #[cfg(feature = "cloud")]
 use {
+    config::get_config,
     crate::service::ingestion::check_ingestion_allowed, actix_web::error::ErrorTooManyRequests,
     config::meta::stream::StreamType,
 };
