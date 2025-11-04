@@ -50,9 +50,10 @@ const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
 import UnflattenedPage from "./logsPages/unflattened.js";
 
-// // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
-// import { RegexPatternsPage } from "./generalPages/regexPatternsPage.js";
-// import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
+// ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
+import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
+import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
+import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
 
 class PageManager {
   /**
@@ -115,9 +116,10 @@ class PageManager {
     this.logsQueryPage = new LogsQueryPage(page);
     this.unflattenedPage = new UnflattenedPage(page);
 
-    // // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
-    // this.regexPatternsPage = new RegexPatternsPage(page);
-    // this.streamAssociationPage = new StreamAssociationPage(page);
+    // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
+    this.sdrPatternsPage = new SDRPatternsPage(page);
+    this.sdrVerificationPage = new SDRVerificationPage(page);
+    this.streamAssociationPage = new StreamAssociationPage(page);
   }
 }
 

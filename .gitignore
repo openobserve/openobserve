@@ -36,3 +36,4 @@ tests/ui-testing/playwright-tests/utils/auth/user.json
 /tests/ui-testing/playwright-results
 /tests/ui-testing/testDinoPOC/MD Files
 *.bak
+/tests/ui-testing/MD_Files
