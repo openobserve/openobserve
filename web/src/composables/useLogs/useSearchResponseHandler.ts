@@ -566,7 +566,10 @@ export const useSearchResponseHandler = () => {
         searchAggData.hasAggregation = true;
         searchObj.meta.resultGrid.showPagination = false;
 
-        if (response.content?.streaming_aggs) {
+        if (
+          response.content?.streaming_aggs &&
+          response.content?.results?.total
+        ) {
           searchAggData.total = response.content?.results?.total;
         } else {
           searchAggData.total =
