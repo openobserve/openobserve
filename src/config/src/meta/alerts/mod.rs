@@ -1197,7 +1197,7 @@ mod test {
         // Test with summer start time (should use PDT offset: UTC-7 = -420 minutes)
         let summer_result = condition.get_next_trigger_time_non_aligned(
             true,
-            -420, // PDT fallback
+            -480, // Even if fallback is PST, actually PDT should be used
             false,
             Some(summer_start_from),
         );
