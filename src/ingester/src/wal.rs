@@ -125,7 +125,7 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
         let idx: usize = file_columns[file_columns.len() - 4]
             .parse()
             .unwrap_or_default();
-        let key = WriterKey::new(idx, org_id, stream_type);
+        let key = WriterKey::new_replay(org_id, stream_type);
         let mut memtable = memtable::MemTable::new();
         let mut reader = match wal::Reader::from_path(wal_file) {
             Ok(v) => v,

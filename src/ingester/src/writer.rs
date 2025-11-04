@@ -585,4 +585,11 @@ impl WriterKey {
             stream_type: Arc::from(stream_type.as_ref()),
         }
     }
+
+    pub(crate) fn new_replay(org_id: &str, stream_type: &str) -> Self {
+        Self {
+            org_id: Arc::from(org_id),
+            stream_type: Arc::from(stream_type),
+        }
+    }
 }
