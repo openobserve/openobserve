@@ -1152,7 +1152,7 @@ impl Engine {
             // TODO: check this implementation
             Func::Time => Value::Float((self.time / 1_000_000) as f64),
             Func::Timestamp => functions::timestamp_range(input)?,
-            Func::Vector => functions::vector(input, self.time)?,
+            Func::Vector => functions::vector_range(input, &self.eval_ctx)?,
             Func::Year => functions::year_range(input)?,
         })
     }

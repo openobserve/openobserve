@@ -15,24 +15,34 @@
 
 use datafusion::error::{DataFusionError, Result};
 
-use crate::service::promql::value::{InstantValue, Labels, Sample, Value};
+use crate::service::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 
-pub(crate) fn vector(data: Value, eval_ts: i64) -> Result<Value> {
+pub(crate) fn vector_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let value = match data {
         Value::Float(f) => f,
         _ => {
-            return Err(DataFusionError::NotImplemented(
+            return Err(DataFusionError::Plan(
                 "Unexpected input. Expected: \"vector(s scalar)\"".into(),
             ));
         }
     };
 
-    let instant = InstantValue {
+    // Generate samples based on start, end, and step from eval_ctx
+    let mut samples = Vec::new();
+    let mut current_ts = eval_ctx.start;
+
+    while current_ts <= eval_ctx.end {
+        samples.push(Sample::new(current_ts, value));
+        current_ts += eval_ctx.step;
+    }
+
+    // Create a matrix with a single RangeValue containing all generated samples
+    let range_value = RangeValue {
         labels: Labels::default(),
-        sample: Sample {
-            timestamp: eval_ts,
-            value,
-        },
+        samples,
+        exemplars: None,
+        time_window: None,
     };
-    Ok(Value::Vector(vec![instant]))
+
+    Ok(Value::Matrix(vec![range_value]))
 }

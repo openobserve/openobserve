@@ -80,7 +80,7 @@ pub(crate) use stddev_over_time::stddev_over_time_range;
 pub(crate) use stdvar_over_time::stdvar_over_time_range;
 pub(crate) use sum_over_time::sum_over_time_range;
 pub(crate) use time_operations::*;
-pub(crate) use vector::vector;
+pub(crate) use vector::vector_range;
 
 /// Reference: https://prometheus.io/docs/prometheus/latest/querying/functions/
 #[derive(Debug, Clone, Copy, PartialEq, EnumString)]
