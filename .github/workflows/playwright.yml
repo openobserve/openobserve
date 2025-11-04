@@ -99,6 +99,7 @@ jobs:
     name: Test Environment Data Cleanup
     runs-on:
       labels: repo-openobserve-standard-4
+    if: always()  # Always run cleanup, even on retries
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -129,6 +130,7 @@ jobs:
   ui_integration_tests:
     name: e2e / ${{ matrix.testfolder }}
     needs: [test_environment_data_cleanup]
+    if: always() && needs.test_environment_data_cleanup.result == 'success'  # Only run if cleanup succeeds
     runs-on:
       labels: repo-openobserve-standard-8
     # container:
