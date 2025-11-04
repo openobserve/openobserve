@@ -378,6 +378,17 @@ const useRoutes = () => {
       },
     },
     {
+      path: "alerts/insights",
+      name: "alertInsights",
+      component: () => import("@/components/alerts/AlertInsights.vue"),
+      meta: {
+        title: "Alert Insights",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "short/:id",
       name: "shortUrl",
       component: ShortUrl,
