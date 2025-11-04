@@ -303,7 +303,7 @@ mod tests {
                 val.schema_key, val.schema, val.records_size, val.records
             );
         }
-        let r = ingestion::write_file(&writer,"default", STREAM_NAME, buf, false).await;
+        let r = ingestion::write_file(&writer, "default", STREAM_NAME, buf, false).await;
         println!("r: {r:?}");
     }
 }
