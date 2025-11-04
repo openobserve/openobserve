@@ -576,17 +576,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <template #bottom="scope">
-                    <div class="bottom-btn">
-                      <div class="tw-text-sm tw-w-full tw-flex tw-justify-start">
-                      </div>
+                    <div class="schema-table-pagination-wrapper">
                       <QTablePagination
-                      class="tw-pl-[10px] tw-py-0 "
-                      :scope="scope"
-                      :position="'bottom'"
-                      :resultTotal="resultTotal"
-                      :perPageOptions="perPageOptions"
-                      @update:changeRecordPerPage="changePagination"
-                    />
+                        :scope="scope"
+                        :position="'bottom'"
+                        :resultTotal="resultTotal"
+                        :perPageOptions="perPageOptions"
+                        @update:changeRecordPerPage="changePagination"
+                      />
                     </div>
                   </template>
                 </q-table>
@@ -2365,6 +2362,26 @@ export default defineComponent({
     position: relative;
     border: 0.0625rem solid var(--o2-border-color);
 
+    // Custom pagination wrapper styling
+    .schema-table-pagination-wrapper {
+      display: flex;
+      justify-content: flex-end;
+      width: 100%;
+
+      // Override the QTablePagination component's justify-between
+      :deep(.q-table__control) {
+        justify-content: flex-end !important;
+
+        &.row.justify-between {
+          justify-content: flex-end !important;
+        }
+      }
+
+      // Prevent pagination text from wrapping
+      :deep(.q-table__bottom-item) {
+        white-space: nowrap;
+      }
+    }
 
     thead tr {
       height: 2.5rem;
