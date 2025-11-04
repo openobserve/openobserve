@@ -197,8 +197,8 @@ jobs:
           - testfolder: "Reports"
             browser: "chrome"
             run_files: [
-              "reportsUpdated.spec.js", 
-              "reportsUpdated2.spec.js"
+              "reportsScheduleNow.spec.js", 
+              "reportsScheduleLater.spec.js"
               ]
           - testfolder: "Streams"
             browser: "chrome"
