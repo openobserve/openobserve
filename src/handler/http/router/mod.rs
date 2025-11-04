@@ -46,7 +46,9 @@ use {
 use super::request::*;
 use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
-    handler::http::request::search::search_inspector,
+    handler::http::{
+        request::search::search_inspector, router::middlewares::blocked_orgs_middleware,
+    },
 };
 
 pub mod middlewares;
@@ -370,6 +372,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
 
     #[allow(deprecated)]
     let service = web::scope("/api")
+        .wrap(middleware::from_fn(blocked_orgs_middleware))
         .wrap(middleware::from_fn(audit_middleware))
         .wrap(HttpAuthentication::with_fn(
             super::auth::validator::oo_validator,

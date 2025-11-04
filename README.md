@@ -22,20 +22,23 @@
 </a>
 </p>
 
-OpenObserve (O2 for short) is a cloud-native observability platform built specifically for logs, metrics, traces, analytics, frontend monitoring and more. Start with a single binary that scales to terabytes, or deploy in HA mode for petabyte-scale workloads.
+OpenObserve (O2 for short) is a cloud-native observability platform built specifically for logs, metrics, traces, analytics, frontend monitoring and more. Start with a single binary that scales to terabytes, or deploy in High Availability mode for petabyte-scale workloads.
 
-<h2>Why OpenObserve?</h2>
+## Why OpenObserve?
 
-<h3>1. Simplicity</h3>
-It is straightforward and easy to operate compared to other observability tools that require understanding and tuning numerous settings. Get OpenObserve up and running on a single node in under 2 minutes. 
+### 1. Simplicity
+It is straightforward and easy to operate compared to other observability tools that require understanding and tuning numerous settings. Get OpenObserve up and running on a single node in under 2 minutes. No PhD required. 
 
-<h3>2. Cost Efficiency</h3>
-You can reduce your log storage costs by ~140x compared to Elasticsearch by using OpenObserve. This is achieved through columnar storage format (Parquet), aggressive compression, and S3-native architecture. See the detailed comparison below.
-
-<h3>3. Single Binary Platform</h3>
-Consolidate metrics, logs, and traces on one single, efficient platform. OpenObserve comes with its own UI, eliminating the need for multiple installations. 
+### 2. Cost Efficiency
+You can reduce your log storage costs by ~140x compared to Elasticsearch. Yes, you read that right - 140x, not a typo. This is achieved through columnar storage format (Parquet), aggressive compression, and S3-native architecture. See the detailed comparison below where we ingested the same amount of data in OpenObserve and Elasticsearch and found OpenObserve storage cost to be ~140x lower. Your CFO will love you.
 
 ![OpenObserve Vs Elasticsearch](./screenshots/zo_vs_es.png)
+
+### 3. Performance
+OpenObserve delivers better performance than Elasticsearch while using 1/4th the hardware resources. Users report faster search performance and significantly faster analytics queries. The columnar storage format (Parquet) with intelligent partitioning and caching reduces the search space by up to 99% for most queries. Built in Rust for memory safety and high performance, OpenObserve handles thousands of concurrent users querying a single cluster simultaneously.
+
+### 4. Single Binary Platform
+Consolidate metrics, logs, and traces on one single, efficient platform. OpenObserve comes with its own UI, eliminating the need for multiple installations. One binary to rule them all.
 
 ## 🎥 Introduction Video
 
@@ -47,14 +50,33 @@ OpenObserve achieves 140x lower storage costs and high performance through its m
 
 - **Parquet columnar storage**: Efficient compression and query performance
 - **S3-native design**: Leverages inexpensive object storage with intelligent caching
-- **Built in Rust**: Memory-safe, blazingly fast, single binary deployment
-- **Smart indexing**: Full-text search on compressed data without full extraction
+- **Built in Rust**: Memory-safe, high-performance, single binary deployment
+- **Partitioning, indexing and smart caching**: Reduces search space by up to 99% for most queries
+- **Native multi-tenancy**: Organizations and streams as first-class concepts with complete data isolation
+- **Stateless architecture**: Enables rapid scaling and low RPO/RTO for disaster recovery
 
-This architecture enables massive cost savings while delivering better performance than Elasticsearch. Users report faster search performance and significantly faster analytics queries, all while using 1/4th the hardware resources.
+This architecture delivers 140x cost savings while providing better performance than Elasticsearch.
+
+### Scale & Deployment
+
+- **Thousands of concurrent users** can query a single cluster simultaneously
+- **Single binary** scales to terabytes - unique in the observability space
+- **High Availability mode** scales to petabytes for the most demanding workloads
+- **Multi-region deployments** with cluster federation via Super Cluster architecture (Enterprise feature)
+- **Federated search** across regions and clusters (Enterprise feature)
+- **Capacity planning tools** to size deployments for your workload
+
+### High Availability & Disaster Recovery
+
+Deploy in High Availability mode with clustering for mission-critical workloads requiring maximum uptime and performance.
+
+**Low RPO/RTO**: OpenObserve's stateless architecture with S3-backed storage enables very low Recovery Point Objective (RPO) and Recovery Time Objective (RTO). Stateless nodes can be rapidly restarted, and data durability is guaranteed by S3's 99.999999999% (11 nines) durability. That's a lot of nines.
 
 [Read detailed architecture documentation →](https://openobserve.ai/docs/architecture/)
 
-## 🌟 Capabilities:
+[Read enterprise deployment guide →](https://openobserve.ai/docs/ha_deployment/)
+
+## 🌟 Capabilities
 
 - **Logs, Metrics, Traces**: Full support for all three pillars of observability.
 - **OpenTelemetry Support**: Native OTLP ingestion for logs, metrics, and traces.
@@ -63,9 +85,9 @@ This architecture enables massive cost savings while delivering better performan
 - **Pipelines**: Enrich, redact, reduce, or normalize data on ingest. Stream processing for logs-to-metrics and more.
 - **Built-in Web UI**: No separate frontend to install or manage.
 - **SQL and PromQL Support**: Query logs and traces with SQL, metrics with SQL or PromQL.
-- **Single Binary or HA Mode**: Start with one binary, scale to full HA when you need it.
+- **Single Binary or High Availability Mode**: Start with one binary, scale to full High Availability when you need it.
 - **Flexible Storage**: Local disk, S3, MinIO, GCS, or Azure Blob Storage.
-- **High Availability and Clustering**: Production-grade HA deployment.
+- **High Availability and Clustering**: Production-grade High Availability deployment.
 - **Dynamic Schema**: No predefined schema required - just start sending data.
 - **Built-in Authentication**: Secure by default.
 - **Simple Upgrades**: No complex migration scripts required.
@@ -89,16 +111,16 @@ docker run -d \
 
 For other ways to quickly install OpenObserve or use OpenObserve cloud, check [quickstart documentation](https://openobserve.ai/docs/quickstart).
 
-For installing OpenObserve in HA mode, check [HA deployment documentation](https://openobserve.ai/docs/ha_deployment/).
+For installing OpenObserve in High Availability mode, check [High Availability deployment documentation](https://openobserve.ai/docs/ha_deployment/).
 
 ## 🏆 Production Ready
 
-OpenObserve is battle-tested and trusted in production environments worldwide:
+OpenObserve is battle-tested in production environments worldwide (and by "battle-tested", we mean real production traffic, not just our test lab):
 
 - **Thousands of active deployments** across diverse industries
 - **Largest deployment processes 2 PB/day** of data ingestion
 - **Single binary scales to terabytes** - unique in the observability space, no other single-binary solution achieves this scale
-- **HA mode scales to petabytes** - for the most demanding workloads
+- **High Availability mode scales to petabytes** - for the most demanding workloads
 
 [Read customer stories →](https://openobserve.ai/customer-stories/)
 
@@ -157,29 +179,6 @@ Real user monitoring with session replay:
 
 </details>
 
-## 🏢 Enterprise Architecture
-
-OpenObserve is built from the ground up for enterprise deployments, not as an afterthought.
-
-### Multi-Tenancy
-
-**Native multi-tenancy architecture** (included in open source) ensures complete data isolation between tenants with organizations and streams as first-class concepts. Each tenant's data is logically isolated, providing security and performance guarantees for all deployments.
-
-### Scale & Concurrency
-
-- **Thousands of concurrent users** can query a single cluster simultaneously
-- **Multi-region deployments** with cluster federation via Super Cluster architecture (Enterprise feature)
-- **Federated search** across regions and clusters (Enterprise feature)
-- **Capacity planning tools** to size deployments for your workload
-
-### High Availability & Disaster Recovery
-
-Deploy in HA mode with clustering for mission-critical workloads requiring maximum uptime and performance.
-
-**Low RPO/RTO**: OpenObserve's stateless architecture with S3-backed storage enables very low Recovery Point Objective (RPO) and Recovery Time Objective (RTO). Stateless nodes can be rapidly restarted, and data durability is guaranteed by S3's 99.999999999% (11 nines) durability.
-
-[Read enterprise deployment guide →](https://openobserve.ai/docs/ha_deployment/)
-
 ## 🔐 Security & Compliance
 
 ### Security Features
@@ -211,7 +210,7 @@ For more details:
 
 ## 💼 Enterprise Support
 
-OpenObserve is built as a true open source project, and we're deeply committed to the community. **The open source version is feature-complete and production-ready** - it includes logs, metrics, traces, dashboards, alerts, pipelines, and everything you need to run observability at scale. It will always remain actively maintained and free to use without restrictions.
+OpenObserve is built as a true open source project, and we're committed to the community. **The open source version is feature-complete and production-ready** - it includes logs, metrics, traces, dashboards, alerts, pipelines, and everything you need to run observability at scale. It will always remain actively maintained and free to use without restrictions.
 
 ### Enterprise Edition
 
@@ -279,7 +278,7 @@ Our Slack community is the most active place for:
 
 ### How does OpenObserve achieve 140x lower storage costs?
 
-Through a combination of Parquet columnar storage format (efficient compression), S3-native architecture (leveraging inexpensive object storage), and smart indexing that enables full-text search without extracting all data. See the detailed comparison chart in the "Why OpenObserve?" section above.
+Through a combination of Parquet columnar storage format (efficient compression), S3-native architecture (leveraging inexpensive object storage). See the detailed comparison chart in the "Why OpenObserve?" section above.
 
 ### What are the limitations?
 
@@ -299,9 +298,9 @@ No. OpenObserve is designed to be intuitive from day one:
 - **Familiar query languages**: Use SQL for logs and traces, PromQL for metrics - no proprietary query language to learn
 - **Easy-to-use GUI**: Intuitive interface with drag-and-drop dashboard builder
 - **Helpful community**: Active Slack community and comprehensive documentation to help you get started quickly
-- **No complex tuning**: Unlike Elasticsearch, you don't need to understand shards, replicas, heap sizes, or other complex configurations
+- **No complex tuning**: Unlike Elasticsearch, you don't need to understand shards, replicas, heap sizes, or other complex configurations. Just install and go.
 
-Most users are productive within hours, not weeks.
+Most users are productive within hours, not weeks. Some even claim minutes, but we'll let you be the judge.
 
 ## 🔐 SBOM
 
@@ -315,9 +314,9 @@ In order to generate the SBOM, you can use the following commands:
 
 Install cargo-cyclonedx:
 
-````bash
+```bash
 cargo install cargo-cyclonedx
-````
+```
 
 Generate the SBOM:
 ```bash
@@ -332,9 +331,9 @@ In order to generate the SBOM, you can use the following commands:
 
 Install cyclonedx-npm:
 
-````bash
+```bash
 npm install --global @cyclonedx/cyclonedx-npm
-````
+```
 
 Generate the SBOM:
 ```bash

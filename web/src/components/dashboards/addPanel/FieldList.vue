@@ -1342,7 +1342,7 @@ export default defineComponent({
       height: 25px;
 
       .field_icons {
-        padding: 0 0 0 0.25rem;
+        padding: 0 0 0 0.15rem;
         transition: all 0.3s ease;
         // background-color: white;
         position: absolute;
@@ -1352,6 +1352,10 @@ export default defineComponent({
 
         .q-icon {
           cursor: pointer;
+        }
+
+        .q-btn {
+          border-left: 2px solid #d0d0d0;
         }
       }
 
