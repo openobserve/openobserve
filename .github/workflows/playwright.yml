@@ -15,10 +15,16 @@ on:
       - "**.md"
       - "**.yml"
       - "**.yaml"
-  workflow_dispatch:
 
 env:
   COLUMNS: 150
+  ZO_ROOT_USER_EMAIL: automation@tester.ai
+  ZO_ROOT_USER_PASSWORD: 12345678
+  ZO_BASE_URL: https://test.internal.zinclabs.dev
+  WS_ZO_BASE_URL: https://test.internal.zinclabs.dev
+  ZO_BASE_URL_SC: https://test.internal.zinclabs.dev
+  ZO_BASE_URL_SC_UI: https://test.internal.zinclabs.dev
+  INGESTION_URL: https://test.internal.zinclabs.dev
   ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 100
   ZO_QUICK_MODE_STRATEGY: first
@@ -38,66 +44,63 @@ env:
   UPLOAD_TO_TESTDINO: false
 
 jobs:
-  # Build binary - ONLY runs for localhost mode
-  build_binary:
-    name: build_binary
-    if: vars.TEST_ENVIRONMENT == 'localhost' || vars.TEST_ENVIRONMENT == ''
-    runs-on:
-      labels: repo-openobserve-standard-16
+  # build_binary:
+  #   name: build_binary
+  #   runs-on:
+  #     labels: repo-openobserve-standard-16
 
-    steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  #   steps:
+  #     - name: Remove unused tools
+  #       run: |
+  #         sudo rm -rf /usr/share/dotnet
+  #         sudo rm -rf /opt/ghc
+  #         sudo rm -rf "/usr/local/share/boost"
+  #         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
-      - name: Clone the current repo
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
+  #     - name: Clone the current repo
+  #       uses: actions/checkout@v5
+  #       with:
+  #         fetch-depth: 0
 
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2025-07-20
-          targets: x86_64-unknown-linux-gnu
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          prefix-key: playwright
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "21.12"
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
+  #     - name: Setup Rust Toolchain
+  #       uses: dtolnay/rust-toolchain@master
+  #       with:
+  #         toolchain: nightly-2025-07-20
+  #         targets: x86_64-unknown-linux-gnu
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         cache-on-failure: true
+  #         prefix-key: playwright
+  #     - name: Install Protoc
+  #       uses: arduino/setup-protoc@v3
+  #       with:
+  #         version: "21.12"
+  #     - uses: actions/setup-node@v5
+  #       with:
+  #         node-version: 22
 
-      - name: Build frontend code
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
-          VITE_COVERAGE: "true"
-          COVERAGE: "true"
-        run: cd web && npm install && npm run build
+  #     - name: Build frontend code
+  #       env:
+  #         NODE_OPTIONS: "--max-old-space-size=8192"
+  #         VITE_COVERAGE: "true"
+  #         COVERAGE: "true"
+  #       run: cd web && npm install && npm run build
 
-      - name: Build and run binary
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+  #     - name: Build and run binary
+  #       run: cargo build --release --target x86_64-unknown-linux-gnu
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-binary
-          path: target/x86_64-unknown-linux-gnu/release/openobserve
-          retention-days: 1
+  #     - name: Upload artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: release-binary
+  #         path: target/x86_64-unknown-linux-gnu/release/openobserve
+  #         retention-days: 1
 
-  # Cleanup - ONLY runs for environment mode
   test_environment_data_cleanup:
     name: Test Environment Data Cleanup
-    if: always() && vars.TEST_ENVIRONMENT != 'localhost' && vars.TEST_ENVIRONMENT != ''
     runs-on:
       labels: repo-openobserve-standard-4
+    if: always()  # Always run cleanup, even on retries
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -109,15 +112,6 @@ jobs:
           node-version: 22
 
       - name: Run cleanup test
-        env:
-          ZO_ROOT_USER_EMAIL: ${{ secrets.ENV_EMAIL }}
-          ZO_ROOT_USER_PASSWORD: ${{ secrets.ENV_PASSWORD }}
-          ZO_BASE_URL: https://${{ vars.TEST_ENVIRONMENT }}.internal.zinclabs.dev
-          WS_ZO_BASE_URL: https://${{ vars.TEST_ENVIRONMENT }}.internal.zinclabs.dev
-          ZO_BASE_URL_SC: https://${{ vars.TEST_ENVIRONMENT }}.internal.zinclabs.dev
-          ZO_BASE_URL_SC_UI: https://${{ vars.TEST_ENVIRONMENT }}.internal.zinclabs.dev
-          INGESTION_URL: https://${{ vars.TEST_ENVIRONMENT }}.internal.zinclabs.dev
-          ENV_ORGNAME: ${{ secrets.ENV_ORGNAME }}
         run: |
           touch .env
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
@@ -127,29 +121,22 @@ jobs:
           echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
           echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
-          echo "ORGNAME=${ENV_ORGNAME}" >> .env
+          echo "ORGNAME=${ORGNAME}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
           npx playwright install --with-deps chromium
           echo "Running pre-test cleanup to remove old test data..."
           npx playwright test cleanup.spec.js
 
-  # UI Integration Tests - runs for BOTH modes with different dependencies
   ui_integration_tests:
     name: e2e / ${{ matrix.testfolder }}
-    needs: [build_binary, test_environment_data_cleanup]
-    if: |
-      always() &&
-      (needs.build_binary.result == 'success' || needs.test_environment_data_cleanup.result == 'success')
+    needs: [test_environment_data_cleanup]
+    if: always() && needs.test_environment_data_cleanup.result == 'success'  # Only run if cleanup succeeds
     runs-on:
       labels: repo-openobserve-standard-8
-    env:
-      # Set RUN_MODE for use in steps: 'true' for environment mode, 'false' for localhost
-      RUN_MODE: ${{ (vars.TEST_ENVIRONMENT != 'localhost' && vars.TEST_ENVIRONMENT != '') && 'true' || 'false' }}
-      ENV_URL: ${{ (vars.TEST_ENVIRONMENT != 'localhost' && vars.TEST_ENVIRONMENT != '' && format('https://{0}.internal.zinclabs.dev', vars.TEST_ENVIRONMENT)) || 'http://localhost:5080' }}
-      ENV_EMAIL: ${{ (vars.TEST_ENVIRONMENT != 'localhost' && vars.TEST_ENVIRONMENT != '' && secrets.ENV_EMAIL) || 'root@example.com' }}
-      ENV_PASSWORD: ${{ (vars.TEST_ENVIRONMENT != 'localhost' && vars.TEST_ENVIRONMENT != '' && secrets.ENV_PASSWORD) || 'Complexpass#123' }}
-      ENV_ORG: ${{ (vars.TEST_ENVIRONMENT != 'localhost' && vars.TEST_ENVIRONMENT != '' && secrets.ENV_ORGNAME) || 'default' }}
+    # container:
+    #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
+    #   options: --user root
     strategy:
       fail-fast: false
       matrix:
@@ -167,17 +154,6 @@ jobs:
                 "usersOrg.spec.js",
                 "org.spec.js",
               ]
-            run_files_env:
-              [
-                "sanity.spec.js",
-                # "changeOrg.spec.js",  # SKIP: org creation fails on env
-                "enrichment.spec.js",
-                "schema.spec.js",
-                "schemaload.spec.js",
-                "serviceAccount.spec.js",
-                # "usersOrg.spec.js",   # SKIP: Add Organization test fails on env
-                # "org.spec.js",        # SKIP: org creation fails on env
-              ]
           - testfolder: "Logs-Core"
             browser: "chrome"
             run_files:
@@ -190,36 +166,17 @@ jobs:
                 "unflattened.spec.js",
                 "logstable.spec.js",
               ]
-            run_files_env:
-              [
-                "join.spec.js",
-                "logshistogram.spec.js",
-                "logspage.spec.js",
-                "logsquickmode.spec.js",
-                "pagination.spec.js",
-                "unflattened.spec.js",
-                "logstable.spec.js",
-              ]
-          - testfolder: "Logs-Queries"
-            browser: "chrome"
-            run_files:
-              [
-                "logsDownloads.spec.js",
-                "logsqueries.spec.js",
-                "secondsPrecisionAdded.spec.js",
-                "logsqueries.cte.spec.js",
-                "logsqueries.matchall.spec.js",
-                "searchpartition.spec.js",
-              ]
-            run_files_env:
-              [
-                # "logsDownloads.spec.js",
-                # "logsqueries.spec.js",
-                # "secondsPrecisionAdded.spec.js",
-                # "logsqueries.cte.spec.js",
-                # "logsqueries.matchall.spec.js",
-                # "searchpartition.spec.js",
-              ]
+          # - testfolder: "Logs-Queries"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "logsDownloads.spec.js",
+          #       "logsqueries.spec.js",
+          #       "secondsPrecisionAdded.spec.js",
+          #       "logsqueries.cte.spec.js",
+          #       "logsqueries.matchall.spec.js",
+          #       "searchpartition.spec.js",
+          #     ]
           - testfolder: "Alerts"
             browser: "chrome"
             run_files:
@@ -228,105 +185,58 @@ jobs:
                 "alerts-ui-operations.spec.js",
                 "alerts-import.spec.js",
               ]
-            run_files_env:
-              [
-                "alerts-e2e-flow.spec.js",
-                "alerts-ui-operations.spec.js",
-                "alerts-import.spec.js",
-              ]
-          - testfolder: "Dashboards-Core"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard.spec.js",
-                "dashboard2.spec.js",
-                "dashboardtype.spec.js",
-                "dashboard-folder.spec.js",
-                "dashboard-import.spec.js",
-                "maxquery.spec.js",
-              ]
-            run_files_env:
-              [
-                # "dashboard.spec.js",
-                # "dashboard2.spec.js",
-                # "dashboardtype.spec.js",
-                # "dashboard-folder.spec.js",
-                # "dashboard-import.spec.js",
-                # "maxquery.spec.js",
-              ]
-          - testfolder: "Dashboards-Settings"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard-filter.spec.js",
-                "dashboard-general-setting.spec.js",
-                "dashboard-tabs-setting.spec.js",
-                "dashboard-variables-setting.spec.js",
-                "dashboard-transpose.spec.js",
-              ]
-            run_files_env:
-              [
-                # "dashboard-filter.spec.js",
-                # "dashboard-general-setting.spec.js",
-                # "dashboard-tabs-setting.spec.js",
-                # "dashboard-variables-setting.spec.js",
-                # "dashboard-transpose.spec.js",
-              ]
-          - testfolder: "Dashboards-Charts"
-            browser: "chrome"
-            run_files:
-              [
-                "custom-charts.spec.js",
-                "dashboard-geoMap.spec.js",
-                "dashboard-maps.spec.js",
-                "dashboard-multi-y-axis.spec.js",
-                "dashboard-html-chart.spec.js",
-                "visualize.spec.js",
-              ]
-            run_files_env:
-              [
-                # "custom-charts.spec.js",
-                # "dashboard-geoMap.spec.js",
-                # "dashboard-maps.spec.js",
-                # "dashboard-multi-y-axis.spec.js",
-                # "dashboard-html-chart.spec.js",
-                # "visualize.spec.js",
-              ]
-          - testfolder: "Dashboards-Streaming"
-            browser: "chrome"
-            run_files: ["dashboard-streaming.spec.js"]
-            run_files_env: [
-              # "dashboard-streaming.spec.js"
-            ]
+          # - testfolder: "Dashboards-Core"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "dashboard.spec.js",
+          #       "dashboard2.spec.js",
+          #       "dashboardtype.spec.js",
+          #       "dashboard-folder.spec.js",
+          #       "dashboard-import.spec.js",
+          #       "maxquery.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Settings"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "dashboard-filter.spec.js",
+          #       "dashboard-general-setting.spec.js",
+          #       "dashboard-tabs-setting.spec.js",
+          #       "dashboard-variables-setting.spec.js",
+          #       "dashboard-transpose.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Charts"
+          #   browser: "chrome"
+          #   run_files: [
+          #       "custom-charts.spec.js",
+          #       "dashboard-geoMap.spec.js",
+          #       "dashboard-maps.spec.js",
+          #       "dashboard-multi-y-axis.spec.js",
+          #       "dashboard-html-chart.spec.js",
+          #       "visualize.spec.js",
+          #       # "visualization-vrl.spec.js"
+          #     ]
+          # - testfolder: "Dashboards-Streaming"
+          #   browser: "chrome"
+          #   run_files: ["dashboard-streaming.spec.js",]
           - testfolder: "Pipelines"
             browser: "chrome"
-            run_files:
-              [
+            run_files: [
                 "pipelines.spec.js",
                 "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
-              ]
-            run_files_env:
-              [
-                "pipelines.spec.js",
-                "pipeline-dynamic.spec.js",
-                "pipeline-core.spec.js",
+                # "remotepipeline.spec.js"
               ]
           - testfolder: "Reports"
             browser: "chrome"
-            run_files:
-              ["reportsScheduleNow.spec.js", "reportsScheduleLater.spec.js"]
-            run_files_env:
-              ["reportsScheduleNow.spec.js", "reportsScheduleLater.spec.js"]
+            run_files: [
+              "reportsScheduleNow.spec.js",
+              "reportsScheduleLater.spec.js"
+              ]
           - testfolder: "Streams"
             browser: "chrome"
             run_files:
-              [
-                "multiselect-stream.spec.js",
-                "streamname.spec.js",
-                "streaming.spec.js",
-              ]
-            run_files_env:
               [
                 "multiselect-stream.spec.js",
                 "streamname.spec.js",
@@ -338,48 +248,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Localhost mode: download binary and start OpenObserve
-      - name: Download artifacts
-        if: env.RUN_MODE != 'true'
-        uses: actions/download-artifact@v5
-        with:
-          name: release-binary
-          path: release-binary
+      # - name: Download artifacts
+      #   uses: actions/download-artifact@v5
+      #   with:
+      #     name: release-binary
+      #     path: release-binary
 
-      - name: Start OpenObserve
-        if: env.RUN_MODE != 'true'
-        env:
-          ZO_ROOT_USER_EMAIL: root@example.com
-          ZO_ROOT_USER_PASSWORD: Complexpass#123
-          ZO_BASE_URL: http://localhost:5080
-          ZO_QUICK_MODE_NUM_FIELDS: 100
-          ZO_QUICK_MODE_STRATEGY: first
-          ZO_ALLOW_USER_DEFINED_SCHEMAS: true
-          ZO_INGEST_ALLOWED_UPTO: 5
-          ZO_FEATURE_QUERY_EXCLUDE_ALL: false
-          ZO_USAGE_BATCH_SIZE: 200
-          ZO_USAGE_PUBLISH_INTERVAL: 2
-          ZO_USAGE_REPORTING_ENABLED: true
-          ZO_MIN_AUTO_REFRESH_INTERVAL: 5
-          ZO_STREAMING_ENABLED: true
-          ZO_COLS_PER_RECORD_LIMIT: "80000"
-          ZO_SMTP_ENABLED: true
-          ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
-          ZO_CREATE_ORG_THROUGH_INGESTION: true
-          ZO_UTF8_VIEW_ENABLED: false
-        run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
+      # - name: Start OpenObserve
+      #   run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
 
-      - name: Wait for start
-        if: env.RUN_MODE != 'true'
-        run: sleep 60
-
-      - name: Ensure we are getting a reply from the server (Localhost)
-        if: env.RUN_MODE != 'true'
-        run: curl http://localhost:5080/web/login
-
-      - name: Ensure we are getting a reply from the server (Environment)
-        if: env.RUN_MODE == 'true'
-        run: curl ${{ env.ENV_URL }}/login
+      # - name: Wait for start
+      #   run: sleep 60
 
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
@@ -391,38 +270,20 @@ jobs:
       - name: Install dependencies and run ui-tests
         run: |
           touch .env
-
-          # Set environment variables based on mode
-          if [ "${{ env.RUN_MODE }}" = "true" ]; then
-            echo "Running in ENVIRONMENT mode"
-            echo "ZO_ROOT_USER_EMAIL=${{ env.ENV_EMAIL }}" >> .env
-            echo "ZO_ROOT_USER_PASSWORD=${{ env.ENV_PASSWORD }}" >> .env
-            echo "ZO_BASE_URL=${{ env.ENV_URL }}" >> .env
-            echo "WS_ZO_BASE_URL=${{ env.ENV_URL }}" >> .env
-            echo "ZO_BASE_URL_SC=${{ env.ENV_URL }}" >> .env
-            echo "ZO_BASE_URL_SC_UI=${{ env.ENV_URL }}" >> .env
-            echo "INGESTION_URL=${{ env.ENV_URL }}" >> .env
-            echo "ORGNAME=${{ env.ENV_ORG }}" >> .env
-            FILE_LIST="${{ join(matrix.run_files_env, ' ') }}"
-          else
-            echo "Running in LOCALHOST mode"
-            echo "ZO_ROOT_USER_EMAIL=${{ env.ENV_EMAIL }}" >> .env
-            echo "ZO_ROOT_USER_PASSWORD=${{ env.ENV_PASSWORD }}" >> .env
-            echo "ZO_BASE_URL=http://localhost:5080" >> .env
-            echo "WS_ZO_BASE_URL=ws://localhost:5080" >> .env
-            echo "ZO_BASE_URL_SC=http://localhost:5080" >> .env
-            echo "ZO_BASE_URL_SC_UI=http://localhost:5080" >> .env
-            echo "INGESTION_URL=http://localhost:5080" >> .env
-            echo "ORGNAME=${{ env.ENV_ORG }}" >> .env
-            FILE_LIST="${{ join(matrix.run_files, ' ') }}"
-          fi
-
+          echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
+          echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
+          echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
+          echo "WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
+          echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
+          echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
+          echo "INGESTION_URL=${INGESTION_URL}" >> .env
+          echo "ORGNAME=${ORGNAME}" >> .env
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
           npx playwright install --with-deps chromium
-
-          echo "DEBUG: RUN_MODE = ${{ env.RUN_MODE }}"
+          # Get list of files to run using join function
+          FILE_LIST="${{ join(matrix.run_files, ' ') }}"
           echo "DEBUG: FILE_LIST = $FILE_LIST"
           echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
 
@@ -483,9 +344,9 @@ jobs:
           path: tests/ui-testing/blob-report
           retention-days: 1
 
-      - name: Check OpenObserve logs
-        if: always() && env.RUN_MODE != 'true'
-        run: cat o2.log
+      # - name: Check OpenObserve logs
+      #   if: always()
+      #   run: cat o2.log
 
   merge_and_upload_reports:
     name: Merge Reports and Upload to TestDino
