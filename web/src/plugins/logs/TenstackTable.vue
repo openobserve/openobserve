@@ -239,7 +239,8 @@ name="warning" class="q-mr-xs" />
             :ref="
               (node: any) =>
                 node &&
-                formattedRows?.[virtualRow.index]?.original?.isExpandedRow &&
+                (formattedRows?.[virtualRow.index]?.original?.isExpandedRow ||
+                  props.wrap) &&
                 rowVirtualizer.measureElement(node)
             "
             class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b tw-cursor-pointer"
@@ -727,7 +728,7 @@ const rowVirtualizerOptions = computed(() => {
     measureElement:
       typeof window !== "undefined" && !isFirefox.value
         ? (element: any) => {
-            if (element.dataset.expanded == "true") {
+            if (element.dataset.expanded == "true" || props.wrap) {
               return element?.getBoundingClientRect().height;
             } else {
               return 22;

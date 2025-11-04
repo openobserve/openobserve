@@ -56,7 +56,7 @@ impl From<TemplateError> for HttpResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
       ),
-    request_body(content = Template, description = "Template data", content_type = "application/json"),    
+    request_body(content = inline(Template), description = "Template data", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -99,7 +99,7 @@ pub async fn save_template(
         ("org_id" = String, Path, description = "Organization name"),
         ("template_name" = String, Path, description = "Template name"),
       ),
-    request_body(content = Template, description = "Template data", content_type = "application/json"),    
+    request_body(content = inline(Template), description = "Template data", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -139,7 +139,7 @@ pub async fn update_template(
         ("template_name" = String, Path, description = "Template name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Template),
+        (status = 200, description = "Success",  content_type = "application/json", body = inline(Template)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -172,7 +172,7 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Template>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Template>)),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(

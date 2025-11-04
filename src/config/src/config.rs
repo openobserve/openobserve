@@ -2148,7 +2148,7 @@ pub struct EnrichmentTable {
 pub struct ServiceGraph {
     #[env_config(
         name = "ZO_SGRAPH_ENABLED",
-        default = false,
+        default = true,
         help = "Enable service graph feature"
     )]
     pub enabled: bool,

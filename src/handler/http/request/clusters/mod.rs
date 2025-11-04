@@ -36,7 +36,7 @@ use {
         ("Authorization"= [])
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HashMap<String, Vec<String>>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(HashMap<String, Vec<String>>)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Clusters", "operation": "get"}))

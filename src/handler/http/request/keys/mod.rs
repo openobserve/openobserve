@@ -46,7 +46,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
                    and validated before being made available for use. Key names cannot contain ':' characters. Only \
                    available in enterprise deployments for enhanced data security and compliance requirements.",
     request_body(
-        content = KeyAddRequest,
+        content = inline(KeyAddRequest),
         description = "Key data to add",
         content_type = "application/json",
     ),
@@ -323,7 +323,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("key_name" = String, Path, description = "name of the key to update", example = "test_key")
     ),
     request_body(
-        content = KeyAddRequest,
+        content = inline(KeyAddRequest),
         description = "updated key data",
         content_type = "application/json",
     ),
