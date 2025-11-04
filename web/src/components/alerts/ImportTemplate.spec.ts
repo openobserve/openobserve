@@ -5,7 +5,7 @@ import ImportTemplate from './ImportTemplate.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { createRouter, createWebHistory } from 'vue-router';
-import { nextTick } from 'vue';
+import { nextTick, ref } from 'vue';
 
 // Mock external dependencies
 vi.mock('@/services/alert_templates', () => ({
@@ -124,6 +124,29 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
         },
         mocks: {
           $store: mockStore,
+        },
+        stubs: {
+          BaseImport: {
+            template: '<div><slot name="output-content"></slot></div>',
+            props: ['title', 'testPrefix', 'isImporting', 'editorHeights'],
+            emits: ['back', 'cancel', 'import'],
+            setup(_props: any, { expose }: any) {
+              const jsonArrayOfObj = ref([]);
+              const jsonStr = ref("");
+              const isImporting = ref(false);
+              const updateJsonArray = (arr: any[]) => {
+                jsonArrayOfObj.value = arr;
+                jsonStr.value = JSON.stringify(arr, null, 2);
+              };
+              expose({
+                jsonArrayOfObj,
+                jsonStr,
+                isImporting,
+                updateJsonArray,
+              });
+              return { jsonArrayOfObj, jsonStr, isImporting, updateJsonArray };
+            },
+          },
         },
       },
     });

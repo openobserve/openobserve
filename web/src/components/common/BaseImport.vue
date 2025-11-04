@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-w-full" :class="containerClass">
+  <div class="tw-w-full" :class="containerClass" :style="containerStyle">
     <!-- Header Section -->
     <div class="card-container tw-mb-[0.625rem]" :class="headerContainerClass">
       <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]" :class="headerClass">
@@ -71,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-scroll
           v-model="splitterModel"
           :style="splitterStyle"
+          :limits="[30, 60]"
         >
           <template #before>
             <div class="tw-w-full tw-h-full">
@@ -192,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               :data-test="`${testPrefix}-import-output-editor`"
-              class="card-container tw-mb-[0.625rem]"
+              class="card-container tw-mb-[0.625rem] tw-w-full"
               :style="outputContainerStyle"
             >
               <!-- Slot for complete output section customization -->
@@ -296,6 +297,10 @@ export default defineComponent({
     containerClass: {
       type: String,
       default: "tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs",
+    },
+    containerStyle: {
+      type: String,
+      default: "",
     },
     headerContainerClass: {
       type: String,
