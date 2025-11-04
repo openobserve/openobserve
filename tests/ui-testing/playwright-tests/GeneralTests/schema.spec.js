@@ -46,7 +46,7 @@ test.describe("Schema testcases", () => {
         // Initialize test setup
         testLogger.testStart(testInfo.title, testInfo.file);
         
-        // Navigate to base URL with authentication
+        // Navigate to base URL with authentication 
         await navigateToBase(page);
         pm = new PageManager(page);
         await page.waitForLoadState('networkidle');
