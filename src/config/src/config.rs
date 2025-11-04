@@ -881,6 +881,12 @@ pub struct Common {
         help = "Skip WAL for query"
     )]
     pub feature_query_skip_wal: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SHARED_MEMTABLE_ENABLED",
+        default = false,
+        help = "Enable shared memtable across multiple organizations"
+    )]
+    pub feature_shared_memtable_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]

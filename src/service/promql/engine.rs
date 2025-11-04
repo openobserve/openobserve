@@ -1155,11 +1155,7 @@ async fn selector_load_data_from_datafusion(
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == TIMESTAMP_COL_NAME
-                || name == VALUE_LABEL
-                || name == EXEMPLARS_LABEL
-                || name == NAME_LABEL
-            {
+            if name == TIMESTAMP_COL_NAME || name == VALUE_LABEL || name == EXEMPLARS_LABEL {
                 None
             } else {
                 Some(name)
