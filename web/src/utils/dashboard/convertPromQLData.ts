@@ -354,6 +354,7 @@ export const convertPromQLData = async (
           fontSize: 12,
           precision: panelSchema.config?.decimals,
           show: true,
+          backgroundColor: store.state.theme === "dark" ? "#333" : "",
           formatter: function (name: any) {
             if (name.axisDimension == "y")
               return formatUnitValue(
