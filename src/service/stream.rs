@@ -753,6 +753,10 @@ pub async fn update_stream_settings(
         }
     }
 
+    if let Some(enable_log_patterns_extraction) = new_settings.enable_log_patterns_extraction {
+        settings.enable_log_patterns_extraction = enable_log_patterns_extraction;
+    }
+
     if !new_settings.full_text_search_keys.add.is_empty() {
         settings
             .full_text_search_keys

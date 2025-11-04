@@ -233,3 +233,30 @@
     }
   }
 }
+
+.logs-analyzed-input{
+  width: 80%;
+
+  :deep(.q-field){
+    max-width: 10rem !important;
+    width: 10rem !important;
+  }
+
+  :deep(.q-field__native){
+    font-size: 1.5rem !important;
+    color: var(--q-primary);
+    font-weight: bold;
+    outline: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  :deep(.q-field__control){
+    height: fit-content !important;
+    padding: 0 !important;
+    &::before, &::after{
+      outline: none !important;
+      border: none !important;
+    }
+  }
+}
