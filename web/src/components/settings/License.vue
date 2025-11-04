@@ -1,15 +1,15 @@
 <template>
   <div class="q-pa-md">
-    <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>    
+    <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
     <div class="text-h6 q-mb-md">License Management</div>
-    
+
     <div v-if="loading" class="q-pa-md text-center">
       <q-spinner size="40px" />
       <div class="q-mt-md">Loading license information...</div>
     </div>
-    <div v-else class="tw-grid tw-grid-cols-3 tw-gap-4">
+    <div v-else class="tw-grid tw-grid-cols-3 tw-gap-4 tw-items-start tw-pb-4">
 
-    <div class="tw-col-span-2" >
+    <div class="tw-col-span-2 tw-min-h-0" >
       <div v-if="licenseData.license === null || !licenseData.license">
         <q-card class="q-mb-md">
           <q-card-section>
@@ -41,7 +41,7 @@
               type="textarea"
               rows="8"
               placeholder="Paste your license key here..."
-              style="min-height: 200px;"
+              style="height: 200px;"
             />
             <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
               <div class="modern-info-banner">
@@ -61,129 +61,124 @@
       </div>
 
       <div v-else>
-        <div class="row q-gutter-md">
-          <div class="col" style="flex: 2">
-            <q-card style="height: 100%">
-              <q-card-section class="full-height">
-                <div class="text-h6 q-mb-md">License Information</div>
-                <q-markup-table flat bordered dense class="compact-table">
-                  <tbody>
-                    <tr>
-                      <td class="text-weight-bold">Installation ID</td>
-                      <td>{{ licenseData.installation_id }}</td>
-                    </tr>
-                    <tr>
-                      <td class="text-weight-bold">License ID</td>
-                      <td>{{ licenseData.license.license_id }}</td>
-                    </tr>
-                    <tr>
-                      <td class="text-weight-bold">Active</td>
-                      <td>
-                        <q-badge :color="licenseData.license.active ? 'green' : 'red'">
-                          {{ licenseData.license.active ? 'Yes' : 'No' }}
-                        </q-badge>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="text-weight-bold">Created At</td>
-                      <td>{{ formatDate(licenseData.license.created_at) }}</td>
-                    </tr>
-                    <tr>
-                      <td class="text-weight-bold">Expires At</td>
-                      <td>{{ formatDate(licenseData.license.expires_at) }}</td>
-                    </tr>
-                    <tr>
-                      <td class="text-weight-bold">Company</td>
-                      <td>{{ licenseData.license.company }}</td>
-                    </tr>
-                    <tr v-if="licenseData.key">
-                      <td class="text-weight-bold">License Key</td>
-                      <td>
-                        <div class="row items-center q-gutter-sm">
-                          <span>{{ getMaskedLicenseKey() }}</span>
-                          <q-btn
-                            flat
-                            round
-                            dense
-                            icon="visibility"
-                            size="sm"
-                            @click="showLicenseKeyModal = true"
-                            class="q-ml-sm"
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                    <tr v-if="licenseData.license.contact_name">
-                      <td class="text-weight-bold">Contact Name</td>
-                      <td>{{ licenseData.license.contact_name }}</td>
-                    </tr>
-                    <tr v-if="licenseData.license.contact_email">
-                      <td class="text-weight-bold">Contact Email</td>
-                      <td>{{ licenseData.license.contact_email }}</td>
-                    </tr>
-                  </tbody>
-                </q-markup-table>
-                <div class="q-mt-md">
-                  <q-btn
-                    color="primary"
-                    no-caps
-                    label="Request new License"
-                    @click="redirectToGetLicense"
-                  />
-                  <q-btn
-                    no-caps
-                    color="primary"
-                    label="Add New License Key"
-                    @click="showUpdateFormAndFocus"
-                  />
-                </div>
-              </q-card-section>
-            </q-card>
-          </div>
-        </div>
-
-        <q-card v-if="showUpdateForm" class="q-mt-md">
+        <q-card>
           <q-card-section>
-            <div class="text-subtitle1 q-mb-sm">Update License Key</div>
-            <q-input
-              v-model="licenseKey"
-              outlined
-              type="textarea"
-              rows="8"
-              placeholder="Paste new license key here..."
-              style="min-height: 200px;"
-            />
-            <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
-              <div class="modern-info-banner">
-                <q-icon name="check_circle" class="text-green-6 q-mr-sm" size="20px" />
-                <span class="text-body2">License key auto-filled from URL. Click "Update License" to apply.</span>
-              </div>
-            </div>
-            <div class="row q-gutter-sm">
+            <div class="text-h6 q-mb-md">License Information</div>
+            <q-markup-table flat bordered dense class="compact-table">
+              <tbody>
+                <tr>
+                  <td class="text-weight-bold">Installation ID</td>
+                  <td>{{ licenseData.installation_id }}</td>
+                </tr>
+                <tr>
+                  <td class="text-weight-bold">License ID</td>
+                  <td>{{ licenseData.license.license_id }}</td>
+                </tr>
+                <tr>
+                  <td class="text-weight-bold">Active</td>
+                  <td>
+                    <q-badge :color="licenseData.license.active ? 'green' : 'red'">
+                      {{ licenseData.license.active ? 'Yes' : 'No' }}
+                    </q-badge>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-weight-bold">Created At</td>
+                  <td>{{ formatDate(licenseData.license.created_at) }}</td>
+                </tr>
+                <tr>
+                  <td class="text-weight-bold">Expires At</td>
+                  <td>{{ formatDate(licenseData.license.expires_at) }}</td>
+                </tr>
+                <tr>
+                  <td class="text-weight-bold">Company</td>
+                  <td>{{ licenseData.license.company }}</td>
+                </tr>
+                <tr v-if="licenseData.key">
+                  <td class="text-weight-bold">License Key</td>
+                  <td>
+                    <div class="row items-center q-gutter-sm">
+                      <span>{{ getMaskedLicenseKey() }}</span>
+                      <q-btn
+                        flat
+                        round
+                        dense
+                        icon="visibility"
+                        size="sm"
+                        @click="showLicenseKeyModal = true"
+                        class="q-ml-sm"
+                      />
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="licenseData.license.contact_name">
+                  <td class="text-weight-bold">Contact Name</td>
+                  <td>{{ licenseData.license.contact_name }}</td>
+                </tr>
+                <tr v-if="licenseData.license.contact_email">
+                  <td class="text-weight-bold">Contact Email</td>
+                  <td>{{ licenseData.license.contact_email }}</td>
+                </tr>
+              </tbody>
+            </q-markup-table>
+            <div class="tw-mt-3 tw-flex tw-gap-3">
               <q-btn
-                outline
-                color="grey-7"
                 no-caps
-                label="Cancel"
-                @click="showUpdateForm = false; licenseKey = ''"
+                label="Request new License"
+                class="o2-primary-button"
+                @click="redirectToGetLicense"
               />
               <q-btn
-                color="primary"
                 no-caps
-                label="Update License"
-                @click="updateLicense"
-                :loading="updating"
-                :disable="!licenseKey.trim()"
+                class="o2-primary-button"
+                label="Add New License Key"
+                @click="showUpdateFormAndFocus"
               />
             </div>
           </q-card-section>
         </q-card>
+
+          <q-card v-show="showUpdateForm" class="q-mt-md">
+            <q-card-section>
+              <div class="text-subtitle1 q-mb-sm">Update License Key</div>
+              <q-input
+                v-model="licenseKey"
+                outlined
+                type="textarea"
+                rows="6"
+                placeholder="Paste new license key here..."
+                style="min-height: 150px;"
+              />
+              <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
+                <div class="modern-info-banner">
+                  <q-icon name="check_circle" class="text-green-6 q-mr-sm" size="20px" />
+                  <span class="text-body2">License key auto-filled from URL. Click "Update License" to apply.</span>
+                </div>
+              </div>
+              <div class="row q-gutter-sm">
+                <q-btn
+                  no-caps
+                  label="Cancel"
+                  class="o2-secondary-button"
+                  @click="showUpdateForm = false; licenseKey = ''"
+                />
+                <q-btn
+                  color="primary"
+                  no-caps
+                  label="Update License"
+                  @click="updateLicense"
+                  :loading="updating"
+                  :disable="!licenseKey.trim()"
+                />
+              </div>
+            </q-card-section>
+          </q-card>
       </div>
     </div>
 
-    <div class="tw-col-span-1">
-            <q-card style="height: 100%">
-              <q-card-section class="full-height column">
+    <div class="tw-col-span-1 tw-self-start">
+            <q-card>
+              <q-card-section>
                 <div class="text-h6 q-mb-md tw-mx-auto">Usage Information</div>
                 <div  class="text-center q-mb-md tw-mt-[10px]">
                   <div class="text-subtitle2 q-mb-sm">Ingestion Usage</div>
@@ -255,10 +250,9 @@
 
         <q-card-actions align="right" class="q-pt-none">
           <q-btn
-            outline
-            color="grey-7"
             no-caps
             label="Cancel"
+            class="o2-secondary-button"
             v-close-popup
               />
           <q-btn
@@ -349,7 +343,6 @@ export default defineComponent({
       setTimeout(() => {
         const textarea = document.querySelector('textarea[placeholder="Paste new license key here..."]') as HTMLTextAreaElement;
         if (textarea) {
-          textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
           textarea.focus();
         }
       }, 100);
