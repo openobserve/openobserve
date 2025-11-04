@@ -322,7 +322,7 @@ impl Engine {
                 if data.is_empty() {
                     Value::None
                 } else {
-                    Value::Vector(data)
+                    Value::Matrix(data)
                 }
             }
             PromExpr::MatrixSelector(MatrixSelector { vs, range }) => {
@@ -348,10 +348,7 @@ impl Engine {
     /// timestamp.
     ///
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
-    async fn eval_vector_selector(
-        &mut self,
-        selector: &VectorSelector,
-    ) -> Result<Vec<InstantValue>> {
+    async fn eval_vector_selector(&mut self, selector: &VectorSelector) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
         }
@@ -369,70 +366,74 @@ impl Engine {
             selector.name = Some(name);
         }
 
-        let data_cache_key = &selector.to_string();
+        let data = self.selector_load_data_owned(&selector, None).await?;
 
-        let cache_exists = {
-            self.ctx
-                .data_cache
-                .read()
-                .await
-                .contains_key(data_cache_key)
-        };
-        if !cache_exists {
-            self.selector_load_data(&selector, None).await?;
-        }
-        let metrics_cache = self.ctx.data_cache.read().await;
-        let metrics_cache = match metrics_cache.get(data_cache_key) {
-            Some(v) => match v.get_ref_matrix_values() {
-                Some(v) => v,
-                None => return Ok(vec![]),
-            },
+        let metrics_cache = match data.get_range_values() {
+            Some(v) => v,
             None => return Ok(vec![]),
         };
 
-        // Evaluation timestamp.
-        let eval_ts = self.time;
-        let start = eval_ts - self.ctx.lookback_delta;
-
-        let mut offset_modifier: i64 = 0;
+        let mut offset_modifier = 0;
         if let Some(offset) = selector.offset {
             match offset {
-                Offset::Pos(off) => {
-                    offset_modifier = micros(off);
+                Offset::Pos(offset) => {
+                    offset_modifier = micros(offset);
                 }
-                Offset::Neg(off) => {
-                    offset_modifier = -micros(off);
+                Offset::Neg(offset) => {
+                    offset_modifier = -micros(offset);
                 }
+            }
+        };
+
+        // Get all evaluation timestamps from the context
+        let eval_timestamps = self.eval_ctx.timestamps();
+
+        // For each metric, select appropriate samples at each evaluation timestamp
+        let mut result = Vec::new();
+        for metric in metrics_cache {
+            let mut selected_samples = Vec::new();
+
+            for &eval_ts in &eval_timestamps {
+                // Calculate lookback window for this evaluation timestamp
+                let start = eval_ts - self.ctx.lookback_delta;
+
+                // Find the sample for this evaluation timestamp
+                // Binary search for the last sample before or at eval_ts (considering offset)
+                let end_index = metric
+                    .samples
+                    .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
+
+                let match_sample = if end_index > 0 {
+                    metric.samples.get(end_index - 1)
+                } else if !metric.samples.is_empty() {
+                    metric.samples.first()
+                } else {
+                    None
+                };
+
+                // Check if the sample is within the lookback window
+                if let Some(sample) = match_sample {
+                    let adjusted_ts = sample.timestamp + offset_modifier;
+                    if adjusted_ts <= eval_ts && adjusted_ts > start {
+                        // Use eval_ts as the timestamp for the selected sample
+                        // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
+                        selected_samples.push(Sample::new(eval_ts, sample.value));
+                    }
+                }
+            }
+
+            // Only include metrics that have at least one sample
+            if !selected_samples.is_empty() {
+                result.push(RangeValue {
+                    labels: metric.labels,
+                    samples: selected_samples,
+                    exemplars: metric.exemplars,
+                    time_window: metric.time_window,
+                });
             }
         }
 
-        let mut values = vec![];
-        for metric in metrics_cache {
-            let end_index = metric
-                .samples
-                .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
-            let match_sample = if end_index > 0 {
-                metric.samples.get(end_index - 1)
-            } else if !metric.samples.is_empty() {
-                metric.samples.first()
-            } else {
-                None
-            };
-            if let Some(sample) = match_sample
-                && sample.timestamp + offset_modifier <= eval_ts
-                && sample.timestamp + offset_modifier > start
-            {
-                let last_value = sample.value;
-                values.push(
-                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                    InstantValue {
-                        labels: metric.labels.clone(),
-                        sample: Sample::new(eval_ts, last_value),
-                    },
-                );
-            }
-        }
-        Ok(values)
+        Ok(result)
     }
 
     /// Range vector selector --- select a whole time range at each evaluation
@@ -510,67 +511,6 @@ impl Engine {
         }
 
         Ok(values)
-    }
-
-    #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
-    async fn selector_load_data(
-        &mut self,
-        selector: &VectorSelector,
-        range: Option<Duration>,
-    ) -> Result<()> {
-        let data_cache_key = selector.to_string();
-        let mut data_loaded = self.ctx.data_loading.lock().await;
-        if data_loaded.contains(&data_cache_key) {
-            return Ok(()); // data is already loading
-        }
-
-        let metrics = match self.selector_load_data_inner(selector, range).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!(
-                    "[trace_id: {}] [PromQL] Failed to load data for stream: {data_cache_key}, error: {e:?}",
-                    self.trace_id
-                );
-                data_loaded.insert(data_cache_key);
-                return Err(e);
-            }
-        };
-
-        // no data, return immediately
-        if metrics.is_empty() {
-            self.ctx
-                .data_cache
-                .write()
-                .await
-                .insert(data_cache_key.clone(), Value::None);
-            data_loaded.insert(data_cache_key);
-            return Ok(());
-        }
-
-        // cache data
-        let mut metric_values = metrics.into_values().collect::<Vec<_>>();
-        metric_values.par_iter_mut().for_each(|metric| {
-            metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            if self.ctx.query_exemplars && metric.exemplars.is_some() {
-                metric
-                    .exemplars
-                    .as_mut()
-                    .unwrap()
-                    .sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            }
-        });
-        let values = if metric_values.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(metric_values)
-        };
-        self.ctx
-            .data_cache
-            .write()
-            .await
-            .insert(data_cache_key.clone(), values);
-        data_loaded.insert(data_cache_key);
-        Ok(())
     }
 
     #[tracing::instrument(name = "promql:engine:load_data_owned", skip_all)]
@@ -1203,11 +1143,7 @@ async fn selector_load_data_from_datafusion(
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == TIMESTAMP_COL_NAME
-                || name == VALUE_LABEL
-                || name == EXEMPLARS_LABEL
-                || name == NAME_LABEL
-            {
+            if name == TIMESTAMP_COL_NAME || name == VALUE_LABEL || name == EXEMPLARS_LABEL {
                 None
             } else {
                 Some(name)

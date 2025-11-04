@@ -20,9 +20,9 @@ use std::{
 
 use config::meta::search::ScanStats;
 use datafusion::error::{DataFusionError, Result};
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashMap;
 use promql_parser::parser::EvalStmt;
-use tokio::sync::{Mutex, RwLock, Semaphore};
+use tokio::sync::{RwLock, Semaphore};
 
 use super::Engine;
 use crate::service::promql::{
@@ -43,11 +43,8 @@ pub struct PromqlContext {
     /// Default look back from sample search.
     pub lookback_delta: i64,
     pub query_exemplars: bool,
-    /// key — metric name; value — time series data
-    pub data_cache: Arc<RwLock<HashMap<String, Value>>>,
     pub scan_stats: Arc<RwLock<ScanStats>>,
     pub timeout: u64, // seconds, query timeout
-    pub data_loading: Arc<Mutex<HashSet<String>>>,
 }
 
 impl PromqlContext {
@@ -65,8 +62,6 @@ impl PromqlContext {
             interval: five_min,
             query_exemplars,
             lookback_delta: five_min,
-            data_cache: Arc::new(RwLock::new(HashMap::default())),
-            data_loading: Arc::new(Mutex::new(HashSet::default())),
             scan_stats: Arc::new(RwLock::new(ScanStats::default())),
             timeout,
         }
