@@ -27,12 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="col-auto">
-        <q-btn
-          v-close-popup="true"
-          round
-          flat
-          :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+        <q-icon
           data-test="dashboard-settings-close-btn"
+          name="cancel"
+          class="cursor-pointer tw-mr-5"
+          size="20px"
+          v-close-popup="true"
         />
       </div>
     </div>
