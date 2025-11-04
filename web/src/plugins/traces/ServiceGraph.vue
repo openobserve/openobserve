@@ -1,6 +1,6 @@
 <template>
     <q-card flat class="tw-h-full">
-      <q-card-section class="tw-p-[0.675rem] tw-h-full">
+      <q-card-section class="tw-p-[0.375rem] tw-h-full card-container">
         <div class="row items-center justify-between q-mb-md">
           <div class="col">
             <div class="text-h5 text-bold">Service Graph</div>
@@ -10,20 +10,24 @@
           </div>
           <div class="col-auto row q-gutter-sm">
             <q-btn
-              outline
+              data-test="service-graph-refresh-btn"
+              no-caps
+              flat
               dense
-              color="primary"
               icon="refresh"
-              label="Refresh"
+              class="tw-border tw-border-solid tw-border-[var(--o2-border-color)] q-px-sm element-box-shadow hover:tw-bg-[var(--o2-hover-accent)]"
               @click="loadServiceGraph"
               :loading="loading"
-            />
+            >
+              <q-tooltip>Refresh Service Graph</q-tooltip>
+            </q-btn>
             <q-btn-dropdown
-              outline
-              dense
-              color="primary"
+              data-test="service-graph-layout-dropdown"
+              size="12px"
               icon="tune"
               label="Layout"
+              class="saved-views-dropdown btn-function el-border hover:tw-bg-[var(--o2-hover-accent)]"
+              @click="() => {}"
             >
               <q-list>
                 <q-item clickable v-close-popup @click="setLayout('hierarchical')">
@@ -44,12 +48,14 @@
               </q-list>
             </q-btn-dropdown>
             <q-btn
-              outline
-              dense
-              color="primary"
+              data-test="service-graph-settings-btn"
+              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border hover:tw-bg-[var(--o2-hover-accent)]"
+              size="xs"
               icon="settings"
               @click="showSettings = true"
-            />
+            >
+              <q-tooltip>Settings</q-tooltip>
+            </q-btn>
           </div>
         </div>
 
@@ -156,7 +162,7 @@
         </div>
 
         <!-- Graph Visualization -->
-        <q-card flat bordered class="graph-card  tw-h-[calc(100%-162px)]">
+        <q-card flat bordered class="graph-card  tw-h-[calc(100%-10.25rem)]">
           <q-card-section class="q-pa-none tw-h-full" style="height: 100%;">
             <div
               ref="graphContainer"
@@ -245,7 +251,7 @@
         </q-card>
 
         <!-- Enhanced Legend -->
-        <div class="row items-center q-mt-md">
+        <div class="row items-center tw-mt-[0.5rem]">
           <div class="col-auto text-subtitle2 text-grey-7 q-mr-md">
             Connection Types:
           </div>
@@ -295,8 +301,9 @@
               label="Graph Height (px)"
               :min="400"
               :max="1200"
-              outlined
+              borderless
               dense
+              class="o2-input showLabelOnTop"
             />
             <q-toggle
               v-model="autoRefresh"
@@ -321,8 +328,8 @@
         </q-card-section>
         <q-separator />
         <q-card-actions align="right">
-          <q-btn flat label="Reset" color="grey" @click="resetSettings" />
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <q-btn flat dense no-caps label="Close" color="primary" v-close-popup class="o2-secondary-button tw-h-[2rem]" />
+          <q-btn label="Reset" @click="resetSettings" class="o2-primary-button tw-h-[2rem]" />  
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -331,7 +338,6 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import serviceGraphService from "@/services/service_graph";
 import AppTabs from "@/components/common/AppTabs.vue";
 
@@ -342,7 +348,6 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const $q = useQuasar();
 
     const loading = ref(false);
     const error = ref<string | null>(null);
@@ -396,7 +401,7 @@ export default defineComponent({
         }
 
         // Load store stats with timeout
-        const statsResponse = await Promise.race([
+        const statsResponse: any = await Promise.race([
           serviceGraphService.getStats(orgId),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error("Request timeout")), 30000)
@@ -471,7 +476,7 @@ export default defineComponent({
         const labels: any = {};
 
         // Parse labels
-        const labelMatches = labelsStr.matchAll(/(\w+)="([^"]+)"/g);
+        const labelMatches = Array.from(labelsStr.matchAll(/(\w+)="([^"]+)"/g));
         for (const [, key, val] of labelMatches) {
           labels[key] = val;
         }
@@ -581,7 +586,7 @@ export default defineComponent({
     };
 
     const renderGraph = () => {
-      if (!graphContainer.value || !window.vis) {
+      if (!graphContainer.value || !(window as any).vis) {
         console.warn("Graph container or vis.js not available");
         return;
       }
@@ -590,7 +595,7 @@ export default defineComponent({
       if (!container) return;
 
       // Calculate error rates for each node
-      const nodeErrorRates = new Map<string, number>();
+      const nodeErrorRates = new Map<string, { total: number; errors: number }>();
       filteredGraphData.value.edges.forEach((edge: any) => {
         const calcRate = (nodeId: string) => {
           const current = nodeErrorRates.get(nodeId) || { total: 0, errors: 0 };
