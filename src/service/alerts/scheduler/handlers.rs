@@ -79,6 +79,7 @@ pub async fn handle_triggers(
 /// Returns the skipped timestamps and the final timestamp to evaluate the alert.
 /// `tz_offset` is in minutes
 /// Frequency is in seconds
+#[allow(clippy::too_many_arguments)]
 fn get_skipped_timestamps(
     supposed_to_run_at: i64,
     cron: &str,
