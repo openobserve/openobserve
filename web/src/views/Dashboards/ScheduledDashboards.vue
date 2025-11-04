@@ -86,11 +86,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div class="q-ml-sm">
-              <q-btn
+              <q-icon
+                name="cancel"
+                class="cursor-pointer"
+                size="20px"
                 v-close-popup="true"
-                round
-                flat
-                :icon="'img:' + getImageURL('images/common/close_icon.svg')"
               />
             </div>
           </div>
