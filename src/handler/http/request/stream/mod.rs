@@ -153,7 +153,7 @@ async fn schema(
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
     ),
-    request_body(content = StreamCreate, description = "Stream create", content_type = "application/json"),
+    request_body(content = inline(StreamCreate), description = "Stream create", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -202,7 +202,7 @@ async fn create(
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
     ),
-    request_body(content = UpdateStreamSettings, description = "Stream settings", content_type = "application/json"),
+    request_body(content = inline(UpdateStreamSettings), description = "Stream settings", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -252,7 +252,7 @@ async fn update_settings(
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
     ),
-    request_body(content = StreamUpdateFields, description = "Update stream fields to a specific data type", content_type = "application/json"),
+    request_body(content = inline(StreamUpdateFields), description = "Update stream fields to a specific data type", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = Object),
@@ -305,7 +305,7 @@ async fn update_fields(
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
     ),
-    request_body(content = StreamDeleteFields, description = "Stream delete fields", content_type = "application/json"),
+    request_body(content = inline(StreamDeleteFields), description = "Stream delete fields", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -413,7 +413,7 @@ async fn delete(
         ("sort" = String, Query, description = "Sort"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ListStream),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(ListStream)),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(

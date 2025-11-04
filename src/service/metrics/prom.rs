@@ -528,7 +528,7 @@ pub async fn remote_write(
             ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
-        let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await?;
+        let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
 
         let fns_length: usize =
             stream_executable_pipelines

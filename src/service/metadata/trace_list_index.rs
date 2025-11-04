@@ -118,6 +118,7 @@ impl Metadata for TraceListIndex {
             ingester::get_writer(0, org_id, StreamType::Metadata.as_str(), STREAM_NAME).await;
         _ = ingestion::write_file(
             &writer,
+            org_id,
             STREAM_NAME,
             buf,
             !get_config().common.wal_fsync_disabled,
@@ -303,7 +304,7 @@ mod tests {
                 val.schema_key, val.schema, val.records_size, val.records
             );
         }
-        let r = ingestion::write_file(&writer, STREAM_NAME, buf, false).await;
+        let r = ingestion::write_file(&writer, "default", STREAM_NAME, buf, false).await;
         println!("r: {r:?}");
     }
 }

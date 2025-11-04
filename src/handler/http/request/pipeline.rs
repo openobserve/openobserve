@@ -58,7 +58,7 @@ impl From<PipelineError> for HttpResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Pipeline, description = "Pipeline data", content_type = "application/json"),
+    request_body(content = inline(Pipeline), description = "Pipeline data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -108,7 +108,7 @@ pub async fn save_pipeline(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = PipelineList),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(PipelineList)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
@@ -201,7 +201,7 @@ async fn list_pipelines(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = PipelineList),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(PipelineList)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
@@ -265,7 +265,7 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Pipeline, description = "Pipeline data", content_type = "application/json"),
+    request_body(content = inline(Pipeline), description = "Pipeline data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -353,7 +353,7 @@ pub async fn enable_pipeline(
         ("org_id" = String, Path, description = "Organization name"),
         ("value" = bool, Query, description = "Enable or disable pipeline"),
     ),
-    request_body(content = PipelineBulkEnableRequest, description = "Pipeline id list", content_type = "application/json"),
+    request_body(content = inline(PipelineBulkEnableRequest), description = "Pipeline id list", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
