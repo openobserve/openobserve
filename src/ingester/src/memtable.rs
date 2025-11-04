@@ -33,7 +33,7 @@ use crate::{
 };
 
 pub(crate) struct MemTable {
-    streams: HashMap<Arc<str>, Stream>, // key: orgId/schemaName, val: stream
+    streams: HashMap<(Arc<str>, Arc<str>), Stream>, // key: (orgId, schemaName), val: stream
     json_bytes_written: AtomicU64,
     arrow_bytes_written: AtomicU64,
 }
@@ -56,7 +56,7 @@ impl MemTable {
         entry: Entry,
         batch: Arc<RecordBatchEntry>,
     ) -> Result<()> {
-        let key = Arc::from(format!("{}/{}", entry.org_id, entry.stream));
+        let key = (entry.org_id.clone(), entry.stream.clone());
         let partitions = match self.streams.get_mut(&key) {
             Some(v) => v,
             None => self.streams.entry(key.clone()).or_insert_with(Stream::new),
@@ -77,7 +77,7 @@ impl MemTable {
         time_range: Option<(i64, i64)>,
         partition_filters: &[(String, Vec<String>)],
     ) -> Result<Vec<ReadRecordBatchEntry>> {
-        let key = Arc::from(format!("{org_id}/{stream_name}"));
+        let key = (Arc::from(org_id), Arc::from(stream_name));
         let Some(stream) = self.streams.get(&key) else {
             return Ok(vec![]);
         };
@@ -92,12 +92,11 @@ impl MemTable {
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let mut schema_size = 0;
         let mut paths = Vec::with_capacity(self.streams.len());
-        for (stream_name, stream) in self.streams.iter() {
-            let key_parts: Vec<&str> = stream_name.splitn(2, '/').collect();
-            let (org_id, stream_name) = if key_parts.len() == 2 {
-                (key_parts[0], key_parts[1])
+        for ((stream_org_id, stream_name), stream) in self.streams.iter() {
+            let org_id = if !stream_org_id.is_empty() {
+                stream_org_id.as_ref()
             } else {
-                (org_id, stream_name.as_ref())
+                org_id
             };
             let (part_schema_size, partitions) = stream
                 .persist(idx, org_id, stream_type, stream_name)
