@@ -559,13 +559,12 @@ pub async fn prepare_cache_response(
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
-                let order_by = v.order_by;
-
                 MultiCachedQueryResponse {
                     ts_column,
                     is_aggregate,
                     is_descending,
-                    order_by,
+                    order_by: v.order_by,
+                    limit: v.limit,
                     ..Default::default()
                 }
             }

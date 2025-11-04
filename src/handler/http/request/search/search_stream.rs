@@ -323,8 +323,8 @@ pub async fn search_http2_stream(
     }
 
     // Set use_cache from query params
-    req.use_cache = get_use_cache_from_request(&query);
     req.clear_cache = get_clear_cache_from_request(&query);
+    req.use_cache = get_use_cache_from_request(&query) && !req.clear_cache;
 
     // Set search type if not set
     if req.search_type.is_none() {

@@ -271,8 +271,8 @@ pub async fn search(
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
         req.query.sql = sql;
     };
-    req.use_cache = get_use_cache_from_request(&query);
     req.clear_cache = get_clear_cache_from_request(&query);
+    req.use_cache = get_use_cache_from_request(&query) && !req.clear_cache;
 
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {
