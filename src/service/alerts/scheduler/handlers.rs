@@ -1119,7 +1119,11 @@ async fn handle_report_triggers(
             new_trigger.next_run_at,
             report.tz_offset,
             Some(frequency_seconds),
-            None, // Reports don't have timezone string yet, use fixed offset
+            if report.timezone.is_empty() {
+                None
+            } else {
+                Some(&report.timezone)
+            },
         );
     }
 
@@ -1458,12 +1462,18 @@ async fn handle_derived_stream_triggers(
             supposed_to_be_run_at,
             derived_stream.tz_offset,
             Some(derived_stream.trigger_condition.period * 60),
-            None, // Derived streams don't have timezone string yet
+            derived_stream.trigger_condition.timezone.as_deref(), /* Derived streams don't have
+                                                                   * timezone string yet */
         )
     } else {
         // For cron frequency, we don't need to align the end time as it is already aligned (the
         // cron crate takes care of it)
-        TriggerCondition::align_time(supposed_to_be_run_at, derived_stream.tz_offset, None, None)
+        TriggerCondition::align_time(
+            supposed_to_be_run_at,
+            derived_stream.tz_offset,
+            None,
+            derived_stream.trigger_condition.timezone.as_deref(),
+        )
     };
 
     let (mut start, mut end) = if derived_stream.start_at.is_some() && trigger.data.is_empty() {
@@ -1524,12 +1534,18 @@ async fn handle_derived_stream_triggers(
             end,
             derived_stream.tz_offset,
             Some(derived_stream.trigger_condition.period * 60),
-            None, // Derived streams don't have timezone string yet
+            derived_stream.trigger_condition.timezone.as_deref(), /* Derived streams don't have
+                                                                   * timezone string yet */
         )
     } else {
         // For cron frequency, we don't need to align the end time as it is already aligned (the
         // cron crate takes care of it)
-        TriggerCondition::align_time(end, derived_stream.tz_offset, None, None)
+        TriggerCondition::align_time(
+            end,
+            derived_stream.tz_offset,
+            None,
+            derived_stream.trigger_condition.timezone.as_deref(),
+        )
     };
 
     let mut trigger_data_stream = TriggerData {
