@@ -36,7 +36,7 @@ Usage Examples:
 - <LogsHighLighting :data="1234567890123" />  // Timestamp-like number
 -->
 <template>
-  <pre class="logs-highlight-json" v-html="colorizedJson"></pre>
+  <span class="logs-highlight-json" v-html="colorizedJson"></span>
 </template>
 
 <script setup lang="ts">

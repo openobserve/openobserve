@@ -177,7 +177,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               props.col.name === 'field' ? 'tw-text-[var(--o2-json-key)]' : ''
             "
           >
-            {{ props.row[props.col.name] }}
+            <span
+              v-if="props.col.name === 'value'"
+              v-html="
+                highlightTextMatch(props.row[props.col.name], searchQuery)
+              "
+            />
+            <span v-else>
+              {{ props.row[props.col.name] }}
+            </span>
           </q-td>
         </template>
       </q-table>
@@ -200,7 +208,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               props.col.name === 'field' ? 'tw-text-[var(--o2-json-key)]' : ''
             "
           >
-            {{ props.row[props.col.name] }}
+            <span
+              v-if="props.col.name === 'value'"
+              v-html="
+                highlightTextMatch(props.row[props.col.name], searchQuery)
+              "
+            />
+            <span v-else>
+              {{ props.row[props.col.name] }}
+            </span>
           </q-td>
         </template>
       </q-table>
@@ -260,28 +276,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mr-xs"
                   @click.stop="expandEvent(props.rowIndex)"
                 ></q-btn>
-                <span v-if="column.name !== '@timestamp'">
-                  <LogsHighLighting
-                    :data="column.prop(props.row)"
-                    :query-string="searchQuery"
-                    :show-braces="false"
-                    :show-quotes="false"
-                  />
-                </span>
+                <span
+                  v-if="column.name !== '@timestamp'"
+                  v-html="
+                    highlightTextMatch(column.prop(props.row), searchQuery)
+                  "
+                />
                 <span v-else> {{ column.prop(props.row) }}</span>
               </div>
             </q-td>
           </q-tr>
           <q-tr v-if="expandedEvents[props.rowIndex.toString()]">
             <q-td colspan="2">
-              <div class="log_json_content">
-                <LogsHighLighting
-                  :data="props.row"
-                  :query-string="searchQuery"
-                  :show-braces="true"
-                  :show-quotes="true"
-                />
-              </div>
+              <pre
+                v-once
+                class="log_json_content"
+                v-html="highlightedJSON(props.row)"
+              />
             </q-td>
           </q-tr>
         </template>
@@ -338,14 +349,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop="expandEvent(props.rowIndex)"
                   :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${props.rowIndex}`"
                 ></q-btn>
-                <span v-if="column.name !== '@timestamp'">
-                  <LogsHighLighting
-                    :data="column.prop(props.row)"
-                    :query-string="searchQuery"
-                    :show-braces="false"
-                    :show-quotes="false"
-                  />
-                </span>
+                <span
+                  v-if="column.name !== '@timestamp'"
+                  v-html="
+                    highlightTextMatch(column.prop(props.row), searchQuery)
+                  "
+                />
                 <span v-else> {{ column.prop(props.row) }}</span>
               </div>
             </q-td>
@@ -532,11 +541,46 @@ export default defineComponent({
         const regex = new RegExp(`(${escapedQuery})`, "gi");
         return escapeHtml(text).replace(
           regex,
-          (match) => `<span style="background-color: rgb(255, 213, 0); color: black;">${match}</span>`
+          (match) => `<span class="highlight">${match}</span>`
         );
       } catch (e) {
         return escapeHtml(text);
       }
+    };
+
+    const highlightedJSON = (value) => {
+      const colors = themeColors;
+      const attrs = value;
+      const query = props.searchQuery;
+
+      const formatValue = (value: any): string => {
+        if (value === null) {
+          return `<span style="color: ${colors.nullValue};">${highlightTextMatch("null", query)}</span>`;
+        } else if (typeof value === "boolean") {
+          return `<span style="color: ${colors.booleanValue};">${highlightTextMatch(String(value), query)}</span>`;
+        } else if (typeof value === "number") {
+          return `<span style="color: ${colors.numberValue};">${highlightTextMatch(String(value), query)}</span>`;
+        } else if (typeof value === "string") {
+          return `<span style="color: ${colors.stringValue};">"${highlightTextMatch(value, query)}"</span>`;
+        } else if (typeof value === "object") {
+          return `<span style="color: ${colors.objectValue};">"${highlightTextMatch(JSON.stringify(value), query)}"</span>`;
+        }
+        return highlightTextMatch(String(value), query);
+      };
+
+      const lines: string[] = [];
+      lines.push('<span style="color: #9ca3af;">{</span>');
+
+      const entries = Object.entries(attrs);
+      entries.forEach(([key, value], index) => {
+        const keyHtml = `<span style="color: ${colors.key};">"${escapeHtml(key)}"</span>`;
+        const valueHtml = formatValue(value);
+        const comma = index < entries.length - 1 ? '<span style="color: #9ca3af;">,</span>' : '';
+        lines.push(`  ${keyHtml}<span style="color: #9ca3af;">:</span> ${valueHtml}${comma}`);
+      });
+
+      lines.push('<span style="color: #9ca3af;">}</span>');
+      return lines.join("\n");
     };
 
     const highlightedAttributes = computed(() => {
@@ -917,6 +961,8 @@ export default defineComponent({
       processColumns,
       getProcessRows,
       highlightedAttributes,
+      highlightTextMatch,
+      highlightedJSON
     };
   },
 });
