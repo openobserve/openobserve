@@ -1219,6 +1219,17 @@ export default defineComponent({
       }
     });
 
+    // Watch activeTab and update resultTotal accordingly
+    // This ensures resultTotal is always in sync with the active tab
+    // If selected tab is schemaFields we will show the uds length otherwise we will show the actual schema length
+    watch(activeTab, (newTab) => {
+      if (newTab === "schemaFields") {
+        resultTotal.value = indexData.value.defined_schema_fields?.length || 0;
+      } else {
+        resultTotal.value = indexData.value.schema?.length || 0;
+      }
+    }, { immediate: true });
+
     const isSchemaUDSEnabled = computed(() => {
       return store.state.zoConfig.user_defined_schemas_enabled;
     });
