@@ -2,7 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 
-// Utility Functions
+// Utility Functions 
 
 // Legacy login function replaced by global authentication via navigateToBase 
 
