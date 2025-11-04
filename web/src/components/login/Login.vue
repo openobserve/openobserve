@@ -232,7 +232,7 @@ export default defineComponent({
         autoRedirectDexLogin.value = true;
         loginWithSSo();
       }
-      loginAsInternalUser.value = true;
+
       if (router.currentRoute.value.query.login_as_internal_user === "true") {
         loginAsInternalUser.value = true;
       }
