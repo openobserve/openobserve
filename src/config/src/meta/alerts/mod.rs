@@ -122,16 +122,17 @@ impl TriggerCondition {
 
             // Try to parse timezone string and get current offset (DST-aware)
             // If parsing fails, fallback to the provided timezone_offset for backward compatibility
-            let current_offset_minutes = match get_timezone_from_string(self.timezone.as_deref(), timezone_offset) {
-                Ok(tz) => {
-                    // Using Tz - DST-aware timezone, get the current offset
-                    get_offset_minutes_from_tz(&tz, start_utc)
-                }
-                Err(_) => {
-                    // Fallback to provided timezone_offset for backward compatibility
-                    timezone_offset
-                }
-            };
+            let current_offset_minutes =
+                match get_timezone_from_string(self.timezone.as_deref(), timezone_offset) {
+                    Ok(tz) => {
+                        // Using Tz - DST-aware timezone, get the current offset
+                        get_offset_minutes_from_tz(&tz, start_utc)
+                    }
+                    Err(_) => {
+                        // Fallback to provided timezone_offset for backward compatibility
+                        timezone_offset
+                    }
+                };
 
             // Create FixedOffset with the calculated or provided offset
             let tz_offset = FixedOffset::east_opt(current_offset_minutes * 60).unwrap();
@@ -699,7 +700,7 @@ mod test {
         // Test with DST-aware timezone string
         let aligned_winter = TriggerCondition::align_time(
             winter_timestamp,
-            -480, // PST fallback
+            -480,      // PST fallback
             Some(300), // 5 minutes
             Some("America/Los_Angeles"),
         );
@@ -721,7 +722,7 @@ mod test {
         // Test with DST-aware timezone string
         let aligned_summer = TriggerCondition::align_time(
             summer_timestamp,
-            -420, // PDT fallback
+            -420,      // PDT fallback
             Some(300), // 5 minutes
             Some("America/Los_Angeles"),
         );
@@ -1208,13 +1209,21 @@ mod test {
         let winter_timestamp = winter_result.unwrap();
         let winter_dt = DateTime::from_timestamp_micros(winter_timestamp).unwrap();
         let winter_la = winter_dt.with_timezone(&Los_Angeles);
-        assert_eq!(winter_la.hour(), 9, "Winter alert should fire at 9 AM LA time");
+        assert_eq!(
+            winter_la.hour(),
+            9,
+            "Winter alert should fire at 9 AM LA time"
+        );
         assert_eq!(winter_la.minute(), 0);
 
         let summer_timestamp = summer_result.unwrap();
         let summer_dt = DateTime::from_timestamp_micros(summer_timestamp).unwrap();
         let summer_la = summer_dt.with_timezone(&Los_Angeles);
-        assert_eq!(summer_la.hour(), 9, "Summer alert should fire at 9 AM LA time");
+        assert_eq!(
+            summer_la.hour(),
+            9,
+            "Summer alert should fire at 9 AM LA time"
+        );
         assert_eq!(summer_la.minute(), 0);
 
         // The UTC times should be different due to DST
@@ -1249,7 +1258,10 @@ mod test {
             false,
             Some(before_spring_dst.timestamp_micros()),
         );
-        assert!(result_before.is_ok(), "Scheduling before DST transition should work");
+        assert!(
+            result_before.is_ok(),
+            "Scheduling before DST transition should work"
+        );
 
         // Day after DST starts: March 10, 2025, 10:00 AM UTC (now PDT)
         let after_spring_dst = Utc.with_ymd_and_hms(2025, 3, 10, 10, 0, 0).unwrap();
@@ -1259,7 +1271,10 @@ mod test {
             false,
             Some(after_spring_dst.timestamp_micros()),
         );
-        assert!(result_after.is_ok(), "Scheduling after DST transition should work");
+        assert!(
+            result_after.is_ok(),
+            "Scheduling after DST transition should work"
+        );
 
         // Both should schedule at 2:00 PM local time
         use chrono_tz::America::Los_Angeles;
@@ -1297,7 +1312,8 @@ mod test {
     #[test]
     fn test_get_next_trigger_time_with_dst_aware_timezone() {
         // Test our get_next_trigger_time_non_aligned function with DST-aware timezone
-        // This tests the complete flow: timezone string parsing -> offset calculation -> cron scheduling
+        // This tests the complete flow: timezone string parsing -> offset calculation -> cron
+        // scheduling
 
         // Test 1: Alert with valid timezone string (DST-aware)
         let condition_dst_aware = TriggerCondition {
@@ -1310,7 +1326,10 @@ mod test {
 
         // Should successfully calculate next trigger time using DST-aware offset
         let result = condition_dst_aware.get_next_trigger_time_non_aligned(true, -480, false, None);
-        assert!(result.is_ok(), "DST-aware timezone scheduling should succeed");
+        assert!(
+            result.is_ok(),
+            "DST-aware timezone scheduling should succeed"
+        );
 
         let timestamp = result.unwrap();
         let dt = DateTime::from_timestamp_micros(timestamp).unwrap();
@@ -1332,14 +1351,17 @@ mod test {
 
         // Should still work by falling back to provided timezone_offset
         let result = condition_fallback.get_next_trigger_time_non_aligned(true, -480, false, None);
-        assert!(result.is_ok(), "Should fallback to timezone_offset when timezone string is invalid");
+        assert!(
+            result.is_ok(),
+            "Should fallback to timezone_offset when timezone string is invalid"
+        );
 
         // Test 3: Test with different timezones to verify DST-awareness
         let timezones_to_test = vec![
-            ("America/New_York", -300),    // EST/EDT
-            ("America/Chicago", -360),     // CST/CDT
-            ("America/Denver", -420),      // MST/MDT
-            ("Europe/London", 0),          // GMT/BST
+            ("America/New_York", -300), // EST/EDT
+            ("America/Chicago", -360),  // CST/CDT
+            ("America/Denver", -420),   // MST/MDT
+            ("Europe/London", 0),       // GMT/BST
         ];
 
         for (tz_name, fallback_offset) in timezones_to_test {
@@ -1351,7 +1373,8 @@ mod test {
                 ..Default::default()
             };
 
-            let result = condition.get_next_trigger_time_non_aligned(true, fallback_offset, false, None);
+            let result =
+                condition.get_next_trigger_time_non_aligned(true, fallback_offset, false, None);
             assert!(
                 result.is_ok(),
                 "Timezone {} should work with DST-awareness",
@@ -1374,7 +1397,10 @@ mod test {
 
         // This should fallback to FixedOffset and still work
         let result = condition.get_next_trigger_time_non_aligned(true, -480, false, None);
-        assert!(result.is_ok(), "Alerts without timezone string should fallback to FixedOffset");
+        assert!(
+            result.is_ok(),
+            "Alerts without timezone string should fallback to FixedOffset"
+        );
     }
 
     #[test]
@@ -1393,8 +1419,7 @@ mod test {
 
         // Test with silence period applied
         let result_with_silence = condition.get_next_trigger_time_non_aligned(
-            true,
-            -300, // EST fallback offset
+            true, -300, // EST fallback offset
             true, // apply_silence = true
             None,
         );
@@ -1405,9 +1430,7 @@ mod test {
 
         // Test without silence period
         let result_no_silence = condition.get_next_trigger_time_non_aligned(
-            true,
-            -300,
-            false, // apply_silence = false
+            true, -300, false, // apply_silence = false
             None,
         );
         assert!(
