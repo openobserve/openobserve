@@ -422,6 +422,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             false, // add_mini_partition = false
         );
@@ -448,6 +449,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             false, // add_mini_partition = false
@@ -492,6 +494,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             false, // add_mini_partition = false
         );
@@ -520,6 +523,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             false, // add_mini_partition = false
@@ -565,6 +569,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             false, // add_mini_partition = false
         );
@@ -593,6 +598,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             false, // add_mini_partition = false
@@ -636,6 +642,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             false, // add_mini_partition = false
         );
@@ -664,6 +671,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             false, // add_mini_partition = false
@@ -707,6 +715,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             true, // add_mini_partition = true
         );
@@ -736,6 +745,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             true, // add_mini_partition = true
@@ -784,6 +794,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             true, // add_mini_partition = true
         );
@@ -810,6 +821,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             true, // add_mini_partition = true
@@ -855,6 +867,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             true, // add_mini_partition = true
         );
@@ -884,6 +897,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             true, // add_mini_partition = true
@@ -932,6 +946,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             true, // add_mini_partition = true
         );
@@ -959,6 +974,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             true, // add_mini_partition = true
@@ -1005,6 +1021,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             true, // add_mini_partition = true
         );
@@ -1025,6 +1042,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             true, // add_mini_partition = true
