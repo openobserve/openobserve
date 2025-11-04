@@ -370,6 +370,7 @@ use crate::{common::meta, handler::http::request};
         (name = "Clusters", description = "Super cluster operations"),
         (name = "Short Url", description = "Short Url Service"),
         (name = "Ratelimit", description = "Ratelimit operations"),
+        (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",

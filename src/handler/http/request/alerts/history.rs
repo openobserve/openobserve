@@ -19,7 +19,7 @@ use config::{
     META_ORG_ID,
     meta::{
         search::{Query, Request as SearchRequest},
-        self_reporting::usage::TRIGGERS_USAGE_STREAM,
+        self_reporting::usage::TRIGGERS_STREAM,
         stream::StreamType,
     },
     utils::time::now_micros,
@@ -156,7 +156,7 @@ pub async fn get_alert_history(
          start_time, end_time, retries, \
          delay_in_secs, evaluation_took_in_secs, \
          source_node, query_took \
-         FROM \"{TRIGGERS_USAGE_STREAM}\" \
+         FROM \"{TRIGGERS_STREAM}\" \
          WHERE module = 'alert' AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
 

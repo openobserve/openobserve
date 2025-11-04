@@ -38,6 +38,8 @@ use tokio::sync::mpsc;
 use tracing::Span;
 
 #[cfg(feature = "enterprise")]
+use crate::common::utils::http::get_extract_patterns_from_request;
+#[cfg(feature = "enterprise")]
 use crate::{
     common::meta::search::AuditContext,
     handler::http::request::search::utils::check_stream_permissions,
@@ -67,6 +69,7 @@ use crate::{
         setup_tracing_with_trace_id,
     },
 };
+
 /// Search HTTP2 streaming endpoint
 
 #[utoipa::path(
@@ -144,6 +147,10 @@ pub async fn search_http2_stream(
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
     let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
+    #[cfg(feature = "enterprise")]
+    let extract_patterns = get_extract_patterns_from_request(&query);
+    #[cfg(not(feature = "enterprise"))]
+    let extract_patterns = false;
 
     // Parse the search request
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
@@ -426,6 +433,7 @@ pub async fn search_http2_stream(
         fallback_order_by_col,
         audit_ctx,
         is_multi_stream_search,
+        extract_patterns,
     ));
 
     // Return streaming response
@@ -733,6 +741,9 @@ pub async fn values_http2_stream(
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
 
+    // Pattern extraction is not supported for values endpoint
+    let extract_patterns = false;
+
     // Spawn the search task to process the request
     actix_web::rt::spawn(process_search_stream_request(
         org_id.clone(),
@@ -748,6 +759,7 @@ pub async fn values_http2_stream(
         None,
         audit_ctx,
         false,
+        extract_patterns,
     ));
 
     // Return streaming response

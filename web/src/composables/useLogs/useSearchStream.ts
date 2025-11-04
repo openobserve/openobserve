@@ -92,7 +92,7 @@ export const useSearchStream = () => {
       onError: responseProcessor.handleSearchError,
       onComplete: handleSearchComplete,
       onReset: handleSearchReset,
-    };
+          };
 
     histogramHandler.processHistogramRequest(
       queryReq,
