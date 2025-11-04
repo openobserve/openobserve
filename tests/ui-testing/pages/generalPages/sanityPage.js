@@ -41,6 +41,7 @@ export class SanityPage {
         // Function locators
         this.functionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
         this.functionSaveButton = '[data-test="logs-search-bar-save-transform-btn"]';
+        this.functionSaveButtonAlternate = '[data-test="logs-search-bar-function-dropdown"]';
         this.fnEditor = '#fnEditor';
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         
@@ -337,15 +338,29 @@ export class SanityPage {
         await this.page.locator(this.fnEditor).locator(".inputarea").fill(".a=2");
         await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
 
-        // Click the Save button (separate button next to function dropdown)
-        await this.page.locator(this.functionSaveButton).click();
+        // Try clicking the Save button with fallback strategies
+        let saveDialogVisible = false;
 
+        // First attempt: Click primary save button
         try {
-          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'attached', timeout: 3000 });
-          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
-        } catch (error) {
+          testLogger.info('Attempting to click primary function save button');
           await this.page.locator(this.functionSaveButton).click();
-          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 5000 });
+          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
+          saveDialogVisible = true;
+          testLogger.info('Primary save button click succeeded');
+        } catch (error) {
+          testLogger.warn('Primary save button click failed, trying alternate locator');
+
+          // Second attempt: Try alternate locator (button inside dropdown)
+          try {
+            await this.page.locator(this.functionSaveButtonAlternate).getByRole('button').filter({ hasText: 'save' }).click();
+            await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
+            saveDialogVisible = true;
+            testLogger.info('Alternate save button click succeeded');
+          } catch (alternateError) {
+            testLogger.error('Both save button attempts failed');
+            throw new Error('Failed to open function save dialog using primary and alternate locators');
+          }
         }
         
         await this.page.locator(this.savedFunctionNameInput).click();
