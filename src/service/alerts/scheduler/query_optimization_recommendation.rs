@@ -86,9 +86,9 @@ impl QueryRecommendationEngine for QueryOptimizerContext {
                 ingestion_type: Some(IngestionType::Json as i32),
                 metadata: None,
             };
-            Ok(ingestion_service::ingest(request)
+            ingestion_service::ingest(request)
                 .await
-                .map_err(|e| anyhow::anyhow!("Ingestion failed. Error={:?}", e))?)
+                .map_err(|e| anyhow::anyhow!("Ingestion failed. Error={:?}", e))
         })
     }
 }

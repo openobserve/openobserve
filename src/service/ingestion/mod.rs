@@ -367,6 +367,7 @@ pub fn init_functions_runtime() -> Runtime {
 
 pub async fn write_file(
     writer: &Arc<ingester::Writer>,
+    org_id: &str,
     stream_name: &str,
     buf: HashMap<String, SchemaRecords>,
     fsync: bool,
@@ -378,8 +379,9 @@ pub async fn write_file(
             if entry.records.is_empty() {
                 None
             } else {
+                let key = format!("{org_id}/{stream_name}");
                 Some(ingester::Entry {
-                    stream: Arc::from(stream_name),
+                    stream: Arc::from(key.as_str()),
                     schema: Some(entry.schema),
                     schema_key: Arc::from(entry.schema_key.as_str()),
                     partition_key: Arc::from(hour_key.as_str()),

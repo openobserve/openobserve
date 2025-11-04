@@ -125,7 +125,7 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
         let idx: usize = file_columns[file_columns.len() - 4]
             .parse()
             .unwrap_or_default();
-        let key = WriterKey::new(org_id, stream_type);
+        let key = WriterKey::new(idx, org_id, stream_type);
         let mut memtable = memtable::MemTable::new();
         let mut reader = match wal::Reader::from_path(wal_file) {
             Ok(v) => v,
@@ -177,10 +177,19 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
             };
             i += 1;
             total += entry.data.len();
+
+            // Use Entry org_id if available, otherwise fall back to file path
+            let (org_id, stream_name) = if entry.stream.contains('/') {
+                let parts: Vec<&str> = entry.stream.splitn(2, '/').collect();
+                (parts[0], parts[1])
+            } else {
+                (org_id, entry.stream.as_ref())
+            };
+
             let infer_schema =
                 infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
                     .context(InferJsonSchemaSnafu)?;
-            let latest_schema = infra::schema::get_cache(org_id, &entry.stream, stream_type.into())
+            let latest_schema = infra::schema::get_cache(org_id, stream_name, stream_type.into())
                 .await
                 .map_err(|e| Error::ExternalError {
                     source: Box::new(e),

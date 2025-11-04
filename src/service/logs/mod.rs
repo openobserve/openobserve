@@ -568,6 +568,7 @@ async fn write_logs(
         ingester::get_writer(thread_id, org_id, StreamType::Logs.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
+        org_id,
         stream_name,
         write_buf,
         !cfg.common.wal_fsync_disabled,
