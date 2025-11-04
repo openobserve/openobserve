@@ -87,6 +87,7 @@ fn get_skipped_timestamps(
     delay: i64,
     align_time: bool,
     now: i64,
+    timezone_str: Option<&str>,
 ) -> (Vec<i64>, i64) {
     let mut skipped_timestamps = Vec::new();
     let mut next_run_at;
@@ -117,6 +118,7 @@ fn get_skipped_timestamps(
                 supposed_to_run_at + second_micros(frequency),
                 tz_offset,
                 Some(frequency),
+                timezone_str,
             )
         } else {
             supposed_to_run_at + second_micros(frequency)
@@ -434,6 +436,7 @@ async fn handle_alert_triggers(
             delay,
             alert.trigger_condition.align_time,
             now,
+            alert.trigger_condition.timezone.as_deref(),
         );
         final_end_time = skipped_timestamps_end_timestamp.1;
         let skipped_timestamps = skipped_timestamps_end_timestamp.0;
@@ -1115,6 +1118,7 @@ async fn handle_report_triggers(
             new_trigger.next_run_at,
             report.tz_offset,
             Some(frequency_seconds),
+            None, // Reports don't have timezone string yet, use fixed offset
         );
     }
 
@@ -1453,11 +1457,12 @@ async fn handle_derived_stream_triggers(
             supposed_to_be_run_at,
             derived_stream.tz_offset,
             Some(derived_stream.trigger_condition.period * 60),
+            None, // Derived streams don't have timezone string yet
         )
     } else {
         // For cron frequency, we don't need to align the end time as it is already aligned (the
         // cron crate takes care of it)
-        TriggerCondition::align_time(supposed_to_be_run_at, derived_stream.tz_offset, None)
+        TriggerCondition::align_time(supposed_to_be_run_at, derived_stream.tz_offset, None, None)
     };
 
     let (mut start, mut end) = if derived_stream.start_at.is_some() && trigger.data.is_empty() {
@@ -1518,11 +1523,12 @@ async fn handle_derived_stream_triggers(
             end,
             derived_stream.tz_offset,
             Some(derived_stream.trigger_condition.period * 60),
+            None, // Derived streams don't have timezone string yet
         )
     } else {
         // For cron frequency, we don't need to align the end time as it is already aligned (the
         // cron crate takes care of it)
-        TriggerCondition::align_time(end, derived_stream.tz_offset, None)
+        TriggerCondition::align_time(end, derived_stream.tz_offset, None, None)
     };
 
     let mut trigger_data_stream = TriggerData {
@@ -2045,6 +2051,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have skipped timestamps for 5:00, 5:05, 5:10
@@ -2074,6 +2081,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have skipped timestamps for 5:00, 5:05, 5:10
@@ -2103,6 +2111,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // When align_time is true and there are skipped timestamps,
@@ -2132,6 +2141,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should still work with timezone offset
@@ -2158,6 +2168,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have no skipped timestamps when delay is 0
@@ -2184,6 +2195,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have many skipped timestamps (60 minutes worth)
@@ -2212,6 +2224,7 @@ mod tests {
                 delay,
                 align_time,
                 now,
+                None,
             )
         });
 
@@ -2237,6 +2250,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         assert!(skipped_timestamps.is_empty());
@@ -2262,6 +2276,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have some skipped timestamps

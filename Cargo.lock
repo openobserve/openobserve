@@ -2486,6 +2486,7 @@ dependencies = [
  "bytes",
  "chromiumoxide",
  "chrono",
+ "chrono-tz",
  "cityhasher",
  "cron",
  "dashmap",
