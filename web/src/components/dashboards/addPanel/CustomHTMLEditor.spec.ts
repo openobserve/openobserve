@@ -320,10 +320,10 @@ describe("CustomHTMLEditor", () => {
 
       const container = wrapper.find('.html-editor');
       const style = container.element.getAttribute('style');
-      
+
       expect(style).toContain('width: 100%');
       expect(style).toContain('height: 100%');
-      expect(style).toContain('overflow: auto');
+      expect(style).toContain('overflow: hidden');
     });
 
     it("should render splitter with correct configuration", () => {

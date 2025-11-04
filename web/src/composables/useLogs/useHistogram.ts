@@ -105,7 +105,7 @@ export const useHistogram = () => {
           ? "Delta Scan Size"
           : "Scan Size";
 
-      const title =
+      let title =
         "Showing " +
         startCount +
         " to " +
@@ -115,12 +115,17 @@ export const useHistogram = () => {
         plusSign +
         " events in " +
         searchObj.data.queryResults.took +
-        " ms. (" +
-        scanSizeLabel +
-        ": " +
-        formatSizeFromMB(searchObj.data.queryResults.scan_size) +
-        plusSign +
-        ")";
+        " ms.";
+
+      if (searchObj.meta.logsVisualizeToggle === "logs") {
+        title +=
+          "(" +
+          scanSizeLabel +
+          ": " +
+          formatSizeFromMB(searchObj.data.queryResults.scan_size) +
+          plusSign +
+          ")";
+      }
       return title;
     } catch (e: any) {
       console.error("Error while generating histogram title", e);

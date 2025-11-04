@@ -402,7 +402,8 @@ export default defineComponent({
 <style lang="scss" scoped>
 .table-header {
   padding: 8px 16px;
-  border-bottom: 1px solid #cccccc70;
+  border-bottom: 1px solid var(--o2-border-color);
+  background-color: var(--o2-table-header-bg);
 }
 
 .header-content {
@@ -425,11 +426,11 @@ export default defineComponent({
     display: grid;
     grid-template-columns: 40px minmax(0, 1fr);
     align-items: center;
-    border-bottom: 1px solid #cccccc70;
+    border-bottom: 1px solid var(--o2-border-color);
     min-height: 40px;
 
     &:hover {
-      background-color: #cccccc10;
+      background-color: var(--o2-hover-accent);
     }
   }
 }

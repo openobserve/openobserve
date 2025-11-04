@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
-<!-- 
+<!--
 TODO IMPORTANT:
 PICKTHIS UP after recent changes are merged
  -->
@@ -62,7 +62,7 @@ PICKTHIS UP after recent changes are merged
               ? 'o2-primary-button-dark'
               : 'o2-primary-button-light'
           "
-          @click="importJson"
+          @click="handleImportClick"
           data-test="regex-pattern-import-json-btn"
         />
       </div>
@@ -72,6 +72,7 @@ PICKTHIS UP after recent changes are merged
 
     <div class="flex" style="width: calc(100vw - 1px)">
       <q-splitter
+        v-if="activeTab !== 'import_built_in_patterns'"
         class="logs-search-splitter"
         no-scroll
         v-model="splitterModel"
@@ -314,6 +315,29 @@ PICKTHIS UP after recent changes are merged
           </div>
         </template>
       </q-splitter>
+
+      <!-- Built-in Patterns Tab (full width, no splitter) -->
+      <div
+        v-if="activeTab === 'import_built_in_patterns'"
+        class="editor-container-built-in"
+      >
+        <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
+          <div class="app-tabs-container tw-h-[36px] tw-w-fit">
+          <app-tabs
+              data-test="regex-pattern-import-tabs"
+              class="tabs-selection-container"
+              :tabs="tabs"
+              v-model:active-tab="activeTab"
+              @update:active-tab="updateActiveTab"
+          />
+          </div>
+        </div>
+        <built-in-patterns-tab
+          ref="builtInPatternsTabRef"
+          @import-patterns="handleBuiltInPatternsImport"
+          data-test="built-in-patterns-tab"
+        />
+      </div>
     </div>
   </div>
 </div>
@@ -363,11 +387,12 @@ export default defineComponent({
     const jsonFiles = ref(null);
     const url = ref("");
     const jsonArrayOfObj = ref<any[]>([{}]);
-    const activeTab = ref("import_json_file");
+    const activeTab = ref("import_built_in_patterns");
     const splitterModel = ref(60);
     const userSelectedRegexPatternName = ref([]);
     const userSelectedRegexPattern = ref([]);
     const regexPatternCreators = ref<any[]>([]);
+    const builtInPatternsTabRef = ref<any>(null);
 
     // Create a Set for O(1) lookups
     const existingPatternNames = ref(new Set());
@@ -471,6 +496,10 @@ export default defineComponent({
 
     const tabs = reactive([
       {
+        label: "Built-in Patterns",
+        value: "import_built_in_patterns",
+      },
+      {
         label: "File Upload / JSON",
         value: "import_json_file",
       },
@@ -509,54 +538,51 @@ export default defineComponent({
         return;
       }
 
-      let hasErrors = false;
       let successCount = 0;
-      const totalCount = jsonArrayOfObj.value.length;
       for (let index = 0; index < jsonArrayOfObj.value.length; index++) {
         const jsonObj = jsonArrayOfObj.value[index];
-        const success = await processJsonObject(jsonObj, index + 1);
-        if (!success) {
-          hasErrors = true;
-        } else {
+        const result = await processJsonObject(jsonObj, index + 1);
+        if (result) {
           successCount++;
         }
       }
 
-      // Only redirect and show success message if ALL regex patterns were imported successfully
-      if (successCount === totalCount) {
+      // Show success message if patterns were imported
+      if (successCount > 0) {
+        const message = `Successfully imported ${successCount} pattern(s)`;
+
         q.notify({
-          message: `Successfully imported regex-pattern(s)`,
+          message: message,
           color: "positive",
           position: "bottom",
-          timeout: 2000,
+          timeout: 3000,
         });
-        emit("update:list");
 
-        router.push({
-          name: "regexPatterns",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        emit("cancel:hideform");
+        if (successCount > 0) {
+          emit("update:list");
+          router.push({
+            name: "regexPatterns",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          });
+          emit("cancel:hideform");
+        }
       }
     };
 
     const processJsonObject = async (jsonObj: any, index: number) => {
       try {
-        const isValidRegexPattern = await validateRegexPatternInputs(
+        const validationResult = await validateRegexPatternInputs(
           jsonObj,
           index,
         );
-        if (!isValidRegexPattern) {
-          return false;
+        if (!validationResult) {
+          return false;  // Validation error
         }
 
         if (regexPatternErrorsToDisplay.value.length === 0) {
-          const hasCreatedRegexPattern = await createRegexPattern(
-            jsonObj,
-            index,
-          );
+          const hasCreatedRegexPattern = await createRegexPattern(jsonObj, index);
           return hasCreatedRegexPattern;
         }
         return false;
@@ -572,51 +598,25 @@ export default defineComponent({
     };
 
     const validateRegexPatternInputs = async (jsonObj: any, index: number) => {
-      if (
-        !jsonObj.name ||
-        !jsonObj.name.trim() ||
-        typeof jsonObj.name !== "string"
-      ) {
-        regexPatternErrorsToDisplay.value.push([
-          {
-            field: "regex_pattern_name",
-            message: `Regex pattern - ${index}: name is required`,
-          },
-        ]);
+      if(!jsonObj.name || !jsonObj.name.trim() || typeof jsonObj.name !== 'string'){
+        regexPatternErrorsToDisplay.value.push([{
+          field: 'regex_pattern_name',
+          message: `Regex pattern - ${index}: name is required`
+        }]);
         return false;
       }
-      // Check if name already exists - O(1) lookup
-      if (existingPatternNames.value.has(jsonObj.name.trim())) {
-        regexPatternErrorsToDisplay.value.push([
-          {
-            field: "regex_pattern_name",
-            message: `Regex pattern - ${index}: with this name already exists`,
-          },
-        ]);
-
+      // Note: Duplicate pattern names are allowed.
+      // Primary key is UUID-based (id), so multiple patterns can have the same name.
+      // The backend will handle duplicates by appending a suffix automatically.
+      if(!jsonObj.pattern || !jsonObj.pattern.trim() || typeof jsonObj.pattern !== 'string'){
+        regexPatternErrorsToDisplay.value.push([{
+          field: 'regex_pattern',
+          message: `Regex pattern - ${index}: is required`
+        }]);
         return false;
       }
-      if (
-        !jsonObj.pattern ||
-        !jsonObj.pattern.trim() ||
-        typeof jsonObj.pattern !== "string"
-      ) {
-        regexPatternErrorsToDisplay.value.push([
-          {
-            field: "regex_pattern",
-            message: `Regex pattern - ${index}: is required`,
-          },
-        ]);
-        return false;
-      }
-      if (
-        typeof jsonObj.description !== "string" &&
-        jsonObj.description !== null &&
-        jsonObj.description !== undefined
-      ) {
-        regexPatternErrorsToDisplay.value.push([
-          `Regex pattern - ${index}: description must be a string or should be empty`,
-        ]);
+      if(typeof jsonObj.description !== 'string' && jsonObj.description !== null && jsonObj.description !== undefined){
+        regexPatternErrorsToDisplay.value.push([`Regex pattern - ${index}: description must be a string or should be empty`]);
         return false;
       }
       return true;
@@ -624,26 +624,23 @@ export default defineComponent({
 
     const createRegexPattern = async (jsonObj: any, index: number) => {
       try {
-        const payload = {
-          name: jsonObj.name,
-          pattern: jsonObj.pattern,
-          description: jsonObj.description,
-        };
-        await regexPatternsService.create(
-          store.state.selectedOrganization.identifier,
-          payload,
-        );
-        regexPatternCreators.value.push({
-          success: true,
-          message: `Regex pattern - ${index}: "${jsonObj.name}" created successfully \nNote: please remove the created regex pattern object ${jsonObj.name} from the json file`,
-        });
-        return true;
+          const payload = {
+              name: jsonObj.name,
+              pattern: jsonObj.pattern,
+              description: jsonObj.description,
+          }
+          await regexPatternsService.create(store.state.selectedOrganization.identifier, payload);
+          regexPatternCreators.value.push({
+              success: true,
+              message: `Regex pattern - ${index}: "${jsonObj.name}" created successfully \nNote: please remove the created regex pattern object ${jsonObj.name} from the json file`,
+          });
+          return true;
       } catch (error: any) {
-        regexPatternCreators.value.push({
-          success: false,
-          message: `Regex pattern - ${index}: "${jsonObj.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
-        });
-        return false;
+          regexPatternCreators.value.push({
+              success: false,
+              message: `Regex pattern - ${index}: "${jsonObj.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
+          });
+          return false;
       }
     };
 
@@ -659,6 +656,27 @@ export default defineComponent({
 
     const onSubmit = (e: any) => {
       e.preventDefault();
+    };
+
+    const handleBuiltInPatternsImport = async (patternsToImport: any[]) => {
+      // Set the patterns to the existing import flow
+      jsonArrayOfObj.value = patternsToImport;
+      jsonStr.value = JSON.stringify(patternsToImport, null, 2);
+
+      // Call the existing import function
+      await importJson();
+    };
+
+    const handleImportClick = async () => {
+      if (activeTab.value === 'import_built_in_patterns') {
+        // For built-in patterns tab, trigger import from the child component
+        if (builtInPatternsTabRef.value) {
+          builtInPatternsTabRef.value.importSelectedPatterns();
+        }
+      } else {
+        // For other tabs (file/url), use the existing import function
+        await importJson();
+      }
     };
 
     return {
@@ -688,6 +706,9 @@ export default defineComponent({
       processJsonObject,
       validateRegexPatternInputs,
       createRegexPattern,
+      handleBuiltInPatternsImport,
+      handleImportClick,
+      builtInPatternsTabRef,
     };
   },
   components: {
@@ -695,13 +716,34 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     AppTabs,
+    BuiltInPatternsTab: defineAsyncComponent(
+      () => import("@/components/settings/BuiltInPatternsTab.vue"),
+    ),
   },
 });
 </script>
 
 <style scoped lang="scss">
+.empty-query .monaco-editor-background {
+  background-image: url("../../assets/images/common/query-editor.png");
+  background-repeat: no-repeat;
+  background-size: 115px;
+}
+
+.empty-function .monaco-editor-background {
+  background-image: url("../../assets/images/common/vrl-function.png");
+  background-repeat: no-repeat;
+  background-size: 170px;
+}
 .editor-container {
   height: calc(70vh - 20px) !important;
+}
+.editor-container-built-in {
+  width: 100%;
+  height: calc(100vh - 128px); /* Account for header, tabs, and padding */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .editor-container-url {
   .monaco-editor {

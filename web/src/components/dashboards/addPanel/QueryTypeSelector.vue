@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onUpdateButton('auto', $event)"
           :style="{
             backgroundColor:
-            store.state.theme == 'dark' ? '#bfbebef5' : '#f0eaea',
+            store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
           }"
         >
           {{ t("panel.auto") }}
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="button"
           :style="{
             backgroundColor:
-            store.state.theme == 'dark' ? '#bfbebef5' : '#f0eaea',
+            store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
           }"
           :class="selectedButtonType === 'promql' ? 'selected' : ''"
           v-show="
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="selectedButtonType === 'custom-sql' ? 'selected' : ''"
           :style="{
             backgroundColor:
-            store.state.theme == 'dark' ? '#bfbebef5' : '#f0eaea',
+            store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
           }"
           class="button button-right"
           @click="onUpdateButton('custom-sql', $event)"

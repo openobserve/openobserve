@@ -328,54 +328,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-if="dashboardPanelData.data.type == 'html'"
-          class="col column"
-          style="width: 100%; height: 100%; flex: 1"
+          class="col column tw-mr-[0.625rem]"
+          style="height: calc(100vh - 106px); flex: 1"
         >
-          <CustomHTMLEditor
-            v-model="dashboardPanelData.data.htmlContent"
-            style="width: 100%; height: 100%"
-            class="col"
-          />
-          <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+          <div class="card-container tw-h-full tw-flex tw-flex-col">
+            <CustomHTMLEditor
+              v-model="dashboardPanelData.data.htmlContent"
+              style="flex: 1; min-height: 0"
+            />
+            <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
+          </div>
         </div>
         <div
           v-if="dashboardPanelData.data.type == 'markdown'"
-          class="col column"
-          style="width: 100%; height: 100%; flex: 1"
+          class="col column tw-mr-[0.625rem]"
+          style="height: calc(100vh - 106px); flex: 1"
         >
-          <CustomMarkdownEditor
-            v-model="dashboardPanelData.data.markdownContent"
-            style="width: 100%; height: 100%"
-            class="col"
-          />
-          <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+          <div class="card-container tw-h-full tw-flex tw-flex-col">
+            <CustomMarkdownEditor
+              v-model="dashboardPanelData.data.markdownContent"
+              style="flex: 1; min-height: 0"
+            />
+            <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
+          </div>
         </div>
         <div
           v-if="dashboardPanelData.data.type == 'custom_chart'"
-          class="col column"
-          style="height: calc(100%); overflow-y: auto"
+          class="col tw-mr-[0.625rem]"
+          style="
+            height: calc(100vh - 106px);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: row;
+            overflow-x: hidden;
+          "
         >
           <q-splitter
             v-model="dashboardPanelData.layout.splitter"
-            @update:model-value="layoutSplitterUpdated"
-            style="width: 100%; height: 100%"
+            :limits="[0, 20]"
+            :style="{
+              width: dashboardPanelData.layout.showFieldList
+                ? '100%'
+                : 'calc(100% - 50px)',
+              height: '100%',
+            }"
           >
             <template #before>
               <div
-                class="col scroll"
-                style="height: calc(100%); overflow-y: auto"
+                class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]"
               >
                 <div
-                  v-if="dashboardPanelData.layout.showFieldList"
-                  class="column"
-                  style="height: 100%"
+                  class="col scroll card-container"
+                  style="height: calc(100vh - 106px); overflow-y: auto"
                 >
-                  <div class="col-auto q-pa-sm">
-                    <span class="text-weight-bold">{{ t("panel.fields") }}</span>
-                  </div>
-                  <div class="col" style="width: 100%">
-                    <!-- <GetFields :editMode="editMode" /> -->
-                    <FieldList :editMode="editMode" />
+                  <div
+                    v-if="dashboardPanelData.layout.showFieldList"
+                    class="column"
+                    style="height: 100%"
+                  >
+                    <div class="col-auto q-pa-sm">
+                      <span class="text-weight-bold">{{
+                        t("panel.fields")
+                      }}</span>
+                    </div>
+                    <div class="col" style="width: 100%">
+                      <FieldList :editMode="editMode" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -384,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="splitter-vertical splitter-enabled"></div>
               <q-btn
                 color="primary"
-                size="12px"
+                size="sm"
                 :icon="
                   dashboardPanelData.layout.showFieldList
                     ? 'chevron_left'
@@ -393,108 +411,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 round
                 style="top: 14px; z-index: 100"
-                :style="{
-                  right: dashboardPanelData.layout.showFieldList
-                    ? '-20px'
-                    : '-0px',
-                  left: dashboardPanelData.layout.showFieldList ? '5px' : '12px',
-                }"
                 @click="collapseFieldList"
               />
             </template>
             <template #after>
-              <div class="row" style="height: calc(100%); overflow-y: auto">
-                <div class="col" style="height: 100%">
-                  <q-splitter
-                    class="query-editor-splitter"
-                    v-model="dashboardPanelData.layout.querySplitter"
-                    horizontal
-                    @update:model-value="querySplitterUpdated"
-                    reverse
-                    unit="px"
-                    :limits="
-                      !dashboardPanelData.layout.showQueryBar
-                        ? [43, 400]
-                        : [140, 400]
-                    "
-                    :disable="!dashboardPanelData.layout.showQueryBar"
-                    style="height: 100%"
+              <div
+                class="row card-container"
+                style="height: calc(100vh - 106px); overflow-y: auto"
+              >
+                <div class="col scroll" style="height: 100%">
+                  <div
+                    class="layout-panel-container tw-h-[calc(100vh-200px)] col"
                   >
-                    <template #before>
-                      <div
-                        class="layout-panel-container col"
-                        style="height: 100%"
-                      >
-                        <q-splitter
-                          class="query-editor-splitter"
-                          v-model="splitterModel"
-                          style="height: 100%"
-                          @update:model-value="layoutSplitterUpdated"
-                        >
-                          <template #before>
-                            <CustomChartEditor
-                              v-model="dashboardPanelData.data.customChartContent"
-                              style="width: 100%; height: 100%"
-                            />
-                          </template>
-                          <template #separator>
-                            <div class="splitter-vertical splitter-enabled"></div>
-                            <q-avatar
-                              color="primary"
-                              text-color="white"
-                              size="20px"
-                              icon="drag_indicator"
-                              style="top: 10px; left: 3.5px"
-                              data-test="dashboard-markdown-editor-drag-indicator"
-                            />
-                          </template>
-                          <template #after>
-                            <PanelSchemaRenderer
-                              v-if="chartData"
-                              @metadata-update="metaDataValue"
-                              :key="dashboardPanelData.data.type"
-                              :panelSchema="chartData"
-                              :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                              :variablesData="{}"
-                              :width="6"
-                              @error="handleChartApiError"
-                              @updated:data-zoom="onDataZoom"
-                              :allowAlertCreation="true"
-                              @updated:vrl-function-field-list="
-                                updateVrlFunctionFieldList
-                              "
-                              @last-triggered-at-update="
-                                handleLastTriggeredAtUpdate
-                              "
-                              @series-data-update="seriesDataUpdate"
-                              searchType="ui"
-                            />
-                          </template>
-                        </q-splitter>
-
-                        <DashboardErrorsComponent
-                          :errors="errorData"
-                          class="col-auto"
-                          style="flex-shrink: 0"
+                    <q-splitter
+                      class="query-editor-splitter"
+                      v-model="splitterModel"
+                      style="height: 100%"
+                      @update:model-value="layoutSplitterUpdated"
+                    >
+                      <template #before>
+                        <CustomChartEditor
+                          v-model="dashboardPanelData.data.customChartContent"
+                          style="width: 100%; height: 100%"
                         />
-                      </div>
-                    </template>
-                    <template #separator>
-                      <div
-                        class="splitter"
-                        :class="
-                          dashboardPanelData.layout.showQueryBar
-                            ? 'splitter-enabled'
-                            : ''
-                        "
-                      ></div>
-                    </template>
-                    <template #after>
-                      <div style="height: 100%; width: 100%" class="row column">
-                        <DashboardQueryEditor />
-                      </div>
-                    </template>
-                  </q-splitter>
+                      </template>
+                      <template #separator>
+                        <div class="splitter-vertical splitter-enabled"></div>
+                        <q-avatar
+                          color="primary"
+                          text-color="white"
+                          size="20px"
+                          icon="drag_indicator"
+                          style="top: 10px; left: 3.5px"
+                          data-test="dashboard-markdown-editor-drag-indicator"
+                        />
+                      </template>
+                      <template #after>
+                        <PanelSchemaRenderer
+                          v-if="chartData"
+                          @metadata-update="metaDataValue"
+                          :key="dashboardPanelData.data.type"
+                          :panelSchema="chartData"
+                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                          :variablesData="{}"
+                          :width="6"
+                          @error="handleChartApiError"
+                          @updated:data-zoom="onDataZoom"
+                          :allowAlertCreation="true"
+                          @updated:vrl-function-field-list="
+                            updateVrlFunctionFieldList
+                          "
+                          @last-triggered-at-update="
+                            handleLastTriggeredAtUpdate
+                          "
+                          @series-data-update="seriesDataUpdate"
+                          searchType="ui"
+                        />
+                      </template>
+                    </q-splitter>
+                  </div>
+                  <div class="col-auto" style="flex-shrink: 0">
+                    <DashboardErrorsComponent
+                      :errors="errorData"
+                      class="col-auto"
+                      style="flex-shrink: 0"
+                    />
+                  </div>
+                  <div class="row column tw-h-[calc(100vh-200px)]">
+                    <DashboardQueryEditor />
+                  </div>
                 </div>
                 <q-separator vertical />
                 <div class="col-auto">
