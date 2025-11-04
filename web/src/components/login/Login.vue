@@ -15,162 +15,164 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="max-width: 400px; margin-top: 100px" class="q-mx-auto q-pa-md">
-    <div
-      class="flex justify-center text-center"
-      v-if="
-        (config.isEnterprise == 'true' &&
-          store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
-          store.state.zoConfig.custom_logo_text != '') ||
-        (config.isEnterprise == 'true' &&
-          store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-          store.state.zoConfig.custom_logo_img != null)
-      "
-    >
-      <span
-        v-if="
-          store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
-          store.state.zoConfig?.custom_logo_text != ''
-        "
-        class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm full-width"
-        >{{ store.state.zoConfig.custom_logo_text }}</span
-      >
-      <span class="full-width flex justify-center">
-        <img
-          v-if="
-            store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-            store.state.zoConfig?.custom_logo_img != null
-          "
-          :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-          style="max-width: 150px; max-height: 31px"
-        />
-      </span>
-      <img
-        v-if="store.state.zoConfig.custom_hide_self_logo == false"
-        class="appLogo"
-        style="height: auto"
-        :style="
-          store.state.zoConfig.custom_logo_text != ''
-            ? 'width: 150px;'
-            : 'width: 250px;'
-        "
-        :src="
-          store.state.theme == 'dark'
-            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-            : getImageURL('images/common/openobserve_latest_light_2.svg')
-        "
-      />
-    </div>
-    <div class="flex justify-center q-mb-lg" v-else>
-      <img
-        class="appLogo"
-        style="height: auto"
-        :style="
-          store.state.zoConfig.custom_logo_text != ''
-            ? 'width: 150px;'
-            : 'width: 250px;'
-        "
-        :src="
-          store.state.theme == 'dark'
-            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-            : getImageURL('images/common/openobserve_latest_light_2.svg')
-        "
-      />
-    </div>
-
-    <div v-if="autoRedirectDexLogin">
-      <p>
-        Redirecting to SSO login page. If you are not redirected, please
-        <a href="#" @click="loginWithSSo" class="cursor-pointer tw-underline">click here</a>.
-      </p>
-    </div>
-
-    <div v-else>
-      <div style="font-size: 22px" class="full-width text-center q-pb-md">
-        Login
-      </div>
-
-      <div v-if="showSSO" class="flex justify-center">
-        <q-btn
-          data-test="sso-login-btn"
-          class="text-bold no-border"
-          padding="sm lg"
-          color="primary"
-          no-caps
-          style="width: 400px"
-          @click="loginWithSSo"
-        >
-          <div
-            class="flex items-center justify-center full-width text-center relative"
-          >
-            <img
-              class="absolute"
-              style="width: 30px; left: 16px"
-              :src="getImageURL('images/common/sso.svg')"
-            />
-            <span class="text-center"> Login with SSO</span>
-          </div>
-        </q-btn>
-      </div>
-
-      <div v-if="showSSO && showInternalLogin" class="q-py-md text-center">
-        <a
-          class="cursor-pointer login-internal-link q-py-md"
-          style="text-decoration: underline"
-          @click="loginAsInternalUser = !loginAsInternalUser"
-          >Login as internal user</a
-        >
-      </div>
-
+  <div class="card-container tw-w-[100vw] tw-h-[100vh]">
+    <div style="max-width: 400px; padding-top: 100px" class="q-mx-auto q-pa-md">
       <div
-        v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
-        class="o2-input login-inputs"
+        class="flex justify-center text-center"
+        v-if="
+          (config.isEnterprise == 'true' &&
+            store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
+            store.state.zoConfig.custom_logo_text != '') ||
+          (config.isEnterprise == 'true' &&
+            store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+            store.state.zoConfig.custom_logo_img != null)
+        "
       >
-        <q-form ref="loginform"
-class="q-gutter-md" @submit.prevent="">
-          <q-input
-            v-model="name"
-            data-cy="login-user-id"
-            data-test="login-user-id"
-            outlined
-            :label="`${t('login.userEmail')} *`"
-            placeholder="Email"
-            class="showLabelOnTop no-case"
-            type="email"
-            dense
-            stack-label
-            filled
+        <span
+          v-if="
+            store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
+            store.state.zoConfig?.custom_logo_text != ''
+          "
+          class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm full-width"
+          >{{ store.state.zoConfig.custom_logo_text }}</span
+        >
+        <span class="full-width flex justify-center">
+          <img
+            v-if="
+              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+              store.state.zoConfig?.custom_logo_img != null
+            "
+            :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
+            style="max-width: 150px; max-height: 31px"
           />
+        </span>
+        <img
+          v-if="store.state.zoConfig.custom_hide_self_logo == false"
+          class="appLogo"
+          style="height: auto"
+          :style="
+            store.state.zoConfig.custom_logo_text != ''
+              ? 'width: 150px;'
+              : 'width: 250px;'
+          "
+          :src="
+            store.state.theme == 'dark'
+              ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+              : getImageURL('images/common/openobserve_latest_light_2.svg')
+          "
+        />
+      </div>
+      <div class="flex justify-center q-mb-lg" v-else>
+        <img
+          class="appLogo"
+          style="height: auto"
+          :style="
+            store.state.zoConfig.custom_logo_text != ''
+              ? 'width: 150px;'
+              : 'width: 250px;'
+          "
+          :src="
+            store.state.theme == 'dark'
+              ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+              : getImageURL('images/common/openobserve_latest_light_2.svg')
+          "
+        />
+      </div>
 
-          <q-input
-            v-model="password"
-            data-cy="login-password"
-            data-test="login-password"
-            outlined
-            :label="`${t('login.password')} *`"
-            placeholder="Password"
-            class="showLabelOnTop no-case"
-            type="password"
-            dense
-            stack-label
-            filled
-          />
+      <div v-if="autoRedirectDexLogin">
+        <p>
+          Redirecting to SSO login page. If you are not redirected, please
+          <a href="#" @click="loginWithSSo" class="cursor-pointer tw-underline">click here</a>.
+        </p>
+      </div>
 
-          <div class="q-mt-lg q-mb-xl">
-            <q-btn
-              data-cy="login-sign-in"
-              unelevated
-              class="full-width text-bold no-border"
-              color="primary"
-              type="submit"
-              padding="sm lg"
-              :label="t('login.login')"
-              :loading="submitting"
-              no-caps
-              @click="onSignIn()"
+      <div v-else>
+        <div style="font-size: 22px" class="full-width text-center q-pb-md">
+          Login
+        </div>
+
+        <div v-if="showSSO" class="flex justify-center">
+          <q-btn
+            data-test="sso-login-btn"
+            class="text-bold no-border"
+            padding="sm lg"
+            color="primary"
+            no-caps
+            style="width: 400px"
+            @click="loginWithSSo"
+          >
+            <div
+              class="flex items-center justify-center full-width text-center relative"
+            >
+              <img
+                class="absolute"
+                style="width: 30px; left: 16px"
+                :src="getImageURL('images/common/sso.svg')"
+              />
+              <span class="text-center"> Login with SSO</span>
+            </div>
+          </q-btn>
+        </div>
+
+        <div v-if="showSSO && showInternalLogin" class="q-py-md text-center">
+          <a
+            class="cursor-pointer login-internal-link q-py-md"
+            style="text-decoration: underline"
+            @click="loginAsInternalUser = !loginAsInternalUser"
+            >Login as internal user</a
+          >
+        </div>
+
+        <div
+          v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
+          class="o2-input login-inputs"
+        >
+          <q-form ref="loginform"
+  class="q-gutter-md" @submit.prevent="">
+            <q-input
+              v-model="name"
+              data-cy="login-user-id"
+              data-test="login-user-id"
+              outlined
+              :label="`${t('login.userEmail')} *`"
+              placeholder="Email"
+              class="showLabelOnTop no-case"
+              type="email"
+              dense
+              stack-label
+              filled
             />
-          </div>
-        </q-form>
+
+            <q-input
+              v-model="password"
+              data-cy="login-password"
+              data-test="login-password"
+              outlined
+              :label="`${t('login.password')} *`"
+              placeholder="Password"
+              class="showLabelOnTop no-case"
+              type="password"
+              dense
+              stack-label
+              filled
+            />
+
+            <div class="q-mt-lg q-mb-xl">
+              <q-btn
+                data-cy="login-sign-in"
+                unelevated
+                class="full-width text-bold no-border"
+                color="primary"
+                type="submit"
+                padding="sm lg"
+                :label="t('login.login')"
+                :loading="submitting"
+                no-caps
+                @click="onSignIn()"
+              />
+            </div>
+          </q-form>
+        </div>
       </div>
     </div>
   </div>
@@ -222,6 +224,7 @@ export default defineComponent({
     const loginAsInternalUser = ref(false);
 
     onBeforeMount(() => {
+
       if (
         config.isCloud == "true" &&
         router.currentRoute.value.path != "/cb"
@@ -229,6 +232,7 @@ export default defineComponent({
         autoRedirectDexLogin.value = true;
         loginWithSSo();
       }
+      loginAsInternalUser.value = true;
       if (router.currentRoute.value.query.login_as_internal_user === "true") {
         loginAsInternalUser.value = true;
       }
