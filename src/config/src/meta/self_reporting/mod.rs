@@ -57,7 +57,7 @@ impl fmt::Display for EnqueueError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             EnqueueError::Timeout => write!(f, "Enqueue operation timed out"),
-            EnqueueError::SendFailed(e) => write!(f, "Channel send failed: {}", e),
+            EnqueueError::SendFailed(e) => write!(f, "Channel send failed: {e}"),
         }
     }
 }
