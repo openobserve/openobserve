@@ -71,30 +71,46 @@ async function exploreStreamAndNavigateToPipeline(page, streamName) {
   await page.locator('[data-test="menu-link-\\/streams-item"]').click();
   await page.waitForTimeout(1000);
   await page.locator('[data-test="log-stream-refresh-stats-btn"]').click();
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(2000);
   await page.getByPlaceholder('Search Stream').click();
   await page.getByPlaceholder('Search Stream').fill(streamName);
   await page.waitForTimeout(1000);
   await page.getByRole('button', { name: 'Explore' }).first().click();
-  await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
+
+  // Wait for logs page to load and query to complete
+  await page.waitForTimeout(2000);
+  await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+  // Wait for the log table to have data
+  await page.waitForSelector('[data-test="log-table-column-1-_timestamp"]', { state: 'visible', timeout: 30000 });
+  const expandButton = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
+  await expandButton.waitFor({ state: 'visible', timeout: 15000 });
+  await expandButton.click();
+
   await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
 }
 
 async function exploreStreamAndInteractWithLogDetails(page, streamName) {
   await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+  await page.waitForTimeout(1000);
   await page.getByPlaceholder('Search Stream').click();
   await page.getByPlaceholder('Search Stream').fill(streamName);
   await page.waitForTimeout(1000);
   await page.getByRole('button', { name: 'Explore' }).first().click();
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(2000);
   await page.getByRole('button', { name: 'Run query' }).waitFor();
   await toggleQuickModeIfOn(page);
+
   await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
     force: true,
-  }); 
-  await page.waitForTimeout(1000);
-  await page.waitForSelector('[data-test="log-table-column-1-_timestamp"]');
-  await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
+  });
+  await page.waitForTimeout(2000);
+  await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+  await page.waitForSelector('[data-test="log-table-column-1-_timestamp"]', { state: 'visible', timeout: 30000 });
+  const expandButton = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
+  await expandButton.waitFor({ state: 'visible', timeout: 15000 });
+  await expandButton.click();
   const expandDetailElement = page.locator('[data-test="log-expand-detail-key-a"]');
   await expandDetailElement.waitFor({ state: 'visible' });
   await expandDetailElement.click();
