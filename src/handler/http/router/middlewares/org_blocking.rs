@@ -5,9 +5,8 @@ use actix_web::{
 };
 #[cfg(feature = "cloud")]
 use {
-    config::get_config,
     crate::service::ingestion::check_ingestion_allowed, actix_web::error::ErrorTooManyRequests,
-    config::meta::stream::StreamType,
+    config::get_config, config::meta::stream::StreamType,
 };
 
 pub async fn blocked_orgs_middleware(
