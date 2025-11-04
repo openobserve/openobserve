@@ -16,35 +16,6 @@ on:
       - "**.yml"
       - "**.yaml"
   workflow_dispatch:
-    inputs:
-      run_on_environment:
-        description: 'Run tests on deployed environment'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'false'
-          - 'true'
-      environment_url:
-        description: 'Environment URL (e.g., https://test.internal.zinclabs.dev)'
-        required: false
-        default: 'https://test.internal.zinclabs.dev'
-        type: string
-      environment_email:
-        description: 'Environment user email'
-        required: false
-        default: 'automation@tester.ai'
-        type: string
-      environment_password:
-        description: 'Environment user password'
-        required: false
-        default: '12345678'
-        type: string
-      environment_org:
-        description: 'Environment organization name'
-        required: false
-        default: 'default'
-        type: string
 
 env:
   COLUMNS: 150
@@ -68,10 +39,9 @@ env:
 
 jobs:
   # Build binary - ONLY runs for localhost mode
-  # Runs on: push/PR (always) OR manual trigger with run_on_environment=false
   build_binary:
     name: build_binary
-    if: github.event_name != 'workflow_dispatch' || inputs.run_on_environment != 'true'
+    if: vars.TEST_ENVIRONMENT == 'localhost' || vars.TEST_ENVIRONMENT == ''
     runs-on:
       labels: repo-openobserve-standard-16
 
@@ -122,10 +92,10 @@ jobs:
           path: target/x86_64-unknown-linux-gnu/release/openobserve
           retention-days: 1
 
-  # Cleanup - ONLY runs for environment mode (manual trigger only)
+  # Cleanup - ONLY runs for environment mode
   test_environment_data_cleanup:
     name: Test Environment Data Cleanup
-    if: always() && github.event_name == 'workflow_dispatch' && inputs.run_on_environment == 'true'
+    if: always() && vars.TEST_ENVIRONMENT != 'localhost' && vars.TEST_ENVIRONMENT != ''
     runs-on:
       labels: repo-openobserve-standard-4
     steps:
@@ -140,13 +110,14 @@ jobs:
 
       - name: Run cleanup test
         env:
-          ZO_ROOT_USER_EMAIL: ${{ inputs.environment_email }}
-          ZO_ROOT_USER_PASSWORD: ${{ inputs.environment_password }}
-          ZO_BASE_URL: ${{ inputs.environment_url }}
-          WS_ZO_BASE_URL: ${{ inputs.environment_url }}
-          ZO_BASE_URL_SC: ${{ inputs.environment_url }}
-          ZO_BASE_URL_SC_UI: ${{ inputs.environment_url }}
-          INGESTION_URL: ${{ inputs.environment_url }}
+          ZO_ROOT_USER_EMAIL: ${{ secrets.ENV_EMAIL }}
+          ZO_ROOT_USER_PASSWORD: ${{ secrets.ENV_PASSWORD }}
+          ZO_BASE_URL: https://${{ vars.TEST_ENVIRONMENT }}.internal.zinclabs.dev
+          WS_ZO_BASE_URL: https://${{ vars.TEST_ENVIRONMENT }}.internal.zinclabs.dev
+          ZO_BASE_URL_SC: https://${{ vars.TEST_ENVIRONMENT }}.internal.zinclabs.dev
+          ZO_BASE_URL_SC_UI: https://${{ vars.TEST_ENVIRONMENT }}.internal.zinclabs.dev
+          INGESTION_URL: https://${{ vars.TEST_ENVIRONMENT }}.internal.zinclabs.dev
+          ENV_ORGNAME: ${{ secrets.ENV_ORGNAME }}
         run: |
           touch .env
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
@@ -156,7 +127,7 @@ jobs:
           echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
           echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
-          echo "ORGNAME=${{ inputs.environment_org }}" >> .env
+          echo "ORGNAME=${ENV_ORGNAME}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
           npx playwright install --with-deps chromium
@@ -174,11 +145,11 @@ jobs:
       labels: repo-openobserve-standard-8
     env:
       # Set RUN_MODE for use in steps: 'true' for environment mode, 'false' for localhost
-      RUN_MODE: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_on_environment == 'true') && 'true' || 'false' }}
-      ENV_URL: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment_url) || 'http://localhost:5080' }}
-      ENV_EMAIL: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment_email) || 'root@example.com' }}
-      ENV_PASSWORD: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment_password) || 'Complexpass#123' }}
-      ENV_ORG: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment_org) || 'default' }}
+      RUN_MODE: ${{ (vars.TEST_ENVIRONMENT != 'localhost' && vars.TEST_ENVIRONMENT != '') && 'true' || 'false' }}
+      ENV_URL: ${{ (vars.TEST_ENVIRONMENT != 'localhost' && vars.TEST_ENVIRONMENT != '' && format('https://{0}.internal.zinclabs.dev', vars.TEST_ENVIRONMENT)) || 'http://localhost:5080' }}
+      ENV_EMAIL: ${{ (vars.TEST_ENVIRONMENT != 'localhost' && vars.TEST_ENVIRONMENT != '' && secrets.ENV_EMAIL) || 'root@example.com' }}
+      ENV_PASSWORD: ${{ (vars.TEST_ENVIRONMENT != 'localhost' && vars.TEST_ENVIRONMENT != '' && secrets.ENV_PASSWORD) || 'Complexpass#123' }}
+      ENV_ORG: ${{ (vars.TEST_ENVIRONMENT != 'localhost' && vars.TEST_ENVIRONMENT != '' && secrets.ENV_ORGNAME) || 'default' }}
     strategy:
       fail-fast: false
       matrix:
