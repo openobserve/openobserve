@@ -67,12 +67,16 @@ describe("DashboardJsonEditor", () => {
           "q-card-section": { template: '<div class="q-card-section"><slot /></div>' },
           "q-card-actions": { template: '<div class="q-card-actions"><slot /></div>' },
           "q-separator": { template: '<div class="q-separator" />' },
-          "q-btn": { 
+          "q-btn": {
             template: '<button class="q-btn" @click="$emit(\'click\')" :disabled="disable || disabled"><slot>{{ label }}</slot></button>',
             props: ["label", "disable", "disabled", "loading"],
             emits: ["click"],
           },
           "q-space": { template: '<div class="q-space" />' },
+          "q-icon": {
+            template: '<i class="q-icon" :data-test="$attrs[\'data-test\']"></i>',
+            props: ["name", "size"],
+          },
         },
       },
     });
