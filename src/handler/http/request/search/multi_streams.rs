@@ -72,7 +72,7 @@ use crate::{
     description = "Executes SQL queries that can span across multiple data streams within the organization. This enables cross-stream analytics, joins, and aggregations to analyze data relationships and patterns across different log streams, metrics, or traces. The query engine automatically handles data from different streams and returns unified results.",
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(
-        content = search::MultiStreamRequest,
+        content = inline(search::MultiStreamRequest),
         description = "Search query",
         content_type = "application/json",
         example = json!({
@@ -653,7 +653,7 @@ pub async fn search_multi(
         ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
     ),
     request_body(
-        content = search::MultiSearchPartitionRequest,
+        content = inline(search::MultiSearchPartitionRequest),
         description = "Search query",
         content_type = "application/json",
         example = json!({
@@ -1024,7 +1024,7 @@ fn parse_simple_multi_stream_request(
     })
 }
 
-fn default_size() -> i64 {
+const fn default_size() -> i64 {
     10
 }
 
@@ -1040,7 +1040,7 @@ fn default_size() -> i64 {
     ),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(
-        content = search::MultiStreamRequest,
+        content = inline(search::MultiStreamRequest),
         description = "Multi-stream search query",
         content_type = "application/json",
         example = json!({
@@ -1066,55 +1066,49 @@ fn default_size() -> i64 {
 #[post("/{org_id}/_multi_search_stream")]
 pub async fn search_multi_stream(
     org_id: web::Path<String>,
+    web::Query(query): web::Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> HttpResponse {
     let cfg = get_config();
     let org_id = org_id.into_inner();
-
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {
-        tracing::info_span!(
-            "/api/{org_id}/_multi_search_stream",
-            org_id = org_id.clone()
-        )
+        tracing::info_span!("/api/{org_id}/_multi_search_stream")
     } else {
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
 
     // Log the request
     log::debug!(
         "[HTTP2_STREAM_MULTI trace_id {trace_id}] Received HTTP/2 multi-stream request for org_id: {org_id}"
     );
 
+    #[cfg(feature = "cloud")]
+    {
+        match is_org_in_free_trial_period(&org_id).await {
+            Ok(false) => {
+                return HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    format!("org {org_id} has expired its trial period"),
+                ));
+            }
+            Err(e) => {
+                return HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    e.to_string(),
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    let user_id = user_email.user_id;
     #[cfg(feature = "enterprise")]
     let body_bytes = String::from_utf8_lossy(&body).to_string();
 
-    // Get query params
-    let Ok(query) = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()) else {
-        #[cfg(feature = "enterprise")]
-        {
-            report_to_audit(
-                user_id,
-                org_id,
-                trace_id,
-                400,
-                Some("Invalid query parameters".to_string()),
-                &in_req,
-                body_bytes,
-            )
-            .await;
-        }
-        return MetaHttpResponse::bad_request("Invalid query parameters");
-    };
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let dashboard_info = get_dashboard_info_from_request(&query);
@@ -1180,25 +1174,6 @@ pub async fn search_multi_stream(
             }
         }
     };
-
-    #[cfg(feature = "cloud")]
-    {
-        match is_org_in_free_trial_period(&org_id).await {
-            Ok(false) => {
-                return HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN,
-                    format!("org {org_id} has expired its trial period"),
-                ));
-            }
-            Err(e) => {
-                return HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN,
-                    e.to_string(),
-                ));
-            }
-            _ => {}
-        }
-    }
 
     // Check permissions for all streams upfront before processing queries
     // Extract stream names from SQL queries and check permissions

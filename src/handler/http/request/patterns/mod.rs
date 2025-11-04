@@ -266,8 +266,6 @@ pub async fn extract_patterns(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_pattern_extraction_uses_search_request() {
         // This endpoint now accepts config::meta::search::Request

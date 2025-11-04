@@ -963,6 +963,7 @@ async fn write_traces(
     let writer = ingester::get_writer(0, org_id, StreamType::Traces.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
+        org_id,
         stream_name,
         data_buf,
         !cfg.common.wal_fsync_disabled,

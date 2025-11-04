@@ -122,7 +122,7 @@ struct BuiltInPatternsQuery {
     summary = "Create a new regex pattern",
     description = "Stores a new regular expression pattern for log processing and data extraction",
     request_body(
-        content = PatternCreateRequest,
+        content = inline(PatternCreateRequest),
         description = "re_pattern to add",
         content_type = "application/json",
     ),
@@ -203,7 +203,7 @@ pub async fn save(
         (
             status = 200,
             description = "Pattern info",
-            body = PatternGetResponse,
+            body = inline(PatternGetResponse),
             content_type = "application/json",
         ),
         (status = 404, description = "Pattern not found", content_type = "text/plain")
@@ -246,7 +246,7 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
         (
             status = 200,
             description = "list all patterns in the org",
-            body = PatternListResponse,
+            body = inline(PatternListResponse),
             content_type = "application/json",
         ),
     ),
@@ -355,7 +355,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("id" = String, Path, description = "id of the pattern to update", example = "12345")
     ),
     request_body(
-        content = PatternCreateRequest,
+        content = inline(PatternCreateRequest),
         description = "updated pattern data",
         content_type = "application/json",
     ),
@@ -426,7 +426,7 @@ pub async fn update(
     summary = "Test regex pattern against sample data",
     description = "Tests a regex pattern against sample input strings to validate pattern matching",
     request_body(
-        content = PatternTestRequest,
+        content = inline(PatternTestRequest),
         description = "re_pattern to test and strings to test against",
         content_type = "application/json",
     ),
@@ -434,7 +434,7 @@ pub async fn update(
         (
             status = 200,
             description = "array of strings",
-            body = PatternTestResponse,
+            body = inline(PatternTestResponse),
             content_type = "application/json",
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")

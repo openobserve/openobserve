@@ -40,7 +40,7 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = NewUserAttribution,
+        content = inline(NewUserAttribution),
         description = "New user attribution info",
         example = json!({
             "from": "Over the web",
