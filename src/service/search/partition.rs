@@ -53,6 +53,7 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
+        is_aggregate: bool,
         _is_streaming_aggregate: bool,
         _streaming_interval_micros: i64,
         add_mini_partition: bool,
@@ -75,6 +76,8 @@ impl PartitionGenerator {
                 order_by,
                 add_mini_partition,
             )
+        } else if is_aggregate {
+            vec![[start_time, end_time]]
         } else {
             self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
         }
