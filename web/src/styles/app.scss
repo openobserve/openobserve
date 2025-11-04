@@ -1510,3 +1510,19 @@ body {
 .no-data-image {
   color: var(--o2-theme-color);
 }
+
+.organization-menu-o2 .org-table {
+  .q-table__bottom .q-btn{
+    @extend .el-border-radius;
+    @extend .el-border;
+
+    margin-left: 0.625rem !important;
+    min-height: 10px !important;
+    min-width: 10px !important;
+    .q-icon{
+      font-size: 1.5rem;
+    }
+
+    color: var(--o2-text-primary);
+  }
+}
