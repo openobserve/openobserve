@@ -78,7 +78,7 @@ test.describe("Alerts Import/Export", () => {
     await download.saveAs(downloadPath);
 
     // Test invalid import
-    await pm.alertsPage.importInvalidFile('utils/td150.json');
+    await pm.alertsPage.importInvalidFile('../test-data/invalid-alert.json');
 
     // Import valid file
     await pm.alertsPage.importValidFile(downloadPath);

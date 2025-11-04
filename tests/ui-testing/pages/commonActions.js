@@ -107,8 +107,8 @@ export class CommonActions {
     }
 
     async ingestTestData(streamName) {
-        const curlCommand = `curl -u ${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]} -k ${process.env["ZO_BASE_URL"]}/api/default/${streamName}/_json -d '[{"level":"info","job":"test","log":"test message for openobserve. this data ingestion has been done using a playwright automation script."}]'`;
-        
+        const curlCommand = `curl -u ${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]} -k ${process.env["ZO_BASE_URL"]}/api/${process.env["ORGNAME"]}/${streamName}/_json -d '[{"level":"info","job":"test","log":"test message for openobserve. this data ingestion has been done using a playwright automation script."}]'`;
+
         return new Promise((resolve, reject) => {
             exec(curlCommand, (error, stdout, stderr) => {
                 if (error) {
@@ -124,8 +124,8 @@ export class CommonActions {
     }
 
     async ingestCustomTestData(streamName) {
-        const curlCommand = `curl -u ${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]} -k ${process.env["ZO_BASE_URL"]}/api/default/${streamName}/_json -d @utils/td150.json`;
-        
+        const curlCommand = `curl -u ${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]} -k ${process.env["ZO_BASE_URL"]}/api/${process.env["ORGNAME"]}/${streamName}/_json -d @utils/td150.json`;
+
         return new Promise((resolve, reject) => {
             exec(curlCommand, (error, stdout, stderr) => {
                 if (error) {

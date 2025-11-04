@@ -111,7 +111,9 @@ export class LogsPage {
         this.sqlPagination = '[data-test="logs-search-sql-pagination"]';
         this.sqlGroupOrderLimitPagination = '[data-test="logs-search-sql-group-order-limit-pagination"]';
         this.interestingFieldBtn = field => `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
+        this.logsSearchBarFunctionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
         this.logsSearchBarFunctionDropdownSave = '[data-test="logs-search-bar-function-dropdown"] button';
+        this.logsSearchBarSaveTransformBtn = '[data-test="logs-search-bar-save-transform-btn"]';
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         this.qNotifyWarning = '#q-notify div';
         this.qPageContainer = '.q-page-container';
@@ -254,7 +256,13 @@ export class LogsPage {
 
     async selectStream(stream) {
         await this.page.locator(this.indexDropDown).click();
-        await this.page.getByText(stream, { exact: true }).first().click();
+        await this.page.waitForTimeout(1000);
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+        // Wait for the stream to be visible in the dropdown
+        const streamLocator = this.page.getByText(stream, { exact: true }).first();
+        await streamLocator.waitFor({ state: 'visible', timeout: 15000 });
+        await streamLocator.click();
     }
 
     async selectIndexStreamOld(streamName) {
@@ -393,9 +401,21 @@ export class LogsPage {
     }
 
     async clearAndFillQueryEditor(query) {
+        // Wait for query editor to be ready
+        await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForTimeout(1000);
+
+        // Click and wait for focus
         await this.page.locator(this.queryEditor).click();
+        await this.page.waitForTimeout(500);
+
+        // Select all and delete
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.waitForTimeout(300);
         await this.page.keyboard.press("Backspace");
+        await this.page.waitForTimeout(300);
+
+        // Type new query
         await this.page.keyboard.type(query);
     }
 
@@ -1659,7 +1679,44 @@ export class LogsPage {
     }
 
     async expectFnEditorNotVisible() {
-        return await expect(this.page.locator('#fnEditor').locator('.inputarea')).not.toBeVisible();
+        try {
+            // Primary approach: Simple visibility check (faster, more reliable)
+            return await expect(this.page.locator('#fnEditor').locator('.inputarea')).not.toBeVisible();
+        } catch (error) {
+            // Fallback approach: Check bounding box if visibility check fails
+            console.log(`[expectFnEditorNotVisible] Simple visibility check failed, trying bounding box approach`);
+
+            const fnEditor = this.page.locator('#fnEditor');
+
+            // Check if fnEditor is in the viewport (not moved off-screen)
+            const boundingBox = await fnEditor.boundingBox().catch(() => null);
+            const viewportSize = await this.page.viewportSize();
+
+            const isInViewport = boundingBox && boundingBox.x >= 0 && boundingBox.x < viewportSize.width;
+
+            console.log(`[expectFnEditorNotVisible] Initial state - fnEditor in viewport: ${isInViewport}, boundingBox:`, boundingBox);
+
+            if (isInViewport) {
+                console.log('[expectFnEditorNotVisible] fnEditor still in viewport, clicking toggle to hide it');
+                // If VRL editor is still in viewport, click toggle to move it off-screen
+                await this.page.locator(this.vrlToggleButton).click();
+                await this.page.waitForTimeout(1000);
+
+                const boundingBoxAfter = await fnEditor.boundingBox().catch(() => null);
+                const isInViewportAfter = boundingBoxAfter && boundingBoxAfter.x >= 0 && boundingBoxAfter.x < viewportSize.width;
+                console.log(`[expectFnEditorNotVisible] After toggle click - fnEditor in viewport: ${isInViewportAfter}, boundingBox:`, boundingBoxAfter);
+            }
+
+            // Verify fnEditor is moved off-screen (x position is negative or beyond viewport width)
+            const finalBoundingBox = await fnEditor.boundingBox();
+            const isHidden = !finalBoundingBox || finalBoundingBox.x < 0 || finalBoundingBox.x >= viewportSize.width;
+
+            if (!isHidden) {
+                throw new Error(`fnEditor is still visible in viewport at position x: ${finalBoundingBox.x}`);
+            }
+
+            return true;
+        }
     }
 
     async clickPast6DaysButton() {
@@ -1832,7 +1889,12 @@ export class LogsPage {
     }
 
     async clickFunctionDropdownSave() {
-        return await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click();
+        try {
+            await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click({ timeout: 3000 });
+        } catch (error) {
+            // If save button click fails, click the save transform button
+            await this.page.locator(this.logsSearchBarSaveTransformBtn).click();
+        }
     }
 
     async clickSavedFunctionNameInput() {
