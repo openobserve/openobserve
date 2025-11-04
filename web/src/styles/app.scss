@@ -512,6 +512,10 @@ body {
   tbody .q-tr:hover {
     background: color-mix(in srgb, var(--o2-theme-color) 5%, var(--o2-theme-mode) 90%);
   }
+
+  thead tr {
+    height: 35px;
+  }
 }
 
 .q-table__card{
