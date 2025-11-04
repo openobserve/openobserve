@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] aboutPage q-pt-xs">
     <div class="card-container tw-h-[calc(100vh-50px)] tw-overflow-auto">
-      <div class="q-px-sm q-pt-sm tw-h-full">
+      <div class="q-px-sm q-py-sm tw-h-full">
         <!-- Hero Section -->
         <div class="hero-section">
           <div class="tw-flex tw-flex-col md:tw-flex-row tw-items-center tw-justify-between tw-gap-8">
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Feature Comparison Table -->
-        <div class="tw-mt-6">
+        <div class="tw-mt-6 tw-mb-[20px]" v-if="config.isCloud === 'false'">
           <FeatureComparisonTable />
         </div>
       </div>
