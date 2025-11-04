@@ -173,12 +173,12 @@ jobs:
     runs-on:
       labels: repo-openobserve-standard-8
     env:
-      # Set RUN_MODE for use in steps
-      RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.run_on_environment || 'false' }}
-      ENV_URL: ${{ inputs.environment_url || 'http://localhost:5080' }}
-      ENV_EMAIL: ${{ inputs.environment_email || 'root@example.com' }}
-      ENV_PASSWORD: ${{ inputs.environment_password || 'Complexpass#123' }}
-      ENV_ORG: ${{ inputs.environment_org || 'default' }}
+      # Set RUN_MODE for use in steps: 'true' for environment mode, 'false' for localhost
+      RUN_MODE: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_on_environment == 'true') && 'true' || 'false' }}
+      ENV_URL: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment_url) || 'http://localhost:5080' }}
+      ENV_EMAIL: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment_email) || 'root@example.com' }}
+      ENV_PASSWORD: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment_password) || 'Complexpass#123' }}
+      ENV_ORG: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment_org) || 'default' }}
     strategy:
       fail-fast: false
       matrix:
