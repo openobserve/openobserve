@@ -1158,7 +1158,6 @@ async fn selector_load_data_from_datafusion(
             if name == TIMESTAMP_COL_NAME
                 || name == VALUE_LABEL
                 || name == EXEMPLARS_LABEL
-                || name == NAME_LABEL
             {
                 None
             } else {
