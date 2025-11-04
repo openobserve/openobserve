@@ -29,7 +29,7 @@ use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
 #[cfg(feature = "enterprise")]
-use crate::handler::http::auth::validator::list_objects_for_user;
+use o2_openfga::{config::get_config as get_openfga_config, meta::mapping::OFGA_MODELS};
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -101,6 +101,12 @@ pub fn escape_like(input: impl AsRef<str>) -> String {
 }
 
 /// GetAlertHistory
+///
+/// # Security Note
+/// The `user_id` header used by the `UserEmail` extractor is set by the authentication
+/// middleware after validating the user's credentials (token/session/basic auth).
+/// See `src/handler/http/auth/validator.rs::validator()` for the middleware implementation.
+/// This prevents header forgery attacks as the header is populated server-side after authentication.
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -174,55 +180,90 @@ pub async fn get_alert_history(
     #[cfg(not(feature = "enterprise"))]
     let permitted_alert_names = alert_names;
 
+    // RBAC: Check permissions for the requested alert(s)
     #[cfg(feature = "enterprise")]
-    {
+    let permitted_alert_names = {
         let user_id = &user_email.user_id;
 
-        // If specific alert_name is requested, validate access to it
-        if let Some(ref alert_name) = query.alert_name {
-            // Check if user has permission to view this specific alert
-            match list_objects_for_user(&org_id, user_id, "GET", "alerts").await {
-                Ok(Some(permitted)) => {
-                    // User has limited access - check if this alert is in the permitted list
-                    if !permitted.contains(alert_name) {
-                        return MetaHttpResponse::forbidden(format!(
-                            "Access denied to alert '{alert_name}'"
-                        ));
+        // If RBAC is enabled, check permissions
+        if get_openfga_config().enabled {
+            let user = match crate::service::users::get_user(Some(&org_id), user_id).await {
+                Some(user) => user,
+                None => {
+                    return MetaHttpResponse::forbidden("User not found");
+                }
+            };
+
+            let role = user.role.to_string();
+
+            // If specific alert_name is requested, check access to it
+            if let Some(ref alert_name) = query.alert_name {
+                let alert_obj = format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("alerts").unwrap().key,
+                    alert_name
+                );
+
+                let has_permission = o2_openfga::authorizer::authz::is_allowed(
+                    &org_id,
+                    user_id,
+                    "GET",
+                    &alert_obj,
+                    "",
+                    &role,
+                )
+                .await;
+
+                if !has_permission {
+                    return MetaHttpResponse::forbidden(format!(
+                        "Access denied to alert '{alert_name}'"
+                    ));
+                }
+
+                alert_names
+            } else {
+                // List all history - filter by accessible alerts
+                let mut accessible_alerts = Vec::new();
+
+                for alert_name in &alert_names {
+                    let alert_obj = format!(
+                        "{}:{}",
+                        OFGA_MODELS.get("alerts").unwrap().key,
+                        alert_name
+                    );
+
+                    let has_permission = o2_openfga::authorizer::authz::is_allowed(
+                        &org_id,
+                        user_id,
+                        "GET",
+                        &alert_obj,
+                        "",
+                        &role,
+                    )
+                    .await;
+
+                    if has_permission {
+                        accessible_alerts.push(alert_name.clone());
                     }
                 }
-                Ok(None) => {
-                    // No filtering needed (root user or RBAC disabled)
+
+                // If user has no access to any alerts, return empty result
+                if accessible_alerts.is_empty() {
+                    return MetaHttpResponse::json(AlertHistoryResponse {
+                        total: 0,
+                        from,
+                        size,
+                        hits: vec![],
+                    });
                 }
-                Err(e) => {
-                    return MetaHttpResponse::forbidden(e.to_string());
-                }
+
+                accessible_alerts
             }
         } else {
-            // List all history - filter by permitted alerts
-            match list_objects_for_user(&org_id, user_id, "GET", "alerts").await {
-                Ok(Some(permitted)) => {
-                    // Filter alert_names to only include permitted ones
-                    permitted_alert_names.retain(|name| permitted.contains(name));
-
-                    // If user has no access to any alerts, return empty result
-                    if permitted_alert_names.is_empty() {
-                        return MetaHttpResponse::json(AlertHistoryResponse {
-                            total: 0,
-                            from,
-                            size,
-                            hits: vec![],
-                        });
-                    }
-                }
-                Ok(None) => {
-                    // No filtering needed (root user or RBAC disabled)
-                }
-                Err(e) => {
-                    return MetaHttpResponse::forbidden(e.to_string());
-                }
-            }
+            // RBAC disabled, allow all alerts
+            alert_names
         }
-    }
+    };
 
     // Build SQL query for the _meta organization's triggers stream
     let mut sql = format!(

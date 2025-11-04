@@ -29,7 +29,7 @@ use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
 #[cfg(feature = "enterprise")]
-use crate::handler::http::auth::validator::list_objects_for_user;
+use o2_openfga::{config::get_config as get_openfga_config, meta::mapping::OFGA_MODELS};
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -85,6 +85,12 @@ pub struct PipelineHistoryResponse {
 }
 
 /// GetPipelineHistory
+///
+/// # Security Note
+/// The `user_id` header used by the `UserEmail` extractor is set by the authentication
+/// middleware after validating the user's credentials (token/session/basic auth).
+/// See `src/handler/http/auth/validator.rs::validator()` for the middleware implementation.
+/// This prevents header forgery attacks as the header is populated server-side after authentication.
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -158,55 +164,90 @@ pub async fn get_pipeline_history(
     #[cfg(not(feature = "enterprise"))]
     let permitted_pipeline_names = pipeline_names;
 
+    // RBAC: Check permissions for the requested pipeline(s)
     #[cfg(feature = "enterprise")]
-    {
+    let permitted_pipeline_names = {
         let user_id = &user_email.user_id;
 
-        // If specific pipeline_name is requested, validate access to it
-        if let Some(ref pipeline_name) = query.pipeline_name {
-            // Check if user has permission to view this specific pipeline
-            match list_objects_for_user(&org_id, user_id, "GET", "pipelines").await {
-                Ok(Some(permitted)) => {
-                    // User has limited access - check if this pipeline is in the permitted list
-                    if !permitted.contains(pipeline_name) {
-                        return MetaHttpResponse::forbidden(format!(
-                            "Access denied to pipeline '{pipeline_name}'"
-                        ));
+        // If RBAC is enabled, check permissions
+        if get_openfga_config().enabled {
+            let user = match crate::service::users::get_user(Some(&org_id), user_id).await {
+                Some(user) => user,
+                None => {
+                    return MetaHttpResponse::forbidden("User not found");
+                }
+            };
+
+            let role = user.role.to_string();
+
+            // If specific pipeline_name is requested, check access to it
+            if let Some(ref pipeline_name) = query.pipeline_name {
+                let pipeline_obj = format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("pipelines").unwrap().key,
+                    pipeline_name
+                );
+
+                let has_permission = o2_openfga::authorizer::authz::is_allowed(
+                    &org_id,
+                    user_id,
+                    "GET",
+                    &pipeline_obj,
+                    "",
+                    &role,
+                )
+                .await;
+
+                if !has_permission {
+                    return MetaHttpResponse::forbidden(format!(
+                        "Access denied to pipeline '{pipeline_name}'"
+                    ));
+                }
+
+                pipeline_names
+            } else {
+                // List all history - filter by accessible pipelines
+                let mut accessible_pipelines = Vec::new();
+
+                for pipeline_name in &pipeline_names {
+                    let pipeline_obj = format!(
+                        "{}:{}",
+                        OFGA_MODELS.get("pipelines").unwrap().key,
+                        pipeline_name
+                    );
+
+                    let has_permission = o2_openfga::authorizer::authz::is_allowed(
+                        &org_id,
+                        user_id,
+                        "GET",
+                        &pipeline_obj,
+                        "",
+                        &role,
+                    )
+                    .await;
+
+                    if has_permission {
+                        accessible_pipelines.push(pipeline_name.clone());
                     }
                 }
-                Ok(None) => {
-                    // No filtering needed (root user or RBAC disabled)
+
+                // If user has no access to any pipelines, return empty result
+                if accessible_pipelines.is_empty() {
+                    return MetaHttpResponse::json(PipelineHistoryResponse {
+                        total: 0,
+                        from,
+                        size,
+                        hits: vec![],
+                    });
                 }
-                Err(e) => {
-                    return MetaHttpResponse::forbidden(e.to_string());
-                }
+
+                accessible_pipelines
             }
         } else {
-            // List all history - filter by permitted pipelines
-            match list_objects_for_user(&org_id, user_id, "GET", "pipelines").await {
-                Ok(Some(permitted)) => {
-                    // Filter pipeline_names to only include permitted ones
-                    permitted_pipeline_names.retain(|name| permitted.contains(name));
-
-                    // If user has no access to any pipelines, return empty result
-                    if permitted_pipeline_names.is_empty() {
-                        return MetaHttpResponse::json(PipelineHistoryResponse {
-                            total: 0,
-                            from,
-                            size,
-                            hits: vec![],
-                        });
-                    }
-                }
-                Ok(None) => {
-                    // No filtering needed (root user or RBAC disabled)
-                }
-                Err(e) => {
-                    return MetaHttpResponse::forbidden(e.to_string());
-                }
-            }
+            // RBAC disabled, allow all pipelines
+            pipeline_names
         }
-    }
+    };
 
     // Build SQL query for the _meta organization's triggers stream
     let mut sql = format!(
