@@ -188,7 +188,7 @@ describe('SettingsIndex.vue', () => {
     it('should initialize with default reactive values', () => {
       wrapper = createWrapper();
       expect(wrapper.vm.settingsTab).toBe('general');
-      expect(wrapper.vm.splitterModel).toBe(220);
+      expect(wrapper.vm.splitterModel).toBe(250);
       expect(wrapper.vm.showManagementTabs).toBe(true);
       expect(wrapper.vm.storePreviousStoreModel).toBe(250);
     });

@@ -849,9 +849,10 @@ mod meta {
         pub ignore_case: bool,
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
     pub enum Operator {
         #[serde(rename = "=")]
+        #[default]
         EqualTo,
         #[serde(rename = "!=")]
         NotEqualTo,
@@ -865,12 +866,6 @@ mod meta {
         LessThanEquals,
         Contains,
         NotContains,
-    }
-
-    impl Default for Operator {
-        fn default() -> Self {
-            Self::EqualTo
-        }
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]

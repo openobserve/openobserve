@@ -260,7 +260,7 @@ export default defineComponent({
     const router: any = useRouter();
     const settingsTab = ref("general");
     const { isMetaOrg } = useIsMetaOrg();
-    const splitterModel = ref(220);
+    const splitterModel = ref(250);
     const storePreviousStoreModel  = ref(250);
 
     const handleSettingsRouting = () => {

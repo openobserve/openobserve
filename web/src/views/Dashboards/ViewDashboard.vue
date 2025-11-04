@@ -122,7 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               @trigger="refreshData"
-              class="dashboard-icons hideOnPrintMode"
+              class="dashboard-icons hideOnPrintMode q-ml-sm"
+              style="padding-left: 0px; padding-right: 0px;"
               size="sm"
             />
             <q-btn
@@ -1307,6 +1308,7 @@ export default defineComponent({
 }
 .stickyHeader.fullscreenHeader {
   top: 0px;
+  z-index: 5100 !important;
 }
 
 .fullscreen {
@@ -1315,7 +1317,7 @@ export default defineComponent({
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
-  z-index: 99999 !important;
+  z-index: 5000 !important;
   margin: 0 !important;
   padding: 0 !important;
   background-color: var(--q-color-page-background, #ffffff) !important;

@@ -88,6 +88,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
+            label="Alert Insights"
+            @click="goToAlertInsights"
+            data-test="alert-insights-btn"
+            icon="insights"
+          />
+          <q-btn
+            class="q-ml-sm o2-secondary-button tw-h-[36px]"
+            no-caps
+            flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
@@ -654,11 +663,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 class="showLabelOnTop no-case tw-mt-[1px] q-mb-sm"
               />
-              <SelectFolderDropDown
+              <div class="q-mb-lg">
+                <SelectFolderDropDown
                   :type="'alerts'"
                   @folder-selected="updateFolderIdToBeCloned"
                   :activeFolderId="folderIdToBeCloned"
-                  />
+                />
+              </div>
               <div class="flex justify-center q-mt-sm">
                 <q-btn
                   data-test="clone-alert-cancel-btn"
@@ -1171,6 +1182,32 @@ export default defineComponent({
       getDestinations();
     });
     onActivated(() => getDestinations());
+
+    // Define filterAlertsByTab before watchers that use it
+    const filterAlertsByTab = (refreshResults: boolean = true) => {
+      if (!refreshResults) {
+        return;
+      }
+      //here we are filtering the alerts by the activeTab
+      //why allAlerts.value is used because we are not fetching the alerts again,
+      // we are just assigning the alerts to the filteredResults
+      if (activeTab.value === "scheduled") {
+        filteredResults.value = allAlerts.value.filter(
+          (alert: any) => !alert.is_real_time,
+        );
+      }
+      //we filter the alerts by the realTime tab
+      else if (activeTab.value === "realTime") {
+        filteredResults.value = allAlerts.value.filter(
+          (alert: any) => alert.is_real_time,
+        );
+      }
+      //else we will return all the alerts
+      else {
+        filteredResults.value = allAlerts.value;
+      }
+    };
+
     // onMounted(async () => {
     //   if (!store.state.organizationData.foldersByType) {
     //     await getFoldersListByType(store, "alerts");
@@ -1254,12 +1291,40 @@ export default defineComponent({
     });
     watch(
       () => router.currentRoute.value.query.action,
-      (action) => {
+      async (action) => {
         if (!action) {
           showAddAlertDialog.value = false;
           showImportAlertDialog.value = false;
+          return;
+        }
+
+        // Handle update action
+        if (action === "update" && router.currentRoute.value.query.alert_id) {
+          const alertId = router.currentRoute.value.query.alert_id as string;
+          try {
+            const alert = await getAlertById(alertId);
+            showAddUpdateFn({ row: alert });
+          } catch (error) {
+            console.error("AlertList: Failed to load alert", error);
+            $q.notify({
+              type: "negative",
+              message: "Failed to load alert for editing",
+              timeout: 2000,
+            });
+          }
+        }
+
+        // Handle add action
+        if (action === "add") {
+          showAddUpdateFn({ row: undefined });
+        }
+
+        // Handle import action
+        if (action === "import") {
+          showImportAlertDialog.value = true;
         }
       },
+      { immediate: true }, // Run immediately to handle direct navigation
     );
     const getDestinations = async () => {
       destinationService
@@ -1679,6 +1744,16 @@ export default defineComponent({
         },
       });
     };
+
+    const goToAlertInsights = () => {
+      router.push({
+        name: "alertInsights",
+        params: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     const exportAlert = async (row: any) => {
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id);
@@ -1947,25 +2022,6 @@ export default defineComponent({
       return owner;
     };
 
-    const filterAlertsByTab = (refreshResults: boolean = true) => {
-      if(!refreshResults){
-       return;
-      }
-      //here we are filtering the alerts by the activeTab
-      //why allAlerts.value is used because we are not fetching the alerts again, 
-      // we are just assigning the alerts to the filteredResults
-      if (activeTab.value === "scheduled") {
-        filteredResults.value = allAlerts.value.filter((alert: any) => !alert.is_real_time);
-      } 
-      //we filter the alerts by the realTime tab
-      else if (activeTab.value === "realTime") {
-        filteredResults.value = allAlerts.value.filter((alert: any) => alert.is_real_time);
-      }
-      //else we will return all the alerts
-      else{
-        filteredResults.value = allAlerts.value;
-      }
-    };
     //this function is used to refresh the imported alerts
     const refreshImportedAlerts = async (store: any, folderId: any) => {
       await getAlertsFn(store, folderId);
@@ -2151,6 +2207,7 @@ export default defineComponent({
       showImportAlertDialog,
       importAlert,
       goToAlertHistory,
+      goToAlertInsights,
       getTemplates,
       exportAlert,
       updateActiveFolderId,

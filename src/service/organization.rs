@@ -63,7 +63,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     let mut stream_summary = StreamSummary::default();
     let mut has_trigger_stream = false;
     for stream in streams.iter() {
-        if stream.name == usage::TRIGGERS_USAGE_STREAM {
+        if stream.name == usage::TRIGGERS_STREAM {
             has_trigger_stream = true;
         }
         if !stream.stream_type.eq(&StreamType::Index)
@@ -82,7 +82,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     } else {
         let sql = format!(
             "SELECT module, status FROM {} WHERE org = '{}' GROUP BY module, status, key",
-            usage::TRIGGERS_USAGE_STREAM,
+            usage::TRIGGERS_STREAM,
             org_id
         );
         let end_time = time::now_micros();

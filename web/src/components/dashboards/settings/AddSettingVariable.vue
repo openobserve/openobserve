@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="row items-center" style="width: 100%">
                   <div
-                    class="row no-wrap items-center q-mb-xs"
+                    class="row no-wrap items-start q-mb-xs"
                     style="width: 100%"
                     v-for="(filter, index) in variableData.query_data.filter"
                     :key="index"
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rules="[
                         (val: any) => !!val.trim() || 'Field is required!',
                       ]"
-                      style="max-width: 41%; width: 41%"
+                      style="max-width: 41%; width: 41%; flex-shrink: 0;"
                       ><q-tooltip v-if="filter.name">
                         {{ filter.name }}
                       </q-tooltip>
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       v-model="filter.operator"
                       :display-value="filter.operator ? filter.operator : ''"
-                      style="width: 18%"
+                      style="width: 18%; flex-shrink: 0;"
                       class="operator"
                       data-test="dashboard-query-values-filter-operator-selector"
                       :rules="[
@@ -270,13 +270,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         margin-top: none !important;
                         width: 41% !important;
                         padding-bottom: 0px !important;
+                        flex-shrink: 0;
                       "
                       placeholder="Enter Value"
                     ></CommonAutoComplete>
                     <q-btn
                       size="sm"
                       padding="12px 5px"
-                      style="margin-bottom: 20px"
+                      style="margin-bottom: 20px; flex-shrink: 0;"
                       flat
                       dense
                       @click="removeFilter(index)"
@@ -404,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 icon="add"
                 no-outline
-                class="q-mt-md"
+                class="q-mt-md el-border"
                 @click="addField()"
                 >Add Option</q-btn
               >
@@ -528,7 +529,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   no-caps
                   icon="add"
                   no-outline
-                  class="q-mt-md"
+                  class="q-mt-md el-border"
                   @click="addCustomValue"
                   data-test="dashboard-add-custom-value-btn"
                 >
