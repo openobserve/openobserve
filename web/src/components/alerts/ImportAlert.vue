@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  style="width: calc(30%); position: relative; top:10px;"
+                  style="width: calc(30%);position: relative; bottom: 21px;"
                   data-test="alert-folder-dropdown"
                 >
                   <SelectFolderDropDown
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-slot:hint> .json files only </template>
                   </q-file>
                 </div>
-                <div style="width: calc(30%); position: relative;">
+                <div style="width: calc(30%); position: relative; bottom: 21px;">
                   <SelectFolderDropDown
                     :type="'alerts'"
                     @folder-selected="updateActiveFolderId"
@@ -1464,7 +1464,7 @@ export default defineComponent({
 
 .editor-container-json {
   .monaco-editor {
-    height: calc(100vh - 314px) !important; /* Total editor height */
+    height: calc(100vh - 308px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
     padding-top: 12px;

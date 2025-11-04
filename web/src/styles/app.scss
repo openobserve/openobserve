@@ -1417,14 +1417,14 @@ body {
   
 
 .o2-custom-select-dashboard{
-  min-height: 2.5rem !important;
+  min-height: 2.7rem !important;
 
   .q-field__control {
     @extend .el-border;
     @extend .el-border-radius;
-    min-height: 2.5rem !important;
-    max-height: 2.5rem !important;
-    height: 2.5rem !important;
+    min-height: 2.7rem !important;
+    max-height: 2.7rem !important;
+    height: 2.7rem !important;
   }
 
   .q-field__native, .q-field__input {
@@ -1433,7 +1433,7 @@ body {
 
   .q-field__append {
     align-items: center;
-    height: 2.5rem !important;
+    height: 2.7rem !important;
   }
 
 }

@@ -52,8 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
-        <div class="q-pa-md card-container tw-h-full">
-          <div class="col-12 q-pb-sm q-pt-sm o2-input">
+        <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <div class="q-pa-md tw-flex-1 tw-overflow-auto">
+            <div class="col-12 q-pb-sm q-pt-sm o2-input">
             <q-input
               data-test="add-template-name-input"
               v-model="formData.name"
@@ -123,9 +124,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:query="formData.body"
               />
             </template>
+            </div>
           </div>
           <div
-            class="flex justify-end q-px-lg q-py-lg full-width tw-absolute tw-bottom-0"
+            class="flex justify-end q-px-lg q-py-lg full-width tw-bg-[var(--q-card-background)]"
           >
             <q-btn
               v-close-popup

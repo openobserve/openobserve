@@ -100,6 +100,21 @@ struct PatternTestResponse {
     results: Vec<String>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+struct BuiltInPatternsResponse {
+    pub patterns: Vec<crate::service::github::adapters::BuiltInPatternResponse>,
+    pub last_updated: i64,
+    pub source_url: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+struct BuiltInPatternsQuery {
+    #[serde(default)]
+    search: String,
+    #[serde(default)]
+    tags: Vec<String>,
+}
+
 /// Store a re_pattern in db
 #[utoipa::path(
     post,
@@ -460,4 +475,67 @@ pub async fn test(web::Json(req): web::Json<PatternTestRequest>) -> Result<HttpR
         drop(req);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
+}
+
+/// Get built-in patterns from GitHub (pyWhat)
+#[utoipa::path(
+    get,
+    context_path = "/api",
+    summary = "Get built-in regex patterns from GitHub",
+    description = "Fetches curated regex patterns from the pyWhat project on GitHub. Supports search and tag filtering. Uses frontend caching only.",
+    params(
+        ("search" = Option<String>, Query, description = "Search query to filter patterns by name, description, or tags"),
+        ("tags" = Option<Vec<String>>, Query, description = "Filter patterns by specific tags")
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Built-in patterns list",
+            body = BuiltInPatternsResponse,
+            content_type = "application/json",
+        ),
+        (status = 500, description = "Failed to fetch patterns", content_type = "application/json")
+    ),
+    tag = "RePattern"
+)]
+#[get("/{org_id}/re_patterns/built-in")]
+pub async fn get_built_in_patterns(
+    _org_id: web::Path<String>,
+    query: web::Query<BuiltInPatternsQuery>,
+) -> Result<HttpResponse, Error> {
+    use crate::service::github::{GitHubDataService, adapters::PyWhatAdapter};
+
+    // Create GitHub service
+    let github_service = GitHubDataService::new();
+
+    // Fetch patterns without backend caching
+    let mut patterns = match PyWhatAdapter::fetch_built_in_patterns(&github_service).await {
+        Ok(patterns) => patterns,
+        Err(e) => {
+            log::error!("Failed to fetch built-in patterns: {}", e);
+            return Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to fetch built-in patterns",
+                "message": e.to_string()
+            })));
+        }
+    };
+
+    // Apply search filter
+    if !query.search.is_empty() {
+        patterns = PyWhatAdapter::filter_by_search(patterns, &query.search);
+    }
+
+    // Apply tag filter
+    if !query.tags.is_empty() {
+        patterns = PyWhatAdapter::filter_by_tags(patterns, &query.tags);
+    }
+
+    let config = config::get_config();
+    let response = BuiltInPatternsResponse {
+        patterns,
+        last_updated: chrono::Utc::now().timestamp(),
+        source_url: config.common.regex_patterns_source_url.clone(),
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }
