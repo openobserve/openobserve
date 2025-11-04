@@ -16,8 +16,8 @@ pub async fn blocked_orgs_middleware(
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
     #[cfg(not(feature = "cloud"))]
     {
-        let mut res = next.call(req).await?;
-        return Ok(res);
+        let res = next.call(req).await?;
+        Ok(res)
     }
 
     #[cfg(feature = "cloud")]
