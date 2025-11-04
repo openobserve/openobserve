@@ -203,15 +203,16 @@ impl Sql {
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
             let has_original_column = has_original_column(&column_visitor.columns);
-            used_schemas = generate_select_star_schema(
-                total_schemas,
-                &columns,
+            used_schemas = generate_select_star_schema(schema::SelectStarSchemaParams {
+                schemas: total_schemas,
+                columns: &columns,
                 has_original_column,
-                query.quick_mode || cfg.limit.quick_mode_force_enabled,
-                cfg.limit.quick_mode_num_fields,
-                &search_event_type,
-                match_visitor.has_match_all,
-            );
+                quick_mode: query.quick_mode || cfg.limit.quick_mode_force_enabled,
+                quick_mode_num_fields: cfg.limit.quick_mode_num_fields,
+                search_event_type: &search_event_type,
+                need_fst_fields: match_visitor.has_match_all,
+                stream_type,
+            });
         } else {
             for (stream, schema) in total_schemas.iter() {
                 let columns = columns.get(stream).cloned().unwrap_or(Default::default());

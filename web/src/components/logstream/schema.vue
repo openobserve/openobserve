@@ -385,6 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-table
                   ref="qTable"
+                  :key="tableRefreshKey"
                   data-test="schema-log-stream-field-mapping-table"
                   :rows="indexData.schema"
                   :columns="columns"
@@ -1102,6 +1103,7 @@ export default defineComponent({
     const selectedDateFields = ref([]);
     const IsdeleteBtnVisible = ref(false);
     const redBtnRows = ref([]);
+    const tableRefreshKey = ref(0); // Force table re-render after deletions
 
     const patternIdToApplyAtMap = new Map();
 
@@ -1239,6 +1241,7 @@ export default defineComponent({
         .deleteFields(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
+          indexData.value.stream_type,
           selectedFields.value.map((field) => field.name),
         )
         .then(async (res) => {
@@ -1251,13 +1254,37 @@ export default defineComponent({
             });
             confirmQueryModeChangeDialog.value = false;
             selectedFields.value = [];
-            await getStream(
+
+            // Force refresh the stream data from the backend
+            // The force flag ensures we get fresh data and not cached
+            let freshStreamData = await getStream(
               indexData.value.name,
               indexData.value.stream_type,
               true,
-              true,
+              true,  // force refresh
             );
-            getSchema();
+
+            // Update the schema with fresh data
+            if (freshStreamData) {
+              freshStreamData = updateStreamResponse(freshStreamData);
+              setSchema(freshStreamData);
+
+              // Update the result total for the UI
+              if (activeTab.value === "schemaFields") {
+                resultTotal.value = freshStreamData.settings?.defined_schema_fields?.length || 0;
+              } else {
+                resultTotal.value = freshStreamData.schema?.length || 0;
+              }
+
+              // Force the q-table to re-render by incrementing the key
+              // This ensures the table shows the updated defined_schema_fields
+              tableRefreshKey.value++;
+
+              // Reset pagination to first page in case we're on a page that no longer exists
+              if (qTable.value) {
+                qTable.value.setPagination({ page: 1, rowsPerPage: pagination.value.rowsPerPage });
+              }
+            }
           } else {
             q.notify({
               color: "negative",
@@ -1341,16 +1368,18 @@ export default defineComponent({
       previousSchemaVersion.pattern_associations && previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
         patternIdToApplyAtMap.set(pattern.field + pattern.pattern_id, pattern);
       });
-      if (!streamResponse.schema?.length) {
+      // When UDS is enabled, we need to handle the schema differently
+      // The backend returns all fields in schema, but only defined_schema_fields are indexed
+      if (!streamResponse.schema?.length && streamResponse.settings.defined_schema_fields?.length) {
+        // Only create schema from defined_schema_fields if schema is completely empty
         streamResponse.schema = [];
-        if (streamResponse.settings.defined_schema_fields?.length)
-          streamResponse.settings.defined_schema_fields.forEach((field) => {
-            streamResponse.schema.push({
-              name: field,
-              delete: false,
-              index_type: [],
-            });
+        streamResponse.settings.defined_schema_fields.forEach((field) => {
+          streamResponse.schema.push({
+            name: field,
+            delete: false,
+            index_type: [],
           });
+        });
       }
       if (Array.isArray(streamResponse.settings.extended_retention_days)) {
         redBtnRows.value = [];
@@ -2264,6 +2293,7 @@ export default defineComponent({
       columns,
       addSchemaField,
       removeSchemaField,
+      tableRefreshKey,
       newSchemaFields,
       scrollToAddFields,
       tabs,

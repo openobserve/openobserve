@@ -367,13 +367,8 @@ pub async fn save_stream_settings(
             )));
     }
 
-    // only allow setting user defined schema for logs stream
-    if stream_type != StreamType::Logs && !settings.defined_schema_fields.is_empty() {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
-            "only logs stream can have user defined schema",
-        )));
-    }
+    // User defined schema is now supported for Logs, Traces, and Metrics
+    // Removed the logs-only restriction to enable UDS for all telemetry data types
 
     // _all field can't setting for inverted index & index field
     for key in settings.full_text_search_keys.iter() {

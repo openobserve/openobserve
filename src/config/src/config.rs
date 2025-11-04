@@ -1273,6 +1273,18 @@ pub struct Limit {
         help = "Maximum number of fields allowed in user-defined schema"
     )]
     pub user_defined_schema_max_fields: usize,
+    #[env_config(
+        name = "ZO_TRACES_MAX_FIELDS_TO_ENABLE_UDS",
+        default = 500,
+        help = "Auto-enable UDS for traces when field count exceeds this limit"
+    )]
+    pub traces_max_fields_to_enable_uds: usize,
+    #[env_config(
+        name = "ZO_METRICS_MAX_LABELS_TO_ENABLE_UDS",
+        default = 200,
+        help = "Auto-enable UDS for metrics when label count exceeds this limit"
+    )]
+    pub metrics_max_labels_to_enable_uds: usize,
     // MB, total data size of memtable in memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     pub mem_table_max_size: usize,

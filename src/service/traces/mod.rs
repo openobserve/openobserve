@@ -788,7 +788,7 @@ async fn write_traces_by_stream(
 async fn write_traces(
     org_id: &str,
     stream_name: &str,
-    json_data: Vec<(i64, json::Map<String, json::Value>)>,
+    mut json_data: Vec<(i64, json::Map<String, json::Value>)>,
 ) -> Result<RequestStats, Error> {
     let cfg = get_config();
     // get schema and stream settings
@@ -801,9 +801,53 @@ async fn write_traces(
     )
     .await;
 
+    // Check for UDS settings - these will be auto-enabled during schema evolution if needed
     let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Traces)
         .await
         .unwrap_or_default();
+
+    // Check if schema was evolved and UDS may have been enabled
+    let updated_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Traces)
+        .await
+        .unwrap_or_default();
+
+    // Check if UDS was just enabled during schema evolution
+    let uds_just_enabled = stream_settings.defined_schema_fields.is_empty()
+        && !updated_settings.defined_schema_fields.is_empty();
+
+    // Apply UDS if enabled
+    let uds_fields = if !updated_settings.defined_schema_fields.is_empty() {
+        log::info!(
+            "[TRACES UDS] Schema evolved for '{}', checking if UDS auto-enabled",
+            stream_name
+        );
+
+        if uds_just_enabled {
+            log::info!(
+                "[TRACES UDS] UDS just auto-enabled for '{}' with {} defined fields! Applying refactor retroactively",
+                stream_name,
+                updated_settings.defined_schema_fields.len()
+            );
+        }
+
+        Some(
+            updated_settings
+                .defined_schema_fields
+                .iter()
+                .cloned()
+                .collect::<HashSet<_>>(),
+        )
+    } else {
+        None
+    };
+
+    // Apply UDS filtering to each record if UDS is enabled
+    if let Some(ref fields) = uds_fields {
+        json_data = json_data
+            .into_iter()
+            .map(|(ts, record)| (ts, refactor_trace_map(record, fields)))
+            .collect();
+    }
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level =
@@ -1667,4 +1711,76 @@ mod tests {
             "Internal server error"
         );
     }
+}
+
+/// Refactor span map to separate indexed and non-indexed attributes based on UDS configuration.
+/// Similar to logs refactor_map, but preserves trace-specific fields.
+///
+/// # Arguments
+/// * `original_map` - The original span data map with all attributes
+/// * `defined_schema_fields` - Set of field names that should be indexed
+///
+/// # Returns
+/// A new map with indexed fields as columns and non-indexed fields in _attributes column
+pub fn refactor_trace_map(
+    original_map: Map<String, json::Value>,
+    defined_schema_fields: &HashSet<String>,
+) -> Map<String, json::Value> {
+    let _cfg = get_config();
+    let mut indexed_map = Map::with_capacity(defined_schema_fields.len() + 15);
+    let mut non_indexed_attrs = Vec::with_capacity(1024); // 1KB initial capacity
+
+    // Core trace fields that should always be preserved as separate columns
+    const CORE_TRACE_FIELDS: &[&str] = &[
+        TIMESTAMP_COL_NAME, // _timestamp
+        "trace_id",
+        "span_id",
+        "trace_flags",
+        "operation_name",
+        "span_kind",
+        "span_status",
+        "start_time",
+        "end_time",
+        "duration",
+        "service_name",
+        "service_namespace",
+        "service_instance_id",
+        "events",     // Keep events as JSON column
+        "span_links", // Keep links as JSON column
+    ];
+
+    let mut has_non_indexed = false;
+    non_indexed_attrs.extend_from_slice(b"{");
+
+    for (key, value) in original_map {
+        // Always keep core trace fields indexed
+        if CORE_TRACE_FIELDS.contains(&key.as_str()) || defined_schema_fields.contains(&key) {
+            indexed_map.insert(key, value);
+        } else {
+            // Add to non-indexed attributes
+            if has_non_indexed {
+                non_indexed_attrs.extend_from_slice(b",");
+            } else {
+                has_non_indexed = true;
+            }
+
+            non_indexed_attrs.extend_from_slice(b"\"");
+            non_indexed_attrs.extend_from_slice(key.as_bytes());
+            non_indexed_attrs.extend_from_slice(b"\":\"");
+            non_indexed_attrs
+                .extend_from_slice(config::utils::json::pickup_string_value(value).as_bytes());
+            non_indexed_attrs.extend_from_slice(b"\"");
+        }
+    }
+    non_indexed_attrs.extend_from_slice(b"}");
+
+    // Store non-indexed attributes in _attributes column (similar to _all for logs)
+    if has_non_indexed {
+        indexed_map.insert(
+            "_attributes".to_string(),
+            json::Value::String(String::from_utf8(non_indexed_attrs).unwrap()),
+        );
+    }
+
+    indexed_map
 }

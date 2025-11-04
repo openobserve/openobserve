@@ -398,6 +398,29 @@ pub async fn handle_otlp_request(
         }
     }
 
+    // Get stream settings for UDS processing
+    let mut stream_uds_settings: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    for stream_name in json_data_by_stream.keys() {
+        let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Metrics)
+            .await
+            .unwrap_or_default();
+
+        if !stream_settings.defined_schema_fields.is_empty() {
+            stream_uds_settings.insert(
+                stream_name.clone(),
+                Some(
+                    stream_settings
+                        .defined_schema_fields
+                        .iter()
+                        .cloned()
+                        .collect(),
+                ),
+            );
+        } else {
+            stream_uds_settings.insert(stream_name.clone(), None);
+        }
+    }
+
     for (local_metric_name, json_data) in json_data_by_stream {
         // get partition keys
         let partition_det = stream_partitioning_map.get(&local_metric_name).unwrap();
@@ -405,10 +428,28 @@ pub async fn handle_otlp_request(
         let partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
 
+        // Get UDS settings for this stream (we'll update this if UDS auto-enables)
+        let mut uds_fields_updated = false;
+
         for mut rec in json_data {
             // get json object
-            let val_map: &mut serde_json::Map<String, serde_json::Value> =
-                rec.as_object_mut().unwrap();
+            let mut val_map = rec.as_object_mut().unwrap().clone();
+
+            // Get current UDS settings (may have been updated in previous iteration)
+            let uds_fields = if uds_fields_updated {
+                stream_uds_settings
+                    .get(&local_metric_name)
+                    .and_then(|v| v.as_ref())
+            } else {
+                stream_uds_settings
+                    .get(&local_metric_name)
+                    .and_then(|v| v.as_ref())
+            };
+
+            // Apply refactor_map ONLY if UDS is already enabled (same as logs)
+            if let Some(fields) = uds_fields {
+                val_map = super::refactor_metrics_map(val_map, fields);
+            }
 
             let timestamp = val_map
                 .get(TIMESTAMP_COL_NAME)
@@ -435,39 +476,131 @@ pub async fn handle_otlp_request(
                 }
             }
             drop(schema_fields);
-            if need_schema_check
-                && check_for_schema(
+            if need_schema_check {
+                let schema_result = check_for_schema(
                     org_id,
                     &local_metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
-                    vec![val_map],
+                    vec![&val_map],
                     timestamp,
                     false, // is_derived is false for metrics
                 )
-                .await
-                .is_ok()
-            {
-                schema_evolved.insert(local_metric_name.to_owned(), true);
+                .await;
+
+                if schema_result.is_ok() {
+                    schema_evolved.insert(local_metric_name.to_owned(), true);
+
+                    // After successful schema evolution, the metric_schema_map should be updated
+                    // Log the state of the schema map
+                    if let Some(cache) = metric_schema_map.get(&local_metric_name) {
+                        let field_count = cache.schema().fields().len();
+                        if field_count == 0 {
+                            log::error!(
+                                "[METRICS UDS] CRITICAL: Schema has 0 fields after successful check_for_schema for '{}'",
+                                local_metric_name
+                            );
+                        }
+                    } else {
+                        log::error!(
+                            "[METRICS UDS] CRITICAL: Schema map entry missing after successful check_for_schema for '{}'",
+                            local_metric_name
+                        );
+                    }
+
+                    // Re-fetch UDS settings after schema evolution (UDS might have auto-enabled)
+                    let stream_settings = infra::schema::get_settings(
+                        org_id,
+                        &local_metric_name,
+                        StreamType::Metrics,
+                    )
+                    .await
+                    .unwrap_or_default();
+
+                    if !stream_settings.defined_schema_fields.is_empty() {
+                        // Apply refactor now if UDS was just enabled
+                        if !stream_uds_settings.contains_key(&local_metric_name)
+                            || stream_uds_settings
+                                .get(&local_metric_name)
+                                .and_then(|v| v.as_ref())
+                                .is_none()
+                        {
+                            log::info!(
+                                "[METRICS UDS] UDS just auto-enabled for '{}' with {} defined fields! Applying refactor retroactively",
+                                local_metric_name,
+                                stream_settings.defined_schema_fields.len()
+                            );
+                            let defined_fields: HashSet<String> = stream_settings
+                                .defined_schema_fields
+                                .iter()
+                                .cloned()
+                                .collect();
+                            val_map = super::refactor_metrics_map(val_map, &defined_fields);
+
+                            // CRITICAL: Update the schema to include _labels field
+                            if val_map.contains_key("_labels") {
+                                // Force schema update to include _labels
+                                if let Err(e) = check_for_schema(
+                                    org_id,
+                                    &local_metric_name,
+                                    StreamType::Metrics,
+                                    &mut metric_schema_map,
+                                    vec![&val_map],
+                                    timestamp,
+                                    false,
+                                )
+                                .await
+                                {
+                                    log::error!(
+                                        "[METRICS UDS] Failed to update schema with _labels: {}",
+                                        e
+                                    );
+                                } else {
+                                    log::info!(
+                                        "[METRICS UDS] Schema updated to include _labels field"
+                                    );
+                                }
+                            }
+
+                            // Update cache for future records in this batch
+                            stream_uds_settings
+                                .insert(local_metric_name.clone(), Some(defined_fields));
+                            uds_fields_updated = true;
+                        }
+                    }
+                } // Close the if schema_result.is_ok() block
             }
 
             let buf = metric_data_map
                 .entry(local_metric_name.to_owned())
                 .or_default();
-            let schema = metric_schema_map
-                .get(&local_metric_name)
-                .unwrap()
-                .schema()
-                .as_ref()
-                .clone()
-                .with_metadata(HashMap::new());
+
+            // Get the current schema from cache (should include _labels if UDS is enabled)
+            // IMPORTANT: After schema evolution, we must re-fetch the updated schema
+            let schema = match metric_schema_map.get(&local_metric_name) {
+                Some(cache) if !cache.schema().fields().is_empty() => cache
+                    .schema()
+                    .as_ref()
+                    .clone()
+                    .with_metadata(HashMap::new()),
+                _ => {
+                    // Schema is empty or missing - this should not happen after check_for_schema
+                    // But we need to handle it to prevent ArrowJsonEncodeError
+                    log::error!(
+                        "[METRICS UDS] Schema for '{}' is empty or missing after evolution! Skipping record.",
+                        local_metric_name
+                    );
+                    continue; // Skip this record to prevent crash
+                }
+            };
+
             let schema_key = schema.hash_key();
             // get hour key
             let hour_key = crate::service::ingestion::get_write_partition_key(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
-                val_map,
+                &val_map,
                 Some(&schema_key),
             );
             let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
@@ -478,7 +611,7 @@ pub async fn handle_otlp_request(
             });
             hour_buf
                 .records
-                .push(Arc::new(json::Value::Object(val_map.to_owned())));
+                .push(Arc::new(json::Value::Object(val_map.clone())));
             hour_buf.records_size += value_str.len();
 
             // real time alert
@@ -491,7 +624,7 @@ pub async fn handle_otlp_request(
                     let alert_end_time = now_micros();
                     for alert in alerts {
                         if let Ok(Some(data)) = alert
-                            .evaluate(Some(val_map), (None, alert_end_time), None)
+                            .evaluate(Some(&val_map), (None, alert_end_time), None)
                             .await
                             .map(|res| res.data)
                         {

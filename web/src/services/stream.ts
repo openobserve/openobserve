@@ -56,9 +56,14 @@ const stream = {
   schema: (org_identifier: string, stream_name: string, type: string) => {
     let url = `/api/${org_identifier}/streams/${stream_name}/schema`;
 
+    const params = new URLSearchParams();
     if (type != "") {
-      url += "?type=" + type;
+      params.append("type", type);
     }
+    // Add cache-busting timestamp to ensure fresh data after deletions
+    params.append("_t", Date.now().toString());
+
+    url += "?" + params.toString();
     return http().get(url);
   },
 
@@ -168,9 +173,14 @@ const stream = {
     );
   },
 
-  deleteFields: (org_identifier: string, stream_name: string, fields: []) => {
+  deleteFields: (
+    org_identifier: string,
+    stream_name: string,
+    stream_type: string,
+    fields: [],
+  ) => {
     return http().put(
-      `/api/${org_identifier}/streams/${stream_name}/delete_fields`,
+      `/api/${org_identifier}/streams/${stream_name}/delete_fields?type=${stream_type}`,
       {
         fields,
       },

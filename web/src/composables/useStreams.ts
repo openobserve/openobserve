@@ -286,9 +286,15 @@ const useStreams = () => {
                 streamName,
                 streamType,
               );
+              const freshStreamData = removeSchemaFields(_stream.data);
               const streamList = deepCopy(streamsCache[streamType].value || {});
-              streamList.list[streamIndex] = removeSchemaFields(_stream.data);
+              streamList.list[streamIndex] = freshStreamData;
               updateStreamsInStore(streamType, streamList);
+
+              // When force refresh is requested, return the fresh data directly
+              if (force) {
+                return resolve(freshStreamData);
+              }
             } catch (err) {
               return reject("Error while fetching schema");
             }

@@ -27,15 +27,31 @@ use infra::schema::{
     unwrap_stream_settings,
 };
 
+/// Parameters for generating SELECT * schema with various options
+pub struct SelectStarSchemaParams<'a> {
+    pub schemas: HashMap<TableReference, Arc<SchemaCache>>,
+    pub columns: &'a HashMap<TableReference, HashSet<String>>,
+    pub has_original_column: HashMap<TableReference, bool>,
+    pub quick_mode: bool,
+    pub quick_mode_num_fields: usize,
+    pub search_event_type: &'a Option<SearchEventType>,
+    pub need_fst_fields: bool,
+    pub stream_type: config::meta::stream::StreamType,
+}
+
 pub fn generate_select_star_schema(
-    schemas: HashMap<TableReference, Arc<SchemaCache>>,
-    columns: &HashMap<TableReference, HashSet<String>>,
-    has_original_column: HashMap<TableReference, bool>,
-    quick_mode: bool,
-    quick_mode_num_fields: usize,
-    search_event_type: &Option<SearchEventType>,
-    need_fst_fields: bool,
+    params: SelectStarSchemaParams,
 ) -> HashMap<TableReference, Arc<SchemaCache>> {
+    let SelectStarSchemaParams {
+        schemas,
+        columns,
+        has_original_column,
+        quick_mode,
+        quick_mode_num_fields,
+        search_event_type,
+        need_fst_fields,
+        stream_type,
+    } = params;
     let mut used_schemas = HashMap::new();
     for (name, schema) in schemas {
         let stream_settings = unwrap_stream_settings(schema.schema());
@@ -88,7 +104,7 @@ pub fn generate_select_star_schema(
         } else {
             used_schemas.insert(
                 name,
-                generate_user_defined_schema(schema.as_ref(), defined_schema_fields),
+                generate_user_defined_schema(schema.as_ref(), defined_schema_fields, stream_type),
             );
         }
     }
@@ -98,6 +114,7 @@ pub fn generate_select_star_schema(
 pub fn generate_user_defined_schema(
     schema: &SchemaCache,
     defined_schema_fields: Vec<String>,
+    stream_type: config::meta::stream::StreamType,
 ) -> Arc<SchemaCache> {
     let cfg = get_config();
     let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
@@ -110,6 +127,26 @@ pub fn generate_user_defined_schema(
     if !fields.contains(ID_COL_NAME) {
         fields.insert(ID_COL_NAME.to_string());
     }
+
+    // Add synthetic columns based on stream type
+    match stream_type {
+        config::meta::stream::StreamType::Metrics => {
+            let labels_col = "_labels";
+            if schema.field_with_name(labels_col).is_some() {
+                log::debug!("[QUERY SCHEMA] Adding _labels column for metrics stream");
+                fields.insert(labels_col.to_string());
+            }
+        }
+        config::meta::stream::StreamType::Traces => {
+            let attributes_col = "_attributes";
+            if schema.field_with_name(attributes_col).is_some() {
+                log::debug!("[QUERY SCHEMA] Adding _attributes column for traces stream");
+                fields.insert(attributes_col.to_string());
+            }
+        }
+        _ => {}
+    }
+
     let new_fields = fields
         .iter()
         .filter_map(|name| schema.field_with_name(name).cloned())

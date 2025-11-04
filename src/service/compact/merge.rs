@@ -61,7 +61,6 @@ use crate::{
     common::infra::cluster::get_node_by_uuid,
     service::{
         db, file_list,
-        schema::generate_schema_for_defined_schema_fields,
         search::{
             DATAFUSION_RUNTIME,
             datafusion::exec::{self, MergeParquetResult, TableBuilder},
@@ -785,12 +784,13 @@ pub async fn merge_files(
         };
     let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema);
-        let latest_schema = generate_schema_for_defined_schema_fields(
+        let latest_schema = infra::schema::generate_schema_for_defined_schema_fields(
             &latest_schema,
             &defined_schema_fields,
             need_original,
             index_original_data,
             index_all_values,
+            stream_type,
         );
         latest_schema.schema().as_ref().clone()
     } else {

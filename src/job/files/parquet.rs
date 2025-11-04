@@ -53,7 +53,6 @@ use crate::{
     common::infra::wal,
     service::{
         db,
-        schema::generate_schema_for_defined_schema_fields,
         search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
         tantivy::create_tantivy_index,
     },
@@ -704,12 +703,13 @@ async fn merge_files(
         };
     let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
-        let latest_schema = generate_schema_for_defined_schema_fields(
+        let latest_schema = infra::schema::generate_schema_for_defined_schema_fields(
             &latest_schema,
             &defined_schema_fields,
             need_original,
             index_original_data,
             index_all_values,
+            stream_type,
         );
         latest_schema.schema().clone()
     } else {

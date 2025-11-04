@@ -401,6 +401,29 @@ pub async fn remote_write(
         }
     }
 
+    // Get stream settings for UDS processing
+    let mut stream_uds_settings: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    for stream_name in json_data_by_stream.keys() {
+        let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Metrics)
+            .await
+            .unwrap_or_default();
+
+        if !stream_settings.defined_schema_fields.is_empty() {
+            stream_uds_settings.insert(
+                stream_name.clone(),
+                Some(
+                    stream_settings
+                        .defined_schema_fields
+                        .iter()
+                        .cloned()
+                        .collect(),
+                ),
+            );
+        } else {
+            stream_uds_settings.insert(stream_name.clone(), None);
+        }
+    }
+
     for (stream_name, json_data) in json_data_by_stream {
         // get partition keys
         let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
@@ -408,9 +431,22 @@ pub async fn remote_write(
         let partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
 
+        // Get UDS settings for this stream
+        let uds_fields_updated = false;
+
         for (mut value, timestamp) in json_data {
-            let val_map = value.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
+            let mut val_map = value.as_object_mut().unwrap().clone();
+
+            // Get current UDS fields (may have been updated in previous iteration)
+            let uds_fields = stream_uds_settings
+                .get(&stream_name)
+                .and_then(|v| v.as_ref());
+
+            // Apply refactor_map ONLY if UDS is already enabled (same as logs)
+            if let Some(fields) = uds_fields {
+                val_map = super::refactor_metrics_map(val_map, fields);
+            }
+            let hash = super::signature_without_labels(&val_map, &[VALUE_LABEL]);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             val_map.insert(
                 TIMESTAMP_COL_NAME.to_string(),
@@ -442,7 +478,7 @@ pub async fn remote_write(
                     &stream_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
-                    vec![val_map],
+                    vec![&val_map],
                     timestamp,
                     false, // is_derived is false for metrics
                 )
@@ -450,8 +486,50 @@ pub async fn remote_write(
                 .is_ok()
             {
                 schema_evolved.insert(stream_name.clone(), true);
+
+                // Re-fetch UDS settings after schema evolution (UDS might have auto-enabled)
+                if uds_fields_updated
+                    && stream_uds_settings
+                        .get(&stream_name)
+                        .and_then(|v| v.as_ref())
+                        .is_none()
+                {
+                    // Reload stream settings to get updated UDS fields
+                    if let Some(cache) = metric_schema_map.get(&stream_name) {
+                        let stream_settings = infra::schema::unwrap_stream_settings(cache.schema())
+                            .unwrap_or_default();
+                        if !stream_settings.defined_schema_fields.is_empty() {
+                            log::info!(
+                                "[METRICS UDS] UDS auto-enabled for '{}' with {} defined fields after schema evolution",
+                                stream_name,
+                                stream_settings.defined_schema_fields.len()
+                            );
+                            // Update the cached UDS settings
+                            let defined_fields: hashbrown::HashSet<String> = stream_settings
+                                .defined_schema_fields
+                                .iter()
+                                .cloned()
+                                .collect();
+                            stream_uds_settings.insert(stream_name.clone(), Some(defined_fields));
+
+                            // Apply refactor retroactively if _labels wasn't created yet
+                            if !val_map.contains_key("_labels")
+                                && let Some(fields) = stream_uds_settings
+                                    .get(&stream_name)
+                                    .and_then(|v| v.as_ref())
+                            {
+                                log::info!(
+                                    "[METRICS UDS] Applying retroactive refactor for '{}' after UDS auto-enable",
+                                    stream_name
+                                );
+                                val_map = super::refactor_metrics_map(val_map, fields);
+                            }
+                        }
+                    }
+                }
             }
 
+            // Get the current schema from cache (should include _labels if UDS is enabled)
             let schema = metric_schema_map
                 .get(&stream_name)
                 .unwrap()
@@ -466,7 +544,7 @@ pub async fn remote_write(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
-                val_map,
+                &val_map,
                 Some(&schema_key),
             );
             let buf = metric_data_map.entry(stream_name.to_owned()).or_default();
@@ -478,7 +556,7 @@ pub async fn remote_write(
             });
             hour_buf
                 .records
-                .push(Arc::new(json::Value::Object(val_map.to_owned())));
+                .push(Arc::new(json::Value::Object(val_map.clone())));
             hour_buf.records_size += value_str.len();
 
             // real time alert
@@ -491,7 +569,7 @@ pub async fn remote_write(
                     let alert_end_time = now_micros();
                     for alert in alerts {
                         if let Ok(Some(data)) = alert
-                            .evaluate(Some(val_map), (None, alert_end_time), None)
+                            .evaluate(Some(&val_map), (None, alert_end_time), None)
                             .await
                             .map(|res| res.data)
                         {
@@ -957,8 +1035,6 @@ async fn prom_ha_handler(
         if replica_label.eq(&leader.name) {
             _accept_record = true;
             leader.last_received = curr_ts;
-            // log::info!(  "Updating last received data for {} to {}",
-            // &leader.name, Utc.timestamp_nanos(last_received * 1000));
         } else if curr_ts - last_received > election_interval {
             // elect new leader as didnt receive data for last 30 secs
             log::info!(
@@ -972,11 +1048,6 @@ async fn prom_ha_handler(
             leader.last_received = curr_ts;
             _accept_record = true;
         } else {
-            // log::info!(
-            //     "Rejecting entry from {}  as leader is {}",
-            //     replica_label,
-            //     &leader.name,
-            // );
             _accept_record = false;
         }
     }

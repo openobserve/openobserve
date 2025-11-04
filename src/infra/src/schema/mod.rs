@@ -13,14 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use arc_swap::ArcSwap;
 use chrono::Utc;
 use config::{
-    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, ORIGINAL_DATA_COL_NAME, RwAHashMap,
-    RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS,
-    get_config,
+    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
+    RwAHashMap, RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS,
+    SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config,
     ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt, time::now_micros},
@@ -109,7 +112,40 @@ pub async fn get_cache(
     if db_schema.fields().is_empty() && db_schema.metadata().is_empty() {
         return Ok(SchemaCache::new(db_schema));
     }
-    let schema = SchemaCache::new(db_schema);
+
+    // Create schema cache from DB schema
+    let mut schema = SchemaCache::new(db_schema);
+
+    // Apply UDS filtering if enabled for this stream
+    // This ensures that cached schemas from DB also respect UDS settings
+    let stream_settings = get_settings(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+
+    if !stream_settings.defined_schema_fields.is_empty() {
+        // Apply the same filtering that service::schema applies
+        log::info!(
+            "[INFRA SCHEMA] Applying UDS filter to DB-loaded schema for {}/{}/{}: {} defined fields",
+            org_id,
+            stream_type,
+            stream_name,
+            stream_settings.defined_schema_fields.len()
+        );
+
+        schema = generate_schema_for_defined_schema_fields(
+            &schema,
+            &stream_settings.defined_schema_fields,
+            stream_settings.store_original_data,
+            stream_settings.index_original_data,
+            stream_settings.index_all_values,
+            stream_type,
+        );
+
+        log::info!(
+            "[INFRA SCHEMA] After UDS filtering: {} fields in schema",
+            schema.fields_map().len()
+        );
+    }
 
     // Only acquire write lock after DB read is complete
     let mut write_guard = STREAM_SCHEMAS_LATEST.write().await;
@@ -250,7 +286,7 @@ pub async fn get_settings(
     }
 
     // Get from DB without holding any locks
-    let settings = get(org_id, stream_name, stream_type)
+    let settings = get_from_db(org_id, stream_name, stream_type)
         .await
         .ok()
         .as_ref()
@@ -611,6 +647,7 @@ pub async fn delete_fields(
     deleted_fields: Vec<String>,
 ) -> Result<()> {
     let key = mk_key(org_id, stream_type, stream_name);
+    let cache_key = key.strip_prefix(SCHEMA_KEY).unwrap().to_string();
     let db = infra_db::get_db().await;
     db.get_for_update(
         &key.clone(),
@@ -665,6 +702,10 @@ pub async fn delete_fields(
         }),
     )
     .await?;
+
+    // Clear the cache for this stream so the next GET returns fresh data
+    STREAM_SCHEMAS_LATEST.write().await.remove(&cache_key);
+    STREAM_SETTINGS.write().await.remove(&cache_key);
 
     Ok(())
 }
@@ -867,6 +908,120 @@ pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
         _ => vec![DataType::Utf8],
     };
     allowed_type.contains(to)
+}
+
+// Generate filtered schema for UDS (User Defined Schema)
+// if defined_schema_fields is not empty, and schema fields greater than defined_schema_fields + 10,
+// then we will use defined_schema_fields
+pub fn generate_schema_for_defined_schema_fields(
+    schema: &SchemaCache,
+    fields: &[String],
+    need_original: bool,
+    index_original_data: bool,
+    index_all_values: bool,
+    stream_type: StreamType,
+) -> SchemaCache {
+    if fields.is_empty() || schema.fields_map().len() < fields.len() + 10 {
+        return schema.clone();
+    }
+
+    let cfg = get_config();
+    let timestamp_col = TIMESTAMP_COL_NAME.to_string();
+    let o2_id_col = ID_COL_NAME.to_string();
+    let original_col = ORIGINAL_DATA_COL_NAME.to_string();
+    let all_values_col = ALL_VALUES_COL_NAME.to_string();
+
+    // Add synthetic columns based on stream type
+    let attributes_col = "_attributes".to_string();
+    let labels_col = "_labels".to_string();
+
+    // Build an ordered list of fields to include in the schema
+    // Start with the defined fields (which are already ordered: core first, then alphabetical)
+    let mut ordered_fields: Vec<String> = Vec::new();
+    let fields_set: HashSet<String> = fields.iter().cloned().collect();
+
+    // Add fields in the order they appear in the defined_schema_fields list
+    for field in fields {
+        ordered_fields.push(field.clone());
+    }
+
+    // Add required system fields if not already present
+    if !fields_set.contains(&timestamp_col) {
+        ordered_fields.insert(0, timestamp_col.clone()); // Timestamp always first
+    }
+    if !fields_set.contains(&cfg.common.column_all) {
+        ordered_fields.push(cfg.common.column_all.clone());
+    }
+
+    // Add synthetic columns based on stream type
+    // Note: These columns might not exist in the schema yet if this is the first time
+    // UDS is being enabled, but they need to be in the schema definition for the
+    // refactor functions to work properly. We'll add them as String fields if missing.
+    match stream_type {
+        StreamType::Traces => {
+            if !fields_set.contains(&attributes_col) {
+                ordered_fields.push(attributes_col.clone());
+            }
+        }
+        StreamType::Metrics => {
+            if !fields_set.contains(&labels_col) {
+                ordered_fields.push(labels_col.clone());
+            }
+        }
+        _ => {}
+    }
+
+    if need_original || index_original_data {
+        if !fields_set.contains(&o2_id_col) {
+            ordered_fields.push(o2_id_col.clone());
+        }
+        if !fields_set.contains(&original_col) {
+            ordered_fields.push(original_col.clone());
+        }
+    }
+    if index_all_values && !fields_set.contains(&all_values_col) {
+        ordered_fields.push(all_values_col.clone());
+    }
+
+    // IMPORTANT: We need to preserve the order of fields as passed in the 'fields' parameter
+    // The fields list should already be ordered: core fields first, then alphabetical
+    // We'll build the new fields list in the same order as defined_schema_fields
+    let mut new_fields = Vec::with_capacity(ordered_fields.len());
+
+    // Add fields in the order they appear in ordered_fields
+    // This preserves the careful ordering done during UDS field selection
+    for field_name in &ordered_fields {
+        if let Some(f) = schema.fields_map().get(field_name) {
+            new_fields.push(schema.schema().fields()[*f].clone());
+        } else if field_name == &attributes_col || field_name == &labels_col {
+            // Create synthetic columns if they don't exist yet
+            // These will hold non-indexed fields as JSON strings
+            log::info!(
+                "[UDS SCHEMA] Creating synthetic column '{}' for {} (not in original schema)",
+                field_name,
+                stream_type
+            );
+            new_fields.push(Arc::new(Field::new(
+                field_name.clone(),
+                DataType::Utf8,
+                true, // nullable
+            )));
+        }
+    }
+
+    // DO NOT SORT! The order is intentional: core fields first, then alphabetical
+    // Sorting here would destroy the careful ordering
+
+    log::info!(
+        "[UDS SCHEMA] Generated filtered schema with {} fields for {}",
+        new_fields.len(),
+        stream_type
+    );
+
+    SchemaCache::new(Schema::new_with_metadata(
+        new_fields,
+        schema.schema().metadata().clone(),
+    ))
 }
 
 #[cfg(test)]

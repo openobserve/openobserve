@@ -68,3 +68,120 @@ fn get_exclude_labels() -> Vec<&'static str> {
     // vec.push(column_timestamp);
     vec
 }
+
+/// Refactor metrics map to separate indexed and non-indexed labels based on UDS configuration.
+/// Similar to logs refactor_map, but preserves metric-specific fields.
+///
+/// # Arguments
+/// * `original_map` - The original metric data map with all labels
+/// * `defined_schema_labels` - Set of label names that should be indexed
+///
+/// # Returns
+/// A new map with indexed labels as columns and non-indexed labels in _labels column
+pub fn refactor_metrics_map(
+    original_map: config::utils::json::Map<String, config::utils::json::Value>,
+    defined_schema_labels: &hashbrown::HashSet<String>,
+) -> config::utils::json::Map<String, config::utils::json::Value> {
+    use std::io::Write;
+
+    use config::utils::json;
+
+    log::debug!(
+        "[METRICS REFACTOR] Starting refactor with {} original fields and {} defined schema labels",
+        original_map.len(),
+        defined_schema_labels.len()
+    );
+
+    let mut indexed_map = json::Map::with_capacity(defined_schema_labels.len() + 10);
+    let mut non_indexed_labels = Vec::with_capacity(1024); // 1KB initial capacity
+
+    // Core metric fields that should always be preserved as separate columns
+    const CORE_METRIC_FIELDS: &[&str] = &[
+        config::TIMESTAMP_COL_NAME, // _timestamp
+        "__name__",                 // Metric name (Prometheus)
+        VALUE_LABEL,                // __value__
+        HASH_LABEL,                 // __hash__
+        EXEMPLARS_LABEL,            // __exemplars__
+        "metric_type",
+        "is_monotonic",
+        "unit",
+        "buckets",   // For histograms
+        "quantiles", // For summaries
+        "sum",
+        "count",
+        "min",
+        "max",
+        "job",                             // Prometheus job label (critical for PromQL)
+        "instance",                        // Prometheus instance label (critical for PromQL)
+        "flag",                            // Flag field
+        "host_name",                       // Host name
+        "instrumentation_library_name",    // Instrumentation library name
+        "instrumentation_library_version", // Instrumentation library version
+        "memory_type",                     // Memory type
+        "region",                          // Region
+        "service_name",                    // Service name (OTLP resource attribute)
+        "service_version",                 // Service version (OTLP resource attribute)
+        "start_time",                      // Start time for cumulative metrics
+        "_labels",                         /* The synthetic column itself must never go into
+                                            * _labels! */
+    ];
+
+    let mut has_non_indexed = false;
+    let mut non_indexed_count = 0;
+    non_indexed_labels.write_all(b"{").unwrap();
+
+    for (key, value) in original_map {
+        // Always keep core metric fields and explicitly defined fields indexed
+        if CORE_METRIC_FIELDS.contains(&key.as_str()) {
+            log::debug!("[METRICS REFACTOR] Keeping core field '{}' indexed", key);
+            indexed_map.insert(key, value);
+        } else if defined_schema_labels.contains(&key) {
+            log::debug!("[METRICS REFACTOR] Keeping defined field '{}' indexed", key);
+            indexed_map.insert(key, value);
+        } else if EXCLUDE_LABELS.contains(&key.as_str()) {
+            log::debug!(
+                "[METRICS REFACTOR] Keeping excluded field '{}' indexed",
+                key
+            );
+            indexed_map.insert(key, value);
+        } else {
+            // Add to non-indexed labels
+            non_indexed_count += 1;
+            if has_non_indexed {
+                non_indexed_labels.write_all(b",").unwrap();
+            } else {
+                has_non_indexed = true;
+            }
+
+            non_indexed_labels.write_all(b"\"").unwrap();
+            non_indexed_labels.write_all(key.as_bytes()).unwrap();
+            non_indexed_labels.write_all(b"\":\"").unwrap();
+            non_indexed_labels
+                .write_all(config::utils::json::pickup_string_value(value).as_bytes())
+                .unwrap();
+            non_indexed_labels.write_all(b"\"").unwrap();
+        }
+    }
+    non_indexed_labels.write_all(b"}").unwrap();
+
+    // Store non-indexed labels in _labels column (similar to _all for logs, _attributes for traces)
+    if has_non_indexed {
+        let labels_json = String::from_utf8(non_indexed_labels).unwrap();
+        log::debug!(
+            "[METRICS REFACTOR] Adding _labels column with {} non-indexed fields ({} bytes)",
+            non_indexed_count,
+            labels_json.len()
+        );
+        indexed_map.insert("_labels".to_string(), json::Value::String(labels_json));
+    } else {
+        log::debug!("[METRICS REFACTOR] No non-indexed labels found, _labels column not added");
+    }
+
+    log::debug!(
+        "[METRICS REFACTOR] Final map has {} fields, _labels present: {}",
+        indexed_map.len(),
+        indexed_map.contains_key("_labels")
+    );
+
+    indexed_map
+}

@@ -25,7 +25,10 @@ use config::{
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
-    meta::{promql::METADATA_LABEL, stream::StreamType},
+    meta::{
+        promql::{EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, VALUE_LABEL},
+        stream::StreamType,
+    },
     metrics,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt, time::now_micros},
 };
@@ -33,7 +36,7 @@ use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
 use infra::schema::{
     STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
-    unwrap_stream_settings,
+    generate_schema_for_defined_schema_fields, unwrap_stream_settings,
 };
 use serde_json::{Map, Value};
 
@@ -98,7 +101,26 @@ pub async fn check_for_schema(
         ));
     }
 
-    if inferred_schema.fields.len() > cfg.limit.req_cols_per_record_limit {
+    // Check if UDS auto-enable would handle the excess columns
+    let uds_auto_enable_possible = cfg.common.allow_user_defined_schemas
+        && matches!(
+            stream_type,
+            StreamType::Logs | StreamType::Traces | StreamType::Metrics
+        )
+        && {
+            let threshold = match stream_type {
+                StreamType::Logs => cfg.limit.schema_max_fields_to_enable_uds,
+                StreamType::Traces => cfg.limit.traces_max_fields_to_enable_uds,
+                StreamType::Metrics => cfg.limit.metrics_max_labels_to_enable_uds,
+                _ => 0,
+            };
+            threshold > 0 && inferred_schema.fields.len() > threshold
+        };
+
+    // Only reject if column limit exceeded AND UDS auto-enable won't help
+    if inferred_schema.fields.len() > cfg.limit.req_cols_per_record_limit
+        && !uds_auto_enable_possible
+    {
         metrics::INGEST_ERRORS
             .with_label_values(&[
                 org_id,
@@ -138,6 +160,7 @@ pub async fn check_for_schema(
                     need_original,
                     index_original_data,
                     index_all_values,
+                    stream_type,
                 );
                 stream_schema_map.insert(stream_name.to_string(), schema);
             }
@@ -344,68 +367,265 @@ pub(crate) async fn handle_diff_schema(
     let mut stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
     let mut defined_schema_fields = stream_setting.defined_schema_fields.clone();
 
+    // Helper function to split string into alphabetic and numeric parts for natural sorting
+    fn split_alphanumeric(s: &str) -> Vec<String> {
+        let mut parts = Vec::new();
+        let mut current = String::new();
+        let mut is_numeric = false;
+
+        for ch in s.chars() {
+            let ch_is_numeric = ch.is_ascii_digit();
+            if !current.is_empty() && ch_is_numeric != is_numeric {
+                parts.push(current);
+                current = String::new();
+            }
+            current.push(ch);
+            is_numeric = ch_is_numeric;
+        }
+        if !current.is_empty() {
+            parts.push(current);
+        }
+        parts
+    }
+
     // Automatically enable User-defined schema when
     // 1. allow_user_defined_schemas is enabled
-    // 2. log ingestion
+    // 2. supported stream type (Logs, Traces, or Metrics)
     // 3. user defined schema is not already enabled
-    // 4. final schema fields count exceeds schema_max_fields_to_enable_uds
-    // user-defined schema does not include _timestamp or _all columns
-    if cfg.common.allow_user_defined_schemas
-        && cfg.limit.schema_max_fields_to_enable_uds > 0
-        && stream_type == StreamType::Logs
-        && defined_schema_fields.is_empty()
-        && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds
-    {
-        let mut uds_fields = HashSet::with_capacity(cfg.limit.schema_max_fields_to_enable_uds);
+    // 4. final schema fields count exceeds the threshold for the stream type
+    // user-defined schema does not include system columns
+    let threshold = match stream_type {
+        StreamType::Logs => cfg.limit.schema_max_fields_to_enable_uds,
+        StreamType::Traces => cfg.limit.traces_max_fields_to_enable_uds,
+        StreamType::Metrics => cfg.limit.metrics_max_labels_to_enable_uds,
+        _ => 0,
+    };
 
-        // Helper to check if a field should be skipped
-        let should_skip = |field_name: &str| {
-            field_name == TIMESTAMP_COL_NAME
-                || field_name == ID_COL_NAME
-                || field_name == ORIGINAL_DATA_COL_NAME
-                || field_name == ALL_VALUES_COL_NAME
-                || field_name == cfg.common.column_all
+    log::debug!(
+        "[UDS AUTO-ENABLE] Checking for {}/{}/{}: threshold={}, current_fields={}, defined_fields_empty={}, allow_uds={}",
+        org_id,
+        stream_type,
+        stream_name,
+        threshold,
+        final_schema.fields().len(),
+        defined_schema_fields.is_empty(),
+        cfg.common.allow_user_defined_schemas
+    );
+
+    if cfg.common.allow_user_defined_schemas
+        && threshold > 0
+        && matches!(
+            stream_type,
+            StreamType::Logs | StreamType::Traces | StreamType::Metrics
+        )
+        && defined_schema_fields.is_empty()
+        && final_schema.fields().len() > threshold
+    {
+        log::info!(
+            "[UDS AUTO-ENABLE] TRIGGERING for {}/{}/{}: {} fields > {} threshold",
+            org_id,
+            stream_type,
+            stream_name,
+            final_schema.fields().len(),
+            threshold
+        );
+
+        // IMPORTANT: Use the actual column limit minus some buffer for system fields
+        // We should use as much of the column limit as possible, not just the threshold
+        let max_indexed_fields = std::cmp::min(
+            cfg.limit.req_cols_per_record_limit - 10, // Reserve 10 for system fields and _labels
+            cfg.limit.user_defined_schema_max_fields,
+        );
+
+        log::info!(
+            "[UDS AUTO-ENABLE] Will keep up to {} fields indexed (column_limit={}, max_fields={}, threshold={})",
+            max_indexed_fields,
+            cfg.limit.req_cols_per_record_limit,
+            cfg.limit.user_defined_schema_max_fields,
+            threshold
+        );
+
+        // Use Vec to preserve order: core fields first, then alphabetical
+        let mut uds_fields: Vec<String> = Vec::with_capacity(max_indexed_fields);
+        let mut uds_fields_set: HashSet<String> = HashSet::with_capacity(max_indexed_fields);
+
+        // Helper to check if a field should be skipped (system fields)
+        let should_skip = |field_name: &str| match stream_type {
+            StreamType::Logs => {
+                field_name == TIMESTAMP_COL_NAME
+                    || field_name == ID_COL_NAME
+                    || field_name == ORIGINAL_DATA_COL_NAME
+                    || field_name == ALL_VALUES_COL_NAME
+                    || field_name == cfg.common.column_all
+            }
+            StreamType::Traces => {
+                // Only skip the _attributes column itself (it's a synthetic column for non-indexed
+                // fields)
+                field_name == "_attributes"
+            }
+            StreamType::Metrics => {
+                // Only skip the _labels column itself (it's a synthetic column for non-indexed
+                // labels)
+                field_name == "_labels"
+            }
+            _ => false,
         };
 
-        // Add FTS fields first
-        for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-            if final_schema.field_with_name(field).is_ok()
-                && !should_skip(field)
-                && uds_fields.insert(field.to_string())
-                && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
-            {
+        // Stream-type specific field prioritization
+        match stream_type {
+            StreamType::Logs => {
+                // Add FTS fields first for logs
+                for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
+                    if final_schema.field_with_name(field).is_ok()
+                        && !should_skip(field)
+                        && !uds_fields_set.contains(field)
+                    {
+                        uds_fields_set.insert(field.to_string());
+                        uds_fields.push(field.to_string());
+                        if uds_fields.len() >= threshold {
+                            break;
+                        }
+                    }
+                }
+            }
+            StreamType::Traces => {
+                // FIRST: Add core trace fields that must always be indexed
+                let core_trace_fields = [
+                    TIMESTAMP_COL_NAME,
+                    "trace_id",
+                    "span_id",
+                    "operation_name",
+                    "service_name",
+                    "span_kind",
+                    "span_status",
+                    "start_time",
+                    "end_time",
+                    "duration",
+                    "events",
+                    "span_links",
+                ];
+
+                for field in core_trace_fields {
+                    if final_schema.field_with_name(field).is_ok()
+                        && !uds_fields_set.contains(field)
+                    {
+                        uds_fields_set.insert(field.to_string());
+                        uds_fields.push(field.to_string());
+                    }
+                }
+
+                // SECOND: Add service.* fields for traces (important for filtering)
+                for field in final_schema.fields() {
+                    let field_name = field.name();
+                    if (field_name.starts_with("service.") || field_name.starts_with("service_"))
+                        && !should_skip(field_name)
+                        && !uds_fields_set.contains(field_name)
+                    {
+                        uds_fields_set.insert(field_name.to_string());
+                        uds_fields.push(field_name.to_string());
+                        if uds_fields.len() >= threshold {
+                            break;
+                        }
+                    }
+                }
+            }
+            StreamType::Metrics => {
+                // FIRST: Add core metric fields that must always be indexed
+                // These match CORE_METRIC_FIELDS in src/service/metrics/mod.rs
+                // IMPORTANT: Use the actual constants, not literal strings!
+                // VALUE_LABEL = "value" (not "__value__")
+                // HASH_LABEL = "__hash__"
+                // EXEMPLARS_LABEL = "exemplars" (not "__exemplars__")
+                let core_metric_fields = [
+                    TIMESTAMP_COL_NAME,
+                    "__name__",      // Metric name (Prometheus standard)
+                    VALUE_LABEL,     // "value" - CRITICAL for metrics!
+                    HASH_LABEL,      // "__hash__"
+                    EXEMPLARS_LABEL, // "exemplars"
+                    "metric_type",
+                    "is_monotonic",
+                    "unit",
+                    "buckets",   // For histograms
+                    "quantiles", // For summaries
+                    "sum",
+                    "count",
+                    "min",
+                    "max",
+                    "job",      // Critical Prometheus labels
+                    "instance", // Critical Prometheus labels
+                ];
+
+                for field in core_metric_fields {
+                    if !uds_fields_set.contains(field) {
+                        if final_schema.field_with_name(field).is_ok() {
+                            uds_fields_set.insert(field.to_string());
+                            uds_fields.push(field.to_string());
+                        } else {
+                            // For metrics, always add critical fields even if not yet in schema
+                            // They will be added during processing (e.g., "value" is added by
+                            // process_data_point)
+                            if field == VALUE_LABEL || field == HASH_LABEL || field == "__name__" {
+                                uds_fields_set.insert(field.to_string());
+                                uds_fields.push(field.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        // Collect remaining fields that aren't in uds_fields yet
+        let mut remaining_fields: Vec<String> = Vec::new();
+        for field in final_schema.fields() {
+            let field_name = field.name();
+            if !should_skip(field_name) && !uds_fields_set.contains(field_name) {
+                remaining_fields.push(field_name.to_string());
+            }
+        }
+
+        // Sort remaining fields with natural ordering (handles numeric suffixes correctly)
+        // This ensures label_1, label_2, ..., label_10, label_11, ..., label_100
+        remaining_fields.sort_by(|a, b| {
+            // Natural sort comparison that handles numeric parts
+            let a_parts = split_alphanumeric(a);
+            let b_parts = split_alphanumeric(b);
+
+            for (a_part, b_part) in a_parts.iter().zip(b_parts.iter()) {
+                let cmp = match (a_part.parse::<i64>(), b_part.parse::<i64>()) {
+                    (Ok(a_num), Ok(b_num)) => a_num.cmp(&b_num),
+                    _ => a_part.cmp(b_part),
+                };
+                if cmp != std::cmp::Ordering::Equal {
+                    return cmp;
+                }
+            }
+            a_parts.len().cmp(&b_parts.len())
+        });
+
+        // Add remaining fields up to max_indexed_fields
+        for field in remaining_fields {
+            if uds_fields.len() >= max_indexed_fields {
                 break;
             }
-        }
-
-        // Add fields from current schema if available
-        if let Some(stream_schema) = stream_schema_map.get(stream_name) {
-            for field in stream_schema.schema().fields() {
-                let field = field.name();
-                if !should_skip(field)
-                    && uds_fields.insert(field.to_string())
-                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
-                {
-                    break;
-                }
-            }
-        }
-
-        // Add remaining fields from final schema
-        if uds_fields.len() < cfg.limit.schema_max_fields_to_enable_uds {
-            for field in final_schema.fields() {
-                let field = field.name();
-                if !should_skip(field)
-                    && uds_fields.insert(field.to_string())
-                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
-                {
-                    break;
-                }
+            if !uds_fields_set.contains(&field) {
+                uds_fields_set.insert(field.clone());
+                uds_fields.push(field);
             }
         }
 
         defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
         stream_setting.defined_schema_fields = defined_schema_fields.clone();
+
+        log::info!(
+            "[UDS AUTO-ENABLE] Selected {} fields for {}/{}/{}: first 10 = {:?}",
+            defined_schema_fields.len(),
+            org_id,
+            stream_type,
+            stream_name,
+            &defined_schema_fields.iter().take(10).collect::<Vec<_>>()
+        );
+
         final_schema.metadata.insert(
             "settings".to_string(),
             json::to_string(&stream_setting).unwrap(),
@@ -424,14 +644,40 @@ pub(crate) async fn handle_diff_schema(
         }
     }
 
-    // update node cache
-    let final_schema = SchemaCache::new(final_schema);
-    let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.insert(cache_key.clone(), final_schema.clone());
-    drop(w);
+    // Wrap schema in cache before filtering
     let need_original = stream_setting.store_original_data;
     let index_original_data = stream_setting.index_original_data;
     let index_all_values = stream_setting.index_all_values;
+
+    let full_schema_cache = SchemaCache::new(final_schema);
+
+    // Generate filtered schema for UDS if applicable
+    // This must be done BEFORE caching to ensure all caches use the filtered schema
+    let final_schema_for_cache = infra::schema::generate_schema_for_defined_schema_fields(
+        &full_schema_cache,
+        &defined_schema_fields,
+        need_original,
+        index_original_data,
+        index_all_values,
+        stream_type,
+    );
+
+    log::info!(
+        "[UDS SCHEMA CACHE] Caching schema for {}/{}/{}: full_fields={}, filtered_fields={}, UDS_enabled={}",
+        org_id,
+        stream_type,
+        stream_name,
+        full_schema_cache.fields_map().len(),
+        final_schema_for_cache.fields_map().len(),
+        !defined_schema_fields.is_empty()
+    );
+
+    // update node cache with FILTERED schema (not full schema!)
+    // This is critical: APIs query from this cache, so it must have the filtered schema
+    let mut w = STREAM_SCHEMAS_LATEST.write().await;
+    w.insert(cache_key.clone(), final_schema_for_cache.clone());
+    drop(w);
+
     if (need_original || index_original_data)
         && let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone())
     {
@@ -444,15 +690,8 @@ pub(crate) async fn handle_diff_schema(
     infra::schema::set_stream_settings_atomic(w.clone());
     drop(w);
 
-    // update thread cache
-    let final_schema = generate_schema_for_defined_schema_fields(
-        &final_schema,
-        &defined_schema_fields,
-        need_original,
-        index_original_data,
-        index_all_values,
-    );
-    stream_schema_map.insert(stream_name.to_string(), final_schema);
+    // update thread cache with the same filtered schema
+    stream_schema_map.insert(stream_name.to_string(), final_schema_for_cache);
 
     log::debug!(
         "handle_diff_schema end for [{}/{}/{}] start_dt: {}, elapsed: {} ms",
@@ -467,60 +706,6 @@ pub(crate) async fn handle_diff_schema(
         is_schema_changed: true,
         types_delta: Some(field_datatype_delta),
     }))
-}
-
-// if defined_schema_fields is not empty, and schema fields greater than defined_schema_fields + 10,
-// then we will use defined_schema_fields
-pub fn generate_schema_for_defined_schema_fields(
-    schema: &SchemaCache,
-    fields: &[String],
-    need_original: bool,
-    index_original_data: bool,
-    index_all_values: bool,
-) -> SchemaCache {
-    if fields.is_empty() || schema.fields_map().len() < fields.len() + 10 {
-        return schema.clone();
-    }
-
-    let cfg = get_config();
-    let timestamp_col = TIMESTAMP_COL_NAME.to_string();
-    let o2_id_col = ID_COL_NAME.to_string();
-    let original_col = ORIGINAL_DATA_COL_NAME.to_string();
-    let all_values_col = ALL_VALUES_COL_NAME.to_string();
-
-    let mut fields: HashSet<&String> = fields.iter().collect();
-    if !fields.contains(&timestamp_col) {
-        fields.insert(&timestamp_col);
-    }
-    if !fields.contains(&cfg.common.column_all) {
-        fields.insert(&cfg.common.column_all);
-    }
-    if need_original || index_original_data {
-        if !fields.contains(&o2_id_col) {
-            fields.insert(&o2_id_col);
-        }
-        if !fields.contains(&original_col) {
-            fields.insert(&original_col);
-        }
-    }
-    if index_all_values && !fields.contains(&all_values_col) {
-        fields.insert(&all_values_col);
-    }
-
-    let mut new_fields = Vec::with_capacity(fields.len());
-    for field in fields {
-        if let Some(f) = schema.fields_map().get(field) {
-            new_fields.push(schema.schema().fields()[*f].clone());
-        }
-    }
-
-    // sort the fields by name to make sure the order is consistent
-    new_fields.sort_by(|a, b| a.name().cmp(b.name()));
-
-    SchemaCache::new(Schema::new_with_metadata(
-        new_fields,
-        schema.schema().metadata().clone(),
-    ))
 }
 
 pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
