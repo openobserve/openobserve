@@ -1,30 +1,17 @@
-name: Playwright UI Tests
+name: Playwright UI Tests (Environment)
 
 on:
-  push:
-    branches:
-      - "main"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
-  pull_request:
-    branches:
-      - "*"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+  workflow_dispatch:
 
 env:
   COLUMNS: 150
-  ZO_ROOT_USER_EMAIL: root@example.com
-  ZO_ROOT_USER_PASSWORD: Complexpass#123
-  ZO_BASE_URL: http://localhost:5080
-  WS_ZO_BASE_URL: ws://localhost:5080
-  ZO_BASE_URL_SC: http://localhost:5080
-  ZO_BASE_URL_SC_UI: http://localhost:5080
-  INGESTION_URL: http://localhost:5080
+  ZO_ROOT_USER_EMAIL: automation@tester.ai
+  ZO_ROOT_USER_PASSWORD: 12345678
+  ZO_BASE_URL: https://test.internal.zinclabs.dev
+  WS_ZO_BASE_URL: https://test.internal.zinclabs.dev
+  ZO_BASE_URL_SC: https://test.internal.zinclabs.dev
+  ZO_BASE_URL_SC_UI: https://test.internal.zinclabs.dev
+  INGESTION_URL: https://test.internal.zinclabs.dev
   ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 100
   ZO_QUICK_MODE_STRATEGY: first
@@ -44,67 +31,46 @@ env:
   UPLOAD_TO_TESTDINO: false
 
 jobs:
-  build_binary:
-    name: build_binary
+  test_environment_data_cleanup:
+    name: Test Environment Data Cleanup
     runs-on:
-      labels: repo-openobserve-standard-16
-
+      labels: repo-openobserve-standard-4
+    if: always()  # Always run cleanup, even on retries
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2025-07-20
-          targets: x86_64-unknown-linux-gnu
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          prefix-key: playwright
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "21.12"
       - uses: actions/setup-node@v5
         with:
           node-version: 22
 
-      - name: Build frontend code
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
-          VITE_COVERAGE: "true"
-          COVERAGE: "true"
-        run: cd web && npm install && npm run build
-
-      - name: Build and run binary
-        run: cargo build --release --target x86_64-unknown-linux-gnu
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-binary
-          path: target/x86_64-unknown-linux-gnu/release/openobserve
-          retention-days: 1
+      - name: Run cleanup test
+        run: |
+          touch .env
+          echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
+          echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
+          echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
+          echo "WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
+          echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
+          echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
+          echo "INGESTION_URL=${INGESTION_URL}" >> .env
+          echo "ORGNAME=${ORGNAME}" >> .env
+          mv .env tests/ui-testing
+          cd tests/ui-testing && npm ci
+          npx playwright install --with-deps chromium
+          echo "Running pre-test cleanup to remove old test data..."
+          npx playwright test cleanup.spec.js
 
   ui_integration_tests:
     name: e2e / ${{ matrix.testfolder }}
-    needs: [build_binary]
+    needs: [test_environment_data_cleanup]
+    if: always() && needs.test_environment_data_cleanup.result == 'success'  # Only run if cleanup succeeds
     runs-on:
       labels: repo-openobserve-standard-8
-    # container:
-    #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
-    #   options: --user root
     strategy:
+      fail-fast: false
       matrix:
         include:
           - testfolder: "GeneralTests"
@@ -132,17 +98,17 @@ jobs:
                 "unflattened.spec.js",
                 "logstable.spec.js",
               ]
-          - testfolder: "Logs-Queries"
-            browser: "chrome"
-            run_files:
-              [
-                "logsDownloads.spec.js",
-                "logsqueries.spec.js",
-                "secondsPrecisionAdded.spec.js",
-                "logsqueries.cte.spec.js",
-                "logsqueries.matchall.spec.js",
-                "searchpartition.spec.js",
-              ]
+          # - testfolder: "Logs-Queries"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "logsDownloads.spec.js",
+          #       "logsqueries.spec.js",
+          #       "secondsPrecisionAdded.spec.js",
+          #       "logsqueries.cte.spec.js",
+          #       "logsqueries.matchall.spec.js",
+          #       "searchpartition.spec.js",
+          #     ]
           - testfolder: "Alerts"
             browser: "chrome"
             run_files:
@@ -151,41 +117,41 @@ jobs:
                 "alerts-ui-operations.spec.js",
                 "alerts-import.spec.js",
               ]
-          - testfolder: "Dashboards-Core"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard.spec.js",
-                "dashboard2.spec.js",
-                "dashboardtype.spec.js",
-                "dashboard-folder.spec.js",
-                "dashboard-import.spec.js",
-                "maxquery.spec.js",
-              ]
-          - testfolder: "Dashboards-Settings"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard-filter.spec.js",
-                "dashboard-general-setting.spec.js",
-                "dashboard-tabs-setting.spec.js",
-                "dashboard-variables-setting.spec.js",
-                "dashboard-transpose.spec.js",
-              ]
-          - testfolder: "Dashboards-Charts"
-            browser: "chrome"
-            run_files: [
-                "custom-charts.spec.js",
-                "dashboard-geoMap.spec.js",
-                "dashboard-maps.spec.js",
-                "dashboard-multi-y-axis.spec.js",
-                "dashboard-html-chart.spec.js",
-                "visualize.spec.js",
-                # "visualization-vrl.spec.js"
-              ]
-          - testfolder: "Dashboards-Streaming"
-            browser: "chrome"
-            run_files: ["dashboard-streaming.spec.js",]
+          # - testfolder: "Dashboards-Core"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "dashboard.spec.js",
+          #       "dashboard2.spec.js",
+          #       "dashboardtype.spec.js",
+          #       "dashboard-folder.spec.js",
+          #       "dashboard-import.spec.js",
+          #       "maxquery.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Settings"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "dashboard-filter.spec.js",
+          #       "dashboard-general-setting.spec.js",
+          #       "dashboard-tabs-setting.spec.js",
+          #       "dashboard-variables-setting.spec.js",
+          #       "dashboard-transpose.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Charts"
+          #   browser: "chrome"
+          #   run_files: [
+          #       "custom-charts.spec.js",
+          #       "dashboard-geoMap.spec.js",
+          #       "dashboard-maps.spec.js",
+          #       "dashboard-multi-y-axis.spec.js",
+          #       "dashboard-html-chart.spec.js",
+          #       "visualize.spec.js",
+          #       # "visualization-vrl.spec.js"
+          #     ]
+          # - testfolder: "Dashboards-Streaming"
+          #   browser: "chrome"
+          #   run_files: ["dashboard-streaming.spec.js",]
           - testfolder: "Pipelines"
             browser: "chrome"
             run_files: [
@@ -197,8 +163,8 @@ jobs:
           - testfolder: "Reports"
             browser: "chrome"
             run_files: [
-              "reportsUpdated.spec.js", 
-              "reportsUpdated2.spec.js"
+              "reportsScheduleNow.spec.js",
+              "reportsScheduleLater.spec.js"
               ]
           - testfolder: "Streams"
             browser: "chrome"
@@ -213,21 +179,6 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v5
-        with:
-          name: release-binary
-          path: release-binary
-
-      - name: Start OpenObserve
-        run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
-
-      - name: Wait for start
-        run: sleep 60
-
-      - name: Ensure we are getting a reply from the server
-        run: curl http://localhost:5080/web/login
 
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
@@ -250,7 +201,7 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
-          npx playwright install --with-deps chromium 
+          npx playwright install --with-deps chromium
           # Get list of files to run using join function
           FILE_LIST="${{ join(matrix.run_files, ' ') }}"
           echo "DEBUG: FILE_LIST = $FILE_LIST"
@@ -269,9 +220,9 @@ jobs:
                 ACTUAL_FOLDER="${{ matrix.testfolder }}"
                 ;;
             esac
-            
+
             echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
-            
+
             # Build file paths
             FILE_PATHS=""
             for file in $FILE_LIST; do
@@ -279,7 +230,7 @@ jobs:
               echo "DEBUG: Will run file: $FILE_PATH"
               FILE_PATHS="$FILE_PATHS $FILE_PATH"
             done
-            
+
             # Run all specified files at once
             echo "DEBUG: Final command: npx playwright test$FILE_PATHS"
             npx playwright test $FILE_PATHS
@@ -313,9 +264,9 @@ jobs:
           path: tests/ui-testing/blob-report
           retention-days: 1
 
-      - name: Check OpenObserve logs
-        if: always()
-        run: cat o2.log
+      # - name: Check OpenObserve logs
+      #   if: always()
+      #   run: cat o2.log
 
   merge_and_upload_reports:
     name: Merge Reports and Upload to TestDino
@@ -369,7 +320,7 @@ jobs:
 
   generate_coverage_report:
     name: Generate Coverage Report
-    needs: [build_binary, ui_integration_tests]
+    needs: [ui_integration_tests]
     runs-on: repo-openobserve-standard-8
     if: success() || failure()
 
@@ -387,12 +338,16 @@ jobs:
           merge-multiple: true
 
       - name: Verify Downloaded Files
-        run: ls -R merged-coverage # Check the structure and contents
+        run: ls -R merged-coverage 2>/dev/null || echo "No coverage files downloaded"
 
       - name: Move Coverage Files to .nyc_output
         run: |
           mkdir -p tests/ui-testing/.nyc_output
-          mv merged-coverage/* tests/ui-testing/.nyc_output/ || echo "No files to move"
+          if [ -d "merged-coverage" ]; then
+            mv merged-coverage/* tests/ui-testing/.nyc_output/ 2>/dev/null || echo "No files to move"
+          else
+            echo "No merged-coverage directory found, skipping"
+          fi
 
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npm ci && npx nyc report
