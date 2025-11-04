@@ -66,6 +66,7 @@ pub mod hec;
 pub mod ingest;
 pub mod loki;
 pub mod otlp;
+pub mod patterns;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 

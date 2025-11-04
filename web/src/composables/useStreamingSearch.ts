@@ -51,7 +51,7 @@ const streamConnections = ref<Record<string, ReadableStreamDefaultReader<Uint8Ar
 const abortControllers = ref<Record<string, AbortController>>({});
 const errorOccurred = ref(false);
 
-type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end';
+type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end' | 'pattern_extraction_result';
 
 const useHttpStreaming = () => {
   const onData = (traceId: string, type: StreamResponseType | 'end', response: any) => {
@@ -263,6 +263,9 @@ const useHttpStreaming = () => {
               break;
             case 'search_response_hits':
               onData(eventTraceId, 'search_response_hits', data);
+              break;
+            case 'pattern_extraction_result':
+              onData(eventTraceId, 'pattern_extraction_result', data);
               break;
             case 'progress':
               onData(eventTraceId, 'progress', data);
@@ -498,9 +501,17 @@ const useHttpStreaming = () => {
     }
   }
 
+  const convertToPatternResult = (type: string, data: any) => {
+    return {
+      type: "pattern_extraction_result",
+      content: data,
+    }
+  }
+
   const wsMapper = {
     'search_response_metadata': convertToWsResponse,
     'search_response_hits': convertToWsResponse,
+    'pattern_extraction_result': convertToPatternResult,
     'progress': convertToWsEventProgress,
     'error': convertToWsError,
     'end': convertToWsEnd,

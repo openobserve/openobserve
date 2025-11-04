@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="search"
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm btn-height-32"
+                class="button button-left tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm btn-height-32"
               >
                 <q-tooltip>
                   {{ t("common.search") }}
@@ -46,12 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <q-btn
                 data-test="logs-visualize-toggle"
-                :class="
-                  searchObj.meta.logsVisualizeToggle === 'visualize'
-                    ? 'selected'
-                    : ''
-                "
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm btn-height-32"
+                :class="[
+                  searchObj.meta.logsVisualizeToggle === 'visualize' ? 'selected' : '',
+                  config.isEnterprise == 'true' ? 'button button-center tw-rounded-none' : 'button button-right !tw-rounded-l-none',
+                  'tw-flex tw-justify-center tw-items-center no-border no-outline q-px-sm btn-height-32'
+                ]"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disable="isVisualizeDisabled"
                 no-caps
@@ -63,6 +62,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-tooltip>
                 <q-tooltip v-else>
                   {{ t("search.visualize") }}
+                </q-tooltip>
+              </q-btn>
+            </div>
+            <div v-if="config.isEnterprise == 'true'">
+              <q-btn
+                data-test="logs-patterns-toggle"
+                :class="
+                  searchObj.meta.logsVisualizeToggle === 'patterns'
+                    ? 'selected'
+                    : ''
+                "
+                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm btn-height-32"
+                @click="onLogsVisualizeToggleUpdate('patterns')"
+                no-caps
+                size="sm"
+                icon="pattern"
+              >
+                <q-tooltip>
+                  {{ t("search.showPatternsLabel") }}
                 </q-tooltip>
               </q-btn>
             </div>
@@ -106,8 +124,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="sqlIcon" alt="SQL Mode"
-class="toolbar-icon" />
+            <img :src="sqlIcon"
+alt="SQL Mode" class="toolbar-icon" />
             <q-tooltip v-if="isSqlModeDisabled">
               {{ t("search.sqlModeDisabledForVisualization") }}
             </q-tooltip>
@@ -238,8 +256,8 @@ class="toolbar-icon" />
                       </q-tr>
                     </template>
                     <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list"
-no-hover>
+                      <q-td :props="props"
+class="field_list" no-hover>
                         <q-item
                           class="q-pa-sm saved-view-item"
                           clickable
@@ -626,8 +644,8 @@ no-hover>
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="quickModeIcon" alt="Quick Mode"
-class="toolbar-icon" />
+            <img :src="quickModeIcon"
+alt="Quick Mode" class="toolbar-icon" />
             <q-tooltip>
               {{ t("search.quickModeLabel") }}
             </q-tooltip>
@@ -1548,8 +1566,8 @@ class="q-pr-sm q-pt-xs" />
           <div>
             <div class="text-left q-mb-xs">
               No of Records:
-              <q-icon name="info" size="17px"
-class="q-ml-xs cursor-pointer">
+              <q-icon name="info"
+size="17px" class="q-ml-xs cursor-pointer">
                 <q-tooltip
                   anchor="center right"
                   self="center left"
@@ -1585,8 +1603,8 @@ class="q-ml-xs cursor-pointer">
             style="opacity: 0.8"
             class="text-left mapping-warning-msg q-mt-md"
           >
-            <q-icon name="warning" color="red"
-class="q-mr-sm" />
+            <q-icon name="warning"
+color="red" class="q-mr-sm" />
             <span>Histogram will be disabled for the schedule job</span>
           </div>
         </q-card-section>
@@ -1754,6 +1772,7 @@ export default defineComponent({
     "handleRunQueryFn",
     "onAutoIntervalTrigger",
     "showSearchHistory",
+    "extractPatterns",
   ],
   methods: {
     searchData() {
@@ -1897,8 +1916,13 @@ export default defineComponent({
     } = useSearchBar();
     const { loadStreamLists, extractFields } = useStreamFields();
 
-    const { refreshData, handleRunQuery, getJobData, routeToSearchSchedule } =
-      useLogs();
+    const {
+      refreshData,
+      handleRunQuery,
+      getJobData,
+      routeToSearchSchedule,
+      getHistogramTitle,
+    } = useLogs();
 
     const { isStreamExists, isStreamFetched, getStreams } = useStreams();
     const queryEditorRef = ref(null);
@@ -3714,7 +3738,7 @@ export default defineComponent({
     const handleHistogramMode = () => {};
 
     const handleRunQueryFn = (clear_cache = false) => {
-      if (searchObj.meta.logsVisualizeToggle == "visualize") {
+      if (searchObj.meta.logsVisualizeToggle == "visualize" || searchObj.meta.logsVisualizeToggle == "patterns") {
         emit("handleRunQueryFn", typeof clear_cache === 'boolean' ? clear_cache : false);
       } else {
         handleRunQuery(typeof clear_cache === 'boolean' ? clear_cache : false);
@@ -3741,6 +3765,7 @@ export default defineComponent({
       ) {
         // cancel all the visualize queries
         cancelVisualizeQueries();
+
         if (
           searchObj.meta.logsVisualizeDirtyFlag === true ||
           !Object.hasOwn(searchObj.data?.queryResults, "hits") ||
@@ -3754,6 +3779,35 @@ export default defineComponent({
           getQueryData();
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }
+      } else if (
+        value == "logs" &&
+        searchObj.meta.logsVisualizeToggle == "patterns"
+      ) {
+        // Switching from patterns to logs - check if we need to fetch logs
+        const hasLogs =
+          searchObj.data?.queryResults?.hits &&
+          searchObj.data.queryResults.hits.length > 0;
+
+        console.log("[SearchBar] Switching patterns → logs, hasLogs:", hasLogs);
+
+        if (!hasLogs) {
+          // No logs data - fetch them
+          console.log("[SearchBar] Fetching logs data");
+          searchObj.loading = true;
+          searchObj.meta.refreshHistogram = true;
+          getQueryData();
+        } else {
+          // Logs exist - just switch the view
+          console.log("[SearchBar] Reusing existing logs data");
+        }
+      } else if (
+        value == "patterns" &&
+        (searchObj.meta.logsVisualizeToggle == "logs" ||
+          searchObj.meta.logsVisualizeToggle == "visualize")
+      ) {
+        // Switching to patterns mode - this will be handled by a separate watcher in Index.vue
+        emit("extractPatterns");
+        console.log("[SearchBar] Switching to patterns mode");
       } else if (
         value == "visualize" &&
         searchObj.meta.logsVisualizeToggle == "logs"
@@ -3803,6 +3857,16 @@ export default defineComponent({
       }
       searchObj.meta.logsVisualizeToggle = value;
       updateUrlQueryParams();
+
+      if (searchObj.meta.logsVisualizeToggle === "logs") {
+        const hasLogs =
+          searchObj.data?.queryResults?.hits &&
+          searchObj.data.queryResults.hits.length > 0;
+
+        if (hasLogs) {
+          searchObj.data.histogram.chartParams.title = getHistogramTitle(false);
+        }
+      }
 
       // dispatch resize event
       window.dispatchEvent(new Event("resize"));
