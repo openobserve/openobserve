@@ -71,10 +71,10 @@ fn get_timezone_from_string(
     timezone_str: Option<&str>,
     fallback_offset: i32,
 ) -> Result<Tz, FixedOffset> {
-    if let Some(tz_str) = timezone_str {
-        if let Ok(tz) = tz_str.parse::<Tz>() {
-            return Ok(tz);
-        }
+    if let Some(tz_str) = timezone_str
+        && let Ok(tz) = tz_str.parse::<Tz>()
+    {
+        return Ok(tz);
     }
     // Fallback to FixedOffset for backward compatibility
     Err(FixedOffset::east_opt(fallback_offset * 60).unwrap())
