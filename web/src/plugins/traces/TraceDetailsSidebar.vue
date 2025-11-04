@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex justify-start items-center q-px-sm header_bg border border-bottom border-top"
-    :style="{ height: '30px' }"
+    class="flex justify-start items-center q-px-sm tw-bg-[var(--o2-hover-accent)] tw-h-[2rem] tw-border tw-border-solid tw-border-t-[var(--o2-border-color)]"
     data-test="trace-details-sidebar-header"
   >
     <div
@@ -95,12 +94,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <q-btn
-        class="q-mx-xs view-span-logs-btn"
+        class="q-mx-xs view-span-logs-btn tw-border !tw-py-[0.3rem]"
         size="10px"
         icon="search"
         dense
         padding="xs sm"
         no-caps
+        color="primary"
         :title="t('traces.viewLogs')"
         @click.stop="viewSpanLogs"
         data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
@@ -154,7 +154,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
   </q-tabs>
   <q-separator style="width: 100%" />
-  <q-tab-panels v-model="activeTab" class="span_details_tab-panels">
+  <q-tab-panels
+    v-model="activeTab"
+    class="span_details_tab-panels tw-pb-[0.375rem]"
+  >
     <q-tab-panel name="tags">
       <q-table
         ref="qTable"
@@ -162,23 +165,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :rows="getTagRows"
         :columns="tagColumns"
         :row-key="(row) => 'tr_' + row.name"
-        :pagination="pagination"
+        :rows-per-page-options="[0]"
         class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
         id="schemaFieldList"
         dense
       >
         <template v-slot:body-cell="props">
           <q-td
-            class="text-left"
+            class="text-left !tw-text-[0.85rem]"
             :class="
-              props.col.name === 'field'
-                ? store.state.theme === 'dark'
-                  ? 'tw-text-red-400'
-                  : 'tw-text-red-700'
-                : ''
+              props.col.name === 'field' ? 'tw-text-[var(--o2-json-key)]' : ''
             "
           >
-            {{ props.row[props.col.name] }}
+            <span
+              v-if="props.col.name === 'value'"
+              v-html="
+                highlightTextMatch(props.row[props.col.name], searchQuery)
+              "
+            />
+            <span v-else>
+              {{ props.row[props.col.name] }}
+            </span>
           </q-td>
         </template>
       </q-table>
@@ -190,22 +197,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :rows="getProcessRows"
         :columns="processColumns"
         :row-key="(row) => 'tr_' + row.name"
-        :pagination="pagination"
+        :rows-per-page-options="[0]"
         class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
         dense
       >
         <template v-slot:body-cell="props">
           <q-td
-            class="text-left"
+            class="text-left !tw-text-[0.85rem]"
             :class="
-              props.col.name === 'field'
-                ? store.state.theme === 'dark'
-                  ? 'tw-text-red-400'
-                  : 'tw-text-red-700'
-                : ''
+              props.col.name === 'field' ? 'tw-text-[var(--o2-json-key)]' : ''
             "
           >
-            {{ props.row[props.col.name] }}
+            <span
+              v-if="props.col.name === 'value'"
+              v-html="
+                highlightTextMatch(props.row[props.col.name], searchQuery)
+              "
+            />
+            <span v-else>
+              {{ props.row[props.col.name] }}
+            </span>
           </q-td>
         </template>
       </q-table>
@@ -213,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-tab-panel name="attributes">
       <pre
         class="attr-text"
-        v-html="highlightedAttributes(spanDetails.attrs)"
+        v-html="highlightedAttributes"
         data-test="trace-details-sidebar-attributes-table"
       ></pre>
     </q-tab-panel>
@@ -225,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :rows="spanDetails.events"
         :columns="eventColumns"
         row-key="name"
-        :pagination="pagination"
+        :rows-per-page-options="[0]"
         class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
         dense
         style="max-height: 400px"
@@ -267,8 +278,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></q-btn>
                 <span
                   v-if="column.name !== '@timestamp'"
-                  v-html="highlightSearch(column.prop(props.row))"
-                ></span>
+                  v-html="
+                    highlightTextMatch(column.prop(props.row), searchQuery)
+                  "
+                />
                 <span v-else> {{ column.prop(props.row) }}</span>
               </div>
             </q-td>
@@ -276,9 +289,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tr v-if="expandedEvents[props.rowIndex.toString()]">
             <q-td colspan="2">
               <pre
+                v-once
                 class="log_json_content"
-                v-html="highlightedAttributes(props.row)"
-              ></pre>
+                v-html="highlightedJSON(props.row)"
+              />
             </q-td>
           </q-tr>
         </template>
@@ -299,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :rows="getExceptionEvents"
         :columns="exceptionEventColumns"
         row-key="name"
-        :pagination="pagination"
+        :rows-per-page-options="[0]"
         class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
         dense
         style="max-height: 400px"
@@ -337,8 +351,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></q-btn>
                 <span
                   v-if="column.name !== '@timestamp'"
-                  v-html="highlightSearch(column.prop(props.row))"
-                ></span>
+                  v-html="
+                    highlightTextMatch(column.prop(props.row), searchQuery)
+                  "
+                />
                 <span v-else> {{ column.prop(props.row) }}</span>
               </div>
             </q-td>
@@ -460,6 +476,7 @@ import { formatTimeWithSuffix, convertTimeFromNsToMs } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
 import { onMounted } from "vue";
+import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -476,6 +493,9 @@ export default defineComponent({
       type: String,
       default: "",
     },
+  },
+  components: {
+    LogsHighLighting,
   },
   emits: ["close", "view-logs", "select-span", "open-trace"],
   setup(props, { emit }) {
@@ -496,45 +516,106 @@ export default defineComponent({
     const q = useQuasar();
     const { buildQueryDetails, navigateToLogs } = useTraces();
     const router = useRouter();
-    const highlightSearch = (
-      value: any,
-      preserveString: any = false,
-    ): string => {
-      if (!props.searchQuery) {
-        // Return the object/JSON value as is if there's no search query
-        return typeof value === "object" && value !== null
-          ? JSON.stringify(value, null, 2)
-          : value;
-      }
 
-      if (typeof value === "string") {
-        // Highlight text in string values
-        const regex = new RegExp(`(${props.searchQuery})`, "gi");
-        if (preserveString) {
-          return `"${value.replace(regex, (match) => `<span class="highlight ${store.state.theme === "dark" ? "tw-text-gray-900" : ""}">${match}</span>`)}"`;
-        } else {
-          return value.replace(
-            regex,
-            (match) =>
-              `<span class="highlight ${store.state.theme === "dark" ? "tw-text-gray-900" : ""}">${match}</span>`,
-          );
-        }
-      } else if (Array.isArray(value)) {
-        return `[${value.map((item) => highlightSearch(item)).join(", ")}]`;
-      } else if (typeof value === "object" && value !== null) {
-        const highlightedEntries = Object.entries(value).map(([key, val]) => {
-          // Do not highlight the keys; only process the values
-          const highlightedVal = highlightSearch(val, true);
-          return `"${key}": ${highlightedVal}`;
-        });
-        return `{\n  ${highlightedEntries.join(",\n  ")}\n}`;
-      } else {
-        return JSON.stringify(value);
+    // JSON syntax highlighting colors - using CSS variables for theme-aware colors
+    const themeColors = {
+      key: "var(--o2-json-key)",
+      stringValue: "var(--o2-json-string)",
+      numberValue: "var(--o2-json-number)",
+      booleanValue: "var(--o2-json-boolean)",
+      nullValue: "var(--o2-json-null)",
+      objectValue: "var(--o2-json-object)",
+    };
+
+    const escapeHtml = (text: string): string => {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    };
+
+    const highlightTextMatch = (text: string, query: string): string => {
+      if (!query) return escapeHtml(text);
+      try {
+        // Escape special regex characters
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(${escapedQuery})`, "gi");
+        return escapeHtml(text).replace(
+          regex,
+          (match) => `<span class="highlight">${match}</span>`
+        );
+      } catch (e) {
+        return escapeHtml(text);
       }
     };
 
+    const highlightedJSON = (value) => {
+      const colors = themeColors;
+      const attrs = value;
+      const query = props.searchQuery;
+
+      const formatValue = (value: any): string => {
+        if (value === null) {
+          return `<span style="color: ${colors.nullValue};">${highlightTextMatch("null", query)}</span>`;
+        } else if (typeof value === "boolean") {
+          return `<span style="color: ${colors.booleanValue};">${highlightTextMatch(String(value), query)}</span>`;
+        } else if (typeof value === "number") {
+          return `<span style="color: ${colors.numberValue};">${highlightTextMatch(String(value), query)}</span>`;
+        } else if (typeof value === "string") {
+          return `<span style="color: ${colors.stringValue};">"${highlightTextMatch(value, query)}"</span>`;
+        } else if (typeof value === "object") {
+          return `<span style="color: ${colors.objectValue};">"${highlightTextMatch(JSON.stringify(value), query)}"</span>`;
+        }
+        return highlightTextMatch(String(value), query);
+      };
+
+      const lines: string[] = [];
+      lines.push('<span style="color: #9ca3af;">{</span>');
+
+      const entries = Object.entries(attrs);
+      entries.forEach(([key, value], index) => {
+        const keyHtml = `<span style="color: ${colors.key};">"${escapeHtml(key)}"</span>`;
+        const valueHtml = formatValue(value);
+        const comma = index < entries.length - 1 ? '<span style="color: #9ca3af;">,</span>' : '';
+        lines.push(`  ${keyHtml}<span style="color: #9ca3af;">:</span> ${valueHtml}${comma}`);
+      });
+
+      lines.push('<span style="color: #9ca3af;">}</span>');
+      return lines.join("\n");
+    };
+
     const highlightedAttributes = computed(() => {
-      return (value: any) => highlightSearch(value, true);
+      const colors = themeColors;
+      const attrs = spanDetails.value.attrs;
+      const query = props.searchQuery;
+
+      const formatValue = (value: any): string => {
+        if (value === null) {
+          return `<span style="color: ${colors.nullValue};">${highlightTextMatch("null", query)}</span>`;
+        } else if (typeof value === "boolean") {
+          return `<span style="color: ${colors.booleanValue};">${highlightTextMatch(String(value), query)}</span>`;
+        } else if (typeof value === "number") {
+          return `<span style="color: ${colors.numberValue};">${highlightTextMatch(String(value), query)}</span>`;
+        } else if (typeof value === "string") {
+          return `<span style="color: ${colors.stringValue};">"${highlightTextMatch(value, query)}"</span>`;
+        } else if (typeof value === "object") {
+          return `<span style="color: ${colors.objectValue};">"${highlightTextMatch(JSON.stringify(value), query)}"</span>`;
+        }
+        return highlightTextMatch(String(value), query);
+      };
+
+      const lines: string[] = [];
+      lines.push('<span style="color: #9ca3af;">{</span>');
+
+      const entries = Object.entries(attrs);
+      entries.forEach(([key, value], index) => {
+        const keyHtml = `<span style="color: ${colors.key};">"${escapeHtml(key)}"</span>`;
+        const valueHtml = formatValue(value);
+        const comma = index < entries.length - 1 ? '<span style="color: #9ca3af;">,</span>' : '';
+        lines.push(`  ${keyHtml}<span style="color: #9ca3af;">:</span> ${valueHtml}${comma}`);
+      });
+
+      lines.push('<span style="color: #9ca3af;">}</span>');
+      return lines.join("\n");
     });
 
     watch(
@@ -875,12 +956,13 @@ export default defineComponent({
       openReferenceTrace,
       spanLinks,
       linkColumns,
-      highlightSearch,
-      highlightedAttributes,
       getTagRows,
       tagColumns,
       processColumns,
       getProcessRows,
+      highlightedAttributes,
+      highlightTextMatch,
+      highlightedJSON
     };
   },
 });
@@ -1055,14 +1137,12 @@ export default defineComponent({
   cursor: default;
 }
 .span_details_tab-panels {
-  height: calc(100% - 104px);
+  height: calc(100% - 6.75rem);
   overflow-y: auto;
   overflow-x: hidden;
 }
 
 .header_bg {
-  border-top: 1px solid $border-color;
-  background-color: color-mix(in srgb, currentColor 5%, transparent);
 }
 </style>
 
@@ -1086,7 +1166,7 @@ export default defineComponent({
   .q-btn__content {
     display: flex;
     align-items: center;
-    font-size: 11px;
+    font-size: 12px;
 
     .q-icon {
       margin-right: 2px !important;
