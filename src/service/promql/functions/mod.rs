@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
+use config::meta::promql::NAME_LABEL;
 use datafusion::error::{DataFusionError, Result};
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use strum::EnumString;
 
@@ -142,6 +144,9 @@ pub(crate) enum Func {
     Year,
 }
 
+pub static KEEP_METRIC_NAME_FUNC: Lazy<HashSet<&str>> =
+    Lazy::new(|| HashSet::from_iter(["last_over_time"]));
+
 #[allow(dead_code)]
 pub trait RangeFunc: Sync {
     fn name(&self) -> &'static str;
@@ -235,7 +240,10 @@ where
             chunk
                 .into_iter()
                 .map(|mut metric| {
-                    let labels = std::mem::take(&mut metric.labels);
+                    let mut labels = std::mem::take(&mut metric.labels);
+                    if !KEEP_METRIC_NAME_FUNC.contains(func.name()) {
+                        labels.retain(|l| l.name != NAME_LABEL);
+                    }
                     // TODO: pass range information to here
                     // let time_window = metric.time_window.as_ref().unwrap();
                     let range = Duration::from_secs(300); // Default 5min range for rate function

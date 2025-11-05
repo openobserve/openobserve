@@ -413,7 +413,7 @@ impl EvalContext {
         if self.is_instant() {
             vec![self.start]
         } else {
-            let nr_steps = (self.end - self.start + self.step - 1) / self.step;
+            let nr_steps = (self.end - self.start) / self.step + 1;
             (0..nr_steps)
                 .map(|i| self.start + (self.step * i))
                 .collect()

@@ -193,28 +193,36 @@ impl Engine {
             PromExpr::Unary(UnaryExpr { expr }) => {
                 let val = self.exec_expr(expr).await?;
                 match val {
-                    Value::Vector(v) => {
-                        let out = v
+                    Value::Matrix(m) => {
+                        let out = m
                             .into_iter()
-                            .map(|mut instant| InstantValue {
-                                labels: std::mem::take(&mut instant.labels),
-                                sample: Sample {
-                                    timestamp: instant.sample.timestamp,
-                                    value: -instant.sample.value,
-                                },
+                            .map(|mut range| RangeValue {
+                                labels: std::mem::take(&mut range.labels),
+                                samples: range
+                                    .samples
+                                    .into_iter()
+                                    .map(|s| Sample {
+                                        timestamp: s.timestamp,
+                                        value: -s.value,
+                                    })
+                                    .collect(),
+                                exemplars: range.exemplars,
+                                time_window: range.time_window,
                             })
                             .collect();
-                        Value::Vector(out)
+                        Value::Matrix(out)
                     }
                     Value::Float(f) => {
-                        let v = InstantValue {
+                        let v = RangeValue {
                             labels: Labels::default(),
-                            sample: Sample {
+                            samples: vec![Sample {
                                 timestamp: self.time,
                                 value: -f,
-                            },
+                            }],
+                            exemplars: None,
+                            time_window: None,
                         };
-                        Value::Vector(vec![v])
+                        Value::Matrix(vec![v])
                     }
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
@@ -231,10 +239,12 @@ impl Engine {
                 let op = expr.op.is_comparison_operator();
 
                 // This is a very special case, as we treat the float also a
-                // `Value::Vector(vec![element])` therefore, better convert it
+                // `Value::Matrix(vec![element])` therefore, better convert it
                 // back to its representation.
                 let rhs = match rhs {
-                    Value::Vector(v) if v.len() == 1 => Value::Float(v[0].sample.value),
+                    Value::Matrix(m) if m.len() == 1 && m[0].samples.len() == 1 => {
+                        Value::Float(m[0].samples[0].value)
+                    }
                     _ => rhs,
                 };
                 match (lhs, rhs) {
@@ -248,22 +258,22 @@ impl Engine {
                         )?;
                         Value::Float(value)
                     }
-                    (Value::Vector(left), Value::Vector(right)) => {
+                    (Value::Matrix(left), Value::Matrix(right)) => {
                         binaries::vector_bin_op(expr, left, right)?
                     }
-                    (Value::Vector(left), Value::Float(right)) => {
+                    (Value::Matrix(left), Value::Float(right)) => {
                         binaries::vector_scalar_bin_op(expr, left, right, false).await?
                     }
-                    (Value::Float(left), Value::Vector(right)) => {
+                    (Value::Float(left), Value::Matrix(right)) => {
                         binaries::vector_scalar_bin_op(expr, right, left, true).await?
                     }
                     (Value::None, Value::None) => Value::None,
                     _ => {
                         log::debug!(
-                            "[trace_id: {}] [PromExpr::Binary] either lhs or rhs vector is found to be empty",
+                            "[trace_id: {}] [PromExpr::Binary] either lhs or rhs matrix is found to be empty",
                             self.trace_id
                         );
-                        Value::Vector(vec![])
+                        Value::Matrix(vec![])
                     }
                 }
             }
@@ -272,15 +282,6 @@ impl Engine {
                 let val = self.exec_expr(&expr.expr).await?;
                 let time_window = Some(TimeWindow::new(self.time, expr.range));
                 let matrix = match val {
-                    Value::Vector(v) => v
-                        .iter()
-                        .map(|v| RangeValue {
-                            labels: v.labels.to_owned(),
-                            samples: vec![v.sample],
-                            exemplars: None,
-                            time_window: time_window.clone(),
-                        })
-                        .collect(),
                     Value::Instant(v) => {
                         vec![RangeValue {
                             labels: v.labels.to_owned(),
@@ -831,13 +832,15 @@ impl Engine {
         let input = match functions_without_args.contains(func.name) {
             true => match args.len() {
                 0 => {
-                    // Found no arg to pass to, lets use a `vector(time())` as the arg.
+                    // Found no arg to pass to, lets use a `matrix(time())` as the arg.
                     // https://prometheus.io/docs/prometheus/latest/querying/functions/#functions
-                    let default_now_vector = vec![InstantValue {
+                    let default_now_matrix = vec![RangeValue {
                         labels: Labels::default(),
-                        sample: Sample::new(self.time, self.time as f64),
+                        samples: vec![Sample::new(self.time, self.time as f64)],
+                        exemplars: None,
+                        time_window: None,
                     }];
-                    Value::Vector(default_now_vector)
+                    Value::Matrix(default_now_matrix)
                 }
                 1 => self.call_expr_first_arg(args).await?,
 

@@ -14,12 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ahash::{HashMap, HashMapExt};
-use datafusion::error::{DataFusionError, Result};
+use datafusion::error::Result;
 
 use crate::service::promql::{
     aggregations::{Accumulate, AggFunc},
     common::quantile as calculate_quantile,
-    value::{EvalContext, Sample, Value},
+    value::{EvalContext, RangeValue, Sample, Value},
 };
 
 /// Aggregates Matrix input for range queries
@@ -34,11 +34,25 @@ pub fn quantile_range(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result
         "[PromQL Timing] quantile_range({qtile}) started with {input_size} series and {timestamps_count} timestamps",
     );
 
-    // Validate quantile parameter
+    // Handle invalid quantile parameter by returning special values
     if !(0.0..=1.0).contains(&qtile) || qtile.is_nan() {
-        return Err(DataFusionError::Plan(format!(
-            "[quantile] parameter must be between 0 and 1, got {qtile}"
-        )));
+        let value = match qtile.signum() as i32 {
+            1 => f64::INFINITY,
+            -1 => f64::NEG_INFINITY,
+            _ => f64::NAN,
+        };
+        let timestamps = eval_ctx.timestamps();
+        let samples: Vec<Sample> = timestamps
+            .iter()
+            .map(|&ts| Sample::new(ts, value))
+            .collect();
+        let range_value = RangeValue {
+            labels: Default::default(),
+            samples,
+            exemplars: None,
+            time_window: None,
+        };
+        return Ok(Value::Matrix(vec![range_value]));
     }
 
     let result = super::eval_arithmetic_range(&None, data, Quantile { qtile }, eval_ctx);
