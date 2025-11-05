@@ -393,12 +393,76 @@ export default defineComponent({
     const currentVariablesDataRef: any = ref({ __global: {} });
 
     // Shared variables values across all levels for dependency resolution
+    // New structure: {
+    //   variableName: value (for global vars)
+    //   OR
+    //   variableName: { tabId: value, tabId2: value2 } (for tab-scoped vars)
+    //   OR
+    //   variableName: { panelId: value, panelId2: value2 } (for panel-scoped vars)
+    // }
     const mergedVariablesValues = ref({});
 
+    // Helper to get variable value based on current context (tab/panel)
+    const getContextualVariableValue = (
+      varName: string,
+      context?: { tabId?: string; panelId?: string }
+    ) => {
+      const storedValue = mergedVariablesValues.value[varName];
+
+      if (storedValue === undefined) return undefined;
+
+      // If value is not an object, it's a global variable
+      if (typeof storedValue !== 'object' || storedValue === null) {
+        return storedValue;
+      }
+
+      // Check if it's a tab-scoped or panel-scoped variable
+      // Priority: panelId > tabId > first available value
+      if (context?.panelId && storedValue[context.panelId] !== undefined) {
+        return storedValue[context.panelId];
+      }
+
+      if (context?.tabId && storedValue[context.tabId] !== undefined) {
+        return storedValue[context.tabId];
+      }
+
+      // Fallback: return first available value (shouldn't happen in normal flow)
+      const values = Object.values(storedValue);
+      return values.length > 0 ? values[0] : undefined;
+    };
+
     // Wrapper for passing to child components (they expect {value: {...}})
-    const mergedVariablesWrapper = computed(() => ({
-      value: mergedVariablesValues.value,
-    }));
+    // This resolves values based on current tab context
+    // Note: Panel-specific resolution happens in getPanelVariablesWrapper
+    const mergedVariablesWrapper = computed(() => {
+      const resolved: Record<string, any> = {};
+      const currentTabId = selectedTabId.value;
+
+      // Get all variable names and resolve them for current context
+      Object.keys(mergedVariablesValues.value).forEach((varName) => {
+        resolved[varName] = getContextualVariableValue(varName, {
+          tabId: currentTabId,
+        });
+      });
+
+      return { value: resolved };
+    });
+
+    // Helper to get panel-specific variable wrapper
+    const getPanelVariablesWrapper = (panelId: string) => {
+      const resolved: Record<string, any> = {};
+      const currentTabId = selectedTabId.value;
+
+      // Get all variable names and resolve them with panel priority
+      Object.keys(mergedVariablesValues.value).forEach((varName) => {
+        resolved[varName] = getContextualVariableValue(varName, {
+          tabId: currentTabId,
+          panelId: panelId,
+        });
+      });
+
+      return { value: resolved };
+    };
 
     // Flag to prevent reload loops during cross-level dependency cascades
     const isReloadingDependencies = ref(false);
@@ -685,9 +749,10 @@ export default defineComponent({
         const varName = varConfig.name;
 
         if (scope === 'global') {
-          // Global variable - get value from mergedVariablesValues
+          // Global variable - get value directly (not nested)
           const value = mergedVariablesValues.value[varName];
-          if (value !== undefined) {
+          // Only include if value is not an object (i.e., it's truly a global value)
+          if (value !== undefined && (typeof value !== 'object' || value === null)) {
             aggregatedValues.push({
               ...varConfig,
               scope: 'global',
@@ -696,16 +761,19 @@ export default defineComponent({
             });
           }
         } else if (scope === 'tabs') {
-          // Tab variable - collect values for all relevant tabs
+          // Tab variable - collect values for all relevant tabs from nested structure
           const tabValues: any[] = [];
-          if (varConfig.tabs && Array.isArray(varConfig.tabs)) {
+          const storedValue = mergedVariablesValues.value[varName];
+
+          if (storedValue && typeof storedValue === 'object' && varConfig.tabs && Array.isArray(varConfig.tabs)) {
             varConfig.tabs.forEach((tabId: string) => {
-              const value = mergedVariablesValues.value[varName];
+              const value = storedValue[tabId];
               if (value !== undefined) {
                 tabValues.push({ tabId, value });
               }
             });
           }
+
           if (tabValues.length > 0) {
             aggregatedValues.push({
               ...varConfig,
@@ -715,16 +783,19 @@ export default defineComponent({
             });
           }
         } else if (scope === 'panels') {
-          // Panel variable - collect values for all relevant panels
+          // Panel variable - collect values for all relevant panels from nested structure
           const panelValues: any[] = [];
-          if (varConfig.panels && Array.isArray(varConfig.panels)) {
+          const storedValue = mergedVariablesValues.value[varName];
+
+          if (storedValue && typeof storedValue === 'object' && varConfig.panels && Array.isArray(varConfig.panels)) {
             varConfig.panels.forEach((panelId: string) => {
-              const value = mergedVariablesValues.value[varName];
+              const value = storedValue[panelId];
               if (value !== undefined) {
                 panelValues.push({ panelId, value });
               }
             });
           }
+
           if (panelValues.length > 0) {
             aggregatedValues.push({
               ...varConfig,
@@ -921,7 +992,8 @@ export default defineComponent({
 
     // Handler for tab variables data updates
     const tabVariablesDataUpdated = (data: any) => {
-      console.log("[Tab Variables Updated]");
+      const currentTabId = selectedTabId.value;
+      console.log(`[Tab Variables Updated - Tab: ${currentTabId}]`);
 
       // Extract current tab values (only TAB level variables with _isCurrentLevel === true)
       const currentTabValues: Record<string, any> = {};
@@ -935,35 +1007,49 @@ export default defineComponent({
       }
 
       // Check if this is first load or if values actually changed
+      const tabKey = `tab_${currentTabId}`;
       const isFirstLoad = !tabVariablesReady.value;
       let hasActualChanges = false;
 
       if (!isFirstLoad) {
-        // Compare with last values to detect actual changes
-        hasActualChanges = Object.keys(currentTabValues).some(
-          (key) =>
-            JSON.stringify(currentTabValues[key]) !==
-            JSON.stringify(lastTabValues.value[key])
-        );
+        // Compare with last values to detect actual changes for THIS tab
+        hasActualChanges = Object.keys(currentTabValues).some((key) => {
+          const lastValue = lastTabValues.value[tabKey]?.[key];
+          return JSON.stringify(currentTabValues[key]) !== JSON.stringify(lastValue);
+        });
       }
 
       // Update merged state only if values changed or first load
       if (isFirstLoad || hasActualChanges) {
-        const updatedValues: Record<string, any> = {
-          ...mergedVariablesValues.value,
-          ...currentTabValues,
-        };
-        mergedVariablesValues.value = updatedValues;
-        lastTabValues.value = { ...currentTabValues };
+        // Store values with tab isolation
+        Object.keys(currentTabValues).forEach((varName) => {
+          const varValue = currentTabValues[varName];
+
+          // Initialize as object if not exists or is not an object (migration from old format)
+          if (!mergedVariablesValues.value[varName] ||
+              typeof mergedVariablesValues.value[varName] !== 'object' ||
+              Array.isArray(mergedVariablesValues.value[varName])) {
+            mergedVariablesValues.value[varName] = {};
+          }
+
+          // Store with tab ID as key for isolation
+          mergedVariablesValues.value[varName][currentTabId] = varValue;
+        });
+
+        // Track last values for this tab
+        if (!lastTabValues.value[tabKey]) {
+          lastTabValues.value[tabKey] = {};
+        }
+        lastTabValues.value[tabKey] = { ...currentTabValues };
 
         console.log(
-          "[Tab Variables]",
+          `[Tab Variables - ${currentTabId}]`,
           isFirstLoad ? "(First Load)" : "(Value Changed)",
           Object.keys(currentTabValues),
         );
       } else {
         console.log(
-          "[Tab Variables] No changes detected, skipping panel cascade",
+          `[Tab Variables - ${currentTabId}] No changes detected, skipping panel cascade`,
         );
         // Still mark as ready but don't trigger cascades
         tabVariablesReady.value = true;
@@ -980,7 +1066,7 @@ export default defineComponent({
       if (isFirstLoad) {
         tabVariablesReady.value = true;
         console.log(
-          "[Tab Variables] First load complete, triggering visible panel loads",
+          `[Tab Variables - ${currentTabId}] First load complete, triggering visible panel loads`,
         );
         nextTick(() => {
           visiblePanels.value.forEach((panelId) => {
@@ -1013,7 +1099,7 @@ export default defineComponent({
       let hasActualChanges = false;
 
       if (!isFirstLoad) {
-        // Compare with last values to detect actual changes
+        // Compare with last values to detect actual changes for THIS panel
         hasActualChanges = Object.keys(currentPanelValues).some(
           (key) =>
             JSON.stringify(currentPanelValues[key]) !==
@@ -1023,12 +1109,22 @@ export default defineComponent({
 
       // Update merged state only if values changed or first load
       if (isFirstLoad || hasActualChanges) {
-        const updatedValues: Record<string, any> = {
-          ...mergedVariablesValues.value,
-          ...currentPanelValues,
-        };
-        mergedVariablesValues.value = updatedValues;
+        // Store values with panel isolation
+        Object.keys(currentPanelValues).forEach((varName) => {
+          const varValue = currentPanelValues[varName];
 
+          // Initialize as object if not exists or is not an object (migration from old format)
+          if (!mergedVariablesValues.value[varName] ||
+              typeof mergedVariablesValues.value[varName] !== 'object' ||
+              Array.isArray(mergedVariablesValues.value[varName])) {
+            mergedVariablesValues.value[varName] = {};
+          }
+
+          // Store with panel ID as key for isolation
+          mergedVariablesValues.value[varName][panelId] = varValue;
+        });
+
+        // Track last values for this panel
         if (!lastPanelValues.value[panelId]) {
           lastPanelValues.value[panelId] = {};
         }
@@ -1053,8 +1149,8 @@ export default defineComponent({
       };
 
       console.log(
-        `[Panel ${panelId}] Merged values:`,
-        Object.keys(mergedVariablesValues.value),
+        `[Panel ${panelId}] Stored with panel isolation:`,
+        Object.keys(currentPanelValues),
       );
     };
 
