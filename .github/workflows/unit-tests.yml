@@ -111,9 +111,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-postgres
-          path: |
-            target/coverage/
-            .coverage_summary.json
+          path: report.json
           retention-days: 1
 
   backend_unit_tests_sqlite:
@@ -168,9 +166,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-sqlite
-          path: |
-            target/coverage/
-            .coverage_summary.json
+          path: report.json
           retention-days: 1
 
   merge_coverage:
@@ -198,38 +194,16 @@ jobs:
 
       - name: Check merged coverage
         run: |
-          # Debug: List downloaded artifacts
-          echo "=== Listing coverage-data directory ==="
-          ls -la coverage-data/ || echo "coverage-data not found"
-          echo "=== Listing subdirectories ==="
-          find coverage-data -type f || echo "No files found"
-
-          # Use the postgres coverage as the primary one
-          if [ -f coverage-data/coverage-postgres/.coverage_summary.json ]; then
-            echo "Found coverage summary at coverage-data/coverage-postgres/.coverage_summary.json"
-            cp coverage-data/coverage-postgres/.coverage_summary.json .
-            cp -r coverage-data/coverage-postgres/target/coverage target/ 2>/dev/null || mkdir -p target/coverage
+          # Use the postgres coverage report for validation
+          if [ -f coverage-data/coverage-postgres/report.json ]; then
+            echo "Found postgres coverage report"
+            cp coverage-data/coverage-postgres/report.json .
             ./coverage.sh check
           else
-            echo "Coverage data not found in expected location"
-            echo "Trying alternative locations..."
-
-            # Try finding the file
-            COVERAGE_FILE=$(find coverage-data -name ".coverage_summary.json" -type f | head -1)
-            if [ -n "$COVERAGE_FILE" ]; then
-              echo "Found coverage file at: $COVERAGE_FILE"
-              cp "$COVERAGE_FILE" .
-              # Try to find and copy coverage directory
-              COVERAGE_DIR=$(find coverage-data -type d -name "coverage" | head -1)
-              if [ -n "$COVERAGE_DIR" ]; then
-                mkdir -p target
-                cp -r "$COVERAGE_DIR" target/
-              fi
-              ./coverage.sh check
-            else
-              echo "ERROR: No coverage data found"
-              exit 1
-            fi
+            echo "ERROR: Coverage report not found"
+            echo "Looking for files..."
+            find coverage-data -type f
+            exit 1
           fi
 
   ui_unit_tests:
