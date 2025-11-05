@@ -184,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :dashboardName="dashboardName"
                   :folderName="folderName"
+                  :panelVariablesConfig="getPanelVariablesConfig(item.id)"
                   @updated:data-zoom="$emit('updated:data-zoom', $event)"
                   @onMovePanel="onMovePanel"
                   @refreshPanelRequest="refreshPanelRequest"
