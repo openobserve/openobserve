@@ -561,8 +561,8 @@ style="opacity: 0.7">
                 toggle-color="primary"
                 bordered
                 size="8px"
-                color="white"
                 text-color="primary"
+                bg-color="primary"
                 @update:model-value="toggleSchema"
                 :options="userDefinedSchemaBtnGroupOption"
               >
@@ -631,7 +631,6 @@ style="opacity: 0.7">
                 toggle-color="primary"
                 bordered
                 size="8px"
-                color="white"
                 text-color="primary"
                 :options="selectedFieldsBtnGroupOption"
                 @update:model-value="toggleInterestingFields"
