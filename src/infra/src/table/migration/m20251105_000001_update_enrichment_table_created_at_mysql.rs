@@ -73,7 +73,7 @@ mod tests {
         let statement = increase_data_column_size_statement();
         assert_eq!(
             statement.to_string(MysqlQueryBuilder),
-            "ALTER TABLE `enrichment_tables` MODIFY COLUMN `created_at` bigint"
+            "ALTER TABLE `enrichment_tables` MODIFY COLUMN `created_at` bigint NOT NULL"
         );
     }
 }
