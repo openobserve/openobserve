@@ -44,19 +44,9 @@ jobs:
             echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
 
-  backend_unit_tests:
+  backend_unit_tests_postgres:
     needs: [check_backend_changes]
     if: needs.check_backend_changes.outputs.has_changes == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        db:
-          - name: postgres
-            store: postgres
-            dsn: postgres://postgres:password@localhost:5432/postgres
-          - name: sqlite
-            store: sqlite
-            dsn: ""
     runs-on:
       labels: ubicloud-standard-8
     permissions:
@@ -64,12 +54,12 @@ jobs:
 
     services:
       postgres:
-        image: ${{ matrix.db.name == 'postgres' && 'postgres:17.5-alpine3.22' || '' }}
+        image: postgres:17.5-alpine3.22
         env:
           POSTGRES_PASSWORD: password
         ports:
           - 5432:5432
-        options: ${{ matrix.db.name == 'postgres' && '--health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5' || '' }}
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
       - name: Clone the current repo
@@ -90,7 +80,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: ${{ matrix.db.name }}
+          prefix-key: postgres
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
@@ -104,32 +94,87 @@ jobs:
         run: rustc -C target-cpu=native --print cfg
 
       - name: Check code formatting
-        if: matrix.db.name == 'postgres'
         run: cargo fmt --all -- --check
 
       - name: Run clippy
-        if: matrix.db.name == 'postgres'
         run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
 
-      - name: Run unit tests with ${{ matrix.db.name }}
+      - name: Run unit tests with postgres
         env:
           ZO_INTERNAL_GRPC_TOKEN: fake
           ZO_TEXT_DATA_TYPE: text
-          ZO_META_STORE: ${{ matrix.db.store }}
-          ZO_META_POSTGRES_DSN: ${{ matrix.db.dsn }}
+          ZO_META_STORE: postgres
+          ZO_META_POSTGRES_DSN: postgres://postgres:password@localhost:5432/postgres
         run: ./coverage.sh run-cov
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.db.name }}
+          name: coverage-postgres
+          path: |
+            target/coverage/
+            .coverage_summary.json
+          retention-days: 1
+
+  backend_unit_tests_sqlite:
+    needs: [check_backend_changes]
+    if: needs.check_backend_changes.outputs.has_changes == 'true'
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions:
+      contents: read
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-07-20
+          targets: x86_64-unknown-linux-gnu
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          prefix-key: sqlite
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "21.12"
+
+      - name: Simulate building frontend code
+        run: mkdir -p web/dist && touch web/dist/index.html
+
+      - name: Print rustc cfg
+        run: rustc -C target-cpu=native --print cfg
+
+      - name: Run unit tests with sqlite
+        env:
+          ZO_INTERNAL_GRPC_TOKEN: fake
+          ZO_TEXT_DATA_TYPE: text
+          ZO_META_STORE: sqlite
+          ZO_META_POSTGRES_DSN: ""
+        run: ./coverage.sh run-cov
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-sqlite
           path: |
             target/coverage/
             .coverage_summary.json
           retention-days: 1
 
   merge_coverage:
-    needs: [backend_unit_tests]
+    needs: [backend_unit_tests_postgres, backend_unit_tests_sqlite]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -204,7 +249,7 @@ jobs:
   unit_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [check_backend_changes, backend_unit_tests, merge_coverage, ui_unit_tests]
+    needs: [check_backend_changes, backend_unit_tests_postgres, backend_unit_tests_sqlite, merge_coverage, ui_unit_tests]
     if: always()
     steps:
       - name: Check test results
@@ -217,11 +262,19 @@ jobs:
             exit 1
           fi
 
-          # Backend tests (may be skipped if no changes)
-          if [ "${{ needs.backend_unit_tests.result }}" == "success" ] || [ "${{ needs.backend_unit_tests.result }}" == "skipped" ]; then
-            echo "Backend tests passed or skipped"
+          # Backend postgres tests (may be skipped if no changes)
+          if [ "${{ needs.backend_unit_tests_postgres.result }}" == "success" ] || [ "${{ needs.backend_unit_tests_postgres.result }}" == "skipped" ]; then
+            echo "Backend postgres tests passed or skipped"
           else
-            echo "Backend tests failed"
+            echo "Backend postgres tests failed"
+            exit 1
+          fi
+
+          # Backend sqlite tests (may be skipped if no changes)
+          if [ "${{ needs.backend_unit_tests_sqlite.result }}" == "success" ] || [ "${{ needs.backend_unit_tests_sqlite.result }}" == "skipped" ]; then
+            echo "Backend sqlite tests passed or skipped"
+          else
+            echo "Backend sqlite tests failed"
             exit 1
           fi
 
