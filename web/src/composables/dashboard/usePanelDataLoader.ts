@@ -1343,6 +1343,12 @@ export const usePanelDataLoader = (
                 state.resultMetaData[currentQueryIndex] = [
                   searchResponse.value,
                 ]; // Wrap in array
+
+                // Wait for annotations to complete
+                if (annotationsPromise) {
+                  state.annotations = await annotationsPromise;
+                }
+
                 // set loading to false
                 state.loading = false;
                 return;
@@ -1382,6 +1388,11 @@ export const usePanelDataLoader = (
                 panelQueryIndex,
                 abortControllerRef,
               );
+
+              // Wait for annotations to complete if they were started
+              if (annotationsPromise) {
+                state.annotations = await annotationsPromise;
+              }
 
               // this is async task, which will be executed in background(await is not required)
               saveCurrentStateToCache();
