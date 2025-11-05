@@ -42,15 +42,15 @@ jobs:
         run: |
           if [ -n "${{ github.event.before }}" ]; then
             if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$|^tests/'; then
-              echo "has_changes=true" >> $GITHUB_OUTPUT
-            else
               echo "has_changes=false" >> $GITHUB_OUTPUT
+            else
+              echo "has_changes=true" >> $GITHUB_OUTPUT
             fi
           else
             if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$|^tests/'; then
-              echo "has_changes=true" >> $GITHUB_OUTPUT
-            else
               echo "has_changes=false" >> $GITHUB_OUTPUT
+            else
+              echo "has_changes=true" >> $GITHUB_OUTPUT
             fi
           fi
 
