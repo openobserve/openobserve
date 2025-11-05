@@ -198,13 +198,38 @@ jobs:
 
       - name: Check merged coverage
         run: |
-          # Use the postgres coverage as the primary one (or merge if your coverage.sh supports it)
+          # Debug: List downloaded artifacts
+          echo "=== Listing coverage-data directory ==="
+          ls -la coverage-data/ || echo "coverage-data not found"
+          echo "=== Listing subdirectories ==="
+          find coverage-data -type f || echo "No files found"
+
+          # Use the postgres coverage as the primary one
           if [ -f coverage-data/coverage-postgres/.coverage_summary.json ]; then
+            echo "Found coverage summary at coverage-data/coverage-postgres/.coverage_summary.json"
             cp coverage-data/coverage-postgres/.coverage_summary.json .
+            cp -r coverage-data/coverage-postgres/target/coverage target/ 2>/dev/null || mkdir -p target/coverage
             ./coverage.sh check
           else
-            echo "Coverage data not found"
-            exit 1
+            echo "Coverage data not found in expected location"
+            echo "Trying alternative locations..."
+
+            # Try finding the file
+            COVERAGE_FILE=$(find coverage-data -name ".coverage_summary.json" -type f | head -1)
+            if [ -n "$COVERAGE_FILE" ]; then
+              echo "Found coverage file at: $COVERAGE_FILE"
+              cp "$COVERAGE_FILE" .
+              # Try to find and copy coverage directory
+              COVERAGE_DIR=$(find coverage-data -type d -name "coverage" | head -1)
+              if [ -n "$COVERAGE_DIR" ]; then
+                mkdir -p target
+                cp -r "$COVERAGE_DIR" target/
+              fi
+              ./coverage.sh check
+            else
+              echo "ERROR: No coverage data found"
+              exit 1
+            fi
           fi
 
   ui_unit_tests:
