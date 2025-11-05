@@ -358,11 +358,18 @@ self="top right" max-width="220px">
         </q-btn-dropdown>
       </q-bar>
     </div>
-    <PanelSchemaRenderer
-      :panelSchema="props.data"
-      :selectedTimeObj="props.selectedTimeDate"
-      :width="props.width"
-      :height="props.height"
+    
+    <!-- Panel-Level Variables (shown below drag-allow section) -->
+    <div class="panel-variables-wrapper">
+      <slot name="panel-variables"></slot>
+    </div>
+
+    <div class="panel-chart-wrapper">
+      <PanelSchemaRenderer
+        :panelSchema="props.data"
+        :selectedTimeObj="props.selectedTimeDate"
+        :width="props.width"
+        :height="props.height"
       :variablesData="props.variablesData"
       :forceLoad="props.forceLoad"
       :searchType="searchType"
@@ -398,6 +405,8 @@ self="top right" max-width="220px">
       :allowAlertCreation="allowAlertCreation"
       @show-legends="showLegendsDialog = true"
     ></PanelSchemaRenderer>
+    </div>
+    
     <q-dialog v-model="showViewPanel">
       <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
     </q-dialog>
@@ -500,6 +509,7 @@ export default defineComponent({
     "dashboardName",
     "folderName",
     "allowAlertCreation",
+    "panelVariablesConfig",
     "shouldRefreshWithoutCache",
   ],
   components: {
@@ -1045,6 +1055,22 @@ export default defineComponent({
 <style lang="scss" scoped>
 .panelcontainer {
   height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+}
+
+.drag-allow {
+  flex-shrink: 0;
+}
+
+.panel-variables-wrapper {
+  flex-shrink: 0;
+}
+
+.panel-chart-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .panelHeader {

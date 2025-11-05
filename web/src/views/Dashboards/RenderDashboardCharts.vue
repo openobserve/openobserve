@@ -147,29 +147,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="grid-stack-item-content">
               <!-- Panel with Panel-Level Variables -->
               <div class="panel-with-variables">
-                <!-- Panel-Level Variables (shown above panel) -->
-                <div
-                  v-if="getPanelVariables(item.id).length > 0"
-                  class="panel-variables-container q-px-xs q-py-xs"
-                  :data-test="`dashboard-panel-${item.id}-variables`"
-                >
-                  <VariablesValueSelector
-                    :key="`panel-variables-${item.id}`"
-                    :ref="(el) => setPanelVariableRef(el, item.id)"
-                    :variablesConfig="getPanelVariablesConfig(item.id)"
-                    :showDynamicFilters="false"
-                    :selectedTimeDate="
-                      currentTimeObj['__variables'] ||
-                      currentTimeObj['__global']
-                    "
-                    :initialVariableValues="mergedVariablesWrapper"
-                    :lazyLoad="true"
-                    @variablesData="
-                      (data) => panelVariablesDataUpdated(data, item.id)
-                    "
-                  />
-                </div>
-
                 <!-- Original Panel Container -->
                 <PanelContainer
                   @onDeletePanel="onDeletePanel"
@@ -203,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :dashboardName="dashboardName"
                   :folderName="folderName"
+                  :panelVariablesConfig="getPanelVariablesConfig(item.id)"
                   @updated:data-zoom="$emit('updated:data-zoom', $event)"
                   @onMovePanel="onMovePanel"
                   @refreshPanelRequest="refreshPanelRequest"
@@ -211,6 +189,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @onEditLayout="openEditLayout"
                   @update:runId="updateRunId"
                 >
+                  <!-- Panel-Level Variables (shown below drag-allow section) -->
+                  <template #panel-variables>
+                    <div
+                      v-if="getPanelVariables(item.id).length > 0"
+                      class="panel-variables-container q-px-xs q-py-xs"
+                      :data-test="`dashboard-panel-${item.id}-variables`"
+                    >
+                      <VariablesValueSelector
+                        :key="`panel-variables-${item.id}`"
+                        :ref="(el) => setPanelVariableRef(el, item.id)"
+                        :variablesConfig="getPanelVariablesConfig(item.id)"
+                        :showDynamicFilters="false"
+                        :selectedTimeDate="
+                          currentTimeObj['__variables'] ||
+                          currentTimeObj['__global']
+                        "
+                        :initialVariableValues="mergedVariablesWrapper"
+                        :lazyLoad="true"
+                        @variablesData="
+                          (data) => panelVariablesDataUpdated(data, item.id)
+                        "
+                      />
+                    </div>
+                  </template>
                 </PanelContainer>
               </div>
             </div>
