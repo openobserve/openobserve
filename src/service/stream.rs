@@ -367,6 +367,14 @@ pub async fn save_stream_settings(
             )));
     }
 
+    // only allow setting user defined schema for supported stream
+    if !stream_type.support_uds() && !settings.defined_schema_fields.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST,
+            format!("stream type [{stream_type}] don't support user defined schema"),
+        )));
+    }
+
     // _all field can't setting for inverted index & index field
     for key in settings.full_text_search_keys.iter() {
         if key == &cfg.common.column_all {
