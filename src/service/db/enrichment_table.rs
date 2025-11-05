@@ -337,7 +337,7 @@ pub async fn get_enrichment_data_from_db(
             }
         }
     }
-    Ok((vec, min_ts as i64, max_ts as i64))
+    Ok((vec, min_ts, max_ts))
 }
 
 pub async fn delete_enrichment_data_from_db(

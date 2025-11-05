@@ -33,7 +33,7 @@ pub struct EnrichmentTableRecord {
     pub org: String,
     pub name: String,
     pub data: Vec<u8>,
-    pub created_at: u64,
+    pub created_at: i64,
 }
 
 #[derive(FromQueryResult, Debug, Serialize, Deserialize)]
@@ -48,7 +48,7 @@ impl EnrichmentTableRecord {
             org: org.to_string(),
             name: name.to_string(),
             data,
-            created_at: now_micros() as u64,
+            created_at: now_micros(),
         }
     }
 }
