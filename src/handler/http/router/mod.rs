@@ -590,6 +590,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(search::query_manager::cancel_query)
         .service(keys::get)
         .service(keys::delete)
+        .service(keys::delete_bulk)
         .service(keys::save)
         .service(keys::list)
         .service(keys::update)

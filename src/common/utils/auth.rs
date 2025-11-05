@@ -707,23 +707,25 @@ impl FromRequest for AuthExtractor {
 
             // if let Some(auth_header) = req.headers().get("Authorization") {
             if !auth_str.is_empty() {
+                let path_is_bulk_operation =
+                    path.contains("/bulk/enable") || path.contains("/cipher_keys/bulk");
+
                 if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
-                || (method.eq("POST")
-                    && url_len > 1
-                    && path_columns[1].starts_with("result_schema"))
-                || (method.eq("POST") && url_len > 1 && path.ends_with("actions/upload"))
-                || path.contains("/prometheus/api/v1/query")
-                || path.contains("/resources")
-                || path.contains("/format_query")
-                || path.contains("/prometheus/api/v1/series")
-                || path.contains("/traces/latest")
-                || path.contains("clusters")
-                || path.contains("query_manager")
-                || path.contains("/short")
-                || path.contains("/ws")
-                || path.contains("/_values_stream")
-                // bulk enable of pipelines and alerts
-                || path.contains("/bulk/enable")
+                    || (method.eq("POST")
+                        && url_len > 1
+                        && path_columns[1].starts_with("result_schema"))
+                    || (method.eq("POST") && url_len > 1 && path.ends_with("actions/upload"))
+                    || path.contains("/prometheus/api/v1/query")
+                    || path.contains("/resources")
+                    || path.contains("/format_query")
+                    || path.contains("/prometheus/api/v1/series")
+                    || path.contains("/traces/latest")
+                    || path.contains("clusters")
+                    || path.contains("query_manager")
+                    || path.contains("/short")
+                    || path.contains("/ws")
+                    || path.contains("/_values_stream")
+                    || path_is_bulk_operation
                 {
                     return Ok(AuthExtractor {
                         auth: auth_str.to_owned(),
