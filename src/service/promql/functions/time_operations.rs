@@ -110,7 +110,7 @@ fn exec(data: Value, op: &TimeOperationType) -> Result<Value> {
         .into_par_iter()
         .map(|mut instant| {
             let ts = op.get_component_from_ts(instant.sample.value as i64);
-            let  labels = std::mem::take(&mut instant.labels);
+            let labels = std::mem::take(&mut instant.labels);
             InstantValue {
                 labels: labels.without_metric_name(),
                 sample: Sample::new(instant.sample.timestamp, ts as f64),

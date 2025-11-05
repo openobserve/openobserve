@@ -20,22 +20,19 @@ use crate::service::promql::value::{InstantValue, RangeValue, Sample, Value};
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent_over_time
 pub(crate) fn absent_over_time(data: Value) -> Result<Value> {
     let ret = super::eval_idelta(data, "absent_over_time", exec, false)?;
-    match ret {
-        Value::Vector(v) => {
-            if let Some(first) = v.first() {
-                let exist = v.iter().any(|instant| instant.sample.value == 0.0);
-                return Ok(Value::Vector(vec![InstantValue {
-                    labels: vec![],
-                    sample: Sample {
-                        timestamp: first.sample.timestamp,
-                        value: if exist { 0.0 } else { 1.0 },
-                    },
-                }]));
-            } else {
-                return Ok(Value::Vector(vec![]));
-            }
+    if let Value::Vector(v) = ret {
+        if let Some(first) = v.first() {
+            let exist = v.iter().any(|instant| instant.sample.value == 0.0);
+            return Ok(Value::Vector(vec![InstantValue {
+                labels: vec![],
+                sample: Sample {
+                    timestamp: first.sample.timestamp,
+                    value: if exist { 0.0 } else { 1.0 },
+                },
+            }]));
+        } else {
+            return Ok(Value::Vector(vec![]));
         }
-        _ => {}
     }
     Ok(Value::None)
 }
