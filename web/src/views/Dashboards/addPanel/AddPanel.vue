@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         align-items: baseline;
                         padding: 0px;
                       "
-                      >Apply without using cache</q-item-label
+                      >Refresh Cache & Apply</q-item-label
                     >
                   </q-item-section>
                 </q-item>
