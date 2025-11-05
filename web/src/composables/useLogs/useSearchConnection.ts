@@ -44,6 +44,7 @@ export const useSearchConnection = () => {
     isPagination: boolean,
     type: "search" | "histogram" | "pageCount" | "values",
     meta?: any,
+    clear_cache?: boolean,
   ) => {
     const { traceId } = generateTraceContext();
     addTraceId(traceId);
@@ -55,6 +56,7 @@ export const useSearchConnection = () => {
       traceId: string;
       org_id: string;
       meta?: any;
+      clear_cache?: boolean;
     } = {
       queryReq,
       type,
@@ -62,6 +64,7 @@ export const useSearchConnection = () => {
       traceId,
       org_id: searchObj.organizationIdentifier,
       meta,
+      clear_cache: clear_cache,
     };
 
     return payload;
@@ -163,7 +166,7 @@ export const useSearchConnection = () => {
         };
       }
 
-      const payload = buildWebSocketPayload(queryReq, isPagination, "search");
+      const payload = buildWebSocketPayload(queryReq, isPagination, "search", {}, searchObj.meta.clearCache);
 
       // Add callbacks to payload
       payload.onData = callbacks.onData;

@@ -171,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
                         :is_ui_histogram="is_ui_histogram"
+                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
                       />
@@ -409,6 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
                         :is_ui_histogram="is_ui_histogram"
+                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
                       />
@@ -519,6 +521,11 @@ export default defineComponent({
       required: false,
       default: false,
     },
+    shouldRefreshWithoutCache: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
   },
   components: {
     ChartSelection,
@@ -561,10 +568,11 @@ export default defineComponent({
     };
     const { showErrorNotification } = useNotifications();
 
+
     const { searchObj } = searchState();
     const { buildSearch } = useSearchStream();
 
-    const { visualizeChartData, is_ui_histogram }: any = toRefs(props);
+    const { visualizeChartData, is_ui_histogram, shouldRefreshWithoutCache }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
 
     const showAddToDashboardDialog = ref(false);
@@ -947,6 +955,7 @@ export default defineComponent({
       splitterModel,
       collapseFieldList,
       is_ui_histogram,
+      shouldRefreshWithoutCache,
       onResultMetadataUpdate,
       hoveredSeriesState,
       resultMetaData,
