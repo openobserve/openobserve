@@ -111,16 +111,11 @@ pub fn generate_user_defined_schema(
 ) -> Arc<SchemaCache> {
     let cfg = get_config();
     let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
-    if !fields.contains(TIMESTAMP_COL_NAME) {
-        fields.insert(TIMESTAMP_COL_NAME.to_string());
-    }
-    if (need_all_column || !cfg.common.feature_query_exclude_all)
-        && !fields.contains(&cfg.common.column_all)
-    {
+    fields.insert(TIMESTAMP_COL_NAME.to_string());
+    fields.insert(ID_COL_NAME.to_string());
+
+    if need_all_column || !cfg.common.feature_query_exclude_all {
         fields.insert(cfg.common.column_all.to_string());
-    }
-    if !fields.contains(ID_COL_NAME) {
-        fields.insert(ID_COL_NAME.to_string());
     }
     let new_fields = fields
         .iter()

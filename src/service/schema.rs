@@ -26,7 +26,10 @@ use config::{
     get_config,
     ider::SnowflakeIdGenerator,
     meta::{
-        promql::{BUCKET_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
+        promql::{
+            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
+            VALUE_LABEL,
+        },
         stream::StreamType,
     },
     metrics,
@@ -527,7 +530,11 @@ pub fn check_schema_for_defined_schema_fields(
             fields.insert(NAME_LABEL.to_string());
             fields.insert(HASH_LABEL.to_string());
             fields.insert(BUCKET_LABEL.to_string());
+            fields.insert(QUANTILE_LABEL.to_string());
+            fields.insert(EXEMPLARS_LABEL.to_string());
             fields.insert(VALUE_LABEL.to_string());
+            fields.insert("trace_id".to_string());
+            fields.insert("span_id".to_string());
         }
         StreamType::Traces => {
             fields.insert("service_name".to_string());

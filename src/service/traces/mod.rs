@@ -216,13 +216,11 @@ pub async fn handle_otlp_request(
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
     let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
     let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
-
     let streams = vec![StreamParams {
         org_id: org_id.to_owned().into(),
         stream_type: StreamType::Traces,
         stream_name: traces_stream_name.to_owned().into(),
     }];
-
     crate::service::ingestion::get_uds_and_original_data_streams(
         &streams,
         &mut user_defined_schema_map,
