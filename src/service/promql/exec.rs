@@ -125,7 +125,41 @@ impl PromqlContext {
                 return Ok((Value::None, result_type_exec, *self.scan_stats.read().await));
             }
             (value, result_type_exec) => {
-                return Ok((value, result_type_exec, *self.scan_stats.read().await));
+                // If this is a range query (start != end) and result is a scalar,
+                // we need to repeat the scalar value for each time point
+                let (final_value, final_result_type) =
+                    if self.start != self.end && matches!(value, Value::Float(_)) {
+                        // Get the scalar value
+                        let scalar_val = match &value {
+                            Value::Float(f) => *f,
+                            _ => unreachable!(),
+                        };
+
+                        // Generate samples for each time point
+                        let timestamps = eval_ctx.timestamps();
+                        let samples: Vec<Sample> = timestamps
+                            .into_iter()
+                            .map(|ts| Sample::new(ts, scalar_val))
+                            .collect();
+
+                        // Create a matrix with a single series containing all time points
+                        let range_value = RangeValue {
+                            labels: Labels::default(),
+                            samples,
+                            exemplars: None,
+                            time_window: None,
+                        };
+
+                        (Value::Matrix(vec![range_value]), Some("matrix".to_string()))
+                    } else {
+                        (value, result_type_exec)
+                    };
+
+                return Ok((
+                    final_value,
+                    final_result_type,
+                    *self.scan_stats.read().await,
+                ));
             }
         }
     }
