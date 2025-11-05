@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     data-test="dashboard-panel-container"
   >
-    <div class="drag-allow">
+    <div :class="{ 'drag-allow': !viewOnly }">
       <q-bar
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'transparent'"
         dense

@@ -1101,7 +1101,7 @@ export const usePanelDataLoader = (
                   state.metadata.queries.push(
                     timeShiftQueries[i]?.metadata ?? {},
                   );
-                  state.resultMetaData.push({});
+                  state.resultMetaData.push([]);
                 }
 
                 // Use HTTP2/streaming for multi-query (time-shift) queries
@@ -1154,15 +1154,17 @@ export const usePanelDataLoader = (
 
                       // Store the current query index for the next hits event
                       currentQueryIndexInStream = queryIndex;
-                      // Update metadata for this specific query index
-                      if (state.resultMetaData[queryIndex] !== undefined) {
-                        state.resultMetaData[queryIndex] = {
-                          ...(state.resultMetaData[queryIndex] ?? {}),
-                          ...results,
-                          streaming_aggs:
-                            response?.content?.streaming_aggs ?? false,
-                        };
+
+                      // Initialize metadata array if not exists
+                      if (!state.resultMetaData[queryIndex]) {
+                        state.resultMetaData[queryIndex] = [];
                       }
+
+                      // Push metadata for each partition
+                      state.resultMetaData[queryIndex].push({
+                        ...(response?.content ?? {}),
+                        ...(response?.content?.results ?? {}),
+                      });
                     }
 
                     if (response.type === "search_response_hits") {
@@ -1193,8 +1195,7 @@ export const usePanelDataLoader = (
                       ) {
                         // Check if streaming_aggs is enabled
                         const streaming_aggs =
-                          state.resultMetaData[queryIndex]?.streaming_aggs ??
-                          false;
+                          state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ?? false;
 
                         // If streaming_aggs, replace the data (aggregation query)
                         if (streaming_aggs) {
@@ -1274,7 +1275,7 @@ export const usePanelDataLoader = (
                 return { result: null, metadata: null };
               } finally {
                 // set loading to false
-                state.loading = false;
+                // state.loading = false;
               }
             } else {
               const { query: query1, metadata: metadata1 } = replaceQueryValue(
