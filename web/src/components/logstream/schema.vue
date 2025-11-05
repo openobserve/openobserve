@@ -222,9 +222,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tabs v-model="activeMainTab" inline-label dense>
                   <!-- Schema Settings Tab with conditional class -->
                   <q-tab
-                    :class="{
-                      'text-primary': activeMainTab === 'schemaSettings',
-                    }"
                     name="schemaSettings"
                     icon="settings"
                     label="Schema Settings"
@@ -233,7 +230,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Red Button Tab -->
                   <q-tab
-                    :class="{ 'text-primary': activeMainTab === 'redButton' }"
                     name="redButton"
                     icon="backup"
                     label="Extended Retention"
@@ -242,7 +238,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Configuration Tab -->
                     <q-tab
-                    :class="{ 'text-primary': activeMainTab === 'configuration' }"
                     name="configuration"
                     icon="tune"
                     label="Configuration"
@@ -313,13 +308,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-input>
                     <q-btn
                       v-if="isSchemaUDSEnabled"
-                      color="primary"
                       data-test="schema-add-fields-title"
                       @click="openDialog"
                       no-caps
                       :disable="isDialogOpen"
                       class="o2-secondary-button tw-h-[36px] tw-w-[32px] q-my-sm"
-                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                       style="min-width: 0px !important; min-height: 0px !important;"
                       flat
                       @click.stop="openDialog"
