@@ -139,6 +139,13 @@ impl StreamType {
         )
     }
 
+    pub fn support_uds(&self) -> bool {
+        matches!(
+            *self,
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces
+        )
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             StreamType::Logs => "logs",

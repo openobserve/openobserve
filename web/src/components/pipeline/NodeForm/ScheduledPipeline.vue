@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-height full-width scheduled-pipeline-container">
+  <div class="full-width scheduled-pipeline-container">
     <div class="flex items-center justify-between q-pb-sm">
       <div class="flex items-center">
         <q-btn
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-splitter
           v-model="splitterModel"
           style="width: 100%"
-          class="full-height"
+          class="o2-custom-splitter"
         >
           <template #before>
             <q-splitter
@@ -142,13 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :popup-content-style="{ textTransform: 'lowercase' }"
                       color="input-border"
                       bg-color="input-bg"
-                      class="no-case full-width"
-                      filled
+                      class="no-case full-width q-mb-xs o2-custom-select-dashboard"
                       stack-label
                       dense
                       use-input
                       hide-selected
                       fill-input
+                      borderless
                       input-debounce="300"
                       @update:model-value="getStreamList"
                     />
@@ -162,13 +162,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :popup-content-style="{ textTransform: 'lowercase' }"
                       color="input-border"
                       bg-color="input-bg"
-                      class="q-py-xs no-case full-width"
-                      filled
+                      class="q-my-xs no-case full-width o2-custom-select-dashboard"
                       stack-label
                       dense
                       use-input
                       hide-selected
                       fill-input
+                      borderless
                       input-debounce="300"
                       @update:model-value="getStreamFields"
                       @filter="filterStreams"
@@ -1065,10 +1065,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-btn>
           </template>
           <template #after>
-            <div class="full-width tw-flex">
+            <div class="full-width tw-flex tw-flex-col" style="height: 100%">
               <div
-                :style="{}"
-                style="height: calc(100vh - 140px) !important; width: 100%"
+                class="tw-flex-1 tw-overflow-auto"
+                style="height: calc(100vh - 200px) !important; width: 100%"
               >
                 <div class="query-editor-container scheduled-pipelines">
                   <span @click.stop="expandState.query = !expandState.query">
@@ -1134,7 +1134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else-if="
                       rows.length == 0 && expandState.output && tab == 'sql'
                     "
-                    style="height: calc(100vh - 190px) !important"
+                    style="height: calc(100vh - 236px) !important"
                   >
                     <h6
                       v-if="selectedStreamName == ''"
@@ -1142,7 +1142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="text-center col-10 q-mx-none"
                     >
                       <q-icon name="info" color="primary"
-size="md" /> Select a
+                  size="md" /> Select a
                       stream and press 'Run query' to continue. Additionally,
                       you can apply additional filters and adjust the date range
                       to enhance search.
@@ -1169,55 +1169,47 @@ size="md" />
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div class="flex justify-end q-mt-md">
-              <q-btn
-                v-if="pipelineObj.isEditNode"
-                data-test="stream-routing-query-delete-btn"
-                class="o2-secondary-button tw-h-[36px]"
-                flat
+              <div
+                class="scheduled-pipeline-footer tw-sticky tw-bottom-0 tw-px-4 tw-py-3 tw-z-10"
                 :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-secondary-button-dark'
-                    : 'o2-secondary-button-light'
+                  store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'
                 "
-                no-caps
-                @click="$emit('delete:node')"
               >
-                <q-icon name="delete" class="q-mr-xs" />
-                {{ t("pipeline.deleteNode") }}
-              </q-btn>
+                <div class="flex justify-end">
+                  <q-btn
+                    v-if="pipelineObj.isEditNode"
+                    data-test="stream-routing-query-delete-btn"
+                    class="o2-secondary-button tw-h-[36px]"
+                    flat
+                    no-caps
+                    @click="$emit('delete:node')"
+                  >
+                    <q-icon name="delete" class="q-mr-xs" />
+                    {{ t("pipeline.deleteNode") }}
+                  </q-btn>
 
-              <q-btn
-                data-test="stream-routing-query-cancel-btn"
-                class="o2-secondary-button tw-h-[36px] q-ml-md"
-                :label="t('alerts.cancel')"
-                flat
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-secondary-button-dark'
-                    : 'o2-secondary-button-light'
-                "
-                no-caps
-                @click="$emit('cancel:form')"
-              />
-              <q-btn
-                data-test="stream-routing-query-save-btn"
-                :label="
-                  validatingSqlQuery ? 'Validating...' : 'Validate and Close'
-                "
-                class="no-border q-ml-md o2-primary-button tw-h-[36px]"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-primary-button-dark'
-                    : 'o2-primary-button-light'
-                "
-                no-caps
-                type="submit"
-                @click="$emit('submit:form')"
-                :disable="validatingSqlQuery"
-              />
+                  <q-btn
+                    data-test="stream-routing-query-cancel-btn"
+                    class="o2-secondary-button tw-h-[36px] q-ml-md"
+                    :label="t('alerts.cancel')"
+                    flat
+                    no-caps
+                    @click="$emit('cancel:form')"
+                  />
+                  <q-btn
+                    data-test="stream-routing-query-save-btn"
+                    :label="
+                      validatingSqlQuery ? 'Validating...' : 'Validate and Close'
+                    "
+                    class="no-border q-ml-md o2-primary-button tw-h-[36px]"
+                    no-caps
+                    type="submit"
+                    @click="$emit('submit:form')"
+                    :disable="validatingSqlQuery"
+                  />
+                </div>
+              </div>
             </div>
           </template>
         </q-splitter>
@@ -2377,9 +2369,14 @@ defineExpose({
   border-radius: 4px;
   overflow: hidden;
 }
+
+.scheduled-pipeline-footer {
+  border-top: 1px solid var(--o2-border-color);
+}
 </style>
 <style lang="scss">
 .scheduled-pipeline-container {
+  height: 100%;
   .q-splitter__before {
     overflow: hidden;
   }
@@ -2456,5 +2453,13 @@ defineExpose({
       color: #ffffff;
     }
   }
+}
+.o2-custom-splitter{
+    >.q-splitter__separator {
+      width: 0.625rem; // 10px
+      z-index: 999 !important;
+      height: 100%;
+      background: transparent;
+    }
 }
 </style>

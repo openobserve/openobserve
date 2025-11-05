@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @request="onRequest"
           binary-state-sort
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          style="width: 100%; height: calc(100vh - 127px)"
+          style="width: 100%; height: calc(100vh - 105px)"
         >
           <template #no-data>
             <div class="tw-h-[100vh] full-width">
@@ -152,13 +152,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </template>
 
+          <template #body-cell-start_time="props">
+            <q-td :props="props">
+              {{ formatDate(props.row.start_time) }}
+            </q-td>
+          </template>
+
+          <template #body-cell-end_time="props">
+            <q-td :props="props">
+              {{ formatDate(props.row.end_time) }}
+            </q-td>
+          </template>
+
           <template #body-cell-status="props">
             <q-td :props="props">
               <q-chip
                 :color="getStatusColor(props.row.status)"
                 text-color="white"
-                size="sm"
+                size="0.8rem"
                 dense
+                outline
               >
                 {{ props.row.status }}
               </q-chip>
@@ -170,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon
                 :name="props.row.is_realtime ? 'check_circle' : 'schedule'"
                 :color="props.row.is_realtime ? 'positive' : 'grey'"
-                size="sm"
+                size="xs"
               >
                 <q-tooltip>
                   {{ props.row.is_realtime ? "Real-time" : "Scheduled" }}
@@ -182,12 +195,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #body-cell-is_silenced="props">
             <q-td :props="props">
               <q-icon
-                v-if="props.row.is_silenced"
-                name="volume_off"
-                color="warning"
-                size="sm"
+                :name="props.row.is_silenced ? 'volume_off' : 'volume_up'"
+                :color="props.row.is_silenced ? 'grey' : 'positive'"
+                size="20px"
               >
-                <q-tooltip>Silenced</q-tooltip>
+                <q-tooltip>{{ props.row.is_silenced ? "Silenced" : "Not Silenced" }}</q-tooltip>
               </q-icon>
             </q-td>
           </template>
@@ -198,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </template>
 
-          <template #body-cell-error="props">
+          <!-- <template #body-cell-error="props">
             <q-td :props="props">
               <q-icon
                 v-if="props.row.error"
@@ -211,19 +223,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tooltip>Click to view error</q-tooltip>
               </q-icon>
             </q-td>
-          </template>
+          </template> -->
 
           <template #body-cell-actions="props">
             <q-td :props="props">
               <q-btn
                 icon="visibility"
-                flat
-                dense
+                padding="sm"
+                unelevated
+                size="sm"
                 round
+                flat
                 @click="showDetailsDialog(props.row)"
                 data-test="alert-history-view-details"
               >
                 <q-tooltip>View Details</q-tooltip>
+              </q-btn>
+              <q-btn
+                v-if="props.row.error"
+                :data-test="`pipeline-list-${props.row.name}-error-indicator`"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                color="negative"
+                icon="error"
+                @click.stop="showErrorDialog(props.row)"
+              >
+                <q-tooltip>
+                  Last error: {{ new Date(props.row.timestamp / 1000).toLocaleString() }}
+                </q-tooltip>
               </q-btn>
             </q-td>
           </template>
@@ -275,9 +305,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-chip
                     :color="getStatusColor(selectedRow.status)"
                     text-color="white"
-                    size="sm"
+                    size="0.8rem"
                     dense
-                    square
+                    outline
                   >
                     {{ selectedRow.status }}
                   </q-chip>
@@ -465,19 +495,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Error Dialog -->
     <q-dialog v-model="errorDialog">
       <q-card style="min-width: 500px">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">Error Details</div>
-          <q-space />
-          <q-btn icon="close" flat round dense @click="errorDialog = false" />
+        <q-card-section class="pipeline-error-header row items-center q-pb-none">
+          <div class="tw-flex-1">
+            <div class="tw-flex tw-items-center tw-gap-3 tw-mb-1">
+              <q-icon name="error" size="24px" class="error-icon" />
+              <span class="pipeline-name">{{ errorMessage.alert_name }}</span>
+            </div>
+            <div class="error-timestamp">
+              <span class="tw-ml-1">Last error:</span>
+              <q-icon name="schedule" size="14px" class="tw-mr-1" />
+              {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
+            </div>
+          </div>
+          <q-btn
+            icon="close"
+            flat
+            round
+            dense
+            @click="closeErrorDialog"
+            class="close-btn"
+          />
         </q-card-section>
 
+        <q-separator />
+
         <q-card-section>
-          <q-card flat bordered class="q-pa-sm bg-negative-1">
-            <pre style="white-space: pre-wrap; word-break: break-word">{{
-              errorMessage
-            }}</pre>
-          </q-card>
+          <div class="tw-mb-4">
+            <div class="section-label tw-mb-2">Error Summary</div>
+              <div class="error-summary-box">
+                {{ errorMessage.error }}
+              </div>
+          </div>
         </q-card-section>
+        <q-card-actions class="pipeline-error-actions">
+          <q-btn
+            flat
+            no-caps
+            label="Close"
+            class="o2-secondary-button tw-h-[36px]"
+            @click="closeErrorDialog"
+          />
+        </q-card-actions>
       </q-card>
     </q-dialog>
   </div>
@@ -548,13 +606,7 @@ const errorMessage = ref("");
 
 // Table columns
 const columns = ref([
-  {
-    name: "timestamp",
-    label: "Timestamp",
-    field: "timestamp",
-    align: "left",
-    sortable: true,
-  },
+  { name: "#", label: "#", field: "#", align: "left", style: "width: 37px;" },
   {
     name: "alert_name",
     label: "Alert Name",
@@ -563,18 +615,12 @@ const columns = ref([
     sortable: true,
   },
   {
-    name: "status",
-    label: "Status",
-    field: "status",
-    align: "center",
-    sortable: true,
-  },
-  {
     name: "is_realtime",
     label: "Type",
     field: "is_realtime",
     align: "center",
     sortable: false,
+    style: "width: 37px;",
   },
   {
     name: "is_silenced",
@@ -582,6 +628,31 @@ const columns = ref([
     field: "is_silenced",
     align: "center",
     sortable: false,
+    style: "width: 37px;",
+  },
+  {
+    name: "timestamp",
+    label: "Timestamp",
+    field: "timestamp",
+    align: "left",
+    sortable: true,
+    style: "width: 160px;",
+  },
+  {
+    name: "start_time",
+    label: "Start Time",
+    field: "start_time",
+    align: "left",
+    sortable: true,
+    style: "width: 160px;",
+  },
+  {
+    name: "end_time",
+    label: "End Time",
+    field: "end_time",
+    align: "left",
+    sortable: true,
+    style: "width: 160px;",
   },
   {
     name: "duration",
@@ -589,6 +660,15 @@ const columns = ref([
     field: (row: any) => row.end_time - row.start_time,
     align: "right",
     sortable: true,
+    style: "width: 50px;",
+  },
+  {
+    name: "status",
+    label: "Status",
+    field: "status",
+    align: "center",
+    sortable: true,
+    style: "width: 150px;",
   },
   {
     name: "retries",
@@ -596,20 +676,22 @@ const columns = ref([
     field: "retries",
     align: "center",
     sortable: true,
+    style: "width: 50px;",
   },
-  {
-    name: "error",
-    label: "Error",
-    field: "error",
-    align: "center",
-    sortable: false,
-  },
+  // {
+  //   name: "error",
+  //   label: "Error",
+  //   field: "error",
+  //   align: "center",
+  //   sortable: false,
+  // },
   {
     name: "actions",
     label: "Actions",
     field: "actions",
     align: "center",
     sortable: false,
+    style: "width: 50px;",
   },
 ]);
 
@@ -710,6 +792,7 @@ const fetchAlertHistory = async () => {
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
+        "#": index + 1,
       }));
 
       // Update pagination total
@@ -801,6 +884,7 @@ const getStatusColor = (status: string) => {
   switch (status?.toLowerCase()) {
     case "success":
     case "ok":
+    case "completed":
       return "positive";
     case "error":
     case "failed":
@@ -811,7 +895,7 @@ const getStatusColor = (status: string) => {
     case "running":
       return "info";
     default:
-      return "grey";
+      return "black";
   }
 };
 
@@ -823,6 +907,11 @@ const showDetailsDialog = (row: any) => {
 const showErrorDialog = (error: string) => {
   errorMessage.value = error;
   errorDialog.value = true;
+};
+
+const closeErrorDialog = () => {
+  errorDialog.value = false;
+  errorMessage.value = null;
 };
 
 const goBack = () => {
@@ -911,5 +1000,65 @@ const changePagination = (val: { label: string; value: any }) => {
       background: #555;
     }
   }
+}
+.pipeline-error-header {
+  padding: 20px 24px 16px;
+
+  .error-icon {
+    color: #ef4444;
+  }
+
+  .pipeline-name {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .error-timestamp {
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    opacity: 0.7;
+    margin-left: 36px;
+  }
+
+  .close-btn {
+    opacity: 0.6;
+    transition: opacity 0.2s;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
+
+.pipeline-error-content {
+  padding: 20px 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.section-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+
+.error-summary-box {
+  padding: 16px;
+  border-radius: 8px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #dc2626;
+}
+.pipeline-error-actions {
+  padding: 16px 24px;
+  justify-content: flex-end;
 }
 </style>

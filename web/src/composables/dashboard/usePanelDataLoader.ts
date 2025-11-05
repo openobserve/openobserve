@@ -74,6 +74,7 @@ export const usePanelDataLoader = (
   is_ui_histogram?: any,
   dashboardName?: any,
   folderName?: any,
+  shouldRefreshWithoutCache?: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -662,6 +663,7 @@ export const usePanelDataLoader = (
         pageType: string;
         searchType: string;
         meta: any;
+        clear_cache: boolean;
       } = {
         queryReq: {
           query: {
@@ -694,6 +696,7 @@ export const usePanelDataLoader = (
           fallback_order_by_col: getFallbackOrderByCol(),
           is_ui_histogram: is_ui_histogram.value,
         },
+        clear_cache: shouldRefreshWithoutCache?.value || false,
       };
 
       // type: "search",
@@ -1098,7 +1101,7 @@ export const usePanelDataLoader = (
                   state.metadata.queries.push(
                     timeShiftQueries[i]?.metadata ?? {},
                   );
-                  state.resultMetaData.push({});
+                  state.resultMetaData.push([]);
                 }
 
                 // Use HTTP2/streaming for multi-query (time-shift) queries
@@ -1136,6 +1139,7 @@ export const usePanelDataLoader = (
                     tab_name: tabName?.value,
                     fallback_order_by_col: getFallbackOrderByCol(),
                     is_ui_histogram: is_ui_histogram.value,
+                    is_refresh_cache: shouldRefreshWithoutCache?.value || false,
                     timeShiftQueries,
                   },
                 };
@@ -1150,14 +1154,17 @@ export const usePanelDataLoader = (
 
                       // Store the current query index for the next hits event
                       currentQueryIndexInStream = queryIndex;
-                      // Update metadata for this specific query index
-                      if (state.resultMetaData[queryIndex] !== undefined) {
-                        state.resultMetaData[queryIndex] = {
-                          ...(state.resultMetaData[queryIndex] ?? {}),
-                          ...results,
-                          streaming_aggs: response?.content?.streaming_aggs ?? false,
-                        };
+
+                      // Initialize metadata array if not exists
+                      if (!state.resultMetaData[queryIndex]) {
+                        state.resultMetaData[queryIndex] = [];
                       }
+
+                      // Push metadata for each partition
+                      state.resultMetaData[queryIndex].push({
+                        ...(response?.content ?? {}),
+                        ...(response?.content?.results ?? {}),
+                      });
                     }
 
                     if (response.type === "search_response_hits") {
@@ -1188,7 +1195,7 @@ export const usePanelDataLoader = (
                       ) {
                         // Check if streaming_aggs is enabled
                         const streaming_aggs =
-                          state.resultMetaData[queryIndex]?.streaming_aggs ?? false;
+                          state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ?? false;
 
                         // If streaming_aggs, replace the data (aggregation query)
                         if (streaming_aggs) {
@@ -1197,7 +1204,9 @@ export const usePanelDataLoader = (
                         // Otherwise, append/prepend based on order_by (multiple partitions)
                         else {
                           const orderBy =
-                            state.resultMetaData[queryIndex]?.order_by?.toLowerCase();
+                            state.resultMetaData[
+                              queryIndex
+                            ]?.order_by?.toLowerCase();
 
                           if (orderBy === "asc") {
                             // For ascending order, prepend new data at start
@@ -1215,7 +1224,8 @@ export const usePanelDataLoader = (
                         }
 
                         if (state.resultMetaData[queryIndex]) {
-                          state.resultMetaData[queryIndex].hits = state.data[queryIndex];
+                          state.resultMetaData[queryIndex].hits =
+                            state.data[queryIndex];
                         }
                       }
                       state.errorDetail = { message: "", code: "" };
@@ -1265,7 +1275,7 @@ export const usePanelDataLoader = (
                 return { result: null, metadata: null };
               } finally {
                 // set loading to false
-                state.loading = false;
+                // state.loading = false;
               }
             } else {
               const { query: query1, metadata: metadata1 } = replaceQueryValue(
@@ -1340,6 +1350,12 @@ export const usePanelDataLoader = (
                 state.resultMetaData[currentQueryIndex] = [
                   searchResponse.value,
                 ]; // Wrap in array
+
+                // Wait for annotations to complete
+                if (annotationsPromise) {
+                  state.annotations = await annotationsPromise;
+                }
+
                 // set loading to false
                 state.loading = false;
                 return;
@@ -1379,6 +1395,11 @@ export const usePanelDataLoader = (
                 panelQueryIndex,
                 abortControllerRef,
               );
+
+              // Wait for annotations to complete if they were started
+              if (annotationsPromise) {
+                state.annotations = await annotationsPromise;
+              }
 
               // this is async task, which will be executed in background(await is not required)
               saveCurrentStateToCache();
@@ -1487,7 +1508,7 @@ export const usePanelDataLoader = (
     // calculate range in seconds (total time range of the dashboard)
     // Note: startISOTimestamp and endISOTimestamp are in microseconds (from API)
     const __range_micros = endISOTimestamp - startISOTimestamp;
-    const __range_seconds = __range_micros / 1000000;  // Convert microseconds to seconds
+    const __range_seconds = __range_micros / 1000000; // Convert microseconds to seconds
 
     // format range, ensuring it's never empty (minimum 1s for PromQL compatibility)
     const formattedRange = formatRateInterval(__range_seconds) || "1s";
