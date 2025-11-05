@@ -170,7 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : ''
           "
           language="sql"
-          @update:query="updateQuery"
+          @update:query="updateQueryValue"
+          @run-query="searchData"
           @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
           @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
         />
@@ -203,8 +204,6 @@ import SyntaxGuide from "./SyntaxGuide.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import AppTabs from "@/components/common/AppTabs.vue";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useStreams from "@/composables/useStreams";
 import { getImageURL } from "@/utils/zincutils";
 
@@ -216,8 +215,6 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     SyntaxGuide,
-    AppTabs,
-    ConfirmDialog,
   },
   emits: ["searchdata", "shareLink", "update:activeTab"],
   props: {
