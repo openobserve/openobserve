@@ -643,30 +643,34 @@ export default defineComponent({
     // Decode all scoped variables from URL
     const decodedVariables = decodeVariablesFromUrl(route.query);
 
-    // Convert decoded variables to flat format expected by components
+    // Convert decoded variables to new nested format for scope isolation
     Object.keys(decodedVariables).forEach((varName) => {
       const variable = decodedVariables[varName];
 
       if (variable.scope === 'global') {
-        // Global: store direct value
+        // Global: store direct value (not nested)
         initialVariableValues.value[varName] = variable.value;
       } else if (variable.scope === 'tabs') {
-        // Tab: Find value for current tab or store all
-        const currentTabId = route.query.tab;
-        if (currentTabId && Array.isArray(variable.value)) {
-          const tabValue = variable.value.find((tv: any) => tv.tabId === currentTabId);
-          if (tabValue) {
-            initialVariableValues.value[varName] = tabValue.value;
-          }
-        }
-        // Also store full array for tab-level component initialization
+        // Tab: Store as nested object with tabId keys for isolation
+        // Structure: { varName: { tabId: value, tabId2: value2 } }
         if (Array.isArray(variable.value) && variable.value.length > 0) {
-          initialVariableValues.value[`${varName}__tabs`] = variable.value;
+          initialVariableValues.value[varName] = {};
+          variable.value.forEach((tv: any) => {
+            if (tv.tabId && tv.value !== undefined) {
+              initialVariableValues.value[varName][tv.tabId] = tv.value;
+            }
+          });
         }
       } else if (variable.scope === 'panels') {
-        // Panel: Store all panel values for later lookup by panel components
+        // Panel: Store as nested object with panelId keys for isolation
+        // Structure: { varName: { panelId: value, panelId2: value2 } }
         if (Array.isArray(variable.value) && variable.value.length > 0) {
-          initialVariableValues.value[`${varName}__panels`] = variable.value;
+          initialVariableValues.value[varName] = {};
+          variable.value.forEach((pv: any) => {
+            if (pv.panelId && pv.value !== undefined) {
+              initialVariableValues.value[varName][pv.panelId] = pv.value;
+            }
+          });
         }
       }
     });
