@@ -39,13 +39,16 @@ export class SanityPage {
         this.confirmButton = '[data-test="confirm-button"]';
         
         // Function locators
-        this.functionDropdown = '[data-test="logs-search-bar-function-dropdown"] button';
+        this.functionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
+        this.functionSaveButton = '[data-test="logs-search-bar-save-transform-btn"]';
+        this.functionSaveButtonAlternate = '[data-test="logs-search-bar-function-dropdown"]';
         this.fnEditor = '#fnEditor';
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         
         // Menu Navigation locators
         this.pipelineMenuItem = '[data-test="menu-link-\\/pipeline-item"]';
         this.realtimeTab = '[data-test="tab-realtime"]';
+        this.streamPipelinesTab = '[data-test="stream-pipelines-tab"]';
         this.functionStreamTab = '[data-test="function-stream-tab"]';
         this.dashboardsMenuItem = '[data-test="menu-link-\\/dashboards-item"]';
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
@@ -164,9 +167,18 @@ export class SanityPage {
     async displayResultTextAndPagination() {
         await this.page.locator(this.refreshButton).click();
         await this.page.waitForLoadState('networkidle');
-        
+
         await expect(this.page.getByText("Showing 1 to 50")).toBeVisible({ timeout: 15000 });
-        await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+        await this.page.waitForTimeout(1000);
+
+        try {
+            await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+        } catch (error) {
+            testLogger.warn('Pagination element not found, retrying with refresh button click');
+            await this.page.locator(this.refreshButton).click();
+            await this.page.waitForLoadState('networkidle');
+            await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+        }
     }
 
     // Histogram Methods
@@ -282,47 +294,73 @@ export class SanityPage {
         await this.page.locator(this.refreshButton).click();
         await this.page.waitForLoadState('networkidle');
         
-        const functionDropdown = this.page.locator(this.functionDropdown).filter({ hasText: "save" });
-        await functionDropdown.click();
-        
         const fnEditor = this.page.locator(this.fnEditor);
-        
+
+        // Check if VRL editor is visible, if not try to enable it via toggle
         if (await fnEditor.count() === 0) {
             const vrlToggle = this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
-            
+
             if (await vrlToggle.count() > 0 && await vrlToggle.isVisible()) {
-                await vrlToggle.locator('div').nth(2).click();
+                await vrlToggle.locator('div').nth(2).click({ force: true });
+                await this.page.waitForTimeout(1000);
                 await this.page.waitForLoadState('domcontentloaded');
             }
         }
-        
+
         const fnEditorTextbox = this.page.locator(this.fnEditor).locator('.monaco-editor');
-        
+
         try {
-            await expect(fnEditorTextbox).toBeVisible({ timeout: 15000 });
-            // await expect(fnEditorTextbox).toBeEditable({ timeout: 10000 });
+            await expect(fnEditorTextbox).toBeVisible({ timeout: 5000 });
             await this.page.waitForLoadState('domcontentloaded');
-            await fnEditorTextbox.click();
+            await fnEditorTextbox.click({ force: true });
         } catch (error) {
-            const cmContent = this.page.locator('.monaco-editor').first();
-            if (await cmContent.count() > 0) {
-                await cmContent.click();
+            // Monaco editor not visible, try clicking toggle button
+            testLogger.warn('Monaco editor not visible, trying toggle button');
+            const vrlToggle = this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
+            if (await vrlToggle.count() > 0) {
+                await vrlToggle.locator('div').nth(1).click({ force: true });
+                await this.page.waitForTimeout(1000);
+
+                // Retry clicking monaco editor
+                await expect(fnEditorTextbox).toBeVisible({ timeout: 10000 });
+                await fnEditorTextbox.click({ force: true });
             } else {
-                throw error;
+                // Fallback to any monaco editor
+                const cmContent = this.page.locator('.monaco-editor').first();
+                if (await cmContent.count() > 0) {
+                    await cmContent.click({ force: true });
+                } else {
+                    throw error;
+                }
             }
         }
         
         await this.page.locator(this.fnEditor).locator(".inputarea").fill(".a=2");
         await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
-        
-        await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
-        
+
+        // Try clicking the Save button with fallback strategies
+        let saveDialogVisible = false;
+
+        // First attempt: Click primary save button
         try {
-          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'attached', timeout: 3000 });
+          testLogger.info('Attempting to click primary function save button');
+          await this.page.locator(this.functionSaveButton).click();
           await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
+          saveDialogVisible = true;
+          testLogger.info('Primary save button click succeeded');
         } catch (error) {
-          await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
-          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 5000 });
+          testLogger.warn('Primary save button click failed, trying alternate locator');
+
+          // Second attempt: Try alternate locator (button inside dropdown)
+          try {
+            await this.page.locator(this.functionSaveButtonAlternate).getByRole('button').filter({ hasText: 'save' }).click();
+            await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
+            saveDialogVisible = true;
+            testLogger.info('Alternate save button click succeeded');
+          } catch (alternateError) {
+            testLogger.error('Both save button attempts failed');
+            throw new Error('Failed to open function save dialog using primary and alternate locators');
+          }
         }
         
         await this.page.locator(this.savedFunctionNameInput).click();
@@ -342,9 +380,16 @@ export class SanityPage {
 
     async createFunctionViaFunctionsPage() {
         await this.page.locator(this.pipelineMenuItem).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForTimeout(500);
+        await this.page.locator(this.streamPipelinesTab).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForTimeout(500);
         await this.page.locator(this.realtimeTab).click();
+        await this.page.waitForTimeout(500);
         await this.page.locator(this.functionStreamTab).click();
-        
+        await this.page.waitForTimeout(500);
+
         await this.page.getByRole(this.createNewFunctionButton.role, { name: this.createNewFunctionButton.name }).click();
         await this.page.getByLabel(this.nameLabel.label).click();
         await this.page.getByLabel(this.nameLabel.label).fill("sanitytest");
@@ -371,21 +416,27 @@ export class SanityPage {
     async createAndDeleteFolder(folderName) {
         await this.page.locator(this.dashboardsMenuItem).click();
         await this.page.waitForLoadState('domcontentloaded');
-        
+        await this.page.waitForTimeout(2000);
+
         await this.page.locator(this.dashboardSearch).click();
         await this.page.locator(this.newFolderButton).click();
-        
-        await expect(this.page.locator(this.folderAddName)).toBeVisible({ timeout: 10000 });
+        await this.page.waitForTimeout(2000);
+        await this.page.locator(this.folderAddName).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForTimeout(1000);
         await this.page.locator(this.folderAddName).fill(folderName);
+        await this.page.waitForTimeout(1000);
         await this.page.locator(this.folderAddSave).click();
-        
+        await this.page.waitForTimeout(2000);
+
         await expect(this.page.getByText(folderName)).toBeVisible({ timeout: 10000 });
         await this.page.getByText(folderName).click();
-        
+        await this.page.waitForTimeout(2000);
+
         await this.page.waitForLoadState('domcontentloaded');
         
         await this.page.locator(`[data-test^="dashboard-folder-tab"]:has-text("${folderName}") [data-test="dashboard-more-icon"]`).click();
         await this.page.locator(this.deleteFolderIcon).click({ force: true });
+        await this.page.waitForTimeout(2000);
         await this.page.locator(this.confirmButton).click();
 
         await expect(this.page.getByText("Folder deleted successfully")).toBeVisible({ timeout: 10000 });
@@ -407,10 +458,12 @@ export class SanityPage {
         
         await this.page.locator(this.streamsMenuItem).click();
         await this.page.waitForLoadState('domcontentloaded');
-        
+        await this.page.waitForTimeout(2000);
+
         await this.page.locator(this.addStreamButton).click();
-        
-        await expect(this.page.getByLabel("Name *")).toBeVisible({ timeout: 10000 });
+        await this.page.waitForTimeout(2000);
+        await this.page.getByLabel("Name *").waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForTimeout(2000);
         await this.page.getByLabel("Name *").fill(uniqueStreamName);
         
         await this.page.locator(this.streamTypeDropdown).getByText("arrow_drop_down").click();
@@ -482,9 +535,11 @@ export class SanityPage {
         
         // Wait for search results to load using proper wait
         await this.page.waitForLoadState('networkidle');
-        
+        await this.page.waitForTimeout(2000);
+
         // Click delete button for the specific stream using first() to handle search results
         await this.page.getByRole("button", { name: "Delete" }).first().click();
+        await this.page.waitForTimeout(2000);
         
         // Wait for and click confirmation dialog button - try different variations
         const confirmButtonVariants = ["Ok", "OK", "Delete", "Confirm", "Yes"];
@@ -504,8 +559,18 @@ export class SanityPage {
         if (!confirmClicked) {
             throw new Error('No confirmation dialog button found with variants: ' + confirmButtonVariants.join(', '));
         }
-            
+
         await this.page.waitForLoadState('networkidle');
+
+        // Verify stream was deleted - search should return no results
+        await this.page.getByPlaceholder("Search Stream").clear();
+        await this.page.getByPlaceholder("Search Stream").fill(uniqueStreamName);
+        await this.page.waitForTimeout(1000);
+
+        const streamStillExists = await this.page.getByText(uniqueStreamName).isVisible({ timeout: 3000 }).catch(() => false);
+        if (streamStillExists) {
+            throw new Error(`Stream ${uniqueStreamName} was not deleted successfully`);
+        }
     }
 
     // Result Summary Methods
@@ -518,8 +583,18 @@ export class SanityPage {
         
         await expect(this.page.locator(this.closeDialog)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.closeDialog).click();
-        
-        await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+        await this.page.waitForTimeout(2000);
+
+        const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+        if (!paginationVisible) {
+            await this.page.locator(this.refreshButton).click();
+            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForTimeout(2000);
+            const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+            if (!retryVisible) {
+                throw new Error('Pagination not visible after clicking result summary and retrying run query');
+            }
+        }
     }
 
     // Sanity2-Specific Methods
@@ -706,13 +781,15 @@ export class SanityPage {
         try {
             await refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForTimeout(2000);
         } catch (error) {
             console.warn('Refresh button click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
             await refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForTimeout(2000);
         }
-        
+
         // Turn off histogram with error handling
         try {
             const histogramToggle = this.page.locator(this.histogramToggleDiv).nth(2);
@@ -735,7 +812,9 @@ export class SanityPage {
             await this.page.waitForTimeout(2000);
             await this.page.locator(this.resultColumnSource).click({ timeout: 10000 });
         }
-        
+
+        await this.page.waitForTimeout(2000);
+
         // Close dialog with error handling
         try {
             const closeDialogButton = this.page.locator(this.closeDialog);
@@ -746,26 +825,55 @@ export class SanityPage {
             await this.page.waitForTimeout(2000);
             await this.page.locator(this.closeDialog).click({ timeout: 10000 });
         }
-        
-        // Click on pagination with error handling
-        try {
-            const paginationElement = this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down");
-            await expect(paginationElement).toBeVisible({ timeout: 15000 });
-            await paginationElement.click({ timeout: 10000 });
-        } catch (error) {
-            console.warn('Pagination element click failed, retrying:', error.message);
+
+        await this.page.waitForTimeout(2000);
+
+        // Check if pagination is visible, if not click run query again
+        const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+        if (!paginationVisible) {
+            await this.page.locator(this.refreshButton).click();
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
             await this.page.waitForTimeout(2000);
-            await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").click({ timeout: 10000 });
+            const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+            if (!retryVisible) {
+                throw new Error('Pagination not visible after histogram off and retrying run query');
+            }
         }
     }
 
     async displayPaginationWhenOnlySQLWithResult() {
+        // Turn off histogram
         await this.page.locator(this.histogramToggleDiv).nth(2).click();
+        await this.page.waitForTimeout(1000);
+
+        // Enable SQL mode
         await this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000);
+
+        // Click run query button
         await this.page.locator(this.refreshButton).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        await this.page.waitForTimeout(2000);
+
+        // Click on result column
         await this.page.locator(this.timestampColumn).click();
+        await this.page.waitForTimeout(2000);
+
+        // Close dialog
         await this.page.locator(this.closeDialog).click();
-        await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").click();
+        await this.page.waitForTimeout(2000);
+
+        // Check if pagination is visible, if not click run query again
+        const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+        if (!paginationVisible) {
+            await this.page.locator(this.refreshButton).click();
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForTimeout(2000);
+            const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+            if (!retryVisible) {
+                throw new Error('Pagination not visible after SQL mode on and retrying run query');
+            }
+        }
     }
 
     async displayHistogramInSQLMode() {
@@ -901,18 +1009,10 @@ export class SanityPage {
             throw new Error('SQL+Histogram test: VRL editor (#fnEditor) not found after toggle');
         }
         
-        // Wait for SQL editor to be ready
-        const sqlEditor = this.page.locator('#fnEditor');
-        await expect(sqlEditor).toBeVisible({ timeout: 15000 });
-        
-        // await expect(sqlEditor).locator('.monaco-editor').toBeEditable({ timeout: 10000 });
-        
-        await sqlEditor.locator('.monaco-editor').click();
-        
         // Enable SQL mode with error handling
         const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2);
         await expect(sqlModeSwitch).toBeVisible({ timeout: 15000 });
-        
+
         try {
             await sqlModeSwitch.click({ timeout: 10000 });
             await this.page.waitForTimeout(1000); // Brief wait for mode switch
@@ -921,11 +1021,16 @@ export class SanityPage {
             await this.page.waitForTimeout(2000);
             await sqlModeSwitch.click({ timeout: 10000 });
         }
-        
-        // Fill SQL query into the editor
-        await sqlEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+
+        // Wait for query editor to be ready
+        const queryEditor = this.page.locator(this.queryEditorContent);
+        await expect(queryEditor).toBeVisible({ timeout: 15000 });
+
+        await queryEditor.locator('.monaco-editor').click();
+        await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         await this.page.waitForLoadState('domcontentloaded');
-        
+        await this.page.waitForTimeout(1000);
+
         // Click refresh button with robust waits
         const refreshButton = this.page.locator(this.refreshButton);
         await expect(refreshButton).toBeVisible({ timeout: 15000 });
@@ -934,13 +1039,15 @@ export class SanityPage {
         try {
             await refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForTimeout(2000);
         } catch (error) {
             console.warn('Refresh button click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
             await refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForTimeout(2000);
         }
-        
+
         // Wait for search results to load before looking for timestamp menu
         await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible({ timeout: 20000 });
         

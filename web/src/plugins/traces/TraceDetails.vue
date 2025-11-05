@@ -141,14 +141,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="trace-details-view-logs-btn"
                 v-close-popup="true"
-                class="text-bold traces-view-logs-btn"
+                class="text-bold traces-view-logs-btn tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
                 :label="
                   searchObj.meta.redirectedFromLogs
                     ? t('traces.backToLogs')
                     : t('traces.viewLogs')
                 "
-                text-color="light-text"
                 padding="sm sm"
+                color="primary"
                 size="sm"
                 no-caps
                 dense
@@ -211,23 +211,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <q-btn
               data-test="trace-details-share-link-btn"
-              class="q-mr-sm download-logs-btn"
-              size="sm"
+              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
+              size="xs"
               icon="share"
-              round
-              flat
-              no-outline
-              :title="t('search.shareLink')"
               @click="shareLink"
-            />
+            >
+              <q-tooltip>
+                {{ t('search.shareLink') }}
+              </q-tooltip>
+            </q-btn>
             <q-btn
               data-test="trace-details-close-btn"
-              round
-              flat
+              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
               icon="cancel"
-              size="md"
+              size="xs"
               @click="routeToTracesList"
-            />
+            >
+              <q-tooltip>
+                {{ t('common.cancel') }}
+              </q-tooltip>
+            </q-btn>
           </div>
         </div>
 
@@ -1650,7 +1653,7 @@ html:has(.trace-details) {
   }
 }
 .custom-height {
-  height: 34px;
+  height: 30px;
 }
 
 .trace-search-container {

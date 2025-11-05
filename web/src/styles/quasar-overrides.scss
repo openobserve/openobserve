@@ -527,8 +527,8 @@ body.desktop .q-hoverable:hover > .q-focus-helper{
     .q-field__control {
       height: 36px !important;
       min-height: 36px !important;
-      background-color: #ffffff;
-      border: 1px solid #e1e1e1;
+      background-color: var(--o2-page-bg);
+      border: 1px solid var(--o2-border-color);
 
       .q-field__control-container {
         height: calc(100% - 1px) !important;
@@ -553,7 +553,7 @@ body.desktop .q-hoverable:hover > .q-focus-helper{
     }
 
     &.q-field--dark .q-field__control {
-      background-color: #ffffff12;
+      background-color: var(--o2-dark-page-bg);
     }
 
     .q-field__bottom {
