@@ -354,6 +354,7 @@ pub async fn get_latest_traces(
         search_type: None,
         search_event_context: None,
         use_cache: default_use_cache(),
+        clear_cache: false,
         local_mode: None,
     };
 

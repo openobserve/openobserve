@@ -402,6 +402,7 @@ impl QueryConditionExt for QueryCondition {
                 search_type,
                 search_event_context,
                 use_cache: false,
+                clear_cache: false,
                 local_mode: None,
             };
             log::debug!(
