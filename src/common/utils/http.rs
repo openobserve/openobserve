@@ -121,6 +121,11 @@ pub(crate) fn get_is_multi_stream_search_from_request(query: &HashMap<String, St
 }
 
 #[inline(always)]
+pub(crate) fn get_clear_cache_from_request(query: &HashMap<String, String>) -> bool {
+    get_key_as_bool(query, "clear_cache")
+}
+
+#[inline(always)]
 #[cfg(feature = "enterprise")]
 pub(crate) fn get_extract_patterns_from_request(query: &HashMap<String, String>) -> bool {
     get_key_as_bool(query, "patterns")
