@@ -74,7 +74,6 @@ export const usePanelDataLoader = (
   is_ui_histogram?: any,
   dashboardName?: any,
   folderName?: any,
-  viewOnly?: boolean,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -109,7 +108,7 @@ export const usePanelDataLoader = (
       "scatter",
       "stacked",
       "h-stacked",
-    ].includes(panelSchema.value.type) && !viewOnly
+    ].includes(panelSchema.value.type);
   };
 
   const getFallbackOrderByCol = () => {
