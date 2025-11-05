@@ -265,3 +265,15 @@ impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
         }
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct DashboardBulkDeleteRequest {
+    pub ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct DashboardBulkDeleteResponse {
+    pub successful: Vec<String>,
+    pub unsuccessful: Vec<String>,
+    pub err: Option<String>,
+}

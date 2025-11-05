@@ -707,12 +707,13 @@ impl FromRequest for AuthExtractor {
 
             // if let Some(auth_header) = req.headers().get("Authorization") {
             if !auth_str.is_empty() {
-                let path_is_bulk_operation = path.contains("/bulk/enable")
-                    || path.contains("/cipher_keys/bulk")
-                    || path.contains("/re_patterns/bulk")
-                    || path.contains("/alerts/templates/bulk")
-                    || path.contains("/alerts/destinations/bulk")
-                    || (path.starts_with("/v2/") && path.contains("/alerts/bulk"));
+                let path_is_bulk_operation = method.eq("DELETE")
+                    && (path.contains("/cipher_keys/bulk")
+                        || path.contains("/re_patterns/bulk")
+                        || path.contains("/alerts/templates/bulk")
+                        || path.contains("/alerts/destinations/bulk")
+                        || (path.starts_with("/v2/") && path.contains("/alerts/bulk"))
+                        || path.contains("/dashboards/bulk"));
 
                 if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
                     || (method.eq("POST")
@@ -729,6 +730,7 @@ impl FromRequest for AuthExtractor {
                     || path.contains("/short")
                     || path.contains("/ws")
                     || path.contains("/_values_stream")
+                    || path.contains("/bulk/enable")
                     || path_is_bulk_operation
                 {
                     return Ok(AuthExtractor {
