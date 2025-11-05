@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{Datelike, NaiveDate, Timelike};
-use config::utils::time::parse_i64_to_timestamp_micros;
+use config::{meta::promql::NAME_LABEL, utils::time::parse_i64_to_timestamp_micros};
 use datafusion::error::{DataFusionError, Result};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use strum::EnumIter;
@@ -111,8 +111,11 @@ pub(crate) fn timestamp_range(data: Value) -> Result<Value> {
                         })
                         .collect();
 
+                    let mut labels = std::mem::take(&mut range_value.labels);
+                    labels.retain(|l| l.name != NAME_LABEL);
+
                     RangeValue {
-                        labels: std::mem::take(&mut range_value.labels),
+                        labels,
                         samples,
                         exemplars: range_value.exemplars,
                         time_window: range_value.time_window,

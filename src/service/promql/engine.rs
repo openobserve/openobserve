@@ -390,6 +390,7 @@ impl Engine {
         let eval_timestamps = self.eval_ctx.timestamps();
 
         // For each metric, select appropriate samples at each evaluation timestamp
+        // TODO: make it parallel
         let mut result = Vec::new();
         for metric in metrics_cache {
             let mut selected_samples = Vec::new();
@@ -405,21 +406,23 @@ impl Engine {
                     .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
 
                 let match_sample = if end_index > 0 {
-                    metric.samples.get(end_index - 1)
-                } else if !metric.samples.is_empty() {
-                    metric.samples.first()
+                    metric.samples.get(end_index - 1).and_then(|sample| {
+                        let adjusted_ts = sample.timestamp + offset_modifier;
+                        if adjusted_ts >= start && adjusted_ts <= eval_ts {
+                            Some(sample)
+                        } else {
+                            None
+                        }
+                    })
                 } else {
                     None
                 };
 
-                // Check if the sample is within the lookback window
+                // Add the matched sample (already validated to be within range)
                 if let Some(sample) = match_sample {
-                    let adjusted_ts = sample.timestamp + offset_modifier;
-                    if adjusted_ts <= eval_ts && adjusted_ts > start {
-                        // Use eval_ts as the timestamp for the selected sample
-                        // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                        selected_samples.push(Sample::new(eval_ts, sample.value));
-                    }
+                    // Use eval_ts as the timestamp for the selected sample
+                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
+                    selected_samples.push(Sample::new(eval_ts, sample.value));
                 }
             }
 
