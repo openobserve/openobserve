@@ -142,13 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :popup-content-style="{ textTransform: 'lowercase' }"
                       color="input-border"
                       bg-color="input-bg"
-                      class="no-case full-width"
-                      filled
+                      class="no-case full-width q-mb-xs o2-custom-select-dashboard"
                       stack-label
                       dense
                       use-input
                       hide-selected
                       fill-input
+                      borderless
                       input-debounce="300"
                       @update:model-value="getStreamList"
                     />
@@ -162,13 +162,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :popup-content-style="{ textTransform: 'lowercase' }"
                       color="input-border"
                       bg-color="input-bg"
-                      class="q-py-xs no-case full-width"
-                      filled
+                      class="q-my-xs no-case full-width o2-custom-select-dashboard"
                       stack-label
                       dense
                       use-input
                       hide-selected
                       fill-input
+                      borderless
                       input-debounce="300"
                       @update:model-value="getStreamFields"
                       @filter="filterStreams"
