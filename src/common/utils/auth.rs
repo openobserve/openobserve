@@ -713,7 +713,8 @@ impl FromRequest for AuthExtractor {
                         || path.contains("/alerts/templates/bulk")
                         || path.contains("/alerts/destinations/bulk")
                         || (path.starts_with("/v2/") && path.contains("/alerts/bulk"))
-                        || path.contains("/dashboards/bulk"));
+                        || path.contains("/dashboards/bulk"))
+                    || path.contains("/pipelines/bulk");
 
                 if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
                     || (method.eq("POST")

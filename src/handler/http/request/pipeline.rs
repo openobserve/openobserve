@@ -20,7 +20,10 @@ use actix_web::{
     web::{self, Json, Query},
 };
 use ahash::HashMap;
-use config::{ider, meta::pipeline::Pipeline};
+use config::{
+    ider,
+    meta::pipeline::{Pipeline, PipelineBulkDeleteRequest, PipelineBulkDeleteResponse},
+};
 
 #[cfg(feature = "enterprise")]
 use crate::handler::http::request::search::utils::check_resource_permissions;
@@ -249,6 +252,70 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
         ))),
         Err(e) => Ok(e.into()),
     }
+}
+
+/// DeletePipelineBulk
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "deletePipelineBulk",
+    summary = "Delete multiple pipelines",
+    description = "Permanently deletes multiple data processing pipelines. This will stop any ongoing data transformations using these pipelines",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = PipelineBulkDeleteRequest, description = "Pipeline data", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = PipelineBulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"}))
+    )
+)]
+#[delete("/{org_id}/pipelines/bulk")]
+async fn delete_pipeline_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<PipelineBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let user_id = user_email.user_id;
+
+    for id in &req.ids {
+        if let Some(res) =
+            check_resource_permissions(&org_id, &user_id, "pipelines", id, "DELETE").await
+        {
+            return Ok(res);
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for id in req.ids {
+        match pipeline::delete_pipeline(&id).await {
+            Ok(()) => {
+                successful.push(id);
+            }
+            Err(e) => {
+                log::error!("error deleting pipeline {org_id}/{id} : {e}");
+                unsuccessful.push(id);
+                err = Some(e.to_string());
+            }
+        }
+    }
+
+    Ok(MetaHttpResponse::json(PipelineBulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }
 
 /// UpdatePipeline

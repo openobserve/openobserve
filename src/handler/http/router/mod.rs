@@ -561,6 +561,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(pipeline::update_pipeline)
         .service(pipeline::list_pipelines)
         .service(pipeline::list_streams_with_pipeline)
+        .service(pipeline::delete_pipeline_bulk)
         .service(pipeline::delete_pipeline)
         .service(pipeline::enable_pipeline)
         .service(pipeline::enable_pipeline_bulk)

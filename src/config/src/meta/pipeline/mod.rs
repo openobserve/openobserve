@@ -417,6 +417,18 @@ pub fn default_status() -> bool {
     true
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct PipelineBulkDeleteRequest {
+    pub ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct PipelineBulkDeleteResponse {
+    pub successful: Vec<String>,
+    pub unsuccessful: Vec<String>,
+    pub err: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
