@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error, sync::Arc, time::Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Error,
+    sync::Arc,
+    time::Instant,
+};
 
 use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
@@ -29,7 +34,6 @@ use config::{
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt, time::now_micros},
 };
-use hashbrown::HashSet;
 use infra::schema::{SchemaCache, unwrap_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -207,6 +211,24 @@ pub async fn handle_otlp_request(
     .await;
     let mut stream_pipeline_inputs = Vec::new();
     // End pipeline params construction
+
+    // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
+    let streams = vec![StreamParams {
+        org_id: org_id.to_owned().into(),
+        stream_type: StreamType::Traces,
+        stream_name: traces_stream_name.to_owned().into(),
+    }];
+    crate::service::ingestion::get_uds_and_original_data_streams(
+        &streams,
+        &mut user_defined_schema_map,
+        &mut streams_need_original_map,
+        &mut streams_need_all_values_map,
+    )
+    .await;
+    // End get user defined schema
 
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
@@ -420,7 +442,7 @@ pub async fn handle_otlp_request(
                     })?;
 
                     // get json object
-                    let record_val = match value.take() {
+                    let mut record_val = match value.take() {
                         json::Value::Object(v) => v,
                         _ => {
                             log::error!(
@@ -436,6 +458,10 @@ pub async fn handle_otlp_request(
                             ));
                         }
                     };
+
+                    if let Some(Some(fields)) = user_defined_schema_map.get(&traces_stream_name) {
+                        record_val = crate::service::ingestion::refactor_map(record_val, fields);
+                    }
 
                     let (ts_data, _) = json_data_by_stream
                         .entry(traces_stream_name.to_string())
@@ -477,7 +503,7 @@ pub async fn handle_otlp_request(
 
                     for (_idx, mut res) in stream_pl_results {
                         // get json object
-                        let record_val = match res.take() {
+                        let mut record_val = match res.take() {
                             json::Value::Object(v) => v,
                             _ => {
                                 log::error!(
@@ -494,6 +520,13 @@ pub async fn handle_otlp_request(
                                     )));
                             }
                         };
+
+                        if let Some(Some(fields)) =
+                            user_defined_schema_map.get(&stream_params.stream_name.to_string())
+                        {
+                            record_val =
+                                crate::service::ingestion::refactor_map(record_val, fields);
+                        }
 
                         log::debug!(
                             "[TRACES:OTLP] pipeline result for stream: {} got {} records",
@@ -556,6 +589,7 @@ pub async fn handle_otlp_request(
 /// This ingestion handler is designated to ScheduledPipeline's gPRC ingestion service.
 /// Only accepts data that has already been validated against the otlp protocol.
 /// Please use other ingestion handlers when ingesting raw trace data.
+/// For internal service only, so don't need to check UDS
 pub async fn ingest_json(
     org_id: &str,
     body: web::Bytes,
