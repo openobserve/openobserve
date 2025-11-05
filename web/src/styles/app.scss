@@ -1555,6 +1555,8 @@ body {
   .button-center {
     border-radius: 0 !important;
     color: var(--o2-text-primary);
+    border-right: 1px solid var(--o2-border-color) !important;
+
   }
 
   .button-right {
@@ -1563,7 +1565,6 @@ body {
     border-bottom-right-radius: 0.375rem !important; // 6px
     color: var(--o2-text-primary);
     transition: all 0.3s ease;
-    border-left: 1px solid var(--o2-border-color) !important;
   }
 
   .selected {
