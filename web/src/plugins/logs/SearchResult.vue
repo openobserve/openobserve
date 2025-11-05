@@ -196,6 +196,12 @@ style="color: transparent"
         </div>
       </div>
       <div
+        :class="[
+          'histogram-container',
+          searchObj.meta.showHistogram
+            ? 'histogram-container--visible'
+            : 'histogram-container--hidden',
+        ]"
         v-else-if="
           searchObj.data.histogram?.errorMsg != '' &&
           searchObj.meta.showHistogram &&
