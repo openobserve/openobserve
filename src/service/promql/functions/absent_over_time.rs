@@ -15,18 +15,37 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::value::{RangeValue, Value};
+use crate::service::promql::value::{InstantValue, RangeValue, Sample, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent_over_time
 pub(crate) fn absent_over_time(data: Value) -> Result<Value> {
-    super::eval_idelta(data, "absent_over_time", exec, false)
+    let ret = super::eval_idelta(data, "absent_over_time", exec, false)?;
+    match ret {
+        Value::Vector(v) => {
+            if let Some(first) = v.first() {
+                let exist = v.iter().any(|instant| instant.sample.value == 0.0);
+                return Ok(Value::Vector(vec![InstantValue {
+                    labels: vec![],
+                    sample: Sample {
+                        timestamp: first.sample.timestamp,
+                        value: if exist { 0.0 } else { 1.0 },
+                    },
+                }]));
+            } else {
+                return Ok(Value::Vector(vec![]));
+            }
+        }
+        _ => {}
+    }
+    Ok(Value::None)
 }
 
 fn exec(data: RangeValue) -> Option<f64> {
     if data.samples.is_empty() {
-        return Some(1.0);
+        Some(1.0)
+    } else {
+        Some(0.0)
     }
-    None
 }
 
 #[cfg(test)]

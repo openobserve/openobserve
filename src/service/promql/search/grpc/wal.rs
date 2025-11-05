@@ -149,7 +149,7 @@ async fn get_wal_batches(
     let mut df = match ctx.table(stream_name).await {
         Ok(df) => df.filter(
             col(TIMESTAMP_COL_NAME)
-                .gt(lit(start))
+                .gt_eq(lit(start))
                 .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
         )?,
         Err(_) => {
