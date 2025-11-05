@@ -554,6 +554,85 @@
   }
 }
 
+.logs-visualize-toggle {
+  .button-group {
+    border: 0.0625rem solid var(--o2-border) !important; // 1px
+    border-radius: 0.5625rem; // 9px
+  }
+
+  .button {
+    background-color: var(--o2-muted-background);
+    border-radius: 0.375rem; // 6px
+    transition: background-color 0.2s ease;
+  }
+
+  .button-left {
+    border-radius: 0 !important;
+    border-top-left-radius: 0.375rem !important; // 6px
+    border-bottom-left-radius: 0.375rem !important; // 6px
+    color: var(--o2-text-primary);
+    border-right: 1px solid var(--o2-border-color) !important;
+  }
+
+  .button-center {
+    border-radius: 0 !important;
+    color: var(--o2-text-primary);
+  }
+
+  .button-right {
+    border-radius: 0 !important;
+    border-top-right-radius: 0.375rem !important; // 6px
+    border-bottom-right-radius: 0.375rem !important; // 6px
+    color: var(--o2-text-primary);
+    transition: all 0.3s ease;
+    border-left: 1px solid var(--o2-border-color) !important;
+  }
+
+  .selected {
+    background-color: var(--q-primary) !important;
+    color: white !important;
+  }
+}
+
+.dark-theme{
+  .logs-visualize-toggle {
+    .button-right {
+      border-top-right-radius: 0.375rem; // 6px
+      border-bottom-right-radius: 0.375rem; // 6px
+      color: var(--o2-text-primary);
+      background-color: rgba(255, 255, 255, 0.1);
+
+      &:hover{
+        color: white;
+      }
+    }
+    .selected {
+      background-color: var(--q-primary) !important;
+      color: white !important;
+    }
+    .button-left {
+      background-color: rgba(255, 255, 255, 0.1);
+      &:hover{
+        color: white;
+      }
+    }
+    .selected {
+      background-color: var(--q-primary) !important;
+      color: white !important;
+    }
+    .button-center {
+      background-color: rgba(255, 255, 255, 0.1);
+      &:hover{
+        color: white;
+      }
+    }
+    .selected {
+      background-color: var(--q-primary) !important;
+      color: white !important;
+    }
+  }
+}
+
 .file-type-button-group {
   .q-btn {
     border: 0.0625rem solid var(--o2-border); // 1px
