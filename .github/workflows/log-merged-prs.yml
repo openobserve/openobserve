@@ -22,7 +22,7 @@ jobs:
       - name: Log to Google Sheet
         if: steps.check_title.outputs.match == 'true'
         env:
-          SHEET_WEBHOOK_URL: ${{ secrets.PR_LOG_SHEET_WEBHOOK_URL }}
+          PR_LOG_SHEET_WEBHOOK_URL: ${{ secrets.PR_LOG_SHEET_WEBHOOK_URL }}
         run: |
           curl -X POST -H 'Content-Type: application/json' \
           -d '{
