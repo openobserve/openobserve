@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           currentTimeObj['__variables'] ||
                           currentTimeObj['__global']
                         "
-                        :initialVariableValues="mergedVariablesWrapper"
+                        :initialVariableValues="getPanelVariablesWrapper(item.id)"
                         :lazyLoad="true"
                         @variablesData="
                           (data) => panelVariablesDataUpdated(data, item.id)
@@ -1689,6 +1689,7 @@ export default defineComponent({
       loadPanelVariablesIfVisible,
       tabVariablesValueSelectorRef,
       mergedVariablesWrapper,
+      getPanelVariablesWrapper,
     };
   },
   methods: {
