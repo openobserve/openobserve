@@ -534,6 +534,7 @@ export default defineComponent({
       is_ui_histogram,
       dashboardName,
       folderName,
+      props.viewOnly
     );
 
     const {
