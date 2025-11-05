@@ -367,14 +367,6 @@ pub async fn save_stream_settings(
             )));
     }
 
-    // only allow setting user defined schema for logs stream
-    if stream_type != StreamType::Logs && !settings.defined_schema_fields.is_empty() {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
-            "only logs stream can have user defined schema",
-        )));
-    }
-
     // _all field can't setting for inverted index & index field
     for key in settings.full_text_search_keys.iter() {
         if key == &cfg.common.column_all {
@@ -583,22 +575,29 @@ pub async fn update_stream_settings(
         settings
             .defined_schema_fields
             .extend(new_settings.defined_schema_fields.add);
-        settings.defined_schema_fields.sort();
-        settings.defined_schema_fields.dedup();
+    }
+    if !new_settings.defined_schema_fields.remove.is_empty() {
+        settings
+            .defined_schema_fields
+            .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
+    }
+    if !settings.defined_schema_fields.is_empty() {
+        // check fields with stream type
+        let fields = super::schema::check_schema_for_defined_schema_fields(
+            stream_type,
+            settings.defined_schema_fields.to_vec(),
+        );
+
         // remove the fields that are not in the new schema
         let schema_fields = schema
             .fields()
             .iter()
             .map(|f| f.name())
             .collect::<HashSet<_>>();
-        settings
-            .defined_schema_fields
-            .retain(|field| schema_fields.contains(field));
-    }
-    if !new_settings.defined_schema_fields.remove.is_empty() {
-        settings
-            .defined_schema_fields
-            .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
+        let mut fields: Vec<_> = fields.into_iter().collect();
+        fields.sort();
+        fields.retain(|field| schema_fields.contains(field));
+        settings.defined_schema_fields = fields;
     }
     if settings.defined_schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
