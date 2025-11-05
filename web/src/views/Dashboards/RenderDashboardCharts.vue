@@ -531,13 +531,8 @@ export default defineComponent({
           column: 192, // 192-column grid for fine-grained positioning
           cellHeight: "17px", // Base cell height
           margin: 2, // Minimal margin between panels
-          draggable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable dragging unless view-only or saving
-            handle: ".drag-allow", // Only allow dragging from specific handle
-          },
-          resizable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable resizing unless view-only or saving
-          },
+          disableResize: props.viewOnly || saveDashboardData.isLoading.value, // Disable resize in view-only
+          disableDrag: props.viewOnly || saveDashboardData.isLoading.value, // Disable drag in view-only
           acceptWidgets: false, // Don't accept external widgets
           removable: false, // Don't allow removal by dragging out
           animate: false, // Disable animations for better performance
@@ -553,6 +548,12 @@ export default defineComponent({
 
       // Handle layout changes (drag/resize) - only update layout data, don't save during operations
       gridStackInstance.on("change", async (event, items) => {
+
+        // skip if viewOnly mode
+        if (props.viewOnly) {
+          return;
+        }
+
         if (gridStackUpdateInProgress) {
           return;
         }
