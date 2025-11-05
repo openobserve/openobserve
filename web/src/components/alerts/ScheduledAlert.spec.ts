@@ -1114,5 +1114,4 @@ describe('ScheduledAlert.vue', () => {
       expect(vm.isHavingError).toBeDefined();
     });
   });
-  
 });
