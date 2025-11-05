@@ -242,7 +242,7 @@ describe("stream service", () => {
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}/schema?type=${params.type}`,
+        `/api/${params.org_identifier}/streams/${params.stream_name}/schema`,
       );
     });
   });
@@ -289,7 +289,7 @@ describe("stream service", () => {
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}/settings?type=${params.type}`,
+        `/api/${params.org_identifier}/streams/${params.stream_name}/settings`,
         params.data,
       );
     });
@@ -337,7 +337,7 @@ describe("stream service", () => {
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}/settings?type=${params.type}`,
+        `/api/${params.org_identifier}/streams/${params.stream_name}/settings`,
         params.data,
       );
     });
