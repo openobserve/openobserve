@@ -1,6 +1,13 @@
 name: Build PR Docker Image
 
 on:
+  push:
+    branches:
+      - "**"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
   pull_request:
     branches:
       - "*"
@@ -13,12 +20,42 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
+  build_frontend:
+    name: build_frontend
+    # if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          # repository: ${{ github.event.pull_request.head.repo.full_name }}
+          # ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend code
+        run: cd web && npm install && npm run build
+
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: web/dist
+          retention-days: 1
+
   build_pr_image_amd64:
     name: build_pr_image_amd64
+    needs: [build_frontend]
     permissions:
       id-token: write
       contents: read
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
+    # if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
     runs-on: ubicloud-standard-8
     steps:
       - name: Remove unused tools
@@ -31,10 +68,16 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          # repository: ${{ github.event.pull_request.head.repo.full_name }}
+          # ref: ${{ github.event.pull_request.head.ref || github.ref }}
           fetch-depth: 0
           fetch-tags: true
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: web/dist
 
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
@@ -49,12 +92,6 @@ jobs:
         uses: arduino/setup-protoc@v3
         with:
           version: "21.12"
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
-      - name: Build frontend code
-        run: cd web && npm install && npm run build
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
@@ -100,10 +137,11 @@ jobs:
 
   build_pr_image_arm64:
     name: build_pr_image_arm64
+    needs: [build_frontend]
     permissions:
       id-token: write
       contents: read
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
+    # if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
     runs-on: "ubicloud-standard-16-arm"
     steps:
       - name: Remove unused tools
@@ -116,10 +154,16 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          # repository: ${{ github.event.pull_request.head.repo.full_name }}
+          # ref: ${{ github.event.pull_request.head.ref || github.ref }}
           fetch-depth: 0
           fetch-tags: true
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: web/dist
 
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
@@ -134,12 +178,6 @@ jobs:
         uses: arduino/setup-protoc@v3
         with:
           version: "21.12"
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
-      - name: Build frontend code
-        run: cd web && npm install && npm run build
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
@@ -194,8 +232,8 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          # repository: ${{ github.event.pull_request.head.repo.full_name }}
+          # ref: ${{ github.event.pull_request.head.ref || github.ref }}
           fetch-depth: 0
           fetch-tags: true
       - name: Set GIT_TAG env
@@ -226,11 +264,18 @@ jobs:
   build_pr_image_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [build_pr_image_amd64, build_pr_image_arm64, build]
+    needs: [build_frontend, build_pr_image_amd64, build_pr_image_arm64, build]
     if: always()
     steps:
       - name: Check build results
         run: |
+          if [ "${{ needs.build_frontend.result }}" == "success" ] || [ "${{ needs.build_frontend.result }}" == "skipped" ]; then
+            echo "Frontend build passed or skipped"
+          else
+            echo "Frontend build failed"
+            exit 1
+          fi
+
           if [ "${{ needs.build_pr_image_amd64.result }}" == "success" ] || [ "${{ needs.build_pr_image_amd64.result }}" == "skipped" ]; then
             echo "AMD64 build passed or skipped"
           else
