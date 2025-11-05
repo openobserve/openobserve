@@ -281,12 +281,14 @@ color="warning" size="xs"></q-icon> Error while
       <!-- Patterns View -->
       <div
         v-if="searchObj.meta.logsVisualizeToggle === 'patterns'"
-        style="
-          height: calc(100vh - 250px);
-          display: flex;
-          flex-direction: column;
-        "
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        style="display: flex; flex-direction: column"
+        :class="[
+          !searchObj.meta.showHistogram ||
+          (searchObj.meta.showHistogram &&
+            searchObj.data.histogram.errorCode == -1)
+            ? 'table-container--without-histogram'
+            : 'table-container--with-histogram',
+        ]"
       >
         <!-- Statistics Bar -->
         <div
