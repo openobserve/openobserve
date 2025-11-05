@@ -60,15 +60,15 @@
         </div>
 
         <!-- Enhanced Stats Bar -->
-        <div class="row q-col-gutter-md q-mb-md" v-if="stats">
+        <div class="row q-col-gutter-md q-mb-md">
           <div class="col-12 col-md-2">
             <q-card flat bordered class="stat-card">
-              <q-card-section class="tw-p-[0.675rem]">
+              <q-card-section class="!tw-p-[0.375rem]">
                 <div class="row items-center">
-                  <q-icon name="hub" size="32px" color="primary" class="q-mr-sm" />
+                  <q-icon name="hub" size="1.5rem" color="primary" class="q-mr-sm" />
                   <div>
                     <div class="text-caption text-grey-7">Services</div>
-                    <div class="text-h5 text-bold">{{ stats.services || 0 }}</div>
+                    <div class="tw-text-[1.25rem] text-bold">{{ stats?.services || 0 }}</div>
                   </div>
                 </div>
               </q-card-section>
@@ -76,12 +76,12 @@
           </div>
           <div class="col-12 col-md-2">
             <q-card flat bordered class="stat-card">
-              <q-card-section class="tw-p-[0.675rem]">
+              <q-card-section class="tw-p-[0.375rem]">
                 <div class="row items-center">
-                  <q-icon name="share" size="32px" color="blue" class="q-mr-sm" />
+                  <q-icon name="share" size="1.5rem" color="blue" class="q-mr-sm" />
                   <div>
                     <div class="text-caption text-grey-7">Connections</div>
-                    <div class="text-h5 text-bold">{{ stats.connections || 0 }}</div>
+                    <div class="tw-text-[1.25rem] text-bold">{{ stats?.connections || 0 }}</div>
                   </div>
                 </div>
               </q-card-section>
@@ -89,12 +89,12 @@
           </div>
           <div class="col-12 col-md-3">
             <q-card flat bordered class="stat-card">
-              <q-card-section class="tw-p-[0.675rem]">
+              <q-card-section class="tw-p-[0.375rem]">
                 <div class="row items-center">
-                  <q-icon name="speed" size="32px" color="orange" class="q-mr-sm" />
+                  <q-icon name="speed" size="1.5rem" color="orange" class="q-mr-sm" />
                   <div>
                     <div class="text-caption text-grey-7">Total Requests</div>
-                    <div class="text-h5 text-bold">{{ formatNumber(stats.totalRequests || 0) }}</div>
+                    <div class="tw-text-[1.25rem] text-bold">{{ formatNumber(stats?.totalRequests || 0) }}</div>
                   </div>
                 </div>
               </q-card-section>
@@ -102,13 +102,13 @@
           </div>
           <div class="col-12 col-md-3">
             <q-card flat bordered class="stat-card">
-              <q-card-section class="tw-p-[0.675rem]">
+              <q-card-section class="tw-p-[0.375rem]">
                 <div class="row items-center">
-                  <q-icon name="error_outline" size="32px" :color="stats.errorRate > 5 ? 'negative' : 'grey-5'" class="q-mr-sm" />
+                  <q-icon name="error_outline" size="1.5rem" :color="stats?.errorRate > 5 ? 'negative' : 'grey-5'" class="q-mr-sm" />
                   <div>
                     <div class="text-caption text-grey-7">Error Rate</div>
-                    <div class="text-h5 text-bold" :class="stats.errorRate > 5 ? 'text-negative' : ''">
-                      {{ stats.errorRate?.toFixed(2) || 0 }}%
+                    <div class="tw-text-[1.25rem] text-bold" :class="stats?.errorRate > 5 ? 'text-negative' : ''">
+                      {{ stats?.errorRate?.toFixed(2) || 0 }}%
                     </div>
                   </div>
                 </div>
@@ -117,12 +117,12 @@
           </div>
           <div class="col-12 col-md-2">
             <q-card flat bordered class="stat-card">
-              <q-card-section class="tw-p-[0.675rem]">
+              <q-card-section class="tw-p-[0.375rem]">
                 <div class="row items-center">
-                  <q-icon name="check_circle" size="32px" :color="storeStats?.enabled ? 'positive' : 'grey'" class="q-mr-sm" />
+                  <q-icon name="check_circle" size="1.5rem" :color="storeStats?.enabled ? 'positive' : 'grey'" class="q-mr-sm" />
                   <div>
                     <div class="text-caption text-grey-7">Status</div>
-                    <div class="text-body1 text-bold">
+                    <div class="tw-text-[1.25rem] text-bold">
                       {{ storeStats?.enabled ? 'Active' : 'Inactive' }}
                     </div>
                   </div>
@@ -162,15 +162,15 @@
         </div>
 
         <!-- Graph Visualization -->
-        <q-card flat bordered class="graph-card  tw-h-[calc(100%-10.25rem)]">
+        <q-card flat bordered class="graph-card  tw-h-[calc(100%-15.25rem)]">
           <q-card-section class="q-pa-none tw-h-full" style="height: 100%;">
             <div
               ref="graphContainer"
               class="graph-container tw-h-full tw-bg-[var(--o2-bg)]"
             >
-              <div v-if="loading" class="flex flex-center tw-h-full">
-                <div class="text-center">
-                  <q-spinner-grid color="primary" size="4em" />
+              <div v-if="true" class="flex flex-center tw-h-full">
+                <div class="text-center tw-flex tw-flex-col tw-items-center">
+                  <q-spinner-hourglass color="primary" size="4em" />
                   <div class="text-subtitle1 q-mt-md text-grey-7">Loading service graph...</div>
                 </div>
               </div>
