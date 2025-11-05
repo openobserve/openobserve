@@ -1,13 +1,6 @@
 name: Build PR Docker Image
 
 on:
-  push:
-    branches:
-      - "**"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
   pull_request:
     branches:
       - "*"
@@ -22,14 +15,14 @@ env:
 jobs:
   build_frontend:
     name: build_frontend
-    # if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
     runs-on: ubuntu-latest
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          # repository: ${{ github.event.pull_request.head.repo.full_name }}
-          # ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -55,7 +48,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    # if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
     runs-on: ubicloud-standard-8
     steps:
       - name: Remove unused tools
@@ -68,8 +61,8 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          # repository: ${{ github.event.pull_request.head.repo.full_name }}
-          # ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -141,7 +134,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    # if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
     runs-on: "ubicloud-standard-16-arm"
     steps:
       - name: Remove unused tools
@@ -154,8 +147,8 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          # repository: ${{ github.event.pull_request.head.repo.full_name }}
-          # ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -232,8 +225,8 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          # repository: ${{ github.event.pull_request.head.repo.full_name }}
-          # ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
           fetch-depth: 0
           fetch-tags: true
       - name: Set GIT_TAG env
