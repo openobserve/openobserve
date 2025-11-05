@@ -1141,7 +1141,8 @@ class="q-pr-sm q-pt-xs" />
         >
           <template #before>
             <div
-              class="col tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mx-[0.375rem] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-full"
+              class="col tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-full"
+              :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw-ml-[0.375rem]' : 'tw-mx-[0.375rem]'"
             >
               <code-query-editor
                 v-if="router.currentRoute.value.name === 'logs'"
@@ -3905,7 +3906,7 @@ export default defineComponent({
           searchObj.data.transformType === "function" && isFocused.value
             ? isDarkMode
               ? "var(--o2-card-bg)"
-              : "var(--o2-card-bg)" // Dark mode: grey, Light mode: yellow (or any color)
+              : "white" // Dark mode: grey, Light mode: yellow (or any color)
             : "",
         borderBottom:
           searchObj.data.transformType === "function" && isFocused.value
