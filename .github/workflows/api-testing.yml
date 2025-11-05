@@ -3,11 +3,11 @@ name: API Integration Test
 on:
   push:
     branches:
-      - "main"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+      - "**"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
   pull_request:
     branches:
       - "*"
@@ -27,17 +27,11 @@ env:
   ZO_CREATE_ORG_THROUGH_INGESTION: true
 
 jobs:
-  api_integration_tests:
-    name: api_integration_tests
-    runs-on: ubicloud-standard-8
+  check_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.check_changes.outputs.has_changes }}
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Checkout git repo
         uses: actions/checkout@v5
         with:
@@ -53,7 +47,6 @@ jobs:
               echo "has_changes=false" >> $GITHUB_OUTPUT
             fi
           else
-            # For new branches or when before is unavailable, check against base branch
             if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$|^tests/'; then
               echo "has_changes=true" >> $GITHUB_OUTPUT
             else
@@ -61,99 +54,139 @@ jobs:
             fi
           fi
 
+  build_binary:
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    runs-on: ubicloud-standard-8
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
       - name: Setup Rust Toolchain
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-07-20
 
       - name: Setup Rust Cache
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
           prefix-key: api-testing
 
       - name: Install Protoc
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: arduino/setup-protoc@v3
         with:
           version: "21.12"
 
       - name: Build OpenObserve debug binary
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: cargo build --features mimalloc
 
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-binary
+          path: target/debug/openobserve
+          retention-days: 1
+
+  run_tests:
+    needs: [check_changes, build_binary]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        test_config:
+          - name: utf8_view_false
+            env_vars: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false"
+            test_file: "tests/test_subquery_join_match.py"
+            log_file: "o2_utf8_false.log"
+          - name: utf8_view_true
+            env_vars: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true"
+            test_file: "tests/test_subquery_join_match.py"
+            log_file: "o2_utf8_true.log"
+          - name: default
+            env_vars: ""
+            test_file: "--ignore=tests/test_subquery_join_match.py"
+            log_file: "o2_default.log"
+    runs-on: ubicloud-standard-8
+    steps:
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: openobserve-binary
+          path: target/debug
+
+      - name: Make binary executable
+        run: chmod +x target/debug/openobserve
+
       - name: Setup Python
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11.6"
 
       - name: Setup rye
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: eifinger/setup-rye@v4
         with:
           enable-cache: true
           working-directory: "tests/api-testing/"
           version: "0.27.0"
 
-      - name: Start OpenObserve
-        if: steps.check_changes.outputs.has_changes == 'true'
-        run: target/debug/openobserve &
-
-      - name: Wait for start
-        if: steps.check_changes.outputs.has_changes == 'true'
-        run: sleep 15
-
       - name: Pin cpython
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: rye pin cpython@3.11.6
         working-directory: tests/api-testing/
 
       - name: Rye sync
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: rye sync
         working-directory: tests/api-testing/
 
-      - name: Run tests
-        if: steps.check_changes.outputs.has_changes == 'true'
+      - name: Start OpenObserve and run tests
         run: |
-          echo "=== Running regression tests with ZO_UTF8_VIEW_ENABLED=false ==="
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false target/debug/openobserve > o2_utf8_false.log 2>&1 &
-          SERVER_PID_FALSE=$!
-          echo "OpenObserve PID for UTF8_VIEW=false: $SERVER_PID_FALSE"
-          sleep 15
-          
-          # Run regression tests with UTF8_VIEW=false
-          rye run pytest tests/test_subquery_join_match.py --force-sugar -v
-          
+          echo "=== Starting OpenObserve with config: ${{ matrix.test_config.name }} ==="
+          ${{ matrix.test_config.env_vars }} target/debug/openobserve > ${{ matrix.test_config.log_file }} 2>&1 &
+          SERVER_PID=$!
+          echo "OpenObserve PID: $SERVER_PID"
+
+          # Wait for server to be ready with health check
+          echo "Waiting for server to be ready..."
+          for i in {1..30}; do
+            if curl -f http://localhost:5080/healthz >/dev/null 2>&1 || curl -f http://localhost:5080/web/login >/dev/null 2>&1; then
+              echo "Server is ready after $i attempts"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "ERROR: Server failed to start after 30 attempts"
+              cat ${{ matrix.test_config.log_file }}
+              exit 1
+            fi
+            echo "Attempt $i: Server not ready yet, waiting..."
+            sleep 1
+          done
+
+          # Run tests
+          cd tests/api-testing
+          rye run pytest ${{ matrix.test_config.test_file }} --force-sugar -v
+          TEST_EXIT_CODE=$?
+
           # Kill the server
-          kill $SERVER_PID_FALSE || true
-          sleep 5
-          
-          echo "=== Running regression tests with ZO_UTF8_VIEW_ENABLED=true ==="
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true target/debug/openobserve > o2_utf8_true.log 2>&1 &
-          SERVER_PID_TRUE=$!
-          echo "OpenObserve PID for UTF8_VIEW=true: $SERVER_PID_TRUE"
-          sleep 15
-          
-          # Run regression tests with UTF8_VIEW=true
-          rye run pytest tests/test_subquery_join_match.py --force-sugar -v
-          
-          # Kill the server
-          kill $SERVER_PID_TRUE || true
-          sleep 5
-          
-          echo "=== Running all other API tests with default settings ==="
-          target/debug/openobserve > o2_default.log 2>&1 &
-          SERVER_PID_DEFAULT=$!
-          echo "OpenObserve PID for other tests: $SERVER_PID_DEFAULT"
-          sleep 15
-          
-          # Run all other tests (excluding regression tests)
-          rye run pytest --ignore=tests/test_subquery_join_match.py --force-sugar
-          
-          # Kill the server
-          kill $SERVER_PID_DEFAULT || true
-        working-directory: tests/api-testing/
+          kill $SERVER_PID || true
+
+          # Show logs if tests failed
+          if [ $TEST_EXIT_CODE -ne 0 ]; then
+            echo "=== Server logs ==="
+            cat ../../${{ matrix.test_config.log_file }}
+          fi
+
+          exit $TEST_EXIT_CODE
