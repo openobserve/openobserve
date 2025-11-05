@@ -910,7 +910,7 @@ export default defineComponent({
      * Common method to extract patterns
      * Handles validation, loading states, and error handling
      */
-    const extractPatternsForCurrentQuery = async () => {
+    const extractPatternsForCurrentQuery = async (clear_cache = false) => {
       console.log("[Index] Extracting patterns for current query");
       searchObj.meta.resultGrid.showPagination = false;
       searchObj.loading = true;
@@ -941,6 +941,8 @@ export default defineComponent({
         );
         searchObj.loading = false;
 
+        // Set clear_cache flag before calling getQueryData
+        searchObj.meta.clearCache = clear_cache;
         searchObj.meta.refreshHistogram = true;
         await getQueryData();
         refreshHistogramChart();
@@ -1926,10 +1928,10 @@ export default defineComponent({
       { deep: true },
     );
 
-    const handleRunQueryFn = async (result_cache = false) => {
+    const handleRunQueryFn = async (clear_cache = false) => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // Set the shouldRefreshWithoutCache flag
-        shouldRefreshWithoutCache.value = result_cache;
+        shouldRefreshWithoutCache.value = clear_cache;
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
           let logsPageQuery = "";
@@ -2018,7 +2020,7 @@ export default defineComponent({
 
       if (searchObj.meta.logsVisualizeToggle == "patterns") {
         // Extract patterns when user clicks run query in patterns mode
-        await extractPatternsForCurrentQuery();
+        await extractPatternsForCurrentQuery(clear_cache);
       }
     };
 
