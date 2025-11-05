@@ -1094,15 +1094,15 @@ class="q-pr-sm q-pt-xs" />
                 >{{ t("search.runQuery") }}</q-btn
               >
                <q-separator  class="tw-h-[29px] tw-w-[1px]" />
-              <q-btn-dropdown flat class="tw-h-[29px]"
-              :class="[
-              config.isEnterprise == 'true' &&
-                  (!!searchObj.data.searchRequestTraceIds.length ||
-                    !!searchObj.data.searchWebSocketTraceIds.length) &&
-                  (searchObj.loading == true ||
-                    searchObj.loadingHistogram == true) ? 'o2-color-cancel' : 'o2-color-primary',
-              config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-normal-border-radius'
-              ]"
+              <q-btn-dropdown v-if="config.isEnterprise == 'true'" flat class="tw-h-[29px]"
+                :class="[
+                config.isEnterprise == 'true' &&
+                    (!!searchObj.data.searchRequestTraceIds.length ||
+                      !!searchObj.data.searchWebSocketTraceIds.length) &&
+                    (searchObj.loading == true ||
+                      searchObj.loadingHistogram == true) ? 'o2-color-cancel' : 'o2-color-primary',
+                config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-normal-border-radius'
+                ]"
                unelevated dense >
                     <q-btn
                       data-test="logs-search-bar-refresh-btn"
