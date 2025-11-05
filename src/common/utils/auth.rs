@@ -707,8 +707,9 @@ impl FromRequest for AuthExtractor {
 
             // if let Some(auth_header) = req.headers().get("Authorization") {
             if !auth_str.is_empty() {
-                let path_is_bulk_operation =
-                    path.contains("/bulk/enable") || path.contains("/cipher_keys/bulk");
+                let path_is_bulk_operation = path.contains("/bulk/enable")
+                    || path.contains("/cipher_keys/bulk")
+                    || path.contains("/re_patterns/bulk");
 
                 if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
                     || (method.eq("POST")

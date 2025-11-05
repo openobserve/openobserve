@@ -618,6 +618,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(re_pattern::get)
         .service(re_pattern::update)
         .service(re_pattern::delete)
+        .service(re_pattern::delete_bulk)
         .service(domain_management::get_domain_management_config)
         .service(domain_management::set_domain_management_config)
         .service(traces::get_service_graph_metrics)
