@@ -1309,10 +1309,6 @@ body {
   .q-select__dropdown-icon {
     transition: transform 0.3s ease;
   }
-
-  &.q-field--focused .q-select__dropdown-icon {
-    transform: rotate(180deg);
-  }
 }
 
 .select-pagination {

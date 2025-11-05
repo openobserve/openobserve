@@ -15,168 +15,156 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="alert-insights-container"
-    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
-  >
-    <!-- Header -->
-    <div
-      class="insights-header flex justify-between items-center tw-border-b"
-      :class="
-        store.state.theme === 'dark'
-          ? 'tw-border-gray-700'
-          : 'tw-border-gray-200'
-      "
-    >
-      <div class="flex items-center">
-        <q-btn
-          icon="arrow_back"
-          flat
-          round
-          @click="goBack"
-          class="back-btn"
-          data-test="alert-insights-back-btn"
-        />
-        <div class="insights-title">{{ t("alerts.insights.title") }}</div>
-      </div>
-
-      <div class="flex items-center">
-        <date-time
-          ref="dateTimeRef"
-          auto-apply
-          :default-type="dateTimeType"
-          :default-absolute-time="{
-            startTime: timeRange.__global.start_time.getTime(),
-            endTime: timeRange.__global.end_time.getTime(),
-          }"
-          :default-relative-time="relativeTime"
-          @on:date-change="updateDateTime"
-          @on:timezone-change="updateTimezone"
-          class="datetime-picker"
-          data-test="alert-insights-datetime"
-        />
-
-        <q-btn
-          icon="refresh"
-          flat
-          round
-          @click="refreshDashboard"
-          :loading="isLoading"
-          data-test="alert-insights-refresh-btn"
+  <div>
+    <div class="tw-px-[0.625rem] tw-py-[0.1rem]">
+      <div class="card-container tw-mb-[0.625rem]">
+        <!-- Header -->
+        <div
+          class="insights-header flex justify-between items-center"
         >
-          <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
-        </q-btn>
+          <div class="flex items-center">
+            <q-btn
+              icon="arrow_back"
+              flat
+              round
+              size="sm"
+              @click="goBack"
+              data-test="alert-insights-back-btn"
+            />
+            <div class="insights-title">{{ t("alerts.insights.title") }}</div>
+          </div>
+
+          <div class="flex items-center">
+            <date-time
+              ref="dateTimeRef"
+              auto-apply
+              :default-type="dateTimeType"
+              :default-absolute-time="{
+                startTime: timeRange.__global.start_time.getTime(),
+                endTime: timeRange.__global.end_time.getTime(),
+              }"
+              :default-relative-time="relativeTime"
+              @on:date-change="updateDateTime"
+              @on:timezone-change="updateTimezone"
+              class="datetime-picker"
+              data-test="alert-insights-datetime"
+            />
+
+            <q-btn
+              icon="refresh"
+              @click="refreshDashboard"
+              :loading="isLoading"
+              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
+              size="sm"
+              data-test="alert-insights-refresh-btn"
+            >
+              <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+            </q-btn>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <q-tabs
+          v-model="currentTab"
+          dense
+          class="alert-insights-tabs q-ml-sm"
+          indicator-color="primary"
+          align="left"
+          data-test="alert-insights-tabs"
+        >
+          <q-tab name="overview" :label="t('alerts.insights.tabs.overview')" data-test="tab-overview" />
+          <q-tab
+            v-if="isEnterprise"
+            name="frequency"
+            :label="t('alerts.insights.tabs.frequency')"
+            data-test="tab-frequency"
+          />
+          <q-tab
+            v-if="isEnterprise"
+            name="correlation"
+            :label="t('alerts.insights.tabs.correlation')"
+            data-test="tab-correlation"
+          />
+          <q-tab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
+        </q-tabs>
+
+        <!-- Filters Section -->
+        <div
+          v-if="show"
+          class="filters-section tw-flex tw-items-center tw-gap-2 tw-flex-wrap"
+        >
+          <span class="filter-label">{{ t("common.filters") }}:</span>
+
+          <!-- Failed Only Toggle -->
+          <q-toggle
+            v-model="showFailedOnly"
+            :label="t('alerts.insights.filters.failedOnly')"
+            class="o2-toggle-button-sm"
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
+            @update:model-value="onFilterChange"
+            data-test="failed-only-toggle"
+          >
+            <q-tooltip>{{ t("alerts.insights.filters.failedOnlyTooltip") }}</q-tooltip>
+          </q-toggle>
+
+          <!-- Silenced Only Toggle -->
+          <q-toggle
+            v-model="showSilencedOnly"
+            :label="t('alerts.insights.filters.silenced')"
+            class="o2-toggle-button-sm"
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
+            @update:model-value="onFilterChange"
+            data-test="silenced-only-toggle"
+          >
+            <q-tooltip>{{ t("alerts.insights.filters.silencedTooltip") }}</q-tooltip>
+          </q-toggle>
+
+          <!-- Range Filter Chips -->
+          <div
+            v-for="[panelId, filter] in rangeFilters"
+            :key="panelId"
+            class="filter-chip tw-rounded tw-flex tw-items-center"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw-bg-indigo-900 tw-text-indigo-100'
+                : 'tw-bg-blue-100 tw-text-blue-800'
+            "
+            data-test="range-filter-chip"
+          >
+            <span class="chip-label">
+              {{ filter.panelTitle }}
+              <span v-if="filter.start !== null && filter.end !== null">
+                {{ formatFilterValue(filter.start) }} -
+                {{ formatFilterValue(filter.end) }}
+              </span>
+              <span v-else-if="filter.start !== null">
+                >= {{ formatFilterValue(filter.start) }}
+              </span>
+              <span v-else-if="filter.end !== null">
+                <= {{ formatFilterValue(filter.end) }}
+              </span>
+            </span>
+            <q-icon
+              name="close"
+              class="chip-close-icon tw-cursor-pointer"
+              @click="removeRangeFilter(panelId)"
+            />
+          </div>
+
+          <!-- Clear All Filters -->
+          <q-btn
+            v-if="hasActiveFilters"
+            flat
+            dense
+            size="sm"
+            class="clear-filters-btn"
+            :label="t('alerts.insights.filters.clearAll')"
+            icon="clear"
+            @click="clearAllFilters"
+            data-test="clear-all-filters-btn"
+          />
+        </div>
       </div>
-    </div>
-
-    <!-- Tabs -->
-    <q-tabs
-      v-model="currentTab"
-      dense
-      class="alert-insights-tabs"
-      active-color="primary"
-      indicator-color="primary"
-      align="left"
-      data-test="alert-insights-tabs"
-    >
-      <q-tab name="overview" :label="t('alerts.insights.tabs.overview')" data-test="tab-overview" />
-      <q-tab
-        v-if="isEnterprise"
-        name="frequency"
-        :label="t('alerts.insights.tabs.frequency')"
-        data-test="tab-frequency"
-      />
-      <q-tab
-        v-if="isEnterprise"
-        name="correlation"
-        :label="t('alerts.insights.tabs.correlation')"
-        data-test="tab-correlation"
-      />
-      <q-tab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
-    </q-tabs>
-
-    <!-- Filters Section -->
-    <div
-      v-if="show"
-      class="filters-section tw-flex tw-items-center tw-gap-2 tw-flex-wrap"
-      :class="
-        store.state.theme === 'dark' ? 'tw-bg-gray-800' : 'tw-bg-gray-50'
-      "
-    >
-      <span class="filter-label">{{ t("common.filters") }}:</span>
-
-      <!-- Failed Only Toggle -->
-      <q-toggle
-        v-model="showFailedOnly"
-        :label="t('alerts.insights.filters.failedOnly')"
-        size="sm"
-        color="primary"
-        class="o2-toggle-button-sm"
-        :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
-        @update:model-value="onFilterChange"
-        data-test="failed-only-toggle"
-      >
-        <q-tooltip>{{ t("alerts.insights.filters.failedOnlyTooltip") }}</q-tooltip>
-      </q-toggle>
-
-      <!-- Silenced Only Toggle -->
-      <q-toggle
-        v-model="showSilencedOnly"
-        :label="t('alerts.insights.filters.silenced')"
-        size="sm"
-        color="primary"
-        class="o2-toggle-button-sm"
-        :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
-        @update:model-value="onFilterChange"
-        data-test="silenced-only-toggle"
-      >
-        <q-tooltip>{{ t("alerts.insights.filters.silencedTooltip") }}</q-tooltip>
-      </q-toggle>
-
-      <!-- Range Filter Chips -->
-      <div
-        v-for="[panelId, filter] in rangeFilters"
-        :key="panelId"
-        class="filter-chip tw-rounded tw-flex tw-items-center"
-        :class="
-          store.state.theme === 'dark'
-            ? 'tw-bg-indigo-900 tw-text-indigo-100'
-            : 'tw-bg-blue-100 tw-text-blue-800'
-        "
-        data-test="range-filter-chip"
-      >
-        <span class="chip-label">
-          {{ filter.panelTitle }}
-          <span v-if="filter.start !== null && filter.end !== null">
-            {{ formatFilterValue(filter.start) }} -
-            {{ formatFilterValue(filter.end) }}
-          </span>
-          <span v-else-if="filter.start !== null">
-            >= {{ formatFilterValue(filter.start) }}
-          </span>
-          <span v-else-if="filter.end !== null">
-            <= {{ formatFilterValue(filter.end) }}
-          </span>
-        </span>
-        <q-icon
-          name="close"
-          class="chip-close-icon tw-cursor-pointer"
-          @click="removeRangeFilter(panelId)"
-        />
-      </div>
-
-      <!-- Clear All Filters -->
-      <q-btn
-        v-if="hasActiveFilters"
-        flat
-        dense
-        size="sm"
-        class="clear-filters-btn"
-        :label="t('alerts.insights.filters.clearAll')"
-        icon="clear"
-        @click="clearAllFilters"
-        data-test="clear-all-filters-btn"
-      />
     </div>
 
     <!-- Action Buttons Row -->
@@ -241,34 +229,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Dashboard Content -->
-    <div
-      class="dashboard-content q-pa-md"
-      @contextmenu="handleNativeContextMenu"
-    >
-      <div v-show="isLoading" class="loading-container flex items-center justify-center">
-        <q-spinner-hourglass color="primary" size="40px" />
-        <div class="q-ml-md">Loading insights...</div>
-      </div>
+    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+      <div class="card-container tw-mb-[0.625rem] tw-h-[calc(100vh-208px)]">
+        <div
+          @contextmenu="handleNativeContextMenu"
+        >
+          <div v-show="isLoading" class="loading-container flex items-center justify-center">
+            <q-spinner-hourglass color="primary" size="40px" />
+            <div class="q-ml-md">Loading insights...</div>
+          </div>
 
-      <div :style="{ visibility: isLoading ? 'hidden' : 'visible' }">
-        <div v-if="!dashboardData" class="loading-message">
-          {{ t("alerts.insights.loading.dashboardConfig") }}
+          <div :style="{ visibility: isLoading ? 'hidden' : 'visible' }">
+            <div v-if="!dashboardData" class="loading-message">
+              {{ t("alerts.insights.loading.dashboardConfig") }}
+            </div>
+            <div v-else-if="!show" class="loading-message">
+              {{ t("alerts.insights.loading.refreshing") }}
+            </div>
+            <RenderDashboardCharts
+              v-else
+              :key="dashboardData.dashboardId + '-' + currentTab"
+              ref="dashboardRef"
+              :viewOnly="true"
+              :dashboardData="dashboardData"
+              :currentTimeObj="timeRange"
+              :allowAlertCreation="false"
+              searchType="dashboards"
+              @updated:dataZoom="onDataZoom"
+              @chart:contextmenu="handleChartContextMenu"
+            />
+          </div>
         </div>
-        <div v-else-if="!show" class="loading-message">
-          {{ t("alerts.insights.loading.refreshing") }}
-        </div>
-        <RenderDashboardCharts
-          v-else
-          :key="dashboardData.dashboardId + '-' + currentTab"
-          ref="dashboardRef"
-          :viewOnly="true"
-          :dashboardData="dashboardData"
-          :currentTimeObj="timeRange"
-          :allowAlertCreation="false"
-          searchType="dashboards"
-          @updated:dataZoom="onDataZoom"
-          @chart:contextmenu="handleChartContextMenu"
-        />
       </div>
     </div>
 
@@ -798,6 +789,8 @@ onMounted(async () => {
 .filter-label {
   font-size: 0.875rem;
   font-weight: 600;
+  position: relative;
+  top: 4px;
 }
 
 .filter-chip {
