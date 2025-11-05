@@ -41,7 +41,7 @@ use promql_parser::{
         VectorMatchCardinality, VectorSelector, token,
     },
 };
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
     PromqlContext,
@@ -197,7 +197,7 @@ impl Engine {
                         let out = m
                             .into_iter()
                             .map(|mut range| RangeValue {
-                                labels: std::mem::take(&mut range.labels),
+                                labels: std::mem::take(&mut range.labels).without_metric_name(),
                                 samples: range
                                     .samples
                                     .into_iter()
@@ -477,6 +477,23 @@ impl Engine {
             Some(v) => v,
             None => return Ok(vec![]),
         };
+
+        let start = std::time::Instant::now();
+        let values = values
+            .into_par_iter()
+            .map(|rv| RangeValue {
+                labels: rv.labels,
+                samples: rv.samples,
+                exemplars: rv.exemplars,
+                time_window: Some(TimeWindow::new_range(range)),
+            })
+            .collect::<Vec<_>>();
+
+        log::info!(
+            "[trace_id: {}] [PromQL Timing] eval_matrix_selector() processing took: {:?}",
+            self.trace_id,
+            start.elapsed()
+        );
 
         let mut offset_modifier = 0;
         if let Some(offset) = selector.offset {

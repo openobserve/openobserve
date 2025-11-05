@@ -15,7 +15,6 @@
 
 use std::{collections::HashSet, time::Duration};
 
-use config::meta::promql::NAME_LABEL;
 use datafusion::error::{DataFusionError, Result};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
@@ -23,7 +22,7 @@ use strum::EnumString;
 
 use crate::service::promql::{
     micros,
-    value::{EvalContext, InstantValue, Labels, RangeValue, Sample, TimeWindow, Value},
+    value::{EvalContext, InstantValue, Labels, LabelsExt, RangeValue, Sample, TimeWindow, Value},
 };
 
 mod absent;
@@ -242,11 +241,10 @@ where
                 .map(|mut metric| {
                     let mut labels = std::mem::take(&mut metric.labels);
                     if !KEEP_METRIC_NAME_FUNC.contains(func.name()) {
-                        labels.retain(|l| l.name != NAME_LABEL);
+                        labels = labels.without_metric_name();
                     }
-                    // TODO: pass range information to here
-                    // let time_window = metric.time_window.as_ref().unwrap();
-                    let range = Duration::from_secs(300); // Default 5min range for rate function
+                    let time_window = metric.time_window.as_ref().unwrap();
+                    let range = time_window.range;
                     let range_micros = micros(range);
                     let mut result_samples = Vec::with_capacity(timestamps.len());
 

@@ -17,7 +17,7 @@ use datafusion::error::{DataFusionError, Result};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use strum::EnumIter;
 
-use crate::service::promql::value::{RangeValue, Sample, Value};
+use crate::service::promql::value::{LabelsExt, RangeValue, Sample, Value};
 
 #[derive(Debug, EnumIter)]
 pub enum MathOperationsType {
@@ -108,7 +108,7 @@ fn exec(data: Value, op: &MathOperationsType) -> Result<Value> {
                         .collect();
 
                     RangeValue {
-                        labels: std::mem::take(&mut range_value.labels),
+                        labels: std::mem::take(&mut range_value.labels).without_metric_name(),
                         samples,
                         exemplars: range_value.exemplars,
                         time_window: range_value.time_window,

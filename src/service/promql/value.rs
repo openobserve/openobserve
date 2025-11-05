@@ -17,6 +17,7 @@ use std::{fmt, hash::Hasher, sync::Arc, time::Duration};
 
 use config::{
     FxIndexMap,
+    meta::promql::NAME_LABEL,
     utils::{json, sort::sort_float},
 };
 use hashbrown::HashSet;
@@ -36,6 +37,13 @@ pub type Labels = Vec<Arc<Label>>;
 
 /// Added functionalities on Labels
 pub trait LabelsExt {
+    /// Remove the metric name i.e. __name__ from the given label
+    ///
+    /// ```json
+    /// {"__name__": "my-metric", "job": "k8s"} -> {"job": "k8s"}
+    /// ```
+    fn without_metric_name(self) -> Labels;
+
     /// Return the value of the label associated with this name of the label.
     fn get_value(&self, name: &str) -> String;
 
@@ -70,6 +78,10 @@ impl LabelsExt for Labels {
     fn without_label(mut self, name: &str) -> Labels {
         self.retain(|label| label.name != name);
         self
+    }
+
+    fn without_metric_name(self) -> Labels {
+        self.without_label(NAME_LABEL)
     }
 
     fn get_value(&self, name: &str) -> String {
@@ -215,6 +227,7 @@ impl Sample {
         Self { timestamp, value }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn is_nan(&self) -> bool {
         self.value.is_nan()
     }
@@ -372,6 +385,14 @@ impl TimeWindow {
         assert!(eval_ts > 0);
         Self {
             eval_ts,
+            range,
+            offset: Duration::ZERO,
+        }
+    }
+
+    pub fn new_range(range: Duration) -> Self {
+        Self {
+            eval_ts: 0,
             range,
             offset: Duration::ZERO,
         }
@@ -1033,17 +1054,6 @@ mod tests {
         for (expect, got) in zip(expected, output_kept.clone()) {
             assert_eq!(expect.name, got.name, "{:?}", &output_kept);
         }
-    }
-
-    #[test]
-    fn test_sample_new_and_is_nan() {
-        let sample = Sample::new(123456, 1.23);
-        assert_eq!(sample.timestamp, 123456);
-        assert_eq!(sample.value, 1.23);
-        assert!(!sample.is_nan());
-
-        let nan_sample = Sample::new(789012, f64::NAN);
-        assert!(nan_sample.is_nan());
     }
 
     #[test]

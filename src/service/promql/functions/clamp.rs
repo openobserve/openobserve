@@ -16,7 +16,7 @@
 use datafusion::error::{DataFusionError, Result};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::service::promql::value::{RangeValue, Sample, Value};
+use crate::service::promql::value::{LabelsExt, RangeValue, Sample, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#clamp
 pub(crate) fn clamp_range(data: Value, min: f64, max: f64) -> Result<Value> {
@@ -36,7 +36,7 @@ pub(crate) fn clamp_range(data: Value, min: f64, max: f64) -> Result<Value> {
                         .collect();
 
                     RangeValue {
-                        labels: std::mem::take(&mut range_value.labels),
+                        labels: std::mem::take(&mut range_value.labels).without_metric_name(),
                         samples,
                         exemplars: range_value.exemplars,
                         time_window: range_value.time_window,

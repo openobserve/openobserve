@@ -98,7 +98,7 @@ pub async fn vector_scalar_bin_op(
             } else {
                 let mut labels = std::mem::take(&mut range.labels);
                 if return_bool || DROP_METRIC_BIN_OP.contains(&expr.op.id()) {
-                    labels.retain(|l| l.name != NAME_LABEL);
+                    labels = labels.without_metric_name();
                 }
                 Some(RangeValue {
                     labels,
@@ -223,7 +223,7 @@ fn vector_and(expr: &BinaryExpr, left: Vec<RangeValue>, right: Vec<RangeValue>) 
             rhs_sig.contains(&left_sig)
         })
         .map(|mut range| {
-            range.labels.retain(|l| l.name != NAME_LABEL);
+            range.labels = range.labels.without_metric_name();
             range
         })
         .collect();
@@ -318,7 +318,7 @@ fn vector_arithmetic_operators(
             } else {
                 let mut labels = std::mem::take(&mut lhs_range.labels);
                 if return_bool || DROP_METRIC_BIN_OP.contains(&operator) {
-                    labels.retain(|l| l.name != NAME_LABEL);
+                    labels = labels.without_metric_name();
                 }
 
                 if let Some(modifier) = expr.modifier.as_ref() {
