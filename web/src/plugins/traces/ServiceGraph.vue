@@ -168,7 +168,7 @@
               ref="graphContainer"
               class="graph-container tw-h-full tw-bg-[var(--o2-bg)]"
             >
-              <div v-if="true" class="flex flex-center tw-h-full">
+              <div v-if="loading" class="flex flex-center tw-h-full">
                 <div class="text-center tw-flex tw-flex-col tw-items-center">
                   <q-spinner-hourglass color="primary" size="4em" />
                   <div class="text-subtitle1 q-mt-md text-grey-7">Loading service graph...</div>
