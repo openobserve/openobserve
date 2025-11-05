@@ -298,3 +298,15 @@ pub struct TemplateBulkDeleteResponse {
     pub unsuccessful: Vec<String>,
     pub err: Option<String>,
 }
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct DestinationBulkDeleteRequest {
+    pub names: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct DestinationBulkDeleteResponse {
+    pub successful: Vec<String>,
+    pub unsuccessful: Vec<String>,
+    pub err: Option<String>,
+}

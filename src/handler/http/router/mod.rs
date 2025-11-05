@@ -529,6 +529,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::destinations::update_destination)
         .service(alerts::destinations::get_destination)
         .service(alerts::destinations::list_destinations)
+        .service(alerts::destinations::delete_destination_bulk)
         .service(alerts::destinations::delete_destination)
         .service(kv::get)
         .service(kv::set)
