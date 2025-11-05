@@ -168,9 +168,9 @@ const stream = {
     );
   },
 
-  deleteFields: (org_identifier: string, stream_name: string, fields: []) => {
+  deleteFields: (org_identifier: string, stream_name: string, stream_type: string, fields: []) => {
     return http().put(
-      `/api/${org_identifier}/streams/${stream_name}/delete_fields`,
+      `/api/${org_identifier}/streams/${stream_name}/delete_fields?type=${stream_type}`,
       {
         fields,
       },
