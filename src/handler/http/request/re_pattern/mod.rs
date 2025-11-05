@@ -439,6 +439,7 @@ pub async fn delete_bulk(
                 successful.push(id);
             }
             Err(e) => {
+                log::error!("error while deleting pattern {org_id}/{id} : {e}");
                 unsuccessful.push(id);
                 err = Some(e.to_string());
             }

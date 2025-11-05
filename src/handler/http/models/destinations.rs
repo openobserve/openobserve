@@ -286,3 +286,15 @@ pub struct Template {
     #[serde(default)]
     pub title: String,
 }
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct TemplateBulkDeleteRequest {
+    pub names: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct TemplateBulkDeleteResponse {
+    pub successful: Vec<String>,
+    pub unsuccessful: Vec<String>,
+    pub err: Option<String>,
+}
