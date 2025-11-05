@@ -126,3 +126,9 @@ pub struct AlertBulkEnableRequest {
     #[schema(value_type = Vec<String>)]
     pub ids: Vec<Ksuid>,
 }
+
+#[derive(Deserialize, ToSchema)]
+pub struct AlertBulkDeleteRequest {
+    #[schema(value_type = Vec<String>)]
+    pub ids: Vec<Ksuid>,
+}
