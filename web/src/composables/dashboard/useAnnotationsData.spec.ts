@@ -19,7 +19,9 @@ vi.mock("@/utils/commons", () => ({
 const mockGetDashboard = vi.mocked(getDashboard);
 
 const mockStore = {
-  state: {},
+  state: {
+    timezone: "UTC",
+  },
   commit: vi.fn(),
   dispatch: vi.fn(),
 };
