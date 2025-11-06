@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             store.state.printMode &&
             panels.length === 1 &&
-            panels[0].type === 'table'
+            panels[0]?.type === 'table'
           "
           style="height: 100%; width: 100%"
         >
@@ -66,17 +66,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :folderId="folderId"
             :reportId="folderId"
             :selectedTimeDate="
-              (panels[0]?.id ? currentTimeObj[panels[0].id] : undefined) ||
+              (panels[0]?.id ? currentTimeObj?.[panels[0]?.id] : undefined) ||
               currentTimeObj['__global'] ||
               {}
             "
             :shouldRefreshWithoutCache="
-              (panels[0]?.id
-                ? shouldRefreshWithoutCacheObj[panels[0].id]
+              (panels?.[0]?.id
+                ? shouldRefreshWithoutCacheObj?.[panels?.[0]?.id]
                 : undefined) || false
             "
             :variablesData="
-              currentVariablesDataRef[panels[0].id] ||
+              currentVariablesDataRef?.[panels[0]?.id] ||
               currentVariablesDataRef['__global']
             "
             :forceLoad="forceLoad"
@@ -124,13 +124,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :folderId="folderId"
                 :reportId="reportId"
                 :selectedTimeDate="
-                  currentTimeObj[item.id] || currentTimeObj['__global'] || {}
+                  currentTimeObj?.[item?.id] || currentTimeObj['__global'] || {}
                 "
                 :shouldRefreshWithoutCache="
-                  shouldRefreshWithoutCacheObj[item.id] || false
+                  shouldRefreshWithoutCacheObj?.[item?.id] || false
                 "
                 :variablesData="
-                  currentVariablesDataRef[item.id] ||
+                  currentVariablesDataRef?.[item?.id] ||
                   currentVariablesDataRef['__global']
                 "
                 :currentVariablesData="variablesData"

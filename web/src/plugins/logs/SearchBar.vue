@@ -3117,6 +3117,8 @@ export default defineComponent({
               try {
                 searchObj.loading = true;
                 searchObj.meta.refreshHistogram = true;
+                // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
+                searchObj.communicationMethod = "streaming";
                 await extractFields();
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
@@ -3137,7 +3139,7 @@ export default defineComponent({
               searchObj.data.stream.selectedFields =
                 extractedObj.data.resultGrid.colOrder[
                   searchObj.data.stream.selectedStream
-                ];
+                ].filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || '_timestamp'));
             } else {
               searchObj.data.stream.selectedFields =
                 extractedObj.data.stream.selectedFields;
@@ -3790,17 +3792,17 @@ export default defineComponent({
           searchObj.data?.queryResults?.hits &&
           searchObj.data.queryResults.hits.length > 0;
 
-        console.log("[SearchBar] Switching patterns → logs, hasLogs:", hasLogs);
+        // console.log("[SearchBar] Switching patterns → logs, hasLogs:", hasLogs);
 
         if (!hasLogs) {
           // No logs data - fetch them
-          console.log("[SearchBar] Fetching logs data");
+          // console.log("[SearchBar] Fetching logs data");
           searchObj.loading = true;
           searchObj.meta.refreshHistogram = true;
           getQueryData();
         } else {
           // Logs exist - just switch the view
-          console.log("[SearchBar] Reusing existing logs data");
+          // console.log("[SearchBar] Reusing existing logs data");
         }
       } else if (
         value == "patterns" &&
@@ -3809,7 +3811,7 @@ export default defineComponent({
       ) {
         // Switching to patterns mode - this will be handled by a separate watcher in Index.vue
         emit("extractPatterns");
-        console.log("[SearchBar] Switching to patterns mode");
+        // console.log("[SearchBar] Switching to patterns mode");
       } else if (
         value == "visualize" &&
         searchObj.meta.logsVisualizeToggle == "logs"
