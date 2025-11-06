@@ -22,7 +22,7 @@ test.describe("Organization Management - CRUD Operations", () => {
         testLogger.info('Organization management test setup completed');
     });
 
-    test.skip("should create a new organization and verify it appears in the list", {
+    test("should create a new organization and verify it appears in the list", {
         tag: ['@organization', '@all', '@crud', '@create']
     }, async ({ page }) => {
         testLogger.info('Testing organization creation');
@@ -73,7 +73,7 @@ test.describe("Organization Management - CRUD Operations", () => {
         }
     });
 
-    test.skip("should search organization by name and find it", {
+    test("should search organization by name and find it", {
         tag: ['@organization', '@all', '@search', '@name']
     }, async ({ page }) => {
         testLogger.info('Testing organization search by name');
@@ -123,7 +123,7 @@ test.describe("Organization Management - CRUD Operations", () => {
         }
     });
 
-    test.skip("should create organization via API and verify identifier", {
+    test("should create organization via API and verify identifier", {
         tag: ['@organization', '@all', '@api', '@identifier']
     }, async ({ page }) => {
         testLogger.info('Testing organization creation via API and identifier verification');
@@ -393,7 +393,7 @@ test.describe("Organization Management - CRUD Operations", () => {
     });
 
 
-    test.skip("should handle numeric-only organization name", {
+    test("should handle numeric-only organization name", {
         tag: ['@organization', '@all', '@validation', '@numeric']
     }, async ({ page }) => {
         testLogger.info('Testing numeric-only organization name');
@@ -479,7 +479,7 @@ test.describe("Organization Management - CRUD Operations", () => {
         testLogger.info('✓ Validation message testing completed');
     });
 
-    test.skip("should test organization management workflow end-to-end", {
+    test("should test organization management workflow end-to-end", {
         tag: ['@organization', '@all', '@workflow', '@e2e']
     }, async ({ page }) => {
         testLogger.info('Testing complete organization management workflow');
