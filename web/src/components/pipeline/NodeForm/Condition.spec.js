@@ -620,6 +620,419 @@ describe("Condition Component", () => {
     });
   });
 
+  describe("Complex Nested Conditions with OR/AND", () => {
+    it("handles complex nested AND within OR", async () => {
+      wrapper.vm.conditionGroup = {
+        groupId: "root-group",
+        label: "or",
+        items: [
+          {
+            column: "level",
+            operator: "=",
+            value: "error",
+            ignore_case: false,
+            id: "test-id-1"
+          },
+          {
+            groupId: "nested-and-group",
+            label: "and",
+            items: [
+              {
+                column: "status",
+                operator: "=",
+                value: "failed",
+                ignore_case: false,
+                id: "test-id-2"
+              },
+              {
+                column: "retry_count",
+                operator: ">",
+                value: "3",
+                ignore_case: false,
+                id: "test-id-3"
+              }
+            ]
+          }
+        ]
+      };
+
+      await wrapper.vm.saveCondition();
+
+      expect(mockAddNode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          condition: {
+            or: [
+              expect.objectContaining({ column: "level", value: "error" }),
+              {
+                and: [
+                  expect.objectContaining({ column: "status", value: "failed" }),
+                  expect.objectContaining({ column: "retry_count", value: "3" })
+                ]
+              }
+            ]
+          }
+        })
+      );
+    });
+
+    it("handles complex nested OR within AND", async () => {
+      wrapper.vm.conditionGroup = {
+        groupId: "root-group",
+        label: "and",
+        items: [
+          {
+            column: "app_name",
+            operator: "=",
+            value: "myapp",
+            ignore_case: false,
+            id: "test-id-1"
+          },
+          {
+            groupId: "nested-or-group",
+            label: "or",
+            items: [
+              {
+                column: "level",
+                operator: "=",
+                value: "error",
+                ignore_case: false,
+                id: "test-id-2"
+              },
+              {
+                column: "level",
+                operator: "=",
+                value: "critical",
+                ignore_case: false,
+                id: "test-id-3"
+              }
+            ]
+          }
+        ]
+      };
+
+      await wrapper.vm.saveCondition();
+
+      expect(mockAddNode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          condition: {
+            and: [
+              expect.objectContaining({ column: "app_name", value: "myapp" }),
+              {
+                or: [
+                  expect.objectContaining({ column: "level", value: "error" }),
+                  expect.objectContaining({ column: "level", value: "critical" })
+                ]
+              }
+            ]
+          }
+        })
+      );
+    });
+
+    it("handles triple-nested conditions", async () => {
+      wrapper.vm.conditionGroup = {
+        groupId: "root-group",
+        label: "and",
+        items: [
+          {
+            column: "env",
+            operator: "=",
+            value: "production",
+            ignore_case: false,
+            id: "test-id-1"
+          },
+          {
+            groupId: "level-1-group",
+            label: "or",
+            items: [
+              {
+                column: "severity",
+                operator: "=",
+                value: "high",
+                ignore_case: false,
+                id: "test-id-2"
+              },
+              {
+                groupId: "level-2-group",
+                label: "and",
+                items: [
+                  {
+                    column: "user_type",
+                    operator: "=",
+                    value: "premium",
+                    ignore_case: false,
+                    id: "test-id-3"
+                  },
+                  {
+                    column: "error_count",
+                    operator: ">",
+                    value: "10",
+                    ignore_case: false,
+                    id: "test-id-4"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+
+      await wrapper.vm.saveCondition();
+
+      expect(mockAddNode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          condition: {
+            and: [
+              expect.objectContaining({ column: "env", value: "production" }),
+              {
+                or: [
+                  expect.objectContaining({ column: "severity", value: "high" }),
+                  {
+                    and: [
+                      expect.objectContaining({ column: "user_type", value: "premium" }),
+                      expect.objectContaining({ column: "error_count", value: "10" })
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        })
+      );
+    });
+
+    it("correctly updates nested groups", () => {
+      const rootGroup = {
+        groupId: "root-group",
+        label: "and",
+        items: [
+          {
+            column: "field1",
+            operator: "=",
+            value: "value1",
+            ignore_case: false,
+            id: "test-id-1"
+          },
+          {
+            groupId: "nested-group",
+            label: "or",
+            items: [
+              {
+                column: "field2",
+                operator: "=",
+                value: "value2",
+                ignore_case: false,
+                id: "test-id-2"
+              }
+            ]
+          }
+        ]
+      };
+
+      wrapper.vm.conditionGroup = rootGroup;
+
+      // Update nested group
+      const updatedNestedGroup = {
+        groupId: "nested-group",
+        label: "or",
+        items: [
+          {
+            column: "field2",
+            operator: "=",
+            value: "value2",
+            ignore_case: false,
+            id: "test-id-2"
+          },
+          {
+            column: "field3",
+            operator: "=",
+            value: "value3",
+            ignore_case: false,
+            id: "test-id-3"
+          }
+        ]
+      };
+
+      wrapper.vm.updateGroup(updatedNestedGroup);
+
+      expect(wrapper.vm.conditionGroup.items[1].items).toHaveLength(2);
+      expect(wrapper.vm.conditionGroup.items[1].items[1].column).toBe("field3");
+    });
+
+    it("handles case sensitivity correctly in OR conditions", async () => {
+      wrapper.vm.conditionGroup = {
+        groupId: "test-group",
+        label: "or",
+        items: [
+          {
+            column: "message",
+            operator: "Contains",
+            value: "Error",
+            ignore_case: true,
+            id: "test-id-1"
+          },
+          {
+            column: "message",
+            operator: "Contains",
+            value: "CRITICAL",
+            ignore_case: false,
+            id: "test-id-2"
+          }
+        ]
+      };
+
+      await wrapper.vm.saveCondition();
+
+      expect(mockAddNode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          condition: {
+            or: [
+              expect.objectContaining({
+                column: "message",
+                value: "Error",
+                ignore_case: true
+              }),
+              expect.objectContaining({
+                column: "message",
+                value: "CRITICAL",
+                ignore_case: false
+              })
+            ]
+          }
+        })
+      );
+    });
+  });
+
+  describe("OR Operator Edge Cases", () => {
+    it("handles single condition in OR group", async () => {
+      wrapper.vm.conditionGroup = {
+        groupId: "test-group",
+        label: "or",
+        items: [
+          {
+            column: "level",
+            operator: "=",
+            value: "error",
+            ignore_case: false,
+            id: "test-id-1"
+          }
+        ]
+      };
+
+      await wrapper.vm.saveCondition();
+
+      expect(mockAddNode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          condition: {
+            or: [
+              expect.objectContaining({ column: "level", value: "error" })
+            ]
+          }
+        })
+      );
+    });
+
+    it("validates OR group with nested empty group", async () => {
+      wrapper.vm.conditionGroup = {
+        groupId: "test-group",
+        label: "or",
+        items: [
+          {
+            column: "level",
+            operator: "=",
+            value: "error",
+            ignore_case: false,
+            id: "test-id-1"
+          },
+          {
+            groupId: "empty-nested-group",
+            label: "and",
+            items: []
+          }
+        ]
+      };
+
+      await wrapper.vm.saveCondition();
+
+      // Should still save because there's at least one valid condition
+      expect(mockAddNode).toHaveBeenCalled();
+    });
+
+    it("removes deeply nested group correctly", () => {
+      wrapper.vm.conditionGroup = {
+        groupId: "root-group",
+        label: "and",
+        items: [
+          {
+            groupId: "level-1-group",
+            label: "or",
+            items: [
+              {
+                groupId: "level-2-group",
+                label: "and",
+                items: [
+                  {
+                    column: "test",
+                    operator: "=",
+                    value: "value",
+                    ignore_case: false,
+                    id: "test-id"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+
+      wrapper.vm.removeConditionGroup("level-2-group");
+
+      // After removing level-2-group, level-1-group should also be removed (empty)
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(0);
+    });
+  });
+
+  describe("Backward Compatibility", () => {
+    it("loads old format conditions correctly", async () => {
+      // Simulate old format being converted
+      mockPipelineObj.isEditNode = true;
+      mockPipelineObj.currentSelectedNodeData = {
+        data: {
+          condition: {
+            and: [
+              {
+                column: "status",
+                operator: "=",
+                value: "active",
+                ignore_case: false
+              }
+            ]
+          }
+        }
+      };
+
+      wrapper = mount(Condition, {
+        global: {
+          plugins: [i18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            FilterGroup: true,
+            ConfirmDialog: true,
+          }
+        }
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.conditionGroup.label).toBe("and");
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(1);
+      expect(wrapper.vm.conditionGroup.items[0].column).toBe("status");
+    });
+  });
+
   describe("Metadata Handling", () => {
     beforeEach(() => {
       vi.useFakeTimers();
