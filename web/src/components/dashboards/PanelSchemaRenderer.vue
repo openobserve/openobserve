@@ -183,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outline
           size="sm"
           @click="toggleAddAnnotationMode"
+          class="el-border"
         >
           <q-tooltip anchor="top middle" self="bottom right">
             {{
