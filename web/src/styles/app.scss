@@ -1332,6 +1332,35 @@ body {
   }
 }
 
+// Exception: Disable hover for saved views dropdown menu
+// Disable table row hover
+.saved-views-dropdown-menu .q-tr:hover,
+.saved-views-dropdown-menu tr:hover,
+.saved-views-dropdown-menu tbody tr:hover,
+.saved-views-dropdown-menu tbody .q-tr:hover {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+.saved-views-dropdown-menu td:hover,
+.saved-views-dropdown-menu .q-td:hover {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+// Disable default q-item hover but enable for saved-view-item specifically
+.saved-views-dropdown-menu .q-item:hover {
+  background-color: transparent !important;
+  background: transparent !important;
+  color: inherit !important;
+}
+
+// Enable hover only for individual saved view items
+.saved-views-dropdown-menu .saved-view-item:hover {
+  background-color: var(--o2-hover-accent) !important;
+  border-radius: 4px;
+}
+
 .q-list--dark, .q-item--dark {
   color: var(--o2-text-primary);
 }
