@@ -20,7 +20,7 @@ test.describe("dashboard maps testcases", () => {
     await page.waitForTimeout(2000);
   });
 
-  test("should correctly apply the filter conditions with different operators, and successfully apply them to the query.", async ({
+  test("should correctly apply the filter conditions with different operators, and successfully apply them to the query", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
