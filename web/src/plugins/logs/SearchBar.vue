@@ -183,7 +183,7 @@ alt="SQL Mode" class="toolbar-icon" />
             icon="save"
             icon-right="saved_search"
             class="saved-views-dropdown no-border"
-            menu-class="saved-views-dropdown-menu"
+            content-class="saved-views-dropdown-menu"
           >
             <q-list
               :style="
@@ -222,15 +222,15 @@ alt="SQL Mode" class="toolbar-icon" />
                           data-test="log-search-saved-view-field-search-input"
                           v-model="searchObj.data.savedViewFilterFields"
                           data-cy="index-field-search-input"
-                          filled
                           borderless
                           dense
                           clearable
                           debounce="1"
+                          class="tw-mx-2 tw-my-2"
                           :placeholder="t('search.searchSavedView')"
                         >
                           <template #prepend>
-                            <q-icon name="search" />
+                            <q-icon name="search"  />
                           </template>
                         </q-input>
                       </div>
