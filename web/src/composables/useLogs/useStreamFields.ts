@@ -870,7 +870,14 @@ export const useStreamFields = () => {
           ],
         );
       }
-      let selectedFields = (logFilterField && logFieldSelectedValue) || [];
+
+      let selectedFields = (
+        (logFilterField && logFieldSelectedValue) ||
+        []
+      ).filter(
+        (_field) =>
+          _field !== (store.state.zoConfig.timestamp_column || "_timestamp"),
+      );
 
       if (
         searchObj.data.stream.selectedFields.length == 0 &&
