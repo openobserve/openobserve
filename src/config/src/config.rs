@@ -21,8 +21,6 @@ use std::{
     time::Duration,
 };
 
-// this is a test comment. delete this later
-
 use aes_siv::{KeyInit, siv::Aes256Siv};
 use arc_swap::ArcSwap;
 use base64::{Engine, prelude::BASE64_STANDARD};
