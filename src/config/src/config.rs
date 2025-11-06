@@ -1825,8 +1825,8 @@ pub struct Nats {
     pub queue_max_size: i64,
     #[env_config(
         name = "ZO_NATS_EVENT_STORAGE",
-        help = "Set the storage type for the event stream, default is: memory, other value is: file",
-        default = "memory"
+        help = "Set the storage type for the event stream, default is: file, other value is: memory",
+        default = "file"
     )]
     pub event_storage: String,
     #[env_config(
