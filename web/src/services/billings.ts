@@ -65,6 +65,12 @@ const billings = {
   },
   submit_new_user_info: async ( org_identifier: string, payload: any,) => {
     return http().post(`/api/${org_identifier}/billings/new_user_attribution`, payload);
+  },
+  get_tax_id: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/billings/tax_id`);
+  },
+  update_tax_id: (org_identifier: string, payload: { tax_id: string; country: string }) => {
+    return http().post(`/api/${org_identifier}/billings/tax_id`, payload);
   }
 };
 
