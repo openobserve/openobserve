@@ -576,17 +576,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <template #bottom="scope">
-                    <div class="bottom-btn">
-                      <div class="tw-text-sm tw-w-full tw-flex tw-justify-start">
-                      </div>
+                    <div class="schema-table-pagination-wrapper">
                       <QTablePagination
-                      class="tw-pl-[10px] tw-py-0 "
-                      :scope="scope"
-                      :position="'bottom'"
-                      :resultTotal="resultTotal"
-                      :perPageOptions="perPageOptions"
-                      @update:changeRecordPerPage="changePagination"
-                    />
+                        :scope="scope"
+                        :position="'bottom'"
+                        :resultTotal="resultTotal"
+                        :perPageOptions="perPageOptions"
+                        @update:changeRecordPerPage="changePagination"
+                      />
                     </div>
                   </template>
                 </q-table>
@@ -1219,6 +1216,17 @@ export default defineComponent({
       }
     });
 
+    // Watch activeTab and update resultTotal accordingly
+    // This ensures resultTotal is always in sync with the active tab
+    // If selected tab is schemaFields we will show the uds length otherwise we will show the actual schema length
+    watch(activeTab, (newTab) => {
+      if (newTab === "schemaFields") {
+        resultTotal.value = indexData.value.defined_schema_fields?.length || 0;
+      } else {
+        resultTotal.value = indexData.value.schema?.length || 0;
+      }
+    }, { immediate: true });
+
     const isSchemaUDSEnabled = computed(() => {
       return store.state.zoConfig.user_defined_schemas_enabled;
     });
@@ -1232,6 +1240,7 @@ export default defineComponent({
         .deleteFields(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
+          indexData.value.stream_type,
           selectedFields.value.map((field) => field.name),
         )
         .then(async (res) => {
@@ -1909,11 +1918,31 @@ export default defineComponent({
     };
 
     const updateDefinedSchemaFields = () => {
-      markFormDirty();
-
       const selectedFieldsSet = new Set(
         selectedFields.value.map((field) => field.name),
       );
+
+      //  Check max limit when adding fields
+      //  We need to check store.state.zoConfig.user_defined_schema_max_fields this config value before adding to UDS 
+      //  Because it should not exceed this value
+      if (activeTab.value !== "schemaFields") {
+        const maxFieldsLength = store.state.zoConfig?.user_defined_schema_max_fields;
+        const currentDefinedSchemaLength = indexData.value.defined_schema_fields.length;
+        const newSchemaFieldLength = currentDefinedSchemaLength + selectedFieldsSet.size;
+
+        if (maxFieldsLength && newSchemaFieldLength > maxFieldsLength) {
+          q.notify({
+            type: "negative",
+            message: `Cannot add fields. Maximum allowed fields in User Defined Schema is ${maxFieldsLength}. Current: ${currentDefinedSchemaLength}, Attempting to add: ${selectedFieldsSet.size}`,
+            timeout: 3000,
+          });
+          selectedFields.value = [];
+          return;
+        }
+      };
+
+      markFormDirty();
+
 
       if (selectedFieldsSet.has(allFieldsName.value))
         selectedFieldsSet.delete(allFieldsName.value);
@@ -2354,6 +2383,26 @@ export default defineComponent({
     position: relative;
     border: 0.0625rem solid var(--o2-border-color);
 
+    // Custom pagination wrapper styling
+    .schema-table-pagination-wrapper {
+      display: flex;
+      justify-content: flex-end;
+      width: 100%;
+
+      // Override the QTablePagination component's justify-between
+      :deep(.q-table__control) {
+        justify-content: flex-end !important;
+
+        &.row.justify-between {
+          justify-content: flex-end !important;
+        }
+      }
+
+      // Prevent pagination text from wrapping
+      :deep(.q-table__bottom-item) {
+        white-space: nowrap;
+      }
+    }
 
     thead tr {
       height: 2.5rem;

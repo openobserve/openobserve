@@ -1101,7 +1101,7 @@ export default defineComponent({
         selectedFields.push(row.name);
       }
 
-      searchObj.data.stream.selectedFields = selectedFields;
+      searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || '_timestamp'));;
 
       searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;
