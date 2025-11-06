@@ -635,6 +635,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(cloud::billings::list_invoices)
         .service(cloud::billings::unsubscribe)
         .service(cloud::billings::create_billing_portal_session)
+        .service(cloud::billings::get_customer_tax_id)
+        .service(cloud::billings::update_customer_tax_id)
         .service(cloud::org_usage::get_org_usage)
         .service(cloud::marketing::handle_new_attribution_event)
         .service(organization::org::all_organizations)

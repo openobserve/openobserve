@@ -29,7 +29,7 @@ use crate::{
         extractors::Headers,
         models::billings::{
             CheckoutSessionDetailRequestQuery, ListInvoicesResponseBody,
-            ListSubscriptionResponseBody,
+            ListSubscriptionResponseBody, TaxIdResponseBody, UpdateTaxIdRequestBody,
         },
     },
     service::{
@@ -440,5 +440,173 @@ pub async fn handle_stripe_event(
             }))
         }
         Err(err) => err.into_http_response(),
+    }
+}
+
+/// GetTaxId
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Billings",
+    operation_id = "GetTaxId",
+    summary = "Get customer tax ID information",
+    description = "Retrieves tax ID information from Stripe for the organization's customer",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = TaxIdResponseBody),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+)]
+#[get("/{org_id}/billings/tax_id")]
+pub async fn get_customer_tax_id(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> impl Responder {
+    let org_id = path.into_inner();
+    let email = user_email.user_id.as_str();
+
+    if organization::get_org(&org_id).await.is_none() {
+        return o2_cloud_billings::BillingError::OrgNotFound.into_http_response();
+    }
+
+    match o2_cloud_billings::get_customer_tax_information(&org_id, email).await {
+        Ok(tax_info) => {
+            let body = TaxIdResponseBody::from(tax_info);
+            HttpResponse::Ok().json(body)
+        }
+        Err(e) => e.into_http_response(),
+    }
+}
+
+/// UpdateTaxId
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Billings",
+    operation_id = "UpdateTaxId",
+    summary = "Update customer tax ID information",
+    description = "Updates tax ID information in Stripe for the organization's customer",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = UpdateTaxIdRequestBody, description = "Tax ID details", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+)]
+#[post("/{org_id}/billings/tax_id")]
+pub async fn update_customer_tax_id(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    body: web::Json<UpdateTaxIdRequestBody>,
+) -> impl Responder {
+    let org_id = path.into_inner();
+    let email = user_email.user_id.as_str();
+
+    if organization::get_org(&org_id).await.is_none() {
+        return o2_cloud_billings::BillingError::OrgNotFound.into_http_response();
+    }
+
+    // Map country code to Stripe TaxIdType
+    let tax_id_type = match map_country_to_tax_id_type(&body.country) {
+        Some(t) => t,
+        None => {
+            return HttpResponse::BadRequest().json(json::json!({
+                "error": format!("Unsupported country code: {}", body.country)
+            }));
+        }
+    };
+
+    match o2_cloud_billings::update_customer_tax_information(
+        &org_id,
+        email,
+        &body.tax_id,
+        tax_id_type,
+    )
+    .await
+    {
+        Ok(()) => HttpResponse::Ok().json(json::json!({
+            "status": "success",
+            "message": "Tax ID updated successfully"
+        })),
+        Err(e) => e.into_http_response(),
+    }
+}
+
+/// Maps country codes to Stripe TaxIdType
+fn map_country_to_tax_id_type(country: &str) -> Option<stripe::TaxIdType> {
+    use stripe::TaxIdType;
+
+    match country.to_uppercase().as_str() {
+        // EU VAT
+        "AT" => Some(TaxIdType::EuVat),
+        "BE" => Some(TaxIdType::EuVat),
+        "BG" => Some(TaxIdType::EuVat),
+        "HR" => Some(TaxIdType::EuVat),
+        "CY" => Some(TaxIdType::EuVat),
+        "CZ" => Some(TaxIdType::EuVat),
+        "DK" => Some(TaxIdType::EuVat),
+        "EE" => Some(TaxIdType::EuVat),
+        "FI" => Some(TaxIdType::EuVat),
+        "FR" => Some(TaxIdType::EuVat),
+        "DE" => Some(TaxIdType::EuVat),
+        "GR" => Some(TaxIdType::EuVat),
+        "HU" => Some(TaxIdType::EuVat),
+        "IE" => Some(TaxIdType::EuVat),
+        "IT" => Some(TaxIdType::EuVat),
+        "LV" => Some(TaxIdType::EuVat),
+        "LT" => Some(TaxIdType::EuVat),
+        "LU" => Some(TaxIdType::EuVat),
+        "MT" => Some(TaxIdType::EuVat),
+        "NL" => Some(TaxIdType::EuVat),
+        "PL" => Some(TaxIdType::EuVat),
+        "PT" => Some(TaxIdType::EuVat),
+        "RO" => Some(TaxIdType::EuVat),
+        "SK" => Some(TaxIdType::EuVat),
+        "SI" => Some(TaxIdType::EuVat),
+        "ES" => Some(TaxIdType::EuVat),
+        "SE" => Some(TaxIdType::EuVat),
+        // Non-EU European
+        "GB" => Some(TaxIdType::GbVat),
+        "CH" => Some(TaxIdType::ChVat),
+        "NO" => Some(TaxIdType::NoVat),
+        // Americas
+        "US" => Some(TaxIdType::UsEin),
+        "CA" => Some(TaxIdType::CaBn),
+        "MX" => Some(TaxIdType::MxRfc),
+        "BR" => Some(TaxIdType::BrCnpj),
+        "CL" => Some(TaxIdType::ClTin),
+        // Asia Pacific
+        "AU" => Some(TaxIdType::AuAbn),
+        "NZ" => Some(TaxIdType::NzGst),
+        "IN" => Some(TaxIdType::InGst),
+        "SG" => Some(TaxIdType::SgGst),
+        "HK" => Some(TaxIdType::HkBr),
+        "MY" => Some(TaxIdType::MyItn),
+        "TH" => Some(TaxIdType::ThVat),
+        "ID" => Some(TaxIdType::IdNpwp),
+        "TW" => Some(TaxIdType::TwVat),
+        "KR" => Some(TaxIdType::KrBrn),
+        "JP" => Some(TaxIdType::JpCn),
+        // Middle East & Africa
+        "AE" => Some(TaxIdType::AeTrn),
+        "SA" => Some(TaxIdType::SaVat),
+        "ZA" => Some(TaxIdType::ZaVat),
+        "IL" => Some(TaxIdType::IlVat),
+        // Other regions
+        "IS" => Some(TaxIdType::IsVat),
+        "LI" => Some(TaxIdType::LiUid),
+        "RU" => Some(TaxIdType::RuInn),
+        "TR" => Some(TaxIdType::TrTin),
+        _ => None,
     }
 }

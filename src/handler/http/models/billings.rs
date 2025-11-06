@@ -98,3 +98,36 @@ pub struct NewUserAttribution {
     pub from: String,
     pub company: String,
 }
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct TaxIdResponseBody {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tax_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tax_id_type: Option<String>,
+}
+
+impl From<Option<cloud_billings::TaxIdInfo>> for TaxIdResponseBody {
+    fn from(value: Option<cloud_billings::TaxIdInfo>) -> Self {
+        match value {
+            Some(info) => Self {
+                tax_id: Some(info.tax_id),
+                country: info.country,
+                tax_id_type: Some(info.tax_id_type),
+            },
+            None => Self {
+                tax_id: None,
+                country: None,
+                tax_id_type: None,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateTaxIdRequestBody {
+    pub tax_id: String,
+    pub country: String,
+}
