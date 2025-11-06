@@ -16,6 +16,10 @@ on:
       - "**.yml"
       - "**.yaml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   COLUMNS: 150
   ZO_ROOT_USER_EMAIL: root@example.com
