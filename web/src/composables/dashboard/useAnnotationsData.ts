@@ -30,11 +30,6 @@ export const useAnnotationsData = (
 
     const timezone = store.state.timezone;
 
-    // If timezone is UTC, no conversion needed
-    if (timezone === "UTC") {
-      return Math.trunc(timestampMs * 1000); // milliseconds to microseconds
-    }
-
     // Chart timestamp is in the dashboard's timezone
     // Use fromZonedTime to convert from dashboard timezone back to UTC
     const zonedDate = new Date(timestampMs);
