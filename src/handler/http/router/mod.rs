@@ -554,6 +554,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(authz::fga::get_users_with_role)
         .service(authz::fga::get_roles_for_user)
         .service(authz::fga::get_groups_for_user)
+        .service(authz::fga::delete_role_bulk)
         .service(authz::fga::delete_role)
         .service(authz::fga::delete_group_bulk)
         .service(authz::fga::delete_group)

@@ -25,8 +25,8 @@ use {
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
     user::{
-        UserGroup, UserGroupBulkDeleteRequest, UserGroupBulkDeleteResponse, UserGroupRequest,
-        UserRoleRequest,
+        RoleBulkDeleteRequest, RoleBulkDeleteResponse, UserGroup, UserGroupBulkDeleteRequest,
+        UserGroupBulkDeleteResponse, UserGroupRequest, UserRoleRequest,
     },
 };
 
@@ -150,6 +150,99 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
     }
 }
 
+/// DeleteRoleBulk
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "DeleteRoleBulk",
+    summary = "Delete multiple custom role",
+    description = "Permanently removes multiple custom roles from the organization. Users and groups assigned to this role will lose the associated permissions. Standard predefined roles cannot be deleted. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = RoleBulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = RoleBulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
+    )
+)]
+#[delete("/{org_id}/roles/bulk")]
+pub async fn delete_role_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<RoleBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let user_id = user_email.user_id;
+
+    for name in &req.names {
+        if let Some(res) =
+            check_resource_permissions(&org_id, &user_id, "roles", name, "DELETE").await
+        {
+            return Ok(res);
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.names.len());
+    let mut unsuccessful = Vec::with_capacity(req.names.len());
+    let mut err = None;
+
+    for name in req.names {
+        match o2_openfga::authorizer::roles::delete_role(&org_id, &name).await {
+            Ok(_) => {
+                successful.push(name);
+            }
+            Err(e) => {
+                log::error!("error in deleting role {org_id}/{name} : {e}");
+                unsuccessful.push(name);
+                err = Some(e.to_string());
+            }
+        }
+    }
+    Ok(MetaHttpResponse::json(RoleBulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "DeleteRoleBulk",
+    summary = "Delete multiple custom role",
+    description = "Permanently removes multiple custom roles from the organization. Users and groups assigned to this role will lose the associated permissions. Standard predefined roles cannot be deleted. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = RoleBulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = RoleBulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
+    )
+)]
+#[delete("/{org_id}/roles/bulk")]
+pub async fn delete_role_bulk(
+    _path: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
+    _req: web::Json<RoleBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
+}
+
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     context_path = "/api",
@@ -173,7 +266,7 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]
-pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn delete_role_bulk(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
