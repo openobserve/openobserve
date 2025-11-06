@@ -17,13 +17,17 @@ use std::io::Error;
 use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
 use {
+    crate::handler::http::request::search::utils::check_resource_permissions,
     crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers},
     o2_dex::meta::auth::RoleRequest,
 };
 
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
-    user::{UserGroup, UserGroupRequest, UserRoleRequest},
+    user::{
+        UserGroup, UserGroupBulkDeleteRequest, UserGroupBulkDeleteResponse, UserGroupRequest,
+        UserRoleRequest,
+    },
 };
 
 #[cfg(feature = "enterprise")]
@@ -935,6 +939,96 @@ pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpRespo
         )),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
+}
+
+/// DeleteGroupBulk
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Groups",
+    operation_id = "DeleteGroupBulk",
+    summary = "Delete multiple user group",
+    description = "Permanently removes multiple user groups from the organization. Users in those groups will lose group-based permissions but retain any directly assigned roles. This action cannot be undone. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = UserGroupBulkDeleteRequest, description = "user group names", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UserGroupBulkDeleteResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
+#[delete("/{org_id}/groups/bulk")]
+pub async fn delete_group_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<UserGroupBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let user_id = user_email.user_id;
+
+    for name in &req.names {
+        if let Some(res) =
+            check_resource_permissions(&org_id, &user_id, "groups", name, "DELETE").await
+        {
+            return Ok(res);
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.names.len());
+    let mut unsuccessful = Vec::with_capacity(req.names.len());
+    let mut err = None;
+
+    for name in req.names {
+        match o2_openfga::authorizer::groups::delete_group(&org_id, &name).await {
+            Ok(_) => {
+                successful.push(name);
+            }
+            Err(e) => {
+                log::error!("error in deleting group {org_id}/{name} : {e}");
+                unsuccessful.push(name);
+                err = Some(e.to_string());
+            }
+        }
+    }
+
+    Ok(MetaHttpResponse::json(UserGroupBulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Groups",
+    operation_id = "DeleteGroupBulk",
+    summary = "Delete multiple user group",
+    description = "Permanently removes multiple user groups from the organization. Users in those groups will lose group-based permissions but retain any directly assigned roles. This action cannot be undone. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = UserGroupBulkDeleteRequest, description = "user group names", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UserGroupBulkDeleteResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
+#[delete("/{org_id}/groups/bulk")]
+pub async fn delete_group_bulk(
+    _path: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
+    _req: web::Json<UserGroupBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(not(feature = "enterprise"))]
