@@ -210,6 +210,21 @@ pub struct ActionRunningStatusResponse {
     pub last_successful_at: Option<DateTime<Utc>>,
 }
 
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ActionBulkDeleteRequest {
+    #[schema(value_type = Vec<String>)]
+    pub ids: Vec<Ksuid>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ActionBulkDeleteResponse {
+    #[schema(value_type = Vec<String>)]
+    pub successful: Vec<Ksuid>,
+    #[schema(value_type = Vec<String>)]
+    pub unsuccessful: Vec<Ksuid>,
+    pub err: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;

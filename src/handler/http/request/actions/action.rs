@@ -17,10 +17,16 @@ use std::io::Error;
 
 use actix_multipart::Multipart;
 use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
-use config::meta::{actions::action::UpdateActionDetailsRequest, destinations::Template};
+use config::meta::{
+    actions::action::{
+        ActionBulkDeleteRequest, ActionBulkDeleteResponse, UpdateActionDetailsRequest,
+    },
+    destinations::Template,
+};
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
+    crate::handler::http::request::search::utils::check_resource_permissions,
     crate::{
         common::{
             meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
@@ -98,6 +104,81 @@ pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpRespo
             }
             Err(e) => Ok(MetaHttpResponse::bad_request(e)),
         }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(path);
+        Ok(HttpResponse::Forbidden().json("Not Supported"))
+    }
+}
+
+/// Delete Action
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Actions",
+    operation_id = "DeleteActionBulk",
+    summary = "Delete multiple automated action",
+    description = "Permanently removes multiple automated actions from the organization. Any action must not be in use by active \
+                   workflows or schedules before deletion. Once deleted, any scheduled executions or trigger-based \
+                   invocations will stop, and the action configuration cannot be recovered.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = ActionBulkDeleteRequest, description = "Ids for actions to be deleted", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = ActionBulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "delete"}))
+    )
+)]
+#[delete("/{org_id}/actions/bulk")]
+pub async fn delete_action_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<ActionBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        let org_id = path.into_inner();
+        let req = req.into_inner();
+        let user_id = user_email.user_id;
+
+        for id in &req.ids {
+            if let Some(res) =
+                check_resource_permissions(&org_id, &user_id, "actions", &id.to_string(), "DELETE")
+                    .await
+            {
+                return Ok(res);
+            }
+        }
+
+        let mut successful = Vec::with_capacity(req.ids.len());
+        let mut unsuccessful = Vec::with_capacity(req.ids.len());
+        let mut err = None;
+
+        for id in req.ids {
+            match delete_app_from_target_cluster(&org_id, id).await {
+                Ok(_) => {
+                    remove_ownership(&org_id, "actions", Authz::new(&id.to_string())).await;
+                    successful.push(id);
+                }
+                Err(e) => {
+                    log::error!("error while deleting action {org_id}/{id} : {e}");
+                    unsuccessful.push(id);
+                    err = Some(e.to_string());
+                }
+            }
+        }
+        Ok(MetaHttpResponse::json(ActionBulkDeleteResponse {
+            successful,
+            unsuccessful,
+            err,
+        }))
     }
 
     #[cfg(not(feature = "enterprise"))]
