@@ -16,8 +16,15 @@
 use std::io::Error;
 
 use actix_web::{HttpResponse, delete, get, post, put, web};
-use config::meta::function::{FunctionList, TestVRLRequest, Transform};
+use config::meta::function::{
+    FunctionBulkDeleteRequest, FunctionBulkDeleteResponse, FunctionList, TestVRLRequest, Transform,
+};
 
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::request::search::utils::check_resource_permissions,
+    service::functions::FunctionDeleteError,
+};
 #[cfg(feature = "enterprise")]
 use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
@@ -144,7 +151,93 @@ async fn list_functions(
 #[delete("/{org_id}/functions/{name}")]
 async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    crate::service::functions::delete_function(org_id, name).await
+    match crate::service::functions::delete_function(&org_id, &name).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            actix_web::http::StatusCode::OK,
+            "Function deleted",
+        ))),
+        Err(e) => match e {
+            FunctionDeleteError::NotFound => {
+                Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                    actix_web::http::StatusCode::NOT_FOUND,
+                    "Function not found",
+                )))
+            }
+            FunctionDeleteError::FunctionInUse(e) => Ok(HttpResponse::BadRequest().json(
+                MetaHttpResponse::error(actix_web::http::StatusCode::BAD_REQUEST, e),
+            )),
+            FunctionDeleteError::PipelineDependencies(e) => Ok(HttpResponse::Conflict().json(
+                MetaHttpResponse::error(actix_web::http::StatusCode::CONFLICT, e),
+            )),
+        },
+    }
+}
+
+/// DeleteFunctionBulk
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Functions",
+    operation_id = "deleteFunctionBulk",
+    summary = "Delete multiple function",
+    description = "Permanently deletes multiple custom transformation functions from the organization. The functions must not be \
+                   in use by active pipelines unless the force parameter is specified. Once deleted, any pipelines \
+                   previously using this function will need to be updated with alternative transformation logic to \
+                   continue functioning properly.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = FunctionBulkDeleteRequest, description = "Function names to delete", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = FunctionBulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "delete"}))
+    )
+)]
+#[delete("/{org_id}/functions/bulk")]
+async fn delete_function_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<FunctionBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let user_id = user_email.user_id;
+
+    for name in &req.names {
+        if let Some(res) =
+            check_resource_permissions(&org_id, &user_id, "functions", name, "DELETE").await
+        {
+            return Ok(res);
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.names.len());
+    let mut unsuccessful = Vec::with_capacity(req.names.len());
+    let mut err = None;
+
+    for name in req.names {
+        match crate::service::functions::delete_function(&org_id, &name).await {
+            Ok(_) | Err(FunctionDeleteError::NotFound) => {
+                successful.push(name);
+            }
+            Err(FunctionDeleteError::FunctionInUse(e))
+            | Err(FunctionDeleteError::PipelineDependencies(e)) => {
+                log::error!("error in deleting function {org_id}/{name} : {e}");
+                unsuccessful.push(name);
+                err = Some(e);
+            }
+        }
+    }
+
+    Ok(HttpResponse::Ok().json(FunctionBulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }
 
 /// UpdateFunction
