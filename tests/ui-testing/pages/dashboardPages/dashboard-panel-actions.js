@@ -39,7 +39,7 @@ export default class DashboardactionPage {
     // Wait for it to go back to o2-primary-button-light (render complete)
     await this.page.waitForFunction(() => {
       const btn = document.querySelector('[data-test="dashboard-apply"]');
-      return btn && btn.classList.contains("o2-primary-button-light");
+      return btn && btn.classList.contains("o2-secondary-button-light");
     });
   }
 
