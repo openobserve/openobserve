@@ -71,8 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {}
             "
             :shouldRefreshWithoutCache="
-              (panels[0]?.id
-                ? shouldRefreshWithoutCacheObj?.[panels[0]?.id]
+              (panels?.[0]?.id
+                ? shouldRefreshWithoutCacheObj?.[panels?.[0]?.id]
                 : undefined) || false
             "
             :variablesData="

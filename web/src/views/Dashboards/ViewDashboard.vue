@@ -869,8 +869,8 @@ export default defineComponent({
         const allPanelIds = [];
         currentDashboardData.data.tabs?.forEach((tab: any) => {
           tab.panels?.forEach((panel: any) => {
-            allPanelIds.push(panel.id);
-            shouldRefreshWithoutCachePerPanel.value[panel.id] = false;
+            allPanelIds.push(panel?.id);
+            shouldRefreshWithoutCachePerPanel.value?.[panel?.id] = false;
           });
         });
 
