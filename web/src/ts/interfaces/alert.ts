@@ -103,6 +103,7 @@ export interface Destination {
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
   output_format?: "json" | "ndjson";
+  destination_type?: string;
 }
 
 export interface DestinationPayload {
