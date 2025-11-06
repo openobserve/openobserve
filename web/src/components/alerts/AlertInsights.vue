@@ -24,14 +24,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex items-center">
             <q-btn
-              icon="arrow_back"
-              flat
-              round
-              size="sm"
+              no-caps
+              padding="xs"
+              outline
+              icon="arrow_back_ios_new"
+              class="hideOnPrintMode el-border"
               @click="goBack"
               data-test="alert-insights-back-btn"
             />
-            <div class="insights-title">{{ t("alerts.insights.title") }}</div>
+            <div class="q-table__title tw-font-[600] q-ml-sm">{{ t("alerts.insights.title") }}</div>
           </div>
 
           <div class="flex items-center">
@@ -450,7 +451,7 @@ const fetchAlerts = async () => {
 };
 
 const goBack = () => {
-  router.push({ name: "alertList" });
+  router.push({ name: "alertList", query: { org_identifier: store.state.selectedOrganization.identifier } });
 };
 
 const updateDateTime = (value: any) => {

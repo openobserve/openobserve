@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-input>
                 <q-btn
                     data-test="pipeline-list-history-btn"
-                    class="q-ml-md o2-secondary-button tw-h-[36px]"
+                    class="q-ml-sm o2-secondary-button tw-h-[36px]"
                     :class="
                         store.state.theme === 'dark'
                         ? 'o2-secondary-button-dark'
