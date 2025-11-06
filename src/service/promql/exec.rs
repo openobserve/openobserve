@@ -84,84 +84,75 @@ impl PromqlContext {
 
         let ctx = Arc::new(self.clone());
         let expr = Arc::new(stmt.expr);
-        let mut result_type: Option<String> = None;
+        let is_instant = self.start == self.end;
 
-        // range query always be matrix result type.
-        if self.start != self.end {
-            result_type = Some("matrix".to_string());
-        } else {
-            // Instant query
-            let eval_ctx = EvalContext::instant(self.start, trace_id.to_string());
-            let mut engine = Engine::new(trace_id, ctx, eval_ctx);
-            let (mut value, result_type_exec) = engine.exec(&expr).await?;
-            if let Value::Float(val) = value {
-                value = Value::Sample(Sample::new(self.end, val));
-            }
-            value.sort();
-            if result_type_exec.is_some() {
-                result_type = result_type_exec;
-            }
-            return Ok((value, result_type, *self.scan_stats.read().await));
-        }
-
-        // Range query
         // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
-
-        // Try the optimized path first - use a single engine with eval context
         let eval_ctx = EvalContext::new(self.start, self.end, self.interval, trace_id.to_string());
         let mut engine = Engine::new_with_context(trace_id, ctx.clone(), eval_ctx.clone());
 
-        match engine.exec(&expr).await? {
-            (Value::Matrix(matrix), result_type_exec) => {
-                // Optimized path succeeded - we got all results in one go
-                if result_type_exec.is_some() {
-                    result_type = result_type_exec;
+        let (value, result_type_exec) = engine.exec(&expr).await?;
+
+        // Convert result format based on query type (instant vs range) only at the end
+        let (final_value, final_result_type) = if is_instant {
+            // For instant queries, convert Matrix to Vector format
+            match value {
+                Value::Matrix(matrix) => {
+                    // Convert each RangeValue to InstantValue (take first sample)
+                    let vector: Vec<InstantValue> = matrix
+                        .into_iter()
+                        .filter_map(|range_val| {
+                            range_val.samples.first().map(|sample| InstantValue {
+                                labels: range_val.labels.clone(),
+                                sample: *sample,
+                            })
+                        })
+                        .collect();
+                    (Value::Vector(vector), Some("vector".to_string()))
                 }
-                let mut value = Value::Matrix(matrix);
-                value.sort();
-                return Ok((value, result_type, *self.scan_stats.read().await));
+                Value::Float(val) => {
+                    // Convert scalar to Sample for instant queries
+                    (
+                        Value::Sample(Sample::new(self.end, val)),
+                        Some("scalar".to_string()),
+                    )
+                }
+                Value::None => (Value::None, result_type_exec),
+                other => (other, result_type_exec),
             }
-            (Value::None, result_type_exec) => {
-                return Ok((Value::None, result_type_exec, *self.scan_stats.read().await));
-            }
-            (value, result_type_exec) => {
-                // If this is a range query (start != end) and result is a scalar,
-                // we need to repeat the scalar value for each time point
-                let (final_value, final_result_type) =
-                    if self.start != self.end && matches!(value, Value::Float(_)) {
-                        // Get the scalar value
-                        let scalar_val = match &value {
-                            Value::Float(f) => *f,
-                            _ => unreachable!(),
-                        };
+        } else {
+            // For range queries, ensure result is in matrix format
+            match value {
+                Value::Float(scalar_val) => {
+                    // Generate samples for each time point
+                    let timestamps = eval_ctx.timestamps();
+                    let samples: Vec<Sample> = timestamps
+                        .into_iter()
+                        .map(|ts| Sample::new(ts, scalar_val))
+                        .collect();
 
-                        // Generate samples for each time point
-                        let timestamps = eval_ctx.timestamps();
-                        let samples: Vec<Sample> = timestamps
-                            .into_iter()
-                            .map(|ts| Sample::new(ts, scalar_val))
-                            .collect();
-
-                        // Create a matrix with a single series containing all time points
-                        let range_value = RangeValue {
-                            labels: Labels::default(),
-                            samples,
-                            exemplars: None,
-                            time_window: None,
-                        };
-
-                        (Value::Matrix(vec![range_value]), Some("matrix".to_string()))
-                    } else {
-                        (value, result_type_exec)
+                    // Create a matrix with a single series containing all time points
+                    let range_value = RangeValue {
+                        labels: Labels::default(),
+                        samples,
+                        exemplars: None,
+                        time_window: None,
                     };
 
-                return Ok((
-                    final_value,
-                    final_result_type,
-                    *self.scan_stats.read().await,
-                ));
+                    (Value::Matrix(vec![range_value]), Some("matrix".to_string()))
+                }
+                Value::None => (Value::None, result_type_exec),
+                other @ Value::Matrix(_) => (other, Some("matrix".to_string())),
+                other => (other, result_type_exec),
             }
-        }
+        };
+
+        let mut sorted_value = final_value;
+        sorted_value.sort();
+        Ok((
+            sorted_value,
+            final_result_type,
+            *self.scan_stats.read().await,
+        ))
     }
 
     /// Query exemplars
@@ -195,7 +186,8 @@ impl PromqlContext {
             let time = self.start;
             let expr = Arc::new(expr);
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let eval_ctx = EvalContext::instant(time, trace_id.to_string());
+            // Use EvalContext::new for instant query (start == end)
+            let eval_ctx = EvalContext::new(time, time, 0, trace_id.to_string());
             let mut engine = Engine::new(trace_id, ctx.clone(), eval_ctx);
             let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
                 tokio::task::spawn(async move {

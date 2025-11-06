@@ -121,7 +121,6 @@ where
     // Handle Matrix input for range queries
     let matrix = match data {
         Value::Matrix(m) => m,
-        // TODO: Handle instant query path
         Value::None => return Ok(Value::None),
         _ => {
             return Err(DataFusionError::Plan(format!(

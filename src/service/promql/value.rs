@@ -422,16 +422,6 @@ impl EvalContext {
         }
     }
 
-    /// Create a single-point context for instant queries
-    pub fn instant(timestamp: i64, trace_id: String) -> Self {
-        Self {
-            start: timestamp,
-            end: timestamp,
-            step: 0,
-            trace_id,
-        }
-    }
-
     /// Returns true if this is an instant query (single timestamp)
     pub fn is_instant(&self) -> bool {
         self.start == self.end

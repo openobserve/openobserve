@@ -81,7 +81,7 @@ mod tests {
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
     // Test helper
     fn deriv_test_helper(data: Value) -> Result<Value> {
-        let eval_ctx = EvalContext::instant(3000, "test".to_string());
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
         deriv_range(data, &eval_ctx)
     }
 

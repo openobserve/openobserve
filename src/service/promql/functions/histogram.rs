@@ -21,8 +21,7 @@ use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 
 use crate::service::promql::value::{
-    EvalContext, InstantValue, Labels, LabelsExt, RangeValue, Sample, Value,
-    signature_without_labels,
+    EvalContext, LabelsExt, RangeValue, Sample, Value, signature_without_labels,
 };
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
@@ -33,71 +32,9 @@ struct Bucket {
 }
 
 impl Bucket {
-    #[allow(dead_code)]
     fn new(upper_bound: f64, count: f64) -> Self {
         Self { upper_bound, count }
     }
-}
-
-// https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L45
-#[derive(Debug)]
-struct MetricWithBuckets {
-    labels: Labels,
-    buckets: Vec<Bucket>,
-}
-
-/// TODO: support native histograms; see [`histogramQuantile`]
-///
-/// [`histogramQuantile`]: https://github.com/prometheus/prometheus/blob/f7c6130ff27a2a12412c02cce223f7a8abc59e49/promql/quantile.go#L146
-pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Result<Value> {
-    let in_vec = match data {
-        Value::Vector(v) => v,
-        Value::None => return Ok(Value::None),
-        _ => {
-            return Err(DataFusionError::Plan(
-                "histogram_quantile: vector argument expected".to_owned(),
-            ));
-        }
-    };
-
-    let mut metrics_with_buckets: HashMap<u64, MetricWithBuckets> = HashMap::default();
-    for InstantValue { mut labels, sample } in in_vec {
-        // [https://prometheus.io/docs/prometheus/latest/querying/functions/#histogram_quantile]:
-        //
-        // The conventional float samples in `in_vec` are considered the counts
-        // of observations in each bucket of one or more conventional
-        // histograms. Each float sample must have a label `le` where the label
-        // value denotes the inclusive upper bound of the bucket. *Float samples
-        // without such a label are silently ignored.*
-        let upper_bound: f64 = match labels.get_value(BUCKET_LABEL).parse() {
-            Ok(u) => u,
-            Err(_) => continue,
-        };
-
-        let sig = signature_without_labels(&labels, &[HASH_LABEL, NAME_LABEL, BUCKET_LABEL]);
-        let entry = metrics_with_buckets.entry(sig).or_insert_with(|| {
-            labels
-                .retain(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL);
-            MetricWithBuckets {
-                labels,
-                buckets: Vec::new(),
-            }
-        });
-        entry.buckets.push(Bucket {
-            upper_bound,
-            count: sample.value,
-        });
-    }
-
-    let values = metrics_with_buckets
-        .into_values()
-        .map(|mb| InstantValue {
-            labels: mb.labels,
-            sample: Sample::new(sample_time, bucket_quantile(phi, mb.buckets)),
-        })
-        .collect();
-
-    Ok(Value::Vector(values))
 }
 
 /// Enhanced version that processes all timestamps at once for range queries
@@ -108,13 +45,12 @@ pub(crate) fn histogram_quantile_range(
 ) -> Result<Value> {
     let start = std::time::Instant::now();
     log::info!(
-        "[trace_id: {}] [PromQL Timing] histogram_quantile_range() started with phi={}, {} timestamps",
+        "[trace_id: {}] [PromQL Timing] histogram_quantile_range() started with phi={phi}, {} time points",
         eval_ctx.trace_id,
-        phi,
         eval_ctx.timestamps().len()
     );
 
-    // Handle matrix input for range queries
+    // Handle input data - convert to matrix format if needed
     let in_matrix = match data {
         Value::Matrix(m) => {
             log::info!(
@@ -123,15 +59,6 @@ pub(crate) fn histogram_quantile_range(
                 m.len()
             );
             m
-        }
-        Value::Vector(v) => {
-            // For instant queries, convert to the original function
-            log::info!(
-                "[trace_id: {}] [PromQL Timing] histogram_quantile_range() converting vector to instant query",
-                eval_ctx.trace_id
-            );
-            let sample_time = eval_ctx.start;
-            return histogram_quantile(sample_time, phi, Value::Vector(v));
         }
         Value::None => {
             log::info!(
@@ -147,24 +74,7 @@ pub(crate) fn histogram_quantile_range(
         }
     };
 
-    // For instant queries, use the original implementation
-    if eval_ctx.is_instant() {
-        let in_vec: Vec<InstantValue> = in_matrix
-            .into_iter()
-            .flat_map(|rv| {
-                rv.samples
-                    .into_iter()
-                    .map(move |s| InstantValue {
-                        labels: rv.labels.clone(),
-                        sample: s,
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-        return histogram_quantile(eval_ctx.start, phi, Value::Vector(in_vec));
-    }
-
-    // For range queries, compute all timestamps at once
+    // Always use range query path - compute all timestamps at once
     let timestamps = eval_ctx.timestamps();
 
     // Group metrics by their signature (without bucket label)
@@ -208,10 +118,7 @@ pub(crate) fn histogram_quantile_range(
                     .find(|s| s.timestamp == eval_ts)
                     .or_else(|| bucket_rv.samples.first())
                 {
-                    buckets.push(Bucket {
-                        upper_bound,
-                        count: sample.value,
-                    });
+                    buckets.push(Bucket::new(upper_bound, sample.value));
                 }
             }
 
@@ -308,10 +215,7 @@ fn coalesce_buckets(buckets: Vec<Bucket>) -> Vec<Bucket> {
             }
             Some(last) => {
                 if b.upper_bound == last.upper_bound {
-                    st = Some(Bucket {
-                        upper_bound: last.upper_bound,
-                        count: last.count + b.count,
-                    });
+                    st = Some(Bucket::new(last.upper_bound, last.count + b.count));
                     None
                 } else {
                     let nb = last.clone();
@@ -349,26 +253,11 @@ mod tests {
     #[test]
     fn test_coalesce_buckets() {
         let buckets = vec![
-            Bucket {
-                upper_bound: 1.0,
-                count: 2.0,
-            },
-            Bucket {
-                upper_bound: 1.0,
-                count: 3.0,
-            },
-            Bucket {
-                upper_bound: 2.0,
-                count: 4.0,
-            },
-            Bucket {
-                upper_bound: 3.0,
-                count: 1.0,
-            },
-            Bucket {
-                upper_bound: 3.0,
-                count: 1.0,
-            },
+            Bucket::new(1.0, 2.0),
+            Bucket::new(1.0, 3.0),
+            Bucket::new(2.0, 4.0),
+            Bucket::new(3.0, 1.0),
+            Bucket::new(3.0, 1.0),
         ];
 
         expect![[r#"
@@ -452,26 +341,11 @@ mod tests {
     #[test]
     fn test_ensure_monotonic() {
         let mut buckets = vec![
-            Bucket {
-                upper_bound: 1.0,
-                count: 2.0,
-            },
-            Bucket {
-                upper_bound: 2.0,
-                count: 1.0,
-            },
-            Bucket {
-                upper_bound: 3.0,
-                count: 4.0,
-            },
-            Bucket {
-                upper_bound: 4.0,
-                count: 3.0,
-            },
-            Bucket {
-                upper_bound: 5.0,
-                count: 5.0,
-            },
+            Bucket::new(1.0, 2.0),
+            Bucket::new(2.0, 1.0),
+            Bucket::new(3.0, 4.0),
+            Bucket::new(4.0, 3.0),
+            Bucket::new(5.0, 5.0),
         ];
         ensure_monotonic(&mut buckets);
         expect![[r#"

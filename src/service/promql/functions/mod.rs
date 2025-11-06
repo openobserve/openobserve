@@ -22,7 +22,7 @@ use strum::EnumString;
 
 use crate::service::promql::{
     micros,
-    value::{EvalContext, InstantValue, Labels, LabelsExt, RangeValue, Sample, TimeWindow, Value},
+    value::{EvalContext, Labels, LabelsExt, RangeValue, Sample, TimeWindow, Value},
 };
 
 mod absent;
@@ -169,7 +169,7 @@ where
 {
     let start = std::time::Instant::now();
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) started",
+        "[trace_id: {}] [PromQL Timing] eval_range({}) started",
         eval_ctx.trace_id,
         func.name()
     );
@@ -177,7 +177,7 @@ where
     let data = match data {
         Value::Matrix(v) => {
             log::info!(
-                "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) processing {} series",
+                "[trace_id: {}] [PromQL Timing] eval_range({}) processing {} series",
                 eval_ctx.trace_id,
                 func.name(),
                 v.len()
@@ -194,35 +194,12 @@ where
         }
     };
 
-    // For instant queries, use the original implementation
-    if eval_ctx.is_instant() {
-        log::info!(
-            "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) using instant query path",
-            eval_ctx.trace_id,
-            func.name()
-        );
-        let mut rate_values = Vec::with_capacity(data.len());
-        for mut metric in data {
-            let labels = std::mem::take(&mut metric.labels);
-            let time_window = metric.time_window.clone();
-            let eval_ts = time_window.as_ref().unwrap().eval_ts;
-            let value = func.exec_range(&labels, &metric.samples, &time_window);
-            if let Some(value) = value {
-                rate_values.push(InstantValue {
-                    labels,
-                    sample: Sample::new(eval_ts, value),
-                });
-            }
-        }
-        return Ok(Value::Vector(rate_values));
-    }
-
-    // For range queries, compute all timestamps at once
+    // Always use range query path - compute all timestamps at once
     let timestamps = eval_ctx.timestamps();
     let mut range_values = Vec::with_capacity(data.len());
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) processing {} time points in range query mode",
+        "[trace_id: {}] [PromQL Timing] eval_range({}) processing {} time points in range query mode",
         eval_ctx.trace_id,
         func.name(),
         timestamps.len()
@@ -232,7 +209,7 @@ where
     let thread_num = cfg.limit.query_thread_num;
     let chunk_size = (data.len() / thread_num).max(1);
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) using {} threads with chunk_size {}",
+        "[trace_id: {}] [PromQL Timing] eval_range({}) using {} threads with chunk_size {}",
         eval_ctx.trace_id,
         func.name(),
         thread_num,
@@ -303,7 +280,7 @@ where
         })
         .collect();
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) parallel processing took: {:?}",
+        "[trace_id: {}] [PromQL Timing] eval_range({}) parallel processing took: {:?}",
         eval_ctx.trace_id,
         func.name(),
         parallel_start.elapsed()
@@ -312,7 +289,7 @@ where
     range_values.extend(results.into_iter().flatten());
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) completed in {:?}, produced {} series",
+        "[trace_id: {}] [PromQL Timing] eval_range({}) completed in {:?}, produced {} series",
         eval_ctx.trace_id,
         func.name(),
         start.elapsed(),

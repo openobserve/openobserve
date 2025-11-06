@@ -123,7 +123,7 @@ mod tests {
         scaling_factor: f64,
         trend_factor: f64,
     ) -> Result<Value> {
-        let eval_ctx = EvalContext::instant(3000, "test".to_string());
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
         holt_winters_range(data, scaling_factor, trend_factor, &eval_ctx)
     }
 

@@ -82,7 +82,7 @@ mod tests {
 
     // Test helper
     fn predict_linear_test_helper(data: Value, duration: f64) -> Result<Value> {
-        let eval_ctx = EvalContext::instant(3000, "test".to_string());
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
         predict_linear_range(data, duration, &eval_ctx)
     }
 

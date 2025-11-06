@@ -86,7 +86,7 @@ mod tests {
 
     // Test helper function that creates an EvalContext for instant queries
     fn irate_test_helper(data: Value) -> Result<Value> {
-        let eval_ctx = EvalContext::instant(3000, "test".to_string());
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
         irate_range(data, &eval_ctx)
     }
 
