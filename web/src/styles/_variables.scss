@@ -345,6 +345,8 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --o2-table-header-bg: color-mix(in srgb, #{$theme-color} 20%, white);
 
+  --o2-table-actions-bg: white;
+
   --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, white);
   --o2-tab-text-color: #{$o2-gray-1400};
 
@@ -428,6 +430,9 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-menu-color: #FFFFFF;
 
   --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
+
+    --o2-table-actions-bg: #1f2223;
+
 
   --o2-tab-bg: color-mix(in srgb, white 20%, var(--o2-theme-color));
   --o2-tab-text-color: #{$o2-gray-100};
