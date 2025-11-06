@@ -24,10 +24,14 @@ use crate::service::promql::{
 /// Enhanced version that processes all timestamps at once for range queries
 pub(crate) fn absent_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
-    log::info!("[PromQL Timing] absent_range() started");
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] absent_range() started",
+        eval_ctx.trace_id
+    );
     let result = super::eval_range(data, AbsentFunc::new(), eval_ctx);
     log::info!(
-        "[PromQL Timing] absent_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] absent_range() execution took: {:?}",
+        eval_ctx.trace_id,
         start.elapsed()
     );
     result

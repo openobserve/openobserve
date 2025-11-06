@@ -29,10 +29,14 @@ pub(crate) fn quantile_over_time_range(
     eval_ctx: &EvalContext,
 ) -> Result<Value> {
     let start = std::time::Instant::now();
-    log::info!("[PromQL Timing] quantile_over_time_range() started");
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] quantile_over_time_range() started",
+        eval_ctx.trace_id
+    );
     let result = super::eval_range(data, QuantileOverTimeFunc::new(phi_quantile), eval_ctx);
     log::info!(
-        "[PromQL Timing] quantile_over_time_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] quantile_over_time_range() execution took: {:?}",
+        eval_ctx.trace_id,
         start.elapsed()
     );
     result

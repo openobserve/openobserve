@@ -29,10 +29,14 @@ pub(crate) fn predict_linear_range(
     eval_ctx: &EvalContext,
 ) -> Result<Value> {
     let start = std::time::Instant::now();
-    log::info!("[PromQL Timing] predict_linear_range() started");
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] predict_linear_range() started",
+        eval_ctx.trace_id
+    );
     let result = super::eval_range(data, PredictLinearFunc::new(duration), eval_ctx);
     log::info!(
-        "[PromQL Timing] predict_linear_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] predict_linear_range() execution took: {:?}",
+        eval_ctx.trace_id,
         start.elapsed()
     );
     result
@@ -78,7 +82,7 @@ mod tests {
 
     // Test helper
     fn predict_linear_test_helper(data: Value, duration: f64) -> Result<Value> {
-        let eval_ctx = EvalContext::instant(3000);
+        let eval_ctx = EvalContext::instant(3000, "test".to_string());
         predict_linear_range(data, duration, &eval_ctx)
     }
 

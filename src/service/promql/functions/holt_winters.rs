@@ -30,14 +30,18 @@ pub(crate) fn holt_winters_range(
     eval_ctx: &EvalContext,
 ) -> Result<Value> {
     let start = std::time::Instant::now();
-    log::info!("[PromQL Timing] holt_winters_range() started");
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] holt_winters_range() started",
+        eval_ctx.trace_id
+    );
     let result = super::eval_range(
         data,
         HoltWintersFunc::new(scaling_factor, trend_factor),
         eval_ctx,
     );
     log::info!(
-        "[PromQL Timing] holt_winters_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] holt_winters_range() execution took: {:?}",
+        eval_ctx.trace_id,
         start.elapsed()
     );
     result
@@ -119,7 +123,7 @@ mod tests {
         scaling_factor: f64,
         trend_factor: f64,
     ) -> Result<Value> {
-        let eval_ctx = EvalContext::instant(3000);
+        let eval_ctx = EvalContext::instant(3000, "test".to_string());
         holt_winters_range(data, scaling_factor, trend_factor, &eval_ctx)
     }
 

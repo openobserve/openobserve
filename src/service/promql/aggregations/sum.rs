@@ -34,12 +34,14 @@ pub fn sum_range(
         _ => (0, 0),
     };
     log::info!(
-        "[PromQL Timing] sum_range() started with {input_size} series and {timestamps_count} timestamps",
+        "[trace_id: {}] [PromQL Timing] sum_range() started with {input_size} series and {timestamps_count} timestamps",
+        eval_ctx.trace_id
     );
 
     let result = super::eval_arithmetic_range(param, data, Sum, eval_ctx);
     log::info!(
-        "[PromQL Timing] sum_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] sum_range() execution took: {:?}",
+        eval_ctx.trace_id,
         start.elapsed()
     );
     result
@@ -150,7 +152,7 @@ mod tests {
 
         // EvalContext with start=1000, end=3000, step=1000 will generate [1000, 2000, 3000]
         // Formula: nr_steps = (end - start) / step + 1 = (3000 - 1000) / 1000 + 1 = 3
-        let eval_ctx = EvalContext::new(ts1, ts3 + 1, 1000);
+        let eval_ctx = EvalContext::new(ts1, ts3 + 1, 1000, "test".to_string());
 
         // Test 1: sum without label grouping (all series summed together)
         let result = sum_range(&None, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();

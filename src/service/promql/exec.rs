@@ -91,7 +91,7 @@ impl PromqlContext {
             result_type = Some("matrix".to_string());
         } else {
             // Instant query
-            let eval_ctx = EvalContext::instant(self.start);
+            let eval_ctx = EvalContext::instant(self.start, trace_id.to_string());
             let mut engine = Engine::new(trace_id, ctx, eval_ctx);
             let (mut value, result_type_exec) = engine.exec(&expr).await?;
             if let Value::Float(val) = value {
@@ -108,7 +108,7 @@ impl PromqlContext {
         // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
 
         // Try the optimized path first - use a single engine with eval context
-        let eval_ctx = EvalContext::new(self.start, self.end, self.interval);
+        let eval_ctx = EvalContext::new(self.start, self.end, self.interval, trace_id.to_string());
         let mut engine = Engine::new_with_context(trace_id, ctx.clone(), eval_ctx.clone());
 
         match engine.exec(&expr).await? {
@@ -195,7 +195,7 @@ impl PromqlContext {
             let time = self.start;
             let expr = Arc::new(expr);
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let eval_ctx = EvalContext::instant(time);
+            let eval_ctx = EvalContext::instant(time, trace_id.to_string());
             let mut engine = Engine::new(trace_id, ctx.clone(), eval_ctx);
             let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
                 tokio::task::spawn(async move {

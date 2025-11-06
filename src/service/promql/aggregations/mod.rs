@@ -113,7 +113,10 @@ where
 {
     let start = std::time::Instant::now();
     let func_name = func.name();
-    log::info!("[PromQL Timing] eval_arithmetic_range({func_name}) started",);
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_arithmetic_range({func_name}) started",
+        eval_ctx.trace_id,
+    );
 
     // Handle Matrix input for range queries
     let matrix = match data {
@@ -140,7 +143,8 @@ where
     }
 
     log::info!(
-        "[PromQL Timing] eval_arithmetic_range({func_name}) processing {} time points",
+        "[trace_id: {}] [PromQL Timing] eval_arithmetic_range({func_name}) processing {} time points",
+        eval_ctx.trace_id,
         eval_timestamps.len()
     );
 
@@ -150,7 +154,8 @@ where
     let thread_num = cfg.limit.query_thread_num;
     let chunk_size = (eval_timestamps.len() / thread_num).max(1);
     log::info!(
-        "[PromQL Timing] eval_arithmetic_range({func_name}) using {} threads with chunk_size {}",
+        "[trace_id: {}] [PromQL Timing] eval_arithmetic_range({func_name}) using {} threads with chunk_size {}",
+        eval_ctx.trace_id,
         thread_num,
         chunk_size
     );
@@ -177,7 +182,8 @@ where
         .collect();
 
     log::info!(
-        "[PromQL Timing] eval_arithmetic_range({func_name}) computed label hashes in {:?}",
+        "[trace_id: {}] [PromQL Timing] eval_arithmetic_range({func_name}) computed label hashes in {:?}",
+        eval_ctx.trace_id,
         start1.elapsed()
     );
 
@@ -191,7 +197,8 @@ where
     }
 
     log::info!(
-        "[PromQL Timing] eval_arithmetic_range({func_name}) built {} groups in {:?}",
+        "[trace_id: {}] [PromQL Timing] eval_arithmetic_range({func_name}) built {} groups in {:?}",
+        eval_ctx.trace_id,
         groups.len(),
         start2.elapsed()
     );
@@ -228,7 +235,8 @@ where
         .collect();
 
     log::info!(
-        "[PromQL Timing] eval_arithmetic_range({func_name}) parallel aggregation took: {:?}",
+        "[trace_id: {}] [PromQL Timing] eval_arithmetic_range({func_name}) parallel aggregation took: {:?}",
+        eval_ctx.trace_id,
         start3.elapsed()
     );
 
@@ -243,7 +251,8 @@ where
     }
 
     log::info!(
-        "[PromQL Timing] eval_arithmetic_range({func_name}) final conversion took: {:?}",
+        "[trace_id: {}] [PromQL Timing] eval_arithmetic_range({func_name}) final conversion took: {:?}",
+        eval_ctx.trace_id,
         start4.elapsed()
     );
 
@@ -262,7 +271,8 @@ where
         .collect();
 
     log::info!(
-        "[PromQL Timing] eval_arithmetic_range({func_name}) completed in {:?}, produced {} series",
+        "[trace_id: {}] [PromQL Timing] eval_arithmetic_range({func_name}) completed in {:?}, produced {} series",
+        eval_ctx.trace_id,
         start.elapsed(),
         result_matrix.len()
     );

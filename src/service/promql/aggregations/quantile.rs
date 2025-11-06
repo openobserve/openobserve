@@ -31,7 +31,8 @@ pub fn quantile_range(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result
         _ => (0, 0),
     };
     log::info!(
-        "[PromQL Timing] quantile_range({qtile}) started with {input_size} series and {timestamps_count} timestamps",
+        "[trace_id: {}] [PromQL Timing] quantile_range({qtile}) started with {input_size} series and {timestamps_count} timestamps",
+        eval_ctx.trace_id,
     );
 
     // Handle invalid quantile parameter by returning special values
@@ -57,7 +58,8 @@ pub fn quantile_range(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result
 
     let result = super::eval_arithmetic_range(&None, data, Quantile { qtile }, eval_ctx);
     log::info!(
-        "[PromQL Timing] quantile_range({qtile}) execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] quantile_range({qtile}) execution took: {:?}",
+        eval_ctx.trace_id,
         start.elapsed()
     );
     result

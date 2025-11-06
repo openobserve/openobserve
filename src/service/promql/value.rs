@@ -408,19 +408,27 @@ pub struct EvalContext {
     pub end: i64,
     /// Step interval in microseconds
     pub step: i64,
+    /// Trace ID for logging and debugging
+    pub trace_id: String,
 }
 
 impl EvalContext {
-    pub fn new(start: i64, end: i64, step: i64) -> Self {
-        Self { start, end, step }
+    pub fn new(start: i64, end: i64, step: i64, trace_id: String) -> Self {
+        Self {
+            start,
+            end,
+            step,
+            trace_id,
+        }
     }
 
     /// Create a single-point context for instant queries
-    pub fn instant(timestamp: i64) -> Self {
+    pub fn instant(timestamp: i64, trace_id: String) -> Self {
         Self {
             start: timestamp,
             end: timestamp,
             step: 0,
+            trace_id,
         }
     }
 

@@ -34,12 +34,14 @@ pub fn max_range(
         _ => (0, 0),
     };
     log::info!(
-        "[PromQL Timing] max_range() started with {input_size} series and {timestamps_count} timestamps",
+        "[trace_id: {}] [PromQL Timing] max_range() started with {input_size} series and {timestamps_count} timestamps",
+        eval_ctx.trace_id,
     );
 
     let result = super::eval_arithmetic_range(param, data, Max, eval_ctx);
     log::info!(
-        "[PromQL Timing] max_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] max_range() execution took: {:?}",
+        eval_ctx.trace_id,
         start.elapsed()
     );
     result
@@ -131,7 +133,7 @@ mod tests {
             },
         ]);
 
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test max without label grouping - should return the maximum value
         let result = max_range(&None, data.clone(), &eval_ctx).unwrap();

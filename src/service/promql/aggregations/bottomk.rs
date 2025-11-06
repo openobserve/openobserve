@@ -44,7 +44,8 @@ pub fn bottomk_range(
     }
 
     log::info!(
-        "[PromQL Timing] bottomk_range(k={}) started with {} series and {} timestamps",
+        "[trace_id: {}] [PromQL Timing] bottomk_range(k={}) started with {} series and {} timestamps",
+        eval_ctx.trace_id,
         k,
         matrix.len(),
         eval_ctx.timestamps().len()
@@ -67,7 +68,8 @@ pub fn bottomk_range(
         .collect();
 
     log::info!(
-        "[PromQL Timing] bottomk_range(k={}) completed in {:?}, produced {} series",
+        "[trace_id: {}] [PromQL Timing] bottomk_range(k={}) completed in {:?}, produced {} series",
+        eval_ctx.trace_id,
         k,
         start.elapsed(),
         result.len()
@@ -188,7 +190,7 @@ mod tests {
             },
         ]);
 
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test bottomk(2) without label grouping - should return 2 lowest values
         let result = bottomk_range(2, &None, data.clone(), &eval_ctx).unwrap();
@@ -218,7 +220,7 @@ mod tests {
         // Create empty data
         let data = Value::Matrix(vec![]);
 
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test bottomk(2) with empty input
         let result = bottomk_range(2, &None, data, &eval_ctx).unwrap();
@@ -244,7 +246,7 @@ mod tests {
             time_window: None,
         }]);
 
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test bottomk(0) - should return None
         let result = bottomk_range(0, &None, data, &eval_ctx).unwrap();

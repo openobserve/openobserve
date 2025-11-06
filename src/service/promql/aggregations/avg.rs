@@ -34,12 +34,14 @@ pub fn avg_range(
         _ => (0, 0),
     };
     log::info!(
-        "[PromQL Timing] avg_range() started with {input_size} series and {timestamps_count} timestamps",
+        "[trace_id: {}] [PromQL Timing] avg_range() started with {input_size} series and {timestamps_count} timestamps",
+        eval_ctx.trace_id,
     );
 
     let result = super::eval_arithmetic_range(param, data, Avg, eval_ctx);
     log::info!(
-        "[PromQL Timing] avg_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] avg_range() execution took: {:?}",
+        eval_ctx.trace_id,
         start.elapsed()
     );
     result
@@ -134,7 +136,7 @@ mod tests {
             },
         ]);
 
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test avg without label grouping - all samples should be averaged together
         let result = avg_range(&None, data.clone(), &eval_ctx).unwrap();

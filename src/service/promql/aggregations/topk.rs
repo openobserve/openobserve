@@ -44,7 +44,8 @@ pub fn topk_range(
     }
 
     log::info!(
-        "[PromQL Timing] topk_range(k={}) started with {} series and {} timestamps",
+        "[trace_id: {}] [PromQL Timing] topk_range(k={}) started with {} series and {} timestamps",
+        eval_ctx.trace_id,
         k,
         matrix.len(),
         eval_ctx.timestamps().len()
@@ -67,7 +68,8 @@ pub fn topk_range(
         .collect();
 
     log::info!(
-        "[PromQL Timing] topk_range(k={}) completed in {:?}, produced {} series",
+        "[trace_id: {}] [PromQL Timing] topk_range(k={}) completed in {:?}, produced {} series",
+        eval_ctx.trace_id,
         k,
         start.elapsed(),
         result.len()
@@ -195,7 +197,7 @@ mod tests {
             },
         ]);
 
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test topk(2) without label grouping - should return 2 highest values
         let result = topk_range(2, &None, data.clone(), &eval_ctx).unwrap();
@@ -225,7 +227,7 @@ mod tests {
         // Create empty data
         let data = Value::Matrix(vec![]);
 
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test topk(2) with empty input
         let result = topk_range(2, &None, data, &eval_ctx).unwrap();
@@ -251,7 +253,7 @@ mod tests {
             time_window: None,
         }]);
 
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test topk(0) - should return None
         let result = topk_range(0, &None, data, &eval_ctx).unwrap();

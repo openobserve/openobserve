@@ -168,12 +168,17 @@ where
     F: RangeFunc,
 {
     let start = std::time::Instant::now();
-    log::info!("[PromQL Timing] eval_idelta_range({}) started", func.name());
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) started",
+        eval_ctx.trace_id,
+        func.name()
+    );
 
     let data = match data {
         Value::Matrix(v) => {
             log::info!(
-                "[PromQL Timing] eval_idelta_range({}) processing {} series",
+                "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) processing {} series",
+                eval_ctx.trace_id,
                 func.name(),
                 v.len()
             );
@@ -192,7 +197,8 @@ where
     // For instant queries, use the original implementation
     if eval_ctx.is_instant() {
         log::info!(
-            "[PromQL Timing] eval_idelta_range({}) using instant query path",
+            "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) using instant query path",
+            eval_ctx.trace_id,
             func.name()
         );
         let mut rate_values = Vec::with_capacity(data.len());
@@ -216,7 +222,8 @@ where
     let mut range_values = Vec::with_capacity(data.len());
 
     log::info!(
-        "[PromQL Timing] eval_idelta_range({}) processing {} time points in range query mode",
+        "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) processing {} time points in range query mode",
+        eval_ctx.trace_id,
         func.name(),
         timestamps.len()
     );
@@ -225,7 +232,8 @@ where
     let thread_num = cfg.limit.query_thread_num;
     let chunk_size = (data.len() / thread_num).max(1);
     log::info!(
-        "[PromQL Timing] eval_idelta_range({}) using {} threads with chunk_size {}",
+        "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) using {} threads with chunk_size {}",
+        eval_ctx.trace_id,
         func.name(),
         thread_num,
         chunk_size
@@ -295,7 +303,8 @@ where
         })
         .collect();
     log::info!(
-        "[PromQL Timing] eval_idelta_range({}) parallel processing took: {:?}",
+        "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) parallel processing took: {:?}",
+        eval_ctx.trace_id,
         func.name(),
         parallel_start.elapsed()
     );
@@ -303,7 +312,8 @@ where
     range_values.extend(results.into_iter().flatten());
 
     log::info!(
-        "[PromQL Timing] eval_idelta_range({}) completed in {:?}, produced {} series",
+        "[trace_id: {}] [PromQL Timing] eval_idelta_range({}) completed in {:?}, produced {} series",
+        eval_ctx.trace_id,
         func.name(),
         start.elapsed(),
         range_values.len()

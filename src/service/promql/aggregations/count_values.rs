@@ -55,7 +55,8 @@ pub fn count_values_range(
     }
 
     log::info!(
-        "[PromQL Timing] count_values_range(label_name={}) started with {} series and {} timestamps",
+        "[trace_id: {}] [PromQL Timing] count_values_range(label_name={}) started with {} series and {} timestamps",
+        eval_ctx.trace_id,
         label_name,
         matrix.len(),
         eval_ctx.timestamps().len()
@@ -130,7 +131,8 @@ pub fn count_values_range(
         .collect();
 
     log::info!(
-        "[PromQL Timing] count_values_range(label_name={}) completed in {:?}, produced {} series",
+        "[trace_id: {}] [PromQL Timing] count_values_range(label_name={}) completed in {:?}, produced {} series",
+        eval_ctx.trace_id,
         label_name,
         start.elapsed(),
         result.len()
@@ -186,7 +188,7 @@ mod tests {
             },
         ]);
 
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test count_values without label grouping
         let result = count_values_range("value", &None, data.clone(), &eval_ctx).unwrap();
@@ -229,7 +231,7 @@ mod tests {
             time_window: None,
         }]);
 
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test count_values with invalid label name
         let result = count_values_range("invalid-label-name!", &None, data, &eval_ctx);
@@ -244,7 +246,7 @@ mod tests {
         // Create empty data
         let data = Value::Matrix(vec![]);
 
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1);
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test count_values with empty input
         let result = count_values_range("value", &None, data, &eval_ctx).unwrap();

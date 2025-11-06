@@ -108,7 +108,8 @@ pub(crate) fn histogram_quantile_range(
 ) -> Result<Value> {
     let start = std::time::Instant::now();
     log::info!(
-        "[PromQL Timing] histogram_quantile_range() started with phi={}, {} timestamps",
+        "[trace_id: {}] [PromQL Timing] histogram_quantile_range() started with phi={}, {} timestamps",
+        eval_ctx.trace_id,
         phi,
         eval_ctx.timestamps().len()
     );
@@ -117,7 +118,8 @@ pub(crate) fn histogram_quantile_range(
     let in_matrix = match data {
         Value::Matrix(m) => {
             log::info!(
-                "[PromQL Timing] histogram_quantile_range() processing {} series",
+                "[trace_id: {}] [PromQL Timing] histogram_quantile_range() processing {} series",
+                eval_ctx.trace_id,
                 m.len()
             );
             m
@@ -125,13 +127,17 @@ pub(crate) fn histogram_quantile_range(
         Value::Vector(v) => {
             // For instant queries, convert to the original function
             log::info!(
-                "[PromQL Timing] histogram_quantile_range() converting vector to instant query"
+                "[trace_id: {}] [PromQL Timing] histogram_quantile_range() converting vector to instant query",
+                eval_ctx.trace_id
             );
             let sample_time = eval_ctx.start;
             return histogram_quantile(sample_time, phi, Value::Vector(v));
         }
         Value::None => {
-            log::info!("[PromQL Timing] histogram_quantile_range() received None input");
+            log::info!(
+                "[trace_id: {}] [PromQL Timing] histogram_quantile_range() received None input",
+                eval_ctx.trace_id
+            );
             return Ok(Value::None);
         }
         _ => {
@@ -226,7 +232,8 @@ pub(crate) fn histogram_quantile_range(
     }
 
     log::info!(
-        "[PromQL Timing] histogram_quantile_range() total execution took: {:?}, produced {} series",
+        "[trace_id: {}] [PromQL Timing] histogram_quantile_range() total execution took: {:?}, produced {} series",
+        eval_ctx.trace_id,
         start.elapsed(),
         range_values.len()
     );

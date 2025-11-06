@@ -23,10 +23,14 @@ use crate::service::promql::{
 /// Enhanced version that processes all timestamps at once for range queries
 pub(crate) fn idelta_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
-    log::info!("[PromQL Timing] idelta_range() started");
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] idelta_range() started",
+        eval_ctx.trace_id
+    );
     let result = super::eval_range(data, IdeltaFunc::new(), eval_ctx);
     log::info!(
-        "[PromQL Timing] idelta_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] idelta_range() execution took: {:?}",
+        eval_ctx.trace_id,
         start.elapsed()
     );
     result
@@ -72,7 +76,7 @@ mod tests {
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
     // Test helper
     fn idelta_test_helper(data: Value) -> Result<Value> {
-        let eval_ctx = EvalContext::instant(3000);
+        let eval_ctx = EvalContext::instant(3000, "test".to_string());
         idelta_range(data, &eval_ctx)
     }
 
