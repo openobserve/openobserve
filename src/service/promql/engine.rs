@@ -52,23 +52,21 @@ use crate::service::promql::{
 };
 
 pub struct Engine {
+    trace_id: String,
+    /// PromQL evaluation context
     ctx: Arc<PromqlContext>,
-    /// The time boundaries for the evaluation.
-    time: i64,
-    /// Evaluation context for range queries
+    /// Evaluation context for promql queries
     eval_ctx: EvalContext,
     /// Filters to include certain columns
     col_filters: Option<HashSet<String>>,
+    /// The result type of the query
     result_type: Option<String>,
-    trace_id: String,
 }
 
 impl Engine {
     pub fn new(trace_id: &str, ctx: Arc<PromqlContext>, eval_ctx: EvalContext) -> Self {
-        let time = eval_ctx.start;
         Self {
             ctx,
-            time,
             eval_ctx,
             col_filters: Some(HashSet::new()),
             result_type: None,
@@ -269,7 +267,7 @@ impl Engine {
             PromExpr::Paren(ParenExpr { expr }) => self.exec_expr(expr).await?,
             PromExpr::Subquery(expr) => {
                 let val = self.exec_expr(&expr.expr).await?;
-                let time_window = Some(TimeWindow::new(self.time, expr.range));
+                let time_window = Some(TimeWindow::new(self.eval_ctx.start, expr.range));
                 let matrix = match val {
                     Value::Instant(v) => {
                         vec![RangeValue {
@@ -289,7 +287,7 @@ impl Engine {
                     }],
                     Value::Float(val) => vec![RangeValue {
                         labels: Labels::default(),
-                        samples: vec![Sample::new(self.time, val)],
+                        samples: vec![Sample::new(self.eval_ctx.start, val)],
                         exemplars: None,
                         time_window,
                     }],
@@ -1107,7 +1105,7 @@ impl Engine {
             Func::StdvarOverTime => functions::stdvar_over_time_range(input, &self.eval_ctx)?,
             Func::SumOverTime => functions::sum_over_time_range(input, &self.eval_ctx)?,
             // TODO: check this implementation
-            Func::Time => Value::Float((self.time / 1_000_000) as f64),
+            Func::Time => Value::Float((self.eval_ctx.start / 1_000_000) as f64),
             Func::Timestamp => functions::timestamp_range(input)?,
             Func::Vector => functions::vector_range(input, &self.eval_ctx)?,
             Func::Year => functions::year_range(input)?,
