@@ -3117,6 +3117,8 @@ export default defineComponent({
               try {
                 searchObj.loading = true;
                 searchObj.meta.refreshHistogram = true;
+                // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
+                searchObj.communicationMethod = "streaming";
                 await extractFields();
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
