@@ -109,7 +109,7 @@
           <div class="col" style="height: 100%">
             <div class="layout-panel-container col" style="height: 100%">
               <VariablesValueSelector
-                :variablesConfig="currentDashboardData.data?.variables"
+                :variablesConfig="filteredVariablesConfig"
                 :showDynamicFilters="
                   currentDashboardData.data?.variables?.showDynamicFilters
                 "
@@ -591,6 +591,62 @@ export default defineComponent({
       }
     };
 
+    // Helper function to determine the scope type of a variable
+    const getScopeType = (variable: any) => {
+      if (variable.panels && variable.panels.length > 0) {
+        return "panels";
+      }
+      if (variable.tabs && variable.tabs.length > 0) {
+        return "tabs";
+      }
+      return "global";
+    };
+
+    // Computed property to filter variables based on current panel and tab context
+    const filteredVariablesConfig = computed(() => {
+      // Get current panel ID and tab ID from route query parameters
+      const currentPanelId = (route.query.panelId as string) || props.panelId;
+      const currentTabId = route.query.tab as string;
+
+      // Return early if no variables are configured
+      if (
+        !currentDashboardData.data?.variables ||
+        !currentDashboardData.data.variables.list
+      ) {
+        return currentDashboardData.data?.variables || { list: [] };
+      }
+
+      // Filter variables based on scope
+      const filteredList = currentDashboardData.data.variables.list.filter(
+        (variable: any) => {
+          const scopeType = getScopeType(variable);
+
+          // Always include global variables
+          if (scopeType === "global") {
+            return true;
+          }
+
+          // Include tab-level variables if they belong to the current tab
+          if (scopeType === "tabs" && currentTabId) {
+            return variable.tabs.includes(currentTabId);
+          }
+
+          // Include panel-level variables if they belong to the current panel
+          if (scopeType === "panels" && currentPanelId) {
+            return variable.panels.includes(currentPanelId);
+          }
+
+          return false;
+        },
+      );
+
+      // Return the filtered variables config
+      return {
+        ...currentDashboardData.data.variables,
+        list: filteredList,
+      };
+    });
+
     watch(selectedDate, () => {
       updateDateTime(selectedDate.value);
     });
@@ -755,6 +811,7 @@ export default defineComponent({
       errorMessage,
       outlinedWarning,
       symOutlinedDataInfoAlert,
+      filteredVariablesConfig,
     };
   },
 });
