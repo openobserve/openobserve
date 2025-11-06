@@ -237,7 +237,7 @@ export default defineComponent({
       await closePopUpWhenValueIsSet();
     };
 
-    const onUpdateValue = (val: any) => {
+    const onUpdateValue = async (val: any) => {
       // If multiselect and user selects any regular value after SELECT_ALL, remove SELECT_ALL
       if (
         props.variableItem.multiSelect &&
@@ -256,6 +256,8 @@ export default defineComponent({
       selectedValue.value = val;
       if (!props.variableItem.multiSelect) {
         emit("update:modelValue", val);
+        // Close dropdown immediately for single-select to prevent it staying open during child variable loading
+        await closePopUpWhenValueIsSet();
       }
     };
 
@@ -330,7 +332,9 @@ export default defineComponent({
     watch(
       () => props.variableItem.options,
       () => {
-        if (isOpen.value && selectRef.value) {
+        // Only update input if dropdown is open AND it's a multiSelect
+        // For single-select, don't interfere as the dropdown should close after selection
+        if (isOpen.value && selectRef.value && props.variableItem.multiSelect) {
           nextTick(() => {
             if (selectRef.value) {
               if (!filterText.value) {
