@@ -212,18 +212,7 @@ impl Engine {
                             .collect();
                         Value::Matrix(out)
                     }
-                    Value::Float(f) => {
-                        let v = RangeValue {
-                            labels: Labels::default(),
-                            samples: vec![Sample {
-                                timestamp: self.time,
-                                value: -f,
-                            }],
-                            exemplars: None,
-                            time_window: None,
-                        };
-                        Value::Matrix(vec![v])
-                    }
+                    Value::Float(f) => Value::Float(-f),
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
                             "Unsupported Unary: {expr:?}"
@@ -356,14 +345,13 @@ impl Engine {
 
         let mut selector = selector.clone();
         if selector.name.is_none() {
-            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
-                Some(mat) => mat.value.clone(),
-                None => {
-                    return Err(DataFusionError::Plan(
-                        "VectorSelector: metric name is required".into(),
-                    ));
-                }
-            };
+            let name = selector
+                .matchers
+                .find_matchers(NAME_LABEL)
+                .first()
+                .unwrap()
+                .value
+                .clone();
 
             selector.name = Some(name);
         }
@@ -391,47 +379,52 @@ impl Engine {
         let eval_timestamps = self.eval_ctx.timestamps();
 
         // For each metric, select appropriate samples at each evaluation timestamp
-        let result: Vec<RangeValue> = metrics_cache
-            .into_par_iter()
-            .filter_map(|metric| {
-                let mut selected_samples = Vec::new();
+        // TODO: make it parallel
+        let mut result = Vec::new();
+        for metric in metrics_cache {
+            let mut selected_samples = Vec::new();
 
-                for &eval_ts in &eval_timestamps {
-                    // Calculate lookback window for this evaluation timestamp
-                    let start = eval_ts - self.ctx.lookback_delta;
+            for &eval_ts in &eval_timestamps {
+                // Calculate lookback window for this evaluation timestamp
+                let start = eval_ts - self.ctx.lookback_delta;
 
-                    // Find the sample for this evaluation timestamp
-                    // Binary search for the last sample before or at eval_ts (considering offset)
-                    let end_index = metric
-                        .samples
-                        .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
+                // Find the sample for this evaluation timestamp
+                // Binary search for the last sample before or at eval_ts (considering offset)
+                let end_index = metric
+                    .samples
+                    .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
 
-                    // Check if there's a valid sample within the time range
-                    if end_index > 0 {
-                        if let Some(sample) = metric.samples.get(end_index - 1) {
-                            let adjusted_ts = sample.timestamp + offset_modifier;
-                            if adjusted_ts >= start && adjusted_ts <= eval_ts {
-                                // Use eval_ts as the timestamp for the selected sample
-                                // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                                selected_samples.push(Sample::new(eval_ts, sample.value));
-                            }
+                let match_sample = if end_index > 0 {
+                    metric.samples.get(end_index - 1).and_then(|sample| {
+                        let adjusted_ts = sample.timestamp + offset_modifier;
+                        if adjusted_ts >= start && adjusted_ts <= eval_ts {
+                            Some(sample)
+                        } else {
+                            None
                         }
-                    }
-                }
-
-                // Only include metrics that have at least one sample
-                if !selected_samples.is_empty() {
-                    Some(RangeValue {
-                        labels: metric.labels,
-                        samples: selected_samples,
-                        exemplars: metric.exemplars,
-                        time_window: metric.time_window,
                     })
                 } else {
                     None
+                };
+
+                // Add the matched sample (already validated to be within range)
+                if let Some(sample) = match_sample {
+                    // Use eval_ts as the timestamp for the selected sample
+                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
+                    selected_samples.push(Sample::new(eval_ts, sample.value));
                 }
-            })
-            .collect();
+            }
+
+            // Only include metrics that have at least one sample
+            if !selected_samples.is_empty() {
+                result.push(RangeValue {
+                    labels: metric.labels,
+                    samples: selected_samples,
+                    exemplars: metric.exemplars,
+                    time_window: metric.time_window,
+                });
+            }
+        }
 
         Ok(result)
     }
@@ -454,14 +447,13 @@ impl Engine {
 
         let mut selector = selector.clone();
         if selector.name.is_none() {
-            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
-                Some(mat) => mat.value.clone(),
-                None => {
-                    return Err(DataFusionError::Plan(
-                        "VectorSelector: metric name is required".into(),
-                    ));
-                }
-            };
+            let name = selector
+                .matchers
+                .find_matchers(NAME_LABEL)
+                .first()
+                .unwrap()
+                .value
+                .clone();
 
             selector.name = Some(name);
         }
