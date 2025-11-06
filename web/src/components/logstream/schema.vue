@@ -1240,6 +1240,7 @@ export default defineComponent({
         .deleteFields(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
+          indexData.value.stream_type,
           selectedFields.value.map((field) => field.name),
         )
         .then(async (res) => {
