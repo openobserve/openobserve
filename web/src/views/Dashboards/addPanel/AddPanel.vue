@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.meta.dateTime.start_time &&
                           dashboardPanelData.meta.dateTime.end_time)
                       "
-                      :variablesConfig="currentDashboardData.data?.variables"
+                      :variablesConfig="filteredVariablesConfig"
                       :showDynamicFilters="
                         currentDashboardData.data?.variables?.showDynamicFilters
                       "
@@ -910,6 +910,56 @@ export default defineComponent({
 
     const currentDashboardData: any = reactive({
       data: {},
+    });
+
+    // Helper to determine scope type (matching VariableSettings.vue logic)
+    const getScopeType = (variable: any) => {
+      if (variable.panels && variable.panels.length > 0) {
+        return "panels";
+      } else if (variable.tabs && variable.tabs.length > 0) {
+        return "tabs";
+      } else {
+        return "global";
+      }
+    };
+
+    // Computed property to filter variables for the current panel
+    // Shows only: global variables + tab variables (for current tab) + panel variables (for current panel)
+    const filteredVariablesConfig = computed(() => {
+      if (!currentDashboardData.data?.variables) {
+        return currentDashboardData.data?.variables;
+      }
+
+      const currentPanelId = route.query.panelId as string;
+      const currentTabId = route.query.tab as string;
+
+      const filteredList = currentDashboardData.data.variables.list.filter(
+        (variable: any) => {
+          const scopeType = getScopeType(variable);
+
+          // Always include global variables
+          if (scopeType === "global") {
+            return true;
+          }
+
+          // Include tab variables if they belong to current tab
+          if (scopeType === "tabs" && currentTabId) {
+            return variable.tabs.includes(currentTabId);
+          }
+
+          // Include panel variables if they belong to current panel
+          if (scopeType === "panels" && currentPanelId) {
+            return variable.panels.includes(currentPanelId);
+          }
+
+          return false;
+        },
+      );
+
+      return {
+        ...currentDashboardData.data.variables,
+        list: filteredList,
+      };
     });
 
     // this is used to activate the watcher only after on mounted
@@ -1956,6 +2006,7 @@ export default defineComponent({
       currentDashboardData,
       variablesData,
       updatedVariablesData,
+      filteredVariablesConfig,
       savePanelData,
       resetAggregationFunction,
       isOutDated,
