@@ -183,6 +183,7 @@ alt="SQL Mode" class="toolbar-icon" />
             icon="save"
             icon-right="saved_search"
             class="saved-views-dropdown no-border"
+            menu-class="saved-views-dropdown-menu"
           >
             <q-list
               :style="
@@ -259,7 +260,7 @@ alt="SQL Mode" class="toolbar-icon" />
                       <q-td :props="props"
 class="field_list" no-hover>
                         <q-item
-                          class="q-pa-sm saved-view-item"
+                          class="q-pa-xs saved-view-item"
                           clickable
                           v-close-popup
                         >
@@ -270,7 +271,7 @@ class="field_list" no-hover>
                           >
                             <q-item-label
                               class="ellipsis"
-                              style="max-width: 188px"
+                              style="max-width: 140px"
                               >{{ props.row.view_name }}</q-item-label
                             >
                           </q-item-section>
@@ -366,7 +367,7 @@ class="field_list" no-hover>
                     <template v-slot:body-cell-view_name="props">
                       <q-td :props="props" class="field_list q-pa-xs">
                         <q-item
-                          class="q-pa-sm saved-view-item"
+                          class="q-pa-xs saved-view-item"
                           clickable
                           v-close-popup
                         >
@@ -376,7 +377,7 @@ class="field_list" no-hover>
                           >
                             <q-item-label
                               class="ellipsis"
-                              style="max-width: 185px"
+                              style="max-width: 90px"
                               >{{ props.row.view_name }}</q-item-label
                             >
                           </q-item-section>
