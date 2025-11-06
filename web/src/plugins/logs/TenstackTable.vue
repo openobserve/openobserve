@@ -236,13 +236,7 @@ name="warning" class="q-mr-xs" />
             :data-expanded="
               formattedRows?.[virtualRow.index]?.original?.isExpandedRow
             "
-            :ref="
-              (node: any) =>
-                node &&
-                (formattedRows?.[virtualRow.index]?.original?.isExpandedRow ||
-                  props.wrap) &&
-                rowVirtualizer.measureElement(node)
-            "
+            :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
             class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b tw-cursor-pointer"
             :class="[
               store.state.theme === 'dark'
