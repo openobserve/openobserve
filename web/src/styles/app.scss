@@ -1332,6 +1332,35 @@ body {
   }
 }
 
+// Exception: Disable hover for saved views dropdown menu
+// Disable table row hover
+.saved-views-dropdown-menu .q-tr:hover,
+.saved-views-dropdown-menu tr:hover,
+.saved-views-dropdown-menu tbody tr:hover,
+.saved-views-dropdown-menu tbody .q-tr:hover {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+.saved-views-dropdown-menu td:hover,
+.saved-views-dropdown-menu .q-td:hover {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+// Disable default q-item hover but enable for saved-view-item specifically
+.saved-views-dropdown-menu .q-item:hover {
+  background-color: transparent !important;
+  background: transparent !important;
+  color: inherit !important;
+}
+
+// Enable hover only for individual saved view items
+.saved-views-dropdown-menu .saved-view-item:hover {
+  background-color: var(--o2-hover-accent) !important;
+  border-radius: 4px;
+}
+
 .q-list--dark, .q-item--dark {
   color: var(--o2-text-primary);
 }
@@ -1549,11 +1578,14 @@ body {
     border-top-left-radius: 0.375rem !important; // 6px
     border-bottom-left-radius: 0.375rem !important; // 6px
     color: var(--o2-text-primary);
+    border-right: 1px solid var(--o2-border-color) !important;
   }
 
   .button-center {
     border-radius: 0 !important;
     color: var(--o2-text-primary);
+    border-right: 1px solid var(--o2-border-color) !important;
+
   }
 
   .button-right {
@@ -1582,9 +1614,22 @@ body {
         color: white;
       }
     }
+
     .selected {
       background-color: var(--q-primary) !important;
       color: white !important;
+    }
+    .button-left {
+      background-color: rgba(255, 255, 255, 0.1);
+      &:hover{
+        color: white;
+      }
+    }
+     .button-center {
+      background-color: rgba(255, 255, 255, 0.1);
+      &:hover{
+        color: white;
+      }
     }
   }
 }

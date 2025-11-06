@@ -28,15 +28,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex items-center">
             <q-btn
-              icon="arrow_back"
-              flat
-              round
+              no-caps
+              padding="xs"
+              outline
+              icon="arrow_back_ios_new"
+              class="hideOnPrintMode el-border"
               @click="goBack"
-              class="q-mr-sm"
               data-test="alert-history-back-btn"
             />
             <div
-              class="q-table__title tw-font-[600]"
+              class="q-table__title tw-font-[600] q-ml-sm"
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
@@ -132,7 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="id"
           v-model:pagination="pagination"
-          :loading="loading"
           :rows-per-page-options="rowsPerPageOptions"
           @request="onRequest"
           binary-state-sort
@@ -617,7 +617,7 @@ const columns = ref([
     label: "Pipeline Name",
     field: "pipeline_name",
     align: "left",
-    sortable: true,
+    sortable: false,
   },
   {
     name: "is_realtime",
@@ -640,7 +640,7 @@ const columns = ref([
     label: "Timestamp",
     field: "timestamp",
     align: "left",
-    sortable: true,
+    sortable: false,
     style: "width: 160px;",
   },
   {
@@ -648,7 +648,7 @@ const columns = ref([
     label: "Start Time",
     field: "start_time",
     align: "left",
-    sortable: true,
+    sortable: false,
     style: "width: 160px;",
   },
   {
@@ -656,7 +656,7 @@ const columns = ref([
     label: "End Time",
     field: "end_time",
     align: "left",
-    sortable: true,
+    sortable: false,
     style: "width: 160px;",
   },
   {
@@ -664,7 +664,7 @@ const columns = ref([
     label: "Duration",
     field: (row: any) => row.end_time - row.start_time,
     align: "right",
-    sortable: true,
+    sortable: false,
     style: "width: 50px;",
   },
   {
@@ -672,7 +672,7 @@ const columns = ref([
     label: "Status",
     field: "status",
     align: "center",
-    sortable: true,
+    sortable: false,
     style: "width: 150px;",
   },
   {
@@ -680,7 +680,7 @@ const columns = ref([
     label: "Retries",
     field: "retries",
     align: "center",
-    sortable: true,
+    sortable: false,
     style: "width: 50px;",
   },
   // {
@@ -791,7 +791,7 @@ const fetchPipelineHistory = async () => {
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
-        "#": index + 1,
+        "#": (index + 1) + (pagination.value.page - 1) * pagination.value.rowsPerPage,
       }));
       console.log(pagination.value);
 
@@ -895,7 +895,7 @@ const getStatusColor = (status: string) => {
     case "running":
       return "info";
     default:
-      return "grey";
+      return store.state.theme === "dark" ? "white" : "black";
   }
 };
 

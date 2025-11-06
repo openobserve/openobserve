@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
-  <div class="flex tw-pr-[0.625rem]">
+  <div class="flex tw-pr-[0.5rem]">
     <div class="flex" style="width: 100%">
       <q-splitter
         class="logs-search-splitter"
@@ -170,8 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div
             data-test="pipeline-import-output-editor"
-            style="width: calc(100% - 10px); height: 100%"
-            class="card-container tw-ml-[0.625rem] tw-h-full"
+            style="width: 100%; height: 100%"
+            class="card-container tw-h-full"
           >
             <div
               v-if="pipelineErrorsToDisplay.length > 0"

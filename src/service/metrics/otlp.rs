@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Error,
+    sync::Arc,
+};
 
 use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
@@ -35,7 +39,6 @@ use config::{
         time::now_micros,
     },
 };
-use hashbrown::HashSet;
 use infra::schema::{SchemaCache, unwrap_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -139,6 +142,12 @@ pub async fn handle_otlp_request(
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
+    // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
+    // End get user defined schema
+
     // associated pipeline
     let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
         HashMap::new();
@@ -151,7 +160,7 @@ pub async fn handle_otlp_request(
     let mut partial_success = ExportMetricsPartialSuccess::default();
 
     // records buffer
-    let mut json_data_by_stream: HashMap<String, Vec<json::Value>> = HashMap::new();
+    let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
 
     for resource_metric in &request.resource_metrics {
         if resource_metric.scope_metrics.is_empty() {
@@ -204,6 +213,20 @@ pub async fn handle_otlp_request(
                         .await;
                     stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
                 }
+
+                // get user defined schema
+                let streams = vec![StreamParams {
+                    org_id: org_id.to_owned().into(),
+                    stream_type: StreamType::Metrics,
+                    stream_name: metric_name.to_owned().into(),
+                }];
+                crate::service::ingestion::get_uds_and_original_data_streams(
+                    &streams,
+                    &mut user_defined_schema_map,
+                    &mut streams_need_original_map,
+                    &mut streams_need_all_values_map,
+                )
+                .await;
 
                 let mut rec = json::json!({});
                 if let Some(res) = &resource_metric.resource {
@@ -316,6 +339,20 @@ pub async fn handle_otlp_request(
                             stream_executable_pipelines
                                 .insert(local_metric_name.clone(), pipeline_params);
                         }
+
+                        let streams = vec![StreamParams {
+                            org_id: org_id.to_owned().into(),
+                            stream_type: StreamType::Metrics,
+                            stream_name: local_metric_name.to_owned().into(),
+                        }];
+
+                        crate::service::ingestion::get_uds_and_original_data_streams(
+                            &streams,
+                            &mut user_defined_schema_map,
+                            &mut streams_need_original_map,
+                            &mut streams_need_all_values_map,
+                        )
+                        .await;
                     }
 
                     // ready to be buffered for downstream processing
@@ -329,10 +366,22 @@ pub async fn handle_otlp_request(
                             .or_default()
                             .push(rec);
                     } else {
+                        // get json object
+                        let mut local_val = match rec.take() {
+                            json::Value::Object(val) => val,
+                            _ => unreachable!(),
+                        };
+
+                        if let Some(Some(fields)) =
+                            user_defined_schema_map.get(local_metric_name.as_str())
+                        {
+                            local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                        }
+
                         json_data_by_stream
                             .entry(local_metric_name.to_string())
                             .or_default()
-                            .push(rec);
+                            .push(local_val);
                     }
                 }
             }
@@ -370,27 +419,40 @@ pub async fn handle_otlp_request(
                         if stream_params.stream_type != StreamType::Metrics {
                             continue;
                         }
+
+                        let destination_stream = stream_params.stream_name.to_string();
+
                         // add partition keys
-                        if !stream_partitioning_map.contains_key(stream_params.stream_name.as_str())
-                        {
+                        if !stream_partitioning_map.contains_key(&destination_stream) {
                             let partition_det =
                                 crate::service::ingestion::get_stream_partition_keys(
                                     org_id,
                                     &StreamType::Metrics,
-                                    &stream_params.stream_name,
+                                    &destination_stream,
                                 )
                                 .await;
-                            stream_partitioning_map.insert(
-                                stream_params.stream_name.to_string(),
-                                partition_det.clone(),
-                            );
+                            stream_partitioning_map
+                                .insert(destination_stream.clone(), partition_det.clone());
                         }
-                        for (_, res) in stream_pl_results {
+                        for (_, mut res) in stream_pl_results {
+                            // get json object
+                            let mut local_val = match res.take() {
+                                json::Value::Object(v) => v,
+                                _ => unreachable!(),
+                            };
+
+                            if let Some(Some(fields)) =
+                                user_defined_schema_map.get(&destination_stream)
+                            {
+                                local_val =
+                                    crate::service::ingestion::refactor_map(local_val, fields);
+                            }
+
                             // buffer to downstream processing directly
                             json_data_by_stream
-                                .entry(stream_params.stream_name.to_string())
+                                .entry(destination_stream.clone())
                                 .or_default()
-                                .push(res);
+                                .push(local_val);
                         }
                     }
                 }
@@ -405,11 +467,7 @@ pub async fn handle_otlp_request(
         let partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
 
-        for mut rec in json_data {
-            // get json object
-            let val_map: &mut serde_json::Map<String, serde_json::Value> =
-                rec.as_object_mut().unwrap();
-
+        for val_map in json_data {
             let timestamp = val_map
                 .get(TIMESTAMP_COL_NAME)
                 .and_then(|ts| ts.as_i64())
@@ -441,7 +499,7 @@ pub async fn handle_otlp_request(
                     &local_metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
-                    vec![val_map],
+                    vec![&val_map],
                     timestamp,
                     false, // is_derived is false for metrics
                 )
@@ -467,7 +525,7 @@ pub async fn handle_otlp_request(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
-                val_map,
+                &val_map,
                 Some(&schema_key),
             );
             let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
@@ -491,7 +549,7 @@ pub async fn handle_otlp_request(
                     let alert_end_time = now_micros();
                     for alert in alerts {
                         if let Ok(Some(data)) = alert
-                            .evaluate(Some(val_map), (None, alert_end_time), None)
+                            .evaluate(Some(&val_map), (None, alert_end_time), None)
                             .await
                             .map(|res| res.data)
                         {

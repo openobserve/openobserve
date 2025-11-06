@@ -246,7 +246,7 @@ name="warning" class="q-mr-xs" />
             class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b tw-cursor-pointer"
             :class="[
               store.state.theme === 'dark'
-                ? 'w-border-gray-800  hover:tw-bg-zinc-800'
+                ? 'w-border-gray-800 hover:tw-bg-zinc-700'
                 : 'w-border-gray-100 hover:tw-bg-zinc-200',
               defaultColumns &&
               !wrap &&
@@ -723,7 +723,7 @@ const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
-    estimateSize: () => 22,
+    estimateSize: () => 24,
     overscan: 20,
     measureElement:
       typeof window !== "undefined" && !isFirefox.value
@@ -731,7 +731,7 @@ const rowVirtualizerOptions = computed(() => {
             if (element.dataset.expanded == "true" || props.wrap) {
               return element?.getBoundingClientRect().height;
             } else {
-              return 22;
+              return 24;
             }
           }
         : undefined,

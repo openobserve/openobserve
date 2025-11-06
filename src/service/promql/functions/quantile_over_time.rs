@@ -18,7 +18,7 @@ use datafusion::error::{DataFusionError, Result};
 use crate::service::promql::{
     aggregations::prepare_vector,
     common::quantile,
-    value::{InstantValue, Sample, Value},
+    value::{InstantValue, LabelsExt, Sample, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#quantile_over_time
@@ -30,7 +30,7 @@ pub(crate) fn eval(
     data: Value,
     phi_quantile: f64,
     timestamp: i64,
-    _keep_name_label: bool,
+    keep_name_label: bool,
 ) -> Result<Value> {
     let data = match data {
         Value::Matrix(v) => v,
@@ -49,10 +49,10 @@ pub(crate) fn eval(
 
     let mut rate_values = Vec::with_capacity(data.len());
     for mut metric in data {
-        let labels = std::mem::take(&mut metric.labels);
-        // if !keep_name_label {
-        //     labels = metric.labels.without_metric_name();
-        // };
+        let mut labels = std::mem::take(&mut metric.labels);
+        if !keep_name_label {
+            labels = metric.labels.without_metric_name();
+        };
 
         let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
         let input: Vec<f64> = metric.samples.iter().map(|x| x.value).collect();

@@ -310,12 +310,13 @@ const useLogs = () => {
     }
   };
 
-  const handleRunQuery = async () => {
+  const handleRunQuery = async (clear_cache = false) => {
     try {
       searchObj.loading = true;
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
+      searchObj.meta.clearCache = clear_cache;
       if (
         Object.hasOwn(router.currentRoute.value.query, "type") &&
         router.currentRoute.value.query.type == "search_history_re_apply"

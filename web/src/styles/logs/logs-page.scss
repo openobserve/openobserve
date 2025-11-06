@@ -973,8 +973,9 @@
     }
 
     .schema-field-toggle {
-      border: 1px solid light-grey;
-      border-radius: 5px;
+      border: 1px solid var(--o2-border-color);
+      border-radius: 0.325rem;
+      background-color: transparent;
       line-height: 10px;
     }
 

@@ -17,7 +17,7 @@ use datafusion::error::{DataFusionError, Result};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use strum::EnumIter;
 
-use crate::service::promql::value::{InstantValue, Sample, Value};
+use crate::service::promql::value::{InstantValue, LabelsExt, Sample, Value};
 
 #[derive(Debug, EnumIter)]
 pub enum MathOperationsType {
@@ -98,8 +98,9 @@ fn exec(data: Value, op: &MathOperationsType) -> Result<Value> {
                 .into_par_iter()
                 .map(|mut instant| {
                     let val = op.apply(instant.sample.value);
+                    let labels = std::mem::take(&mut instant.labels);
                     InstantValue {
-                        labels: std::mem::take(&mut instant.labels),
+                        labels: labels.without_metric_name(),
                         sample: Sample::new(instant.sample.timestamp, val),
                     }
                 })

@@ -1739,7 +1739,7 @@ export default defineComponent({
     const goToAlertHistory = () => {
       router.push({
         name: "alertHistory",
-        params: {
+        query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
@@ -1748,7 +1748,7 @@ export default defineComponent({
     const goToAlertInsights = () => {
       router.push({
         name: "alertInsights",
-        params: {
+        query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });

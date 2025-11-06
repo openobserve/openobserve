@@ -36,11 +36,16 @@ pub fn generate_select_star_schema(
     search_event_type: &Option<SearchEventType>,
     need_fst_fields: bool,
 ) -> HashMap<TableReference, Arc<SchemaCache>> {
+    let cfg = get_config();
     let mut used_schemas = HashMap::new();
     for (name, schema) in schemas {
         let stream_settings = unwrap_stream_settings(schema.schema());
         let defined_schema_fields = get_stream_setting_defined_schema_fields(&stream_settings);
         let has_original_column = *has_original_column.get(&name).unwrap_or(&false);
+        let need_all_column = columns
+            .get(&name)
+            .map(|cols| cols.contains(&cfg.common.column_all))
+            .unwrap_or(false);
         // check if it is user defined schema
         if defined_schema_fields.is_empty() || defined_schema_fields.len() > quick_mode_num_fields {
             let quick_mode = quick_mode && schema.schema().fields().len() > quick_mode_num_fields;
@@ -88,7 +93,11 @@ pub fn generate_select_star_schema(
         } else {
             used_schemas.insert(
                 name,
-                generate_user_defined_schema(schema.as_ref(), defined_schema_fields),
+                generate_user_defined_schema(
+                    schema.as_ref(),
+                    defined_schema_fields,
+                    need_all_column,
+                ),
             );
         }
     }
@@ -98,17 +107,15 @@ pub fn generate_select_star_schema(
 pub fn generate_user_defined_schema(
     schema: &SchemaCache,
     defined_schema_fields: Vec<String>,
+    need_all_column: bool,
 ) -> Arc<SchemaCache> {
     let cfg = get_config();
     let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
-    if !fields.contains(TIMESTAMP_COL_NAME) {
-        fields.insert(TIMESTAMP_COL_NAME.to_string());
-    }
-    if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
+    fields.insert(TIMESTAMP_COL_NAME.to_string());
+    fields.insert(ID_COL_NAME.to_string());
+
+    if need_all_column || !cfg.common.feature_query_exclude_all {
         fields.insert(cfg.common.column_all.to_string());
-    }
-    if !fields.contains(ID_COL_NAME) {
-        fields.insert(ID_COL_NAME.to_string());
     }
     let new_fields = fields
         .iter()

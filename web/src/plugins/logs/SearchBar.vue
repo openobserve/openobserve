@@ -183,6 +183,7 @@ alt="SQL Mode" class="toolbar-icon" />
             icon="save"
             icon-right="saved_search"
             class="saved-views-dropdown no-border"
+            content-class="saved-views-dropdown-menu"
           >
             <q-list
               :style="
@@ -221,15 +222,15 @@ alt="SQL Mode" class="toolbar-icon" />
                           data-test="log-search-saved-view-field-search-input"
                           v-model="searchObj.data.savedViewFilterFields"
                           data-cy="index-field-search-input"
-                          filled
                           borderless
                           dense
                           clearable
                           debounce="1"
+                          class="tw-mx-2 tw-my-2"
                           :placeholder="t('search.searchSavedView')"
                         >
                           <template #prepend>
-                            <q-icon name="search" />
+                            <q-icon name="search"  />
                           </template>
                         </q-input>
                       </div>
@@ -259,7 +260,7 @@ alt="SQL Mode" class="toolbar-icon" />
                       <q-td :props="props"
 class="field_list" no-hover>
                         <q-item
-                          class="q-pa-sm saved-view-item"
+                          class="q-pa-xs saved-view-item"
                           clickable
                           v-close-popup
                         >
@@ -270,7 +271,7 @@ class="field_list" no-hover>
                           >
                             <q-item-label
                               class="ellipsis"
-                              style="max-width: 188px"
+                              style="max-width: 140px"
                               >{{ props.row.view_name }}</q-item-label
                             >
                           </q-item-section>
@@ -366,7 +367,7 @@ class="field_list" no-hover>
                     <template v-slot:body-cell-view_name="props">
                       <q-td :props="props" class="field_list q-pa-xs">
                         <q-item
-                          class="q-pa-sm saved-view-item"
+                          class="q-pa-xs saved-view-item"
                           clickable
                           v-close-popup
                         >
@@ -376,7 +377,7 @@ class="field_list" no-hover>
                           >
                             <q-item-label
                               class="ellipsis"
-                              style="max-width: 185px"
+                              style="max-width: 90px"
                               >{{ props.row.view_name }}</q-item-label
                             >
                           </q-item-section>
@@ -970,38 +971,96 @@ class="q-pr-sm q-pt-xs" />
               </q-btn-dropdown>
             </q-btn-group>
             <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'">
-              <q-btn
+              <div v-if="config.isEnterprise == 'true'" class="tw-flex">
+                <q-btn
                 v-if="
-                  config.isEnterprise == 'true' &&
-                  visualizeSearchRequestTraceIds.length
+                  visualizeSearchRequestTraceIds.length > 0
                 "
                 data-test="logs-search-bar-visualize-cancel-btn"
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button tw-w-[90px] element-box-shadow"
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
+                :class="
+                  config.isEnterprise == 'true'
+                    ? 'search-button-enterprise-border-radius'
+                    : 'search-button-normal-border-radius'
+                "
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
               <q-btn
-                v-else
-                data-test="logs-search-bar-visualize-refresh-btn"
-                dense
+                  v-else
+                  data-test="logs-search-bar-visualize-refresh-btn"
+                  dense
+                  flat
+                  :title="t('search.runQuery')"
+                  class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                  :class="
+                    config.isEnterprise == 'true'
+                      ? 'search-button-enterprise-border-radius'
+                      : 'search-button-normal-border-radius'
+                  "
+                  no-caps
+                  @click="handleRunQueryFn"
+                  >{{ t("search.runQuery") }}</q-btn
+                >
+              <q-separator class="tw-h-[29px] tw-w-[1px]" />
+              <q-btn-dropdown
                 flat
-                :title="t('search.runQuery')"
-                class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
-                no-caps
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-primary-button-dark'
-                    : 'o2-primary-button-light'
-                "
-                @click="handleRunQueryFn"
-                :disable="disable"
-                >{{ t("search.runQuery") }}</q-btn
+                class="tw-h-[29px] search-button-dropdown"
+                :class="[
+                  config.isEnterprise == 'true' &&
+                  visualizeSearchRequestTraceIds.length
+                    ? 'o2-color-cancel'
+                    : 'o2-color-primary',
+                  config.isEnterprise == 'true'
+                    ? 'search-button-dropdown-enterprise-border-radius'
+                    : 'search-button-normal-border-radius',
+                ]"
+                unelevated
+                dense
               >
+                <q-btn
+                  data-test="logs-search-bar-refresh-btn"
+                  data-cy="search-bar-visuzlie-hard-refresh-button"
+                  dense
+                  flat
+                  no-caps
+                  :title="'Refresh Cache & Run Query'"
+                  class="q-pa-sm search-button-dropdown tw-text-[12px]"
+                  v-close-popup
+                  @click="handleRunQueryFn(true)"
+                  :disable="
+                    config.isEnterprise == 'true' &&
+                    !!visualizeSearchRequestTraceIds.length
+                  "
+                >
+                  <q-icon name="refresh" class="q-mr-xs" />
+                  Refresh Cache & Run Query</q-btn
+                >
+              </q-btn-dropdown>
+              </div>
+              <div v-else class="tw-flex">
+                <q-btn
+                  data-test="logs-search-bar-visualize-refresh-btn"
+                  dense
+                  flat
+                  :title="t('search.runQuery')"
+                  class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                  :class="
+                    config.isEnterprise == 'true'
+                      ? 'search-button-enterprise-border-radius'
+                      : 'search-button-normal-border-radius'
+                  "
+                  no-caps
+                  @click="handleRunQueryFn"
+                  :disable="disable"
+                  >{{ t("search.runQuery") }}</q-btn
+                >
+              </div>
             </div>
-            <div v-else>
+            <div v-else class="tw-flex">
               <q-btn
                 v-if="
                   config.isEnterprise == 'true' &&
@@ -1013,9 +1072,9 @@ class="q-pr-sm q-pt-xs" />
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button tw-w-[90px] element-box-shadow"
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -1024,16 +1083,10 @@ class="q-pr-sm q-pt-xs" />
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                flat
                 :title="t('search.runQuery')"
-                class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
-                style="font-size: 11px"
+                class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 no-caps
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-primary-button-dark'
-                    : 'o2-primary-button-light'
-                "
                 @click="handleRunQueryFn"
                 :disable="
                   searchObj.loading == true ||
@@ -1041,6 +1094,35 @@ class="q-pr-sm q-pt-xs" />
                 "
                 >{{ t("search.runQuery") }}</q-btn
               >
+               <q-separator  class="tw-h-[29px] tw-w-[1px]" />
+              <q-btn-dropdown v-if="config.isEnterprise == 'true'" flat class="tw-h-[29px]"
+                :class="[
+                config.isEnterprise == 'true' &&
+                    (!!searchObj.data.searchRequestTraceIds.length ||
+                      !!searchObj.data.searchWebSocketTraceIds.length) &&
+                    (searchObj.loading == true ||
+                      searchObj.loadingHistogram == true) ? 'o2-color-cancel' : 'o2-color-primary',
+                config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-normal-border-radius'
+                ]"
+               unelevated dense >
+                    <q-btn
+                      data-test="logs-search-bar-refresh-btn"
+                      data-cy="search-bar-refresh-button"
+                      dense
+                      flat
+                      no-caps
+                      :title="'Refresh Cache & Run Query'"
+                      class="q-pa-sm tw-text-[12px] "
+                      v-close-popup
+                      @click="handleRunQueryFn(true)"
+                      :disable="
+                        searchObj.loading == true ||
+                        searchObj.loadingHistogram == true
+                      "
+                      >
+                      <q-icon name="refresh" class="q-mr-xs" />
+                      Refresh Cache & Run Query</q-btn>
+              </q-btn-dropdown>
             </div>
           </div>
         </div>
@@ -1060,7 +1142,8 @@ class="q-pr-sm q-pt-xs" />
         >
           <template #before>
             <div
-              class="col tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mx-[0.375rem] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-full"
+              class="col tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-full"
+              :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw-ml-[0.375rem]' : 'tw-mx-[0.375rem]'"
             >
               <code-query-editor
                 v-if="router.currentRoute.value.name === 'logs'"
@@ -3656,14 +3739,11 @@ export default defineComponent({
 
     const handleHistogramMode = () => {};
 
-    const handleRunQueryFn = () => {
-      if (
-        searchObj.meta.logsVisualizeToggle == "visualize" ||
-        searchObj.meta.logsVisualizeToggle == "patterns"
-      ) {
-        emit("handleRunQueryFn");
+    const handleRunQueryFn = (clear_cache = false) => {
+      if (searchObj.meta.logsVisualizeToggle == "visualize" || searchObj.meta.logsVisualizeToggle == "patterns") {
+        emit("handleRunQueryFn", typeof clear_cache === 'boolean' ? clear_cache : false);
       } else {
-        handleRunQuery();
+        handleRunQuery(typeof clear_cache === 'boolean' ? clear_cache : false);
       }
     };
 
@@ -3827,7 +3907,7 @@ export default defineComponent({
           searchObj.data.transformType === "function" && isFocused.value
             ? isDarkMode
               ? "var(--o2-card-bg)"
-              : "var(--o2-card-bg)" // Dark mode: grey, Light mode: yellow (or any color)
+              : "white" // Dark mode: grey, Light mode: yellow (or any color)
             : "",
         borderBottom:
           searchObj.data.transformType === "function" && isFocused.value
@@ -4528,4 +4608,35 @@ export default defineComponent({
 .q-dark .group-menu-btn {
   border: 0.0625rem solid var(--o2-border-color) !important;
 }
+.o2-run-query-button{
+  font-size: 11px;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  padding: 0px 12px !important;
+  width: 92px !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  /* subtle default glow */
+  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
+}
+.o2-color-primary{
+    background-color: var(--o2-primary-btn-bg);
+    color: var(--o2-primary-btn-text);
+    &:hover {
+    opacity: 0.9;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
+  }
+}
+ .search-button-enterprise-border-radius{
+      border-radius: 0.375rem 0px 0px 0.375rem !important;
+  }
+  .search-button-normal-border-radius{
+      border-radius: 0.375rem;
+  }
+  .search-button-dropdown-enterprise-border-radius{
+          border-radius: 0px 0.375rem 0.375rem  0px !important;
+  }
+  .o2-color-cancel{
+    background-color:#f67a7a;
+    color: var(--o2-primary-btn-text);
+  }
 </style>
