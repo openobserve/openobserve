@@ -200,7 +200,7 @@ export default function useDragAndDrop() {
 
   function onNodeChange(changes:any) {
 
-    console.log("Node change", changes);
+    // console.log("Node change", changes);
   }
 
   function onNodesChange(changes:any) {

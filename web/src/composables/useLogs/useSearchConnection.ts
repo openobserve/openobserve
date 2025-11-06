@@ -73,7 +73,6 @@ export const useSearchConnection = () => {
   const initializeSearchConnection = (
     payload: any,
   ): string | Promise<void> | null => {
-    if (searchObj.communicationMethod === "streaming") {
       payload.searchType = "ui";
       payload.pageType = searchObj.data.stream.streamType;
       return fetchQueryDataWithHttpStream(payload, {
@@ -90,9 +89,6 @@ export const useSearchConnection = () => {
           if (payload.onReset) payload.onReset(data, traceId);
         },
       }) as Promise<void>;
-    }
-
-    return null;
   };
 
   const sendSearchMessage = (queryReq: any) => {
@@ -186,7 +182,7 @@ export const useSearchConnection = () => {
         queryReq.query.from = 0;
         searchObj.meta.refreshHistogram = false;
       }
-
+      
       const requestId = initializeSearchConnection(payload);
 
       if (!requestId) {

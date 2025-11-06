@@ -9,7 +9,7 @@ let updateThemeFromExternal: ((themeConfig: any) => void) | null = null;
 // Toggle customizer panel
 const toggleCustomizer = () => {
   isOpen.value = !isOpen.value;
-  console.log("Toggle customizer:", isOpen.value);
+  // console.log("Toggle customizer:", isOpen.value);
 };
 
 // Register the update function (called by ThemeCustomizer on mount)

@@ -324,7 +324,7 @@ export default defineComponent({
         // Clear cache if requested (manual refresh)
         if (clearCache) {
           RegexPatternCache.clear(orgId);
-          console.log('[BuiltInPatternsTab] Cleared frontend cache, fetching fresh data');
+          // console.log('[BuiltInPatternsTab] Cleared frontend cache, fetching fresh data');
         }
 
         // Check frontend cache first unless cleared
@@ -336,7 +336,7 @@ export default defineComponent({
               selected: false,
             }));
 
-            console.log(`[BuiltInPatternsTab] Loaded ${patterns.value.length} patterns from frontend cache`);
+            // console.log(`[BuiltInPatternsTab] Loaded ${patterns.value.length} patterns from frontend cache`);
 
             q.notify({
               message: t('regex_patterns.patterns_loaded', { count: patterns.value.length }),
@@ -356,7 +356,7 @@ export default defineComponent({
 
         // Cache the fetched patterns in frontend
         RegexPatternCache.set(orgId, fetchedPatterns);
-        console.log(`[BuiltInPatternsTab] Cached ${fetchedPatterns.length} patterns in frontend`);
+        // console.log(`[BuiltInPatternsTab] Cached ${fetchedPatterns.length} patterns in frontend`);
 
         patterns.value = fetchedPatterns.map((p: BuiltInPattern) => ({
           ...p,

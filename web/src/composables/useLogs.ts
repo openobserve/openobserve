@@ -490,16 +490,17 @@ const useLogs = () => {
   };
 
   const reorderSelectedFields = () => {
-    const selectedFields = [...searchObj.data.stream.selectedFields];
+    const selectedFields = [...searchObj.data.stream.selectedFields].filter(
+      (_field) =>
+        _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+    );
 
-    let colOrder =
-      searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream];
-
-    if (!selectedFields.includes(store.state.zoConfig.timestamp_column)) {
-      colOrder = colOrder.filter(
-        (v: any) => v !== store.state.zoConfig.timestamp_column,
-      );
-    }
+    let colOrder = searchObj.data.resultGrid.colOrder[
+      searchObj.data.stream.selectedStream
+    ].filter(
+      (_field) =>
+        _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+    );
 
     if (JSON.stringify(selectedFields) !== JSON.stringify(colOrder)) {
       reorderArrayByReference(selectedFields, colOrder);
