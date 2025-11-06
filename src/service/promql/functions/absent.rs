@@ -17,7 +17,7 @@ use datafusion::error::Result;
 
 use crate::service::promql::{
     functions::RangeFunc,
-    value::{EvalContext, Labels, RangeValue, Sample, TimeWindow, Value},
+    value::{EvalContext, Labels, Sample, TimeWindow, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent
@@ -50,16 +50,7 @@ impl RangeFunc for AbsentFunc {
         "absent"
     }
 
-    fn exec_instant(&self, data: RangeValue) -> Option<f64> {
-        // Return 1.0 if no samples exist, None otherwise
-        if data.samples.is_empty() {
-            Some(1.0)
-        } else {
-            None
-        }
-    }
-
-    fn exec_range(
+    fn exec(
         &self,
         _labels: &Labels,
         samples: &[Sample],

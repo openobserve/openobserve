@@ -146,15 +146,10 @@ pub(crate) enum Func {
 pub static KEEP_METRIC_NAME_FUNC: Lazy<HashSet<&str>> =
     Lazy::new(|| HashSet::from_iter(["last_over_time"]));
 
-#[allow(dead_code)]
 pub trait RangeFunc: Sync {
     fn name(&self) -> &'static str;
 
-    fn exec_instant(&self, _data: RangeValue) -> Option<f64> {
-        None
-    }
-
-    fn exec_range(
+    fn exec(
         &self,
         labels: &Labels,
         samples: &[Sample],
@@ -252,7 +247,7 @@ where
                             continue;
                         }
 
-                        if let Some(value) = func.exec_range(
+                        if let Some(value) = func.exec(
                             &labels,
                             window_samples,
                             &Some(TimeWindow {

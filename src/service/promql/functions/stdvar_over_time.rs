@@ -18,7 +18,7 @@ use datafusion::error::Result;
 use crate::service::promql::{
     common::std_variance,
     functions::RangeFunc,
-    value::{EvalContext, Labels, RangeValue, Sample, TimeWindow, Value},
+    value::{EvalContext, Labels, Sample, TimeWindow, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#stdvar_over_time
@@ -51,11 +51,7 @@ impl RangeFunc for StdvarOverTimeFunc {
         "stdvar_over_time"
     }
 
-    fn exec_instant(&self, _data: RangeValue) -> Option<f64> {
-        None
-    }
-
-    fn exec_range(
+    fn exec(
         &self,
         _labels: &Labels,
         samples: &[Sample],

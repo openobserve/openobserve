@@ -17,7 +17,7 @@ use datafusion::error::Result;
 
 use crate::service::promql::{
     functions::RangeFunc,
-    value::{EvalContext, Labels, RangeValue, Sample, TimeWindow, Value},
+    value::{EvalContext, Labels, Sample, TimeWindow, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#changes
@@ -50,11 +50,7 @@ impl RangeFunc for ChangesFunc {
         "changes"
     }
 
-    fn exec_instant(&self, _data: RangeValue) -> Option<f64> {
-        None
-    }
-
-    fn exec_range(
+    fn exec(
         &self,
         _labels: &Labels,
         samples: &[Sample],

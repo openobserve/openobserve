@@ -17,10 +17,7 @@ use datafusion::error::Result;
 
 use crate::service::promql::{
     functions::RangeFunc,
-    value::{
-        EvalContext, ExtrapolationKind, Labels, RangeValue, Sample, TimeWindow, Value,
-        extrapolated_rate,
-    },
+    value::{EvalContext, ExtrapolationKind, Labels, Sample, TimeWindow, Value, extrapolated_rate},
 };
 
 /// Enhanced version that processes all timestamps at once for range queries
@@ -52,11 +49,7 @@ impl RangeFunc for RateFunc {
         "rate"
     }
 
-    fn exec_instant(&self, _data: RangeValue) -> Option<f64> {
-        None
-    }
-
-    fn exec_range(
+    fn exec(
         &self,
         _labels: &Labels,
         samples: &[Sample],
