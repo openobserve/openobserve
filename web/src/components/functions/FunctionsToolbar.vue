@@ -6,13 +6,11 @@
       <div class="add-function-back-btn">
         <div
           data-test="add-function-back-btn"
-          class="flex justify-center items-center cursor-pointer"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
+          no-caps
+          padding="xs"
+          outline
+          icon="arrow_back_ios_new"
+          class="el-border tw-w-6 tw-h-6 tw-flex tw-items-center tw-justify-center cursor-pointer el-border-radius q-mr-sm"
           title="Go Back"
           @click="redirectToFunctions"
         >

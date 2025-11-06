@@ -1613,7 +1613,7 @@ export default defineComponent({
               message: "Error while validating sql query. Please check the query and try again.",
               timeout: 1500,
             });
-            console.log("Error while validating sql query",error);
+            console.error("Error while validating sql query",error);
             return false;
           }
         }
