@@ -487,6 +487,18 @@ pub struct RoleBulkDeleteResponse {
     pub err: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct UserBulkDeleteRequest {
+    pub emails: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct UserBulkDeleteResponse {
+    pub successful: Vec<String>,
+    pub unsuccessful: Vec<String>,
+    pub err: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;

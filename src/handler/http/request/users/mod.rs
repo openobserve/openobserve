@@ -43,14 +43,16 @@ use crate::{
     common::{
         meta::{
             self,
+            http::HttpResponse as MetaHttpResponse,
             user::{
                 AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
-                UserOrgRole, UserRequest, UserRoleRequest, UserUpdateMode, get_roles,
+                UserBulkDeleteRequest, UserBulkDeleteResponse, UserOrgRole, UserRequest,
+                UserRoleRequest, UserUpdateMode, get_roles,
             },
         },
         utils::auth::{UserEmail, generate_presigned_url, is_valid_email},
     },
-    handler::http::extractors::Headers,
+    handler::http::{extractors::Headers, request::search::utils::check_resource_permissions},
     service::users,
 };
 
@@ -342,6 +344,81 @@ pub async fn delete(
     let (org_id, email_id) = path.into_inner();
     let initiator_id = user_email.user_id;
     users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
+}
+
+/// BulkRemoveUserFromOrganization
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "BulkRemoveUserFromOrg",
+    summary = "Remove multiple users from organization",
+    description = "Removes multiple users from the organization, immediately revoking their access to all organization resources, \
+                   data, and services. The user account itself remains active and can be added back to organizations \
+                   later. This action is permanent and cannot be undone without re-adding the user explicitly.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("email_id" = String, Path, description = "User name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"}))
+    )
+)]
+#[delete("/{org_id}/users/bulk")]
+pub async fn delete_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<UserBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let initiator_id = user_email.user_id;
+
+    for email in &req.emails {
+        if let Some(res) =
+            check_resource_permissions(&org_id, &initiator_id, "users", email, "DELETE").await
+        {
+            return Ok(res);
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.emails.len());
+    let mut unsuccessful = Vec::with_capacity(req.emails.len());
+    let mut err = None;
+
+    for email in req.emails {
+        match users::remove_user_from_org(&org_id, &email, &initiator_id).await {
+            Ok(v) => {
+                if v.status().is_success() {
+                    successful.push(email);
+                } else {
+                    log::error!(
+                        "error in deleting service account {org_id}/{email} : {:?}",
+                        v.status().canonical_reason()
+                    );
+                    unsuccessful.push(email);
+                    err = v.status().canonical_reason().map(|v| v.to_string());
+                }
+            }
+            Err(e) => {
+                log::error!("error in deleting service account {org_id}/{email} : {e}");
+                unsuccessful.push(email);
+                err = Some(e.to_string());
+            }
+        }
+    }
+
+    Ok(MetaHttpResponse::json(UserBulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }
 
 /// AuthenticateUser

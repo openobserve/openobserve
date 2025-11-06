@@ -381,6 +381,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
         .service(users::list)
         .service(users::save)
+        .service(users::delete_bulk)
         .service(users::delete)
         .service(users::update)
         .service(users::add_user_to_org)
