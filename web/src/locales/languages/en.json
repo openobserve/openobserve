@@ -561,7 +561,8 @@
     "view": "View",
     "delay": "Delay",
     "history": "Pipeline History",
-    "searchHistory": "Enter Pipeline Name"
+    "searchHistory": "Enter Pipeline Name",
+    "destination_type": "Destination Type"
   },
   "function": {
     "header": "Functions",

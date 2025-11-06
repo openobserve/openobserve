@@ -86,6 +86,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="col-12"
           >
+            <div
+              v-if="createNewDestination"
+              class="col-12 q-py-xs destination-method-select"
+            >
+              <q-select
+                data-test="add-destination-type-select"
+                v-model="formData.destination_type"
+                :label="t('pipeline.destination_type') + ' *'"
+                :options="destinationTypes"
+                bg-color="input-bg"
+                class="showLabelOnTop"
+                stack-label
+                outlined
+                filled
+                dense
+                emit-value
+                map-options
+                :rules="[(val: any) => !!val || 'Field is required!']"
+                tabindex="0"
+              />
+            </div>
             <div class="col-12 q-py-xs">
               <q-input
                 v-if="createNewDestination"
@@ -123,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                 tabindex="0"
+                suffix="/services/collector/raw"
               />
             </div>
             <div class="tw-flex tw-flex-row tw-gap-x-2">
@@ -326,6 +348,15 @@ const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
 const apiMethods = ["get", "post", "put"];
 const outputFormats = ["json", "ndjson"];
+const destinationTypes = [
+  { label: "OpenObserve", value: "openobserve" },
+  { label: "Splunk", value: "splunk" },
+  { label: "Elasticsearch / OpenSearch", value: "elasticsearch" },
+  { label: "Datadog", value: "datadog" },
+  { label: "Dynatrace", value: "dynatrace" },
+  { label: "Newrelic", value: "newrelic" },
+  { label: "Custom", value: "custom" },
+];
 const store = useStore();
 const { t } = useI18n();
 const formData: Ref<DestinationData> = ref({
@@ -338,6 +369,7 @@ const formData: Ref<DestinationData> = ref({
   emails: "",
   type: "http",
   output_format: "json",
+  destination_type: "openobserve",
 });
 const isUpdatingDestination = ref(false);
 const createNewDestination = ref(false);
@@ -394,6 +426,7 @@ watch(
         emails: "",
         type: "http",
         output_format: "json",
+        destination_type: "openobserve",
       };
       apiHeaders.value = [{ key: "", value: "", uuid: getUUID() }];
     }
