@@ -39,7 +39,12 @@ export default class DashboardactionPage {
     // Wait for parent button group to have o2-secondary-button-light class (render complete)
     await this.page.waitForFunction(() => {
       const btn = document.querySelector('[data-test="dashboard-apply"]');
-      return btn && btn.parentElement && btn.parentElement.classList.contains("o2-secondary-button-light");
+      return (
+        btn &&
+        (btn.classList.contains("o2-secondary-button-light") ||
+          (btn.parentElement &&
+            btn.parentElement.classList.contains("o2-secondary-button-light")))
+      );
     });
   }
 
