@@ -492,14 +492,14 @@ const useLogs = () => {
   const reorderSelectedFields = () => {
     const selectedFields = [...searchObj.data.stream.selectedFields].filter(
       (_field) =>
-        _field !== (store.state.zoConfig.timestamp_column || "_timestamp"),
+        _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
     );
 
     let colOrder = searchObj.data.resultGrid.colOrder[
       searchObj.data.stream.selectedStream
     ].filter(
       (_field) =>
-        _field !== (store.state.zoConfig.timestamp_column || "_timestamp"),
+        _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
     );
 
     if (JSON.stringify(selectedFields) !== JSON.stringify(colOrder)) {

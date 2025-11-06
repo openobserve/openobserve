@@ -666,7 +666,7 @@ export const logsUtils = () => {
     selectedFields[`${identifier}_${stream}`] =
       searchObj.data.stream.selectedFields.filter(
         (_field) =>
-          _field !== (store.state.zoConfig.timestamp_column || "_timestamp"),
+          _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
       );
     useLocalLogFilterField(selectedFields);
   };

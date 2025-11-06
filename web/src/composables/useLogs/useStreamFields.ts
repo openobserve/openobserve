@@ -876,7 +876,7 @@ export const useStreamFields = () => {
         []
       ).filter(
         (_field) =>
-          _field !== (store.state.zoConfig.timestamp_column || "_timestamp"),
+          _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
       );
 
       if (

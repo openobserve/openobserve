@@ -3136,11 +3136,10 @@ export default defineComponent({
                 searchObj.data.stream.selectedStream,
               )
             ) {
-              debugger;
               searchObj.data.stream.selectedFields =
                 extractedObj.data.resultGrid.colOrder[
                   searchObj.data.stream.selectedStream
-                ].filter((_field) => _field !== (store.state.zoConfig.timestamp_column || '_timestamp'));
+                ].filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || '_timestamp'));
             } else {
               searchObj.data.stream.selectedFields =
                 extractedObj.data.stream.selectedFields;

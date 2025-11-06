@@ -1193,7 +1193,7 @@ export default defineComponent({
 
       selectedFields.splice(SFIndex, 1);
 
-      this.searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (store.state.zoConfig.timestamp_column || '_timestamp'));
+      this.searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (this.store?.state?.zoConfig?.timestamp_column || '_timestamp'));
 
       this.searchObj.organizationIdentifier =
         this.store.state.selectedOrganization.identifier;
@@ -1493,7 +1493,7 @@ export default defineComponent({
           searchObj.data.stream.selectedFields.filter(
             (v: any) => v !== fieldName,
           );
-      } else if(fieldName !== (store.state.zoConfig.timestamp_column || '_timestamp')) {
+      } else if(fieldName !== (store?.state?.zoConfig?.timestamp_column || '_timestamp')) {
         searchObj.data.stream.selectedFields.push(fieldName);
       }
       searchObj.organizationIdentifier =
