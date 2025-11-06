@@ -36,14 +36,17 @@ export default class DashboardactionPage {
   // Wait for chart to render
 
   async waitForChartToRender() {
-    // Wait for parent button group to have o2-secondary-button-light class (render complete)
+    // Wait for button or parent to have light button class (render complete)
+    // Supports both repo structures: button.o2-primary-button-light OR parent.o2-secondary-button-light
     await this.page.waitForFunction(() => {
       const btn = document.querySelector('[data-test="dashboard-apply"]');
       return (
         btn &&
-        (btn.classList.contains("o2-secondary-button-light") ||
+        (btn.classList.contains("o2-primary-button-light") ||
+          btn.classList.contains("o2-secondary-button-light") ||
           (btn.parentElement &&
-            btn.parentElement.classList.contains("o2-secondary-button-light")))
+            (btn.parentElement.classList.contains("o2-primary-button-light") ||
+              btn.parentElement.classList.contains("o2-secondary-button-light"))))
       );
     });
   }
