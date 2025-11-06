@@ -95,7 +95,6 @@ export interface Headers {
 export interface Destination {
   name: string;
   url?: string;
-  url_endpoint?: string; // Frontend only - used for display/editing
   method?: string;
   skip_tls_verify?: boolean;
   headers?: Headers;
@@ -103,15 +102,13 @@ export interface Destination {
   emails?: string;
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
-  output_format?: "json" | "ndjson" | "nestedevent" | string; // string allows esbulk with dynamic index
-  destination_type?: string; // Frontend internal use
-  destination_type_name?: string; // From backend
-  esbulk_index?: string; // For esbulk format index name
+  output_format?: "json" | "ndjson";
+  destination_type?: string;
 }
 
 export interface DestinationPayload {
   name: string;
-  url?: string; // Full URL (merged with endpoint before sending)
+  url?: string;
   method?: string;
   skip_tls_verify?: boolean;
   headers?: Headers;
@@ -119,8 +116,7 @@ export interface DestinationPayload {
   emails?: string[];
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
-  output_format?: "json" | "ndjson" | "nestedevent" | string; // string allows esbulk with dynamic index
-  destination_type?: string; // New field added
+  output_format?: "json" | "ndjson";
 }
 
 // Destination object which is modified in frontend to display in table and form
