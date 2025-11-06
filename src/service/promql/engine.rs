@@ -843,9 +843,14 @@ impl Engine {
                 0 => {
                     // Found no arg to pass to, lets use a `matrix(time())` as the arg.
                     // https://prometheus.io/docs/prometheus/latest/querying/functions/#functions
+                    let timestamps = self.eval_ctx.timestamps();
+                    let samples: Vec<Sample> = timestamps
+                        .iter()
+                        .map(|&ts| Sample::new(ts, ts as f64))
+                        .collect();
                     let default_now_matrix = vec![RangeValue {
                         labels: Labels::default(),
-                        samples: vec![Sample::new(self.time, self.time as f64)],
+                        samples,
                         exemplars: None,
                         time_window: None,
                     }];
