@@ -577,6 +577,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(short_url::retrieve)
         .service(service_accounts::list)
         .service(service_accounts::save)
+        .service(service_accounts::delete_bulk)
         .service(service_accounts::delete)
         .service(service_accounts::update)
         .service(service_accounts::get_api_token)
