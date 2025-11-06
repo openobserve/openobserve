@@ -41,7 +41,7 @@ env:
   ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_UTF8_VIEW_ENABLED: false
-  UPLOAD_TO_TESTDINO: false
+  UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
   build_binary:

@@ -6,7 +6,7 @@ test.describe("Pre-Test Cleanup", () => {
   /**
    * This cleanup test runs before all UI integration tests
    * It removes all test data from previous runs using API calls
-   * This ensures a clean state for all subsequent tests
+   * This ensures a clean state for all subsequent tests 
    */
   test('Clean up all test data via API', {
     tag: ['@cleanup', '@all']
