@@ -1610,11 +1610,11 @@ export default defineComponent({
     watch(
       () => patternsState.value.patterns,
       (newPatterns) => {
-        console.log("[SearchResult] Patterns state changed:", {
-          hasPatterns: !!newPatterns,
-          patternCount: newPatterns?.patterns?.length || 0,
-          statistics: newPatterns?.statistics,
-        });
+        // console.log("[SearchResult] Patterns state changed:", {
+        //   hasPatterns: !!newPatterns,
+        //   patternCount: newPatterns?.patterns?.length || 0,
+        //   statistics: newPatterns?.statistics,
+        // });
       },
       { deep: true },
     );

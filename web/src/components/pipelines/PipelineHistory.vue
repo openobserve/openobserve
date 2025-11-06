@@ -793,7 +793,7 @@ const fetchPipelineHistory = async () => {
         id: `${hit.timestamp}_${index}`,
         "#": (index + 1) + (pagination.value.page - 1) * pagination.value.rowsPerPage,
       }));
-      console.log(pagination.value);
+      // console.log(pagination.value);
 
       // Update pagination total
       pagination.value.rowsNumber = historyData.total || 0;

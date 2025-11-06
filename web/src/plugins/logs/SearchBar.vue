@@ -3792,17 +3792,17 @@ export default defineComponent({
           searchObj.data?.queryResults?.hits &&
           searchObj.data.queryResults.hits.length > 0;
 
-        console.log("[SearchBar] Switching patterns → logs, hasLogs:", hasLogs);
+        // console.log("[SearchBar] Switching patterns → logs, hasLogs:", hasLogs);
 
         if (!hasLogs) {
           // No logs data - fetch them
-          console.log("[SearchBar] Fetching logs data");
+          // console.log("[SearchBar] Fetching logs data");
           searchObj.loading = true;
           searchObj.meta.refreshHistogram = true;
           getQueryData();
         } else {
           // Logs exist - just switch the view
-          console.log("[SearchBar] Reusing existing logs data");
+          // console.log("[SearchBar] Reusing existing logs data");
         }
       } else if (
         value == "patterns" &&
@@ -3811,7 +3811,7 @@ export default defineComponent({
       ) {
         // Switching to patterns mode - this will be handled by a separate watcher in Index.vue
         emit("extractPatterns");
-        console.log("[SearchBar] Switching to patterns mode");
+        // console.log("[SearchBar] Switching to patterns mode");
       } else if (
         value == "visualize" &&
         searchObj.meta.logsVisualizeToggle == "logs"
