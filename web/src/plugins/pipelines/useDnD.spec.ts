@@ -370,27 +370,6 @@ describe("useDragAndDrop", () => {
     });
   });
 
-  describe("onNodeChange", () => {
-    it("should log node changes", () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const changes = [{ type: 'position', id: 'node1' }];
-
-      useDnD.onNodeChange(changes);
-
-      expect(consoleSpy).toHaveBeenCalledWith("Node change", changes);
-      consoleSpy.mockRestore();
-    });
-
-    it("should handle empty changes array", () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
-      useDnD.onNodeChange([]);
-
-      expect(consoleSpy).toHaveBeenCalledWith("Node change", []);
-      consoleSpy.mockRestore();
-    });
-  });
-
   describe("onNodesChange", () => {
     it("should update hasInputNode when nodes change", () => {
       useDnD.pipelineObj.currentSelectedPipeline.nodes = [{ io_type: "input" }];
