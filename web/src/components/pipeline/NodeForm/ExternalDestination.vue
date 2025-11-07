@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                 tabindex="0"
-                suffix="/services/collector/raw"
+                :suffix="urlSuffix"
               />
             </div>
             <div class="tw-flex tw-flex-row tw-gap-x-2">
@@ -436,6 +436,27 @@ watch(
 const isValidDestination = computed(
   () => formData.value.name && formData.value.url && formData.value.method,
 );
+
+const urlSuffix = computed(() => {
+  switch (formData.value.destination_type) {
+    case "openobserve":
+      return "/api/default/_json";
+    case "splunk":
+      return "/services/collector/raw";
+    case "elasticsearch":
+      return "/_bulk";
+    case "datadog":
+      return "/v1/input";
+    case "dynatrace":
+      return "/api/v2/logs/ingest";
+    case "newrelic":
+      return "/log/v1";
+    case "custom":
+      return "";
+    default:
+      return "";
+  }
+});
 const createDestination = () => {
   if (!isValidDestination.value) {
     q.notify({
