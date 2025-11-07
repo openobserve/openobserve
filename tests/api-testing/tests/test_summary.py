@@ -457,7 +457,9 @@ def test_summary(create_session, base_url, base_url_sc, org_id):
     # Clean up alert templates (get list and delete all)
     resp_get_templates = session.get(f"{base_url}api/{org_id}/alerts/templates")
     if resp_get_templates.status_code == 200:
-        templates = resp_get_templates.json().get("list", [])
+        templates_data = resp_get_templates.json()
+        # Handle both list and dict response formats
+        templates = templates_data if isinstance(templates_data, list) else templates_data.get("list", [])
         for template in templates:
             template_name = template.get("name")
             if template_name:
