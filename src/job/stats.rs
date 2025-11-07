@@ -115,12 +115,13 @@ async fn update_node_disk_usage() -> Result<(), anyhow::Error> {
         // Sum up all disks that contain subdirectories of the data directory
         // This handles cases where multiple disks are mounted at different subpaths
         let mut total_space = 0_u64;
-        let mut total_available = 0_u64;
+        let mut total_used = 0_u64;
 
         for disk in disks {
-            if data_dir.starts_with(&disk.mount_point) {
+            // Check if the disk mount point is under the data directory
+            if disk.mount_point.starts_with(data_dir.to_string_lossy().as_ref()) {
                 total_space += disk.total_space;
-                total_available += disk.available_space;
+                total_used += disk.total_space - disk.available_space;
             }
         }
 
@@ -129,9 +130,9 @@ async fn update_node_disk_usage() -> Result<(), anyhow::Error> {
             config::metrics::NODE_DISK_TOTAL
                 .with_label_values::<&str>(&[])
                 .set(total_space as i64);
-            config::metrics::NODE_DISK_AVAILABLE
+            config::metrics::NODE_DISK_USAGE
                 .with_label_values::<&str>(&[])
-                .set(total_available as i64);
+                .set(total_used as i64);
         }
 
         tokio::time::sleep(time::Duration::from_secs(60)).await;
