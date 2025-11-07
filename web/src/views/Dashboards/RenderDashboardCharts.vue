@@ -774,8 +774,18 @@ export default defineComponent({
         if (scope === 'global') {
           // Global variable - get value directly (not nested)
           const value = mergedVariablesValues.value[varName];
-          // Only include if value is not an object (i.e., it's truly a global value)
-          if (value !== undefined && (typeof value !== 'object' || value === null)) {
+          // Include if value is defined and either:
+          // 1. Not an object (primitive values)
+          // 2. Is null
+          // 3. Is an array (for multi-select variables)
+          // Exclude objects that have tabId or panelId (scoped values)
+          const isValidValue = value !== undefined && (
+            typeof value !== 'object' ||
+            value === null ||
+            (Array.isArray(value) && !value.some((v: any) => v?.tabId || v?.panelId))
+          );
+
+          if (isValidValue) {
             aggregatedValues.push({
               ...varConfig,
               scope: 'global',
@@ -788,11 +798,13 @@ export default defineComponent({
           const tabValues: any[] = [];
           const storedValue = mergedVariablesValues.value[varName];
 
-          if (storedValue && typeof storedValue === 'object' && varConfig.tabs && Array.isArray(varConfig.tabs)) {
-            varConfig.tabs.forEach((tabId: string) => {
-              const value = storedValue[tabId];
-              if (value !== undefined) {
-                tabValues.push({ tabId, value });
+          // storedValue is an array like [{ tabId: "tab1", value: "val1" }, { tabId: "tab2", value: "val2" }]
+          if (Array.isArray(storedValue)) {
+            storedValue.forEach((entry: any) => {
+              // Verify this entry belongs to a tab defined in varConfig
+              if (entry.tabId && entry.value !== undefined &&
+                  varConfig.tabs && varConfig.tabs.includes(entry.tabId)) {
+                tabValues.push({ tabId: entry.tabId, value: entry.value });
               }
             });
           }
@@ -810,11 +822,13 @@ export default defineComponent({
           const panelValues: any[] = [];
           const storedValue = mergedVariablesValues.value[varName];
 
-          if (storedValue && typeof storedValue === 'object' && varConfig.panels && Array.isArray(varConfig.panels)) {
-            varConfig.panels.forEach((panelId: string) => {
-              const value = storedValue[panelId];
-              if (value !== undefined) {
-                panelValues.push({ panelId, value });
+          // storedValue is an array like [{ panelId: "panel1", value: "val1" }, { panelId: "panel2", value: "val2" }]
+          if (Array.isArray(storedValue)) {
+            storedValue.forEach((entry: any) => {
+              // Verify this entry belongs to a panel defined in varConfig
+              if (entry.panelId && entry.value !== undefined &&
+                  varConfig.panels && varConfig.panels.includes(entry.panelId)) {
+                panelValues.push({ panelId: entry.panelId, value: entry.value });
               }
             });
           }
@@ -840,20 +854,19 @@ export default defineComponent({
     watch(
       aggregatedVariablesForUrl,
       (newValue) => {
+        console.log('[URL Sync] Emitting variables to parent for URL update:', {
+          isVariablesLoading: newValue.isVariablesLoading,
+          variableCount: newValue.values?.length || 0,
+          variables: newValue.values?.map((v: any) => ({
+            name: v.name,
+            scope: v.scope,
+            hasValue: v.value !== undefined,
+            valueType: Array.isArray(v.value) ? `array(${v.value.length})` : typeof v.value,
+          })),
+        });
         emit("variablesData", newValue);
       },
-      { deep: true },
-    );
-
-    // Keep the old watcher for backward compatibility
-    watch(
-      () => currentVariablesDataRef.value,
-      () => {
-        if (currentVariablesDataRef.value?.__global) {
-          emit("variablesData", currentVariablesDataRef.value?.__global);
-        }
-      },
-      { deep: true },
+      { deep: true, immediate: true },
     );
 
     watch(
