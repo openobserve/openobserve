@@ -1,21 +1,21 @@
 <template>
   Sort By:
-  <q-btn-group class="tw-border-none">
+  <q-btn-group class="el-border">
     <q-btn
-      :class="[!fieldObj.sortBy ? 'selected' : '', 'tw-px-2.5']"
+      :class="[!fieldObj.sortBy ? 'selected' : '', 'tw-px-2.5', 'el-border']"
       @click="updateSortOption(null)"
       icon="block"
       size="sm"
       data-test="dashboard-sort-by-item-clear"
     />
     <q-btn
-      :class="[fieldObj.sortBy === 'ASC' ? 'selected' : 'no-border custom-border', 'tw-px-2.5']"
+      :class="[fieldObj.sortBy === 'ASC' ? 'selected' : '', 'tw-px-2', 'custom-border']"
       @click="updateSortOption('ASC')"
       data-test="dashboard-sort-by-item-asc"
       ><AscSort
     /></q-btn>
     <q-btn
-      :class="[fieldObj.sortBy === 'DESC' ? 'selected' : '', 'tw-px-2.5']"
+      :class="[fieldObj.sortBy === 'DESC' ? 'selected' : '', 'tw-px-2.5', 'el-border']"
       @click="updateSortOption('DESC')"
       data-test="dashboard-sort-by-item-desc"
       ><DescSort
@@ -70,10 +70,10 @@ export default defineComponent({
   border: none !important;
 }
 .custom-border {
-  border-top: 1px solid #d5d5d5 !important;
-  border-bottom: 1px solid #d5d5d5 !important;
-  border-left: 0px solid !important;
-  border-right: 0px solid !important;
+  border-top: 0px solid !important;
+  border-bottom: 0px solid !important;
+  border-left: 1px solid #d5d5d5 !important;
+  border-right: 1px solid #d5d5d5 !important;
 }
 .q-btn {
   border: none;
