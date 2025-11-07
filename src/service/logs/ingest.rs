@@ -196,134 +196,326 @@ pub async fn ingest(
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
     let mut size_by_stream = HashMap::new();
-    for ret in data.iter() {
-        let mut item = match ret {
-            Ok(item) => item,
-            Err(e) => {
-                log::error!("IngestionError: {e:?}");
-                return Err(Error::IngestionError(format!("Failed processing: {e:?}")));
-            }
-        };
 
-        if let Some(extend) = extend_json.as_ref() {
-            for (key, val) in extend.iter() {
-                item[key] = val.clone();
-            }
-        }
+    // Collect items first (IngestionDataIter is a custom iterator that can't be parallelized)
+    let items: Vec<_> = data.iter().collect::<Result<Vec<_>, _>>().map_err(|e| {
+        log::error!("IngestionError: {e:?}");
+        Error::IngestionError(format!("Failed processing: {e:?}"))
+    })?;
 
-        // store a copy of original data before it's being transformed and/or flattened, when
-        // 1. original data is an object
-        let original_data = if item.is_object() {
-            // 2. current stream does not have pipeline
-            if executable_pipeline.is_none() {
-                // current stream requires original
-                streams_need_original_map
-                    .get(&stream_name)
-                    .is_some_and(|v| *v)
-                    .then(|| item.to_string())
-            } else {
+    // Threshold for parallel processing - below this, sequential is faster due to overhead
+    const PARALLEL_THRESHOLD: usize = 256;
+
+    // Clone and extend items - use parallel processing for large batches
+    let extended_items: Vec<_> = if items.len() >= PARALLEL_THRESHOLD {
+        use rayon::prelude::*;
+
+        items
+            .par_iter()
+            .map(|item| {
+                let mut cloned_item = item.clone();
+
+                // Apply extend_json if present
+                if let Some(extend) = extend_json.as_ref() {
+                    for (key, val) in extend.iter() {
+                        cloned_item[key] = val.clone();
+                    }
+                }
+
+                cloned_item
+            })
+            .collect()
+    } else {
+        // Sequential processing for small batches
+        items
+            .iter()
+            .map(|item| {
+                let mut cloned_item = item.clone();
+
+                // Apply extend_json if present
+                if let Some(extend) = extend_json.as_ref() {
+                    for (key, val) in extend.iter() {
+                        cloned_item[key] = val.clone();
+                    }
+                }
+
+                cloned_item
+            })
+            .collect()
+    };
+
+    if executable_pipeline.is_some() {
+        // Pipeline path: no flattening needed, just sequential processing
+        for item in extended_items {
+            // store a copy of original data before it's being transformed and/or flattened, when
+            // 1. original data is an object
+            let original_data = if item.is_object() {
                 // 3. with pipeline, storing original as long as streams_need_original_set is not
                 //    empty
                 // because not sure the pipeline destinations
                 store_original_when_pipeline_exists.then(|| item.to_string())
-            }
-        } else {
-            None // `item` won't be flattened, no need to store original
-        };
+            } else {
+                None // `item` won't be flattened, no need to store original
+            };
 
-        // we report stream size before pushing data to pipeline
-        // this is to capture the actual size of stream at the time of ingestion
-        let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
-        *_size += estimate_json_bytes(&item);
+            // we report stream size before pushing data to pipeline
+            // this is to capture the actual size of stream at the time of ingestion
+            let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+            *_size += estimate_json_bytes(&item);
 
-        if executable_pipeline.is_some() {
             // buffer the records, timestamp, and originals for pipeline batch processing
             pipeline_inputs.push(item);
             original_options.push(original_data);
-        } else {
-            // JSON Flattening - use per-stream flatten level
-            let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
-            let mut res = flatten::flatten_with_level(item, flatten_level)?;
+        }
+    } else {
+        // Non-pipeline path: flattening and processing
+        let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+        let needs_original = streams_need_original_map
+            .get(&stream_name)
+            .is_some_and(|v| *v);
+        let needs_all_values = streams_need_all_values_map
+            .get(&stream_name)
+            .is_some_and(|v| *v);
 
-            // handle timestamp
-            let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {
-                Ok(ts) => ts,
-                Err(e) => {
-                    stream_status.status.failed += 1;
-                    stream_status.status.error = e.to_string();
-                    metrics::INGEST_ERRORS
-                        .with_label_values(&[
-                            org_id,
-                            StreamType::Logs.as_str(),
-                            &stream_name,
-                            TS_PARSE_FAILED,
-                        ])
-                        .inc();
-                    log_failed_record(log_ingestion_errors, &res, &e.to_string());
-                    continue;
-                }
-            };
+        // Use parallel or sequential processing based on batch size
+        if extended_items.len() >= PARALLEL_THRESHOLD {
+            // Parallel processing for large batches
+            use rayon::prelude::*;
 
-            // get json object
-            let mut local_val = match res.take() {
-                json::Value::Object(val) => val,
-                _ => unreachable!(),
-            };
+            // Thread-safe accumulators
+            let failed_count = std::sync::atomic::AtomicU32::new(0);
+            let error_msg = parking_lot::Mutex::new(String::new());
+            let total_size = std::sync::atomic::AtomicUsize::new(0);
 
-            if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                local_val = crate::service::ingestion::refactor_map(local_val, fields);
-            }
+            // Process items in parallel using rayon
+            let results: Vec<_> = extended_items
+                .into_par_iter()
+                .enumerate()
+                .filter_map(|(idx, item)| {
+                    // Calculate size
+                    let item_size = estimate_json_bytes(&item);
+                    total_size.fetch_add(item_size, std::sync::atomic::Ordering::Relaxed);
 
-            // add `_original` and '_record_id` if required by StreamSettings
-            if streams_need_original_map
-                .get(&stream_name)
-                .is_some_and(|v| *v)
-                && let Some(original_data) = original_data
-            {
-                local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
-                let record_id = crate::service::ingestion::generate_record_id(
-                    org_id,
-                    &stream_name,
-                    &StreamType::Logs,
-                );
-                local_val.insert(
-                    ID_COL_NAME.to_string(),
-                    json::Value::String(record_id.to_string()),
-                );
-            }
+                    // store a copy of original data before it's being transformed and/or flattened,
+                    // when
+                    // 1. original data is an object
+                    let original_data = if item.is_object() {
+                        // 2. current stream does not have pipeline
+                        // current stream requires original
+                        needs_original.then(|| item.to_string())
+                    } else {
+                        None // `item` won't be flattened, no need to store original
+                    };
 
-            // add `_all_values` if required by StreamSettings
-            if streams_need_all_values_map
-                .get(&stream_name)
-                .is_some_and(|v| *v)
-            {
-                let mut values = Vec::with_capacity(local_val.len());
-                for (k, value) in local_val.iter() {
-                    if [
-                        TIMESTAMP_COL_NAME,
-                        ID_COL_NAME,
-                        ORIGINAL_DATA_COL_NAME,
-                        ALL_VALUES_COL_NAME,
-                    ]
-                    .contains(&k.as_str())
-                    {
-                        continue;
+                    // JSON Flattening - use per-stream flatten level (cached)
+                    let mut res = match flatten::flatten_with_level(item, flatten_level) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            failed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let err_str = e.to_string();
+                            let mut err = error_msg.lock();
+                            *err = err_str;
+                            return None;
+                        }
+                    };
+
+                    // handle timestamp
+                    let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {
+                        Ok(ts) => ts,
+                        Err(e) => {
+                            failed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let err_str = e.to_string();
+                            let mut err = error_msg.lock();
+                            *err = err_str.clone();
+                            metrics::INGEST_ERRORS
+                                .with_label_values(&[
+                                    org_id,
+                                    StreamType::Logs.as_str(),
+                                    &stream_name,
+                                    TS_PARSE_FAILED,
+                                ])
+                                .inc();
+                            log_failed_record(log_ingestion_errors, &res, &err_str);
+                            return None;
+                        }
+                    };
+
+                    // get json object
+                    let mut local_val = match res.take() {
+                        json::Value::Object(val) => val,
+                        _ => unreachable!(),
+                    };
+
+                    if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
+                        local_val = crate::service::ingestion::refactor_map(local_val, fields);
                     }
-                    values.push(value.to_string());
-                }
-                local_val.insert(
-                    ALL_VALUES_COL_NAME.to_string(),
-                    json::Value::String(values.join(" ")),
-                );
+
+                    // add `_original` and '_record_id` if required by StreamSettings
+                    if needs_original && let Some(original_data) = original_data {
+                        local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
+                        let record_id = crate::service::ingestion::generate_record_id(
+                            org_id,
+                            &stream_name,
+                            &StreamType::Logs,
+                        );
+                        local_val.insert(
+                            ID_COL_NAME.to_string(),
+                            json::Value::String(record_id.to_string()),
+                        );
+                    }
+
+                    // add `_all_values` if required by StreamSettings
+                    if needs_all_values {
+                        let mut values = Vec::with_capacity(local_val.len());
+                        for (k, value) in local_val.iter() {
+                            if [
+                                TIMESTAMP_COL_NAME,
+                                ID_COL_NAME,
+                                ORIGINAL_DATA_COL_NAME,
+                                ALL_VALUES_COL_NAME,
+                            ]
+                            .contains(&k.as_str())
+                            {
+                                continue;
+                            }
+                            values.push(value.to_string());
+                        }
+                        local_val.insert(
+                            ALL_VALUES_COL_NAME.to_string(),
+                            json::Value::String(values.join(" ")),
+                        );
+                    }
+
+                    // Return with original index to maintain order
+                    Some((idx, timestamp, local_val))
+                })
+                .collect();
+
+            // Update stream status with failed count
+            let failed = failed_count.load(std::sync::atomic::Ordering::Relaxed);
+            stream_status.status.failed += failed;
+            if failed > 0 {
+                stream_status.status.error = error_msg.lock().clone();
             }
 
+            // Update size
+            let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+            *_size += total_size.load(std::sync::atomic::Ordering::Relaxed);
+
+            // Reconstruct results in original order
             let (ts_data, fn_num) = json_data_by_stream
                 .entry(stream_name.clone())
                 .or_insert_with(|| (Vec::new(), None));
-            ts_data.push((timestamp, local_val));
+
+            // Sort by original index and collect timestamp + value pairs
+            let mut sorted_results = results;
+            sorted_results.sort_by_key(|(idx, ..)| *idx);
+
+            for (_, timestamp, local_val) in sorted_results {
+                ts_data.push((timestamp, local_val));
+            }
             *fn_num = need_usage_report.then_some(0); // no pl -> no func
+        } else {
+            // Sequential processing for small batches
+            for item in extended_items {
+                // Calculate size
+                let item_size = estimate_json_bytes(&item);
+                let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+                *_size += item_size;
+
+                // store a copy of original data before it's being transformed and/or flattened,
+                // when
+                // 1. original data is an object
+                let original_data = if item.is_object() {
+                    // 2. current stream does not have pipeline
+                    // current stream requires original
+                    needs_original.then(|| item.to_string())
+                } else {
+                    None // `item` won't be flattened, no need to store original
+                };
+
+                // JSON Flattening - use per-stream flatten level (cached)
+                let mut res = match flatten::flatten_with_level(item, flatten_level) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        stream_status.status.failed += 1;
+                        stream_status.status.error = e.to_string();
+                        continue;
+                    }
+                };
+
+                // handle timestamp
+                let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {
+                    Ok(ts) => ts,
+                    Err(e) => {
+                        stream_status.status.failed += 1;
+                        stream_status.status.error = e.to_string();
+                        metrics::INGEST_ERRORS
+                            .with_label_values(&[
+                                org_id,
+                                StreamType::Logs.as_str(),
+                                &stream_name,
+                                TS_PARSE_FAILED,
+                            ])
+                            .inc();
+                        log_failed_record(log_ingestion_errors, &res, &e.to_string());
+                        continue;
+                    }
+                };
+
+                // get json object
+                let mut local_val = match res.take() {
+                    json::Value::Object(val) => val,
+                    _ => unreachable!(),
+                };
+
+                if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
+                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                }
+
+                // add `_original` and '_record_id` if required by StreamSettings
+                if needs_original && let Some(original_data) = original_data {
+                    local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
+                    let record_id = crate::service::ingestion::generate_record_id(
+                        org_id,
+                        &stream_name,
+                        &StreamType::Logs,
+                    );
+                    local_val.insert(
+                        ID_COL_NAME.to_string(),
+                        json::Value::String(record_id.to_string()),
+                    );
+                }
+
+                // add `_all_values` if required by StreamSettings
+                if needs_all_values {
+                    let mut values = Vec::with_capacity(local_val.len());
+                    for (k, value) in local_val.iter() {
+                        if [
+                            TIMESTAMP_COL_NAME,
+                            ID_COL_NAME,
+                            ORIGINAL_DATA_COL_NAME,
+                            ALL_VALUES_COL_NAME,
+                        ]
+                        .contains(&k.as_str())
+                        {
+                            continue;
+                        }
+                        values.push(value.to_string());
+                    }
+                    local_val.insert(
+                        ALL_VALUES_COL_NAME.to_string(),
+                        json::Value::String(values.join(" ")),
+                    );
+                }
+
+                let (ts_data, fn_num) = json_data_by_stream
+                    .entry(stream_name.clone())
+                    .or_insert_with(|| (Vec::new(), None));
+                ts_data.push((timestamp, local_val));
+                *fn_num = need_usage_report.then_some(0); // no pl -> no func
+            }
         }
-        tokio::task::coop::consume_budget().await;
     }
 
     // batch process records through pipeline
