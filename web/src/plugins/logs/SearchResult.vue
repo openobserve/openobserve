@@ -287,7 +287,7 @@ color="warning" size="xs"></q-icon> Error while
       <!-- Patterns View -->
       <div
         v-if="searchObj.meta.logsVisualizeToggle === 'patterns'"
-        style="display: flex; flex-direction: column"
+        class="tw-flex tw-flex-col"
         :class="[
           !searchObj.meta.showHistogram ||
           (searchObj.meta.showHistogram &&
@@ -299,20 +299,15 @@ color="warning" size="xs"></q-icon> Error while
         <!-- Statistics Bar -->
         <div
           v-if="patternsState?.patterns?.statistics"
-          class="q-pa-md"
-          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-grey-2'"
-          style="border-bottom: 1px solid; flex-shrink: 0"
-          :style="{
-            borderColor: store.state.theme === 'dark' ? '#3a3a3a' : '#e0e0e0',
-          }"
+          class="tw-py-[0.375rem] tw-shrink-0 tw-bg-[var(--o2-hover-accent)]"
         >
-          <div class="row q-col-gutter-md">
-            <div class="col-3">
+          <div class="row q-col-gutter-md !tw-ml-0">
+            <div class="col-3 !tw-pl-0">
               <q-card
                 flat
                 :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
               >
-                <q-card-section class="q-pa-md">
+                <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">
                   <div
                     class="text-caption"
                     :class="
@@ -375,12 +370,12 @@ color="warning" size="xs"></q-icon> Error while
                 </q-card-section>
               </q-card>
             </div>
-            <div class="col-3">
+            <div class="col-3 !tw-pl-[0.375rem]">
               <q-card
                 flat
                 :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
               >
-                <q-card-section class="q-pa-md">
+                <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">
                   <div
                     class="text-caption"
                     :class="
@@ -400,12 +395,12 @@ color="warning" size="xs"></q-icon> Error while
                 </q-card-section>
               </q-card>
             </div>
-            <div class="col-3">
+            <div class="col-3 !tw-pl-[0.375rem]">
               <q-card
                 flat
                 :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
               >
-                <q-card-section class="q-pa-md">
+                <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">
                   <div
                     class="text-caption"
                     :class="
@@ -427,12 +422,12 @@ color="warning" size="xs"></q-icon> Error while
                 </q-card-section>
               </q-card>
             </div>
-            <div class="col-3">
+            <div class="col-3 !tw-pl-[0.375rem]">
               <q-card
                 flat
                 :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
               >
-                <q-card-section class="q-pa-md">
+                <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">
                   <div
                     class="text-caption"
                     :class="
@@ -459,24 +454,23 @@ color="warning" size="xs"></q-icon> Error while
         <div
           v-if="patternsState?.patterns?.patterns?.length > 0"
           style="flex: 1; overflow: hidden"
+          class="tw-py-[0.375rem]"
         >
           <q-virtual-scroll
             :items="patternsState?.patterns?.patterns"
-            virtual-scroll-slice-size="5"
+            virtual-scroll-slice-size="6"
             v-slot="{ item: pattern, index }"
-            style="height: 100%"
-            class="q-pa-md"
+            class="tw-pl-[0.375rem] tw-pr-[0.625rem] tw-h-full"
           >
             <q-card
               flat
-              bordered
               :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
-              class="q-mb-md cursor-pointer"
+              class="tw-mb-[0.375rem] cursor-pointer tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
               @click="openPatternDetails(pattern, index)"
             >
               <!-- Header with Rank and Stats - Compact -->
               <q-card-section
-                class="q-pa-md"
+                class="tw-p-[0.625rem]"
                 :class="
                   store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-1'
                 "
@@ -503,9 +497,6 @@ color="warning" size="xs"></q-icon> Error while
                             : 'text-grey-8'
                         "
                         style="
-                          font-family:
-                            &quot;Monaco&quot;, &quot;Menlo&quot;,
-                            &quot;Courier New&quot;, monospace;
                           font-size: 0.8125rem;
                         "
                       >
@@ -553,7 +544,7 @@ color="warning" size="xs"></q-icon> Error while
                       >
                     </div>
                   </div>
-                  <div class="col-auto row items-center q-gutter-xs">
+                  <div class="col-auto row items-center q-gutter-xs pattern-block-actions">
                     <q-btn
                       size="0.375rem"
                       @click.stop="addPatternToSearch(pattern, 'include')"
@@ -562,7 +553,7 @@ color="warning" size="xs"></q-icon> Error while
                       flat
                       dense
                     >
-                      <q-icon color="currentColor">
+                      <q-icon color="currentColor" size="0.8rem">
                         <EqualIcon></EqualIcon>
                       </q-icon>
                     </q-btn>
@@ -574,20 +565,11 @@ color="warning" size="xs"></q-icon> Error while
                       flat
                       dense
                     >
-                      <q-icon color="currentColor">
+                      <q-icon class="tw-text-[var(--o2-text-color)]" size="0.8rem">
                         <NotEqualIcon></NotEqualIcon>
                       </q-icon>
                     </q-btn>
-                    <q-icon
-                      name="info"
-                      size="1.0625rem"
-                      class="cursor-pointer"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-grey-5'
-                          : 'text-grey-7'
-                      "
-                    >
+                    <q-icon name="info" size="1rem" class="cursor-pointer">
                       <q-tooltip
                         >Show details ({{
                           pattern.examples?.[0]?.variables
@@ -1023,7 +1005,6 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 
-import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
@@ -1032,7 +1013,6 @@ import usePatterns from "@/composables/useLogs/usePatterns";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
-import TenstackTable from "./TenstackTable.vue";
 import { useSearchAround } from "@/composables/useLogs/searchAround";
 import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
@@ -1437,12 +1417,6 @@ export default defineComponent({
 
       // Set the filter to be added to the query
       searchObj.data.stream.addToFilter = filterExpression;
-
-      $q.notify({
-        type: "positive",
-        message: `Pattern ${action === "include" ? "included in" : "excluded from"} search (${constants.length} match_all clause${constants.length > 1 ? "s" : ""})`,
-        timeout: 2000,
-      });
     };
 
     const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
