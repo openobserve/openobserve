@@ -116,7 +116,7 @@ impl PromqlContext {
                         Some("scalar".to_string()),
                     )
                 }
-                Value::None => (Value::None, result_type_exec),
+                Value::None => (Value::None, Some("vector".to_string())),
                 other => (other, result_type_exec),
             }
         } else {
@@ -140,7 +140,7 @@ impl PromqlContext {
 
                     (Value::Matrix(vec![range_value]), Some("matrix".to_string()))
                 }
-                Value::None => (Value::None, result_type_exec),
+                Value::None => (Value::None, Some("matrix".to_string())),
                 other @ Value::Matrix(_) => (other, Some("matrix".to_string())),
                 other => (other, result_type_exec),
             }
