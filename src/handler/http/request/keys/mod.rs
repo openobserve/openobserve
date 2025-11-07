@@ -346,17 +346,17 @@ pub async fn delete_bulk(
     let org_id = path.into_inner();
     let body = body.into_inner();
     let user_id = &user_email.user_id;
-    for key in &body.key_names {
+    for key in &body.ids {
         if let Some(res) =
             check_resource_permissions(&org_id, user_id, "cipher_keys", key, "DELETE").await
         {
             return Ok(res);
         }
     }
-    let mut successful = Vec::with_capacity(body.key_names.len());
-    let mut unsuccessful = Vec::with_capacity(body.key_names.len());
+    let mut successful = Vec::with_capacity(body.ids.len());
+    let mut unsuccessful = Vec::with_capacity(body.ids.len());
     let mut err = None;
-    for key_name in body.key_names {
+    for key_name in body.ids {
         match crate::service::db::keys::remove(
             &org_id,
             infra::table::cipher::EntryKind::CipherKey,

@@ -289,7 +289,7 @@ pub struct Template {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct TemplateBulkDeleteRequest {
-    pub names: Vec<String>,
+    pub ids: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -301,7 +301,7 @@ pub struct TemplateBulkDeleteResponse {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct DestinationBulkDeleteRequest {
-    pub names: Vec<String>,
+    pub ids: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]

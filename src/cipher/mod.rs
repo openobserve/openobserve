@@ -47,7 +47,7 @@ pub struct KeyListResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct KeyBulkDeleteRequest {
-    pub key_names: Vec<String>,
+    pub ids: Vec<String>,
 }
 
 #[derive(Default, Serialize, ToSchema)]

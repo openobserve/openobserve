@@ -299,7 +299,7 @@ async fn delete_destination_bulk(
     let req = req.into_inner();
     let user_id = user_email.user_id;
 
-    for name in &req.names {
+    for name in &req.ids {
         if let Some(res) =
             check_resource_permissions(&org_id, &user_id, "destinations", name, "DELETE").await
         {
@@ -307,11 +307,11 @@ async fn delete_destination_bulk(
         }
     }
 
-    let mut successful = Vec::with_capacity(req.names.len());
-    let mut unsuccessful = Vec::with_capacity(req.names.len());
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
     let mut err = None;
 
-    for name in req.names {
+    for name in req.ids {
         match destinations::delete(&org_id, &name).await {
             Ok(_) => {
                 successful.push(name);

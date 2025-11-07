@@ -308,7 +308,7 @@ pub async fn delete_bulk(
     let req = req.into_inner();
     let initiator_id = user_email.user_id;
 
-    for email in &req.emails {
+    for email in &req.ids {
         if let Some(res) =
             check_resource_permissions(&org_id, &initiator_id, "service_accounts", email, "DELETE")
                 .await
@@ -317,11 +317,11 @@ pub async fn delete_bulk(
         }
     }
 
-    let mut successful = Vec::with_capacity(req.emails.len());
-    let mut unsuccessful = Vec::with_capacity(req.emails.len());
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
     let mut err = None;
 
-    for email in req.emails {
+    for email in req.ids {
         match users::remove_user_from_org(&org_id, &email, &initiator_id).await {
             Ok(v) => {
                 if v.status().is_success() {

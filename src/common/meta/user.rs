@@ -465,7 +465,7 @@ impl AuthTokensExt {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct UserGroupBulkDeleteRequest {
-    pub names: Vec<String>,
+    pub ids: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -477,7 +477,7 @@ pub struct UserGroupBulkDeleteResponse {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct RoleBulkDeleteRequest {
-    pub names: Vec<String>,
+    pub ids: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -489,7 +489,7 @@ pub struct RoleBulkDeleteResponse {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct UserBulkDeleteRequest {
-    pub emails: Vec<String>,
+    pub ids: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]

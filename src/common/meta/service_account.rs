@@ -41,7 +41,7 @@ pub struct UpdateServiceAccountRequest {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct ServiceAccountBulkDeleteRequest {
-    pub emails: Vec<String>,
+    pub ids: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]

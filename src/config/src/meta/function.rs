@@ -150,7 +150,7 @@ pub struct VRLResultResolver {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct FunctionBulkDeleteRequest {
-    pub names: Vec<String>,
+    pub ids: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
