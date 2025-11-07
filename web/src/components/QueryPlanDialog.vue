@@ -195,6 +195,7 @@ import {
 } from "@/utils/queryPlanParser";
 import MetricsSummaryCard from "@/components/query-plan/MetricsSummaryCard.vue";
 import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
+import { searchState } from "@/composables/useLogs/searchState";
 
 export default defineComponent({
   name: "QueryPlanDialog",
@@ -229,6 +230,8 @@ export default defineComponent({
     const isAnalyzing = ref(false);
     const showAnalyzeResults = ref(false);
     const splitterPosition = ref(50); // Split at 50%
+
+    let { searchObj } = searchState();
 
     const showDialog = computed({
       get: () => props.modelValue,
@@ -445,7 +448,7 @@ export default defineComponent({
         const response = await streamingSearch.search({
           org_identifier: store.state.selectedOrganization.identifier,
           query: explainQueryPayload,
-          page_type: "logs",
+          page_type: searchObj.data.stream.streamType || "logs",
           search_type: "ui",
           traceId,
         });

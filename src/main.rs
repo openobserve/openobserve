@@ -433,7 +433,7 @@ async fn main() -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("set node schedulable failed"));
     }
 
-    // Check for query recommendations trigger & create one
+    // Check for query recommendations trigger and create one
     match db::scheduler::list(Some(QueryRecommendations)).await {
         Ok(list) if list.len() == 1 => {}
         _ => {

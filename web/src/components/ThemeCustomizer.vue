@@ -249,9 +249,9 @@ const applyMenuVariables = (themeColorHex: string, targetElement: HTMLElement) =
   const menuGradientEnd = hexToRgba(themeColorHex, 0.8);   // 0.8 on 1-10 scale = 0.08 alpha
   const menuBorderColor = hexToRgba(themeColorHex, 6);     // 6 on 1-10 scale = 0.6 alpha
 
-  targetElement.style.setProperty('--o2-menu-gradient-start', menuGradientStart);
-  targetElement.style.setProperty('--o2-menu-gradient-end', menuGradientEnd);
-  targetElement.style.setProperty('--o2-menu-border-color', menuBorderColor);
+  // targetElement.style.setProperty('--o2-menu-gradient-start', menuGradientStart);
+  // targetElement.style.setProperty('--o2-menu-gradient-end', menuGradientEnd);
+  // targetElement.style.setProperty('--o2-menu-border-color', menuBorderColor);
 };
 
 // Function to apply all variables for the current mode
