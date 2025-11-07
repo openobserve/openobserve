@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Tax ID Section -->
     <div class="q-px-sm q-mb-lg">
       <div class="q-table__title tw-font-[600] q-mb-md">
-        {{ t("billing.taxInformation") }}
+        Tax Details
       </div>
       <q-card flat bordered class="q-pa-md">
         <div v-if="taxIdLoading" class="text-center q-py-md">
@@ -34,10 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="col">
               <div class="text-subtitle2 text-grey-7">Country</div>
               <div class="text-body1">{{ getCountryName(taxIdData.country) }}</div>
-            </div>
-            <div class="col">
-              <div class="text-subtitle2 text-grey-7">Type</div>
-              <div class="text-body1">{{ taxIdData.tax_id_type }}</div>
             </div>
             <div class="col-auto">
               <q-btn
@@ -57,32 +53,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="startEditing"
             />
           </div>
-          <div v-else class="q-gutter-md">
-            <div class="row q-col-gutter-md">
-              <div class="col-12 col-md-6">
-                <q-select
-                  v-model="editForm.country"
-                  :options="countryOptions"
-                  label="Country"
-                  outlined
-                  dense
-                  option-value="code"
-                  option-label="name"
-                  emit-value
-                  map-options
-                  :rules="[(val) => !!val || 'Country is required']"
-                />
-              </div>
-              <div class="col-12 col-md-6">
-                <q-input
-                  v-model="editForm.tax_id"
-                  label="Tax ID"
-                  outlined
-                  dense
-                  :hint="getTaxIdHint(editForm.country)"
-                  :rules="[(val) => !!val || 'Tax ID is required']"
-                />
-              </div>
+          <div v-else>
+            <div class="q-mb-md">
+              <div class="text-subtitle2 q-mb-xs">Country *</div>
+              <q-select
+                v-model="editForm.country"
+                :options="countryOptions"
+                outlined
+                dense
+                option-value="code"
+                option-label="name"
+                emit-value
+                map-options
+                placeholder="Select country"
+                :rules="[(val) => !!val || 'Country is required']"
+              />
+            </div>
+            <div class="q-mb-md">
+              <div class="text-subtitle2 q-mb-xs">Tax ID *</div>
+              <q-input
+                v-model="editForm.tax_id"
+                outlined
+                dense
+                :placeholder="getTaxIdHint(editForm.country)"
+                :rules="[(val) => !!val || 'Tax ID is required']"
+              />
+            </div>
+            <div v-if="saveError" class="text-negative q-mb-md">
+              {{ saveError }}
             </div>
             <div class="row q-gutter-sm justify-end">
               <q-btn
@@ -96,9 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="saving"
                 @click="saveTaxId"
               />
-            </div>
-            <div v-if="saveError" class="text-negative q-mt-sm">
-              {{ saveError }}
             </div>
           </div>
         </div>
