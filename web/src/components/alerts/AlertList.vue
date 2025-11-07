@@ -79,6 +79,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
+            :label="t(`alerts.history`)"
+            @click="goToAlertHistory"
+            data-test="alert-history-btn"
+            icon="history"
+          />
+          <q-btn
+            v-if="1==0"
+            class="q-ml-sm o2-secondary-button tw-h-[36px]"
+            no-caps
+            flat
             label="Alert Insights"
             @click="goToAlertInsights"
             data-test="alert-insights-btn"
