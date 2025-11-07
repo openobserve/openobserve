@@ -316,6 +316,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon name="play_arrow" size="16px" />
                   <span class="tw-ml-2">Resume</span>
                 </q-btn>
+                <q-btn
+                  v-if="selectedPipelines.length > 0"
+                  data-test="pipeline-list-delete-pipelines-btn"
+                  class="flex q-mr-sm items-center no-border o2-secondary-button tw-h-[36px]"
+                  no-caps
+                  dense
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  @click="openBulkDeleteDialog"
+                >
+                  <q-icon name="delete" size="16px" />
+                  <span class="tw-ml-2">Delete</span>
+                </q-btn>
                 <QTablePagination
                   :scope="scope"
                   :position="'bottom'"
@@ -1130,6 +1142,100 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     });
   }
   };
+
+const openBulkDeleteDialog = () => {
+  confirmDialogMeta.value.show = true;
+  confirmDialogMeta.value.title = t("pipeline.deletePipeline");
+  confirmDialogMeta.value.message = `Are you sure you want to delete ${selectedPipelines.value.length} pipeline(s)?`;
+  confirmDialogMeta.value.onConfirm = bulkDeletePipelines;
+  confirmDialogMeta.value.data = null;
+};
+
+const bulkDeletePipelines = async () => {
+  const dismiss = q.notify({
+    spinner: true,
+    message: "Deleting pipelines...",
+    timeout: 0,
+  });
+
+  try {
+    if (selectedPipelines.value.length === 0) {
+      q.notify({
+        type: "negative",
+        message: "No pipelines selected for deletion",
+        timeout: 2000,
+      });
+      dismiss();
+      return;
+    }
+
+    // Extract pipeline ids
+    const payload = {
+      ids: selectedPipelines.value.map((p: any) => p.pipeline_id),
+    };
+
+    const response = await pipelineService.bulkDelete(
+      store.state.selectedOrganization.identifier,
+      payload
+    );
+
+    dismiss();
+
+    // Handle response based on successful/unsuccessful arrays
+    if (response.data) {
+      const { successful = [], unsuccessful = [] } = response.data;
+      const successCount = successful.length;
+      const failCount = unsuccessful.length;
+
+      if (failCount > 0 && successCount > 0) {
+        // Partial success
+        q.notify({
+          type: "warning",
+          message: `${successCount} pipeline(s) deleted successfully, ${failCount} failed`,
+          timeout: 5000,
+        });
+      } else if (failCount > 0) {
+        // All failed
+        q.notify({
+          type: "negative",
+          message: `Failed to delete ${failCount} pipeline(s)`,
+          timeout: 3000,
+        });
+      } else {
+        // All successful
+        q.notify({
+          type: "positive",
+          message: `${successCount} pipeline(s) deleted successfully`,
+          timeout: 2000,
+        });
+      }
+    } else {
+      // Fallback success message
+      q.notify({
+        type: "positive",
+        message: `${selectedPipelines.value.length} pipeline(s) deleted successfully`,
+        timeout: 2000,
+      });
+    }
+
+    selectedPipelines.value = [];
+    await getPipelines();
+    updateActiveTab();
+  } catch (error: any) {
+    dismiss();
+    console.error("Error deleting pipelines:", error);
+
+    // Show error message from response if available
+    const errorMessage = error.response?.data?.message || "Error deleting pipelines. Please try again.";
+    q.notify({
+      type: "negative",
+      message: errorMessage,
+      timeout: 3000,
+    });
+  }
+
+  resetConfirmDialog();
+};
 </script>
 <style lang="scss" scoped>
 .dark-mode {
