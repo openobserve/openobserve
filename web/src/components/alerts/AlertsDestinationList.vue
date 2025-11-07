@@ -60,9 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="qTable"
         :rows="visibleRows"
         :columns="columns"
-        row-key="id"
+        row-key="name"
         :pagination="pagination"
-
+        selection="multiple"
+        v-model:selected="selectedDestinations"
         class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
         :style="hasVisibleRows
             ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
@@ -138,11 +139,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-td>
         </template>
+
+        <template v-slot:body-selection="scope">
+          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+        </template>
+
         <template #bottom="scope">
-          <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
+          <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
             <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-sm">
                   {{ resultTotal }} {{ t('alert_destinations.header') }}
                 </div>
+            <q-btn
+              v-if="selectedDestinations.length > 0"
+              data-test="destination-list-delete-destinations-btn"
+              class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
+              no-caps
+              dense
+              @click="openBulkDeleteDialog"
+            >
+              <q-icon name="delete" size="16px" />
+              <span class="tw-ml-2">Delete</span>
+            </q-btn>
           <QTablePagination
             :scope="scope"
             :position="'bottom'"
@@ -154,6 +176,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:header="props">
             <q-tr :props="props">
+              <!-- Adding this block to render the select-all checkbox -->
+              <q-th v-if="columns.length > 0" auto-width>
+                <q-checkbox
+                  v-model="props.selected"
+                  size="sm"
+                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                  class="o2-table-checkbox"
+                />
+              </q-th>
+
               <!-- Render the table headers -->
               <q-th
                 v-for="col in props.cols"
@@ -191,6 +223,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
+    />
+
+    <ConfirmDialog
+      title="Delete Destinations"
+      :message="`Are you sure you want to delete ${selectedDestinations.length} destination(s)?`"
+      @update:ok="bulkDeleteDestinations"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
     />
   </q-page>
 </template>
@@ -293,6 +333,8 @@ export default defineComponent({
       visible: false,
       data: null,
     });
+    const confirmBulkDelete = ref<boolean>(false);
+    const selectedDestinations = ref<any[]>([]);
     const showDestinationEditor = ref(false);
     const showImportDestination = ref(false);
     const router = useRouter();
@@ -344,7 +386,7 @@ export default defineComponent({
           .catch(() => {
             q.notify({
               type: "negative",
-              message: "Error while loading alert destination.",
+              message: "Error while loading actions.",
             });
           })
           .finally(() => dismiss());
@@ -554,7 +596,97 @@ export default defineComponent({
       if (!filterQuery.value) return destinations.value || [];
       return filterData(destinations.value || [], filterQuery.value);
     });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
+
+    const bulkDeleteDestinations = async () => {
+      const dismiss = q.notify({
+        spinner: true,
+        message: "Deleting destinations...",
+        timeout: 0,
+      });
+
+      try {
+        if (selectedDestinations.value.length === 0) {
+          q.notify({
+            type: "negative",
+            message: "No destinations selected for deletion",
+            timeout: 2000,
+          });
+          dismiss();
+          return;
+        }
+
+        // Extract destination names for the API call (BE supports names)
+        const payload = {
+          ids: selectedDestinations.value.map((d: any) => d.name),
+        };
+
+        const response = await destinationService.bulkDelete(
+          store.state.selectedOrganization.identifier,
+          payload
+        );
+
+        dismiss();
+
+        // Handle response based on successful/unsuccessful arrays
+        if (response.data) {
+          const { successful = [], unsuccessful = [] } = response.data;
+          const successCount = successful.length;
+          const failCount = unsuccessful.length;
+
+          if (failCount > 0 && successCount > 0) {
+            // Partial success
+            q.notify({
+              type: "warning",
+              message: `${successCount} destination(s) deleted successfully, ${failCount} failed`,
+              timeout: 5000,
+            });
+          } else if (failCount > 0) {
+            // All failed
+            q.notify({
+              type: "negative",
+              message: `Failed to delete ${failCount} destination(s)`,
+              timeout: 3000,
+            });
+          } else {
+            // All successful
+            q.notify({
+              type: "positive",
+              message: `${successCount} destination(s) deleted successfully`,
+              timeout: 2000,
+            });
+          }
+        } else {
+          // Fallback success message
+          q.notify({
+            type: "positive",
+            message: `${selectedDestinations.value.length} destination(s) deleted successfully`,
+            timeout: 2000,
+          });
+        }
+
+        selectedDestinations.value = [];
+        // Refresh destinations list
+        getDestinations();
+      } catch (error: any) {
+        dismiss();
+        console.error("Error deleting destinations:", error);
+
+        // Show error message from response if available
+        const errorMessage = error.response?.data?.message || "Error deleting destinations. Please try again.";
+        q.notify({
+          type: "negative",
+          message: errorMessage,
+          timeout: 3000,
+        });
+      }
+
+      confirmBulkDelete.value = false;
+    };
 
     return {
       t,
@@ -592,7 +724,11 @@ export default defineComponent({
       selectedPerPage,
       visibleRows,
       hasVisibleRows,
-      outlinedDelete
+      outlinedDelete,
+      openBulkDeleteDialog,
+      bulkDeleteDestinations,
+      confirmBulkDelete,
+      selectedDestinations,
     };
   },
 });
