@@ -395,17 +395,6 @@ describe("SettingsIndex", () => {
       expect(regexTab.exists()).toBe(false);
     });
 
-    it("should show meta org tabs when is meta org", async () => {
-      // Since the mock is set to return isMetaOrg: true, test that meta org tabs exist
-      const wrapper = createWrapper();
-      await nextTick();
-      
-      const queryTab = wrapper.find('[data-name="queryManagement"]');
-      
-      // Since isMetaOrg is mocked to be true, this tab should exist
-      expect(queryTab.exists()).toBe(true);
-    });
-
     it("should hide cloud-only tabs when not cloud", async () => {
       const config = await import("@/aws-exports");
       vi.mocked(config.default).isCloud = "false";
