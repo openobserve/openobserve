@@ -280,6 +280,8 @@ impl Engine {
                                         range,
                                         offset: tw.offset,
                                     });
+                                } else {
+                                    rv.time_window = Some(TimeWindow::new_range(range));
                                 }
                                 rv
                             })
@@ -1074,7 +1076,6 @@ impl Engine {
             Func::Rate => functions::rate_range(input, &self.eval_ctx)?,
             Func::Resets => functions::resets_range(input, &self.eval_ctx)?,
             Func::Round => functions::round_range(input)?,
-            // TODO: check this implementation
             Func::Scalar => match input {
                 Value::Float(_) => input,
                 _ => {
