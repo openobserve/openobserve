@@ -57,7 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="qTableRef"
         :rows="visibleRows"
         :columns="columns"
-        row-key="id"
+        row-key="name"
+        selection="multiple"
+        v-model:selected="selectedTemplates"
         style="width: 100%"
         :rows-per-page-options="[0]"
         :pagination="pagination"
@@ -68,6 +70,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #no-data>
           <NoData />
+        </template>
+        <template v-slot:body-selection="scope">
+          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+        </template>
+        <template v-slot:header="props">
+          <q-tr :props="props">
+            <!-- Adding this block to render the select-all checkbox -->
+            <q-th v-if="columns.length > 0" auto-width>
+              <q-checkbox
+                v-model="props.selected"
+                size="sm"
+                :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                class="o2-table-checkbox"
+              />
+            </q-th>
+
+            <!-- render the table headers -->
+            <q-th
+              v-for="col in props.cols"
+              :key="col.name"
+              :props="props"
+              :class="col.classes"
+              :style="col.style"
+            >
+              {{ col.label }}
+            </q-th>
+          </q-tr>
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
@@ -113,33 +142,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
         <template #bottom="scope">
-          <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
-                  {{ resultTotal }} {{ t('alert_templates.header') }}
-                </div>
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
+          <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[150px] tw-mr-md">
+              {{ resultTotal }} {{ t('alert_templates.header') }}
+            </div>
+            <q-btn
+              v-if="selectedTemplates.length > 0"
+              data-test="template-list-delete-templates-btn"
+              class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
+              no-caps
+              dense
+              @click="openBulkDeleteDialog"
+            >
+              <q-icon name="delete" size="16px" />
+              <span class="tw-ml-2">Delete</span>
+            </q-btn>
+            <QTablePagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
           </div>
         </template>
-        <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
       </q-table>
     </div>
     <div v-else-if="!showImportTemplate && showTemplateEditor">
@@ -159,6 +190,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="deleteTemplate"
       @update:cancel="cancelDeleteTemplate"
       v-model="confirmDelete.visible"
+    />
+
+    <ConfirmDialog
+      title="Delete Templates"
+      :message="`Are you sure you want to delete ${selectedTemplates.length} template(s)?`"
+      @update:ok="bulkDeleteTemplates"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
     />
   </q-page>
 </template>
@@ -230,6 +269,8 @@ const confirmDelete: Ref<{
   visible: boolean;
   data: any;
 }> = ref({ visible: false, data: null });
+const selectedTemplates: Ref<any[]> = ref([]);
+const confirmBulkDelete = ref(false);
 const pagination: any = ref({
   page: 1,
   rowsPerPage: 20, // 0 means all rows
@@ -432,6 +473,50 @@ const visibleRows = computed(() => {
   if (!filterQuery.value) return templates.value || [];
   return filterData(templates.value || [], filterQuery.value);
 });
-const hasVisibleRows = computed(() => visibleRows.value.length > 0)
-</script>
+const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+const openBulkDeleteDialog = () => {
+  confirmBulkDelete.value = true;
+};
+
+const bulkDeleteTemplates = () => {
+  const templateNames = selectedTemplates.value.map((template: any) => template.name);
+
+  templateService
+    .bulkDelete(store.state.selectedOrganization.identifier, { ids: templateNames })
+    .then((res) => {
+      const { successful, unsuccessful } = res.data;
+
+      if (successful.length > 0 && unsuccessful.length === 0) {
+        q.notify({
+          type: "positive",
+          message: `Successfully deleted ${successful.length} template(s)`,
+          timeout: 2000,
+        });
+      } else if (successful.length > 0 && unsuccessful.length > 0) {
+        q.notify({
+          type: "warning",
+          message: `Deleted ${successful.length} template(s), but ${unsuccessful.length} failed`,
+          timeout: 3000,
+        });
+      } else if (unsuccessful.length > 0) {
+        q.notify({
+          type: "negative",
+          message: `Failed to delete ${unsuccessful.length} template(s)`,
+          timeout: 2000,
+        });
+      }
+
+      selectedTemplates.value = [];
+      confirmBulkDelete.value = false;
+      getTemplates();
+    })
+    .catch((err) => {
+      q.notify({
+        type: "negative",
+        message: "Error while deleting templates",
+        timeout: 2000,
+      });
+    });
+};</script>
 <style lang=""></style>
