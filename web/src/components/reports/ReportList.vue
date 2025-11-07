@@ -65,14 +65,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="reportListTableRef"
             :rows="visibleRows"
             :columns="columns"
-            row-key="id"
+            row-key="name"
             :pagination="pagination"
             :filter="filterQuery"
             :filter-method="filterData"
+            selection="multiple"
+            v-model:selected="selectedReports"
             style="width: 100%"
             :style="hasVisibleRows
-                ? 'width: 100%; height: calc(100vh - 124px)' 
+                ? 'width: 100%; height: calc(100vh - 124px)'
                 : 'width: 100%'"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           >
             <template #no-data>
               <NoData />
@@ -145,11 +148,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-td>
             </template>
 
+            <template v-slot:body-selection="scope">
+              <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+            </template>
+
             <template #bottom="scope">
               <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
                       {{ resultTotal }} {{ t('reports.header') }}
                     </div>
+                <q-btn
+                  v-if="selectedReports.length > 0"
+                  data-test="report-list-delete-reports-btn"
+                  class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-secondary-button-dark'
+                      : 'o2-secondary-button-light'
+                  "
+                  no-caps
+                  dense
+                  @click="openBulkDeleteDialog"
+                >
+                  <q-icon name="delete" size="16px" />
+                  <span class="tw-ml-2">Delete</span>
+                </q-btn>
                 <QTablePagination
                 :scope="scope"
                 :position="'bottom'"
@@ -163,8 +186,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-slot:header="props">
                 <q-tr :props="props">
-                  <!-- Rendering the of the columns -->
-                  <!-- here we can add the classes class so that the head will be sticky -->
+                  <!-- Adding this block to render the select-all checkbox -->
+                  <q-th v-if="columns.length > 0" auto-width>
+                    <q-checkbox
+                      v-model="props.selected"
+                      size="sm"
+                      :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                      class="o2-table-checkbox"
+                    />
+                  </q-th>
+
+                  <!-- Rendering the rest of the columns -->
                   <q-th
                     v-for="col in props.cols"
                     :key="col.name"
@@ -187,6 +219,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :message="deleteDialog.message"
       @update:ok="deleteReport"
       @update:cancel="deleteDialog.show = false"
+    />
+
+    <ConfirmDialog
+      v-model="confirmBulkDelete"
+      title="Delete Reports"
+      :message="`Are you sure you want to delete ${selectedReports.length} report(s)?`"
+      @update:ok="bulkDeleteReports"
+      @update:cancel="confirmBulkDelete = false"
     />
   </div>
 </template>
@@ -266,6 +306,10 @@ const deleteDialog = ref({
   message: "Are you sure you want to delete report?",
   data: "" as any,
 });
+
+const confirmBulkDelete = ref<boolean>(false);
+
+const selectedReports = ref<any[]>([]);
 
 const reportListTableRef: Ref<any> = ref(null);
 
@@ -532,7 +576,113 @@ const visibleRows = computed(() => {
   if (!filterQuery.value) return reportsTableRows.value || [];
   return filterData(reportsTableRows.value || [], filterQuery.value);
 });
-const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+const openBulkDeleteDialog = () => {
+  confirmBulkDelete.value = true;
+};
+
+const bulkDeleteReports = async () => {
+  const dismiss = q.notify({
+    spinner: true,
+    message: "Deleting reports...",
+    timeout: 0,
+  });
+
+  try {
+    if (selectedReports.value.length === 0) {
+      q.notify({
+        type: "negative",
+        message: "No reports selected for deletion",
+        timeout: 2000,
+      });
+      dismiss();
+      return;
+    }
+
+    // Extract report names for the API call (BE supports names)
+    const payload = {
+      ids: selectedReports.value.map((r: any) => r.name),
+    };
+
+    const response = await reports.bulkDelete(
+      store.state.selectedOrganization.identifier,
+      payload
+    );
+
+    dismiss();
+
+    // Handle response based on successful/unsuccessful arrays
+    if (response.data) {
+      const { successful = [], unsuccessful = [] } = response.data;
+      const successCount = successful.length;
+      const failCount = unsuccessful.length;
+
+      if (failCount > 0 && successCount > 0) {
+        // Partial success
+        q.notify({
+          type: "warning",
+          message: `${successCount} report(s) deleted successfully, ${failCount} failed`,
+          timeout: 5000,
+        });
+      } else if (failCount > 0) {
+        // All failed
+        q.notify({
+          type: "negative",
+          message: `Failed to delete ${failCount} report(s)`,
+          timeout: 3000,
+        });
+      } else {
+        // All successful
+        q.notify({
+          type: "positive",
+          message: `${successCount} report(s) deleted successfully`,
+          timeout: 2000,
+        });
+      }
+
+      // Remove deleted reports from staticReportsList by name 
+      const successfulNames = new Set(successful);
+      staticReportsList.value = staticReportsList.value.filter(
+        (r: any) => !successfulNames.has(r.name)
+      );
+
+      // Refresh the table
+      filterReports();
+    } else {
+      // Fallback success message
+      q.notify({
+        type: "positive",
+        message: `${selectedReports.value.length} report(s) deleted successfully`,
+        timeout: 2000,
+      });
+
+      // Remove all selected reports by name
+      const selectedNames = new Set(selectedReports.value.map((r: any) => r.name));
+      staticReportsList.value = staticReportsList.value.filter(
+        (r: any) => !selectedNames.has(r.name)
+      );
+
+      // Refresh the table
+      filterReports();
+    }
+
+    selectedReports.value = [];
+  } catch (error: any) {
+    dismiss();
+    console.error("Error deleting reports:", error);
+
+    // Show error message from response if available
+    const errorMessage = error.response?.data?.message || "Error deleting reports. Please try again.";
+    q.notify({
+      type: "negative",
+      message: errorMessage,
+      timeout: 3000,
+    });
+  }
+
+  confirmBulkDelete.value = false;
+};
 
 </script>
 
