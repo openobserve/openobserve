@@ -40,7 +40,6 @@ pub async fn blocked_orgs_middleware(
         {
             // for all ingester routes, the first part of path is org_id
             let org_id = path.split("/").next().unwrap();
-
             // the function can return error if there ware any db errors or such
             // in that case, we allow the request to proceed
             match organization::is_org_in_free_trial_period(org_id).await {
