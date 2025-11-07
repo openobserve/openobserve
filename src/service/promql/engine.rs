@@ -267,30 +267,24 @@ impl Engine {
             PromExpr::Paren(ParenExpr { expr }) => self.exec_expr(expr).await?,
             PromExpr::Subquery(expr) => {
                 let val = self.exec_expr(&expr.expr).await?;
-                let time_window = Some(TimeWindow::new(self.eval_ctx.start, expr.range));
+                let range = expr.range;
                 let matrix = match val {
-                    Value::Instant(v) => {
-                        vec![RangeValue {
-                            labels: v.labels.to_owned(),
-                            samples: vec![v.sample],
-                            exemplars: None,
-                            time_window,
-                        }]
+                    Value::Matrix(vs) => {
+                        // For matrix type, update the time_window range but preserve eval_ts
+                        vs.into_iter()
+                            .map(|mut rv| {
+                                // Update time_window with new range while keeping eval_ts
+                                if let Some(tw) = rv.time_window {
+                                    rv.time_window = Some(TimeWindow {
+                                        eval_ts: tw.eval_ts,
+                                        range,
+                                        offset: tw.offset,
+                                    });
+                                }
+                                rv
+                            })
+                            .collect()
                     }
-                    Value::Range(v) => vec![v],
-                    Value::Matrix(vs) => vs,
-                    Value::Sample(s) => vec![RangeValue {
-                        labels: Labels::default(),
-                        samples: vec![s],
-                        exemplars: None,
-                        time_window,
-                    }],
-                    Value::Float(val) => vec![RangeValue {
-                        labels: Labels::default(),
-                        samples: vec![Sample::new(self.eval_ctx.start, val)],
-                        exemplars: None,
-                        time_window,
-                    }],
                     v => {
                         return Err(DataFusionError::NotImplemented(format!(
                             "Unsupported subquery, the return value should have been a matrix but got {:?}",

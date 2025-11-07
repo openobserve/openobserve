@@ -265,7 +265,7 @@ where
                             labels,
                             samples: result_samples,
                             exemplars: None,
-                            time_window: None,
+                            time_window: metric.time_window,
                         })
                     } else {
                         None
