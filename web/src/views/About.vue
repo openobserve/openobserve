@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] aboutPage q-pt-xs">
-    <div class="card-container tw-px-4 tw-py-4 tw-h-[calc(100vh-48px)]">
-      <div class="tw-w-full">
+    <div class="card-container tw-h-[calc(100vh-50px)] tw-overflow-auto">
+      <div class="q-px-sm q-py-sm tw-h-full">
         <!-- Hero Section -->
         <div class="hero-section">
           <div class="tw-flex tw-flex-col md:tw-flex-row tw-items-center tw-justify-between tw-gap-8">
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
           <!-- Open Source Libraries -->
           <div class=" feature-card">
-            <div class="tw-mb-4" style="min-height: 120px;">
+            <div class="tw-mb-4">
               <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
                   <q-icon name="code" size="24px" />
@@ -273,6 +273,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+        <!-- Feature Comparison Table -->
+        <div class="tw-mt-6 tw-mb-[20px]" v-if="config.isCloud === 'false'">
+          <FeatureComparisonTable />
+        </div>
       </div>
     </div>
   </q-page>
@@ -286,10 +290,12 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
+import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
 
 export default defineComponent({
   name: "PageAbout",
   components: {
+    FeatureComparisonTable,
   },
   setup() {
     const store = useStore();
@@ -390,7 +396,7 @@ export default defineComponent({
 .aboutPage {
   // Hero Section
   .hero-section {
-    padding: 2rem;
+    padding: 0.1rem;
     margin-bottom: 1rem;
 
     .logo {

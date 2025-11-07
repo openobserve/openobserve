@@ -561,8 +561,8 @@ style="opacity: 0.7">
                 toggle-color="primary"
                 bordered
                 size="8px"
-                color="white"
                 text-color="primary"
+                bg-color="primary"
                 @update:model-value="toggleSchema"
                 :options="userDefinedSchemaBtnGroupOption"
               >
@@ -631,7 +631,6 @@ style="opacity: 0.7">
                 toggle-color="primary"
                 bordered
                 size="8px"
-                color="white"
                 text-color="primary"
                 :options="selectedFieldsBtnGroupOption"
                 @update:model-value="toggleInterestingFields"
@@ -1102,7 +1101,7 @@ export default defineComponent({
         selectedFields.push(row.name);
       }
 
-      searchObj.data.stream.selectedFields = selectedFields;
+      searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || '_timestamp'));;
 
       searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;

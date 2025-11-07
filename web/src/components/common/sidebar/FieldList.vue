@@ -236,15 +236,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="log-search-index-list-field-search-input"
             v-model="filterFieldValue"
             data-cy="index-field-search-input"
-            filled
             borderless
             dense
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
+            class="o2-search-input tw-min-w-full "
           >
             <template #prepend>
-              <q-icon name="search" />
+              <q-icon name="search" class="o2-search-input-icon" />
             </template>
           </q-input>
         </template>

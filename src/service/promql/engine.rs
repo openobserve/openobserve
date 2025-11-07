@@ -344,14 +344,14 @@ impl Engine {
 
         let mut selector = selector.clone();
         if selector.name.is_none() {
-            let name = selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .unwrap()
-                .value
-                .clone();
-
+            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
+                Some(mat) => mat.value.clone(),
+                None => {
+                    return Err(DataFusionError::Plan(
+                        "VectorSelector: metric name is required".into(),
+                    ));
+                }
+            };
             selector.name = Some(name);
         }
 
@@ -1155,11 +1155,7 @@ async fn selector_load_data_from_datafusion(
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == TIMESTAMP_COL_NAME
-                || name == VALUE_LABEL
-                || name == EXEMPLARS_LABEL
-                || name == NAME_LABEL
-            {
+            if name == TIMESTAMP_COL_NAME || name == VALUE_LABEL || name == EXEMPLARS_LABEL {
                 None
             } else {
                 Some(name)

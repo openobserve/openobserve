@@ -19,19 +19,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="tracePage" id="tracePage"
 style="min-height: auto">
     <div id="tracesSecondLevel">
-      <div class="tw-min-h-[82px] tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
+      <div
+        class="tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs"
+        :class="
+          activeTab === 'service-maps' ? 'tw-min-h-[45px]' : 'tw-min-h-[82px]'
+        "
+      >
+        <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
         <search-bar
           data-test="logs-search-bar"
           ref="searchBarRef"
           :fieldValues="fieldValues"
           :isLoading="searchObj.loading"
+          :activeTab="activeTab"
           class="card-container"
           @searchdata="searchData"
           @onChangeTimezone="refreshTimezone"
           @shareLink="copyTracesUrl"
+          @update:activeTab="activeTab = $event"
         />
       </div>
+
+      <!-- Service Maps Tab Content -->
       <div
+        v-if="activeTab === 'service-maps'"
+        class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-h-[calc(100vh-98px)] tw-overflow-hidden"
+      >
+        <service-graph class="tw-h-full" />
+      </div>
+
+      <!-- Search Tab Content -->
+      <div
+        v-if="activeTab === 'search'"
         id="tracesThirdLevel"
         class="traces-search-result-container relative-position"
       >
@@ -206,8 +225,10 @@ const SearchResult = defineAsyncComponent(() => import("./SearchResult.vue"));
 const SanitizedHtmlRenderer = defineAsyncComponent(
   () => import("@/components/SanitizedHtmlRenderer.vue"),
 );
+const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 
 const store = useStore();
+const activeTab = ref("search");
 const router = useRouter();
 const $q = useQuasar();
 const { t } = useI18n();
@@ -1077,6 +1098,11 @@ function refreshStreamData() {
 
 onBeforeMount(async () => {
   restoreUrlQueryParams();
+  // Restore active tab from URL query params
+  const queryParams = router.currentRoute.value.query;
+  if (queryParams.tab === 'service-maps') {
+    activeTab.value = 'service-maps';
+  }
   await importSqlParser();
   if (searchObj.loading == false) {
     await loadPageData();
@@ -1336,6 +1362,17 @@ watch(updateSelectedColumns, () => {
   setTimeout(() => {
     updateGridColumns();
   }, 300);
+});
+
+// Watch for active tab changes and update URL
+watch(activeTab, (newTab) => {
+  const query = { ...router.currentRoute.value.query };
+  if (newTab === 'service-maps') {
+    query.tab = 'service-maps';
+  } else {
+    delete query.tab;
+  }
+  router.replace({ query });
 });
 </script>
 

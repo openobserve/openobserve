@@ -37,7 +37,7 @@ pub(crate) fn get_stream_type_from_request(query: &HashMap<String, String>) -> O
 pub(crate) fn get_enable_align_histogram_from_request(query: &HashMap<String, String>) -> bool {
     query
         .get("enable_align_histogram")
-        .map(|s| s.parse().unwrap_or_default())
+        .and_then(|s| s.parse::<bool>().ok())
         .unwrap_or_default()
 }
 
@@ -65,19 +65,11 @@ pub(crate) fn get_fallback_order_by_col_from_request(
 pub(crate) fn get_search_type_from_request(
     query: &HashMap<String, String>,
 ) -> Result<Option<SearchEventType>, Error> {
-    let event_type = match query.get("search_type") {
-        Some(s) => match SearchEventType::try_from(s.as_str()) {
-            Ok(search_type) => Some(search_type),
-            _ => {
-                return Err(Error::other(
-                    "'event_type' query param with value 'ui', 'dashboards', 'reports', 'alerts' , 'rum' or 'values' allowed",
-                ));
-            }
-        },
-        None => None,
-    };
-
-    Ok(event_type)
+    query
+        .get("search_type")
+        .map(|s| SearchEventType::try_from(s.as_str()))
+        .transpose()
+        .map_err(Error::other)
 }
 
 #[inline(always)]
@@ -126,6 +118,11 @@ pub(crate) fn get_is_ui_histogram_from_request(query: &HashMap<String, String>) 
 #[inline(always)]
 pub(crate) fn get_is_multi_stream_search_from_request(query: &HashMap<String, String>) -> bool {
     get_key_as_bool(query, "is_multi_stream_search")
+}
+
+#[inline(always)]
+pub(crate) fn get_clear_cache_from_request(query: &HashMap<String, String>) -> bool {
+    get_key_as_bool(query, "clear_cache")
 }
 
 #[inline(always)]

@@ -3322,7 +3322,7 @@ mod tests {
         let last_end_time = current_time - dur_20_mins;
         // Current end time needs to be aligned (as this is cron frequency)
         let current_next_run_time =
-            TriggerCondition::align_time(last_end_time + period_micros, 0, Some(300)); // This will cause start > end
+            TriggerCondition::align_time(last_end_time + period_micros, 0, Some(300), None); // This will cause start > end
         let timeout = Duration::try_minutes(2)
             .unwrap()
             .num_microseconds()

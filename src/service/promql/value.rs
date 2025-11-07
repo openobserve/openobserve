@@ -17,6 +17,7 @@ use std::{fmt, hash::Hasher, sync::Arc, time::Duration};
 
 use config::{
     FxIndexMap,
+    meta::promql::NAME_LABEL,
     utils::{json, sort::sort_float},
 };
 use hashbrown::HashSet;
@@ -36,6 +37,13 @@ pub type Labels = Vec<Arc<Label>>;
 
 /// Added functionalities on Labels
 pub trait LabelsExt {
+    /// Remove the metric name i.e. __name__ from the given label
+    ///
+    /// ```json
+    /// {"__name__": "my-metric", "job": "k8s"} -> {"job": "k8s"}
+    /// ```
+    fn without_metric_name(self) -> Labels;
+
     /// Return the value of the label associated with this name of the label.
     fn get_value(&self, name: &str) -> String;
 
@@ -70,6 +78,10 @@ impl LabelsExt for Labels {
     fn without_label(mut self, name: &str) -> Labels {
         self.retain(|label| label.name != name);
         self
+    }
+
+    fn without_metric_name(self) -> Labels {
+        self.without_label(NAME_LABEL)
     }
 
     fn get_value(&self, name: &str) -> String {
@@ -215,6 +227,7 @@ impl Sample {
         Self { timestamp, value }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn is_nan(&self) -> bool {
         self.value.is_nan()
     }

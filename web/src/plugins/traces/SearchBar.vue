@@ -18,49 +18,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="search-bar-component" id="searchBarComponent">
     <div class="row !tw-m-0 tw-p-[0.375rem]">
       <div class="float-right col flex items-center">
-        <div
-          class="q-pr-xs tw-mr-[0.375rem] tw-flex tw-items-center tw-justify-center tw-border-solid tw-border tw-border-[var(--o2-border-color)] tw-rounded-[0.375rem]"
-        >
-          <q-toggle
-            data-test="traces-search-bar-show-metrics-toggle-btn"
-            v-model="searchObj.meta.showHistogram"
-            class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-          >
-          </q-toggle>
-          <img
-            :src="metricsIcon"
-            alt="Metrics"
-            style="width: 20px; height: 20px"
-          />
-          <q-tooltip>
-            {{ t("traces.RedMetrics") }}
-          </q-tooltip>
+        <!-- Tab Toggle Buttons -->
+        <div class="button-group logs-visualize-toggle element-box-shadow tw-mr-[0.375rem]">
+          <div class="row">
+            <div>
+              <q-btn
+                data-test="traces-search-toggle"
+                :class="activeTab === 'search' ? 'selected' : ''"
+                @click="$emit('update:activeTab', 'search')"
+                no-caps
+                size="sm"
+                icon="search"
+                class="button button-left tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm tw-h-[2rem]"
+              >
+                <q-tooltip>
+                  {{ t("common.search") }}
+                </q-tooltip>
+              </q-btn>
+            </div>
+            <div>
+              <q-btn
+                data-test="traces-service-maps-toggle"
+                :class="activeTab === 'service-maps' ? 'selected' : ''"
+                @click="$emit('update:activeTab', 'service-maps')"
+                no-caps
+                size="sm"
+                icon="hub"
+                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm tw-h-[2rem]"
+              >
+                <q-tooltip>
+                  Service Maps
+                </q-tooltip>
+              </q-btn>
+            </div>
+          </div>
         </div>
-        <q-btn
-          data-test="traces-search-bar-reset-filters-btn"
-          no-caps
-          size="13px"
-          icon="restart_alt"
-          class="tw-flex tw-justify-center tw-items-center tw-w-[2rem] tw-min-h-[2rem] tw-h-[2rem] tw-mr-[0.375rem] tw-rounded-[0.375rem] el-border"
-          @click="resetFilters"
-        >
-          <q-tooltip>
-            {{ t("search.resetFilters") }}
-          </q-tooltip>
-        </q-btn>
-        <syntax-guide
-          data-test="logs-search-bar-sql-mode-toggle-btn"
-          :sqlmode="searchObj.meta.sqlMode"
-        />
+
+        <!-- Show search controls only when on Search tab -->
+        <template v-if="activeTab === 'search'">
+          <div
+            class="q-pr-xs tw-mr-[0.375rem] tw-flex tw-items-center tw-justify-center tw-border-solid tw-border tw-border-[var(--o2-border-color)] tw-rounded-[0.375rem]"
+          >
+            <q-toggle
+              data-test="traces-search-bar-show-metrics-toggle-btn"
+              v-model="searchObj.meta.showHistogram"
+              class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+              size="xs"
+              flat
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-toggle-button-xs-dark'
+                  : 'o2-toggle-button-xs-light'
+              "
+            >
+            </q-toggle>
+            <img
+              :src="metricsIcon"
+              alt="Metrics"
+              style="width: 20px; height: 20px"
+            />
+            <q-tooltip>
+              {{ t("traces.RedMetrics") }}
+            </q-tooltip>
+          </div>
+          <q-btn
+            data-test="traces-search-bar-reset-filters-btn"
+            no-caps
+            size="13px"
+            icon="restart_alt"
+            class="tw-flex tw-justify-center tw-items-center tw-w-[2rem] tw-min-h-[2rem] tw-h-[2rem] tw-mr-[0.375rem] tw-rounded-[0.375rem] el-border"
+            @click="resetFilters"
+          >
+            <q-tooltip>
+              {{ t("search.resetFilters") }}
+            </q-tooltip>
+          </q-btn>
+          <syntax-guide
+            data-test="logs-search-bar-sql-mode-toggle-btn"
+            :sqlmode="searchObj.meta.sqlMode"
+          />
+        </template>
       </div>
-      <div class="float-right col-auto">
+      <div v-if="activeTab === 'search'" class="float-right col-auto">
         <div class="float-left tw-mr-[0.375rem]">
           <date-time
             ref="dateTimeRef"
@@ -114,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <div v-if="searchObj.meta.showQuery" class="row">
+    <div v-if="activeTab === 'search' && searchObj.meta.showQuery" class="row">
       <div
         class="col tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mx-[0.375rem] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden"
       >
@@ -131,7 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : ''
           "
           language="sql"
-          @update:query="updateQuery"
+          @update:query="updateQueryValue"
+          @run-query="searchData"
           @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
           @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
         />
@@ -164,8 +204,6 @@ import SyntaxGuide from "./SyntaxGuide.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import AppTabs from "@/components/common/AppTabs.vue";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useStreams from "@/composables/useStreams";
 import { getImageURL } from "@/utils/zincutils";
 
@@ -177,10 +215,8 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     SyntaxGuide,
-    AppTabs,
-    ConfirmDialog,
   },
-  emits: ["searchdata", "shareLink"],
+  emits: ["searchdata", "shareLink", "update:activeTab"],
   props: {
     fieldValues: {
       type: Object,
@@ -192,6 +228,10 @@ export default defineComponent({
     isLoading: {
       type: Boolean,
       default: false,
+    },
+    activeTab: {
+      type: String,
+      default: "search",
     },
   },
   methods: {

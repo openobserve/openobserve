@@ -19,132 +19,179 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div style="overflow-y: auto" class="scroll">
     <div class="tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs">
       <div
-        class="flex items-center q-pa-sm card-container"
-        :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
+      class="flex items-center q-pa-sm card-container"
+      :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
+    >
+      <div
+        class="flex items-center q-table__title"
+        :class="!store.state.isAiChatEnabled ? 'q-mr-md' : 'q-mr-sm'"
       >
-        <div
-          class="flex items-center q-table__title"
-          :class="!store.state.isAiChatEnabled ? 'q-mr-md' : 'q-mr-sm'"
-        >
-          <span>
-            {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
-          </span>
-          <div>
-            <q-input
-              data-test="dashboard-panel-name"
-              v-model="dashboardPanelData.data.title"
-              :label="t('panel.name') + '*'"
-              class="q-ml-xl dynamic-input"
-              dense
-              borderless
-              :style="inputStyle"
-            />
-          </div>
-        </div>
-        <div class="flex q-gutter-sm">
-          <q-btn
-            outline
-            padding="xs sm"
-            class="q-mr-sm tw-h-[36px] el-border"
-            no-caps
-            label="Dashboard Tutorial"
-            @click="showTutorial"
-            data-test="dashboard-panel-tutorial-btn"
-          ></q-btn>
-          <q-btn
-            v-if="
-              !['html', 'markdown', 'custom_chart'].includes(
-                dashboardPanelData.data.type,
-              )
-            "
-            outline
-            padding="sm"
-            class="q-mr-sm tw-h-[36px] el-border"
-            no-caps
-            icon="info_outline"
-            @click="showViewPanel = true"
-            data-test="dashboard-panel-data-view-query-inspector-btn"
-          >
-            <q-tooltip anchor="center left" self="center right"
-              >Query Inspector
-            </q-tooltip>
-          </q-btn>
-          <DateTimePickerDashboard
-            v-if="selectedDate"
-            v-model="selectedDate"
-            ref="dateTimePickerRef"
-            :disable="disable"
-            class="tw-h-[36px]"
-            @hide="setTimeForVariables"
+        <span>
+          {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
+        </span>
+        <div>
+          <q-input
+            data-test="dashboard-panel-name"
+            v-model="dashboardPanelData.data.title"
+            :label="t('panel.name') + '*'"
+            class="q-ml-xl dynamic-input"
+            dense
+            borderless
+            :style="inputStyle"
           />
-          <q-btn
-            outline
-            color="red"
-            no-caps
-            flat
-            class="o2-secondary-button tw-h-[36px] q-ml-md"
-            style="color: red !important"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            :label="t('panel.discard')"
-            @click="goBackToDashboardList"
-            data-test="dashboard-panel-discard"
-          />
-          <q-btn
-            class="o2-secondary-button tw-h-[36px] q-ml-md"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
-            flat
-            :label="t('panel.save')"
-            data-test="dashboard-panel-save"
-            @click.stop="savePanelData.execute()"
-            :loading="savePanelData.isLoading.value"
-          />
-          <template
-            v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-          >
-            <q-btn
-              v-if="
-                config.isEnterprise == 'true' && searchRequestTraceIds.length
-              "
-              data-test="dashboard-cancel"
-              no-caps
-              dense
-              flat
-              class="o2-primary-button tw-h-[36px] q-ml-md"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-negative-button-dark'
-                  : 'o2-negative-button-light'
-              "
-              :label="t('panel.cancel')"
-              @click="cancelAddPanelQuery"
-            />
-            <q-btn
-              v-else
-              data-test="dashboard-apply"
-              class="o2-primary-button tw-h-[36px] q-ml-md"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-primary-button-dark'
-                  : 'o2-primary-button-light'
-              "
-              no-caps
-              flat
-              dense
-              :label="t('panel.apply')"
-              @click="runQuery"
-            />
-          </template>
         </div>
       </div>
+      <div class="flex q-gutter-sm">
+        <q-btn
+          outline
+          padding="xs sm"
+          class="q-mr-sm tw-h-[36px] el-border"
+          no-caps
+          label="Dashboard Tutorial"
+          @click="showTutorial"
+          data-test="dashboard-panel-tutorial-btn"
+        ></q-btn>
+        <q-btn
+          v-if="
+            !['html', 'markdown', 'custom_chart'].includes(
+              dashboardPanelData.data.type,
+            )
+          "
+          outline
+          padding="sm"
+          class="q-mr-sm tw-h-[36px] el-border"
+          no-caps
+          icon="info_outline"
+          @click="showViewPanel = true"
+          data-test="dashboard-panel-data-view-query-inspector-btn"
+        >
+          <q-tooltip anchor="center left" self="center right"
+            >Query Inspector
+          </q-tooltip>
+        </q-btn>
+        <DateTimePickerDashboard
+          v-if="selectedDate"
+          v-model="selectedDate"
+          ref="dateTimePickerRef"
+          :disable="disable"
+          class="tw-h-[36px]"
+          @hide="setTimeForVariables"
+        />
+        <q-btn
+          outline
+          color="red"
+          no-caps
+          flat
+          class="o2-secondary-button tw-h-[36px] q-ml-md"
+          style="color: red !important"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
+          :label="t('panel.discard')"
+          @click="goBackToDashboardList"
+          data-test="dashboard-panel-discard"
+        />
+        <q-btn
+          class="o2-secondary-button tw-h-[36px] q-ml-md"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
+          no-caps
+          flat
+          :label="t('panel.save')"
+          data-test="dashboard-panel-save"
+          @click.stop="savePanelData.execute()"
+          :loading="savePanelData.isLoading.value"
+        />
+        <template
+          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+        >
+          <q-btn
+            v-if="config.isEnterprise === 'false'"
+            data-test="dashboard-apply"
+            class="tw-h-[36px] q-ml-md o2-primary-button"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
+            no-caps
+            flat
+            dense
+            :disable="searchRequestTraceIds.length > 0"
+            :label="t('panel.apply')"
+            @click="() => runQuery(false)"
+          />
+          <q-btn-group
+            v-if="config.isEnterprise === 'true'"
+            class="tw-h-[36px] q-ml-md o2-primary-button"
+            style="padding-left: 0px !important ; padding-right: 0px !important"
+            :class="
+              store.state.theme === 'dark'
+                ? searchRequestTraceIds.length > 0
+                  ? 'o2-negative-button-dark'
+                  : 'o2-secondary-button-dark'
+                : searchRequestTraceIds.length > 0
+                  ? 'o2-negative-button-light'
+                  : 'o2-secondary-button-light'
+            "
+          >
+            <q-btn
+              :data-test="
+                searchRequestTraceIds.length > 0
+                  ? 'dashboard-cancel'
+                  : 'dashboard-apply'
+              "
+              no-caps
+              :label="
+                searchRequestTraceIds.length > 0
+                  ? t('panel.cancel')
+                  : t('panel.apply')
+              "
+              @click="onApplyBtnClick"
+            />
+
+            <q-btn-dropdown
+              class="text-bold no-border tw-px-0"
+              no-caps
+              auto-close
+              dropdown-icon="keyboard_arrow_down"
+              :disable="searchRequestTraceIds.length > 0"
+            >
+              <q-list>
+                <q-item
+                  clickable
+                  @click="runQuery(true)"
+                  :disable="searchRequestTraceIds.length > 0"
+                >
+                  <q-item-section avatar>
+                    <q-icon
+                      size="xs"
+                      name="refresh"
+                      style="align-items: baseline; padding: 0px"
+                    />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label
+                      style="
+                        font-size: 12px;
+                        align-items: baseline;
+                        padding: 0px;
+                      "
+                      >Refresh Cache & Apply</q-item-label
+                    >
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-btn-dropdown>
+          </q-btn-group>
+        </template>
+      </div>
+    </div>
     </div>
     <div>
       <div class="row" style="overflow-y: auto">
@@ -377,6 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :variablesData="updatedVariablesData"
                         :allowAnnotationsAdd="editMode"
                         :width="6"
+                      :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         @error="handleChartApiError"
                         @updated:data-zoom="onDataZoom"
                         @updated:vrlFunctionFieldList="
@@ -594,6 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
                           :variablesData="updatedVariablesData"
                           :width="6"
+                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
                           @updated:vrlFunctionFieldList="
@@ -770,6 +819,7 @@ export default defineComponent({
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
     const { getStream } = useStreams();
     const seriesData = ref([]);
+    const shouldRefreshWithoutCache = ref(false);
 
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
@@ -1171,7 +1221,7 @@ export default defineComponent({
       },
     );
 
-    const runQuery = () => {
+    const runQuery = (withoutCache = false) => {
       try {
         // console.time("runQuery");
         if (!isValid(true, true)) {
@@ -1182,6 +1232,9 @@ export default defineComponent({
         // if (dashboardPanelData.data.type === "custom_chart") {
         //   runJavaScriptCode();
         // }
+
+        // should use cache flag
+        shouldRefreshWithoutCache.value = withoutCache;
 
         // Also update variables data
         Object.assign(
@@ -1784,6 +1837,14 @@ export default defineComponent({
       }
     };
 
+    const onApplyBtnClick = () => {
+      if (searchRequestTraceIds.value.length > 0) {
+        cancelAddPanelQuery();
+      } else {
+        runQuery();
+      }
+    };
+
     // [END] cancel running queries
 
     const inputStyle = computed(() => {
@@ -1923,6 +1984,8 @@ export default defineComponent({
       dateTimeForVariables,
       seriesDataUpdate,
       seriesData,
+      onApplyBtnClick,
+      shouldRefreshWithoutCache,
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,
       errorMessage,

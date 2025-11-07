@@ -204,7 +204,7 @@ pub async fn log(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = SegmentEvent, content_type = "multipart/form-data",
+        content = inline(SegmentEvent), content_type = "multipart/form-data",
         description = "Multipart form data containing compressed session replay segment and event metadata"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", 

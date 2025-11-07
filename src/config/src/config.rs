@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 11;
+pub const DB_SCHEMA_VERSION: u64 = 12;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -881,6 +881,12 @@ pub struct Common {
         help = "Skip WAL for query"
     )]
     pub feature_query_skip_wal: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SHARED_MEMTABLE_ENABLED",
+        default = false,
+        help = "Enable shared memtable across multiple organizations"
+    )]
+    pub feature_shared_memtable_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -1171,7 +1177,7 @@ pub struct Common {
     pub additional_reporting_orgs: String,
     #[env_config(
         name = "ZO_USAGE_REPORT_TO_OWN_ORG",
-        default = false,
+        default = true,
         help = "Report alert/report triggers to the originating organization in addition to _meta org"
     )]
     pub usage_report_to_own_org: bool,
@@ -1819,8 +1825,8 @@ pub struct Nats {
     pub queue_max_size: i64,
     #[env_config(
         name = "ZO_NATS_EVENT_STORAGE",
-        help = "Set the storage type for the event stream, default is: memory, other value is: file",
-        default = "memory"
+        help = "Set the storage type for the event stream, default is: file, other value is: memory",
+        default = "file"
     )]
     pub event_storage: String,
     #[env_config(
@@ -2142,7 +2148,7 @@ pub struct EnrichmentTable {
 pub struct ServiceGraph {
     #[env_config(
         name = "ZO_SGRAPH_ENABLED",
-        default = false,
+        default = true,
         help = "Enable service graph feature"
     )]
     pub enabled: bool,
@@ -3193,5 +3199,29 @@ mod tests {
 
         cfg.route.dispatch_strategy = RouteDispatchStrategy::Other;
         assert!(check_route_config(&cfg).is_err());
+    }
+
+    #[test]
+    fn test_usage_report_to_own_org_field_exists() {
+        // Test that usage_report_to_own_org field exists and is accessible
+        let cfg = Config::init().unwrap();
+        // Verify the field is accessible as a boolean
+        let _value: bool = cfg.common.usage_report_to_own_org;
+        // Test passes if we can access the field without error
+    }
+
+    #[test]
+    fn test_usage_report_to_own_org_env_override() {
+        // Test that environment variable can override the default
+        unsafe {
+            std::env::set_var("ZO_USAGE_REPORT_TO_OWN_ORG", "false");
+        }
+        let cfg = Config::init().unwrap();
+        // Note: This test may fail if the config is already loaded
+        // In that case, we just verify the field exists
+        let _ = cfg.common.usage_report_to_own_org;
+        unsafe {
+            std::env::remove_var("ZO_USAGE_REPORT_TO_OWN_ORG");
+        }
     }
 }

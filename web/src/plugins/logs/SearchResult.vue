@@ -196,6 +196,12 @@ style="color: transparent"
         </div>
       </div>
       <div
+        :class="[
+          'histogram-container',
+          searchObj.meta.showHistogram
+            ? 'histogram-container--visible'
+            : 'histogram-container--hidden',
+        ]"
         v-else-if="
           searchObj.data.histogram?.errorMsg != '' &&
           searchObj.meta.showHistogram &&
@@ -281,12 +287,14 @@ color="warning" size="xs"></q-icon> Error while
       <!-- Patterns View -->
       <div
         v-if="searchObj.meta.logsVisualizeToggle === 'patterns'"
-        style="
-          height: calc(100vh - 250px);
-          display: flex;
-          flex-direction: column;
-        "
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        style="display: flex; flex-direction: column"
+        :class="[
+          !searchObj.meta.showHistogram ||
+          (searchObj.meta.showHistogram &&
+            searchObj.data.histogram.errorCode == -1)
+            ? 'table-container--without-histogram'
+            : 'table-container--with-histogram',
+        ]"
       >
         <!-- Statistics Bar -->
         <div
@@ -1081,7 +1089,6 @@ export default defineComponent({
       // If selected fields are empty, then we are setting colOrder to empty array as we
       // don't change the order of default columns
       // If you store the colOrder it will create issue when you save the view and load it again
-
       if (!this.searchObj.data.stream.selectedFields.length) {
         this.searchObj.data.resultGrid.colOrder[
           this.searchObj.data.stream.selectedStream
@@ -1096,7 +1103,7 @@ export default defineComponent({
             this.store.state.selectedOrganization.identifier;
           let selectedFields = this.reorderSelectedFields();
 
-          this.searchObj.data.stream.selectedFields = selectedFields;
+          this.searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (this.store?.state?.zoConfig?.timestamp_column || '_timestamp'));
           this.updatedLocalLogFilterField();
         }
       }
@@ -1186,7 +1193,7 @@ export default defineComponent({
 
       selectedFields.splice(SFIndex, 1);
 
-      this.searchObj.data.stream.selectedFields = selectedFields;
+      this.searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (this.store?.state?.zoConfig?.timestamp_column || '_timestamp'));
 
       this.searchObj.organizationIdentifier =
         this.store.state.selectedOrganization.identifier;
@@ -1486,7 +1493,7 @@ export default defineComponent({
           searchObj.data.stream.selectedFields.filter(
             (v: any) => v !== fieldName,
           );
-      } else {
+      } else if(fieldName !== (store?.state?.zoConfig?.timestamp_column || '_timestamp')) {
         searchObj.data.stream.selectedFields.push(fieldName);
       }
       searchObj.organizationIdentifier =
@@ -1602,11 +1609,11 @@ export default defineComponent({
     watch(
       () => patternsState.value.patterns,
       (newPatterns) => {
-        console.log("[SearchResult] Patterns state changed:", {
-          hasPatterns: !!newPatterns,
-          patternCount: newPatterns?.patterns?.length || 0,
-          statistics: newPatterns?.statistics,
-        });
+        // console.log("[SearchResult] Patterns state changed:", {
+        //   hasPatterns: !!newPatterns,
+        //   patternCount: newPatterns?.patterns?.length || 0,
+        //   statistics: newPatterns?.statistics,
+        // });
       },
       { deep: true },
     );

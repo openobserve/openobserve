@@ -16,7 +16,7 @@
 use datafusion::error::{DataFusionError, Result};
 use strum::EnumString;
 
-use crate::service::promql::value::{InstantValue, RangeValue, Sample, Value};
+use crate::service::promql::value::{InstantValue, LabelsExt, RangeValue, Sample, Value};
 
 mod absent;
 mod absent_over_time;
@@ -140,7 +140,7 @@ pub(crate) fn eval_idelta(
     data: Value,
     fn_name: &str,
     fn_handler: fn(RangeValue) -> Option<f64>,
-    _keep_name_label: bool,
+    keep_name_label: bool,
 ) -> Result<Value> {
     let data = match data {
         Value::Matrix(v) => v,
@@ -155,10 +155,10 @@ pub(crate) fn eval_idelta(
 
     let mut rate_values = Vec::with_capacity(data.len());
     for mut metric in data {
-        let labels = std::mem::take(&mut metric.labels);
-        // if !keep_name_label {
-        //     labels = labels.without_metric_name()
-        // };
+        let mut labels = std::mem::take(&mut metric.labels);
+        if !keep_name_label {
+            labels = labels.without_metric_name()
+        };
 
         let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
         if let Some(value) = fn_handler(metric) {
