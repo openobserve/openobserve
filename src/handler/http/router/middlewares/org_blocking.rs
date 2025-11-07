@@ -37,7 +37,7 @@ pub async fn blocked_orgs_middleware(
             // for all ingester routes, the first part of path is org_id
             let org_id = path.split("/").next().unwrap();
             // stream type doesn't matter here, as we are giving name as None
-            match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+            match check_ingestion_allowed(org_id, StreamType::Logs, None).await {
                 Ok(_) => {
                     log::warn!("here {org_id} is valid");
                 }
