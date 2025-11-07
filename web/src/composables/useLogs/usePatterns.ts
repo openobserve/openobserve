@@ -40,7 +40,7 @@ export default function usePatterns() {
   ) => {
     // Prevent duplicate calls
     if (patternsState.value.loading) {
-      console.log("[Patterns] Already loading, skipping duplicate call");
+      // console.log("[Patterns] Already loading, skipping duplicate call");
       return;
     }
 
@@ -49,7 +49,7 @@ export default function usePatterns() {
       patternsState.value.error = null;
       patternsState.value.lastQuery = queryReq;
 
-      console.log("[Patterns] Extracting patterns for stream:", stream_name);
+      // console.log("[Patterns] Extracting patterns for stream:", stream_name);
 
       const response = await patternsService.extractPatterns({
         org_identifier,
@@ -57,7 +57,7 @@ export default function usePatterns() {
         query: queryReq,
       });
 
-      console.log("[Patterns] API Response:", response.data);
+      // console.log("[Patterns] API Response:", response.data);
 
       // Transform patterns to match UI expectations
       const transformedPatterns = response.data.patterns.map(
@@ -84,11 +84,11 @@ export default function usePatterns() {
         patterns: transformedPatterns,
       };
 
-      console.log(
-        "[Patterns] Extraction complete:",
-        transformedPatterns.length,
-        "patterns found",
-      );
+      // console.log(
+      //   "[Patterns] Extraction complete:",
+      //   transformedPatterns.length,
+      //   "patterns found",
+      // );
     } catch (error: any) {
       console.error("[Patterns] Error extracting patterns:", error);
       patternsState.value.error =
@@ -107,7 +107,7 @@ export default function usePatterns() {
     patternsState.value.patterns = null;
     patternsState.value.error = null;
     patternsState.value.lastQuery = null;
-    console.log("[Patterns] Cleared patterns state");
+    // console.log("[Patterns] Cleared patterns state");
   };
 
   /**

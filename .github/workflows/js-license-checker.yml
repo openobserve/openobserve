@@ -4,17 +4,21 @@ on:
   push:
     branches:
       - "main"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
   pull_request:
     branches:
       - "*"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   js-license-check:

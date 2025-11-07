@@ -543,6 +543,9 @@ body {
     right: 0;
     z-index: 1;
   }
+    td:last-child.actions-column {
+      background-color: var(--o2-table-actions-bg);
+    }
   tr{
     td{
       border-bottom: 1px solid var(--o2-border-color) !important;
@@ -628,6 +631,7 @@ body {
       z-index: 1;
       width: 100px ;
       box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
+      background-color: var(--o2-table-actions-bg);
     }
   }
   .q-table{

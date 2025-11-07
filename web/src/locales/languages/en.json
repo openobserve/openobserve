@@ -1143,6 +1143,16 @@
       "groupWaitTimeTooltip": "Time to wait and collect similar alerts before sending a grouped notification. Allows batching of alerts that occur in quick succession."
     },
     "noHistory": "No alert history found",
+    "totalEvaluations": "Total Evaluations",
+    "firingCount": "Firing Count",
+    "currentState": "Current State",
+    "lastEvaluation": "Last Evaluation",
+    "alertHistory": "Alert History",
+    "noHistoryData": "No alert history data available",
+    "avgEvaluationTime": "Avg Evaluation Time",
+    "successRate": "Success Rate",
+    "loadMore": "Load More",
+    "failedToFetchHistory": "Failed to fetch alert history",
     "insights": {
       "title": "Alert Insights",
       "badge": "Interactive Analysis",

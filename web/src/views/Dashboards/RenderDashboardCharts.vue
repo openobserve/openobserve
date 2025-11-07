@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             store.state.printMode &&
             panels.length === 1 &&
-            panels[0].type === 'table'
+            panels[0]?.type === 'table'
           "
           style="height: 100%; width: 100%"
         >
@@ -66,17 +66,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :folderId="folderId"
             :reportId="folderId"
             :selectedTimeDate="
-              (panels[0]?.id ? currentTimeObj[panels[0].id] : undefined) ||
+              (panels[0]?.id ? currentTimeObj?.[panels[0]?.id] : undefined) ||
               currentTimeObj['__global'] ||
               {}
             "
             :shouldRefreshWithoutCache="
-              (panels[0]?.id
-                ? shouldRefreshWithoutCacheObj[panels[0].id]
+              (panels?.[0]?.id
+                ? shouldRefreshWithoutCacheObj?.[panels?.[0]?.id]
                 : undefined) || false
             "
             :variablesData="
-              currentVariablesDataRef[panels[0].id] ||
+              currentVariablesDataRef?.[panels[0]?.id] ||
               currentVariablesDataRef['__global']
             "
             :forceLoad="forceLoad"
@@ -124,13 +124,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :folderId="folderId"
                 :reportId="reportId"
                 :selectedTimeDate="
-                  currentTimeObj[item.id] || currentTimeObj['__global'] || {}
+                  currentTimeObj?.[item?.id] || currentTimeObj['__global'] || {}
                 "
                 :shouldRefreshWithoutCache="
-                  shouldRefreshWithoutCacheObj[item.id] || false
+                  shouldRefreshWithoutCacheObj?.[item?.id] || false
                 "
                 :variablesData="
-                  currentVariablesDataRef[item.id] ||
+                  currentVariablesDataRef?.[item?.id] ||
                   currentVariablesDataRef['__global']
                 "
                 :currentVariablesData="variablesData"
@@ -542,6 +542,13 @@ export default defineComponent({
           column: 192, // 192-column grid for fine-grained positioning
           cellHeight: "17px", // Base cell height
           margin: 2, // Minimal margin between panels
+          draggable: {
+            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable dragging unless view-only or saving
+            handle: ".drag-allow", // Only allow dragging from specific handle
+          },
+          resizable: {
+            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable resizing unless view-only or saving
+          },
           disableResize: props.viewOnly || saveDashboardData.isLoading.value, // Disable resize in view-only
           disableDrag: props.viewOnly || saveDashboardData.isLoading.value, // Disable drag in view-only
           acceptWidgets: false, // Don't accept external widgets
