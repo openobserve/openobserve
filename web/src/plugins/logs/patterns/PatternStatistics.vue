@@ -15,13 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-py-[0.375rem] tw-shrink-0 tw-bg-[var(--o2-hover-accent)]">
+  <div class="tw-py-[0.375rem] tw-shrink-0 tw-bg-[var(--o2-hover-accent)]" data-test="pattern-statistics">
     <div class="row q-col-gutter-md !tw-ml-0">
       <!-- Logs Analyzed Card -->
       <div class="col-3 !tw-pl-0">
         <q-card
           flat
           :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
+          data-test="pattern-stats-logs-analyzed-card"
         >
           <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">
             <div
@@ -37,9 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="!isEditingScanSize"
                 class="row items-center no-wrap tw-m-0 tw-pl-1"
+                data-test="pattern-stats-scan-size-display"
               >
                 <div
                   class="tw-text-[1.5rem] tw-leading-[2rem] text-weight-bold text-primary tw-h-fit tw-pr-1"
+                  data-test="pattern-stats-scan-size-value"
                 >
                   {{ scanSize.toLocaleString() }}
                 </div>
@@ -53,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                   "
+                  data-test="pattern-stats-edit-scan-size-btn"
                 >
                   <q-tooltip>Edit scan size</q-tooltip>
                 </q-btn>
@@ -63,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 class="row items-center no-wrap logs-analyzed-input"
                 style="gap: 0.25rem"
+                data-test="pattern-stats-scan-size-edit"
               >
                 <q-input
                   v-model.number="localScanSize"
@@ -76,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   autofocus
                   @keyup.escape="cancelEditScanSize"
                   @blur="updateScanSize"
+                  data-test="pattern-stats-scan-size-input"
                 />
               </div>
             </div>
@@ -88,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card
           flat
           :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
+          data-test="pattern-stats-patterns-found-card"
         >
           <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">
             <div
@@ -98,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               Patterns Found
             </div>
-            <div class="text-h5 text-weight-bold q-mt-xs text-primary">
+            <div class="text-h5 text-weight-bold q-mt-xs text-primary" data-test="pattern-stats-patterns-found-value">
               {{ statistics?.total_patterns_found || 0 }}
             </div>
           </q-card-section>
@@ -110,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card
           flat
           :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
+          data-test="pattern-stats-coverage-card"
         >
           <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">
             <div
@@ -120,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               Coverage
             </div>
-            <div class="text-h5 text-weight-bold q-mt-xs text-primary">
+            <div class="text-h5 text-weight-bold q-mt-xs text-primary" data-test="pattern-stats-coverage-value">
               {{ (statistics?.coverage_percentage || 0).toFixed(1) }}%
             </div>
           </q-card-section>
@@ -132,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card
           flat
           :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
+          data-test="pattern-stats-processing-time-card"
         >
           <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">
             <div
@@ -142,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               Processing Time
             </div>
-            <div class="text-h5 text-weight-bold q-mt-xs text-primary">
+            <div class="text-h5 text-weight-bold q-mt-xs text-primary" data-test="pattern-stats-processing-time-value">
               {{ statistics?.extraction_time_ms || 0 }}ms
             </div>
           </q-card-section>

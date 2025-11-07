@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
     class="tw-mb-[0.375rem] cursor-pointer tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
     @click="$emit('click', pattern, index)"
+    :data-test="`pattern-card-${index}`"
   >
     <!-- Header with Rank and Stats - Compact -->
     <q-card-section
@@ -33,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             text-color="white"
             class="text-weight-bold"
+            :data-test="`pattern-card-${index}-rank`"
           >
             {{ index + 1 }}
           </q-avatar>
@@ -51,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   &quot;Courier New&quot;, monospace;
                 font-size: 0.8125rem;
               "
+              :data-test="`pattern-card-${index}-template`"
             >
               {{ pattern.template }}
             </div>
@@ -61,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
               "
+              :data-test="`pattern-card-${index}-info-icon`"
             >
               <q-tooltip
                 anchor="center right"
@@ -83,17 +87,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-caption"
             :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-6'"
           >
-            <span class="text-weight-bold text-primary">{{
+            <span class="text-weight-bold text-primary" :data-test="`pattern-card-${index}-frequency`">{{
               pattern.frequency.toLocaleString()
             }}</span>
             occurrences
             <span class="q-mx-xs">•</span>
-            <span class="text-weight-bold text-primary"
+            <span class="text-weight-bold text-primary" :data-test="`pattern-card-${index}-percentage`"
               >{{ pattern.percentage.toFixed(2) }}%</span
             >
             <span
               v-if="pattern.is_anomaly"
               class="text-negative text-weight-bold q-ml-sm"
+              :data-test="`pattern-card-${index}-anomaly-badge`"
               >⚠️ ANOMALY</span
             >
           </div>
@@ -106,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             round
             flat
             dense
+            :data-test="`pattern-card-${index}-include-btn`"
           >
             <q-icon color="currentColor">
               <EqualIcon></EqualIcon>
@@ -118,12 +124,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             round
             flat
             dense
+            :data-test="`pattern-card-${index}-exclude-btn`"
           >
             <q-icon class="tw-text-[var(--o2-text-color)]">
               <NotEqualIcon></NotEqualIcon>
             </q-icon>
           </q-btn>
-          <q-icon name="info" size="1.0625rem" class="cursor-pointer">
+          <q-icon name="info" size="1.0625rem" class="cursor-pointer" :data-test="`pattern-card-${index}-details-icon`">
             <q-tooltip
               >Show details ({{
                 pattern.examples?.[0]?.variables
