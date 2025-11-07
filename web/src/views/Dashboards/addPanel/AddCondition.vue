@@ -52,7 +52,6 @@
               :streams="getAllSelectedStreams()"
               v-model="condition.column"
               :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
-              class="o2-custom-select-dashboard"
             />
             <q-btn
               size="xs"

@@ -12,8 +12,10 @@
         behavior="menu"
         hide-selected
         fill-input
+        borderless
         @filter="filterFields"
         data-test="stream-field-select"
+        class="o2-custom-select-dashboard"
       >
         <template v-slot:option="scope">
           <q-expansion-item
