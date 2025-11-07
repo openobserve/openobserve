@@ -4,17 +4,21 @@ on:
   push:
     branches:
       - "main"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
   pull_request:
     branches:
       - "*"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   COLUMNS: 150
@@ -44,8 +48,29 @@ env:
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
+  check_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.check_changes.outputs.has_changes }}
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check if relevant code has changes
+        id: check_changes
+        run: |
+          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qvE '\.(md|yml|yaml)$'; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
   build_binary:
     name: build_binary
+    needs: check_changes
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on:
       labels: repo-openobserve-standard-16
 
@@ -404,3 +429,52 @@ jobs:
           name: coverage-report
           path: tests/ui-testing/coverage-report
           retention-days: 7
+
+  playwright_summary:
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs: [check_changes, build_binary, ui_integration_tests, merge_and_upload_reports, generate_coverage_report]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          # If no relevant changes, all tests are skipped - this is success
+          if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
+            echo "No relevant changes detected - tests skipped"
+            exit 0
+          fi
+
+          # If we have changes, check all job results
+          # Accept success or skipped for all jobs
+          BUILD_OK=false
+          UI_OK=false
+          MERGE_OK=false
+          COV_OK=false
+
+          if [ "${{ needs.build_binary.result }}" == "success" ] || [ "${{ needs.build_binary.result }}" == "skipped" ]; then
+            BUILD_OK=true
+          fi
+
+          if [ "${{ needs.ui_integration_tests.result }}" == "success" ] || [ "${{ needs.ui_integration_tests.result }}" == "skipped" ]; then
+            UI_OK=true
+          fi
+
+          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ]; then
+            MERGE_OK=true
+          fi
+
+          if [ "${{ needs.generate_coverage_report.result }}" == "success" ] || [ "${{ needs.generate_coverage_report.result }}" == "skipped" ]; then
+            COV_OK=true
+          fi
+
+          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ] && [ "$COV_OK" == "true" ]; then
+            echo "All Playwright tests completed successfully"
+            exit 0
+          else
+            echo "Playwright tests failed:"
+            echo "  build_binary: ${{ needs.build_binary.result }}"
+            echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
+            echo "  merge_and_upload_reports: ${{ needs.merge_and_upload_reports.result }}"
+            echo "  generate_coverage_report: ${{ needs.generate_coverage_report.result }}"
+            exit 1
+          fi

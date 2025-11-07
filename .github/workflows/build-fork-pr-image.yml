@@ -4,6 +4,10 @@ on:
   repository_dispatch:
     types: [ok-to-test-command]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   AWS_REGION: us-east-1
 
