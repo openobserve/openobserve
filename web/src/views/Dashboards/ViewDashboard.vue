@@ -643,34 +643,24 @@ export default defineComponent({
     // Decode all scoped variables from URL
     const decodedVariables = decodeVariablesFromUrl(route.query);
 
-    // Convert decoded variables to new nested format for scope isolation
+    // Convert decoded variables to the format expected by mergedVariablesValues
     Object.keys(decodedVariables).forEach((varName) => {
       const variable = decodedVariables[varName];
 
       if (variable.scope === 'global') {
-        // Global: store direct value (not nested)
+        // Global: store direct value (string, number, or array for multi-select)
         initialVariableValues.value[varName] = variable.value;
       } else if (variable.scope === 'tabs') {
-        // Tab: Store as nested object with tabId keys for isolation
-        // Structure: { varName: { tabId: value, tabId2: value2 } }
+        // Tab: Store as array of { tabId, value } objects
+        // Structure: { varName: [{ tabId, value }, { tabId2, value2 }] }
         if (Array.isArray(variable.value) && variable.value.length > 0) {
-          initialVariableValues.value[varName] = {};
-          variable.value.forEach((tv: any) => {
-            if (tv.tabId && tv.value !== undefined) {
-              initialVariableValues.value[varName][tv.tabId] = tv.value;
-            }
-          });
+          initialVariableValues.value[varName] = variable.value;
         }
       } else if (variable.scope === 'panels') {
-        // Panel: Store as nested object with panelId keys for isolation
-        // Structure: { varName: { panelId: value, panelId2: value2 } }
+        // Panel: Store as array of { panelId, value } objects
+        // Structure: { varName: [{ panelId, value }, { panelId2, value2 }] }
         if (Array.isArray(variable.value) && variable.value.length > 0) {
-          initialVariableValues.value[varName] = {};
-          variable.value.forEach((pv: any) => {
-            if (pv.panelId && pv.value !== undefined) {
-              initialVariableValues.value[varName][pv.panelId] = pv.value;
-            }
-          });
+          initialVariableValues.value[varName] = variable.value;
         }
       }
     });
