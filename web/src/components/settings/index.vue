@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon="query_stats"
                   :label="t('settings.queryManagement')"
                   content-class="tab_content"
-                  v-if="isMetaOrg"
+                  v-if="config.isEnterprise == 'true' && isMetaOrg"
                 />
                 <q-route-tab
                   v-if="config.isEnterprise == 'true' && isMetaOrg"

@@ -1740,7 +1740,7 @@ export default defineComponent({
 
           // Light mode: make text blue for readability
           body.body--light & {
-            color: var(--o2-menu-color) !important;
+            color: #19191e !important;
           }
         }
         color: var(--o2-menu-color);
@@ -1750,7 +1750,7 @@ export default defineComponent({
           color: var(--o2-menu-color) !important;
 
           .q-icon {
-            color: var(--o2-menu-color) !important;
+            color: #19191e !important;
           }
         }
       }
