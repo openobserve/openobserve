@@ -60,13 +60,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             :rows="visibleRows"
             :columns="columns"
-            row-key="id"
+            row-key="email"
+            selection="multiple"
+            v-model:selected="selectedAccounts"
             :pagination="pagination"
             :filter="filterQuery"
             :style="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
           >
             <template #no-data>
               <NoData></NoData>
+            </template>
+
+            <template v-slot:body-selection="scope">
+              <q-td auto-width>
+                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+              </q-td>
             </template>
 
             <template #body-cell-token="props">
@@ -167,6 +175,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
                   {{ resultTotal }} {{ t('serviceAccounts.header') }}
                 </div>
+                <q-btn
+                  v-if="selectedAccounts.length > 0"
+                  data-test="service-accounts-list-delete-accounts-btn"
+                  class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-secondary-button-dark'
+                      : 'o2-secondary-button-light'
+                  "
+                  no-caps
+                  dense
+                  @click="openBulkDeleteDialog"
+                >
+                  <q-icon name="delete" size="16px" />
+                  <span class="tw-ml-2">Delete</span>
+                </q-btn>
                 <QTablePagination
                   :scope="scope"
                   :resultTotal="resultTotal"
@@ -179,6 +203,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-slot:header="props">
                   <q-tr :props="props">
+                    <!-- Adding this block to render the select-all checkbox -->
+                    <q-th v-if="columns.length > 0" auto-width>
+                      <q-checkbox
+                        v-model="props.selected"
+                        size="sm"
+                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                        class="o2-table-checkbox"
+                      />
+                    </q-th>
+
                     <!-- Rendering the rest of the columns -->
                     <q-th
                       v-for="col in props.cols"
@@ -261,6 +295,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="deleteUser"
           >
             {{ t("user.ok") }}
+          </q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="confirmBulkDelete">
+      <q-card style="width: 280px">
+        <q-card-section class="confirmBody">
+          <div class="head">Delete Service Accounts</div>
+          <div class="para">Are you sure you want to delete {{ selectedAccounts.length }} service account(s)?</div>
+        </q-card-section>
+
+        <q-card-actions class="confirmActions">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+            Cancel
+          </q-btn>
+          <q-btn
+            v-close-popup="true"
+            unelevated
+            no-caps
+            class="no-border"
+            color="primary"
+            @click="bulkDeleteServiceAccounts"
+          >
+            OK
           </q-btn>
         </q-card-actions>
       </q-card>
@@ -375,6 +434,8 @@ export default defineComponent({
     const serviceToken  = ref("");
 
     const serviceAccounts = ref([]);
+    const selectedAccounts: any = ref([]);
+    const confirmBulkDelete = ref(false);
 
     onBeforeMount(()=>{
       getServiceAccountsUsers();
@@ -659,6 +720,54 @@ export default defineComponent({
         });
     };
 
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
+
+    const bulkDeleteServiceAccounts = async () => {
+      const accountEmails = selectedAccounts.value.map((account: any) => account.email);
+
+      try {
+        const res = await service_accounts.bulkDelete(
+          store.state.selectedOrganization.identifier,
+          { ids: accountEmails }
+        );
+        const { successful, unsuccessful } = res.data;
+
+        if (successful.length > 0 && unsuccessful.length === 0) {
+          $q.notify({
+            color: "positive",
+            message: `Successfully deleted ${successful.length} service account(s)`,
+            timeout: 2000,
+          });
+        } else if (successful.length > 0 && unsuccessful.length > 0) {
+          $q.notify({
+            color: "warning",
+            message: `Deleted ${successful.length} service account(s), but ${unsuccessful.length} failed`,
+            timeout: 3000,
+          });
+        } else if (unsuccessful.length > 0) {
+          $q.notify({
+            color: "negative",
+            message: `Failed to delete ${unsuccessful.length} service account(s)`,
+            timeout: 2000,
+          });
+        }
+
+        selectedAccounts.value = [];
+        confirmBulkDelete.value = false;
+        await getServiceAccountsUsers();
+      } catch (err: any) {
+        if (err?.response?.status !== 403) {
+          $q.notify({
+            color: "negative",
+            message: err?.response?.data?.message || "Error while deleting service accounts",
+            timeout: 2000,
+          });
+        }
+      }
+    };
+
     const refreshServiceToken = async (row:any,fromColum = true) =>{
       if(fromColum) row.isLoading = true;
       await service_accounts.refresh_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
@@ -800,6 +909,10 @@ export default defineComponent({
       confirmRefresh,
       visibleRows,
       hasVisibleRows,
+      selectedAccounts,
+      confirmBulkDelete,
+      openBulkDeleteDialog,
+      bulkDeleteServiceAccounts,
     };
   },
 });
