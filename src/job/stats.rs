@@ -112,18 +112,28 @@ async fn update_node_disk_usage() -> Result<(), anyhow::Error> {
 
     loop {
         let disks = config::utils::sysinfo::disk::get_disk_usage();
-        // Find the disk that contains the data directory
+        // Sum up all disks that contain subdirectories of the data directory
+        // This handles cases where multiple disks are mounted at different subpaths
+        let mut total_space = 0_u64;
+        let mut total_available = 0_u64;
+
         for disk in disks {
             if data_dir.starts_with(&disk.mount_point) {
-                config::metrics::NODE_DISK_TOTAL
-                    .with_label_values::<&str>(&[])
-                    .set(disk.total_space as i64);
-                config::metrics::NODE_DISK_USAGE
-                    .with_label_values::<&str>(&[])
-                    .set((disk.total_space - disk.available_space) as i64);
-                break;
+                total_space += disk.total_space;
+                total_available += disk.available_space;
             }
         }
+
+        // Only update metrics if we found at least one matching disk
+        if total_space > 0 {
+            config::metrics::NODE_DISK_TOTAL
+                .with_label_values::<&str>(&[])
+                .set(total_space as i64);
+            config::metrics::NODE_DISK_AVAILABLE
+                .with_label_values::<&str>(&[])
+                .set(total_available as i64);
+        }
+
         tokio::time::sleep(time::Duration::from_secs(60)).await;
     }
 }
