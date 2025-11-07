@@ -394,13 +394,25 @@ export default defineComponent({
 
     // Shared variables values across all levels for dependency resolution
     // New structure: {
-    //   variableName: value (for global vars)
+    //   variableName: value || [] (for global vars - can be array for multi-select)
     //   OR
-    //   variableName: { tabId: value, tabId2: value2 } (for tab-scoped vars)
+    //   variableName: [{ tabId, value: value || [] }] (for tab-scoped vars - array of tab values)
     //   OR
-    //   variableName: { panelId: value, panelId2: value2 } (for panel-scoped vars)
+    //   variableName: [{ panelId, value: value || [] }] (for panel-scoped vars - array of panel values)
     // }
     const mergedVariablesValues = ref({});
+
+    // Helper to check if value is a scoped array (tab/panel scoped)
+    const isScopedArray = (value: any): boolean => {
+      if (!Array.isArray(value)) return false;
+      if (value.length === 0) return false;
+      // Check if first element has tabId or panelId property
+      return (
+        typeof value[0] === 'object' &&
+        value[0] !== null &&
+        ('tabId' in value[0] || 'panelId' in value[0])
+      );
+    };
 
     // Helper to get variable value based on current context (tab/panel)
     const getContextualVariableValue = (
@@ -411,24 +423,35 @@ export default defineComponent({
 
       if (storedValue === undefined) return undefined;
 
-      // If value is not an object, it's a global variable
+      // If value is not an array or object, it's a simple global variable (string, number, etc)
       if (typeof storedValue !== 'object' || storedValue === null) {
         return storedValue;
       }
 
-      // Check if it's a tab-scoped or panel-scoped variable
-      // Priority: panelId > tabId > first available value
-      if (context?.panelId && storedValue[context.panelId] !== undefined) {
-        return storedValue[context.panelId];
+      // Check if it's a scoped array (tab/panel scoped with structure like [{ tabId, value }])
+      if (isScopedArray(storedValue)) {
+        // Priority: panelId > tabId > first available value
+        if (context?.panelId) {
+          const panelEntry = storedValue.find((entry: any) => entry.panelId === context.panelId);
+          if (panelEntry !== undefined) return panelEntry.value;
+        }
+
+        if (context?.tabId) {
+          const tabEntry = storedValue.find((entry: any) => entry.tabId === context.tabId);
+          if (tabEntry !== undefined) return tabEntry.value;
+        }
+
+        // Fallback: return first available value
+        return storedValue.length > 0 ? storedValue[0].value : undefined;
       }
 
-      if (context?.tabId && storedValue[context.tabId] !== undefined) {
-        return storedValue[context.tabId];
+      // If it's an array but not scoped, it's a global multi-select variable - return as is
+      if (Array.isArray(storedValue)) {
+        return storedValue;
       }
 
-      // Fallback: return first available value (shouldn't happen in normal flow)
-      const values = Object.values(storedValue);
-      return values.length > 0 ? values[0] : undefined;
+      // If we reach here, it's some other object - return as is (shouldn't happen)
+      return storedValue;
     };
 
     // Wrapper for passing to child components (they expect {value: {...}})
@@ -1021,19 +1044,34 @@ export default defineComponent({
 
       // Update merged state only if values changed or first load
       if (isFirstLoad || hasActualChanges) {
-        // Store values with tab isolation
+        // Store values with tab isolation using array structure
         Object.keys(currentTabValues).forEach((varName) => {
-          const varValue = currentTabValues[varName];
+          const varValue = currentTabValues[varName]; // Can be string, number, or array (for multi-select)
 
-          // Initialize as object if not exists or is not an object (migration from old format)
-          if (!mergedVariablesValues.value[varName] ||
-              typeof mergedVariablesValues.value[varName] !== 'object' ||
-              Array.isArray(mergedVariablesValues.value[varName])) {
-            mergedVariablesValues.value[varName] = {};
+          // Check if this variable already has a scoped array structure
+          const existingValue = mergedVariablesValues.value[varName];
+
+          if (!existingValue || !isScopedArray(existingValue)) {
+            // Initialize as scoped array if it doesn't exist or isn't already a scoped array
+            mergedVariablesValues.value[varName] = [];
           }
 
-          // Store with tab ID as key for isolation
-          mergedVariablesValues.value[varName][currentTabId] = varValue;
+          // Find if an entry for this tab already exists
+          const existingEntryIndex = mergedVariablesValues.value[varName].findIndex(
+            (entry: any) => entry.tabId === currentTabId
+          );
+
+          // Update or add the entry for this tab
+          if (existingEntryIndex >= 0) {
+            // Update existing entry
+            mergedVariablesValues.value[varName][existingEntryIndex].value = varValue;
+          } else {
+            // Add new entry
+            mergedVariablesValues.value[varName].push({
+              tabId: currentTabId,
+              value: varValue, // Preserve array structure for multi-select
+            });
+          }
         });
 
         // Track last values for this tab
@@ -1109,19 +1147,34 @@ export default defineComponent({
 
       // Update merged state only if values changed or first load
       if (isFirstLoad || hasActualChanges) {
-        // Store values with panel isolation
+        // Store values with panel isolation using array structure
         Object.keys(currentPanelValues).forEach((varName) => {
-          const varValue = currentPanelValues[varName];
+          const varValue = currentPanelValues[varName]; // Can be string, number, or array (for multi-select)
 
-          // Initialize as object if not exists or is not an object (migration from old format)
-          if (!mergedVariablesValues.value[varName] ||
-              typeof mergedVariablesValues.value[varName] !== 'object' ||
-              Array.isArray(mergedVariablesValues.value[varName])) {
-            mergedVariablesValues.value[varName] = {};
+          // Check if this variable already has a scoped array structure
+          const existingValue = mergedVariablesValues.value[varName];
+
+          if (!existingValue || !isScopedArray(existingValue)) {
+            // Initialize as scoped array if it doesn't exist or isn't already a scoped array
+            mergedVariablesValues.value[varName] = [];
           }
 
-          // Store with panel ID as key for isolation
-          mergedVariablesValues.value[varName][panelId] = varValue;
+          // Find if an entry for this panel already exists
+          const existingEntryIndex = mergedVariablesValues.value[varName].findIndex(
+            (entry: any) => entry.panelId === panelId
+          );
+
+          // Update or add the entry for this panel
+          if (existingEntryIndex >= 0) {
+            // Update existing entry
+            mergedVariablesValues.value[varName][existingEntryIndex].value = varValue;
+          } else {
+            // Add new entry
+            mergedVariablesValues.value[varName].push({
+              panelId: panelId,
+              value: varValue, // Preserve array structure for multi-select
+            });
+          }
         });
 
         // Track last values for this panel
