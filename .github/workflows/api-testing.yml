@@ -4,17 +4,17 @@ on:
   push:
     branches:
       - "main"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
   pull_request:
     branches:
       - "*"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -161,3 +161,19 @@ jobs:
           # Kill the server
           kill $SERVER_PID_DEFAULT || true
         working-directory: tests/api-testing/
+
+  api_tests_summary:
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs: [api_integration_tests]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.api_integration_tests.result }}" == "success" ] || [ "${{ needs.api_integration_tests.result }}" == "skipped" ]; then
+            echo "API tests passed or skipped"
+            exit 0
+          else
+            echo "API tests failed"
+            exit 1
+          fi

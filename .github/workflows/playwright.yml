@@ -438,18 +438,43 @@ jobs:
     steps:
       - name: Check test results
         run: |
+          # If no relevant changes, all tests are skipped - this is success
           if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
             echo "No relevant changes detected - tests skipped"
             exit 0
           fi
 
-          if [ "${{ needs.build_binary.result }}" == "success" ] && \
-             ([ "${{ needs.ui_integration_tests.result }}" == "success" ] || [ "${{ needs.ui_integration_tests.result }}" == "skipped" ]) && \
-             ([ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ]) && \
-             ([ "${{ needs.generate_coverage_report.result }}" == "success" ] || [ "${{ needs.generate_coverage_report.result }}" == "skipped" ]); then
+          # If we have changes, check all job results
+          # Accept success or skipped for all jobs
+          BUILD_OK=false
+          UI_OK=false
+          MERGE_OK=false
+          COV_OK=false
+
+          if [ "${{ needs.build_binary.result }}" == "success" ] || [ "${{ needs.build_binary.result }}" == "skipped" ]; then
+            BUILD_OK=true
+          fi
+
+          if [ "${{ needs.ui_integration_tests.result }}" == "success" ] || [ "${{ needs.ui_integration_tests.result }}" == "skipped" ]; then
+            UI_OK=true
+          fi
+
+          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ]; then
+            MERGE_OK=true
+          fi
+
+          if [ "${{ needs.generate_coverage_report.result }}" == "success" ] || [ "${{ needs.generate_coverage_report.result }}" == "skipped" ]; then
+            COV_OK=true
+          fi
+
+          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ] && [ "$COV_OK" == "true" ]; then
             echo "All Playwright tests completed successfully"
             exit 0
           else
-            echo "Playwright tests failed"
+            echo "Playwright tests failed:"
+            echo "  build_binary: ${{ needs.build_binary.result }}"
+            echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
+            echo "  merge_and_upload_reports: ${{ needs.merge_and_upload_reports.result }}"
+            echo "  generate_coverage_report: ${{ needs.generate_coverage_report.result }}"
             exit 1
           fi
