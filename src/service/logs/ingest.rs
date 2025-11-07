@@ -279,19 +279,26 @@ pub async fn ingest(
 
         // Use parallel or sequential processing based on batch size
         if extended_items.len() >= PARALLEL_THRESHOLD {
-            // Parallel processing for large batches
+            // Parallel processing for large batches - use spawn_blocking to avoid blocking async runtime
             use rayon::prelude::*;
 
-            // Thread-safe accumulators
-            let failed_count = std::sync::atomic::AtomicU32::new(0);
-            let error_msg = parking_lot::Mutex::new(String::new());
-            let total_size = std::sync::atomic::AtomicUsize::new(0);
+            // Clone data needed in the blocking task
+            let org_id_owned = org_id.to_string();
+            let stream_name_owned = stream_name.clone();
+            let user_defined_schema_map_clone = user_defined_schema_map.clone();
 
-            // Process items in parallel using rayon
-            let results: Vec<_> = extended_items
-                .into_par_iter()
-                .enumerate()
-                .filter_map(|(idx, item)| {
+            // Move the heavy compute work to a blocking thread pool
+            let (results, failed, total_size, error_message) = tokio::task::spawn_blocking(move || {
+                // Thread-safe accumulators
+                let failed_count = std::sync::atomic::AtomicU32::new(0);
+                let error_msg = parking_lot::Mutex::new(String::new());
+                let total_size = std::sync::atomic::AtomicUsize::new(0);
+
+                // Process items in parallel using rayon
+                let results: Vec<_> = extended_items
+                    .into_par_iter()
+                    .enumerate()
+                    .filter_map(|(idx, item)| {
                     // Calculate size
                     let item_size = estimate_json_bytes(&item);
                     total_size.fetch_add(item_size, std::sync::atomic::Ordering::Relaxed);
@@ -329,9 +336,9 @@ pub async fn ingest(
                             *err = err_str.clone();
                             metrics::INGEST_ERRORS
                                 .with_label_values(&[
-                                    org_id,
+                                    org_id_owned.as_str(),
                                     StreamType::Logs.as_str(),
-                                    &stream_name,
+                                    stream_name_owned.as_str(),
                                     TS_PARSE_FAILED,
                                 ])
                                 .inc();
@@ -346,7 +353,7 @@ pub async fn ingest(
                         _ => unreachable!(),
                     };
 
-                    if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
+                    if let Some(Some(fields)) = user_defined_schema_map_clone.get(&stream_name_owned) {
                         local_val = crate::service::ingestion::refactor_map(local_val, fields);
                     }
 
@@ -354,8 +361,8 @@ pub async fn ingest(
                     if needs_original && let Some(original_data) = original_data {
                         local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
                         let record_id = crate::service::ingestion::generate_record_id(
-                            org_id,
-                            &stream_name,
+                            &org_id_owned,
+                            &stream_name_owned,
                             &StreamType::Logs,
                         );
                         local_val.insert(
@@ -386,21 +393,30 @@ pub async fn ingest(
                         );
                     }
 
-                    // Return with original index to maintain order
-                    Some((idx, timestamp, local_val))
-                })
-                .collect();
+                        // Return with original index to maintain order
+                        Some((idx, timestamp, local_val))
+                    })
+                    .collect();
+
+                // Extract values to return from spawn_blocking
+                let failed = failed_count.load(std::sync::atomic::Ordering::Relaxed);
+                let size = total_size.load(std::sync::atomic::Ordering::Relaxed);
+                let error = error_msg.lock().clone();
+
+                (results, failed, size, error)
+            })
+            .await
+            .expect("spawn_blocking task panicked");
 
             // Update stream status with failed count
-            let failed = failed_count.load(std::sync::atomic::Ordering::Relaxed);
             stream_status.status.failed += failed;
             if failed > 0 {
-                stream_status.status.error = error_msg.lock().clone();
+                stream_status.status.error = error_message;
             }
 
             // Update size
             let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
-            *_size += total_size.load(std::sync::atomic::Ordering::Relaxed);
+            *_size += total_size;
 
             // Reconstruct results in original order
             let (ts_data, fn_num) = json_data_by_stream
