@@ -469,11 +469,7 @@ pub async fn get_customer_tax_id(
 ) -> impl Responder {
     let org_id = path.into_inner();
     let email = user_email.user_id.as_str();
-    log::info!(
-        "[API:TAX_ID] GET request - org: {}, email: {}",
-        org_id,
-        email
-    );
+    log::info!("[API:TAX_ID] GET request - org: {org_id}, email: {email}");
 
     if organization::get_org(&org_id).await.is_none() {
         log::warn!("[API:TAX_ID] Organization not found: {}", org_id);
@@ -490,7 +486,7 @@ pub async fn get_customer_tax_id(
             HttpResponse::Ok().json(body)
         }
         Err(e) => {
-            log::error!("[API:TAX_ID] Error retrieving tax info: {:?}", e);
+            log::error!("[API:TAX_ID] Error retrieving tax info: {e:?}");
             e.into_http_response()
         }
     }
@@ -525,9 +521,7 @@ pub async fn update_customer_tax_id(
     let org_id = path.into_inner();
     let email = user_email.user_id.as_str();
     log::info!(
-        "[API:TAX_ID] POST request - org: {}, email: {}, country: {}",
-        org_id,
-        email,
+        "[API:TAX_ID] POST request - org: {org_id}, email: {email}, country: {}",
         body.country
     );
 
@@ -538,13 +532,12 @@ pub async fn update_customer_tax_id(
 
     // Map country code to Stripe TaxIdType
     let tax_id_type = match map_country_to_tax_id_type(&body.country) {
-        Some(t) => {
+        Some(tax_id_type) => {
             log::info!(
-                "[API:TAX_ID] Mapped country {} to tax type: {:?}",
+                "[API:TAX_ID] Mapped country {} to tax type: {tax_id_type:?}",
                 body.country,
-                t
             );
-            t
+            tax_id_type
         }
         None => {
             log::warn!("[API:TAX_ID] Unsupported country code: {}", body.country);
@@ -563,17 +556,14 @@ pub async fn update_customer_tax_id(
     .await
     {
         Ok(()) => {
-            log::info!(
-                "[API:TAX_ID] Successfully updated tax ID for org: {}",
-                org_id
-            );
+            log::info!("[API:TAX_ID] Successfully updated tax ID for org: {org_id}");
             HttpResponse::Ok().json(json::json!({
                 "status": "success",
                 "message": "Tax ID updated successfully"
             }))
         }
         Err(e) => {
-            log::error!("[API:TAX_ID] Error updating tax ID: {:?}", e);
+            log::error!("[API:TAX_ID] Error updating tax ID: {e:?}");
             e.into_http_response()
         }
     }
