@@ -39,7 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="arrow_forward" class="view-arrow-icon" />
                 <router-link
                   exact
-                  :to="{ name: 'logstreams' }"
+                  :to="{
+                    name: 'logstreams',
+                    query: { org_identifier: store.state.selectedOrganization?.identifier }
+                  }"
                   class="absolute full-width full-height"
                   aria-label="Navigate to streams page"
                 ></router-link>
@@ -228,7 +231,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
                       exact
-                      :to="{ name: 'functionList' }"
+                      :to="{
+                        name: 'functionList',
+                        query: { org_identifier: store.state.selectedOrganization?.identifier }
+                      }"
                       class="absolute full-width full-height"
                       aria-label="Navigate to functions page"
                     ></router-link>
@@ -262,7 +268,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
                       exact
-                      :to="{ name: 'dashboards' }"
+                      :to="{
+                        name: 'dashboards',
+                        query: { org_identifier: store.state.selectedOrganization?.identifier }
+                      }"
                       class="absolute full-width full-height"
                       aria-label="Navigate to dashboards page"
                     ></router-link>
@@ -295,7 +304,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
-                    :to="{ name: 'alertList' }"
+                    :to="{
+                      name: 'alertList',
+                      query: { org_identifier: store.state.selectedOrganization?.identifier }
+                    }"
                     class="absolute full-width full-height"
                     aria-label="Navigate to alerts page"
                   ></router-link>
@@ -340,7 +352,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
-                    :to="{ name: 'pipelines' }"
+                    :to="{
+                      name: 'pipelines',
+                      query: { org_identifier: store.state.selectedOrganization?.identifier }
+                    }"
                     class="absolute full-width full-height"
                     aria-label="Navigate to pipelines page"
                   ></router-link>
