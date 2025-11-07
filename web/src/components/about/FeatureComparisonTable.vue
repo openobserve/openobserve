@@ -23,9 +23,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <h3 class="feature-title">Feature Comparison</h3>
       </div>
-      <p class="feature-subtitle">
-        Compare features across Open Source, Enterprise, and Cloud offerings
-      </p>
+      <div class="feature-subtitle-wrapper">
+        <p class="feature-subtitle">
+          <span v-if="currentPlanName">
+            You are currently on the
+            <strong>{{ currentPlanName }}</strong> plan.
+          </span>
+          <span v-else>
+            Compare features across Open Source, Enterprise, and Cloud offerings
+          </span>
+        </p>
+        <p
+          v-if="store.state.zoConfig.build_type === 'opensource'"
+          class="enterprise-promotion"
+        >
+          Try our <strong>Enterprise plan</strong> - free for up to 200GB/day
+          ingestion and search with advanced features like SSO, RBAC, and more!
+        </p>
+      </div>
     </div>
 
     <div class="table-wrapper">
@@ -44,7 +59,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td key="name" :props="props" class="feature-name-cell">
               {{ props.row.name }}
             </q-td>
-            <q-td key="opensource" :props="props" class="feature-value-cell">
+            <q-td
+              key="opensource"
+              :props="props"
+              class="feature-value-cell"
+              :class="{
+                'highlighted-column':
+                  store.state.zoConfig.build_type === 'opensource',
+              }"
+            >
               <span v-if="props.row.values.opensource === true" class="status-icon status-available">
                 ✅
               </span>
@@ -55,7 +78,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ props.row.values.opensource }}
               </span>
             </q-td>
-            <q-td key="enterprise" :props="props" class="feature-value-cell">
+            <q-td
+              key="enterprise"
+              :props="props"
+              class="feature-value-cell"
+              :class="{
+                'highlighted-column':
+                  store.state.zoConfig.build_type === 'enterprise',
+              }"
+            >
               <span v-if="props.row.values.enterprise === true" class="status-icon status-available">
                 ✅
               </span>
@@ -85,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
 import type { QTableColumn } from "quasar";
 
@@ -182,7 +213,7 @@ export default defineComponent({
         { name: 'Audit trail', values: { opensource: false, enterprise: true, cloud: true } },
         { name: 'Action Scripts', values: { opensource: false, enterprise: true, cloud: true } },
         { name: 'Cipher keys (HIPAA, PCI compliance)', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Sensitive data redaction using vectorscan', values: { opensource: false, enterprise: true, cloud: true } },
+        { name: 'Sensitive data redaction', values: { opensource: false, enterprise: true, cloud: true } },
         { name: 'Ability to influence roadmap', values: { opensource: false, enterprise: true, cloud: '✅ on enterprise plan' } },
         { name: 'License', values: { opensource: 'AGPL', enterprise: 'Enterprise', cloud: 'Cloud' } },
         { name: 'Support', values: { opensource: 'Community', enterprise: 'Enterprise', cloud: 'Cloud' } },
@@ -193,11 +224,18 @@ export default defineComponent({
       ]
     };
 
+    const currentPlanName = computed(() => {
+      const buildType = store.state.zoConfig.build_type;
+      const edition = featureData.editions.find((ed) => ed.id === buildType);
+      return edition ? edition.name : "";
+    });
+
     return {
       store,
       featureData,
       columns,
-      pagination
+      pagination,
+      currentPlanName,
     };
   }
 });
@@ -235,11 +273,38 @@ export default defineComponent({
       letter-spacing: -0.02em;
     }
 
-    .feature-subtitle {
-      font-size: 0.9375rem;
-      line-height: 1.8;
-      opacity: 0.8;
-      margin-bottom: 0;
+    .feature-subtitle-wrapper {
+      .feature-subtitle {
+        font-size: 0.9375rem;
+        line-height: 1.8;
+        opacity: 0.8;
+        margin-bottom: 0;
+
+        strong {
+          font-weight: 600;
+          opacity: 1;
+        }
+      }
+
+      .enterprise-promotion {
+        font-size: 0.9375rem;
+        line-height: 1.8;
+        margin-top: 0.5rem;
+        margin-bottom: 0;
+        padding: 0.75rem 1rem;
+        background: linear-gradient(
+          135deg,
+          rgba(76, 175, 80, 0.1),
+          rgba(33, 150, 243, 0.1)
+        );
+        border-left: 3px solid #4caf50;
+        border-radius: 0.375rem;
+
+        strong {
+          font-weight: 600;
+          color: #4caf50;
+        }
+      }
     }
   }
 
@@ -279,6 +344,21 @@ export default defineComponent({
         color: var(--q-text-color);
         display: block;
         padding: 0 0.5rem;
+      }
+
+      &.highlighted-column {
+        background-color: color-mix(in srgb, var(--o2-theme-color) 15%, var(--o2-theme-mode) 85%);
+        font-weight: 500;
+        position: relative;
+
+        &::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 3px;
+        }
       }
     }
   }

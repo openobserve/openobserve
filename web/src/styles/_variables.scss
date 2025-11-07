@@ -338,12 +338,15 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-border-color: rgba(0, 0, 0, 0.12);
   --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
 
-  --o2-menu-gradient-start: rgba(89, 155, 174, 0.04);
-  --o2-menu-gradient-end: rgba(89, 155, 174, 0.08);
+  --o2-menu-gradient-start: rgba(89, 175, 199, 0.3);
+  --o2-menu-gradient-end: rgba(48, 193, 233, 0.3);
   --o2-menu-border-color: rgba(89, 155, 174, 0.6);
   --o2-menu-color: #3F7994;
 
+
   --o2-table-header-bg: color-mix(in srgb, #{$theme-color} 20%, white);
+
+  --o2-table-actions-bg: white;
 
   --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, white);
   --o2-tab-text-color: #{$o2-gray-1400};
@@ -422,12 +425,15 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-border-color: rgba(255, 255, 255, 0.40);
   --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
 
-  --o2-menu-gradient-start: rgba(89, 155, 174, 0.04);
-  --o2-menu-gradient-end: rgba(158, 215, 231, 0.08);
+  --o2-menu-gradient-start: rgba(89, 155, 174, 0.3);
+  --o2-menu-gradient-end: rgba(48, 193, 233, 0.3);
   --o2-menu-border-color: #3F7994;
   --o2-menu-color: #FFFFFF;
 
   --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
+
+    --o2-table-actions-bg: #1f2223;
+
 
   --o2-tab-bg: color-mix(in srgb, white 20%, var(--o2-theme-color));
   --o2-tab-text-color: #{$o2-gray-100};

@@ -2487,39 +2487,58 @@ export default defineComponent({
     };
 
     const downloadLogs = async (data, format) => {
-      let filename = "logs-data";
-      let dataobj;
-      if (format === "csv") {
-        filename += ".csv";
-        dataobj = await json2csv(data);
-      } else {
-        filename += ".json";
-        dataobj = JSON.stringify(data, null, 2);
-      }
-      if (dataobj.length === 0) {
+      //here we are using a package json2csv which converts json to csv data
+      //why package because we faced one issue where user has , in some of the fields so
+      //it is treating it as seperate fields
+      //eg: {body:"hey this is the email body , with some info in it "}
+      //after converting it will treat hey this is the email body this as the body and remaining will be the next column
+      //to solve this issue we are using json2csv package
+      try {
+        let filename = "logs-data";
+        let dataobj;
+        const options = {
+          emptyFieldValue: "",
+        };
+
+        if (format === "csv") {
+          filename += ".csv";
+          dataobj = await json2csv(data, options);
+        } else {
+          filename += ".json";
+          dataobj = JSON.stringify(data, null, 2);
+        }
+        if (dataobj.length === 0) {
+          $q.notify({
+            type: "negative",
+            message: "No data available to download.",
+          });
+          return;
+        }
+        if (format === "csv") {
+          dataobj = new Blob([dataobj], { type: "text/csv" });
+        } else {
+          dataobj = new Blob([dataobj], { type: "application/json" });
+        }
+        const file = new File([dataobj], filename, {
+          type: format === "csv" ? "text/csv" : "application/json",
+        });
+        const url = URL.createObjectURL(file);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showDownloadMenu.value = false;
+      } catch (error) {
+        showDownloadMenu.value = false;
         $q.notify({
           type: "negative",
-          message: "No data available to download.",
+          message: "Error downloading logs",
+          timeout: 2000,
         });
-        return;
       }
-      if (format === "csv") {
-        dataobj = new Blob([dataobj], { type: "text/csv" });
-      } else {
-        dataobj = new Blob([dataobj], { type: "application/json" });
-      }
-      const file = new File([dataobj], filename, {
-        type: format === "csv" ? "text/csv" : "application/json",
-      });
-      const url = URL.createObjectURL(file);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      showDownloadMenu.value = false;
     };
 
     onMounted(async () => {
@@ -3117,6 +3136,8 @@ export default defineComponent({
               try {
                 searchObj.loading = true;
                 searchObj.meta.refreshHistogram = true;
+                // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
+                searchObj.communicationMethod = "streaming";
                 await extractFields();
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
@@ -3137,7 +3158,7 @@ export default defineComponent({
               searchObj.data.stream.selectedFields =
                 extractedObj.data.resultGrid.colOrder[
                   searchObj.data.stream.selectedStream
-                ];
+                ].filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || '_timestamp'));
             } else {
               searchObj.data.stream.selectedFields =
                 extractedObj.data.stream.selectedFields;
@@ -3790,17 +3811,17 @@ export default defineComponent({
           searchObj.data?.queryResults?.hits &&
           searchObj.data.queryResults.hits.length > 0;
 
-        console.log("[SearchBar] Switching patterns → logs, hasLogs:", hasLogs);
+        // console.log("[SearchBar] Switching patterns → logs, hasLogs:", hasLogs);
 
         if (!hasLogs) {
           // No logs data - fetch them
-          console.log("[SearchBar] Fetching logs data");
+          // console.log("[SearchBar] Fetching logs data");
           searchObj.loading = true;
           searchObj.meta.refreshHistogram = true;
           getQueryData();
         } else {
           // Logs exist - just switch the view
-          console.log("[SearchBar] Reusing existing logs data");
+          // console.log("[SearchBar] Reusing existing logs data");
         }
       } else if (
         value == "patterns" &&
@@ -3809,7 +3830,7 @@ export default defineComponent({
       ) {
         // Switching to patterns mode - this will be handled by a separate watcher in Index.vue
         emit("extractPatterns");
-        console.log("[SearchBar] Switching to patterns mode");
+        // console.log("[SearchBar] Switching to patterns mode");
       } else if (
         value == "visualize" &&
         searchObj.meta.logsVisualizeToggle == "logs"

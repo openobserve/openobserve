@@ -456,9 +456,8 @@ pub async fn run_datafusion(
                     .build()
             )
         );
-        let mut scan_stats = visit.scan_stats;
         // Update scan stats to include aggregation cache ratio
-        scan_stats.aggs_cache_ratio = aggs_cache_ratio;
+        visit.scan_stats.aggs_cache_ratio = aggs_cache_ratio;
         ret.map(|data| {
             check_query_default_limit_exceeded(
                 data.iter().fold(0, |acc, batch| acc + batch.num_rows()),

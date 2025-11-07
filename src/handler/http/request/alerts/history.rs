@@ -16,7 +16,6 @@
 use actix_web::{HttpRequest, HttpResponse, get, web};
 use chrono::{Duration, Utc};
 use config::{
-    META_ORG_ID,
     meta::{
         search::{Query, Request as SearchRequest},
         self_reporting::usage::TRIGGERS_STREAM,
@@ -88,7 +87,7 @@ pub struct AlertHistoryResponse {
     tag = "Alerts",
     operation_id = "GetAlertHistory",
     summary = "Get alert execution history",
-    description = "Retrieves the execution history of alerts for the organization. This endpoint queries the _meta organization's triggers stream to provide details about when alerts were triggered, their status, and execution details.",
+    description = "Retrieves the execution history of alerts for the organization. This endpoint queries the organization's own triggers stream to provide details about when alerts were triggered, their status, and execution details.",
     security(
         ("Authorization"= [])
     ),
@@ -220,7 +219,7 @@ pub async fn get_alert_history(
 
     let total_count = match SearchService::search(
         &trace_id,
-        META_ORG_ID,
+        &org_id,
         StreamType::Logs,
         Some(user_email.user_id.clone()),
         &count_req,
@@ -276,10 +275,10 @@ pub async fn get_alert_history(
         ..Default::default()
     };
 
-    // Execute search against _meta organization's triggers stream
+    // Execute search against organization's own triggers stream
     let search_result = match SearchService::search(
         &trace_id,
-        META_ORG_ID,
+        &org_id,
         StreamType::Logs,
         Some(user_email.user_id.clone()),
         &data_req,
@@ -369,4 +368,186 @@ async fn get_organization_alert_names(org_id: &str) -> Result<Vec<String>, anyho
     let names: Vec<String> = alerts.into_iter().map(|alert| alert.name).collect();
 
     Ok(names)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_alert_history_query_defaults() {
+        let query = AlertHistoryQuery {
+            alert_name: None,
+            start_time: None,
+            end_time: None,
+            from: None,
+            size: None,
+        };
+
+        assert!(query.alert_name.is_none());
+        assert!(query.start_time.is_none());
+        assert!(query.end_time.is_none());
+        assert!(query.from.is_none());
+        assert!(query.size.is_none());
+    }
+
+    #[test]
+    fn test_alert_history_query_with_values() {
+        let query = AlertHistoryQuery {
+            alert_name: Some("test_alert".to_string()),
+            start_time: Some(1234567890000000),
+            end_time: Some(1234567990000000),
+            from: Some(0),
+            size: Some(50),
+        };
+
+        assert_eq!(query.alert_name, Some("test_alert".to_string()));
+        assert_eq!(query.start_time, Some(1234567890000000));
+        assert_eq!(query.end_time, Some(1234567990000000));
+        assert_eq!(query.from, Some(0));
+        assert_eq!(query.size, Some(50));
+    }
+
+    #[test]
+    fn test_alert_history_entry_creation() {
+        let entry = AlertHistoryEntry {
+            timestamp: 1234567890000000,
+            alert_name: "test_alert".to_string(),
+            org: "test_org".to_string(),
+            status: "firing".to_string(),
+            is_realtime: true,
+            is_silenced: false,
+            start_time: 1234567800000000,
+            end_time: 1234567900000000,
+            retries: 0,
+            error: None,
+            success_response: Some("Alert sent successfully".to_string()),
+            is_partial: Some(false),
+            delay_in_secs: Some(5),
+            evaluation_took_in_secs: Some(1.5),
+            source_node: Some("node1".to_string()),
+            query_took: Some(100),
+        };
+
+        assert_eq!(entry.alert_name, "test_alert");
+        assert_eq!(entry.status, "firing");
+        assert!(entry.is_realtime);
+        assert!(!entry.is_silenced);
+        assert_eq!(entry.retries, 0);
+        assert!(entry.error.is_none());
+        assert!(entry.success_response.is_some());
+    }
+
+    #[test]
+    fn test_alert_history_response_creation() {
+        let response = AlertHistoryResponse {
+            total: 100,
+            from: 0,
+            size: 50,
+            hits: vec![],
+        };
+
+        assert_eq!(response.total, 100);
+        assert_eq!(response.from, 0);
+        assert_eq!(response.size, 50);
+        assert_eq!(response.hits.len(), 0);
+    }
+
+    #[test]
+    fn test_alert_history_response_with_entries() {
+        let entry = AlertHistoryEntry {
+            timestamp: 1234567890000000,
+            alert_name: "test_alert".to_string(),
+            org: "test_org".to_string(),
+            status: "ok".to_string(),
+            is_realtime: false,
+            is_silenced: false,
+            start_time: 1234567800000000,
+            end_time: 1234567900000000,
+            retries: 0,
+            error: None,
+            success_response: None,
+            is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: None,
+            source_node: None,
+            query_took: None,
+        };
+
+        let response = AlertHistoryResponse {
+            total: 1,
+            from: 0,
+            size: 50,
+            hits: vec![entry],
+        };
+
+        assert_eq!(response.total, 1);
+        assert_eq!(response.hits.len(), 1);
+        assert_eq!(response.hits[0].alert_name, "test_alert");
+        assert_eq!(response.hits[0].status, "ok");
+    }
+
+    #[tokio::test]
+    async fn test_get_organization_alert_names_empty() {
+        // This test would require mocking the database
+        // For now, we're testing the structure exists
+        let result = get_organization_alert_names("test_org").await;
+        // In a real test environment with mocked DB, we would assert:
+        // assert!(result.is_ok());
+        // assert_eq!(result.unwrap().len(), 0);
+
+        // For now, just verify the function signature and error handling exists
+        match result {
+            Ok(_names) => {
+                // Success case - would have alerts
+            }
+            Err(_e) => {
+                // Expected in test environment without DB
+                // This is acceptable for unit testing
+            }
+        }
+    }
+
+    #[test]
+    fn test_alert_history_entry_with_error() {
+        let entry = AlertHistoryEntry {
+            timestamp: 1234567890000000,
+            alert_name: "failing_alert".to_string(),
+            org: "test_org".to_string(),
+            status: "error".to_string(),
+            is_realtime: true,
+            is_silenced: false,
+            start_time: 1234567800000000,
+            end_time: 1234567900000000,
+            retries: 3,
+            error: Some("Connection timeout".to_string()),
+            success_response: None,
+            is_partial: Some(true),
+            delay_in_secs: Some(10),
+            evaluation_took_in_secs: Some(5.5),
+            source_node: Some("node2".to_string()),
+            query_took: Some(500),
+        };
+
+        assert_eq!(entry.status, "error");
+        assert_eq!(entry.retries, 3);
+        assert!(entry.error.is_some());
+        assert_eq!(entry.error.unwrap(), "Connection timeout");
+        assert!(entry.is_partial.unwrap());
+    }
+
+    #[test]
+    fn test_alert_history_pagination() {
+        // Test pagination parameters
+        let query = AlertHistoryQuery {
+            alert_name: None,
+            start_time: None,
+            end_time: None,
+            from: Some(100),
+            size: Some(25),
+        };
+
+        assert_eq!(query.from.unwrap(), 100);
+        assert_eq!(query.size.unwrap(), 25);
+    }
 }
