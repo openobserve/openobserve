@@ -4,6 +4,7 @@ import useNotifications from "../useNotifications";
 import { getDashboard } from "@/utils/commons";
 import { useStore } from "vuex";
 import { fromZonedTime } from "date-fns-tz";
+import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 export const useAnnotationsData = (
   organization: string,
@@ -23,21 +24,6 @@ export const useAnnotationsData = (
   const { showInfoNotification } = useNotifications();
 
   const store = useStore();
-
-  // Function to convert chart timestamp (timezone-adjusted) back to UTC for saving
-  const convertTimestampForSaving = (timestampMs: number) => {
-    if (!timestampMs) return null;
-
-    const timezone = store.state.timezone;
-
-    // Chart timestamp is in the dashboard's timezone
-    // Use fromZonedTime to convert from dashboard timezone back to UTC
-    const zonedDate = new Date(timestampMs);
-    const utcDate = fromZonedTime(zonedDate, timezone);
-    const utcMs = utcDate.getTime();
-
-    return Math.trunc(utcMs * 1000); // milliseconds to microseconds
-  };
 
   // Function
 
@@ -77,8 +63,8 @@ export const useAnnotationsData = (
   // Handle adding or editing annotation
   const handleAddAnnotation = (start: any, end: any) => {
     annotationToAddEdit.value = {
-      start_time: convertTimestampForSaving(start),
-      end_time: convertTimestampForSaving(end),
+      start_time: getUTCTimestampFromZonedTimestamp(start, store.state.timezone),
+      end_time: getUTCTimestampFromZonedTimestamp(end, store.state.timezone),
       title: "",
       text: "",
       tags: [],
