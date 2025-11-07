@@ -438,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <template #bottom="scope">
                   <div class="bottom-btn tw-h-[48px]">
-                    <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+                   <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
                       {{ resultTotal }} {{ t('alerts.header') }}
                     </div>
 
@@ -481,7 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
-                      class="tw-flex items-center no-border o2-secondary-button tw-h-[36px] tw-ml-sm tw-w-[141px]"
+                      class="tw-flex items-center no-border o2-secondary-button tw-h-[36px] q-mr-sm tw-w-[180px]"
                       :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                       no-caps
                       dense
@@ -489,6 +489,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <q-icon name="play_arrow" size="16px" />
                       <span class="tw-ml-2">Resume</span>
+                  </q-btn>
+                  <q-btn
+                      v-if="selectedAlerts.length > 0"
+                      data-test="alert-list-delete-alerts-btn"
+                      class="tw-flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px] tw-ml-sm"
+                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                      no-caps
+                      dense
+                      @click="openBulkDeleteDialog"
+                    >
+                      <q-icon name="delete" size="16px" />
+                      <span class="tw-ml-2">Delete</span>
                   </q-btn>
                     <QTablePagination
                       :scope="scope"
@@ -531,6 +543,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
+    />
+
+    <ConfirmDialog
+      title="Delete Alerts"
+      :message="`Are you sure you want to delete ${selectedAlerts.length} alert(s)?`"
+      @update:ok="bulkDeleteAlerts"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
     />
 
     <!-- Alert Details Drawer -->
@@ -2348,6 +2368,102 @@ export default defineComponent({
       }
     };
 
+  const confirmBulkDelete = ref<boolean>(false);
+
+  const openBulkDeleteDialog = () => {
+    confirmBulkDelete.value = true;
+  };
+
+  const bulkDeleteAlerts = async () => {
+    const dismiss = $q.notify({
+      spinner: true,
+      message: "Deleting alerts...",
+      timeout: 0,
+    });
+
+    try {
+      if (selectedAlerts.value.length === 0) {
+        $q.notify({
+          type: "negative",
+          message: "No alerts selected for deletion",
+          timeout: 2000,
+        });
+        dismiss();
+        return;
+      }
+
+      // Extract alert ids
+      const payload = {
+        ids: selectedAlerts.value.map((a: any) => a.alert_id),
+      };
+
+      const response = await alertsService.bulkDelete(
+        store.state.selectedOrganization.identifier,
+        payload
+      );
+
+      dismiss();
+
+      // Handle response based on successful/unsuccessful arrays
+      if (response.data) {
+        const { successful = [], unsuccessful = [] } = response.data;
+        const successCount = successful.length;
+        const failCount = unsuccessful.length;
+
+        if (failCount > 0 && successCount > 0) {
+          // Partial success
+          $q.notify({
+            type: "warning",
+            message: `${successCount} alert(s) deleted successfully, ${failCount} failed`,
+            timeout: 5000,
+          });
+        } else if (failCount > 0) {
+          // All failed
+          $q.notify({
+            type: "negative",
+            message: `Failed to delete ${failCount} alert(s)`,
+            timeout: 3000,
+          });
+        } else {
+          // All successful
+          $q.notify({
+            type: "positive",
+            message: `${successCount} alert(s) deleted successfully`,
+            timeout: 2000,
+          });
+        }
+      } else {
+        // Fallback success message
+        $q.notify({
+          type: "positive",
+          message: `${selectedAlerts.value.length} alert(s) deleted successfully`,
+          timeout: 2000,
+        });
+      }
+
+      selectedAlerts.value = [];
+      // Refresh alerts
+      await getAlertsFn(store, activeFolderId.value);
+
+      if (filterQuery.value) {
+        filterAlertsByQuery(filterQuery.value);
+      }
+    } catch (error: any) {
+      dismiss();
+      console.error("Error deleting alerts:", error);
+
+      // Show error message from response if available
+      const errorMessage = error.response?.data?.message || "Error deleting alerts. Please try again.";
+      $q.notify({
+        type: "negative",
+        message: errorMessage,
+        timeout: 3000,
+      });
+    }
+
+    confirmBulkDelete.value = false;
+  };
+
     return {
       t,
       qTable,
@@ -2460,6 +2576,9 @@ export default defineComponent({
       transformToExpression,
       filterAlertsByQuery,
       bulkToggleAlerts,
+      openBulkDeleteDialog,
+      bulkDeleteAlerts,
+      confirmBulkDelete,
     };
   },
 });

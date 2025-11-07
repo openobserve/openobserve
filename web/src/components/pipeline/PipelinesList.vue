@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="selectedPipelines.length > 0"
                   data-test="pipeline-list-export-pipelines-btn"
-                  class="flex  q-mx-sm items-center no-border o2-secondary-button tw-h-[36px]"
+                  class="flex  q-mr-sm items-center no-border o2-secondary-button tw-h-[36px]"
                   no-caps
                   dense
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
