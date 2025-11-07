@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :rows="rows"
       :columns="columns as []"
       :table-colspan="9"
-      row-key="index"
+      :row-key="rowKey"
       :virtual-scroll="virtualScroll"
       :virtual-scroll-item-size="48"
       :rows-per-page-options="[0]"
@@ -42,12 +42,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :filter-method="filter && filter.method"
       @virtual-scroll="onScroll"
       :style="tableStyle"
+      v-model:selected="selectedRows"
+      :selection="selection"
     >
       <template #no-data>
         <NoData class="q-mb-lg" />
       </template>
+      <template v-slot:header-selection="scope" v-if="selection === 'multiple'">
+        <q-checkbox
+          v-model="scope.selected"
+          size="sm"
+          class="o2-table-checkbox"
+
+        />
+      </template>
       <template v-slot:header="props">
         <q-tr :props="props" class="thead-sticky">
+          <!-- Add checkbox header when selection is enabled -->
+          <q-th auto-width v-if="selection === 'multiple'">
+            <q-checkbox
+              v-model="props.selected"
+              size="sm"
+              class="o2-table-checkbox"
+            />
+          </q-th>
           <q-th
             v-for="col in props.cols"
             :key="col.name"
@@ -60,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tr>
       </template>
        <template #top="scope" v-if="!hideTopPagination">
-        <div class="tw-flex tw-items-center tw-justify-between tw-w-full q-py-xs  "> 
+        <div class="tw-flex tw-items-center tw-justify-between tw-w-full q-py-xs  ">
           <span class="tw-font-bold tw-text-[14px] tw-w-full q-pa-none">
           {{ rows.length }} {{ title }}
         </span>
@@ -74,8 +92,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         </div>
        </template>
+      <template v-slot:body-selection="scope" v-if="selection === 'multiple'">
+        <q-td auto-width>
+          <q-checkbox
+            v-model="scope.selected"
+            size="sm"
+            class="o2-table-checkbox"
+          />
+        </q-td>
+      </template>
       <template v-slot:body="props">
         <q-tr :props="props" :key="`m_${props.row.index}`">
+          <!-- Add checkbox column when selection is enabled -->
+          <q-td auto-width v-if="selection === 'multiple'">
+            <q-checkbox
+              v-model="props.selected"
+              size="sm"
+              class="o2-table-checkbox"
+            />
+          </q-td>
           <q-td
             v-for="col in props.cols"
             :class="col.class || ''"
@@ -112,16 +147,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template  #bottom="scope">
         <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-          <div v-if="showBottomPaginationWithTitle" class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
-            {{ resultTotal }} {{ title }}
+          <div class="tw-flex tw-items-center tw-gap-2">
+            <div v-if="showBottomPaginationWithTitle" class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+              {{ resultTotal }} {{ title }}
+            </div>
+            <slot name="bottom-actions" :scope="scope"></slot>
           </div>
-            <QTablePagination
-              :scope="scope"
-              :position="'bottom'"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              @update:changeRecordPerPage="changePagination"
-            />
+          <QTablePagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
         </div>
       </template>
     </q-table>
@@ -206,9 +244,25 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  selection: {
+    type: String,
+    default: "none",
+  },
+  rowKey: {
+    type: String,
+    default: "index",
+  },
+  selected: {
+    type: Array,
+    default: () => [],
+  },
+  theme: {
+    type: String,
+    default: "light",
+  },
 });
 
-const emit = defineEmits(["event-emitted"]);
+const emit = defineEmits(["event-emitted", "update:selected"]);
 
 const perPageOptions: any = [
       { label: "20", value: 20 },
@@ -222,6 +276,11 @@ const resultTotal = ref<number>(0);
 const selectedPerPage = ref<number>(20);
 
 const qTableRef: Ref<InstanceType<typeof QTable> | null> = ref(null);
+
+const selectedRows = computed({
+  get: () => props.selected,
+  set: (val) => emit("update:selected", val),
+});
 
 const showPagination = computed(() => {
   return props.pagination;

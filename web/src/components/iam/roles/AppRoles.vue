@@ -70,6 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('iam.roles')"
       :hideTopPagination="true"
       :showBottomPaginationWithTitle="true"
+      selection="multiple"
+      row-key="role_name"
+      v-model:selected="selectedRoles"
+      :theme="store.state.theme"
     >
       <template v-slot:actions="slotProps: any">
         <div class="tw-flex tw-items-center tw-gap-2 tw-justify-center">
@@ -99,6 +103,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
       </template>
+      <template v-slot:bottom-actions>
+        <q-btn
+          v-if="selectedRoles.length > 0"
+          data-test="iam-roles-bulk-delete-btn"
+          class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
+          no-caps
+          dense
+          @click="openBulkDeleteDialog"
+        >
+          <q-icon name="delete" size="16px" />
+          <span class="tw-ml-2">{{ t('common.delete') }}</span>
+        </q-btn>
+      </template>
     </app-table>
   </div>
   </div>
@@ -117,6 +139,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="deleteConformDialog.show = false"
     v-model="deleteConformDialog.show"
   />
+  <ConfirmDialog
+    title="Bulk Delete Roles"
+    :message="`Are you sure you want to delete ${selectedRoles.length} role(s)?`"
+    @update:ok="bulkDeleteUserRoles"
+    @update:cancel="confirmBulkDelete = false"
+    v-model="confirmBulkDelete"
+  />
   </q-page>
 </template>
 
@@ -127,7 +156,7 @@ import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
-import { getRoles, deleteRole } from "@/services/iam";
+import { getRoles, deleteRole, bulkDeleteRoles } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
@@ -153,6 +182,9 @@ const deleteConformDialog = ref({
   show: false,
   data: null as any,
 });
+
+const selectedRoles: any = ref([]);
+const confirmBulkDelete = ref(false);
 
 const columns: any = [
   {
@@ -274,6 +306,57 @@ const showConfirmDialog = (row: any) => {
 const _deleteRole = () => {
   deleteUserRole(deleteConformDialog.value.data);
   deleteConformDialog.value.data = null;
+};
+
+const openBulkDeleteDialog = () => {
+  confirmBulkDelete.value = true;
+};
+
+const bulkDeleteUserRoles = async () => {
+  const roleNames = selectedRoles.value.map((role: any) => role.role_name);
+
+  try {
+    const response = await bulkDeleteRoles(store.state.selectedOrganization.identifier, {
+      ids: roleNames,
+    });
+
+    const { successful = [], unsuccessful = [], err } = response.data || {};
+
+    if (err) {
+      throw new Error(err);
+    }
+
+    if (successful.length > 0 && unsuccessful.length === 0) {
+      q.notify({
+        message: `Successfully deleted ${successful.length} role(s)`,
+        color: "positive",
+        position: "bottom",
+      });
+    } else if (successful.length > 0 && unsuccessful.length > 0) {
+      q.notify({
+        message: `Deleted ${successful.length} role(s). Failed to delete ${unsuccessful.length} role(s)`,
+        color: "warning",
+        position: "bottom",
+      });
+    } else if (unsuccessful.length > 0) {
+      q.notify({
+        message: `Failed to delete ${unsuccessful.length} role(s)`,
+        color: "negative",
+        position: "bottom",
+      });
+    }
+
+    await setupRoles();
+    selectedRoles.value = [];
+    confirmBulkDelete.value = false;
+  } catch (error: any) {
+    q.notify({
+      message: error?.message || "Error while deleting roles",
+      color: "negative",
+      position: "bottom",
+    });
+    confirmBulkDelete.value = false;
+  }
 };
 
 const visibleRows = computed(() => {
