@@ -55,6 +55,9 @@ const dashboards = {
       }`
     );
   },
+  bulkDelete: (organization: string, data: any) => {
+    return http().delete(`/api/${organization}/dashboards/bulk`, { data });
+  },
   get_Dashboard: (org_identifier: string, dashboardID: string, folderId?: string) => {
     return http().get(`/api/${org_identifier}/dashboards/${dashboardID}?folder=${folderId ?? "default"}`);
   },

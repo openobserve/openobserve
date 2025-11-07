@@ -306,12 +306,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-checkbox
                     v-model="props.selected"
                     size="sm"
-                    color="secondary"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-table-checkbox-dark'
-                        : 'o2-table-checkbox-light'
-                    "
                     class="o2-table-checkbox"
                     @update:model-value="props.select"
                   />
@@ -462,6 +456,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-icon name="download" size="16px" />
                     <span class="tw-ml-2">Export</span>
                   </q-btn>
+                  <q-btn
+                    v-if="selected.length > 0"
+                    data-test="dashboard-list-delete-dashboards-btn"
+                    class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-secondary-button-dark'
+                        : 'o2-secondary-button-light'
+                    "
+                    @click="openBulkDeleteDialog"
+                  >
+                    <q-icon name="delete" size="16px" />
+                    <span class="tw-ml-2">Delete</span>
+                  </q-btn>
                 </div>
                 <QTablePagination
                   :scope="scope"
@@ -539,6 +547,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:ok="deleteFolder"
             @update:cancel="confirmDeleteFolderDialog = false"
             v-model="confirmDeleteFolderDialog"
+          />
+
+          <!-- bulk delete dashboards dialog -->
+          <ConfirmDialog
+            title="Delete Dashboards"
+            data-test="dashboard-confirm-bulk-delete-dialog"
+            :message="`Are you sure you want to delete ${selected.length} dashboard(s)?`"
+            @update:ok="bulkDeleteDashboards"
+            @update:cancel="confirmBulkDelete = false"
+            v-model="confirmBulkDelete"
           />
         </div>
         </div>
@@ -1248,6 +1266,98 @@ export default defineComponent({
       selectedDashboardIdToMove.value = selectedDashboardIds.value;
     };
 
+    const confirmBulkDelete = ref<boolean>(false);
+
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
+
+    const bulkDeleteDashboards = async () => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Deleting dashboards...",
+        timeout: 0,
+      });
+
+      try {
+        if (selected.value.length === 0) {
+          $q.notify({
+            type: "negative",
+            message: "No dashboards selected for deletion",
+            timeout: 2000,
+          });
+          dismiss();
+          return;
+        }
+
+        // Extract dashboard ids
+        const payload = {
+          ids: selectedDashboardIds.value,
+        };
+
+        const response = await dashboardService.bulkDelete(
+          store.state.selectedOrganization.identifier,
+          payload
+        );
+
+        dismiss();
+
+        // Handle response based on successful/unsuccessful arrays
+        if (response.data) {
+          const { successful = [], unsuccessful = [] } = response.data;
+          const successCount = successful.length;
+          const failCount = unsuccessful.length;
+
+          if (failCount > 0 && successCount > 0) {
+            // Partial success
+            $q.notify({
+              type: "warning",
+              message: `${successCount} dashboard(s) deleted successfully, ${failCount} failed`,
+              timeout: 5000,
+            });
+          } else if (failCount > 0) {
+            // All failed
+            $q.notify({
+              type: "negative",
+              message: `Failed to delete ${failCount} dashboard(s)`,
+              timeout: 3000,
+            });
+          } else {
+            // All successful
+            $q.notify({
+              type: "positive",
+              message: `${successCount} dashboard(s) deleted successfully`,
+              timeout: 2000,
+            });
+          }
+        } else {
+          // Fallback success message
+          $q.notify({
+            type: "positive",
+            message: `${selected.value.length} dashboard(s) deleted successfully`,
+            timeout: 2000,
+          });
+        }
+
+        selected.value = [];
+        // Refresh dashboards
+        await getDashboards(store, activeFolderId.value);
+      } catch (error: any) {
+        dismiss();
+        console.error("Error deleting dashboards:", error);
+
+        // Show error message from response if available
+        const errorMessage = error.response?.data?.message || "Error deleting dashboards. Please try again.";
+        $q.notify({
+          type: "negative",
+          message: errorMessage,
+          timeout: 3000,
+        });
+      }
+
+      confirmBulkDelete.value = false;
+    };
+
     return {
       t,
       qTable,
@@ -1320,6 +1430,9 @@ export default defineComponent({
       selected,
       multipleExportDashboard,
       moveMultipleDashboards,
+      openBulkDeleteDialog,
+      bulkDeleteDashboards,
+      confirmBulkDelete,
     };
   },
   methods: {
