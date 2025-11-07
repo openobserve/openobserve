@@ -18,16 +18,22 @@ use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
 use {
     crate::handler::http::request::search::utils::check_resource_permissions,
-    crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers},
     o2_dex::meta::auth::RoleRequest,
 };
 
-use crate::common::meta::{
-    http::HttpResponse as MetaHttpResponse,
-    user::{
-        RoleBulkDeleteRequest, RoleBulkDeleteResponse, UserGroup, UserGroupBulkDeleteRequest,
-        UserGroupBulkDeleteResponse, UserGroupRequest, UserRoleRequest,
+use crate::{
+    common::{
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            user::{
+                RoleBulkDeleteRequest, RoleBulkDeleteResponse, UserGroup,
+                UserGroupBulkDeleteRequest, UserGroupBulkDeleteResponse, UserGroupRequest,
+                UserRoleRequest,
+            },
+        },
+        utils::auth::UserEmail,
     },
+    handler::http::extractors::Headers,
 };
 
 #[cfg(feature = "enterprise")]
@@ -244,12 +250,13 @@ pub async fn delete_role_bulk(
 }
 
 #[cfg(not(feature = "enterprise"))]
+/// DeleteRole
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
     operation_id = "DeleteRole",
     summary = "Delete custom role",
-    description = "Permanently removes a custom role from the organization. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
+    description = "Permanently removes a custom role from the organization. Users and groups assigned to this role will lose the associated permissions. Standard predefined roles cannot be deleted. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -266,7 +273,11 @@ pub async fn delete_role_bulk(
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]
-pub async fn delete_role_bulk(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn delete_role(
+    _path: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
+    _req: web::Json<RoleBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 

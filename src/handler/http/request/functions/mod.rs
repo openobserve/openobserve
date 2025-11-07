@@ -20,13 +20,13 @@ use config::meta::function::{
     FunctionBulkDeleteRequest, FunctionBulkDeleteResponse, FunctionList, TestVRLRequest, Transform,
 };
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::request::search::utils::check_resource_permissions,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::extractors::Headers,
     service::functions::FunctionDeleteError,
 };
-#[cfg(feature = "enterprise")]
-use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 /// CreateFunction
 #[utoipa::path(
@@ -205,11 +205,12 @@ async fn delete_function_bulk(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let req = req.into_inner();
-    let user_id = user_email.user_id;
+    let _user_id = user_email.user_id;
 
+    #[cfg(feature = "enterprise")]
     for name in &req.ids {
         if let Some(res) =
-            check_resource_permissions(&org_id, &user_id, "functions", name, "DELETE").await
+            check_resource_permissions(&org_id, &_user_id, "functions", name, "DELETE").await
         {
             return Ok(res);
         }

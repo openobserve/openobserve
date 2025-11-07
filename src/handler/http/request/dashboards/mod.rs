@@ -17,6 +17,8 @@ use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, patch, 
 use config::meta::dashboards::Dashboard;
 use hashbrown::HashMap;
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
@@ -31,7 +33,6 @@ use crate::{
             MoveDashboardRequestBody,
             MoveDashboardsRequestBody, // UpdateDashboardRequestBody, UpdateDashboardResponseBody,
         },
-        request::search::utils::check_resource_permissions,
     },
     service::dashboards::{self, DashboardError},
 };
@@ -353,11 +354,12 @@ async fn delete_dashboard_bulk(
 ) -> impl Responder {
     let org_id = path.into_inner();
     let req = req.into_inner();
-    let user_id = user_email.user_id;
+    let _user_id = user_email.user_id;
 
+    #[cfg(feature = "enterprise")]
     for id in &req.ids {
         if let Some(res) =
-            check_resource_permissions(&org_id, &user_id, "dashboards", id, "DELETE").await
+            check_resource_permissions(&org_id, &_user_id, "dashboards", id, "DELETE").await
         {
             return res;
         }

@@ -17,16 +17,16 @@ use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, post, put, web};
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
+        extractors::Headers,
         models::destinations::{Template, TemplateBulkDeleteRequest, TemplateBulkDeleteResponse},
-        request::search::utils::check_resource_permissions,
     },
     service::{alerts::templates, db::alerts::templates::TemplateError},
 };
-#[cfg(feature = "enterprise")]
-use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 impl From<TemplateError> for HttpResponse {
     fn from(value: TemplateError) -> Self {
@@ -286,11 +286,12 @@ async fn delete_template_bulk(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let req = req.into_inner();
-    let user_id = user_email.user_id;
+    let _user_id = user_email.user_id;
 
+    #[cfg(feature = "enterprise")]
     for name in &req.ids {
         if let Some(res) =
-            check_resource_permissions(&org_id, &user_id, "templates", name, "DELETE").await
+            check_resource_permissions(&org_id, &_user_id, "templates", name, "DELETE").await
         {
             return Ok(res);
         }

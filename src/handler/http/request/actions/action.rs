@@ -184,6 +184,8 @@ pub async fn delete_action_bulk(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
+        drop(user_email);
+        drop(req);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }

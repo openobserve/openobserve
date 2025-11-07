@@ -332,11 +332,13 @@ async fn delete_alert_bulk(
 ) -> HttpResponse {
     let org_id = path.into_inner();
     let req = req.into_inner();
-    let user_id = user_email.user_id;
+    let _user_id = user_email.user_id;
 
+    #[cfg(feature = "enterprise")]
     for id in &req.ids {
         if let Some(res) =
-            check_resource_permissions(&org_id, &user_id, "alerts", &id.to_string(), "DELETE").await
+            check_resource_permissions(&org_id, &_user_id, "alerts", &id.to_string(), "DELETE")
+                .await
         {
             return res;
         }

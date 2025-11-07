@@ -23,6 +23,8 @@ use actix_web::{
 use config::{meta::user::UserRole, utils::rand::generate_random_string};
 use hashbrown::HashMap;
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
     common::{
         meta::{
@@ -36,7 +38,7 @@ use crate::{
         },
         utils::auth::UserEmail,
     },
-    handler::http::{extractors::Headers, request::search::utils::check_resource_permissions},
+    handler::http::extractors::Headers,
     service::users,
 };
 
@@ -308,6 +310,7 @@ pub async fn delete_bulk(
     let req = req.into_inner();
     let initiator_id = user_email.user_id;
 
+    #[cfg(feature = "enterprise")]
     for email in &req.ids {
         if let Some(res) =
             check_resource_permissions(&org_id, &initiator_id, "service_accounts", email, "DELETE")
