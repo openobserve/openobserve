@@ -849,7 +849,9 @@ export default defineComponent({
     watch(
       () => currentVariablesDataRef.value,
       () => {
-        // This is now handled by aggregatedVariablesForUrl watcher above
+        if (currentVariablesDataRef.value?.__global) {
+          emit("variablesData", currentVariablesDataRef.value?.__global);
+        }
       },
       { deep: true },
     );
