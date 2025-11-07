@@ -115,7 +115,7 @@ impl PromqlContext {
         let mut string_literals = Vec::new();
         let mut tasks = Vec::new();
         let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
-        let nr_steps = (self.end - self.start + self.interval - 1) / self.interval;
+        let nr_steps = (self.end - self.start) / self.interval + 1;
         for i in 0..nr_steps {
             let time = self.start + (self.interval * i);
             let expr = expr.clone();

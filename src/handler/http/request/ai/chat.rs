@@ -18,7 +18,7 @@ use actix_web::{
     HttpRequest, HttpResponse, Responder, post,
     web::{self, Json},
 };
-use o2_enterprise::enterprise::{ai, common::config::get_config as get_o2_config};
+use o2_enterprise::enterprise::{ai::agent, common::config::get_config as get_o2_config};
 use serde::Deserialize;
 use tracing::Span;
 
@@ -45,7 +45,7 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name")
     ),
     request_body(
-        content = PromptRequest,
+        content = inline(PromptRequest),
         description = "Prompt details",
         example = json!({
             "messages": [
@@ -57,7 +57,7 @@ use crate::{
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Chat response", body = PromptResponse),
+        (status = StatusCode::OK, description = "Chat response", body = inline(PromptResponse)),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
@@ -91,8 +91,8 @@ pub async fn chat(
     };
 
     if config.ai.enabled {
-        let response = ai::service::chat(
-            ai::meta::AiServerRequest::new(body.messages, body.model, body.context),
+        let response = agent::service::chat(
+            agent::meta::AiServerRequest::new(body.messages, body.model, body.context),
             trace_id.clone(),
         )
         .await;
@@ -165,7 +165,7 @@ impl TraceInfo {
         ("org_id" = String, Path, description = "Organization name")
     ),
     request_body(
-        content = PromptRequest,
+        content = inline(PromptRequest),
         description = "Prompt details",
         example = json!({
             "messages": [
@@ -234,8 +234,8 @@ pub async fn chat_stream(
     }
     let auth_str = crate::common::utils::auth::extract_auth_str(&in_req).await;
 
-    let stream = match ai::service::chat_stream(
-        ai::meta::AiServerRequest::new(req_body.messages, req_body.model, req_body.context),
+    let stream = match agent::service::chat_stream(
+        agent::meta::AiServerRequest::new(req_body.messages, req_body.model, req_body.context),
         auth_str,
         trace_id.clone(),
     )

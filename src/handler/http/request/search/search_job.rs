@@ -71,7 +71,7 @@ use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = config::meta::search::Request, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = inline(config::meta::search::Request), description = "Search query", content_type = "application/json", example = json!({
         "query": {
             "sql": "select * from k8s ",
             "start_time": 1675182660872049i64,
@@ -233,7 +233,7 @@ pub async fn submit_job(
         ("org_id" = String, Path, description = "Organization name")
     ),
     responses(
-        (status = 200, description = "List of search jobs", body = Vec<Object>, example = json!([{
+        (status = 200, description = "List of search jobs", body = inline(Vec<Object>), example = json!([{
             "id": "abc123",
             "trace_id": "xyz789",
             "org_id": "default",

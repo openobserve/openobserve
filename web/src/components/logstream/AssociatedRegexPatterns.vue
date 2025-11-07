@@ -74,7 +74,7 @@
                             @filter-method="handleFilterMethod"
                           >
                             <template v-slot:body="props">
-                              <q-tr :data-test="`associated-regex-patterns-applied-patterns-table-row-${props.row.pattern_id}`" class="tw-cursor-pointer " :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'dark-selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'light-selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
+                              <q-tr :data-test="`associated-regex-patterns-applied-patterns-table-row-${props.row.pattern_id}`" class="tw-cursor-pointer " :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
                                 <q-td :data-test="`associated-regex-patterns-applied-patterns-table-cell-${props.row.pattern_id}`" class="tw-flex tw-justify-between tw-items-center" style="border-bottom: 0px; font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px;" :props="props" key="pattern_name">
                                   <span class="regex-pattern-name">
                                     {{ props.row.pattern_name }}
@@ -117,7 +117,7 @@
                             @:filter-method="handleFilterMethod"
                           >
                           <template v-slot:body="props">
-                              <q-tr :data-test="`associated-regex-patterns-all-patterns-table-row-${props.row.pattern_id}`" style="padding: 8px 0px !important;"  class="tw-cursor-pointer" :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'dark-selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'light-selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
+                              <q-tr :data-test="`associated-regex-patterns-all-patterns-table-row-${props.row.pattern_id}`" style="padding: 8px 0px !important;"  class="tw-cursor-pointer" :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
                                 <q-td :data-test="`associated-regex-patterns-all-patterns-table-cell-${props.row.pattern_id}`" class="tw-flex tw-justify-between tw-items-center " style="border-bottom: 0px;  font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px; " :props="props" key="pattern_name">
                                  <span class="regex-pattern-name">{{ props.row.pattern_name }}</span> 
                                   <span v-if="checkIfPatternIsApplied(props.row.pattern_id)">
@@ -139,191 +139,202 @@
         <q-separator vertical />
         <!-- here we will have the right side section -->
         <div class="tw-w-[75%] tw-flex tw-flex-col" style="height: calc(100vh - 59px);">
-          <div class="tw-flex-1 tw-overflow-y-auto tw-pt-4">
-            <div v-if="userClickedPattern" class="tw-flex tw-flex-col tw-gap-3 tw-px-4">
-              <!-- pattern name section -->
-              <div class="tw-flex tw-flex-col tw-gap-1">
-                <span class="individual-section-title">
-                  Pattern name
-                </span>
-                <span class="individual-section-sub-information" data-test="associated-regex-patterns-pattern-name">
-                  {{ userClickedPattern.pattern_name }}
-                </span>
-              </div>
-              <!-- pattern description section -->
-              <div class="tw-flex tw-flex-col tw-gap-1">
-                <span class="individual-section-title">
-                Pattern Description
-                </span>
-                <span class="individual-section-sub-information" data-test="associated-regex-patterns-pattern-description">
-                  {{ userClickedPattern.description ? userClickedPattern.description : 'No description available' }}
-                </span>
-              </div>
-              <!-- when value matches -->
-              <div class="tw-flex tw-flex-col">
-                <span class="individual-section-title">When value matches:
-                </span>
-                <div class="tw-flex tw-gap-8">
-                  <div class="tw-flex tw-items-start">
-                  <q-radio v-model="policy" val="Redact" data-test="associated-regex-patterns-redact-radio">
+          <div class="tw-flex-1 tw-overflow-y-auto tw-pt-3">
+            <div v-if="userClickedPattern" class="tw-flex tw-flex-col tw-gap-3 tw-px-3">
+              <!-- Pattern Info Card -->
+              <div class="section-card tw-p-3 tw-rounded-lg tw-border" :class="store.state.theme === 'dark' ? 'tw-bg-[#2A2A2A] tw-border-[#3A3A3A]' : 'tw-bg-[#F9FAFB] tw-border-[#E5E7EB]'">
+                <div class="tw-flex tw-flex-col tw-gap-2">
+                  <!-- pattern name section -->
+                  <div class="tw-flex tw-flex-col tw-gap-1">
+                    <span class="individual-section-title tw-text-[10px] tw-uppercase tw-tracking-wider tw-opacity-50 tw-font-[600]">
+                      Pattern Name
+                    </span>
+                    <span class="individual-section-value tw-text-[15px] tw-font-[700]" data-test="associated-regex-patterns-pattern-name">
+                      {{ userClickedPattern.pattern_name }}
+                    </span>
+                  </div>
 
-                  </q-radio>
-                  <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
-                      Redact
-                      <span class="tw-font-[400] individual-section-sub-information">
-                        Replace with [REDACTED]
-                      </span>
-                    </div>
+                  <q-separator :class="store.state.theme === 'dark' ? 'tw-bg-[#3A3A3A]' : 'tw-bg-[#E5E7EB]'" />
 
-                </div>
-                <div class="tw-flex tw-items-start">
-                  <q-radio v-model="policy" val="DropField" data-test="associated-regex-patterns-drop-field-radio">
-
-                  </q-radio>
-                  <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
-                      Drop
-                      <span class="tw-font-[400] individual-section-sub-information">
-                        Drop the field completely
-                      </span>
-                    </div>
-
-                </div>
-                <div class="tw-flex tw-items-start">
-                  <q-radio v-model="policy" val="Hash" data-test="associated-regex-patterns-hash-radio">
-
-                  </q-radio>
-                  <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
-                      Hash
-                      <span class="tw-font-[400] individual-section-sub-information">
-                        Replace with searchable hash
-                      </span>
-                    </div>
-
-                </div>
-                </div>
-              </div>
-              <!-- detach at section -->
-              <div class="tw-flex tw-flex-col">
-                <span class="individual-section-title">
-                  Detect at:
-                </span>
-                <div class="tw-flex tw-gap-8 tw-ml-2">
-                  <q-checkbox size="sm" v-model="apply_at" val="AtIngestion" data-test="associated-regex-patterns-ingestion-checkbox">
-                    <span class="individual-section-sub-title">Ingestion</span>
-                  </q-checkbox>
-                  <q-checkbox size="sm" v-model="apply_at" val="AtSearch" data-test="associated-regex-patterns-query-checkbox">
-                    <span class="individual-section-sub-title">Query</span>
-                  </q-checkbox>
-
+                  <!-- pattern description section -->
+                  <div class="tw-flex tw-flex-col tw-gap-1">
+                    <span class="individual-section-title tw-text-[10px] tw-uppercase tw-tracking-wider tw-opacity-50 tw-font-[600]">
+                      Description
+                    </span>
+                    <span class="individual-section-value tw-text-[13px] tw-leading-[1.5]" data-test="associated-regex-patterns-pattern-description">
+                      {{ userClickedPattern.description ? userClickedPattern.description : 'No description available' }}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <q-separator />
-
-              <!-- test pattern section -->
-
-              <div class="tw-flex tw-flex-col tw-gap-2">
-                <span class="individual-section-title-main">
-                  Test Pattern
-                </span>
-                <div class="tw-flex tw-flex-col">
-                  <span class="individual-section-sub-title2">
-                    Regex Pattern
-                  </span>
-                  <span class="regex-pattern-text" data-test="associated-regex-patterns-regex-pattern">
-                    {{ userClickedPattern.pattern }}
-                  </span>
-                </div>
-                <div class="tw-h-[19px] -tw-mb-1 tw-flex tw-items-center tw-justify-end tw-font-[600] " style="border-radius: 3px;">
-                            <q-btn :disable="testString.length === 0 || testLoading" class="tw-px-2 tw-bg-[#5960B2] tw-text-[12px] tw-text-white tw-min-h-[19px] tw-h-[19px] tw-flex tw-items-center tw-justify-center"
-                        style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
-                        <span>
-                            Test Input
-                        </span>
-                    </q-btn>
+              <!-- Configuration Card -->
+              <div class="section-card tw-p-3 tw-rounded-lg tw-border" :class="store.state.theme === 'dark' ? 'tw-bg-[#2A2A2A] tw-border-[#3A3A3A]' : 'tw-bg-[#F9FAFB] tw-border-[#E5E7EB]'">
+                <div class="tw-flex tw-gap-4">
+                  <!-- when value matches -->
+                  <div class="tw-flex tw-flex-col tw-gap-1.5 tw-flex-1">
+                    <span class="individual-section-title tw-text-[12px] tw-font-[700]">
+                      When value matches
+                    </span>
+                    <div class="tw-flex tw-flex-col tw-gap-0.5">
+                      <div class="tw-flex tw-items-center">
+                        <q-radio v-model="policy" val="Redact" data-test="associated-regex-patterns-redact-radio" size="xs" />
+                        <div class="tw-flex tw-items-center tw-gap-2 tw-ml-1">
+                          <span class="tw-font-[600] tw-text-[12px]">Redact</span>
+                          <span class="tw-font-[400] tw-text-[10px] tw-opacity-60">Replace with [REDACTED]</span>
                         </div>
-                <div class="regex-pattern-test-string-container">
-                    <FullViewContainer
+                      </div>
+                      <div class="tw-flex tw-items-center">
+                        <q-radio v-model="policy" val="DropField" data-test="associated-regex-patterns-drop-field-radio" size="xs" />
+                        <div class="tw-flex tw-items-center tw-gap-2 tw-ml-1">
+                          <span class="tw-font-[600] tw-text-[12px]">Drop</span>
+                          <span class="tw-font-[400] tw-text-[10px] tw-opacity-60">Drop the field completely</span>
+                        </div>
+                      </div>
+                      <div class="tw-flex tw-items-center">
+                        <q-radio v-model="policy" val="Hash" data-test="associated-regex-patterns-hash-radio" size="xs" />
+                        <div class="tw-flex tw-items-center tw-gap-2 tw-ml-1">
+                          <span class="tw-font-[600] tw-text-[12px]">Hash</span>
+                          <span class="tw-font-[400] tw-text-[10px] tw-opacity-60">Replace with searchable hash</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <q-separator vertical :class="store.state.theme === 'dark' ? 'tw-bg-[#3A3A3A]' : 'tw-bg-[#E5E7EB]'" />
+
+                  <!-- detect at section -->
+                  <div class="tw-flex tw-flex-col tw-gap-1.5 tw-min-w-[120px]">
+                    <span class="individual-section-title tw-text-[12px] tw-font-[700]">
+                      Detect at
+                    </span>
+                    <div class="tw-flex tw-flex-col tw-gap-1.5">
+                      <q-checkbox size="xs" v-model="apply_at" val="AtIngestion" data-test="associated-regex-patterns-ingestion-checkbox">
+                        <span class="individual-section-sub-title tw-font-[600] tw-text-[12px]">Ingestion</span>
+                      </q-checkbox>
+                      <q-checkbox size="xs" v-model="apply_at" val="AtSearch" data-test="associated-regex-patterns-query-checkbox">
+                        <span class="individual-section-sub-title tw-font-[600] tw-text-[12px]">Query</span>
+                      </q-checkbox>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <q-separator :class="store.state.theme === 'dark' ? 'tw-bg-[#444444]' : 'tw-bg-[#D1D5DB]'" />
+
+              <!-- Test Pattern Card -->
+              <div class="section-card tw-p-3 tw-rounded-lg tw-border" :class="store.state.theme === 'dark' ? 'tw-bg-[#2A2A2A] tw-border-[#3A3A3A]' : 'tw-bg-[#F9FAFB] tw-border-[#E5E7EB]'">
+                <div class="tw-flex tw-flex-col tw-gap-2.5">
+                  <div class="tw-flex tw-items-center tw-justify-between">
+                    <span class="individual-section-title-main tw-text-[13px] tw-font-[700]">
+                      Test Pattern
+                    </span>
+                    <q-btn
+                      :disable="testString.length === 0 || testLoading"
+                      class="o2-primary-button tw-h-[28px]"
+                      flat
+                      dense
+                      no-caps
+                      @click="testStringOutput">
+                      <span class="tw-text-[12px]">Test Input</span>
+                    </q-btn>
+                  </div>
+
+                  <div class="tw-flex tw-flex-col tw-gap-1">
+                    <span class="individual-section-sub-title2 tw-text-[10px] tw-uppercase tw-tracking-wider tw-opacity-50 tw-font-[600]">
+                      Regex Pattern
+                    </span>
+                    <div class="tw-p-2 tw-rounded tw-font-mono tw-text-[11px] tw-break-all" :class="store.state.theme === 'dark' ? 'tw-bg-[#1A1A1A]' : 'tw-bg-[#FFFFFF]'">
+                      <span class="regex-pattern-text" data-test="associated-regex-patterns-regex-pattern">
+                        {{ userClickedPattern.pattern }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <q-separator :class="store.state.theme === 'dark' ? 'tw-bg-[#3A3A3A]' : 'tw-bg-[#E5E7EB]'" />
+
+                  <div class="tw-flex tw-flex-col tw-gap-2">
+                    <div class="regex-pattern-test-string-container">
+                      <FullViewContainer
                         name="query"
                         v-model:is-expanded="expandState.regexTestString"
                         label="Input string"
-                        class="tw-mt-1 tw-py-md tw-h-[24px]"
+                        class="tw-py-md tw-h-[24px]"
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
-                    >
-                </FullViewContainer>
-                    <div v-if="expandState.regexTestString" class="regex-pattern-input" >
+                      />
+                      <div v-if="expandState.regexTestString" class="regex-pattern-input tw-mt-2">
                         <q-input
-                        data-test="add-regex-test-string-input"
-                        v-model="testString"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="regex-test-string-input"
-                        :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        tabindex="0"
-                        style="width: 100%; resize: none;"
-                        type="textarea"
-                        placeholder="Eg. 1234567890"
-                        rows="5"
+                          data-test="add-regex-test-string-input"
+                          v-model="testString"
+                          color="input-border"
+                          bg-color="input-bg"
+                          class="regex-test-string-input"
+                          :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
+                          stack-label
+                          outlined
+                          filled
+                          dense
+                          tabindex="0"
+                          style="width: 100%; resize: none;"
+                          type="textarea"
+                          placeholder="Eg. 1234567890"
+                          rows="5"
                         />
+                      </div>
                     </div>
-                </div>
-                <div class="regex-pattern-test-string-container">
-                    <FullViewContainer
+
+                    <div class="regex-pattern-test-string-container">
+                      <FullViewContainer
                         name="output"
                         v-model:is-expanded="expandState.outputString"
                         label="Output"
-                        class="tw-mt-1 tw-py-md tw-h-[24px]"
+                        class="tw-py-md tw-h-[24px]"
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
-                    >
-                </FullViewContainer>
-                    <div v-if="expandState.outputString" class="regex-pattern-input" >
+                      />
+                      <div v-if="expandState.outputString" class="regex-pattern-input tw-mt-2">
                         <q-input
-                        v-if="outputString.length > 0"
-                        data-test="add-regex-test-string-input"
-                        v-model="outputString"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="regex-test-string-input"
-                        :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        tabindex="0"
-                        style="width: 100%; resize: none;"
-                        type="textarea"
-                        placeholder="Output String"
-                        rows="5"
+                          v-if="outputString.length > 0"
+                          data-test="add-regex-test-string-input"
+                          v-model="outputString"
+                          color="input-border"
+                          bg-color="input-bg"
+                          class="regex-test-string-input"
+                          :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
+                          stack-label
+                          outlined
+                          filled
+                          dense
+                          tabindex="0"
+                          style="width: 100%; resize: none;"
+                          type="textarea"
+                          placeholder="Output String"
+                          rows="5"
                         />
-                        <div v-else class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-[111px] " 
-                        :class="store.state.theme === 'dark' ? 'dark-mode-regex-no-output' : 'light-mode-regex-no-output'"
-
-                        >
-                            <div v-if="!testLoading && outputString.length === 0">
-                                <q-icon :name="outlinedLightbulb" size="24px" :class="store.state.theme === 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#A8A8A8]'" />
+                        <div v-else class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-[111px]"
+                          :class="store.state.theme === 'dark' ? 'dark-mode-regex-no-output' : 'light-mode-regex-no-output'">
+                          <div v-if="!testLoading && outputString.length === 0">
+                            <q-icon :name="outlinedLightbulb" size="24px" :class="store.state.theme === 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#A8A8A8]'" />
                             <span class="tw-text-[12px] tw-font-[400] tw-text-center" :class="store.state.theme === 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#4B5563]'">
-                                Please click Test Input to see the results
+                              Please click Test Input to see the results
                             </span>
-                            </div>
-                            <div v-else-if="testLoading">
-                                <span class="tw-flex tw-items-center tw-justify-center tw-h-[111px]">
-                                    <q-spinner-hourglass color="primary" size="24px" />
-                                </span>
-                            </div>
+                          </div>
+                          <div v-else-if="testLoading">
+                            <span class="tw-flex tw-items-center tw-justify-center tw-h-[111px]">
+                              <q-spinner-hourglass color="primary" size="24px" />
+                            </span>
+                          </div>
                         </div>
+                      </div>
                     </div>
+                  </div>
                 </div>
-                <q-separator />
               </div>
 
 
               <!-- remove or add pattern button  -->
-               <div class="tw-mb-4" :class="store.state.theme === 'dark' ? 'add-remove-pattern-button-dark' : 'add-remove-pattern-button-light'">
-                <q-btn @click="handleAddOrRemovePattern" no-caps class="no-border">
+               <div class="tw-mb-4">
+                <q-btn @click="handleAddOrRemovePattern" borderless no-caps class="q-mr-md o2-secondary-button tw-h-[36px] no-border">
+                  <q-icon class="tw-mr-1" :name="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'delete' : 'add'"></q-icon>
                   <span>
                     {{ checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'Remove Pattern' : 'Add Pattern' }}
                   </span> 
@@ -355,24 +366,21 @@
             <q-btn
               v-close-popup="true"
               label="Cancel"
-              class="q-my-sm text-bold q-mr-md"
+              class="q-mr-md o2-secondary-button tw-h-[36px] no-border"
               padding="sm md"
               no-caps
-              style="border: 1px solid #E6E6E6;"
               data-test="associated-regex-patterns-cancel-btn"
             />
             <q-btn
               data-test="associated-regex-patterns-update-btn"
               label="Update Changes"
-              class="q-my-sm text-bold no-border"
+              class="q-pa-none o2-primary-button tw-h-[34px] element-box-shadow"
               padding="sm xl"
               type="submit"
               no-caps
+              dense
+              flat
               @click="updateRegexPattern"
-              :style="{
-                'background-color': isFormDirty ? '#5ca380' : '#aeaeae',
-                'color': isFormDirty ? '#ffffff' : '#000000'
-              }"
               :disabled="!isFormDirty"
             />
           </div>
@@ -896,8 +904,16 @@ export default defineComponent({
       .individual-section-sub-information{
         color: #000000;
       }
+      .individual-section-value{
+        color: #000000;
+      }
       .regex-pattern-text{
         color: #5A5A5A;
+      }
+    }
+    .dark-regex-patterns{
+      .individual-section-value{
+        color: #ffffff;
       }
     }
     .add-remove-pattern-button-light{
@@ -920,11 +936,9 @@ export default defineComponent({
         }
     }
 
-    .light-selected-pattern-row {
-    background-color: #E1E3F6;
-  }
-  .dark-selected-pattern-row {
-    background-color: #7C87EF38 !important;
+    .selected-pattern-row {
+      color: var(--o2-tab-text-color);
+      background-color: var(--o2-tab-bg);
   }
 .dark-associated-regex-patterns-table{
   background-color: #1F1F1F !important;

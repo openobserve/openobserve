@@ -26,6 +26,7 @@ bitvec.workspace = true
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
+chrono-tz.workspace = true
 cityhasher.workspace = true
 chromiumoxide.workspace = true
 cron.workspace = true

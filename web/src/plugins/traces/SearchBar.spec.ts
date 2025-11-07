@@ -338,7 +338,7 @@ describe("SearchBar", () => {
       wrapper.vm.searchObj.data.editorValue = "test query";
       wrapper.vm.searchObj.data.advanceFiltersQuery = "test filter";
 
-      const resetBtn = wrapper.find(".reset-filters");
+      const resetBtn = wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]');
       await resetBtn.trigger("click");
 
       expect(wrapper.vm.searchObj.data.editorValue).toBe("");
@@ -396,6 +396,9 @@ describe("SearchBar", () => {
 
   describe("Query functionality", () => {
     it("should update query value in editor", async () => {
+      // Ensure editorValue starts clean
+      wrapper.vm.searchObj.data.editorValue = "";
+
       const mockQueryEditor = {
         setValue: vi.fn(),
         getCursorIndex: vi.fn().mockReturnValue(5),

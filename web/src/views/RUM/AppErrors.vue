@@ -16,49 +16,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="sessions_page">
-    <div class="text-right q-py-sm flex align-center justify-between">
-      <syntax-guide class="q-mr-sm" />
-      <div class="flex align-center justify-end metrics-date-time q-mr-md">
-        <date-time
-          auto-apply
-          :default-type="errorTrackingState.data.datetime?.valueType"
-          :default-absolute-time="{
-            startTime: errorTrackingState.data.datetime.startTime,
-            endTime: errorTrackingState.data.datetime.endTime,
-          }"
-          :default-relative-time="
-            errorTrackingState.data.datetime.relativeTimePeriod
+    <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
+      <div class="card-container">
+        <div class="text-right q-py-sm flex align-center justify-between">
+          <syntax-guide class="q-mr-sm" />
+          <div class="flex align-center justify-end metrics-date-time q-mr-md">
+            <date-time
+              auto-apply
+              :default-type="errorTrackingState.data.datetime?.valueType"
+              :default-absolute-time="{
+                startTime: errorTrackingState.data.datetime.startTime,
+                endTime: errorTrackingState.data.datetime.endTime,
+              }"
+              :default-relative-time="
+                errorTrackingState.data.datetime.relativeTimePeriod
+              "
+              data-test="logs-search-bar-date-time-dropdown"
+              class="q-mr-md"
+              @on:date-change="updateDateChange"
+            />
+            <q-btn
+              data-test="metrics-explorer-run-query-button"
+              data-cy="metrics-explorer-run-query-button"
+              dense
+              flat
+              title="Run query"
+              class="q-pa-none search-button"
+              @click="runQuery"
+            >
+              Run query
+            </q-btn>
+          </div>
+        </div>
+        <div
+          style="
+            border-top: 1px solid rgb(219, 219, 219);
+            border-bottom: 1px solid rgb(219, 219, 219);
           "
-          data-test="logs-search-bar-date-time-dropdown"
-          class="q-mr-md"
-          @on:date-change="updateDateChange"
-        />
-        <q-btn
-          data-test="metrics-explorer-run-query-button"
-          data-cy="metrics-explorer-run-query-button"
-          dense
-          flat
-          title="Run query"
-          class="q-pa-none search-button"
-          @click="runQuery"
         >
-          Run query
-        </q-btn>
+          <query-editor
+            editor-id="rum-errors-query-editor"
+            class="monaco-editor"
+            v-model:query="errorTrackingState.data.editorValue"
+            style="height: 40px !important"
+            :debounce-time="300"
+          />
+        </div>
       </div>
-    </div>
-    <div
-      style="
-        border-top: 1px solid rgb(219, 219, 219);
-        border-bottom: 1px solid rgb(219, 219, 219);
-      "
-    >
-      <query-editor
-        editor-id="rum-errors-query-editor"
-        class="monaco-editor"
-        v-model:query="errorTrackingState.data.editorValue"
-        style="height: 40px !important"
-        :debounce-time="300"
-      />
     </div>
     <q-splitter
       class="logs-horizontal-splitter full-height"
@@ -67,15 +71,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       vertical
     >
       <template #before>
-        <FieldList
-          :fields="streamFields"
-          :time-stamp="{
-            startTime: dateTime.startTime,
-            endTime: dateTime.endTime,
-          }"
-          :stream-name="errorTrackingState.data.stream.errorStream"
-          @event-emitted="handleSidebarEvent"
-        />
+        <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
+          <FieldList
+            :fields="streamFields"
+            :time-stamp="{
+              startTime: dateTime.startTime,
+              endTime: dateTime.endTime,
+            }"
+            :stream-name="errorTrackingState.data.stream.errorStream"
+            class="card-container"
+            @event-emitted="handleSidebarEvent"
+          />
+        </div>
       </template>
       <template #separator>
         <q-avatar
@@ -87,34 +94,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template #after>
-        <div class="q-mt-xs">
-          <template v-if="isLoading.length">
-            <div
-              class="q-pb-lg flex items-center justify-center text-center"
-              style="height: calc(100vh - 200px)"
-            >
-              <div>
-                <q-spinner-hourglass
-                  color="primary"
-                  size="40px"
-                  style="margin: 0 auto; display: block"
-                />
-                <div class="text-center full-width">
-                  Hold on tight, we're fetching your application errors.
+        <div class="tw-pb-[0.625rem] tw-pr-[0.625rem]">
+          <div class="card-container">
+            <template v-if="isLoading.length">
+              <div
+                class="q-pb-lg flex items-center justify-center text-center"
+                style="height: calc(100vh - 300px)"
+              >
+                <div>
+                  <q-spinner-hourglass
+                    color="primary"
+                    size="40px"
+                    style="margin: 0 auto; display: block"
+                  />
+                  <div class="text-center full-width">
+                    Hold on tight, we're fetching your application errors.
+                  </div>
                 </div>
               </div>
-            </div>
-          </template>
-          <AppTable
-            :columns="columns"
-            :rows="errorTrackingState.data.errors"
-            class="app-table-container"
-            @event-emitted="handleTableEvent"
-          >
-            <template v-slot:error_details="slotProps">
-              <ErrorDetail :column="slotProps.column.row" />
             </template>
-          </AppTable>
+            <AppTable
+              :columns="columns"
+              :rows="errorTrackingState.data.errors"
+              class="app-table-container"
+              @event-emitted="handleTableEvent"
+            >
+              <template v-slot:error_details="slotProps">
+                <ErrorDetail :column="slotProps.column.row" />
+              </template>
+            </AppTable>
+          </div>
         </div>
       </template>
     </q-splitter>
@@ -359,7 +368,7 @@ const getErrorLogs = () => {
       : ""
   } GROUP BY ${errorFields} type, service order by zo_sql_timestamp DESC`;
 
-  req.query.sql.replace("\n", " ");
+  req.query.sql.replaceAll("\n", " ");
   delete req.aggs;
   isLoading.value.push(true);
 
@@ -485,7 +494,7 @@ function updateUrlQueryParams() {
 }
 
 .app-table-container {
-  height: calc(100vh - 190px) !important;
+  height: calc(100vh - 200px) !important;
 }
 </style>
 <style lang="scss">

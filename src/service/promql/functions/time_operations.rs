@@ -19,7 +19,7 @@ use datafusion::error::{DataFusionError, Result};
 use rayon::prelude::*;
 use strum::EnumIter;
 
-use crate::service::promql::value::{InstantValue, Sample, Value};
+use crate::service::promql::value::{InstantValue, LabelsExt, Sample, Value};
 
 #[derive(Debug, EnumIter)]
 pub enum TimeOperationType {
@@ -110,8 +110,9 @@ fn exec(data: Value, op: &TimeOperationType) -> Result<Value> {
         .into_par_iter()
         .map(|mut instant| {
             let ts = op.get_component_from_ts(instant.sample.value as i64);
+            let labels = std::mem::take(&mut instant.labels);
             InstantValue {
-                labels: std::mem::take(&mut instant.labels),
+                labels: labels.without_metric_name(),
                 sample: Sample::new(instant.sample.timestamp, ts as f64),
             }
         })

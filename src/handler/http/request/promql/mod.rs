@@ -233,7 +233,7 @@ async fn query(
         end,
         step: 300_000_000, // 5m
         query_exemplars: false,
-        no_cache: None,
+        use_cache: None,
     };
 
     search(&trace_id, org_id, &req, user_email, timeout).await
@@ -562,7 +562,7 @@ async fn query_range(
         end,
         step,
         query_exemplars,
-        no_cache: req.no_cache,
+        use_cache: req.use_cache,
     };
     search(&trace_id, org_id, &req, user_email, timeout).await
 }

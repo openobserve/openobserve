@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use actix_web::web;
 use chrono::{TimeZone, Utc};
@@ -37,7 +40,6 @@ use config::{
     },
 };
 use datafusion::arrow::datatypes::Schema;
-use hashbrown::HashSet;
 use infra::{
     cache::stats,
     errors::{Error, Result},
@@ -85,6 +87,12 @@ pub async fn remote_write(
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
+    // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
+    // End get user defined schema
+
     // associated pipeline
     let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
         HashMap::new();
@@ -101,7 +109,7 @@ pub async fn remote_write(
         .map_err(|e| anyhow::anyhow!("Invalid protobuf: {}", e.to_string()))?;
 
     // records buffer
-    let mut json_data_by_stream: HashMap<String, Vec<(json::Value, i64)>> = HashMap::new();
+    let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
 
     // parse metadata
     for item in request.metadata {
@@ -200,6 +208,31 @@ pub async fn remote_write(
             Some(v) => v.to_owned(),
             None => continue,
         };
+
+        // get stream pipeline
+        if !stream_executable_pipelines.contains_key(&metric_name) {
+            let pipeline_params = crate::service::ingestion::get_stream_executable_pipeline(
+                org_id,
+                &metric_name,
+                &StreamType::Metrics,
+            )
+            .await;
+            stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
+        }
+
+        // get user defined schema
+        let streams = vec![StreamParams {
+            org_id: org_id.to_owned().into(),
+            stream_type: StreamType::Metrics,
+            stream_name: metric_name.to_owned().into(),
+        }];
+        crate::service::ingestion::get_uds_and_original_data_streams(
+            &streams,
+            &mut user_defined_schema_map,
+            &mut streams_need_original_map,
+            &mut streams_need_all_values_map,
+        )
+        .await;
 
         // parse samples
         for sample in event.samples {
@@ -307,17 +340,6 @@ pub async fn remote_write(
             .await;
             // End get stream alert
 
-            // get stream pipeline
-            if !stream_executable_pipelines.contains_key(&metric_name) {
-                let pipeline_params = crate::service::ingestion::get_stream_executable_pipeline(
-                    org_id,
-                    &metric_name,
-                    &StreamType::Metrics,
-                )
-                .await;
-                stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
-            }
-
             let mut value: json::Value = json::to_value(&metric).unwrap();
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
             value.as_object_mut().unwrap().insert(
@@ -337,11 +359,21 @@ pub async fn remote_write(
                     .or_default()
                     .push((value, timestamp));
             } else {
+                // get json object
+                let mut local_val = match value.take() {
+                    json::Value::Object(val) => val,
+                    _ => unreachable!(),
+                };
+
+                if let Some(Some(fields)) = user_defined_schema_map.get(&metric_name) {
+                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                }
+
                 // buffer to downstream processing directly
                 json_data_by_stream
                     .entry(metric_name.clone())
                     .or_default()
-                    .push((value, timestamp));
+                    .push((local_val, timestamp));
             }
         }
     }
@@ -373,27 +405,39 @@ pub async fn remote_write(
                             continue;
                         }
 
+                        let destination_stream = stream_params.stream_name.to_string();
+
                         // add partition keys
-                        if !stream_partitioning_map.contains_key(stream_params.stream_name.as_str())
-                        {
+                        if !stream_partitioning_map.contains_key(&destination_stream) {
                             let partition_det =
                                 crate::service::ingestion::get_stream_partition_keys(
                                     org_id,
                                     &StreamType::Metrics,
-                                    &stream_params.stream_name,
+                                    &destination_stream,
                                 )
                                 .await;
-                            stream_partitioning_map.insert(
-                                stream_params.stream_name.to_string(),
-                                partition_det.clone(),
-                            );
+                            stream_partitioning_map
+                                .insert(destination_stream.clone(), partition_det.clone());
                         }
-                        for (idx, res) in stream_pl_results {
+                        for (idx, mut res) in stream_pl_results {
+                            // get json object
+                            let mut local_val = match res.take() {
+                                json::Value::Object(v) => v,
+                                _ => unreachable!(),
+                            };
+
+                            if let Some(Some(fields)) =
+                                user_defined_schema_map.get(&destination_stream)
+                            {
+                                local_val =
+                                    crate::service::ingestion::refactor_map(local_val, fields);
+                            }
+
                             // buffer to downstream processing directly
                             json_data_by_stream
-                                .entry(stream_params.stream_name.to_string())
+                                .entry(destination_stream.clone())
                                 .or_default()
-                                .push((res, timestamps[idx]));
+                                .push((local_val, timestamps[idx]));
                         }
                     }
                 }
@@ -408,9 +452,8 @@ pub async fn remote_write(
         let partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
 
-        for (mut value, timestamp) in json_data {
-            let val_map = value.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
+        for (mut val_map, timestamp) in json_data {
+            let hash = super::signature_without_labels(&val_map, &[VALUE_LABEL]);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             val_map.insert(
                 TIMESTAMP_COL_NAME.to_string(),
@@ -442,7 +485,7 @@ pub async fn remote_write(
                     &stream_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
-                    vec![val_map],
+                    vec![&val_map],
                     timestamp,
                     false, // is_derived is false for metrics
                 )
@@ -466,7 +509,7 @@ pub async fn remote_write(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
-                val_map,
+                &val_map,
                 Some(&schema_key),
             );
             let buf = metric_data_map.entry(stream_name.to_owned()).or_default();
@@ -491,7 +534,7 @@ pub async fn remote_write(
                     let alert_end_time = now_micros();
                     for alert in alerts {
                         if let Ok(Some(data)) = alert
-                            .evaluate(Some(val_map), (None, alert_end_time), None)
+                            .evaluate(Some(&val_map), (None, alert_end_time), None)
                             .await
                             .map(|res| res.data)
                         {
@@ -528,7 +571,7 @@ pub async fn remote_write(
             ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
-        let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await?;
+        let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
 
         let fns_length: usize =
             stream_executable_pipelines
@@ -744,6 +787,7 @@ pub(crate) async fn get_series(
         search_type: None,
         search_event_context: None,
         use_cache: default_use_cache(),
+        clear_cache: false,
         local_mode: None,
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
@@ -888,6 +932,7 @@ pub(crate) async fn get_label_values(
         search_type: None,
         search_event_context: None,
         use_cache: default_use_cache(),
+        clear_cache: false,
         local_mode: None,
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {

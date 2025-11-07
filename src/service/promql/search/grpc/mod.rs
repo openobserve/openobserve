@@ -356,11 +356,7 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Val
         }
         value::Value::Matrix(v) => {
             v.iter().for_each(|v| {
-                let samples = v
-                    .samples
-                    .iter()
-                    .filter_map(|x| if x.is_nan() { None } else { Some(x.into()) })
-                    .collect::<Vec<_>>();
+                let samples = v.samples.iter().map(|x| x.into()).collect::<Vec<_>>();
                 let exemplars = v.exemplars.as_ref().map(|v| {
                     let exemplars = v.iter().map(|x| x.as_ref().into()).collect::<Vec<_>>();
                     cluster_rpc::Exemplars { exemplars }

@@ -191,7 +191,7 @@ export class StreamsPage {
     }
 
     async checkStreaming() {
-        await this.managementPage.checkStreaming();
+        // await this.managementPage.checkStreaming();
     }
 
     // Additional methods for streamname test

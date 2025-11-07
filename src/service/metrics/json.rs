@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::BufReader, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    io::BufReader,
+    sync::Arc,
+};
 
 use actix_web::{http, web};
 use anyhow::{Result, anyhow};
@@ -84,6 +88,12 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
     let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
+    // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
+    // End get user defined schema
+
     // associated pipeline
     let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
         HashMap::new();
@@ -94,7 +104,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
     // records buffer
-    let mut json_data_by_stream: HashMap<String, Vec<(json::Value, String)>> = HashMap::new();
+    let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader.into_iter() {
@@ -126,6 +136,20 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             stream_executable_pipelines.insert(stream_name.clone(), exec_pl_option);
         }
         // End pipeline params construction
+
+        // get user defined schema
+        let streams = vec![StreamParams {
+            org_id: org_id.to_owned().into(),
+            stream_type: StreamType::Metrics,
+            stream_name: stream_name.to_owned().into(),
+        }];
+        crate::service::ingestion::get_uds_and_original_data_streams(
+            &streams,
+            &mut user_defined_schema_map,
+            &mut streams_need_original_map,
+            &mut streams_need_all_values_map,
+        )
+        .await;
 
         // check metrics type for Histogram & Summary
         if metrics_type.to_lowercase() == "histogram" || metrics_type.to_lowercase() == "summary" {
@@ -176,7 +200,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             json::Value::Number(timestamp.into()),
         );
 
-        let record = json::Value::Object(record.to_owned());
+        let mut value = json::Value::Object(record.to_owned());
 
         // ready to be buffered for downstream processing
         if stream_executable_pipelines
@@ -188,13 +212,23 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             stream_pipeline_inputs
                 .entry(stream_name.to_owned())
                 .or_default()
-                .push((record, metrics_type));
+                .push((value, metrics_type));
         } else {
+            // get json object
+            let mut local_val = match value.take() {
+                json::Value::Object(val) => val,
+                _ => unreachable!(),
+            };
+
+            if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
+                local_val = crate::service::ingestion::refactor_map(local_val, fields);
+            }
+
             // buffer to downstream processing directly
             json_data_by_stream
                 .entry(stream_name.clone())
                 .or_default()
-                .push((record, metrics_type));
+                .push((local_val, metrics_type));
         }
     }
 
@@ -233,27 +267,39 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                             continue;
                         }
 
+                        let destination_stream = stream_params.stream_name.to_string();
+
                         // add partition keys
-                        if !stream_partitioning_map.contains_key(stream_params.stream_name.as_str())
-                        {
+                        if !stream_partitioning_map.contains_key(&destination_stream) {
                             let partition_det =
                                 crate::service::ingestion::get_stream_partition_keys(
                                     org_id,
                                     &StreamType::Metrics,
-                                    &stream_params.stream_name,
+                                    &destination_stream,
                                 )
                                 .await;
-                            stream_partitioning_map.insert(
-                                stream_params.stream_name.to_string(),
-                                partition_det.clone(),
-                            );
+                            stream_partitioning_map
+                                .insert(destination_stream.clone(), partition_det.clone());
                         }
-                        for (idx, res) in stream_pl_results {
+                        for (idx, mut res) in stream_pl_results {
+                            // get json object
+                            let mut local_val = match res.take() {
+                                json::Value::Object(v) => v,
+                                _ => unreachable!(),
+                            };
+
+                            if let Some(Some(fields)) =
+                                user_defined_schema_map.get(&destination_stream)
+                            {
+                                local_val =
+                                    crate::service::ingestion::refactor_map(local_val, fields);
+                            }
+
                             // buffer to downstream processing directly
                             json_data_by_stream
-                                .entry(stream_params.stream_name.to_string())
+                                .entry(destination_stream.clone())
                                 .or_default()
-                                .push((res, metric_types[idx].to_owned()));
+                                .push((local_val, metric_types[idx].to_owned()));
                         }
                     }
                 }
@@ -292,8 +338,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             }
             // End get stream alert
 
-            let record = record.as_object_mut().unwrap();
-
             // check value
             let value: f64 = match record.get(VALUE_LABEL).ok_or(anyhow!("missing value"))? {
                 json::Value::Number(s) => s.as_f64().unwrap(),
@@ -315,7 +359,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             // remove type from labels
             record.remove(TYPE_LABEL);
             // add hash
-            let hash = super::signature_without_labels(record, &get_exclude_labels());
+            let hash = super::signature_without_labels(&record, &get_exclude_labels());
             record.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
 
             // convert every label to string
@@ -377,7 +421,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                 &stream_name,
                 StreamType::Metrics,
                 &mut stream_schema_map,
-                vec![record],
+                vec![&record],
                 timestamp,
                 false, // is_derived is false for metrics
             )
@@ -396,7 +440,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                 timestamp,
                 &partition_keys,
                 partition_time_level,
-                record,
+                &record,
                 Some(&schema_key),
             );
             let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
@@ -427,7 +471,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                     let alert_end_time = now_micros();
                     for alert in alerts {
                         if let Ok(Some(data)) = alert
-                            .evaluate(Some(record), (None, alert_end_time), None)
+                            .evaluate(Some(&record), (None, alert_end_time), None)
                             .await
                             .map(|res| res.data)
                         {
@@ -458,7 +502,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
-        let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await?;
+        let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
 
         req_stats.response_time = start.elapsed().as_secs_f64();
         let fns_length: usize =

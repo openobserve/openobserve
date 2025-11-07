@@ -1,39 +1,21 @@
 <template>
-    <div :class="[`  tw-px-2 tw-mb-2 tw-border group-border tw-mt-6  `, 
-        store.state.theme === 'dark' ? 'dark-mode' : 'light-mode',
+    <div :class="[`  tw-px-2 tw-mb-2 el-border tw-mt-6 el-border-radius `, 
         store.state.isAiChatEnabled ? `tw-w-full tw-ml-[${depth * 10}px]` : `xl:tw-w-fit tw-ml-[${depth * 20}px]`
     ]"
     :style="{
         opacity: computedOpacity,
         backgroundColor: computedStyleMap
     }"
-    >    <!-- here we can implment the color picker bg -->
-        <div class="  tw-w-fit group-tabs"
-        :class="store.state.theme === 'dark' ? 'dark-mode-group-tabs ' : 'light-mode-group-tabs'"
+    >  
+        <div class="  tw-w-fit condition-tabs el-border"
         >
-            <q-tabs
+          <AppTabs
             data-test="scheduled-alert-tabs"
-            v-model="label"
-            no-caps
-            outside-arrows
-            size="sm"
-            mobile-arrows
-            class=""
-            @update:model-value="toggleLabel"
-      >
-        <q-tab
-        class=""
-          data-test="scheduled-alert-custom-tab"
-          name="or"
-          :label="'OR'"
-        />
-        <q-tab
-          data-test="scheduled-alert-metrics-tab"
-          name="and"
-          :label="'AND'"
-          
-        />
-      </q-tabs>
+            :tabs="tabOptions"
+            class="tw-h-[20px] custom-tabs-selection-container"
+            v-model:active-tab="label"
+            @update:active-tab="toggleLabel"
+          />
       </div>
   
       <!-- Group content -->
@@ -149,7 +131,18 @@
   const store = useStore();
 
   const label = ref(props.group.label);
-  
+
+  const tabOptions = computed(() => [
+    {
+      label: "OR",
+      value: "or",
+    },
+    {
+      label: "AND",
+      value: "and",
+    },
+  ]);
+
   function isGroup(item: any) {
     return item && item.items && Array.isArray(item.items);
   }
@@ -284,13 +277,6 @@ defineExpose({
         max-width: 900px;
     }
 
-    .dark-mode .group-border {
-        border: 1px solid #464646;
-    }
-
-    .light-mode .group-border {
-        border-color: #e5e4e4;
-    }
 
     .group-tabs {
       position: relative;
@@ -340,53 +326,67 @@ defineExpose({
   border-radius: 4px;
 }
 
-    .group-tabs {
-      .q-tab--active {
-        background-color: $primary;
-        color: $white;
-      }
+  .group-tabs {
+      border: 1px solid $border-color;
+      background-color: transparent !important;
+    .q-tab--active {
+      background-color: var(--o2-primary-btn-bg);
+      color: $white;
+    }
 
       .q-tab__indicator {
         display: none;
       }
 
-    }
-    .dark-mode-group-tabs  .q-tab--inactive{
-        background-color: #494A4A !important;
-        
-        color: $white
+  
+
+    .q-tab--inactive {
+      background-color: var(--o2-inactive-tab-bg);
     }
 
+    .q-tab{
+          &:hover:not(.q-tab--active) {
+    background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
+  }
 
-    .light-mode-group-tabs {
-      border: 1px solid #cdcdcd;
-      .q-tab--inactive{
-        background-color: #ffffff !important;
-        color: black;
-      }
-
+    &:hover.q-tab--active {
+      background-color: var(--o2-primary-btn-bg) !important;
     }
-    .dark-mode-group-tabs{
-      border: 1px solid #464646;
-        .q-tab--inactive{
-        background-color: #494A4A !important;
-        opacity: 1;
-        color: $white;
-      }      
-    }
-    .group-tabs{
-      .q-tab--active {
-        background-color: $primary;
-        color: $white;
-      }
-      .q-tab{
-        border: none;
-      }
-
-      .q-tab__indicator {
-        display: none;
       }
     }
+    
+  .condition-tabs{
+    position: relative;
+    bottom: 14px;
+    border-radius: 4px;
+    height: 28px;
+    padding: 2px;
+    background-color: var(--o2-card-bg);
+  }
+  .custom-tabs-selection-container{
+    border: none;
+    border-radius: none;
+    .o2-tab{
+      border-radius: 4px;
+      height: 22px;
+      padding: 4px 12px;
+      border-bottom: none;
+      white-space: normal;
+      line-height: 1rem;
+      font-size: 10px;
+      border-bottom: none !important;
+    }
+    .o2-tab.active{
+      background-color: var(--o2-primary-btn-bg) !important;
+      color: rgba(255,255,255) !important;
+    }
+    .o2-tab:hover{
+      background-color: var(--o2-hover-accent) !important;
+    }
+    .o2-tab.active:hover{
+      background-color: var(--o2-primary-btn-bg) !important;
+    }
+  }
 
 
   </style>

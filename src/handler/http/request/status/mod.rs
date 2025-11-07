@@ -172,7 +172,7 @@ struct Rum {
                    requests. Returns a simple status indicator that can be used by load balancers, monitoring systems, \
                    and orchestration platforms to determine service availability and readiness.",
     responses(
-        (status = 200, description="Status OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"}))
+        (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"}))
     )
 )]
 #[get("/healthz")]
@@ -199,8 +199,8 @@ pub async fn healthz_head() -> Result<HttpResponse, Error> {
                    is both online and enabled for task scheduling. Used by cluster management systems to determine \
                    which nodes are available for workload distribution and background job processing.",
     responses(
-        (status = 200, description="Status OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"})),
-        (status = 404, description="Status Not OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "not ok"})),
+        (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"})),
+        (status = 404, description="Status Not OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "not ok"})),
     )
 )]
 #[get("/schedulez")]
@@ -419,11 +419,6 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         }),
     );
 
-    let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();
-    stats.insert(
-        "COMPACT",
-        json::json!({"file_list_offset": last_file_list_offset}),
-    );
     stats.insert(
         "DATAFUSION",
         json::json!({"file_stat_cache": {

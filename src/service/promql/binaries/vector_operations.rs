@@ -20,6 +20,7 @@ use std::{
 
 use config::meta::promql::NAME_LABEL;
 use datafusion::error::{DataFusionError, Result};
+use once_cell::sync::Lazy;
 use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
 use rayon::prelude::*;
 
@@ -30,16 +31,16 @@ use crate::service::promql::{
 
 // DROP_METRIC_VECTOR_BIN_OP if the operation is one of these, drop the metric
 // __name__
-// pub static DROP_METRIC_VECTOR_BIN_OP: Lazy<HashSet<u8>> = Lazy::new(|| {
-//     HashSet::from_iter([
-//         token::T_ADD,
-//         token::T_SUB,
-//         token::T_DIV,
-//         token::T_MUL,
-//         token::T_POW,
-//         token::T_MOD,
-//     ])
-// });
+pub static DROP_METRIC_VECTOR_BIN_OP: Lazy<HashSet<u8>> = Lazy::new(|| {
+    HashSet::from_iter([
+        token::T_ADD,
+        token::T_SUB,
+        token::T_DIV,
+        token::T_MUL,
+        token::T_POW,
+        token::T_MOD,
+    ])
+});
 
 /// Implement the operation between a vector and a float.
 ///
@@ -70,10 +71,10 @@ pub async fn vector_scalar_bin_op(
             .ok()
             {
                 Some(value) => {
-                    let labels = std::mem::take(&mut instant.labels);
-                    // if return_bool || DROP_METRIC_VECTOR_BIN_OP.contains(&expr.op.id()) {
-                    //     labels = labels.without_metric_name();
-                    // }
+                    let mut labels = std::mem::take(&mut instant.labels);
+                    if return_bool || DROP_METRIC_VECTOR_BIN_OP.contains(&expr.op.id()) {
+                        labels = labels.without_metric_name();
+                    }
 
                     let final_value = if is_comparison_operator && swapped_lhs_rhs && return_bool {
                         value
@@ -286,9 +287,9 @@ fn vector_arithmetic_operators(
             .ok()
             .map(|value| {
                 let mut labels = std::mem::take(&mut lhs_instant.labels);
-                // if return_bool || DROP_METRIC_VECTOR_BIN_OP.contains(&operator) {
-                //     labels = labels.without_metric_name();
-                // }
+                if return_bool || DROP_METRIC_VECTOR_BIN_OP.contains(&operator) {
+                    labels = labels.without_metric_name();
+                }
 
                 if let Some(modifier) = expr.modifier.as_ref() {
                     if modifier.card == VectorMatchCardinality::OneToOne {

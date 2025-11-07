@@ -1016,6 +1016,7 @@ export const convertSQLData = async (
           show: true,
           fontsize: 12,
           precision: panelSchema.config?.decimals,
+          backgroundColor: store.state.theme === "dark" ? "#333" : "",
           formatter: function (params: any) {
             try {
               let lineBreaks = "";
@@ -1549,6 +1550,7 @@ export const convertSQLData = async (
         options.xAxis = options.xAxis.slice(0, 1);
         options.tooltip.axisPointer.label = {
           show: true,
+          backgroundColor: store.state.theme === "dark" ? "#333" : "",
           label: {
             fontsize: 12,
             precision: panelSchema.config?.decimals,
@@ -1990,6 +1992,7 @@ export const convertSQLData = async (
       options.xAxis = options.xAxis.slice(0, 1);
       options.tooltip.axisPointer.label = {
         show: true,
+        backgroundColor: store.state.theme === "dark" ? "#333" : "",
         label: {
           fontsize: 12,
           precision: panelSchema.config?.decimals,
@@ -2153,6 +2156,7 @@ export const convertSQLData = async (
           label: {
             fontsize: 12,
             precision: panelSchema.config?.decimals,
+            backgroundColor: store.state.theme === "dark" ? "#333" : "",
           },
         });
       // if auto sql
@@ -2636,6 +2640,7 @@ export const convertSQLData = async (
         label: {
           fontsize: 12,
           precision: panelSchema.config?.decimals,
+          backgroundColor: store.state.theme === "dark" ? "#333" : "",
           formatter: function (params: any) {
             try {
               if (params?.axisDimension == "y")
@@ -2816,6 +2821,7 @@ export const convertSQLData = async (
         label: {
           fontsize: 12,
           precision: panelSchema.config?.decimals,
+          backgroundColor: store.state.theme === "dark" ? "#333" : "",
           formatter: function (params: any) {
             try {
               if (params?.axisDimension == "y")

@@ -17,7 +17,7 @@ use datafusion::error::{DataFusionError, Result};
 
 use crate::service::promql::{
     common::linear_regression,
-    value::{InstantValue, Sample, Value},
+    value::{InstantValue, LabelsExt, Sample, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#predict_linear
@@ -44,7 +44,7 @@ fn exec(data: Value, duration: f64) -> Result<Value> {
         if let Some((slope, intercept)) = linear_regression(&metric.samples, eval_ts / 1000) {
             let value = slope * duration + intercept;
             rate_values.push(InstantValue {
-                labels,
+                labels: labels.without_metric_name(),
                 sample: Sample::new(eval_ts, value),
             });
         }

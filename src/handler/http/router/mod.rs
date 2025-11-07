@@ -46,7 +46,9 @@ use {
 use super::request::*;
 use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
-    handler::http::request::search::search_inspector,
+    handler::http::{
+        request::search::search_inspector, router::middlewares::blocked_orgs_middleware,
+    },
 };
 
 pub mod middlewares;
@@ -370,6 +372,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
 
     #[allow(deprecated)]
     let service = web::scope("/api")
+        .wrap(middleware::from_fn(blocked_orgs_middleware))
         .wrap(middleware::from_fn(audit_middleware))
         .wrap(HttpAuthentication::with_fn(
             super::auth::validator::oo_validator,
@@ -507,6 +510,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::enable_alert_bulk)
         .service(alerts::trigger_alert)
         .service(alerts::move_alerts)
+        .service(alerts::history::get_alert_history)
         .service(alerts::deprecated::save_alert)
         .service(alerts::deprecated::update_alert)
         .service(alerts::deprecated::get_alert)
@@ -556,7 +560,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(pipeline::delete_pipeline)
         .service(pipeline::enable_pipeline)
         .service(pipeline::enable_pipeline_bulk)
+        .service(pipelines::history::get_pipeline_history)
         .service(search::multi_streams::search_multi)
+        .service(search::multi_streams::search_multi_stream)
         .service(search::multi_streams::_search_partition_multi)
         .service(search::multi_streams::around_multi)
         .service(stream::delete_stream_cache)
@@ -604,14 +610,18 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ai::prompt::get_prompt)
         .service(ai::prompt::update_prompt)
         .service(ai::prompt::rollback_prompt)
-        .service(re_pattern::get)
+        .service(re_pattern::get_built_in_patterns)
+        .service(re_pattern::test)
         .service(re_pattern::list)
         .service(re_pattern::save)
+        .service(re_pattern::get)
         .service(re_pattern::update)
         .service(re_pattern::delete)
-        .service(re_pattern::test)
         .service(domain_management::get_domain_management_config)
-        .service(domain_management::set_domain_management_config);
+        .service(domain_management::set_domain_management_config)
+        .service(traces::get_service_graph_metrics)
+        .service(traces::get_store_stats)
+        .service(patterns::extract_patterns);
 
     #[cfg(feature = "cloud")]
     let service = service

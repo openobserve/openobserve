@@ -65,8 +65,15 @@ describe("ImportRegexPattern", () => {
           "q-separator": true,
           "q-form": true,
           "q-file": true,
-          "q-splitter": true,
-          "app-tabs": true,
+          "q-splitter": {
+            template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
+            props: ['modelValue', 'style', 'noScroll']
+          },
+          "app-tabs": {
+            template: '<div :data-test="$attrs[\'data-test\']" :class="$attrs.class"><slot></slot></div>',
+            props: ['tabs', 'activeTab'],
+            emits: ['update:active-tab']
+          },
           "query-editor": true,
           "q-icon": true
         }
@@ -91,7 +98,7 @@ describe("ImportRegexPattern", () => {
 
     it("should initialize with correct default values", () => {
       expect(wrapper.vm.jsonStr).toBe("");
-      expect(wrapper.vm.activeTab).toBe("import_json_file");
+      expect(wrapper.vm.activeTab).toBe("import_built_in_patterns");
       expect(wrapper.vm.url).toBe("");
       expect(wrapper.vm.splitterModel).toBe(60);
       expect(wrapper.vm.queryEditorPlaceholderFlag).toBe(true);
@@ -114,6 +121,10 @@ describe("ImportRegexPattern", () => {
 
     it("should initialize correct tabs structure", () => {
       expect(wrapper.vm.tabs).toEqual([
+        {
+          label: "Built-in Patterns",
+          value: "import_built_in_patterns",
+        },
         {
           label: "File Upload / JSON",
           value: "import_json_file",
@@ -344,14 +355,15 @@ describe("ImportRegexPattern", () => {
       expect(wrapper.vm.regexPatternErrorsToDisplay[0][0].message).toContain("name is required");
     });
 
-    it("should return false for existing pattern name", async () => {
-      const result = await wrapper.vm.validateRegexPatternInputs({ 
-        name: "existing-pattern-1", 
-        pattern: ".*" 
+    it("should return true for existing pattern name (duplicates allowed)", async () => {
+      // Note: Duplicate pattern names are now allowed as primary key is UUID-based
+      const result = await wrapper.vm.validateRegexPatternInputs({
+        name: "existing-pattern-1",
+        pattern: ".*"
       }, 1);
-      
-      expect(result).toBe(false);
-      expect(wrapper.vm.regexPatternErrorsToDisplay[0][0].message).toContain("with this name already exists");
+
+      expect(result).toBe(true);
+      expect(wrapper.vm.regexPatternErrorsToDisplay).toEqual([]);
     });
 
     it("should return false for empty pattern", async () => {

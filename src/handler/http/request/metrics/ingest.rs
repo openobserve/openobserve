@@ -16,7 +16,11 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, http, http::header, post, web};
+#[cfg(feature = "cloud")]
+use config::meta::stream::StreamType;
 
+#[cfg(feature = "cloud")]
+use crate::service::ingestion::check_ingestion_allowed;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
@@ -54,6 +58,20 @@ pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpRes
     };
 
     let org_id = org_id.into_inner();
+
+    #[cfg(feature = "cloud")]
+    match check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
+    }
+
     let mut resp = match metrics::json::ingest(&org_id, body).await {
         Ok(v) => HttpResponse::Ok().json(v),
         Err(e) => {
@@ -103,6 +121,20 @@ pub async fn otlp_metrics_write(
     };
 
     let org_id = org_id.into_inner();
+
+    #[cfg(feature = "cloud")]
+    match check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
+    }
+
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     let mut resp = if content_type.eq(CONTENT_TYPE_PROTO) {
         metrics::otlp::otlp_proto(&org_id, body).await?

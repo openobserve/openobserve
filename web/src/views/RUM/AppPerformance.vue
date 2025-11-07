@@ -17,52 +17,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier">
-    <div class="flex justify-between items-center q-py-sm q-px-md">
-      <div class="performance_title">
-        {{ t("rum.performanceSummaryLabel") }}
-      </div>
-      <div class="flex items-center">
-        <DateTimePickerDashboard
-          class="q-ml-sm rum-date-time-picker"
-          ref="dateTimePicker"
-          v-model="selectedDate"
+  <div :key="store.state.selectedOrganization.identifier">
+    <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
+      <div class="card-container">
+        <div class="flex justify-between items-center q-py-sm q-px-md">
+          <div class="performance_title">
+            {{ t("rum.performanceSummaryLabel") }}
+          </div>
+          <div class="flex items-center">
+            <DateTimePickerDashboard
+              class="q-ml-sm rum-date-time-picker"
+              ref="dateTimePicker"
+              v-model="selectedDate"
+            />
+            <AutoRefreshInterval
+              v-model="refreshInterval"
+              :min-refresh-interval="
+                store.state?.zoConfig?.min_auto_refresh_interval || 5
+              "
+              trigger
+              @trigger="refreshData"
+            />
+            <q-btn
+              class="q-ml-sm"
+              outline
+              padding="xs"
+              no-caps
+              icon="refresh"
+              @click="refreshData"
+            >
+            </q-btn>
+          </div>
+        </div>
+        <AppTabs
+          class="q-px-md"
+          :tabs="tabs"
+          v-model:active-tab="activePerformanceTab"
         />
-        <AutoRefreshInterval
-          v-model="refreshInterval"
-          :min-refresh-interval="
-            store.state?.zoConfig?.min_auto_refresh_interval || 5
-          "
-          trigger
-          @trigger="refreshData"
-        />
-        <q-btn
-          class="q-ml-sm"
-          outline
-          padding="xs"
-          no-caps
-          icon="refresh"
-          @click="refreshData"
-        >
-        </q-btn>
       </div>
     </div>
-    <AppTabs
-      class="q-px-md"
-      :tabs="tabs"
-      v-model:active-tab="activePerformanceTab"
-    />
-    <q-separator></q-separator>
+
     <router-view v-slot="{ Component }">
       <keep-alive>
-        <component
-          :is="Component"
-          :date-time="currentTimeObj"
-          :selected-date="selectedDate"
-        />
+        <div
+          class="tw-pb-[0.625rem] tw-px-[0.625rem] tw-h-full tw-h-[calc(100%-146px)]"
+        >
+          <div class="card-container tw-py-[0.625rem] tw-h-full">
+            <component
+              :is="Component"
+              :date-time="currentTimeObj"
+              :selected-date="selectedDate"
+            />
+          </div>
+        </div>
       </keep-alive>
     </router-view>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">

@@ -15,6 +15,7 @@
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    io::Write,
     sync::{Arc, atomic::Ordering},
 };
 
@@ -367,6 +368,7 @@ pub fn init_functions_runtime() -> Runtime {
 
 pub async fn write_file(
     writer: &Arc<ingester::Writer>,
+    org_id: &str,
     stream_name: &str,
     buf: HashMap<String, SchemaRecords>,
     fsync: bool,
@@ -379,6 +381,7 @@ pub async fn write_file(
                 None
             } else {
                 Some(ingester::Entry {
+                    org_id: Arc::from(org_id),
                     stream: Arc::from(stream_name),
                     schema: Some(entry.schema),
                     schema_key: Arc::from(entry.schema_key.as_str()),
@@ -591,6 +594,45 @@ pub fn create_log_ingestion_req(
             "Ingestion type not yet supported".to_string(),
         )),
     }
+}
+
+pub fn refactor_map(
+    original_map: Map<String, Value>,
+    defined_schema_keys: &HashSet<String>,
+) -> Map<String, Value> {
+    let mut new_map = Map::with_capacity(defined_schema_keys.len() + 2);
+    let mut non_schema_map = Vec::with_capacity(1024); // 1KB
+
+    let mut has_elements = false;
+    non_schema_map.write_all(b"{").unwrap();
+    for (key, value) in original_map {
+        if defined_schema_keys.contains(&key) {
+            new_map.insert(key, value);
+        } else {
+            if has_elements {
+                non_schema_map.write_all(b",").unwrap();
+            } else {
+                has_elements = true;
+            }
+            non_schema_map.write_all(b"\"").unwrap();
+            non_schema_map.write_all(key.as_bytes()).unwrap();
+            non_schema_map.write_all(b"\":\"").unwrap();
+            non_schema_map
+                .write_all(pickup_string_value(value).as_bytes())
+                .unwrap();
+            non_schema_map.write_all(b"\"").unwrap();
+        }
+    }
+    non_schema_map.write_all(b"}").unwrap();
+
+    if has_elements {
+        new_map.insert(
+            config::get_config().common.column_all.to_string(),
+            Value::String(String::from_utf8(non_schema_map).unwrap()),
+        );
+    }
+
+    new_map
 }
 
 #[cfg(test)]

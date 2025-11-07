@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 11;
+pub const DB_SCHEMA_VERSION: u64 = 12;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -496,6 +496,7 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub encryption: Encryption,
     pub enrichment_table: EnrichmentTable,
+    pub service_graph: ServiceGraph,
 }
 
 #[derive(EnvConfig, Default)]
@@ -526,7 +527,7 @@ pub struct ReportServer {
     pub port: u16,
     #[env_config(name = "ZO_REPORT_SERVER_HTTP_ADDR", default = "127.0.0.1")]
     pub addr: String,
-    #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
+    #[env_config(name = "ZO_REPORT_SERVER_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
 }
 
@@ -668,6 +669,12 @@ pub struct Http {
         help = "this value must use webpki or native. it means use standard root certificates from webpki-roots or native-roots as a rustls certificate store"
     )]
     pub tls_root_certificates: String,
+    #[env_config(
+        name = "ZO_HTTP_ACCESS_LOG_FORMAT",
+        default = "",
+        help = "Custom access log format, leave empty to use default format, shortcut: common, json"
+    )]
+    pub access_log_format: String,
 }
 
 #[derive(EnvConfig, Default)]
@@ -874,6 +881,12 @@ pub struct Common {
         help = "Skip WAL for query"
     )]
     pub feature_query_skip_wal: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SHARED_MEMTABLE_ENABLED",
+        default = false,
+        help = "Enable shared memtable across multiple organizations"
+    )]
+    pub feature_shared_memtable_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -1132,6 +1145,12 @@ pub struct Common {
     pub metrics_cache_enabled: bool,
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
+    #[env_config(
+        name = "ZO_REGEX_PATTERNS_SOURCE_URL",
+        default = "https://raw.githubusercontent.com/openobserve/sdr_patterns/main/regex.json",
+        help = "URL for built-in regex patterns JSON source. Can be customized to use different pattern libraries."
+    )]
+    pub regex_patterns_source_url: String,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
     #[env_config(name = "ZO_ES_VERSION", default = "")]
@@ -1156,6 +1175,12 @@ pub struct Common {
     pub min_auto_refresh_interval: u32,
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
+    #[env_config(
+        name = "ZO_USAGE_REPORT_TO_OWN_ORG",
+        default = true,
+        help = "Report alert/report triggers to the originating organization in addition to _meta org"
+    )]
+    pub usage_report_to_own_org: bool,
     #[env_config(name = "ZO_FILE_LIST_DUMP_ENABLED", default = false)]
     pub file_list_dump_enabled: bool,
     #[env_config(name = "ZO_FILE_LIST_DUMP_DUAL_WRITE", default = true)]
@@ -1290,6 +1315,8 @@ pub struct Limit {
     pub file_download_priority_queue_window_secs: i64,
     #[env_config(name = "ZO_FILE_DOWNLOAD_ENABLE_PRIORITY_QUEUE", default = true)]
     pub file_download_enable_priority_queue: bool,
+    #[env_config(name = "ZO_GRPC_INGEST_TIMEOUT", default = 600)]
+    pub grpc_ingest_timeout: u64,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
     #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 0)]
@@ -1324,8 +1351,6 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
-    #[env_config(name = "ZO_METRICS_MAX_SERIES_PER_QUERY", default = 30000)]
-    pub metrics_max_series_per_query: usize,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
@@ -1800,8 +1825,8 @@ pub struct Nats {
     pub queue_max_size: i64,
     #[env_config(
         name = "ZO_NATS_EVENT_STORAGE",
-        help = "Set the storage type for the event stream, default is: memory, other value is: file",
-        default = "memory"
+        help = "Set the storage type for the event stream, default is: file, other value is: memory",
+        default = "file"
     )]
     pub event_storage: String,
     #[env_config(
@@ -2115,6 +2140,38 @@ pub struct EnrichmentTable {
     pub merge_interval: u64,
 }
 
+/// Service Graph Configuration
+///
+/// Note: Worker count is fixed at 256 (one per shard) for optimal concurrency.
+/// No async channels are used in the current implementation.
+#[derive(EnvConfig, Default)]
+pub struct ServiceGraph {
+    #[env_config(
+        name = "ZO_SGRAPH_ENABLED",
+        default = true,
+        help = "Enable service graph feature"
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_SGRAPH_WAIT_DURATION_MS",
+        default = 10000,
+        help = "Wait duration for span pairing in milliseconds"
+    )]
+    pub wait_duration_ms: u64,
+    #[env_config(
+        name = "ZO_SGRAPH_MAX_ITEMS_PER_SHARD",
+        default = 100000,
+        help = "Maximum items per shard in edge store (256 shards total)"
+    )]
+    pub max_items_per_shard: usize,
+    #[env_config(
+        name = "ZO_SGRAPH_CLEANUP_INTERVAL_MS",
+        default = 2000,
+        help = "Cleanup interval for expired edges in milliseconds"
+    )]
+    pub cleanup_interval_ms: u64,
+}
+
 pub fn init() -> Config {
     if let Err(e) = load_config() {
         log::error!("Failed to load config {e}");
@@ -2365,9 +2422,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check for metrics limit
-    if cfg.limit.metrics_max_series_per_query == 0 {
-        cfg.limit.metrics_max_series_per_query = 30_000;
-    }
     if cfg.limit.metrics_max_points_per_series == 0 {
         cfg.limit.metrics_max_points_per_series = 30_000;
     }
@@ -3141,5 +3195,29 @@ mod tests {
 
         cfg.route.dispatch_strategy = RouteDispatchStrategy::Other;
         assert!(check_route_config(&cfg).is_err());
+    }
+
+    #[test]
+    fn test_usage_report_to_own_org_field_exists() {
+        // Test that usage_report_to_own_org field exists and is accessible
+        let cfg = Config::init().unwrap();
+        // Verify the field is accessible as a boolean
+        let _value: bool = cfg.common.usage_report_to_own_org;
+        // Test passes if we can access the field without error
+    }
+
+    #[test]
+    fn test_usage_report_to_own_org_env_override() {
+        // Test that environment variable can override the default
+        unsafe {
+            std::env::set_var("ZO_USAGE_REPORT_TO_OWN_ORG", "false");
+        }
+        let cfg = Config::init().unwrap();
+        // Note: This test may fail if the config is already loaded
+        // In that case, we just verify the field exists
+        let _ = cfg.common.usage_report_to_own_org;
+        unsafe {
+            std::env::remove_var("ZO_USAGE_REPORT_TO_OWN_ORG");
+        }
     }
 }

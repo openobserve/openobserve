@@ -89,7 +89,7 @@ impl From<DashboardError> for HttpResponse {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = DashboardRequestBody,
+        content = inline(DashboardRequestBody),
         description = "Dashboard details",
         example = json!({
             "title": "Network Traffic Overview",
@@ -97,7 +97,7 @@ impl From<DashboardError> for HttpResponse {
         }),
     ),
     responses(
-        (status = StatusCode::CREATED, description = "Dashboard created", body = DashboardResponseBody),
+        (status = StatusCode::CREATED, description = "Dashboard created", body = inline(DashboardResponseBody)),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
@@ -140,9 +140,9 @@ pub async fn create_dashboard(
         ("org_id" = String, Path, description = "Organization name"),
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
-    request_body(content = DashboardRequestBody, description = "Dashboard details"),
+    request_body(content = inline(DashboardRequestBody), description = "Dashboard details"),
     responses(
-        (status = StatusCode::OK, description = "Dashboard updated", body = DashboardResponseBody),
+        (status = StatusCode::OK, description = "Dashboard updated", body = inline(DashboardResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = ()),
     ),
@@ -191,7 +191,7 @@ async fn update_dashboard(
         ListDashboardsQuery
     ),
     responses(
-        (status = StatusCode::OK, body = ListDashboardsResponseBody),
+        (status = StatusCode::OK, body = inline(ListDashboardsResponseBody)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"}))
@@ -230,7 +230,7 @@ async fn list_dashboards(
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
     responses(
-        (status = StatusCode::OK, body = DashboardResponseBody),
+        (status = StatusCode::OK, body = inline(DashboardResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
     extensions(
@@ -263,7 +263,7 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
     responses(
-        (status = StatusCode::OK, body = DashboardResponseBody),
+        (status = StatusCode::OK, body = inline(DashboardResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
     extensions(
@@ -331,7 +331,7 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
      request_body(
-        content = MoveDashboardRequestBody,
+        content = inline(MoveDashboardRequestBody),
         description = "MoveDashboard details",
         example = json!({
             "from": "Source folder id",
@@ -384,7 +384,7 @@ async fn move_dashboard(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = MoveDashboardsRequestBody, description = "Identifies dashboards and the destination folder", content_type = "application/json"),    
+    request_body(content = inline(MoveDashboardsRequestBody), description = "Identifies dashboards and the destination folder", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
