@@ -1347,7 +1347,7 @@ export default defineComponent({
       interval: number | undefined,
     ) => {
       if (interval && hoveredTimestamp) {
-        const startTime = hoveredTimestamp * 1000; // Convert to microseconds
+        const startTime = hoveredTimestamp; // Convert to microseconds
         return {
           startTime,
           endTime: startTime + interval,

@@ -1437,5 +1437,5 @@ export const getUTCTimestampFromZonedTimestamp = (
   const utcDate = fromZonedTime(zonedDate, currentTimeZone);
   const utcMs = utcDate.getTime();
 
-  return utcMs; 
+  return Math.trunc(utcMs * 1000); // milliseconds to microseconds
 };
