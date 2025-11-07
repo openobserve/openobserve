@@ -387,10 +387,10 @@ def test_summary(create_session, base_url, base_url_sc, org_id):
         f"Expected to be {expected_num_dashboards_sc}, but got {actual_num_dashboards_sc}"
     )
 
-    # Retrieve the pipeline list
-    resp_list_pipelines = session.get(f"{url_sc}api/{org_id}/pipelines")
+    # Retrieve the pipeline list (use base_url since it was created there)
+    resp_list_pipelines = session.get(f"{base_url}api/{org_id}/pipelines")
     assert resp_list_pipelines.status_code == 200, f"Expected status code 200 but got {resp_list_pipelines.status_code}"
-    
+
     # Parse the pipeline list response
     pipelines_list = resp_list_pipelines.json().get("list", [])
     assert pipelines_list, "No pipelines found in the list response."
@@ -403,21 +403,21 @@ def test_summary(create_session, base_url, base_url_sc, org_id):
             break
 
     assert pipeline_id, "Pipeline ID not found for the created pipeline."
-    print(f"Pipeline ID: {pipeline_id}")    
-    resp_get_pipeline = session.get(f"{url_sc}api/{org_id}/pipelines")
+    print(f"Pipeline ID: {pipeline_id}")
+    resp_get_pipeline = session.get(f"{base_url}api/{org_id}/pipelines")
     print(resp_get_pipeline.json())
     assert resp_get_pipeline.status_code == 200
     pipeline_list = resp_get_pipeline.json()["list"]
     target_pipeline = next((p for p in pipeline_list if p["pipeline_id"] == pipeline_id), None)
     assert target_pipeline is not None, f"Pipeline {pipeline_id} not found in the list"
-   
+
     # Delete the pipeline
-    resp_delete_pipeline = session.delete(f"{url_sc}api/{org_id}/pipelines/{pipeline_id}")
+    resp_delete_pipeline = session.delete(f"{base_url}api/{org_id}/pipelines/{pipeline_id}")
     assert resp_delete_pipeline.status_code == 200, f"Expected status code 200 but got {resp_delete_pipeline.status_code}"
     print(f"Deleted pipeline {pipeline_id}")
 
-    # Make the request to get the list of alerts
-    resp_get_allalertsnew = session.get(f"{url_sc}api/v2/{org_id}/alerts")
+    # Make the request to get the list of alerts (use base_url since they were created there)
+    resp_get_allalertsnew = session.get(f"{base_url}api/v2/{org_id}/alerts")
     # Ensure the response is successful
     assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
     # Parse the response JSON
@@ -426,32 +426,62 @@ def test_summary(create_session, base_url, base_url_sc, org_id):
     assert "list" in response_json, "Response does not contain 'list'"
     # Get the list of alerts from the response
     alerts = response_json["list"]
+    # Store destination and folder info before deleting alerts
+    destinations_to_delete = set()
+    folders_to_delete = set()
     # Now you can iterate over the alerts
     for alert in alerts:
         alert_id = alert.get("alert_id")
         assert alert_id, f"Alert ID is missing for alert: {alert}"
         print(f"Extracted alert_id: {alert_id}")
+        # Store destinations and folder for cleanup
+        if alert.get("destinations"):
+            destinations_to_delete.update(alert["destinations"])
+        if alert.get("folderId"):
+            folders_to_delete.add(alert["folderId"])
             # Validate the alert existence first
-        resp_check_alert = session.get(f"{url_sc}api/v2/{org_id}/alerts/{alert_id}")
+        resp_check_alert = session.get(f"{base_url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
         print(f"Alert {alert_id} exists and is retrievable.")
             # Proceed to delete the alert
-        resp_delete_alertnew = session.delete(f"{url_sc}api/v2/{org_id}/alerts/{alert_id}")
+        resp_delete_alertnew = session.delete(f"{base_url}api/v2/{org_id}/alerts/{alert_id}")
         print(f"Deleted Alert Response: {resp_delete_alertnew.text}")
         assert resp_delete_alertnew.status_code == 200, f"Failed to delete alert {alert_id}"
         print(f"Successfully deleted alert {alert_id}")
 
-    # Proceed to delete the function
+    # Clean up alert destinations
+    for destination_name in destinations_to_delete:
+        resp_delete_dest = session.delete(f"{base_url}api/{org_id}/alerts/destinations/{destination_name}")
+        print(f"Deleted destination {destination_name}: {resp_delete_dest.status_code}")
+
+    # Clean up alert templates (get list and delete all)
+    resp_get_templates = session.get(f"{base_url}api/{org_id}/alerts/templates")
+    if resp_get_templates.status_code == 200:
+        templates_data = resp_get_templates.json()
+        # Handle both list and dict response formats
+        templates = templates_data if isinstance(templates_data, list) else templates_data.get("list", [])
+        for template in templates:
+            template_name = template.get("name")
+            if template_name:
+                resp_delete_template = session.delete(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
+                print(f"Deleted template {template_name}: {resp_delete_template.status_code}")
+
+    # Clean up alert folders
+    for folder_id in folders_to_delete:
+        resp_delete_folder = session.delete(f"{base_url}api/v2/{org_id}/folders/{folder_id}")
+        print(f"Deleted folder {folder_id}: {resp_delete_folder.status_code}")
+
+    # Proceed to delete the function (use base_url since it was created there)
     resp_delete_function = session.delete(
-        f"{url_sc}api/{org_id}/functions/pytestfunction"
+        f"{base_url}api/{org_id}/functions/pytestfunction"
     )
     assert (
         resp_delete_function.status_code == 200
     ), f"Deleting this function, but got {resp_delete_function.status_code} {resp_delete_function.content}"
     print(f"Function deleted successfully")
 
-    # Proceed to delete the dashboard
-    resp_get_alldashboards = session.get(f"{url_sc}api/{org_id}/dashboards")
+    # Proceed to delete the dashboard (use base_url since it was created there)
+    resp_get_alldashboards = session.get(f"{base_url}api/{org_id}/dashboards")
     assert resp_get_alldashboards.status_code == 200, f"Expected status code 200 but got {resp_get_alldashboards.status_code}"
     # Parse the response JSON
     dashboards_response = resp_get_alldashboards.json()
@@ -472,7 +502,7 @@ def test_summary(create_session, base_url, base_url_sc, org_id):
         print(f"Extracted Dashboard ID: {dashboard_id}")
         # Now you can delete the dashboard using the extracted ID
         resp_delete_dashboard = session.delete(
-            f"{url_sc}api/{org_id}/dashboards/{dashboard_id}"
+            f"{base_url}api/{org_id}/dashboards/{dashboard_id}"
         )
         # Assert that the deletion was successful
         assert resp_delete_dashboard.status_code == 200, f"Failed to delete dashboard, status code: {resp_delete_dashboard.status_code}"
@@ -483,8 +513,8 @@ def test_summary(create_session, base_url, base_url_sc, org_id):
     # Wait for deletion to propagate
     time.sleep(3)
 
-    # Proceed to delete the stream
-    resp_delete_stream= session.delete(f"{url_sc}api/{org_id}/streams/{stream_name}?type=logs")
+    # Proceed to delete the stream (use base_url since it was created there)
+    resp_delete_stream= session.delete(f"{base_url}api/{org_id}/streams/{stream_name}?type=logs")
     print(f"Deleted Stream Response: {resp_delete_stream.text}")
     assert resp_delete_stream.status_code == 200, f"Failed to delete  {stream_name}"
     print(f"Successfully deleted stream {stream_name}")
