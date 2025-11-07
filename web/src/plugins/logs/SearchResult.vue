@@ -369,9 +369,9 @@ color="warning" size="xs"></q-icon> Error while
         :selectedPattern="selectedPattern"
         :totalPatterns="patternsState?.patterns?.patterns?.length || 0"
         @navigate="navigatePatternDetail"
-                />
-              </div>
-            </div>
+      />
+    </div>
+  </div>
 </template>
 
 <script lang="ts">

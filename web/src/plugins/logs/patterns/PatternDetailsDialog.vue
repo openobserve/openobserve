@@ -24,18 +24,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-card
       v-if="selectedPattern"
-      class="detail-table-dialog"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-      style="width: 70vw; max-width: 70vw"
+      class="column full-height no-wrap detail-table-dialog !tw-w-[90vw] !tw-max-w-[90vw]"
+      :style="{ borderTop: `4px solid var(--q-primary)` }"
     >
       <!-- Header -->
-      <q-card-section
-        class="q-pa-md"
-        :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-1'"
-      >
-        <div class="row items-center">
+      <q-card-section class="q-px-md q-pb-sm">
+        <div class="row items-center no-wrap">
           <div class="col">
-            <div class="text-h6">Pattern Details</div>
+            <div class="text-body1 text-bold">Pattern Details</div>
             <div
               class="text-caption"
               :class="
@@ -47,44 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-auto">
             <q-btn
-              outline
-              no-caps
-              padding="xs md"
-              icon="chevron_left"
-              label="Previous"
-              @click="$emit('navigate', false, true)"
-              :disable="selectedPattern.index === 0"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'text-grey-5 border-grey-5'
-                  : 'text-grey-7 border-grey-7'
-              "
-              class="q-mr-sm"
-            />
-            <q-btn
-              outline
-              no-caps
-              padding="xs md"
-              icon-right="chevron_right"
-              label="Next"
-              @click="$emit('navigate', true, false)"
-              :disable="selectedPattern.index >= totalPatterns - 1"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'text-grey-5 border-grey-5'
-                  : 'text-grey-7 border-grey-7'
-              "
-              class="q-mr-sm"
-            />
-            <q-btn
-              flat
+              v-close-popup="true"
               round
-              dense
-              icon="close"
-              @click="$emit('update:modelValue', false)"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-              "
+              flat
+              icon="cancel"
+              data-test="close-pattern-dialog"
             />
           </div>
         </div>
@@ -92,14 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-separator />
 
-      <!-- Content -->
+      <!-- Content - Single Scrollable View -->
       <q-card-section
-        class="q-pa-md"
-        style="height: calc(100vh - 100px); overflow-y: auto"
+        class="tw-py-[0.375rem] tw-px-[0.625rem]"
+        style="flex: 1; overflow-y: auto"
       >
         <!-- Statistics -->
-        <div class="q-mb-lg">
-          <div class="text-subtitle2 text-weight-medium q-mb-md">
+        <div class="tw-mb-[1rem]">
+          <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
             Statistics
           </div>
           <div class="row q-col-gutter-md">
@@ -111,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'
                 "
               >
-                <q-card-section class="q-pa-md">
+                <q-card-section class="tw-p-[0.375rem]">
                   <div
                     class="text-caption"
                     :class="
@@ -122,8 +85,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     Occurrences
                   </div>
-                  <div class="text-h5 text-weight-bold text-primary q-mt-xs">
-                    {{ selectedPattern.pattern.frequency.toLocaleString() }}
+                  <div
+                    class="text-h5 text-weight-bold text-primary q-mt-xs"
+                  >
+                    {{
+                      selectedPattern.pattern.frequency.toLocaleString()
+                    }}
                   </div>
                 </q-card-section>
               </q-card>
@@ -136,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'
                 "
               >
-                <q-card-section class="q-pa-md">
+                <q-card-section class="tw-p-[0.375rem]">
                   <div
                     class="text-caption"
                     :class="
@@ -147,14 +114,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     Percentage
                   </div>
-                  <div class="text-h5 text-weight-bold text-primary q-mt-xs">
+                  <div
+                    class="text-h5 text-weight-bold text-primary q-mt-xs"
+                  >
                     {{ selectedPattern.pattern.percentage.toFixed(2) }}%
                   </div>
                 </q-card-section>
               </q-card>
             </div>
           </div>
-          <div v-if="selectedPattern.pattern.is_anomaly" class="q-mt-md">
+          <div
+            v-if="selectedPattern.pattern.is_anomaly"
+            class="q-mt-md"
+          >
             <q-banner class="bg-negative text-white">
               <template v-slot:avatar>
                 <q-icon name="warning" size="md" />
@@ -164,14 +136,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Template -->
-        <div class="q-mb-lg">
-          <div class="text-subtitle2 text-weight-medium q-mb-md">
+        <!-- Description -->
+        <div class="tw-mb-[1rem]">
+          <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
+            Description
+          </div>
+          <div
+            class="tw-px-[0.625rem] tw-py-[0.375rem]"
+            :class="
+              store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+            "
+            style="
+              border-radius: 0.25rem;
+              border-left: 0.25rem solid;
+              border-color: var(--q-primary);
+            "
+          >
+            {{
+              selectedPattern.pattern.description ||
+              "No description available"
+            }}
+          </div>
+        </div>
+
+        <!-- Pattern Template -->
+        <div class="tw-mb-[1rem]">
+          <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
             Pattern Template
           </div>
           <div
-            class="q-pa-md"
-            :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+            class="tw-px-[0.625rem] tw-py-[0.375rem]"
+            :class="
+              store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+            "
             style="
               font-family:
                 &quot;Monaco&quot;, &quot;Menlo&quot;,
@@ -195,35 +192,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selectedPattern.pattern.variables &&
             selectedPattern.pattern.variables.length > 0
           "
-          class="q-mb-lg"
+          class="tw-mb-[1rem]"
         >
-          <div class="text-subtitle2 text-weight-medium q-mb-md">
+          <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
             Variables ({{ selectedPattern.pattern.variables.length }})
           </div>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem">
-            <q-chip
-              v-for="variable in selectedPattern.pattern.variables"
-              :key="variable.index"
-              :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-3'"
-            >
-              <span class="text-weight-bold text-primary">{{
-                variable.name || "var_" + variable.index
-              }}</span>
-              <span
-                class="q-mx-xs"
-                :class="
-                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-                "
-                >•</span
+          <q-table
+            :rows="selectedPattern.pattern.variables"
+            :columns="variableColumns"
+            :row-key="(row: any) => 'var_' + row.index"
+            :rows-per-page-options="[0]"
+            class="q-table o2-quasar-table o2-row-md tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+            dense
+          >
+            <template v-slot:body-cell-name="props">
+              <q-td
+                class="text-left text-weight-bold text-primary"
               >
-              <span
-                :class="
-                  store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-7'
-                "
-                >{{ variable.var_type || "unknown" }}</span
-              >
-            </q-chip>
-          </div>
+                {{ props.row.name || "var_" + props.row.index }}
+              </q-td>
+            </template>
+
+            <template v-slot:body-cell-type="props">
+              <q-td class="text-left">
+                <q-chip
+                  size="sm"
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-3'
+                  "
+                >
+                  {{ props.row.var_type || "unknown" }}
+                </q-chip>
+              </q-td>
+            </template>
+          </q-table>
         </div>
 
         <!-- Example Logs -->
@@ -232,16 +234,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selectedPattern.pattern.examples &&
             selectedPattern.pattern.examples.length > 0
           "
-          class="q-mb-lg"
+          class="tw-mb-[1rem]"
         >
-          <div class="text-subtitle2 text-weight-medium q-mb-md">
+          <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
             Example Logs ({{ selectedPattern.pattern.examples.length }})
           </div>
           <div
             v-for="(example, exIdx) in selectedPattern.pattern.examples"
             :key="exIdx"
-            class="q-pa-md q-mb-md"
-            :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-1'"
+            class="tw-px-[0.625rem] tw-py-[0.375rem] tw-mb-[0.375rem]"
+            :class="
+              store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-1'
+            "
             style="
               font-family:
                 &quot;Monaco&quot;, &quot;Menlo&quot;,
@@ -259,6 +263,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
           >
             {{ example.log_message }}
+          </div>
+        </div>
+      </q-card-section>
+
+      <!-- Footer Navigation -->
+      <q-separator />
+      <q-card-section class="tw-px-[0.625rem] tw-py-[0.375rem]">
+        <div class="row items-center no-wrap justify-between">
+          <div class="col-auto">
+            <q-btn
+              data-test="pattern-detail-previous-btn"
+              class="o2-secondary-button tw-h-[36px]"
+              no-caps
+              :disabled="selectedPattern.index === 0"
+              @click="$emit('navigate', false, true)"
+              icon="navigate_before"
+              label="Previous"
+            />
+          </div>
+          <div class="col-auto text-center">
+            <span class="text-caption text-grey-7">
+              {{ selectedPattern.index + 1 }} of {{ totalPatterns }}
+            </span>
+          </div>
+          <div class="col-auto">
+            <q-btn
+              data-test="pattern-detail-next-btn"
+              class="o2-secondary-button tw-h-[36px]"
+              no-caps
+              :disabled="selectedPattern.index >= totalPatterns - 1"
+              @click="$emit('navigate', true, false)"
+              icon-right="navigate_next"
+              label="Next"
+            />
           </div>
         </div>
       </q-card-section>
@@ -281,4 +319,19 @@ defineEmits<{
 }>();
 
 const store = useStore();
+
+const variableColumns = [
+  {
+    name: "name",
+    label: "Variable Name",
+    field: "name",
+    align: "left",
+  },
+  {
+    name: "type",
+    label: "Type",
+    field: "var_type",
+    align: "left",
+  },
+];
 </script>
