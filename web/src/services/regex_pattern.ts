@@ -54,6 +54,9 @@ const regexPatterns = {
       `/api/${org_identifier}/re_patterns/${id}`
     );
   },
+  bulkDelete: (org_identifier: string, data: any) => {
+    return http().delete(`/api/${org_identifier}/re_patterns/bulk`, { data });
+  },
   test: (
     org_identifier: string,
     pattern: string,
