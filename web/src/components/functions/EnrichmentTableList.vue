@@ -54,17 +54,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="qTable"
               :rows="visibleRows"
               :columns="columns"
-              row-key="id"
+              row-key="name"
               :pagination="pagination"
               :filter="filterQuery"
               style="width: 100%"
               :style="hasVisibleRows
-                  ? 'width: 100%; height: calc(100vh - 127px)' 
+                  ? 'width: 100%; height: calc(100vh - 127px)'
                   : 'width: 100%'"
               class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky "
+              selection="multiple"
+              v-model:selected="selectedEnrichmentTables"
             >
               <template #no-data>
                 <NoData />
+              </template>
+              <template v-slot:body-selection="scope">
+                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
               </template>
               <template v-slot:body-cell-actions="props">
                 <q-td :props="props">
@@ -128,22 +133,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #bottom="scope">
-                <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
-                  <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
-                    {{ resultTotal }} {{ t('function.enrichmentTables') }}
+                <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+                  <div class="tw-flex tw-items-center tw-gap-2">
+                    <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+                      {{ resultTotal }} {{ t('function.enrichmentTables') }}
+                    </div>
+                    <q-btn
+                      v-if="selectedEnrichmentTables.length > 0"
+                      data-test="enrichment-tables-bulk-delete-btn"
+                      class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'o2-secondary-button-dark'
+                          : 'o2-secondary-button-light'
+                      "
+                      no-caps
+                      dense
+                      @click="openBulkDeleteDialog"
+                    >
+                      <q-icon name="delete" size="16px" />
+                      <span class="tw-ml-2">Delete</span>
+                    </q-btn>
                   </div>
-                <QTablePagination
-                  :scope="scope"
-                  :position="'bottom'"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  @update:changeRecordPerPage="changePagination"
-                />
+                  <QTablePagination
+                    :scope="scope"
+                    :position="'bottom'"
+                    :resultTotal="resultTotal"
+                    :perPageOptions="perPageOptions"
+                    @update:changeRecordPerPage="changePagination"
+                  />
                 </div>
               </template>
               <template v-slot:header="props">
                   <q-tr :props="props">
-                    <!-- Rendering the of the columns -->
+                    <!-- Adding this block to render the select-all checkbox -->
+                    <q-th v-if="columns.length > 0" auto-width>
+                      <q-checkbox
+                        v-model="props.selected"
+                        size="sm"
+                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                        class="o2-table-checkbox"
+                      />
+                    </q-th>
+
+                    <!-- Rendering the rest of the columns -->
                     <!-- here we can add the classes class so that the head will be sticky -->
                     <q-th
                       v-for="col in props.cols"
@@ -175,6 +208,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="deleteLookupTable"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
+    />
+    <ConfirmDialog
+      title="Bulk Delete Enrichment Tables"
+      :message="`Are you sure you want to delete ${selectedEnrichmentTables.length} enrichment table(s)?`"
+      @update:ok="bulkDeleteEnrichmentTables"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
     />
     <q-dialog
       v-model="showEnrichmentSchema"
@@ -236,6 +276,8 @@ export default defineComponent({
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const confirmBulkDelete = ref<boolean>(false);
+    const selectedEnrichmentTables = ref<any[]>([]);
     const showEnrichmentSchema = ref<boolean>(false);
     const filterQuery = ref("");
     const { track } = useReo();
@@ -502,6 +544,66 @@ export default defineComponent({
       });
     };
 
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
+
+    const bulkDeleteEnrichmentTables = () => {
+      const selectedItems = selectedEnrichmentTables.value;
+      const promises: Promise<any>[] = [];
+
+      selectedItems.forEach((table: any) => {
+        promises.push(
+          streamService.delete(
+            store.state.selectedOrganization.identifier,
+            table.name,
+            "enrichment_tables",
+          ),
+        );
+      });
+
+      Promise.all(promises)
+        .then((responses) => {
+          const successfulDeletions = responses.filter(
+            (res) => res.data.code === 200,
+          );
+          const failedDeletions = responses.filter(
+            (res) => res.data.code !== 200,
+          );
+
+          if (successfulDeletions.length > 0 && failedDeletions.length === 0) {
+            $q.notify({
+              color: "positive",
+              message: `Successfully deleted ${successfulDeletions.length} enrichment table(s).`,
+            });
+          } else if (successfulDeletions.length > 0 && failedDeletions.length > 0) {
+            $q.notify({
+              color: "warning",
+              message: `Deleted ${successfulDeletions.length} enrichment table(s). Failed to delete ${failedDeletions.length} enrichment table(s).`,
+            });
+          } else if (failedDeletions.length > 0) {
+            $q.notify({
+              color: "negative",
+              message: `Failed to delete ${failedDeletions.length} enrichment table(s).`,
+            });
+          }
+
+          resetStreamType("enrichment_tables");
+          getLookupTables(true);
+          selectedEnrichmentTables.value = [];
+          confirmBulkDelete.value = false;
+        })
+        .catch((err: any) => {
+          if (err.response?.status != 403) {
+            $q.notify({
+              color: "negative",
+              message: "Error while deleting enrichment tables.",
+            });
+          }
+          confirmBulkDelete.value = false;
+        });
+    };
+
     const showDeleteDialogFn = (props: any) => {
       selectedDelete.value = props.row;
       confirmDelete.value = true;
@@ -630,6 +732,10 @@ export default defineComponent({
       getTimeRange,
       visibleRows,
       hasVisibleRows,
+      confirmBulkDelete,
+      selectedEnrichmentTables,
+      openBulkDeleteDialog,
+      bulkDeleteEnrichmentTables,
     };
   },
   computed: {
