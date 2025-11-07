@@ -309,7 +309,7 @@ import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
-import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { getUTCTimestampFromZonedTimestamp, validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 import { exportFile } from "quasar";
@@ -1533,7 +1533,10 @@ export default defineComponent({
 
           const hoveredTime = drilldownParams[0]?.value?.[0];
           const hoveredTimestamp = hoveredTime
-            ? new Date(hoveredTime).getTime()
+            ? getUTCTimestampFromZonedTimestamp(
+                hoveredTime,
+                store.state.timezone,
+              )
             : null;
           const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 
