@@ -60,9 +60,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="width: 100%;"
             :style="{ height: hasVisibleRows ? 'calc(100vh - 124px)' : '' }"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky o2-last-row-border"
+            selection="multiple"
+            v-model:selected="selectedActionScripts"
             >
             <template #no-data>
               <NoData />
+            </template>
+            <template v-slot:body-selection="scope">
+              <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
             </template>
             <template v-slot:body-cell-actions="props">
               <q-td :props="props">
@@ -118,10 +123,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom="scope">
-              <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
-                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
-                      {{ resultTotal }} {{ t('actions.header') }}
-                    </div>
+              <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+                <div class="tw-flex tw-items-center tw-gap-2">
+                  <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[80px] tw-mr-md">
+                    {{ resultTotal }} {{ t('actions.header') }}
+                  </div>
+                  <q-btn
+                    v-if="selectedActionScripts.length > 0"
+                    data-test="action-scripts-bulk-delete-btn"
+                    class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-secondary-button-dark'
+                        : 'o2-secondary-button-light'
+                    "
+                    no-caps
+                    dense
+                    @click="openBulkDeleteDialog"
+                  >
+                    <q-icon name="delete" size="16px" />
+                    <span class="tw-ml-2">Delete</span>
+                  </q-btn>
+                </div>
                 <QTablePagination
                 :scope="scope"
                 :position="'bottom'"
@@ -134,7 +157,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-slot:header="props">
                 <q-tr :props="props">
-                  <!-- Rendering the of the columns -->
+                  <!-- Adding this block to render the select-all checkbox -->
+                  <q-th v-if="columns.length > 0" auto-width>
+                    <q-checkbox
+                      v-model="props.selected"
+                      size="sm"
+                      :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                      class="o2-table-checkbox"
+                    />
+                  </q-th>
+
+                  <!-- Rendering the rest of the columns -->
                   <!-- here we can add the classes class so that the head will be sticky -->
                   <q-th
                     v-for="col in props.cols"
@@ -167,6 +200,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="deleteAlert"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
+    />
+    <ConfirmDialog
+      title="Bulk Delete Action Scripts"
+      :message="`Are you sure you want to delete ${selectedActionScripts.length} action script(s)?`"
+      @update:ok="bulkDeleteActionScripts"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
     />
     <template>
       <q-dialog class="q-pa-md" v-model="showForm" persistent>
@@ -334,6 +374,8 @@ export default defineComponent({
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const confirmBulkDelete = ref<boolean>(false);
+    const selectedActionScripts = ref<any[]>([]);
     const splitterModel = ref(220);
     const showForm = ref(false);
     const indexOptions = ref([]);
@@ -784,6 +826,69 @@ export default defineComponent({
       selectedDelete.value = props.row;
       confirmDelete.value = true;
     };
+
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
+
+    const bulkDeleteActionScripts = async () => {
+      try {
+        if (selectedActionScripts.value.length === 0) {
+          $q.notify({
+            type: "warning",
+            message: "No action scripts selected",
+            timeout: 2000,
+          });
+          confirmBulkDelete.value = false;
+          return;
+        }
+
+        const response = await actions.bulkDelete(
+          store.state.selectedOrganization.identifier,
+          {
+            ids: selectedActionScripts.value.map((script: any) => script.id),
+          }
+        );
+
+        const { successful = [], unsuccessful = [], err } = response.data || {};
+
+        if (err) {
+          throw new Error(err);
+        }
+
+        if (successful.length > 0 && unsuccessful.length === 0) {
+          $q.notify({
+            type: "positive",
+            message: `Successfully deleted ${successful.length} action script(s)`,
+            timeout: 2000,
+          });
+        } else if (successful.length > 0 && unsuccessful.length > 0) {
+          $q.notify({
+            type: "warning",
+            message: `Deleted ${successful.length} action script(s). Failed to delete ${unsuccessful.length} action script(s)`,
+            timeout: 3000,
+          });
+        } else if (unsuccessful.length > 0) {
+          $q.notify({
+            type: "negative",
+            message: `Failed to delete ${unsuccessful.length} action script(s)`,
+            timeout: 2000,
+          });
+        }
+
+        await getActionScripts();
+        selectedActionScripts.value = [];
+        confirmBulkDelete.value = false;
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error?.message || "Error while deleting action scripts",
+          timeout: 2000,
+        });
+        confirmBulkDelete.value = false;
+      }
+    };
+
     const filterColumns = (options: any[], val: String, update: Function) => {
       let filteredOptions: any[] = [];
       if (val === "") {
@@ -971,6 +1076,10 @@ export default defineComponent({
       routeTo,
       visibleRows,
       hasVisibleRows,
+      confirmBulkDelete,
+      selectedActionScripts,
+      openBulkDeleteDialog,
+      bulkDeleteActionScripts,
     };
   },
 });
