@@ -19,6 +19,7 @@ use std::{
         Arc,
         atomic::{AtomicI64, AtomicU64, Ordering},
     },
+    time::Instant,
 };
 
 use arrow_schema::Schema;
@@ -52,6 +53,27 @@ static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
     writers
 });
 
+static WAL_RUNTIMES: Lazy<Vec<Option<Arc<tokio::runtime::Runtime>>>> = Lazy::new(|| {
+    let cfg = get_config();
+    if !cfg.common.wal_dedicated_runtime_enabled {
+        return vec![];
+    }
+
+    let writer_num = cfg.limit.mem_table_bucket_num + MEM_TABLE_INDIVIDUAL_STREAMS.len();
+    let mut runtimes = Vec::with_capacity(writer_num);
+
+    for idx in 0..writer_num {
+        runtimes.push(create_dedicated_runtime_for_idx(idx));
+    }
+
+    log::info!(
+        "[INGESTER:RUNTIME] Created {} dedicated runtimes for WAL writers",
+        runtimes.iter().filter(|r| r.is_some()).count()
+    );
+
+    runtimes
+});
+
 pub struct Writer {
     idx: usize,
     key: WriterKey,
@@ -59,7 +81,7 @@ pub struct Writer {
     memtable: Arc<RwLock<MemTable>>,
     next_seq: AtomicU64,
     created_at: AtomicI64,
-    write_queue: Arc<mpsc::Sender<(WriterSignal, Vec<Entry>, bool)>>,
+    write_queue: Arc<mpsc::Sender<(WriterSignal, crate::ProcessedBatch, bool)>>,
 }
 
 // check total memtable size
@@ -242,7 +264,7 @@ pub async fn check_ttl() -> Result<()> {
         for r in w.values() {
             if let Err(e) = r
                 .write_queue
-                .send((WriterSignal::Rotate, vec![], false))
+                .send((WriterSignal::Rotate, crate::ProcessedBatch::empty(), false))
                 .await
             {
                 log::error!("[INGESTER:MEM:{}] writer queue rotate error: {e}", r.idx);
@@ -286,7 +308,8 @@ impl Writer {
             wal_id
         );
 
-        let (tx, mut rx) = mpsc::channel(cfg.limit.wal_write_queue_size);
+        let (tx, rx) = mpsc::channel(cfg.limit.wal_write_queue_size);
+
         let writer = Self {
             idx,
             key: key.clone(),
@@ -309,38 +332,59 @@ impl Writer {
         let writer_clone = writer.clone();
 
         log::info!("[INGESTER:MEM:{idx}] writer queue start consuming");
-        tokio::spawn(async move {
-            let mut total: usize = 0;
-            loop {
-                match rx.recv().await {
-                    None => break,
-                    Some((sign, entries, fsync)) => match sign {
-                        WriterSignal::Close => break,
-                        WriterSignal::Rotate => {
-                            if let Err(e) = writer.rotate(0, 0).await {
-                                log::error!("[INGESTER:MEM:{idx}] writer rotate error: {e}");
-                            }
-                        }
-                        WriterSignal::Produce => {
-                            if let Err(e) = writer.consume(entries, fsync).await {
-                                log::error!("[INGESTER:MEM:{idx}] writer consume batch error: {e}");
-                            }
-                        }
-                    },
-                }
-                total += 1;
-                if total.is_multiple_of(1000) {
-                    log::info!(
-                        "[INGESTER:MEM:{idx}] writer queue consuming, total: {}, in queue: {}",
-                        total,
-                        rx.len()
-                    );
-                }
-            }
-            log::info!("[INGESTER:MEM:{idx}] writer queue closed");
-        });
+        let dedicated_runtime = if idx < WAL_RUNTIMES.len() {
+            WAL_RUNTIMES[idx].clone()
+        } else {
+            None
+        };
+
+        // Spawn consumer tasks on an independent runtime, or use the default runtime
+        if let Some(rt) = dedicated_runtime {
+            rt.spawn(async move {
+                Self::consume_loop(writer, rx, idx).await;
+            });
+        } else {
+            tokio::spawn(async move {
+                Self::consume_loop(writer, rx, idx).await;
+            });
+        }
 
         writer_clone
+    }
+
+    async fn consume_loop(
+        writer: Arc<Writer>,
+        mut rx: mpsc::Receiver<(WriterSignal, crate::ProcessedBatch, bool)>,
+        idx: usize,
+    ) {
+        let mut total: usize = 0;
+        loop {
+            match rx.recv().await {
+                None => break,
+                Some((sign, batch, fsync)) => match sign {
+                    WriterSignal::Close => break,
+                    WriterSignal::Rotate => {
+                        if let Err(e) = writer.rotate(0, 0).await {
+                            log::error!("[INGESTER:MEM:{idx}] writer rotate error: {e}");
+                        }
+                    }
+                    WriterSignal::Produce => {
+                        if let Err(e) = writer.consume_processed(batch, fsync).await {
+                            log::error!("[INGESTER:MEM:{idx}] writer consume batch error: {e}");
+                        }
+                    }
+                },
+            }
+            total += 1;
+            if total.is_multiple_of(1000) {
+                log::info!(
+                    "[INGESTER:MEM:{idx}] writer queue consuming, total: {}, in queue: {}",
+                    total,
+                    rx.len()
+                );
+            }
+        }
+        log::info!("[INGESTER:MEM:{idx}] writer queue closed");
     }
 
     pub fn get_key_str(&self) -> String {
@@ -361,19 +405,25 @@ impl Writer {
         self.write_batch(vec![entry], fsync).await
     }
 
-    pub async fn write_batch(&self, entries: Vec<Entry>, fsync: bool) -> Result<()> {
+    pub async fn write_batch(&self, mut entries: Vec<Entry>, fsync: bool) -> Result<()> {
         if entries.is_empty() {
             return Ok(());
         }
+
+        // Pre-process data BEFORE sending to queue
+        // This moves CPU-intensive work (JSON to Arrow conversion) out of the consume loop,
+        // allowing consume to focus purely on IO operations
+        let processed_batch = self.preprocess_batch(&mut entries)?;
+
         let cfg = get_config();
         if !cfg.common.wal_write_queue_enabled {
-            return self.consume(entries, fsync).await;
+            return self.consume_processed(processed_batch, fsync).await;
         }
 
         if cfg.common.wal_write_queue_full_reject {
-            if let Err(e) = self
-                .write_queue
-                .try_send((WriterSignal::Produce, entries, fsync))
+            if let Err(e) =
+                self.write_queue
+                    .try_send((WriterSignal::Produce, processed_batch, fsync))
             {
                 log::error!(
                     "[INGESTER:MEM:{}] write queue full, reject write: {}",
@@ -386,7 +436,7 @@ impl Writer {
             }
         } else {
             self.write_queue
-                .send((WriterSignal::Produce, entries, fsync))
+                .send((WriterSignal::Produce, processed_batch, fsync))
                 .await
                 .context(TokioMpscSendEntriesSnafu)?;
         }
@@ -394,21 +444,23 @@ impl Writer {
         Ok(())
     }
 
-    async fn consume(&self, mut entries: Vec<Entry>, fsync: bool) -> Result<()> {
-        if entries.is_empty() {
-            return Ok(());
-        }
-
+    fn preprocess_batch(&self, entries: &mut [Entry]) -> Result<crate::ProcessedBatch> {
+        let _start_preprocess_batch = Instant::now();
+        // Serialize entries to bytes for WAL writing
         let bytes_entries = entries
             .iter_mut()
             .map(|entry| entry.into_bytes())
             .collect::<Result<Vec<_>>>()?;
+
+        // Bulk convert to Arrow RecordBatch
         let batch_entries = entries
             .iter()
             .map(|entry| {
                 entry.into_batch(self.key.stream_type.clone(), entry.schema.clone().unwrap())
             })
             .collect::<Result<Vec<_>>>()?;
+
+        // Calculate total sizes for rotation check
         let (entries_json_size, entries_arrow_size) = batch_entries
             .iter()
             .map(|entry| (entry.data_json_size, entry.data_arrow_size))
@@ -419,17 +471,40 @@ impl Writer {
                 },
             );
 
-        // check rotation
-        self.rotate(entries_json_size, entries_arrow_size).await?;
+        // Move entries into ProcessedBatch
+        // Safety: entries are no longer needed after this point
+        let entries_vec = entries.to_vec();
+        let _start_preprocess_batch_duration = _start_preprocess_batch.elapsed();
+        if _start_preprocess_batch_duration.as_millis() > 100 {
+            log::warn!("_start_preprocess_batch: {_start_preprocess_batch_duration:?}");
+        }
+        Ok(crate::ProcessedBatch {
+            entries: entries_vec,
+            bytes_entries,
+            batch_entries,
+            entries_json_size,
+            entries_arrow_size,
+        })
+    }
 
-        // write into wal
+    async fn consume_processed(&self, batch: crate::ProcessedBatch, fsync: bool) -> Result<()> {
+        if batch.entries.is_empty() {
+            return Ok(());
+        }
+        let _start_consume_processed = Instant::now();
+        // Check rotation
+        self.rotate(batch.entries_json_size, batch.entries_arrow_size)
+            .await?;
+
+        // Write into WAL - pure IO, no CPU-intensive processing
         let start = std::time::Instant::now();
         let mut wal = self.wal.write().await;
         let wal_lock_time = start.elapsed().as_millis() as f64;
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(wal_lock_time);
-        for entry in bytes_entries {
+        let _start_wal_processed = Instant::now();
+        for entry in batch.bytes_entries {
             if entry.is_empty() {
                 continue;
             }
@@ -437,28 +512,42 @@ impl Writer {
             tokio::task::coop::consume_budget().await;
         }
         drop(wal);
+        let _start_wal_processed_duration = _start_wal_processed.elapsed();
+        if _start_wal_processed_duration.as_millis() > 50 {
+            log::warn!("_start_wal_processed_duration: {_start_wal_processed_duration:?}");
+        }
 
-        // write into memtable
+        // Write into Memtable - pure IO, no CPU-intensive processing
         let start = std::time::Instant::now();
         let mut mem = self.memtable.write().await;
         let mem_lock_time = start.elapsed().as_millis() as f64;
         metrics::INGEST_MEMTABLE_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(mem_lock_time);
-        for (entry, batch) in entries.into_iter().zip(batch_entries) {
+        let _start_mem_processed = Instant::now();
+        for (entry, batch_entry) in batch.entries.into_iter().zip(batch.batch_entries) {
             if entry.data_size == 0 {
                 continue;
             }
-            mem.write(entry.schema.clone().unwrap(), entry, batch)?;
+            mem.write(entry.schema.clone().unwrap(), entry, batch_entry)?;
             tokio::task::coop::consume_budget().await;
         }
         drop(mem);
+        let _start_mem_processed_duration = _start_mem_processed.elapsed();
+        if _start_mem_processed_duration.as_millis() > 50 {
+            log::warn!("_start_mem_processed_duration: {_start_mem_processed_duration:?}");
+        }
 
-        // check fsync
+        // Check fsync
         if fsync {
             let mut wal = self.wal.write().await;
             wal.sync().context(WalSnafu)?;
             drop(wal);
+        }
+
+        let _start_consume_processed_duration = _start_consume_processed.elapsed();
+        if _start_consume_processed_duration.as_millis() > 100 {
+            log::warn!("_start_consume_processed_duration: {_start_consume_processed_duration:?}");
         }
 
         Ok(())
@@ -539,7 +628,7 @@ impl Writer {
         // wait for all messages to be processed
         if let Err(e) = self
             .write_queue
-            .send((WriterSignal::Close, vec![], true))
+            .send((WriterSignal::Close, crate::ProcessedBatch::empty(), true))
             .await
         {
             log::error!("[INGESTER:MEM:{}] close writer error: {}", self.idx, e);
@@ -600,6 +689,99 @@ impl Writer {
     }
 }
 
+fn create_dedicated_runtime_for_idx(idx: usize) -> Option<Arc<tokio::runtime::Runtime>> {
+    let cfg = get_config();
+
+    if !cfg.common.wal_dedicated_runtime_enabled {
+        return None;
+    }
+
+    let total_cpus = cfg.limit.cpu_num;
+    // Security Check: At least 2 CPU cores are required for isolation (1 for HTTP, 1 for WAL)
+    if total_cpus < 2 {
+        log::warn!(
+            "[INGESTER:MEM:{idx}] Cannot enable dedicated runtime: need at least 2 CPUs, got {total_cpus}"
+        );
+        return None;
+    }
+
+    // New Strategy: Reserve CPU cores for WAL writers regardless of the number of HTTP workers
+    // configured Reservation Rules:
+    // - Small systems (<= 8 CPU cores): Reserve 1 CPU core
+    // - Medium systems (9-32 CPU cores): Reserve max(1, total_cpus / 8) CPU cores
+    // - Large systems (> 32 CPU cores): Reserve max(4, total_cpus / 8) CPU cores
+    let reserved_cpus_for_wal = if total_cpus <= 8 {
+        1
+    } else if total_cpus <= 32 {
+        std::cmp::max(1, total_cpus / 8)
+    } else {
+        std::cmp::max(4, total_cpus / 8)
+    };
+    // Ensure the number of reserved CPU cores is reasonable (no more than half of the total)
+    let reserved_cpus_for_wal = std::cmp::min(reserved_cpus_for_wal, total_cpus / 2);
+
+    // WAL writers use the last few CPU cores
+    // Example: 8-core system with 1 reserved core -> WAL uses CPU 7
+    // 32-core system with 4 reserved cores -> WAL uses CPUs 28-31
+    let wal_cpu_start = total_cpus - reserved_cpus_for_wal;
+    let cpu_id = wal_cpu_start + (idx % reserved_cpus_for_wal);
+
+    // Double-Check: Ensure the cpu_id is within the valid range
+    if cpu_id >= total_cpus {
+        log::error!(
+            "[INGESTER:MEM:{idx}] BUG: Calculated CPU ID {cpu_id} exceeds total CPUs {total_cpus}, falling back to shared runtime"
+        );
+        return None;
+    }
+
+    log::info!(
+        "[INGESTER:MEM:{idx}] Creating dedicated runtime on CPU core {cpu_id} (total CPUs: {total_cpus}, reserved for WAL: {reserved_cpus_for_wal}, HTTP can use: 0-{})",
+        wal_cpu_start - 1
+    );
+
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .thread_name(format!("wal-writer-{idx}"))
+        .on_thread_start(move || {
+            if let Some(core_ids) = core_affinity::get_core_ids() {
+                if cpu_id < core_ids.len() {
+                    if core_affinity::set_for_current(core_ids[cpu_id]) {
+                        log::info!(
+                                "[INGESTER:MEM:{idx}] Successfully bound WAL writer thread to CPU core {cpu_id}"
+                            );
+                    } else {
+                        log::warn!(
+                                "[INGESTER:MEM:{idx}] Failed to bind WAL writer thread to CPU core {cpu_id}"
+                            );
+                    }
+                } else {
+                    log::warn!(
+                            "[INGESTER:MEM:{idx}] CPU core {cpu_id} not available, total cores: {}",
+                            core_ids.len()
+                        );
+                }
+            } else {
+                log::warn!(
+                        "[INGESTER:MEM:{idx}] Failed to get CPU core IDs for binding"
+                    );
+            }
+        })
+        .enable_all()
+        .build();
+
+    match runtime {
+        Ok(rt) => {
+            log::info!("[INGESTER:MEM:{idx}] Created dedicated runtime successfully");
+            Some(Arc::new(rt))
+        }
+        Err(e) => {
+            log::error!(
+                "[INGESTER:MEM:{idx}] Failed to create dedicated runtime: {e}, falling back to shared runtime"
+            );
+            None
+        }
+    }
+}
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub(crate) struct WriterKey {
     pub(crate) org_id: Arc<str>,

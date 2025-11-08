@@ -56,6 +56,8 @@ pub struct TraceListItem {
     pub stream_name: String,
     pub service_name: String,
     pub trace_id: String,
+    pub span_id: String,
+    pub operation_name: String,
 }
 
 impl Metadata for TraceListIndex {
@@ -65,6 +67,8 @@ impl Metadata for TraceListIndex {
             Field::new("stream_name", DataType::Utf8, false),
             Field::new("service_name", DataType::Utf8, false),
             Field::new("trace_id", DataType::Utf8, false),
+            Field::new("span_id", DataType::Utf8, false),
+            Field::new("operation_name", DataType::Utf8, false),
         ]))
     }
 
@@ -266,6 +270,8 @@ mod tests {
             stream_name: "default".to_string(),
             service_name: "oojaeger".to_string(),
             trace_id: "b09e986672880927996155acd4ef113c".to_string(),
+            span_id: "b09e986672880927".to_string(),
+            operation_name: "GET /user".to_string(),
             _timestamp: 1711267573271714542,
         };
         let schema_key = "9d384d5af30d1657";
