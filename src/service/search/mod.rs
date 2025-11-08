@@ -65,6 +65,8 @@ use {
             TaskStatus, WorkGroup,
             cache::{
                 CardinalityLevel,
+                discovery::discover_cache_for_query,
+                partition_optimizer::generate_optimal_partitions,
                 streaming_agg::{
                     create_aggregation_cache_file_path, generate_aggregation_cache_interval,
                     get_aggregation_cache_key_from_request,
@@ -885,6 +887,7 @@ pub async fn search_partition(
     if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
         total_secs += 1;
     }
+    total_secs = 4;
 
     // If total secs is <= aggs_min_num_partition_secs (default 3 seconds), then disable
     // partitioning even if streaming aggs is true. This optimization avoids partition overhead
@@ -1041,12 +1044,63 @@ pub async fn search_partition(
                 hashed_query,
                 cache_interval_mins,
             );
+
+            // Discover existing cache files for this query
+            let cache_discovery_result = match discover_cache_for_query(
+                &cache_file_path,
+                query.start_time,
+                query.end_time,
+            ) {
+                Ok(result) => result,
+                Err(e) => {
+                    log::warn!(
+                        "[trace_id {trace_id}] [streaming_id: {streaming_id}] Failed to discover cache: {e}, proceeding without cache optimization"
+                    );
+                    // Create empty discovery result to proceed without cache
+                    o2_enterprise::enterprise::search::cache::discovery::CacheDiscoveryResult::new(
+                        vec![],
+                        vec![
+                            o2_enterprise::enterprise::search::cache::discovery::TimeRange::new(
+                                query.start_time,
+                                query.end_time,
+                            ),
+                        ],
+                        0.0,
+                    )
+                }
+            };
+
+            log::info!(
+                "[trace_id {trace_id}] [streaming_id: {streaming_id}] Cache discovery: coverage={:.2}%, cached_ranges={}, uncached_ranges={}",
+                cache_discovery_result.cache_coverage_ratio * 100.0,
+                cache_discovery_result.cached_ranges.len(),
+                cache_discovery_result.uncached_ranges.len()
+            );
+
+            // Generate optimal partitions based on cache discovery
+            let partition_strategy = generate_optimal_partitions(
+                cache_discovery_result,
+                query.start_time,
+                query.end_time,
+                cardinality_level,
+            );
+
+            log::info!(
+                "[trace_id {trace_id}] [streaming_id: {streaming_id}] Partition strategy: requires_execution={}, execution_partitions={}",
+                partition_strategy.requires_execution(),
+                partition_strategy.execution_partition_count()
+            );
+
             streaming_aggs_exec::init_cache(
                 &streaming_id,
                 query.start_time,
                 query.end_time,
                 &cache_file_path,
             );
+
+            // Store partition strategy for use in do_partitioned_search
+            streaming_aggs_exec::set_partition_strategy(&streaming_id, partition_strategy);
+
             log::info!(
                 "[trace_id {trace_id}] [streaming_id: {streaming_id}] init streaming_agg cache: cache_file_path: {cache_file_path}"
             );
@@ -1064,10 +1118,51 @@ pub async fn search_partition(
     {
         resp.streaming_output = streaming_aggs;
         resp.streaming_aggs = streaming_aggs;
-        resp.streaming_id = streaming_id;
+        resp.streaming_id = streaming_id.clone();
     }
 
     // Generate partitions
+    #[cfg(feature = "enterprise")]
+    let partitions = if streaming_aggs && streaming_id.is_some() {
+        // Use cache-aware partition strategy if available
+        let streaming_id_ref = streaming_id.as_ref().unwrap();
+        match streaming_aggs_exec::get_partition_strategy(streaming_id_ref) {
+            Some(strategy) => {
+                log::info!(
+                    "[trace_id {trace_id}] [streaming_id: {streaming_id_ref}] Using cache-aware partition strategy"
+                );
+                strategy.to_time_partitions(sql_order_by)
+            }
+            None => {
+                log::warn!(
+                    "[trace_id {trace_id}] [streaming_id: {streaming_id_ref}] No partition strategy found, using default generation"
+                );
+                generator.generate_partitions(
+                    req.start_time,
+                    req.end_time,
+                    step,
+                    sql_order_by,
+                    is_aggregate,
+                    is_streaming_aggregate,
+                    streaming_interval_micros,
+                    add_mini_partition,
+                )
+            }
+        }
+    } else {
+        generator.generate_partitions(
+            req.start_time,
+            req.end_time,
+            step,
+            sql_order_by,
+            is_aggregate,
+            is_streaming_aggregate,
+            streaming_interval_micros,
+            add_mini_partition,
+        )
+    };
+
+    #[cfg(not(feature = "enterprise"))]
     let partitions = generator.generate_partitions(
         req.start_time,
         req.end_time,
