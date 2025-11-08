@@ -119,7 +119,10 @@ async fn update_node_disk_usage() -> Result<(), anyhow::Error> {
 
         for disk in disks {
             // Check if the disk mount point is under the data directory
-            if disk.mount_point.starts_with(data_dir.to_string_lossy().as_ref()) {
+            if disk
+                .mount_point
+                .starts_with(data_dir.to_string_lossy().as_ref())
+            {
                 total_space += disk.total_space;
                 total_used += disk.total_space - disk.available_space;
             }
