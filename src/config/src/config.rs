@@ -1249,6 +1249,12 @@ pub struct Common {
         help = "enable trace list index for traces"
     )]
     pub traces_list_index_enabled: bool,
+    #[env_config(
+        name = "ZO_INGESTION_LOG_ENABLE_CHECK",
+        default = true,
+        help = "ingestion log enabled check"
+    )]
+    pub ingestion_log_enabled_check: bool,
 }
 
 #[derive(EnvConfig, Default)]
