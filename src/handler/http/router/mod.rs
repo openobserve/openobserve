@@ -636,6 +636,18 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(traces::get_store_stats)
         .service(patterns::extract_patterns);
 
+    #[cfg(feature = "enterprise")]
+    let service = service
+        .service(alerts::deduplication::get_config)
+        .service(alerts::deduplication::set_config)
+        .service(alerts::deduplication::delete_config)
+        .service(alerts::incidents::get_config)
+        .service(alerts::incidents::set_config)
+        .service(alerts::incidents::delete_config)
+        .service(alerts::incidents::list_incidents)
+        .service(alerts::incidents::get_incident)
+        .service(alerts::incidents::update_incident_status);
+
     #[cfg(feature = "cloud")]
     let service = service
         .service(organization::org::get_org_invites)

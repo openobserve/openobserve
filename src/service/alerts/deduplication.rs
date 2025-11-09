@@ -50,11 +50,9 @@ pub async fn get_dedup_state(
 pub struct DedupStateParams<'a> {
     pub fingerprint: &'a str,
     pub alert_id: &'a str,
-    pub org_id: &'a str,
     pub first_seen_at: i64,
     pub last_seen_at: i64,
     pub occurrence_count: i64,
-    pub notification_sent: bool,
 }
 
 /// Save or update deduplication state
@@ -62,27 +60,21 @@ pub async fn save_dedup_state(
     db: &DatabaseConnection,
     params: DedupStateParams<'_>,
 ) -> Result<alert_dedup_state::Model, sea_orm::DbErr> {
-    let now = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros();
-
     // Try to find existing record
     if let Some(existing) = get_dedup_state(db, params.fingerprint).await? {
         // Update existing
         let mut active: alert_dedup_state::ActiveModel = existing.clone().into();
         active.last_seen_at = Set(params.last_seen_at);
         active.occurrence_count = Set(params.occurrence_count);
-        active.notification_sent = Set(params.notification_sent);
         active.update(db).await
     } else {
         // Insert new
         let new_state = alert_dedup_state::ActiveModel {
             fingerprint: Set(params.fingerprint.to_string()),
             alert_id: Set(params.alert_id.to_string()),
-            org_id: Set(params.org_id.to_string()),
             first_seen_at: Set(params.first_seen_at),
             last_seen_at: Set(params.last_seen_at),
             occurrence_count: Set(params.occurrence_count),
-            notification_sent: Set(params.notification_sent),
-            created_at: Set(now),
         };
         new_state.insert(db).await
     }
@@ -99,18 +91,13 @@ pub fn is_within_window(state: &alert_dedup_state::Model, time_window_minutes: i
 /// Cleanup old deduplication state records
 pub async fn cleanup_expired_state(
     db: &DatabaseConnection,
-    org_id: Option<&str>,
     older_than_minutes: i64,
 ) -> Result<u64, sea_orm::DbErr> {
     let cutoff_time = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros()
         - (older_than_minutes * 60 * 1_000_000);
 
-    let mut query = alert_dedup_state::Entity::delete_many()
+    let query = alert_dedup_state::Entity::delete_many()
         .filter(alert_dedup_state::Column::LastSeenAt.lt(cutoff_time));
-
-    if let Some(org) = org_id {
-        query = query.filter(alert_dedup_state::Column::OrgId.eq(org));
-    }
 
     let result = query.exec(db).await?;
     Ok(result.rows_affected)
@@ -142,7 +129,7 @@ async fn apply_deduplication_impl(
 ) -> Result<Vec<Map<String, Value>>, sea_orm::DbErr> {
     let now = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros();
     let alert_id = alert.get_unique_key();
-    let org_id = &alert.org_id;
+    let _org_id = &alert.org_id;
 
     // Determine effective time window using enterprise logic
     let time_window_minutes = o2_enterprise::enterprise::alerts::dedup::get_effective_time_window(
@@ -165,11 +152,9 @@ async fn apply_deduplication_impl(
                         DedupStateParams {
                             fingerprint: &fingerprint,
                             alert_id: &alert_id,
-                            org_id,
                             first_seen_at: existing_state.first_seen_at,
                             last_seen_at: now,
                             occurrence_count: existing_state.occurrence_count + 1,
-                            notification_sent: true,
                         },
                     )
                     .await
@@ -199,11 +184,9 @@ async fn apply_deduplication_impl(
                 DedupStateParams {
                     fingerprint: &fingerprint,
                     alert_id: &alert_id,
-                    org_id,
                     first_seen_at: now,
                     last_seen_at: now,
                     occurrence_count: 1,
-                    notification_sent: true,
                 },
             )
             .await

@@ -71,6 +71,8 @@ mod m20250923_000001_update_enrichment_table_data_size;
 mod m20250930_000001_create_pipeline_last_errors_table;
 mod m20251024_000001_add_alert_deduplication;
 mod m20251105_000001_update_enrichment_table_created_at_mysql;
+mod m20251107_000001_simplify_alert_dedup_schema;
+mod m20251107_000003_create_alert_correlation_schema;
 
 pub struct Migrator;
 
@@ -131,6 +133,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20250930_000001_create_pipeline_last_errors_table::Migration),
             Box::new(m20251024_000001_add_alert_deduplication::Migration),
             Box::new(m20251105_000001_update_enrichment_table_created_at_mysql::Migration),
+            Box::new(m20251107_000001_simplify_alert_dedup_schema::Migration),
+            Box::new(m20251107_000003_create_alert_correlation_schema::Migration),
         ]
     }
 }
