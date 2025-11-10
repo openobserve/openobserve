@@ -361,8 +361,10 @@ jobs:
           if [ -f "playwright-results/report.json" ]; then
             echo "::notice::JSON report found at playwright-results/report.json"
             ls -lh playwright-results/report.json
-            # Point TestDino to the JSON report location
-            if npx tdpw cache playwright-results; then
+            # tdpw cache expects to be run from the directory containing report.json
+            # Change to playwright-results directory where report.json lives
+            cd playwright-results
+            if npx tdpw cache; then
               echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
               echo "::notice::This data will be used for optimized reruns if tests fail"
             else
