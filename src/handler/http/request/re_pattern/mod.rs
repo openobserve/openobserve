@@ -426,7 +426,7 @@ pub async fn delete_bulk(
             (&pattern_usage[0..], "".to_string())
         };
         if !pattern_usage.is_empty() {
-            unsuccessful.push(id);
+            unsuccessful.push(id.to_string());
             err = Some(format!(
                 "Cannot delete pattern, associated with {pattern_streams:?}{extra}"
             ));
