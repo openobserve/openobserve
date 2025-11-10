@@ -311,6 +311,8 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-destructive-foreground: #{$o2-gray-100}; // Text on destructive buttons
   --o2-focus-ring: #{$o2-iris-1200};        // Focus state indicator
   --o2-hover-shadow: #dddddd;
+  --o2-hover-gray: color-mix(in srgb, #{$theme-color} 5%, rgb(247, 247, 247));
+
 
   --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
   --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
@@ -397,6 +399,7 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-destructive-foreground: #{$o2-dark-gray-100}; // Destructive text
   --o2-focus-ring: #{$o2-dark-iris-600};      // Focus indicators
   --o2-hover-shadow: rgba(0, 0, 0, 0.6);
+  --o2-hover-gray: color-mix(in srgb, #{$theme-color} 20%, rgb(39, 39, 39));
 
   --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
   --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);

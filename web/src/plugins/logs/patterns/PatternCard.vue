@@ -17,16 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-card
     flat
-    :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
-    class="tw-mb-[0.375rem] cursor-pointer tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+    class="tw-mb-[0.375rem] cursor-pointer tw-border tw-border-solid tw-border-[var(--o2-border-color)] hover:tw-bg-[var(--o2-hover-gray)]"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
   >
     <!-- Header with Rank and Stats - Compact -->
-    <q-card-section
-      class="tw-p-[0.625rem]"
-      :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-1'"
-    >
+    <q-card-section class="tw-p-[0.625rem]">
       <div class="row items-center q-col-gutter-md no-wrap">
         <div class="col-auto">
           <q-avatar
@@ -78,21 +74,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="q-mb-xs">
                   <strong>Template:</strong> {{ pattern.template }}
                 </div>
-                <div><strong>Description:</strong> {{ pattern.description }}</div>
+                <div>
+                  <strong>Description:</strong> {{ pattern.description }}
+                </div>
               </q-tooltip>
             </q-icon>
           </div>
           <!-- Occurrences and percentage on second line -->
           <div
             class="text-caption"
-            :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-6'"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-6'
+            "
           >
-            <span class="text-weight-bold text-primary" :data-test="`pattern-card-${index}-frequency`">{{
-              pattern.frequency.toLocaleString()
-            }}</span>
-            occurrences
+            <span
+              class="text-weight-bold text-primary"
+              :data-test="`pattern-card-${index}-frequency`"
+            >
+              {{ pattern.frequency.toLocaleString() }}
+            </span>
+            occurrences 
             <span class="q-mx-xs">•</span>
-            <span class="text-weight-bold text-primary" :data-test="`pattern-card-${index}-percentage`"
+            <span
+              class="text-weight-bold text-primary"
+              :data-test="`pattern-card-${index}-percentage`"
               >{{ pattern.percentage.toFixed(2) }}%</span
             >
             <span
@@ -103,7 +108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </div>
         </div>
-        <div class="col-auto row items-center q-gutter-xs pattern-block-actions">
+        <div
+          class="col-auto row items-center q-gutter-xs pattern-block-actions"
+        >
           <q-btn
             size="0.375rem"
             @click.stop="$emit('include', pattern)"
@@ -130,7 +137,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <NotEqualIcon></NotEqualIcon>
             </q-icon>
           </q-btn>
-          <q-icon name="info" size="1.0625rem" class="cursor-pointer" :data-test="`pattern-card-${index}-details-icon`">
+          <q-icon
+            name="info"
+            size="1.0625rem"
+            class="cursor-pointer"
+            :data-test="`pattern-card-${index}-details-icon`"
+          >
             <q-tooltip
               >Show details ({{
                 pattern.examples?.[0]?.variables
