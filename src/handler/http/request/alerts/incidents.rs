@@ -14,6 +14,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Alert incidents and correlation API endpoints (Enterprise feature)
+//!
+//! # Code Duplication Note
+//!
+//! This module contains paired OSS/Enterprise implementations for each endpoint.
+//! The duplication is intentional and serves several purposes:
+//!
+//! 1. **OpenAPI Documentation**: Each implementation has its own `#[utoipa::path]` attributes that
+//!    document the OSS vs Enterprise behavior in generated docs.
+//!
+//! 2. **Type Safety**: OSS endpoints use `serde_json::Value` for request bodies to avoid importing
+//!    enterprise-only types, while enterprise uses proper types.
+//!
+//! 3. **Compile-Time Feature Gating**: The `#[cfg(feature = "enterprise")]` ensures only the
+//!    appropriate implementation is compiled, with zero runtime overhead.
+//!
+//! Alternative approaches (macros, trait objects) would reduce duplication but at
+//! the cost of clarity, type safety, or runtime performance. Given these endpoints
+//! are stable and rarely change, explicit duplication is the pragmatic choice.
 
 use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]

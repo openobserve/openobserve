@@ -17,6 +17,24 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 /// Semantic field group - defines field names that represent the same entity
+///
+/// # Field Name Overlaps
+///
+/// Field names can appear in multiple semantic groups. When extracting dimensions,
+/// the **first-defined group** takes precedence. This allows flexible configurations
+/// where a field like "service" can have different meanings in different contexts.
+///
+/// Example:
+/// ```
+/// // Group 1: service-primary (defined first)
+/// //   field_names: ["service", "primary_service"]
+/// //
+/// // Group 2: service-backup (defined second)
+/// //   field_names: ["service", "backup_service"]
+/// //
+/// // When extracting dimensions from {"service": "api"}:
+/// // → Matches "service-primary" group (first occurrence wins)
+/// ```
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct SemanticFieldGroup {
     /// Unique identifier (lowercase, dash-separated, e.g., "host", "k8s-cluster")
@@ -26,6 +44,8 @@ pub struct SemanticFieldGroup {
     pub display_name: String,
 
     /// List of field names that are equivalent (e.g., ["host", "hostname", "node"])
+    ///
+    /// Note: Field names can overlap with other groups. First-defined group wins.
     pub field_names: Vec<String>,
 
     /// Whether to normalize values (lowercase + trim)
@@ -152,6 +172,16 @@ impl SemanticFieldGroup {
 }
 
 /// Configuration for alert deduplication
+///
+/// # Naming Convention
+///
+/// This config uses `fingerprint_fields` (not `deduplication_dimensions`) to distinguish
+/// from `CorrelationConfig::correlation_dimensions`:
+/// - **fingerprint_fields**: Semantic group IDs used for *identifying* duplicate alert firings
+/// - **correlation_dimensions**: Semantic group IDs used for *matching* alerts to incidents
+///
+/// The term "fields" emphasizes we're building a unique fingerprint, while "dimensions"
+/// in correlation emphasizes the multi-dimensional matching space.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]
 pub struct DeduplicationConfig {
@@ -160,15 +190,27 @@ pub struct DeduplicationConfig {
     pub enabled: bool,
 
     /// Semantic field groups - defines field name equivalences
+    ///
+    /// Defines how field names from different data sources map to canonical dimensions.
+    /// Example: `["host", "hostname", "server"]` all map to semantic group ID "host".
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub semantic_field_groups: Vec<SemanticFieldGroup>,
 
     /// Fingerprint fields - semantic group IDs to use for deduplication
+    ///
+    /// These define which dimensions to include when calculating alert fingerprints.
+    /// Alerts with the same fingerprint within the time window are considered duplicates.
+    ///
+    /// Example: `["service", "host"]` means alerts are unique per service+host combination.
+    ///
+    /// Note: Called "fields" (not "dimensions") to emphasize fingerprint construction.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fingerprint_fields: Vec<String>,
 
     /// Time window in minutes for deduplication
-    /// If None, defaults to 2x alert frequency
+    ///
+    /// Alerts with the same fingerprint within this window are suppressed.
+    /// If None, defaults to 2x the alert evaluation frequency.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_window_minutes: Option<i64>,
 }
@@ -186,7 +228,8 @@ impl DeduplicationConfig {
         }
 
         let mut seen_ids = std::collections::HashSet::new();
-        let mut all_field_names = std::collections::HashSet::new();
+        let mut field_name_to_group: std::collections::HashMap<&String, &String> =
+            std::collections::HashMap::new();
 
         for group in &self.semantic_field_groups {
             // Validate ID format
@@ -225,13 +268,16 @@ impl DeduplicationConfig {
                 ));
             }
 
-            // Check for field name overlaps
+            // Track field name overlaps (warn but allow)
+            // Precedence: first-defined group wins when extracting dimensions
             for field_name in &group.field_names {
-                if !all_field_names.insert(field_name) {
-                    return Err(format!(
-                        "Field name '{}' appears in multiple semantic groups",
-                        field_name
-                    ));
+                if let Some(existing_group_id) = field_name_to_group.get(field_name) {
+                    log::warn!(
+                        "[deduplication] Field name '{field_name}' appears in multiple semantic groups: '{existing_group_id}' and '{}'. Using first occurrence (group '{existing_group_id}').",
+                        group.id
+                    );
+                } else {
+                    field_name_to_group.insert(field_name, &group.id);
                 }
             }
         }
@@ -251,8 +297,7 @@ impl DeduplicationConfig {
         for field_id in &self.fingerprint_fields {
             if !seen_ids.contains(field_id) {
                 return Err(format!(
-                    "Fingerprint field '{}' does not reference a defined semantic group",
-                    field_id
+                    "Fingerprint field '{field_id}' does not reference a defined semantic group"
                 ));
             }
         }
@@ -328,16 +373,44 @@ mod tests {
         assert!(config.validate().is_err());
         config.semantic_field_groups.pop();
 
-        // Test overlapping field names
+        // Test overlapping field names - now allowed with warning
         config.semantic_field_groups[1]
             .field_names
             .push("service".to_string());
-        assert!(config.validate().is_err());
+        assert!(config.validate().is_ok()); // Should succeed, just warns
         config.semantic_field_groups[1].field_names.pop();
 
         // Test invalid fingerprint field reference
         config.fingerprint_fields.push("nonexistent".to_string());
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_deduplication_config_overlapping_field_names() {
+        // Test that overlapping field names are allowed (with warning)
+        // Precedence: first-defined group wins
+        let config = DeduplicationConfig {
+            enabled: true,
+            semantic_field_groups: vec![
+                SemanticFieldGroup {
+                    id: "service-primary".to_string(),
+                    display_name: "Primary Service".to_string(),
+                    field_names: vec!["service".to_string(), "primary_service".to_string()],
+                    normalize: true,
+                },
+                SemanticFieldGroup {
+                    id: "service-backup".to_string(),
+                    display_name: "Backup Service".to_string(),
+                    field_names: vec!["service".to_string(), "backup_service".to_string()], /* "service" overlaps */
+                    normalize: true,
+                },
+            ],
+            fingerprint_fields: vec!["service-primary".to_string()],
+            time_window_minutes: Some(10),
+        };
+
+        // Should succeed - overlaps are allowed, just logged as warnings
+        assert!(config.validate().is_ok());
     }
 
     #[test]
