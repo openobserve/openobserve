@@ -13,32 +13,85 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ahash::{HashMap, HashMapExt};
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
-use rayon::prelude::*;
 
 use crate::service::promql::{
+    aggregations::{Accumulate, AggFunc},
     common::std_variance2,
-    value::{InstantValue, Sample, Value},
+    value::{EvalContext, Sample, Value},
 };
 
-pub fn stdvar(timestamp: i64, param: &Option<LabelModifier>, data: Value) -> Result<Value> {
-    let score_values = super::eval_std_dev_var(param, data, "stdvar")?;
-    if score_values.is_none() {
-        return Ok(Value::None);
+/// Aggregates Matrix input for range queries
+pub fn stdvar(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    let (input_size, timestamps_count) = match &data {
+        Value::Matrix(m) => (m.len(), eval_ctx.timestamps().len()),
+        _ => (0, 0),
+    };
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] stdvar() started with {input_size} series and {timestamps_count} timestamps",
+        eval_ctx.trace_id,
+    );
+
+    let result = super::eval_aggregate(param, data, Stdvar, eval_ctx);
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] stdvar() execution took: {:?}",
+        eval_ctx.trace_id,
+        start.elapsed()
+    );
+    result
+}
+
+pub struct Stdvar;
+
+impl AggFunc for Stdvar {
+    fn name(&self) -> &'static str {
+        "stdvar"
     }
-    let values = score_values
-        .unwrap()
-        .into_par_iter()
-        .map(|(_, mut v)| {
-            let std_var = std_variance2(&v.values, v.current_mean, v.current_count).unwrap();
-            InstantValue {
-                labels: std::mem::take(&mut v.labels),
-                sample: Sample::new(timestamp, std_var),
-            }
-        })
-        .collect();
-    Ok(Value::Vector(values))
+
+    fn build(&self) -> Box<dyn super::Accumulate> {
+        Box::new(StdvarAccumulate::new())
+    }
+}
+
+pub struct StdvarAccumulate {
+    // Store all values per timestamp for variance calculation
+    values: HashMap<i64, Vec<f64>>,
+}
+
+impl StdvarAccumulate {
+    fn new() -> Self {
+        StdvarAccumulate {
+            values: HashMap::new(),
+        }
+    }
+}
+
+impl Accumulate for StdvarAccumulate {
+    fn accumulate(&mut self, sample: &Sample) {
+        let entry = self.values.entry(sample.timestamp).or_default();
+        entry.push(sample.value);
+    }
+
+    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+        self.values
+            .into_iter()
+            .filter_map(|(timestamp, values)| {
+                if values.is_empty() {
+                    return None;
+                }
+                // Calculate mean
+                let sum: f64 = values.iter().sum();
+                let count = values.len() as i64;
+                let mean = sum / count as f64;
+
+                // Calculate variance
+                std_variance2(&values, mean, count).map(|variance| Sample::new(timestamp, variance))
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -46,13 +99,13 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::service::promql::value::{InstantValue, Label, Sample, Value};
+    use crate::service::promql::value::{Label, RangeValue, Sample, Value};
 
     #[test]
-    fn test_stdvar_function() {
+    fn test_stdvar_range_function() {
         let timestamp = 1640995200; // 2022-01-01 00:00:00 UTC
 
-        // Create test data with multiple samples
+        // Create test data with multiple samples as Matrix (range query format)
         let labels1 = vec![
             Arc::new(Label::new("instance", "server1")),
             Arc::new(Label::new("job", "node_exporter")),
@@ -63,35 +116,44 @@ mod tests {
             Arc::new(Label::new("job", "node_exporter")),
         ];
 
-        let data = Value::Vector(vec![
-            InstantValue {
+        let data = Value::Matrix(vec![
+            RangeValue {
                 labels: labels1.clone(),
-                sample: Sample::new(timestamp, 10.0),
+                samples: vec![Sample::new(timestamp, 10.0)],
+                exemplars: None,
+                time_window: None,
             },
-            InstantValue {
+            RangeValue {
                 labels: labels1.clone(),
-                sample: Sample::new(timestamp, 20.0),
+                samples: vec![Sample::new(timestamp, 20.0)],
+                exemplars: None,
+                time_window: None,
             },
-            InstantValue {
+            RangeValue {
                 labels: labels2.clone(),
-                sample: Sample::new(timestamp, 30.0),
+                samples: vec![Sample::new(timestamp, 30.0)],
+                exemplars: None,
+                time_window: None,
             },
         ]);
 
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+
         // Test stdvar without label grouping - should return variance
-        let result = stdvar(timestamp, &None, data.clone()).unwrap();
+        let result = stdvar(&None, data.clone(), &eval_ctx).unwrap();
 
         match result {
-            Value::Vector(values) => {
-                assert_eq!(values.len(), 1);
+            Value::Matrix(matrix) => {
+                assert_eq!(matrix.len(), 1);
+                let series = &matrix[0];
                 // All samples are grouped together when no label modifier is provided
                 // Variance of [10.0, 20.0, 30.0] should be approximately 66.67
-                assert!((values[0].sample.value - 66.67).abs() < 0.1);
-                assert_eq!(values[0].sample.timestamp, timestamp);
+                assert!((series.samples[0].value - 66.67).abs() < 0.1);
+                assert_eq!(series.samples[0].timestamp, timestamp);
                 // Should have empty labels since all samples are grouped together
-                assert!(values[0].labels.is_empty());
+                assert!(series.labels.is_empty());
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }
