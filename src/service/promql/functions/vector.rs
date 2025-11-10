@@ -27,14 +27,12 @@ pub(crate) fn vector(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
         }
     };
 
-    // Generate samples based on start, end, and step from eval_ctx
-    let mut samples = Vec::new();
-    let mut current_ts = eval_ctx.start;
-
-    while current_ts <= eval_ctx.end {
-        samples.push(Sample::new(current_ts, value));
-        current_ts += eval_ctx.step;
-    }
+    // Generate samples using timestamps from eval_ctx
+    let samples: Vec<Sample> = eval_ctx
+        .timestamps()
+        .iter()
+        .map(|&ts| Sample::new(ts, value))
+        .collect();
 
     // Create a matrix with a single RangeValue containing all generated samples
     let range_value = RangeValue {
