@@ -253,6 +253,8 @@ jobs:
           fi
 
       - name: Install dependencies and run ui-tests
+        env:
+          TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
         run: |
           touch .env
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
