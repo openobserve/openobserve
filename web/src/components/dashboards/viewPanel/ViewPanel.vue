@@ -276,6 +276,7 @@ import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import { defineAsyncComponent } from "vue";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
@@ -605,17 +606,6 @@ export default defineComponent({
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
-    };
-
-    // Helper function to determine the scope type of a variable
-    const getScopeType = (variable: any) => {
-      if (variable.panels && variable.panels.length > 0) {
-        return "panels";
-      }
-      if (variable.tabs && variable.tabs.length > 0) {
-        return "tabs";
-      }
-      return "global";
     };
 
     // Computed property to filter variables based on current panel and tab context
