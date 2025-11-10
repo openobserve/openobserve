@@ -277,6 +277,7 @@ import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
+import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import { useLoading } from "@/composables/useLoading";
@@ -487,23 +488,9 @@ export default defineComponent({
       return { value: resolved };
     };
 
-    // Flag to prevent reload loops during cross-level dependency cascades
-    const isReloadingDependencies = ref(false);
-
     // ============================================
     // LEVEL-BASED VARIABLES LOGIC
     // ============================================
-
-    // Helper to determine scope type (matching VariableSettings.vue logic)
-    const getScopeType = (variable: any) => {
-      if (variable.panels && variable.panels.length > 0) {
-        return "panels";
-      } else if (variable.tabs && variable.tabs.length > 0) {
-        return "tabs";
-      } else {
-        return "global";
-      }
-    };
 
     // Helper to create config with ALL variables for dependency resolution
     // but only current level visible for UI
@@ -596,28 +583,12 @@ export default defineComponent({
           v.panels.includes(panelId),
       );
 
-      console.log(`[getPanelVariablesConfig] For panel "${panelId}":`, {
-        totalVariables: allVars.length,
-        globalVars: globalVars.map((v: any) => v.name),
-        tabVars: tabVars.map((v: any) => v.name),
-        panelVars: panelVars.map((v: any) => v.name),
-      });
-
       // Include global, tab, and panel variables for full dependency resolution
       const config = createConfigWithAllVariables(
         panelVars,
         [...globalVars, ...tabVars, ...panelVars],
         false,
       );
-
-      console.log(`[getPanelVariablesConfig] Config created:`, {
-        listLength: config.list.length,
-        levelVariables: config._levelVariables.map((v: any) => v.name),
-        configListWithFlags: config.list.map((v: any) => ({
-          name: v.name,
-          _isCurrentLevel: v._isCurrentLevel,
-        })),
-      });
 
       return config;
     };
@@ -627,34 +598,6 @@ export default defineComponent({
       return config._levelVariables || [];
     };
 
-    // Debug helper - log variables distribution
-    watch(
-      () => props.dashboardData?.variables?.list,
-      (variables) => {
-        if (variables) {
-          console.log("[Variables Distribution]");
-          console.log(
-            "Global:",
-            variables
-              .filter((v: any) => getScopeType(v) === "global")
-              .map((v: any) => v.name),
-          );
-          console.log(
-            "Tabs:",
-            variables
-              .filter((v: any) => getScopeType(v) === "tabs")
-              .map((v: any) => ({ name: v.name, tabs: v.tabs })),
-          );
-          console.log(
-            "Panels:",
-            variables
-              .filter((v: any) => getScopeType(v) === "panels")
-              .map((v: any) => ({ name: v.name, panels: v.panels })),
-          );
-        }
-      },
-      { immediate: true },
-    );
 
     // Track panel visibility
     const visiblePanels = ref(new Set<string>());
@@ -678,14 +621,6 @@ export default defineComponent({
       const hasTabVariables = activeTabVariables.value.length > 0;
       const canLoad = !hasTabVariables || tabVariablesReady.value;
 
-      console.log(`[Panel Load Check - ${panelId}]`, {
-        isVisible: visiblePanels.value.has(panelId),
-        alreadyLoaded: panelVariablesLoaded.value.has(panelId),
-        hasTabVariables,
-        tabVariablesReady: tabVariablesReady.value,
-        canLoad,
-        mergedValuesKeys: Object.keys(mergedVariablesValues.value),
-      });
 
       if (
         visiblePanels.value.has(panelId) &&
@@ -694,14 +629,8 @@ export default defineComponent({
       ) {
         const ref = panelVariableRefs[panelId];
         if (ref && ref.loadAllVariablesData) {
-          console.log(
-            `[Lazy Load] Loading panel variables for ${panelId} with merged values:`,
-            mergedVariablesValues.value,
-          );
           ref.loadAllVariablesData(true);
           panelVariablesLoaded.value.add(panelId);
-        } else {
-          console.warn(`[Lazy Load] Panel ref not found for ${panelId}`);
         }
       }
     };
@@ -854,16 +783,6 @@ export default defineComponent({
     watch(
       aggregatedVariablesForUrl,
       (newValue) => {
-        console.log('[URL Sync] Emitting variables to parent for URL update:', {
-          isVariablesLoading: newValue.isVariablesLoading,
-          variableCount: newValue.values?.length || 0,
-          variables: newValue.values?.map((v: any) => ({
-            name: v.name,
-            scope: v.scope,
-            hasValue: v.value !== undefined,
-            valueType: Array.isArray(v.value) ? `array(${v.value.length})` : typeof v.value,
-          })),
-        });
         emit("variablesData", newValue);
       },
       { deep: true, immediate: true },
@@ -966,46 +885,24 @@ export default defineComponent({
           };
           mergedVariablesValues.value = updatedValues;
           lastGlobalValues.value = { ...currentGlobalValues };
-
-          console.log(
-            "[Global Variables Updated]",
-            isFirstLoad ? "(First Load)" : "(Value Changed)",
-            Object.keys(currentGlobalValues),
-          );
         } else {
-          console.log(
-            "[Global Variables] No changes detected, skipping cascade",
-          );
           return;
         }
 
         // Mark global as loaded and trigger tab load ONLY on first load
         if (isFirstLoad) {
           globalVariablesLoaded.value = true;
-          console.log(
-            "[Global Variables] First load complete, triggering tab load",
-          );
 
           nextTick(() => {
             if (
               tabVariablesValueSelectorRef.value &&
               activeTabVariables.value.length > 0
             ) {
-              console.log(
-                "[Triggering Tab Load] After global loaded, calling loadAllVariablesData",
-              );
               tabVariablesValueSelectorRef.value.loadAllVariablesData(true);
             } else if (activeTabVariables.value.length === 0) {
-              console.log(
-                "[No Tab Variables] Marking as ready and triggering panel loads",
-              );
               tabVariablesReady.value = true;
               nextTick(() => {
                 visiblePanels.value.forEach((panelId) => {
-                  console.log(
-                    "[Triggering Panel Load] After global (no tab vars):",
-                    panelId,
-                  );
                   loadPanelVariablesIfVisible(panelId);
                 });
               });
@@ -1031,7 +928,6 @@ export default defineComponent({
     // Handler for tab variables data updates
     const tabVariablesDataUpdated = (data: any) => {
       const currentTabId = selectedTabId.value;
-      console.log(`[Tab Variables Updated - Tab: ${currentTabId}]`);
 
       // Extract current tab values (only TAB level variables with _isCurrentLevel === true)
       const currentTabValues: Record<string, any> = {};
@@ -1095,15 +991,7 @@ export default defineComponent({
         }
         lastTabValues.value[tabKey] = { ...currentTabValues };
 
-        console.log(
-          `[Tab Variables - ${currentTabId}]`,
-          isFirstLoad ? "(First Load)" : "(Value Changed)",
-          Object.keys(currentTabValues),
-        );
       } else {
-        console.log(
-          `[Tab Variables - ${currentTabId}] No changes detected, skipping panel cascade`,
-        );
         // Still mark as ready but don't trigger cascades
         tabVariablesReady.value = true;
         return;
@@ -1118,9 +1006,6 @@ export default defineComponent({
       // Mark tab variables as ready and trigger panel loads ONLY on first load
       if (isFirstLoad) {
         tabVariablesReady.value = true;
-        console.log(
-          `[Tab Variables - ${currentTabId}] First load complete, triggering visible panel loads`,
-        );
         nextTick(() => {
           visiblePanels.value.forEach((panelId) => {
             loadPanelVariablesIfVisible(panelId);
@@ -1134,7 +1019,6 @@ export default defineComponent({
 
     // Handler for panel variables data updates
     const panelVariablesDataUpdated = (data: any, panelId: string) => {
-      console.log(`[Panel Variables Updated - ${panelId}]`);
 
       // Extract current panel values (only PANEL level variables with _isCurrentLevel === true)
       const currentPanelValues: Record<string, any> = {};
@@ -1198,15 +1082,7 @@ export default defineComponent({
         }
         lastPanelValues.value[panelId] = { ...currentPanelValues };
 
-        console.log(
-          `[Panel ${panelId}]`,
-          isFirstLoad ? "(First Load)" : "(Value Changed)",
-          Object.keys(currentPanelValues),
-        );
       } else {
-        console.log(
-          `[Panel ${panelId}] No changes detected, skipping updates`,
-        );
         return;
       }
 
@@ -1216,10 +1092,6 @@ export default defineComponent({
         ...data,
       };
 
-      console.log(
-        `[Panel ${panelId}] Stored with panel isolation:`,
-        Object.keys(currentPanelValues),
-      );
     };
 
     // ======= [END] dashboard PrintMode =======
@@ -1642,10 +1514,6 @@ export default defineComponent({
       (newVal) => {
         if (newVal?.value && Object.keys(newVal.value).length > 0) {
           mergedVariablesValues.value = { ...newVal.value };
-          console.log(
-            "[RenderDashboardCharts] Initialized merged values from props:",
-            Object.keys(mergedVariablesValues.value),
-          );
         }
       },
       { immediate: true },
@@ -1654,7 +1522,6 @@ export default defineComponent({
     // Watch for tab changes - reset state
     watch(selectedTabId, (newTabId, oldTabId) => {
       if (newTabId !== oldTabId) {
-        console.log(`[Tab Changed] From ${oldTabId} to ${newTabId}`);
 
         // Reset state for new tab
         tabVariablesReady.value = false;
@@ -1665,16 +1532,11 @@ export default defineComponent({
         // If no tab variables, mark as ready immediately
         nextTick(() => {
           if (activeTabVariables.value.length === 0) {
-            console.log("[Tab Variables] No tab variables, marking as ready");
             tabVariablesReady.value = true;
 
             // Trigger panel loads if no tab variables
             nextTick(() => {
               visiblePanels.value.forEach((panelId) => {
-                console.log(
-                  "[Tab Change] Triggering panel load (no tab vars):",
-                  panelId,
-                );
                 loadPanelVariablesIfVisible(panelId);
               });
             });
@@ -1688,7 +1550,6 @@ export default defineComponent({
       nextTick(() => {
         // If no tab variables on current tab, mark as ready
         if (activeTabVariables.value.length === 0) {
-          console.log("[Init] No tab variables, marking as ready");
           tabVariablesReady.value = true;
         }
       });
