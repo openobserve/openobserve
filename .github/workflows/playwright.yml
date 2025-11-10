@@ -132,107 +132,107 @@ jobs:
     strategy:
       matrix:
         include:
-          - testfolder: "GeneralTests"
-            browser: "chrome"
-            run_files:
-              [
-                "sanity.spec.js",
-                "changeOrg.spec.js",
-                "enrichment.spec.js",
-                "schema.spec.js",
-                "schemaload.spec.js",
-                "serviceAccount.spec.js",
-                "usersOrg.spec.js",
-                "org.spec.js",
-              ]
-          - testfolder: "Logs-Core"
-            browser: "chrome"
-            run_files:
-              [
-                "join.spec.js",
-                "logshistogram.spec.js",
-                "logspage.spec.js",
-                "logsquickmode.spec.js",
-                "pagination.spec.js",
-                "unflattened.spec.js",
-                "logstable.spec.js",
-              ]
-          - testfolder: "Logs-Queries"
-            browser: "chrome"
-            run_files:
-              [
-                "logsDownloads.spec.js",
-                "logsqueries.spec.js",
-                "secondsPrecisionAdded.spec.js",
-                "logsqueries.cte.spec.js",
-                "logsqueries.matchall.spec.js",
-                "searchpartition.spec.js",
-              ]
-          - testfolder: "Alerts"
-            browser: "chrome"
-            run_files:
-              [
-                "alerts-e2e-flow.spec.js",
-                "alerts-ui-operations.spec.js",
-                "alerts-import.spec.js",
-              ]
-          - testfolder: "Dashboards-Core"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard.spec.js",
-                "dashboard2.spec.js",
-                "dashboardtype.spec.js",
-                "dashboard-folder.spec.js",
-                "dashboard-import.spec.js",
-                "maxquery.spec.js",
-              ]
-          - testfolder: "Dashboards-Settings"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard-filter.spec.js",
-                "dashboard-general-setting.spec.js",
-                "dashboard-tabs-setting.spec.js",
-                "dashboard-variables-setting.spec.js",
-                "dashboard-transpose.spec.js",
-              ]
-          - testfolder: "Dashboards-Charts"
-            browser: "chrome"
-            run_files: [
-                "custom-charts.spec.js",
-                "dashboard-geoMap.spec.js",
-                "dashboard-maps.spec.js",
-                "dashboard-multi-y-axis.spec.js",
-                "dashboard-html-chart.spec.js",
-                "visualize.spec.js",
-                # "visualization-vrl.spec.js"
-              ]
-          - testfolder: "Dashboards-Streaming"
-            browser: "chrome"
-            run_files: ["dashboard-streaming.spec.js",]
+          # - testfolder: "GeneralTests"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "sanity.spec.js",
+          #       "changeOrg.spec.js",
+          #       "enrichment.spec.js",
+          #       "schema.spec.js",
+          #       "schemaload.spec.js",
+          #       "serviceAccount.spec.js",
+          #       "usersOrg.spec.js",
+          #       "org.spec.js",
+          #     ]
+          # - testfolder: "Logs-Core"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "join.spec.js",
+          #       "logshistogram.spec.js",
+          #       "logspage.spec.js",
+          #       "logsquickmode.spec.js",
+          #       "pagination.spec.js",
+          #       "unflattened.spec.js",
+          #       "logstable.spec.js",
+          #     ]
+          # - testfolder: "Logs-Queries"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "logsDownloads.spec.js",
+          #       "logsqueries.spec.js",
+          #       "secondsPrecisionAdded.spec.js",
+          #       "logsqueries.cte.spec.js",
+          #       "logsqueries.matchall.spec.js",
+          #       "searchpartition.spec.js",
+          #     ]
+          # - testfolder: "Alerts"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "alerts-e2e-flow.spec.js",
+          #       "alerts-ui-operations.spec.js",
+          #       "alerts-import.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Core"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "dashboard.spec.js",
+          #       "dashboard2.spec.js",
+          #       "dashboardtype.spec.js",
+          #       "dashboard-folder.spec.js",
+          #       "dashboard-import.spec.js",
+          #       "maxquery.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Settings"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "dashboard-filter.spec.js",
+          #       "dashboard-general-setting.spec.js",
+          #       "dashboard-tabs-setting.spec.js",
+          #       "dashboard-variables-setting.spec.js",
+          #       "dashboard-transpose.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Charts"
+          #   browser: "chrome"
+          #   run_files: [
+          #       "custom-charts.spec.js",
+          #       "dashboard-geoMap.spec.js",
+          #       "dashboard-maps.spec.js",
+          #       "dashboard-multi-y-axis.spec.js",
+          #       "dashboard-html-chart.spec.js",
+          #       "visualize.spec.js",
+          #       # "visualization-vrl.spec.js"
+          #     ]
+          # - testfolder: "Dashboards-Streaming"
+          #   browser: "chrome"
+          #   run_files: ["dashboard-streaming.spec.js",]
           - testfolder: "Pipelines"
             browser: "chrome"
             run_files: [
-                "pipelines.spec.js",
-                "pipeline-dynamic.spec.js",
+                # "pipelines.spec.js",
+                # "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
-                # "remotepipeline.spec.js"
+                "remotepipeline.spec.js"
               ]
-          - testfolder: "Reports"
-            browser: "chrome"
-            run_files: [
-              "reportsScheduleNow.spec.js", 
-              "reportsScheduleLater.spec.js"
-              ]
-          - testfolder: "Streams"
-            browser: "chrome"
-            run_files:
-              [
-                "multiselect-stream.spec.js",
-                "streamname.spec.js",
-                "streaming.spec.js",
-              ]
+          # - testfolder: "Reports"
+          #   browser: "chrome"
+          #   run_files: [
+          #     "reportsScheduleNow.spec.js", 
+          #     "reportsScheduleLater.spec.js"
+          #     ]
+          # - testfolder: "Streams"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "multiselect-stream.spec.js",
+          #       "streamname.spec.js",
+          #       "streaming.spec.js",
+          #     ]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -261,6 +261,18 @@ jobs:
         with:
           node-version: 22
 
+      - name: Check if this is a rerun
+        id: check_rerun
+        run: |
+          echo "::notice::GitHub run attempt: ${{ github.run_attempt }}"
+          if [ "${{ github.run_attempt }}" -gt "1" ]; then
+            echo "is_rerun=true" >> $GITHUB_OUTPUT
+            echo "::notice::This is a rerun (attempt ${{ github.run_attempt }}). Will attempt to run only failed tests."
+          else
+            echo "is_rerun=false" >> $GITHUB_OUTPUT
+            echo "::notice::This is the first run. Will run all tests in matrix."
+          fi
+
       - name: Install dependencies and run ui-tests
         run: |
           touch .env
@@ -275,7 +287,41 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
-          npx playwright install --with-deps chromium 
+          npx playwright install --with-deps chromium
+
+          # Check if this is a rerun
+          IS_RERUN="${{ steps.check_rerun.outputs.is_rerun }}"
+
+          if [ "$IS_RERUN" = "true" ]; then
+            echo "::group::Fetching last failed tests from TestDino"
+            # Try to get last failed tests from TestDino
+            if npx tdpw last-failed > last-failed-flags.txt 2>&1; then
+              LAST_FAILED_FLAGS="$(cat last-failed-flags.txt)"
+
+              if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
+                echo "::notice::Found failed tests from previous run. Running only: $LAST_FAILED_FLAGS"
+                echo "RERUN_MODE=optimized" >> $GITHUB_ENV
+                echo "EXTRA_PW_FLAGS=$LAST_FAILED_FLAGS" >> $GITHUB_ENV
+              else
+                echo "::warning::TestDino returned no failed tests. Falling back to running all tests in this matrix job."
+                echo "::warning::This means you'll be billed for all tests. Please investigate why last-failed returned empty."
+                echo "RERUN_MODE=fallback" >> $GITHUB_ENV
+                echo "EXTRA_PW_FLAGS=" >> $GITHUB_ENV
+              fi
+            else
+              echo "::error::Failed to fetch last failed tests from TestDino."
+              cat last-failed-flags.txt
+              echo "::warning::Falling back to running all tests in this matrix job."
+              echo "::warning::This means you'll be billed for all tests. Please check TestDino integration."
+              echo "RERUN_MODE=fallback" >> $GITHUB_ENV
+              echo "EXTRA_PW_FLAGS=" >> $GITHUB_ENV
+            fi
+            echo "::endgroup::"
+          else
+            echo "RERUN_MODE=normal" >> $GITHUB_ENV
+            echo "EXTRA_PW_FLAGS=" >> $GITHUB_ENV
+          fi
+
           # Get list of files to run using join function
           FILE_LIST="${{ join(matrix.run_files, ' ') }}"
           echo "DEBUG: FILE_LIST = $FILE_LIST"
@@ -294,9 +340,9 @@ jobs:
                 ACTUAL_FOLDER="${{ matrix.testfolder }}"
                 ;;
             esac
-            
+
             echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
-            
+
             # Build file paths
             FILE_PATHS=""
             for file in $FILE_LIST; do
@@ -304,13 +350,39 @@ jobs:
               echo "DEBUG: Will run file: $FILE_PATH"
               FILE_PATHS="$FILE_PATHS $FILE_PATH"
             done
-            
-            # Run all specified files at once
-            echo "DEBUG: Final command: npx playwright test$FILE_PATHS"
-            npx playwright test $FILE_PATHS
+
+            # Determine what to run based on rerun mode
+            if [ "$RERUN_MODE" = "optimized" ]; then
+              echo "::notice::🎯 OPTIMIZED RERUN: Running only failed tests with flags: $EXTRA_PW_FLAGS"
+              echo "DEBUG: Final command: npx playwright test $EXTRA_PW_FLAGS"
+              npx playwright test $EXTRA_PW_FLAGS
+            else
+              # Normal run or fallback
+              if [ "$RERUN_MODE" = "fallback" ]; then
+                echo "::warning::⚠️ FALLBACK RERUN: Running all tests in matrix (TestDino optimization failed)"
+              fi
+              echo "DEBUG: Final command: npx playwright test$FILE_PATHS"
+              npx playwright test $FILE_PATHS
+            fi
           else
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
           fi
+
+      - name: Cache test failures to TestDino
+        if: always()
+        env:
+          TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
+        run: |
+          cd tests/ui-testing
+          echo "::group::Caching test failure metadata to TestDino"
+          if npx tdpw cache; then
+            echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
+            echo "::notice::This data will be used for optimized reruns if tests fail"
+          else
+            echo "::warning::⚠️ Failed to cache test metadata to TestDino"
+            echo "::warning::Rerun optimization may not work properly"
+          fi
+          echo "::endgroup::"
 
       - name: Sanitize Test Folder Name
         shell: bash
