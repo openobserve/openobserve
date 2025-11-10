@@ -355,7 +355,7 @@ jobs:
             fi
           else
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
-          fi
+          fi 
 
       - name: Cache test failures to TestDino
         if: always()
