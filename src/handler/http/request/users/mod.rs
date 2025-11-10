@@ -136,7 +136,7 @@ pub async fn list(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = PostUserRequest, description = "User data", content_type = "application/json"),
+    request_body(content = inline(PostUserRequest), description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
@@ -197,7 +197,7 @@ pub async fn save(
         ("org_id" = String, Path, description = "Organization name"),
         ("email_id" = String, Path, description = "User's email id"),
     ),
-    request_body(content = UpdateUser, description = "User data", content_type = "application/json"),
+    request_body(content = inline(UpdateUser), description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
@@ -270,7 +270,7 @@ pub async fn update(
         ("org_id" = String, Path, description = "Organization name"),
         ("email_id" = String, Path, description = "User's email id"),
     ),
-    request_body(content = UserRoleRequest, description = "User role", content_type = "application/json"),
+    request_body(content = inline(UserRoleRequest), description = "User role", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
@@ -354,9 +354,9 @@ context_path = "/auth",
                    Supports both JSON request body authentication and Authorization header-based authentication. \
                    Successful authentication establishes a session that allows access to protected resources and APIs \
                    throughout the platform.",
-    request_body(content = SignInUser, description = "User login", content_type = "application/json"),
+    request_body(content = inline(SignInUser), description = "User login", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SignInResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(SignInResponse)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"}))
@@ -851,7 +851,7 @@ pub async fn list_invitations(
         ("token" = String, Path, description = "invitation token"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(UserList)),
     )
 )]
 #[delete("/invites/{token}")]

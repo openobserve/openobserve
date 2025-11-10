@@ -16,8 +16,10 @@
 mod check_keep_alive;
 mod compress;
 mod encoding;
+mod org_blocking;
 mod slow_log;
 
 pub use check_keep_alive::check_keep_alive;
 pub use compress::Compress;
+pub use org_blocking::blocked_orgs_middleware;
 pub use slow_log::SlowLog;

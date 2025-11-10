@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { CommonActions } from '../commonActions';
+import { AlertsPage } from './alertsPage.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class AlertDestinationsPage {
     constructor(page) {
         this.page = page;
         this.commonActions = new CommonActions(page);
+        this.alertsPage = new AlertsPage(page);
         
         // Navigation locators
         this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
@@ -34,6 +36,8 @@ export class AlertDestinationsPage {
         this.deleteDestinationButton = '[data-test="alert-destination-list-{destinationName}-delete-destination"]';
         this.importJsonFileTab = '[data-test="tab-import_json_file"]';
         this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
+        this.destinationCountText = 'Alert Destinations';
+        this.destinationInUseMessage = 'Destination is currently used by alert:';
     }
 
     async navigateToDestinations() {
@@ -154,6 +158,180 @@ export class AlertDestinationsPage {
         await this.page.locator(this.confirmButton).click();
         await this.page.waitForTimeout(1000); // Wait for deletion to complete
         await expect(this.page.getByText('No data available')).toBeVisible();
+    }
+
+    /**
+     * Search for destinations by prefix
+     * @param {string} searchText - Text to search for
+     */
+    async searchDestinations(searchText) {
+        await this.page.locator(this.destinationListSearchInput).click();
+        await this.page.locator(this.destinationListSearchInput).fill('');
+        await this.page.locator(this.destinationListSearchInput).fill(searchText);
+        await this.page.waitForTimeout(2000); // Wait for search results
+        testLogger.debug('Searched for destinations', { searchText });
+    }
+
+    /**
+     * Get all destination names from current search results
+     * @returns {Promise<string[]>} Array of destination names
+     */
+    async getAllDestinationNames() {
+        const destinationNames = [];
+
+        // Find all delete buttons with the pattern
+        const deleteButtons = await this.page.locator('[data-test*="alert-destination-list-"][data-test*="-delete-destination"]').all();
+
+        for (const button of deleteButtons) {
+            const dataTest = await button.getAttribute('data-test');
+            // Extract destination name from data-test="alert-destination-list-{destinationName}-delete-destination"
+            const match = dataTest.match(/alert-destination-list-(.+)-delete-destination/);
+            if (match && match[1]) {
+                destinationNames.push(match[1]);
+            }
+        }
+
+        testLogger.debug('Found destination names', { destinationNames, count: destinationNames.length });
+        return destinationNames;
+    }
+
+    /**
+     * Delete a single destination by name
+     * Handles case where destination is in use by an alert
+     * @param {string} destinationName - Name of the destination to delete
+     */
+    async deleteDestinationByName(destinationName) {
+        const deleteButton = this.page.locator(this.deleteDestinationButton.replace('{destinationName}', destinationName));
+        await deleteButton.waitFor({ state: 'visible', timeout: 5000 });
+        await deleteButton.click();
+        await this.page.locator(this.confirmButton).click();
+
+        // Check if "Destination is currently used by alert" message appears
+        try {
+            const inUseMessage = await this.page.getByText(this.destinationInUseMessage).textContent({ timeout: 3000 });
+
+            // Extract alert name from message: "Destination is currently used by alert: Automation_Alert_3Igfv"
+            const match = inUseMessage.match(/alert:\s*(.+)$/);
+            if (match && match[1]) {
+                const alertName = match[1].trim();
+                testLogger.warn('Destination in use by alert, deleting alert first', { destinationName, alertName });
+
+                // Close the error dialog
+                await this.page.keyboard.press('Escape');
+                await this.page.waitForTimeout(500);
+
+                // Navigate to alerts and delete the alert
+                await this.alertsPage.searchAndDeleteAlert(alertName);
+
+                // Navigate back to destinations
+                await this.navigateToDestinations();
+                await this.page.waitForTimeout(1000);
+
+                // Search for the destination again
+                await this.searchDestinations(destinationName);
+
+                // Retry deleting the destination
+                await deleteButton.waitFor({ state: 'visible', timeout: 5000 });
+                await deleteButton.click();
+                await this.page.locator(this.confirmButton).click();
+            }
+        } catch (e) {
+            // No "in use" message, deletion was successful
+        }
+
+        await this.page.waitForTimeout(1000);
+        testLogger.debug('Deleted destination', { destinationName });
+    }
+
+    /**
+     * Check if any destinations exist in search results
+     * @returns {Promise<boolean>}
+     */
+    async hasDestinations() {
+        try {
+            // Check if "No data available" is shown
+            const noData = await this.page.getByText('No data available').isVisible({ timeout: 2000 });
+            if (noData) {
+                testLogger.debug('No destinations found');
+                return false;
+            }
+            return true;
+        } catch (e) {
+            // If no "No data available", assume there are destinations
+            return true;
+        }
+    }
+
+    /**
+     * Delete all destinations matching a prefix
+     * @param {string} prefix - Prefix to search for (e.g., "auto_playwright_destination")
+     */
+    async deleteAllDestinationsWithPrefix(prefix) {
+        testLogger.info('Starting to delete all destinations with prefix', { prefix });
+
+        // Navigate to destinations page
+        await this.navigateToDestinations();
+        await this.page.waitForTimeout(2000);
+
+        let totalDeleted = 0;
+        let previousCount = -1;
+
+        // Keep looping until search returns no results
+        while (true) {
+            // Search for destinations with the prefix
+            await this.searchDestinations(prefix);
+            await this.page.waitForTimeout(1500);
+
+            // Check if any destinations exist
+            const hasAny = await this.hasDestinations();
+            if (!hasAny) {
+                testLogger.info('No destinations found with prefix', { prefix, totalDeleted });
+                break;
+            }
+
+            // Get all matching destination names from current page
+            let destinationNames = await this.getAllDestinationNames();
+            const currentCount = destinationNames.length;
+
+            if (currentCount === 0) {
+                testLogger.info('No destination names found, stopping');
+                break;
+            }
+
+            // Safety check: if count hasn't changed after deletion, something is wrong
+            if (previousCount === currentCount && previousCount !== -1) {
+                testLogger.error('Destination count unchanged after deletion attempt - stopping to prevent infinite loop', {
+                    currentCount,
+                    destinationNames,
+                    totalDeleted
+                });
+                break;
+            }
+            previousCount = currentCount;
+
+            testLogger.info('Found destinations to delete', { count: currentCount, destinationNames });
+
+            // Delete only the FIRST destination to handle cascade properly
+            // After cascade (destination→alert), page state changes
+            const destinationName = destinationNames[0];
+            testLogger.debug('Deleting destination (one at a time for cascade handling)', { destinationName });
+
+            try {
+                await this.deleteDestinationByName(destinationName);
+                totalDeleted++;
+
+                // After successful deletion with potential cascade, navigate back to destinations
+                await this.navigateToDestinations();
+                await this.page.waitForTimeout(1000);
+            } catch (error) {
+                testLogger.error('Failed to delete destination', { destinationName, error: error.message });
+                // Try to recover by navigating back to destinations page
+                await this.navigateToDestinations();
+                await this.page.waitForTimeout(1000);
+            }
+        }
+
+        testLogger.info('Completed deletion of all destinations with prefix', { prefix, totalDeleted });
     }
 
     /**

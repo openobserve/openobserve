@@ -313,7 +313,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Set absolute date-time and timezone
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.selectAbsolutetime("8", "16");
+    await pm.dashboardTimeRefresh.selectAbsolutetime("1", "1");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
 

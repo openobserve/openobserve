@@ -20,6 +20,7 @@ use crate::service::{compact::stats::update_stats_from_file_list, db};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { update_node_memory_usage().await });
+    tokio::task::spawn(async move { update_node_disk_usage().await });
 
     if file_list_update_stats().is_none() {
         log::debug!("[STATS] job not started as not a compactor");
@@ -101,5 +102,42 @@ async fn update_node_memory_usage() -> Result<(), anyhow::Error> {
             .with_label_values::<&str>(&[])
             .set(mem_usage as i64);
         tokio::time::sleep(time::Duration::from_secs(1)).await;
+    }
+}
+
+// update node disk usage metrics every 60 seconds
+async fn update_node_disk_usage() -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+    let data_dir = std::path::Path::new(&cfg.common.data_dir);
+
+    loop {
+        let disks = config::utils::sysinfo::disk::get_disk_usage();
+        // Sum up all disks that contain subdirectories of the data directory
+        // This handles cases where multiple disks are mounted at different subpaths
+        let mut total_space = 0_u64;
+        let mut total_used = 0_u64;
+
+        for disk in disks {
+            // Check if the disk mount point is under the data directory
+            if disk
+                .mount_point
+                .starts_with(data_dir.to_string_lossy().as_ref())
+            {
+                total_space += disk.total_space;
+                total_used += disk.total_space - disk.available_space;
+            }
+        }
+
+        // Only update metrics if we found at least one matching disk
+        if total_space > 0 {
+            config::metrics::NODE_DISK_TOTAL
+                .with_label_values::<&str>(&[])
+                .set(total_space as i64);
+            config::metrics::NODE_DISK_USAGE
+                .with_label_values::<&str>(&[])
+                .set(total_used as i64);
+        }
+
+        tokio::time::sleep(time::Duration::from_secs(60)).await;
     }
 }

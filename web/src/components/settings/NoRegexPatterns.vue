@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <div
-      class="full-width column flex-center q-gutter-sm q-mt-xs"
+      class="full-width column flex-center q-gutter-sm q-mt-xs tw-h-full"
       style="font-size: 1.5rem"
-      :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
     >
       <q-img
         :src="getImageURL('images/regex_pattern/no_data_regex_pattern.svg')"
@@ -89,13 +88,5 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     color: #5960b2;
     font-weight: 700;
     cursor: pointer;
-  }
-  .dark-mode{
-    .title-text{
-        color: #ffffff;
-    }
-    .subtitle-text{
-        color: #ffffff;
-    }
   }
   </style>

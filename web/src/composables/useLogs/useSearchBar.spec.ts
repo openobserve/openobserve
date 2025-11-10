@@ -29,14 +29,14 @@ installQuasar({
 // Create i18n instance
 const i18n = createI18n({
   legacy: false,
-  locale: 'en',
+  locale: "en",
   messages: {
     en: {
       search: {
-        queryRangeRestrictionMsg: 'Query range restricted to {range}'
-      }
-    }
-  }
+        queryRangeRestrictionMsg: "Query range restricted to {range}",
+      },
+    },
+  },
 });
 
 // Create test wrapper component
@@ -44,13 +44,13 @@ const TestComponent = defineComponent({
   setup() {
     const searchBar = useSearchBar();
     return {
-      ...searchBar
+      ...searchBar,
     };
   },
-  template: '<div></div>'
+  template: "<div></div>",
 });
 
-describe('useSearchBar Composable', () => {
+describe("useSearchBar Composable", () => {
   let wrapper: any;
 
   beforeEach(() => {
@@ -65,64 +65,60 @@ describe('useSearchBar Composable', () => {
     vi.clearAllMocks();
   });
 
-  describe('Search Bar Functions', () => {
-    it('should have onStreamChange function', () => {
-      expect(typeof wrapper.vm.onStreamChange).toBe('function');
+  describe("Search Bar Functions", () => {
+    it("should have onStreamChange function", () => {
+      expect(typeof wrapper.vm.onStreamChange).toBe("function");
     });
 
-    it('should have getFunctions function', () => {
-      expect(typeof wrapper.vm.getFunctions).toBe('function');
+    it("should have getFunctions function", () => {
+      expect(typeof wrapper.vm.getFunctions).toBe("function");
     });
 
-    it('should have getActions function', () => {
-      expect(typeof wrapper.vm.getActions).toBe('function');
+    it("should have getActions function", () => {
+      expect(typeof wrapper.vm.getActions).toBe("function");
     });
 
-    it('should have getSavedViews function', () => {
-      expect(typeof wrapper.vm.getSavedViews).toBe('function');
+    it("should have getSavedViews function", () => {
+      expect(typeof wrapper.vm.getSavedViews).toBe("function");
     });
 
-    it('should have getRegionInfo function', () => {
-      expect(typeof wrapper.vm.getRegionInfo).toBe('function');
+    it("should have getRegionInfo function", () => {
+      expect(typeof wrapper.vm.getRegionInfo).toBe("function");
     });
 
-    it('should have setSelectedStreams function', () => {
-      expect(typeof wrapper.vm.setSelectedStreams).toBe('function');
+    it("should have setSelectedStreams function", () => {
+      expect(typeof wrapper.vm.setSelectedStreams).toBe("function");
     });
 
-    it('should have getQueryData function', () => {
-      expect(typeof wrapper.vm.getQueryData).toBe('function');
+    it("should have getQueryData function", () => {
+      expect(typeof wrapper.vm.getQueryData).toBe("function");
     });
 
-    it('should have setCommunicationMethod function', () => {
-      expect(typeof wrapper.vm.setCommunicationMethod).toBe('function');
+    it("should have sendCancelSearchMessage function", () => {
+      expect(typeof wrapper.vm.sendCancelSearchMessage).toBe("function");
     });
 
-    it('should have sendCancelSearchMessage function', () => {
-      expect(typeof wrapper.vm.sendCancelSearchMessage).toBe('function');
+    it("should have cancelQuery function", () => {
+      expect(typeof wrapper.vm.cancelQuery).toBe("function");
     });
 
-    it('should have cancelQuery function', () => {
-      expect(typeof wrapper.vm.cancelQuery).toBe('function');
+    it("should have handleQueryData function", () => {
+      expect(typeof wrapper.vm.handleQueryData).toBe("function");
     });
 
-    it('should have getPageCount function', () => {
-      expect(typeof wrapper.vm.getPageCount).toBe('function');
-    });
-
-    it('should have handleQueryData function', () => {
-      expect(typeof wrapper.vm.handleQueryData).toBe('function');
+    it("should have setDateTime function", () => {
+      expect(typeof wrapper.vm.setDateTime).toBe("function");
     });
   });
 
-  describe('onStreamChange', () => {
-    it('should handle stream change', async () => {
+  describe("onStreamChange", () => {
+    it("should handle stream change", async () => {
       const { onStreamChange } = wrapper.vm;
       await onStreamChange();
       expect(onStreamChange).toHaveBeenCalled;
     });
 
-    it('should handle empty query string', async () => {
+    it("should handle empty query string", async () => {
       const { onStreamChange } = wrapper.vm;
       await onStreamChange();
       expect(onStreamChange).toHaveBeenCalled;

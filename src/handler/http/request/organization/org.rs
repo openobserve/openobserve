@@ -63,7 +63,7 @@ use crate::{
         ("Authorization"= [])
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = OrganizationResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationResponse)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"}))
@@ -170,7 +170,7 @@ pub async fn organizations(
         ("Authorization"= [])
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = AllOrganizationResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(AllOrganizationResponse)),
     )
 )]
 #[get("/{org_id}/organizations")]
@@ -293,7 +293,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(PasscodeResponse)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -335,7 +335,7 @@ async fn get_user_passcode(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(PasscodeResponse)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -377,7 +377,7 @@ async fn update_user_passcode(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(RumIngestionResponse)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -419,7 +419,7 @@ async fn get_user_rumtoken(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(RumIngestionResponse)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -461,7 +461,7 @@ async fn update_user_rumtoken(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(RumIngestionResponse)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -499,9 +499,9 @@ async fn create_user_rumtoken(
     security(
         ("Authorization"= [])
     ),
-    request_body(content = Organization, description = "Organization data", content_type = "application/json"),
+    request_body(content = inline(Organization), description = "Organization data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(RumIngestionResponse)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"}))
@@ -532,7 +532,7 @@ async fn create_org(
     security(
         ("Authorization"= [])
     ),
-    request_body(content = ExtendTrialPeriodRequest, description = "Extend free trial request", content_type = "application/json"),
+    request_body(content = inline(ExtendTrialPeriodRequest), description = "Extend free trial request", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "text", body = String),
     )
@@ -597,9 +597,9 @@ async fn extend_trial_period(
     params(
         ("org_id" = String, Path, description = "Organization id"),
     ),
-    request_body(content = OrgRenameBody, description = "Organization new name", content_type = "application/json"),
+    request_body(content = inline(OrgRenameBody), description = "Organization new name", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
     )
 )]
 #[put("/{org_id}/rename")]
@@ -640,7 +640,7 @@ async fn rename_org(
         ("org_id" = String, Path, description = "Organization id"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = OrganizationInviteUserRecord),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationInviteUserRecord)),
     )
 )]
 #[get("/{org_id}/invites")]
@@ -678,7 +678,7 @@ pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Er
         ("org_id" = String, Path, description = "Organization id"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
     )
 )]
 #[post("/{org_id}/invites")]
@@ -712,7 +712,7 @@ pub async fn generate_org_invite(
         ("id" = String, Path, description = "invitation token"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
     )
 )]
 #[delete("/{org_id}/invites/{token}")]
@@ -742,7 +742,7 @@ pub async fn delete_org_invite(path: web::Path<(String, String)>) -> Result<Http
         ("invite_token" = String, Path, description = "The token sent to the user"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
     )
 )]
 #[put("/{org_id}/member_subscription/{invite_token}")]
@@ -787,7 +787,7 @@ async fn accept_org_invite(
         ("regions" = String, Query, description = "Optional comma-separated list of regions to filter by (e.g., 'us-east-1,us-west-2')")
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = NodeListResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(NodeListResponse)),
         (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
@@ -876,7 +876,7 @@ pub async fn node_list_impl(
         ("regions" = String, Query, description = "Optional comma-separated list of regions to filter by (e.g., 'us-east-1,us-west-2')")
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ClusterInfoResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(ClusterInfoResponse)),
         (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )

@@ -5,7 +5,8 @@
       v-model="condition.logicalOperator"
       dense
       options-dense
-      filled
+      borderless
+      hide-bottom-space
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
       class="condition-logical-operator"
@@ -36,16 +37,17 @@
               input-debounce="0"
               behavior="menu"
               dense
-              filled
               style="width: 100%"
               use-input
               borderless
+              hide-bottom-space
               hide-selected
               fill-input
               emit-value
               @filter="filterStreamFn"
               @update:model-value="handleFieldChange"
               :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
+              class="o2-custom-select-dashboard"
             />
             <q-btn
               size="xs"
@@ -53,6 +55,7 @@
               @click="removeColumnName"
               icon="close"
               :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
+              class="el-border"
             />
           </div>
           <div style="height: 100%">
@@ -85,12 +88,14 @@
                     <div class="flex column" style="height: 220px">
                       <q-select
                         dense
-                        filled
+                        borderless
+                        hide-bottom-space
                         v-model="condition.operator"
                         :options="operators"
                         :label="t('common.operator')"
                         style="width: 100%"
                         data-test="dashboard-add-condition-operator"
+                        class="o2-custom-select-dashboard"
                       />
                       <CommonAutoComplete
                         v-if="
@@ -108,7 +113,8 @@
                   <q-tab-panel dense name="list" class="q-pa-none">
                     <q-select
                       dense
-                      filled
+                      borderless
+                      hide-bottom-space
                       v-model="condition.values"
                       :options="sortedFilteredListOptions"
                       :label="t('common.selectFilter')"
@@ -122,6 +128,7 @@
                       use-input
                       @filter="filterListFn"
                       data-test="dashboard-add-condition-list-tab"
+                      class="o2-custom-select-dashboard"
                     >
                       <template v-slot:selected>
                         {{

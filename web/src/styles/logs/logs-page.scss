@@ -9,7 +9,7 @@
    LAYOUT HELPERS
    ============================================================================ */
 
-.logPage {
+.logPage_bkcss {
   padding: 0 !important;
   margin: 0 !important;
   box-sizing: border-box !important;
@@ -122,6 +122,14 @@
     }
   }
 
+  .q-splitter {
+    .q-splitter__before,
+    .q-splitter__after {
+      transition: none !important;
+      padding-right: 0 !important;
+    }
+  }
+
   .reset-filters {
     width: 2rem; // 32px
     height: 2rem; // 32px
@@ -173,19 +181,7 @@
   .row:nth-child(2) {
     height: 100%; /* or any other height you want to set */
   }
-
-  .empty-query .monaco-editor-background {
-    background-image: url("../../assets/images/common/query-editor.png");
-    background-repeat: no-repeat;
-    background-size: 115px;
-  }
-
-  .empty-function .monaco-editor-background {
-    background-image: url("../../assets/images/common/vrl-function.png");
-    background-repeat: no-repeat;
-    background-size: 170px;
-  }
-
+  
   .function-dropdown {
     width: 12.8125rem; // 205px
     padding-bottom: 0;
@@ -340,7 +336,7 @@
   }
 
   .download-logs-btn {
-    height: 1.875rem; // 30px
+    height: 1rem; // 30px
     border-radius: 0.375rem; // 6px
     transition: all 0.2s ease;
 
@@ -349,17 +345,17 @@
     }
 
     .q-icon {
-      font-size: 1.125rem; // 18px
+      font-size: 1rem; // 18px
     }
   }
 
   .save-transform-btn {
-    height: 1.9375rem; // 31px
+    height: 1rem; // 31px
     border-radius: 0.375rem; // 6px
   }
 
   .query-editor-container {
-    height: calc(100% - 2.1875rem) !important; // 35px
+    height: calc(100% - 3.31rem) !important; // 35px
   }
 
   .logs-auto-refresh-interval {
@@ -386,9 +382,11 @@
       padding: 0.25rem 0.3125rem; // 4px 5px
       border-radius: 0.375rem; // 6px
     }
-
     &:hover {
       background-color: var(--o2-hover-accent);
+    }
+    .q-btn-dropdown__arrow-container{
+      border-left: 1px solid var(--o2-border);
     }
   }
 
@@ -556,35 +554,6 @@
   }
 }
 
-.logs-visualize-toggle {
-  .button-group {
-    border: 0.0625rem solid var(--o2-border) !important; // 1px
-    border-radius: 0.5625rem; // 9px
-  }
-
-  .button {
-    background-color: var(--o2-muted-background);
-    border-radius: 0.375rem; // 6px
-    transition: background-color 0.2s ease;
-  }
-
-  .button-left {
-    border-top-left-radius: 0.375rem; // 6px
-    border-bottom-left-radius: 0.375rem; // 6px
-    color: var(--o2-text-primary);
-  }
-
-  .button-right {
-    border-top-right-radius: 0.375rem; // 6px
-    border-bottom-right-radius: 0.375rem; // 6px
-    color: var(--o2-text-primary);
-  }
-  .selected {
-    background-color: var(--q-primary) !important;
-    color: var(--o2-primary-foreground) !important;
-  }
-}
-
 .file-type-button-group {
   .q-btn {
     border: 0.0625rem solid var(--o2-border); // 1px
@@ -626,7 +595,7 @@
   width: 100%;
 
   .q-menu {
-    box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
+    // box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
     transform: translateY(0.5rem);
     border-radius: 0px;
 
@@ -649,7 +618,7 @@
 
   .index-table {
     width: 100%;
-    height: calc(100% - 44px);
+    height: calc(100% - 40px);
     // border: 1px solid rgba(0, 0, 0, 0.02);
 
     .q-table {
@@ -701,7 +670,7 @@
     .field-list-pagination {
       display: flex;
       align-items: center;
-      gap: 0.25rem; // 4px - better spacing
+      gap: 0.125rem; // 4px - better spacing
 
       .pagination-nav-btn {
         padding: 0 !important;
@@ -733,21 +702,20 @@
       }
 
       .pagination-page-btn {
-        padding: 0 !important;
+        padding: 0.375rem 0.25rem !important;
         margin: 0 !important;
-        min-width: auto !important;
-        width: auto !important;
-        min-height: auto !important;
-        height: auto !important;
-        font-size: 0.8125rem !important; // 13px - slightly larger
+        min-width: 1.5rem !important;
+        width: 1.5rem !important;
+        min-height: 1.375rem !important;
+        height: 1.375rem !important;
+        font-size: 0.75rem !important; // 13px - slightly larger
         font-weight: 500;
         line-height: 1;
-        color: var(--o2-text-primary);
-        border-radius: 0.375rem !important; // 4px - rounded border
+        color: var(--o2-text-primary) !important;
+        border-radius: 0.25rem !important; // 4px - rounded border
         overflow: visible !important;
 
         .q-btn__content {
-          padding: 0.125rem 0.375rem !important; // 2px 6px - slightly more padding
           min-height: auto !important;
           line-height: 1;
         }
@@ -791,6 +759,7 @@
       z-index: 2;
       left: 0;
       height: 20px;
+      color: var(--o2-text-primary);
       // text-transform: capitalize;
     }
 
@@ -818,7 +787,7 @@
 
     &.selected {
       .field_overlay {
-        background-color: rgba(89, 96, 178, 0.3);
+        background-color: var(--o2-hover-accent);
 
         .field_icons {
           opacity: 0;
@@ -836,31 +805,41 @@
   &.theme-dark {
     .field_list {
       &:hover {
-        box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
-
         .field_overlay {
-          background-color: #3f4143;
+          background-color: var(--o2-hover-accent);
+        }
+
+        .q-focus-helper{
           opacity: 1;
+          background: none !important;
+
+          &:before{
+            opacity: 1 !important;
+            background: none !important;
+          }
+
+          &:after{
+            opacity: 1 !important;
+            background: none !important;
+          }
         }
       }
     }
 
     .field-list-pagination {
       .q-btn {
-        color: white !important;
-        border-radius: 0.375rem !important;
-      }
-
-      .pagination-page-active {
-        border: 1px solid rgb(196, 196, 196) !important;
+        color: var(--o2-text-primary) !important;
+        border-radius: 0.25rem !important;
       }
     }
 
     .field-list-reset {
       .reset-icon {
-        color: white;
+        color: var(--o2-text-primary);
         border: 1px solid rgba(196, 196, 196);
         border-radius: 0.375rem !important;
+        padding: 0.125rem;
+
 
         &:hover {
           color: white;
@@ -872,10 +851,10 @@
   &.theme-light {
     .field_list {
       &:hover {
-        box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
+        // box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
 
         .field_overlay {
-          background-color: #e8e8e8;
+          background-color: var(--o2-hover-accent);
           opacity: 1;
         }
       }
@@ -988,25 +967,22 @@
 
       .field_list {
         &.selected {
-          background-color: rgba(89, 96, 178, 0.3);
-
-          .field_overlay {
-            // background-color: #ffffff;
-          }
+          background-color: var(--o2-hover-accent);
         }
       }
     }
 
     .schema-field-toggle {
-      border: 1px solid light-grey;
-      border-radius: 5px;
+      border: 1px solid var(--o2-border-color);
+      border-radius: 0.325rem;
+      background-color: transparent;
       line-height: 10px;
     }
 
     .q-table__bottom {
       padding: 0 !important;
-      min-height: 1.95rem !important; // 31.2px
-      max-height: 1.95rem !important;
+      min-height: 2.43rem !important; // 31.2px
+      max-height: 2.43rem !important;
     }
 
     .pagination-field-count {
@@ -1018,7 +994,7 @@
 
   .field-table {
     .q-table__bottom {
-      padding: 0.3125rem !important; // 5px
+      // padding: 0.3125rem !important; // 5px
     }
 
     .schema-field-toggle .q-btn {
@@ -1056,13 +1032,14 @@
   padding: 0.125rem 0.25rem; // Compact padding
   background: rgba(255, 255, 255, 0.1); // Glassmorphic
   backdrop-filter: blur(10px);
-  margin-top: 0.5rem;
+  margin-top: 0.4rem;
 
   .q-btn {
     padding: 0.125rem 0.25rem;
     min-height: 1.5rem;
     font-size: 0.75rem;
     border-radius: 0.25rem;
+    line-height: 1rem;
   }
 }
 
@@ -1074,24 +1051,25 @@
   backdrop-filter: blur(10px) !important;
   min-height: 1.45rem !important;
   height: 1.45rem !important;
-  border: 1px solid rgb(196, 196, 196) !important;
+  border: 0.0626rem solid var(--o2-border-color) !important;
   display: flex !important;
   align-items: center !important;
   overflow: visible !important;
-  margin-top: 0.55rem;
+  margin-top: 0.4rem;
 
   .q-field__control-container {
     padding-top: 0 !important;
   }
 
   .q-field__control {
-    height: 1.75rem !important;
-    min-height: 1.75rem !important;
+    height: 1.4rem !important;
+    min-height: 1.4rem !important;
     padding: 0 !important;
     display: flex !important;
     align-items: center !important;
     overflow: visible !important;
     top: -3px;
+    border: none !important;
 
     &:before,
     &:after {
@@ -1101,34 +1079,40 @@
 
   .q-field__native {
     padding: 0 0.25rem !important;
-    min-height: 1.75rem !important;
-    line-height: 1.75rem !important;
+    min-height: 100% !important;
+    line-height: 100% !important;
     font-size: 0.75rem !important;
     overflow: visible !important;
+    height: 100% !important;
+    display: flex;
+    align-items: center;
 
-    input,
     span {
-      line-height: 1.15rem !important;
       padding: 0 !important;
-      margin: -4px 0 0 0 !important;
+      height: auto;
+    }
+
+    input {
+      display: none;
     }
   }
 
   .q-field__input {
     padding: 0 !important;
-    line-height: 1.75rem !important;
+    line-height: 100% !important;
   }
 
   .q-field__append {
     padding: 0 !important;
     padding-left: 0.25rem !important;
-    height: 1.75rem !important;
+    height: 100% !important;
     display: flex !important;
     align-items: center !important;
   }
 
   .q-icon {
     font-size: 1rem !important;
+    transform: none !important;
   }
 
   // Selected value display
@@ -1198,8 +1182,8 @@
   overflow: auto !important;
 
   &--with-histogram {
-    height: calc(100% - 8.0rem) !important; // 128px
-    max-height: calc(100% - 8.0rem) !important;
+    height: calc(100% - 8.7rem) !important; // 128px
+    max-height: calc(100% - 8.7rem) !important;
   }
 
   &--without-histogram {
@@ -1267,13 +1251,12 @@
   .q-pagination__content {
     input {
       border: 1px solid rgba(255, 255, 255, 0.28) !important;
-      color: rgba(255, 255, 255, 0.87);
+      color: var(--o2-text-primary);
       background-color: transparent;
     }
 
     .q-btn {
-      color: white !important;
-      border-radius: 0.375rem !important;
+      color: var(--o2-text-primary) !important;
     }
   }
 }
@@ -1296,10 +1279,10 @@
   }
 
   .select-noof-records {
-    border: 1px solid rgb(196, 196, 196);
     padding-left: 0.56rem;
     border-radius: 0.375rem;
     height: 2.55rem;
+
   }
 }
 
@@ -1351,16 +1334,21 @@
 
 .logs-json-preview-tabs {
   height: fit-content;
-  .rum-tab {
+  overflow: hidden;
+  border: none;
+  border-top: 1px solid var(--o2-border-color);
+  border-left: 1px solid var(--o2-border-color);
+  border-right: 1px solid var(--o2-border-color);
+  
+  .o2-tab {
     width: fit-content !important;
-    padding: 2px 12px !important;
-    border: none !important;
+    padding: 0.25rem 0.5rem !important;
     font-size: 12px !important;
+    border-bottom: 3px solid var(--o2-border-color) !important;
+  }
 
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
+  .active {
+    border-bottom: 3px solid var(--o2-primary-btn-bg) !important;
   }
 }
 
@@ -1397,5 +1385,32 @@
     }
   }
 }
+
+
+/* ============================================================================
+   SPLITTER ICON COLLAPSE/EXPAND BUTTONS
+   Specific styles for collapse/expand icons in splitter separators
+   ============================================================================ */
+
+.logs-splitter-icon-collapse {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
+  position: absolute !important;
+  top: 26px !important;
+  left: 15px !important;
+  z-index: 100 !important;
+  border-radius: 0.325rem;
+}
+
+.logs-splitter-icon-expand {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
+  position: absolute !important;
+  top: 26px !important;
+  left: 4px !important;
+  z-index: 100 !important;
+  border-radius: 0.325rem;
+}
+
 
 /************************* JSONPreview.vue *************************/

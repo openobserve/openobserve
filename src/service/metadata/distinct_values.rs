@@ -304,6 +304,7 @@ impl Metadata for DistinctValues {
             .await;
             _ = ingestion::write_file(
                 &writer,
+                &org_id,
                 &distinct_stream_name,
                 buf,
                 !cfg.common.wal_fsync_disabled,

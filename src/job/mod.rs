@@ -263,7 +263,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_querier() && get_enterprise_config().ai.enabled {
         tokio::task::spawn(async move {
-            o2_enterprise::enterprise::ai::prompt::prompts::load_system_prompt()
+            o2_enterprise::enterprise::ai::agent::prompt::prompts::load_system_prompt()
                 .await
                 .expect("load system prompt failed");
         });

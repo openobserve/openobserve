@@ -35,7 +35,7 @@ export
     await this.homeIcon.hover();
     await this.page.waitForSelector('[data-test="menu-link-settings-item"]');
         await this.managementMenuItem.click({ force: true });
-        await expect(this.page.getByRole('main')).toContainText('Management');
+        await expect(this.page.getByRole('main')).toContainText('General Settings');
     }
 
     async managementPageDefaultMultiOrg() {
@@ -92,12 +92,16 @@ export
     async checkStreaming() {
 
         await this.page.goto(
-            process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=default"
+            process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=" + process.env["ORGNAME"]
           );
           await this.page.waitForLoadState('networkidle');
+
+          // Wait for logs page to fully load before navigating away
+          await this.page.waitForTimeout(2000);
+
           await this.page.locator('[data-test="menu-link-settings-item"]').click();
           await this.page.goto(
-            process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=default"
+            process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=" + process.env["ORGNAME"]
           );
           await this.page.waitForLoadState('networkidle');
         

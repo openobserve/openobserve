@@ -90,10 +90,52 @@ pub fn check_memory_circuit_breaker() -> Result<()> {
     }
 }
 
-fn get_table_idx(thread_id: usize, stream_name: &str) -> usize {
+// check disk space availability
+// Threshold interpretation (similar to memory circuit breaker):
+// - Values < 100: treated as percentage of disk used (e.g., 90 = trigger when 90% full)
+// - Values >= 100: treated as absolute MB remaining (e.g., 500 = trigger when < 500MB free)
+// Reads from atomic metrics updated every 60 seconds to avoid expensive syscalls
+pub fn check_disk_circuit_breaker() -> Result<()> {
+    let cfg = get_config();
+    if !cfg.common.disk_circuit_breaker_enabled {
+        return Ok(());
+    }
+
+    let threshold = cfg.common.disk_circuit_breaker_threshold;
+    let total_space = metrics::NODE_DISK_TOTAL
+        .with_label_values::<&str>(&[])
+        .get() as u64;
+    let used_space = metrics::NODE_DISK_USAGE
+        .with_label_values::<&str>(&[])
+        .get() as u64;
+
+    let triggered = if threshold < 100 {
+        // Percentage mode: trigger when disk usage exceeds threshold%
+        // e.g., threshold=90 means trigger when disk is >90% full
+        used_space > total_space / 100 * threshold as u64
+    } else {
+        // Absolute MB mode: trigger when free space is less than threshold MB
+        let available_space = total_space.saturating_sub(used_space);
+        available_space < (threshold as u64) * 1024 * 1024
+    };
+
+    if triggered {
+        Err(Error::DiskCircuitBreakerError {})
+    } else {
+        Ok(())
+    }
+}
+
+fn get_table_idx(thread_id: usize, org_id: &str, stream_name: &str) -> usize {
     if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
         *idx
+    } else if get_config().common.feature_shared_memtable_enabled {
+        // When shared memtable is enabled, hash by thread_id and org_id
+        let hash_key = format!("{thread_id}_{org_id}");
+        let hash_id = gxhash::new().sum64(&hash_key);
+        hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
     } else {
+        // Original behavior: hash by thread_id and stream_name
         let hash_key = format!("{thread_id}_{stream_name}");
         let hash_id = gxhash::new().sum64(&hash_key);
         hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
@@ -108,8 +150,8 @@ pub async fn get_writer(
     stream_name: &str,
 ) -> Arc<Writer> {
     let start = std::time::Instant::now();
-    let key = WriterKey::new(org_id, stream_type);
-    let idx = get_table_idx(thread_id, stream_name);
+    let idx = get_table_idx(thread_id, org_id, stream_name);
+    let key = WriterKey::new(idx, org_id, stream_type);
     let r = WRITERS[idx].read().await;
     let data = r.get(&key);
     if start.elapsed().as_millis() > 500 {
@@ -159,13 +201,16 @@ pub async fn read_from_memtable(
     partition_filters: &[(String, Vec<String>)],
 ) -> Result<Vec<ReadRecordBatchEntry>> {
     let cfg = get_config();
-    let key = WriterKey::new(org_id, stream_type);
     // fast past
     if cfg.limit.mem_table_bucket_num <= 1 {
-        let idx = get_table_idx(0, stream_name);
+        let idx = get_table_idx(0, org_id, stream_name);
+        let key = WriterKey::new(idx, org_id, stream_type);
         let w = WRITERS[idx].read().await;
         return match w.get(&key) {
-            Some(r) => r.read(stream_name, time_range, partition_filters).await,
+            Some(r) => {
+                r.read(org_id, stream_name, time_range, partition_filters)
+                    .await
+            }
             None => Ok(Vec::new()),
         };
     }
@@ -173,14 +218,17 @@ pub async fn read_from_memtable(
     let mut batches = Vec::new();
     let mut visited = HashSet::with_capacity(cfg.limit.mem_table_bucket_num);
     for thread_id in 0..cfg.limit.http_worker_num {
-        let idx = get_table_idx(thread_id, stream_name);
+        let idx = get_table_idx(thread_id, org_id, stream_name);
         if visited.contains(&idx) {
             continue;
         }
         visited.insert(idx);
+        let key = WriterKey::new(idx, org_id, stream_type);
         let w = WRITERS[idx].read().await;
         if let Some(r) = w.get(&key)
-            && let Ok(data) = r.read(stream_name, time_range, partition_filters).await
+            && let Ok(data) = r
+                .read(org_id, stream_name, time_range, partition_filters)
+                .await
         {
             batches.extend(data);
         }
@@ -518,12 +566,13 @@ impl Writer {
 
     pub async fn read(
         &self,
+        org_id: &str,
         stream_name: &str,
         time_range: Option<(i64, i64)>,
         partition_filters: &[(String, Vec<String>)],
     ) -> Result<Vec<ReadRecordBatchEntry>> {
         let memtable = self.memtable.read().await;
-        memtable.read(stream_name, time_range, partition_filters)
+        memtable.read(org_id, stream_name, time_range, partition_filters)
     }
 
     /// Check if the wal file size is over the threshold or the file is too old
@@ -558,13 +607,25 @@ pub(crate) struct WriterKey {
 }
 
 impl WriterKey {
-    pub(crate) fn new<T>(org_id: T, stream_type: T) -> Self
+    pub(crate) fn new<T>(bucket_idx: usize, org_id: T, stream_type: T) -> Self
     where
         T: AsRef<str>,
     {
+        let org_id = if get_config().common.feature_shared_memtable_enabled {
+            Arc::from(format!("shared_org_{bucket_idx}"))
+        } else {
+            Arc::from(org_id.as_ref())
+        };
         Self {
-            org_id: Arc::from(org_id.as_ref()),
+            org_id,
             stream_type: Arc::from(stream_type.as_ref()),
+        }
+    }
+
+    pub(crate) fn new_replay(org_id: &str, stream_type: &str) -> Self {
+        Self {
+            org_id: Arc::from(org_id),
+            stream_type: Arc::from(stream_type),
         }
     }
 }

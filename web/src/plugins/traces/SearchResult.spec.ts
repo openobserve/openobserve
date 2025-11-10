@@ -232,7 +232,8 @@ describe("SearchResult", () => {
     const searchList = wrapper.find('[data-test="traces-search-result-list"]');
     expect(searchList.exists()).toBe(true);
     expect(searchList.classes()).toContain("search-list");
-    expect(searchList.attributes("style")).toContain("width: 100%");
+    // Width is now applied via Tailwind CSS class instead of inline style
+    expect(searchList.classes()).toContain("tw-w-full");
   });
 
   it("should render TracesMetricsDashboard component", () => {

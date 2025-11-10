@@ -54,6 +54,7 @@ pub async fn get_usage(sql: String, start_time: i64, end_time: i64) -> Result<Ve
         search_type: Some(SearchEventType::Other),
         search_event_context: None,
         use_cache: default_use_cache(),
+        clear_cache: false,
         local_mode: None,
     };
 

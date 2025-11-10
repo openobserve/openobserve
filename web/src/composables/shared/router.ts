@@ -164,6 +164,11 @@ const useRoutes = () => {
       },
     },
     {
+      // Redirect old service-graph route to traces page
+      path: "service-graph",
+      redirect: "/traces",
+    },
+    {
       name: "streamExplorer",
       path: "streams/stream-explore",
       component: StreamExplorer,
@@ -315,6 +320,18 @@ const useRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
+            {
+              path: "history",
+              name: "pipelineHistory",
+              component: () =>
+                import("@/components/pipelines/PipelineHistory.vue"),
+              meta: {
+                title: "Pipeline History",
+              },
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
           ],
         },
       ],
@@ -347,6 +364,17 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/AlertHistory.vue"),
       meta: {
         title: "Alert History",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alerts/insights",
+      name: "alertInsights",
+      component: () => import("@/components/alerts/AlertInsights.vue"),
+      meta: {
+        title: "Alert Insights",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "ifsc_code",
+    "description": "IFSC code format validation",
+    "pattern": "^[A-Z]{2}\\d{2}[A-Z]{4}\\d{10}$"
+  },
+  {
+    "name": "date_dd_mm_yyyy",
+    "description": "Date in DD/MM/YYYY format",
+    "pattern": "^\\d{2}/\\d{2}/\\d{4}$"
+  },
+  {
+    "name": "log_filename",
+    "description": "Log file name format",
+    "pattern": "^\\w+\\.log$"
+  },
+  {
+    "name": "time_hh_mm_ss",
+    "description": "Time in HH:MM:SS format",
+    "pattern": "^\\d{2}:\\d{2}:\\d{2}$"
+  },
+  {
+    "name": "log_level_keyword",
+    "description": "Log level keywords",
+    "pattern": "ERROR|WARN|INFO|DEBUG"
+  },
+  {
+    "name": "hex_number",
+    "description": "Hexadecimal number format",
+    "pattern": "0x[a-fA-F0-9]+"
+  }
+]

@@ -111,17 +111,17 @@ describe("CustomChartEditor", () => {
 
       const container = wrapper.find('.markdown-editor');
       const style = container.element.getAttribute('style');
-      
+
       expect(style).toContain('width: 100%');
       expect(style).toContain('height: 100%');
-      expect(style).toContain('overflow: auto');
+      expect(style).toContain('overflow: hidden');
     });
 
     it("should render inner container with correct height", () => {
       wrapper = createWrapper();
 
-      const innerContainer = wrapper.find('div').findAll('div').find(el => 
-        el.attributes('style') && el.attributes('style').includes('width: 100%') && el.attributes('style').includes('height: calc(100% - 1px)')
+      const innerContainer = wrapper.find('div').findAll('div').find(el =>
+        el.attributes('style') && el.attributes('style').includes('width: 100%') && el.attributes('style').includes('height: 100%')
       );
       expect(innerContainer).toBeDefined();
     });
@@ -447,9 +447,9 @@ describe("CustomChartEditor", () => {
 
       const queryEditor = wrapper.find('[data-test="dashboard-markdown-editor-query-editor"]');
       const style = queryEditor.attributes('style');
-      
+
       expect(style).toContain('padding-left: 20px');
-      expect(style).toContain('height: 100% !important');
+      expect(style).toContain('height: 100%');
     });
   });
 
@@ -537,7 +537,7 @@ describe("CustomChartEditor", () => {
       const innerDivs = wrapper.findAll('div');
       const hasInnerContainer = innerDivs.some(div => {
         const style = div.attributes('style');
-        return style && style.includes('width: 100%') && style.includes('height: calc(100% - 1px)');
+        return style && style.includes('width: 100%') && style.includes('height: 100%');
       });
       expect(hasInnerContainer).toBe(true);
 

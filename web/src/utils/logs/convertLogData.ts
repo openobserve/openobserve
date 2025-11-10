@@ -2,7 +2,12 @@ import { toZonedTime, format } from "date-fns-tz";
 export const convertLogData = (
   x: any,
   y: any,
-  params: { title: any; unparsed_x_data: any; timezone: string }
+  params: {
+    title: any;
+    unparsed_x_data: any;
+    timezone: string;
+    itemStyle: any;
+  },
 ) => {
   const options: any = {
     title: {
@@ -100,9 +105,26 @@ export const convertLogData = (
         ]),
         type: "bar",
         emphasis: { focus: "series" },
-        itemStyle: {
-          color: "#7A80C2",
-        },
+        itemStyle: params.itemStyle
+          ? params.itemStyle
+          : {
+              color: (() => {
+                // Check if dark mode is active
+                const isDarkMode = document.body.classList.contains('body--dark');
+
+                if (isDarkMode) {
+                  // In dark mode, read from body
+                  return getComputedStyle(document.body)
+                    .getPropertyValue("--o2-dark-theme-color")
+                    .trim();
+                } else {
+                  // In light mode, read from root
+                  return getComputedStyle(document.documentElement)
+                    .getPropertyValue("--o2-theme-color")
+                    .trim();
+                }
+              })(),
+            },
       },
     ],
   };

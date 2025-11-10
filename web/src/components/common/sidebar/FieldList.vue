@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="column index-menu">
-    <div class="index-table q-mt-xs">
+    <div class="index-table">
       <q-table
         data-test="log-search-index-list-fields-table"
         :visible-columns="['name']"
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pagination="{ rowsPerPage: 10000 }"
         hide-header
         hide-bottom
-        class="traces-field-table"
+        class="traces-field-table tw-h-full"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
@@ -69,7 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 expand-icon="
                      expand_more
                   "
-                @before-show="(event: any) => openFilterCreator(event, props.row)"
+                @before-show="
+                  (event: any) => openFilterCreator(event, props.row)
+                "
               >
                 <template v-slot:header>
                   <div
@@ -90,7 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         round
                       />
                     </div>
-                    <div v-if="!hideCopyValue" style="background-color: #E8E8E8;"  class="field_overlay">
+                    <div
+                      v-if="!hideCopyValue"
+                      style="background-color: #e8e8e8"
+                      class="field_overlay"
+                    >
                       <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-copy-btn`"
                         icon="content_copy"
@@ -133,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         []"
                         :key="value.key"
                       >
-                        <q-list  dense>
+                        <q-list dense>
                           <q-item tag="label" class="q-pr-none">
                             <div
                               class="flex row wrap justify-between"
@@ -155,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </div>
                             </div>
                             <div
-                            v-if="!hideIncludeExlcude"
+                              v-if="!hideIncludeExlcude"
                               class="flex row"
                               :class="
                                 store.state.theme === 'dark'
@@ -170,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 round
                                 @click="
                                   addSearchTerm(
-                                    `${props.row.name}='${value.key}'`
+                                    `${props.row.name}='${value.key}'`,
                                   )
                                 "
                               >
@@ -185,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 round
                                 @click="
                                   addSearchTerm(
-                                    `${props.row.name}!='${value.key}'`
+                                    `${props.row.name}!='${value.key}'`,
                                   )
                                 "
                               >
@@ -195,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </q-btn>
                             </div>
                             <div
-                            v-if="!hideCopyValue"
+                              v-if="!hideCopyValue"
                               class="flex row"
                               :class="
                                 store.state.theme === 'dark'
@@ -208,14 +214,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 size="8px"
                                 title="Copy Value"
                                 round
-                                dense 
+                                dense
                                 flat
-                                @click="
-                                 copyContentValue(value.key)
-                                "
+                                @click="copyContentValue(value.key)"
                               >
-                                <q-icon  name="content_copy"></q-icon>
-   
+                                <q-icon name="content_copy"></q-icon>
                               </q-btn>
                             </div>
                           </q-item>
@@ -233,15 +236,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="log-search-index-list-field-search-input"
             v-model="filterFieldValue"
             data-cy="index-field-search-input"
-            filled
             borderless
             dense
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
+            class="o2-search-input tw-min-w-full "
           >
             <template #prepend>
-              <q-icon name="search" />
+              <q-icon name="search" class="o2-search-input-icon" />
             </template>
           </q-input>
         </template>
@@ -290,18 +293,18 @@ export default defineComponent({
       type: String,
       default: "logs",
     },
-    hideIncludeExlcude:{
+    hideIncludeExlcude: {
       type: Boolean,
       default: false,
     },
-    hideCopyValue:{
+    hideCopyValue: {
       type: Boolean,
       default: true,
     },
-    hideAddSearchTerm:{
+    hideAddSearchTerm: {
       type: Boolean,
       default: false,
-    }
+    },
   },
   emits: ["event-emitted"],
   setup(props, { emit }) {
@@ -332,7 +335,7 @@ export default defineComponent({
 
     const openFilterCreator = (
       event: any,
-      { name, ftsKey, stream_name }: any
+      { name, ftsKey, stream_name }: any,
     ) => {
       if (ftsKey) {
         event.stopPropagation();
@@ -408,7 +411,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-field-table {
-  height: calc(100vh - 190px) !important;
+  height: calc(100vh - 200px) !important;
 }
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);

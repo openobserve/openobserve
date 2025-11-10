@@ -21,7 +21,7 @@ use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
         function::{RESULT_ARRAY, VRLResultResolver},
-        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
+        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE, StreamResponses},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -29,14 +29,18 @@ use config::{
     metrics,
     utils::{base64, json},
 };
+use futures::stream::StreamExt;
 use hashbrown::HashMap;
 use infra::errors;
+use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 #[cfg(feature = "cloud")]
 use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
+#[cfg(feature = "enterprise")]
+use crate::{common::meta::search::AuditContext, service::self_reporting::audit};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -45,16 +49,18 @@ use crate::{
             functions,
             http::{
                 get_dashboard_info_from_request, get_enable_align_histogram_from_request,
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
+                get_fallback_order_by_col_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request,
             },
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::{
-        extractors::Headers, request::search::error_utils::map_error_to_http_response,
+    handler::http::request::search::{Headers, error_utils::map_error_to_http_response},
+    service::{
+        search as SearchService, search::streaming::process_search_stream_request_multi,
+        self_reporting::report_request_usage_stats, setup_tracing_with_trace_id,
     },
-    service::{search as SearchService, self_reporting::report_request_usage_stats},
 };
 
 /// SearchStreamData
@@ -66,7 +72,7 @@ use crate::{
     description = "Executes SQL queries that can span across multiple data streams within the organization. This enables cross-stream analytics, joins, and aggregations to analyze data relationships and patterns across different log streams, metrics, or traces. The query engine automatically handles data from different streams and returns unified results.",
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(
-        content = search::MultiStreamRequest,
+        content = inline(search::MultiStreamRequest),
         description = "Search query",
         content_type = "application/json",
         example = json!({
@@ -647,7 +653,7 @@ pub async fn search_multi(
         ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
     ),
     request_body(
-        content = search::MultiSearchPartitionRequest,
+        content = inline(search::MultiSearchPartitionRequest),
         description = "Search query",
         content_type = "application/json",
         example = json!({
@@ -950,6 +956,461 @@ pub async fn around_multi(
         b_ts.cmp(&a_ts)
     });
     Ok(HttpResponse::Ok().json(multi_resp))
+}
+
+/// Parse simple multi-stream request format and convert to MultiStreamRequest
+fn parse_simple_multi_stream_request(
+    body: &[u8],
+) -> Result<search::MultiStreamRequest, infra::errors::Error> {
+    #[derive(serde::Deserialize)]
+    struct SimpleMultiStreamWrapper {
+        query: SimpleMultiStreamQuery,
+    }
+    #[derive(serde::Deserialize)]
+    struct SimpleMultiStreamQuery {
+        sql: Vec<String>,
+        start_time: i64,
+        end_time: i64,
+        #[serde(default)]
+        from: i64,
+        #[serde(default = "default_size")]
+        size: i64,
+        #[serde(default)]
+        track_total_hits: bool,
+        #[serde(default)]
+        query_fn: Option<String>,
+        #[serde(default)]
+        quick_mode: bool,
+    }
+
+    let simple_req: SimpleMultiStreamWrapper =
+        json::from_slice(body).map_err(infra::errors::Error::SerdeJsonError)?;
+
+    // Convert to MultiStreamRequest format
+    let sql_queries = simple_req
+        .query
+        .sql
+        .into_iter()
+        .map(|sql| search::SqlQuery {
+            sql,
+            start_time: Some(simple_req.query.start_time),
+            end_time: Some(simple_req.query.end_time),
+            query_fn: simple_req.query.query_fn.clone(),
+            is_old_format: false,
+        })
+        .collect();
+
+    Ok(search::MultiStreamRequest {
+        sql: sql_queries,
+        encoding: search::RequestEncoding::Empty,
+        timeout: 0,
+        from: simple_req.query.from,
+        size: simple_req.query.size,
+        start_time: simple_req.query.start_time,
+        end_time: simple_req.query.end_time,
+        sort_by: None,
+        quick_mode: simple_req.query.quick_mode,
+        query_type: "".to_string(),
+        track_total_hits: simple_req.query.track_total_hits,
+        uses_zo_fn: simple_req.query.query_fn.is_some(),
+        query_fn: simple_req.query.query_fn,
+        skip_wal: false,
+        regions: vec![],
+        clusters: vec![],
+        search_type: None,
+        search_event_context: None,
+        index_type: "".to_string(),
+        per_query_response: false,
+    })
+}
+
+const fn default_size() -> i64 {
+    10
+}
+
+/// SearchStreamMulti HTTP2 streaming endpoint
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Search",
+    operation_id = "SearchStreamMultiHttp2",
+    summary = "Stream search results across multiple queries",
+    description = "Executes multiple SQL queries and streams the results back in real-time using HTTP/2 server-sent events. This enables streaming of results from multiple independent queries simultaneously, ideal for multi-stream dashboards and complex analytics where you want to receive data as it becomes available from different data sources.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(
+        content = inline(search::MultiStreamRequest),
+        description = "Multi-stream search query",
+        content_type = "application/json",
+        example = json!({
+            "sql": ["select * from \"alert_test\"", "select * from \"addstream\""],
+            "start_time": 1759297137133000i64,
+            "end_time": 1759297197133000i64,
+            "from": 0,
+            "size": 50,
+            "quick_mode": true,
+            "streaming_output": false,
+            "streaming_id": null
+        })
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "text/event-stream"),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+    )
+)]
+#[post("/{org_id}/_multi_search_stream")]
+pub async fn search_multi_stream(
+    org_id: web::Path<String>,
+    web::Query(query): web::Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
+    in_req: HttpRequest,
+    body: web::Bytes,
+) -> HttpResponse {
+    let cfg = get_config();
+    let org_id = org_id.into_inner();
+    // Create a tracing span
+    let http_span = if cfg.common.tracing_search_enabled {
+        tracing::info_span!("/api/{org_id}/_multi_search_stream")
+    } else {
+        Span::none()
+    };
+    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+
+    // Log the request
+    log::debug!(
+        "[HTTP2_STREAM_MULTI trace_id {trace_id}] Received HTTP/2 multi-stream request for org_id: {org_id}"
+    );
+
+    #[cfg(feature = "cloud")]
+    {
+        match is_org_in_free_trial_period(&org_id).await {
+            Ok(false) => {
+                return HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    format!("org {org_id} has expired its trial period"),
+                ));
+            }
+            Err(e) => {
+                return HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    e.to_string(),
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    let user_id = user_email.user_id;
+    #[cfg(feature = "enterprise")]
+    let body_bytes = String::from_utf8_lossy(&body).to_string();
+
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+    let dashboard_info = get_dashboard_info_from_request(&query);
+
+    let search_type = match get_search_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            #[cfg(feature = "enterprise")]
+            let error_message = e.to_string();
+
+            let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    http_response.status().into(),
+                    Some(error_message),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+            }
+            return http_response;
+        }
+    };
+    let search_event_context = search_type
+        .as_ref()
+        .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
+
+    let fallback_order_by_col = get_fallback_order_by_col_from_request(&query);
+
+    // Parse the multi-stream request - handle both formats
+    let multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
+        Ok(v) => v,
+        Err(_) => {
+            // Try parsing as a simple multi-query format and convert it
+            match parse_simple_multi_stream_request(&body) {
+                Ok(converted_req) => converted_req,
+                Err(e) => {
+                    #[cfg(feature = "enterprise")]
+                    let error_message = e.to_string();
+
+                    let http_response = map_error_to_http_response(&e, Some(trace_id.clone()));
+
+                    #[cfg(feature = "enterprise")]
+                    {
+                        report_to_audit(
+                            user_id,
+                            org_id,
+                            trace_id,
+                            http_response.status().into(),
+                            Some(error_message),
+                            &in_req,
+                            body_bytes,
+                        )
+                        .await;
+                    }
+                    return http_response;
+                }
+            }
+        }
+    };
+
+    // Check permissions for all streams upfront before processing queries
+    // Extract stream names from SQL queries and check permissions
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_openfga::meta::mapping::OFGA_MODELS;
+
+        use crate::{
+            common::utils::auth::{AuthExtractor, is_root_user},
+            service::users::get_user,
+        };
+
+        if !is_root_user(&user_id) {
+            let user: config::meta::user::User = get_user(Some(&org_id), &user_id).await.unwrap();
+            let stream_type_str = stream_type.as_str();
+            let user_role = user.role.clone();
+            let user_is_external = user.is_external;
+
+            // Extract all stream names from SQL queries
+            let mut stream_names = hashbrown::HashSet::new();
+            for sql_query in &multi_req.sql {
+                match resolve_stream_names(&sql_query.sql) {
+                    Ok(streams) => {
+                        for stream in streams {
+                            stream_names.insert(stream);
+                        }
+                    }
+                    Err(e) => {
+                        #[cfg(feature = "enterprise")]
+                        let error_message = format!("Failed to parse SQL: {e}");
+
+                        let http_response =
+                            map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+
+                        #[cfg(feature = "enterprise")]
+                        {
+                            report_to_audit(
+                                user_id.clone(),
+                                org_id.clone(),
+                                trace_id.clone(),
+                                http_response.status().into(),
+                                Some(error_message),
+                                &in_req,
+                                body_bytes.clone(),
+                            )
+                            .await;
+                        }
+                        return http_response;
+                    }
+                }
+            }
+
+            // Check permissions for each unique stream
+            for stream_name in stream_names {
+                if !crate::handler::http::auth::validator::check_permissions(
+                    &user_id,
+                    AuthExtractor {
+                        auth: "".to_string(),
+                        method: "GET".to_string(),
+                        o2_type: format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(stream_type_str)
+                                .map_or(stream_type_str, |model| model.key),
+                            stream_name
+                        ),
+                        org_id: org_id.clone(),
+                        bypass_check: false,
+                        parent_id: "".to_string(),
+                    },
+                    user_role.clone(),
+                    user_is_external,
+                )
+                .await
+                {
+                    #[cfg(feature = "enterprise")]
+                    {
+                        report_to_audit(
+                            user_id.clone(),
+                            org_id.clone(),
+                            trace_id.clone(),
+                            403,
+                            Some(format!("Unauthorized Access to stream: {stream_name}")),
+                            &in_req,
+                            body_bytes.clone(),
+                        )
+                        .await;
+                    }
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
+            }
+        }
+    }
+
+    let mut queries = multi_req.to_query_req();
+
+    // Before making any requests, first check the sql expressions can be decoded correctly
+    for req in queries.iter_mut() {
+        if let Err(e) = req.decode() {
+            #[cfg(feature = "enterprise")]
+            let error_message = e.to_string();
+
+            let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id.clone(),
+                    org_id.clone(),
+                    trace_id.clone(),
+                    http_response.status().into(),
+                    Some(error_message),
+                    &in_req,
+                    body_bytes.clone(),
+                )
+                .await;
+            }
+            return http_response;
+        }
+    }
+
+    // Create a channel for streaming results
+    let (tx, rx) = mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
+
+    #[cfg(feature = "enterprise")]
+    let audit_ctx = Some(AuditContext {
+        method: in_req.method().to_string(),
+        path: in_req.path().to_string(),
+        query_params: in_req.query_string().to_string(),
+        body: body_bytes,
+    });
+    #[cfg(not(feature = "enterprise"))]
+    let audit_ctx = None;
+
+    let search_span = setup_tracing_with_trace_id(
+        &trace_id,
+        tracing::info_span!("service::search::multi_search_stream_h2"),
+    )
+    .await;
+
+    // Spawn the multi-stream search task
+    actix_web::rt::spawn(process_search_stream_request_multi(
+        org_id.clone(),
+        user_id,
+        trace_id.clone(),
+        queries,
+        stream_type,
+        search_span.clone(),
+        tx,
+        fallback_order_by_col,
+        audit_ctx,
+        dashboard_info,
+        search_type,
+        search_event_context,
+    ));
+
+    // Return streaming response
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
+        let chunks_iter = match result {
+            Ok(v) => v.to_chunks(),
+            Err(err) => {
+                log::error!(
+                    "[HTTP2_STREAM_MULTI trace_id {trace_id}] Error in multi-stream search: {err}"
+                );
+                let err_res = match err {
+                    infra::errors::Error::ErrorCode(ref code) => {
+                        // if err code is cancelled return cancelled response
+                        match code {
+                            infra::errors::ErrorCodes::SearchCancelQuery(_) => {
+                                StreamResponses::Cancelled
+                            }
+                            _ => {
+                                let message = code.get_message();
+                                let error_detail = code.get_error_detail();
+                                let http_response = map_error_to_http_response(&err, None);
+
+                                StreamResponses::Error {
+                                    code: http_response.status().into(),
+                                    message,
+                                    error_detail: Some(error_detail),
+                                }
+                            }
+                        }
+                    }
+                    _ => StreamResponses::Error {
+                        code: 500,
+                        message: err.to_string(),
+                        error_detail: None,
+                    },
+                };
+                err_res.to_chunks()
+            }
+        };
+
+        // Convert the iterator to a stream
+        futures::stream::iter(chunks_iter)
+    });
+
+    HttpResponse::Ok()
+        .content_type("text/event-stream")
+        .streaming(stream)
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn report_to_audit(
+    user_id: String,
+    org_id: String,
+    trace_id: String,
+    code: u16,
+    error_message: Option<String>,
+    req: &HttpRequest,
+    req_body: String,
+) {
+    use o2_enterprise::enterprise::common::{
+        auditor::{AuditMessage, Protocol, ResponseMeta},
+        config::get_config as get_o2_config,
+    };
+
+    let is_audit_enabled = get_o2_config().common.audit_enabled;
+    if is_audit_enabled {
+        audit(AuditMessage {
+            user_email: user_id,
+            org_id,
+            _timestamp: chrono::Utc::now().timestamp(),
+            protocol: Protocol::Http,
+            response_meta: ResponseMeta {
+                http_method: req.method().to_string(),
+                http_path: req.path().to_string(),
+                http_query_params: req.query_string().to_string(),
+                http_body: req_body,
+                http_response_code: code,
+                error_msg: error_message,
+                trace_id: Some(trace_id.to_string()),
+            },
+        })
+        .await;
+    }
 }
 
 #[cfg(test)]

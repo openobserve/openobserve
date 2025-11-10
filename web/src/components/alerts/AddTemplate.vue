@@ -14,9 +14,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <div class="row items-center no-wrap q-mx-md q-my-sm">
-      <div class="flex items-center">
+  <q-page
+    class="q-pa-none o2-custom-bg"
+    style="height: calc(100vh - 48px); min-height: inherit"
+  >
+    <div
+      class="row items-center no-wrap card-container q-px-md tw-mb-[0.675rem]"
+    >
+      <div class="flex items-center tw-h-[60px]">
         <div
           class="flex justify-center items-center q-mr-md cursor-pointer"
           style="
@@ -41,26 +46,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-separator style="width: 100%" />
-
     <q-splitter
       v-model="splitterModel"
       unit="%"
       style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
-        <div class="row q-pa-md">
-          <div class="col-12 q-pb-sm q-pt-sm o2-input">
+        <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <div class="q-pa-md tw-flex-1 tw-overflow-auto">
+            <div class="col-12 q-pb-sm q-pt-sm o2-input">
             <q-input
               data-test="add-template-name-input"
               v-model="formData.name"
               :label="t('alerts.name') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               v-bind:readonly="isUpdatingTemplate"
               v-bind:disable="isUpdatingTemplate"
@@ -75,28 +76,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div class="col-12 q-pb-md">
-            <app-tabs
-              style="
-                border: 1px solid #8a8a8a;
-                border-radius: 4px;
-                overflow: hidden;
-                width: fit-content;
-              "
-              :tabs="tabs"
-              v-model:active-tab="formData.type"
-            />
+            <div class="app-tabs-container tw-w-fit">
+              <app-tabs
+                class="tabs-selection-container"
+                :tabs="tabs"
+                v-model:active-tab="formData.type"
+              />
+            </div>
           </div>
           <div v-if="formData.type === 'email'" class="col-12 q-pt-xs o2-input">
             <q-input
               data-test="add-template-email-title-input"
               v-model="formData.title"
               :label="t('alerts.title') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
               class="showLabelOnTop"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               :rules="[(val: any) => !!val.trim() || 'Field is required!']"
               tabindex="0"
@@ -129,15 +124,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:query="formData.body"
               />
             </template>
+            </div>
           </div>
-          <div class="col-12 flex justify-start">
+          <div
+            class="flex justify-end q-px-lg q-py-lg full-width tw-bg-[var(--q-card-background)]"
+          >
             <q-btn
               v-close-popup
               class="q-mr-md o2-secondary-button tw-h-[36px]"
               :label="t('alerts.cancel')"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="$emit('cancel:hideform')"
               data-test="add-template-cancel-btn"
             />
@@ -146,7 +143,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.save')"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               @click="saveTemplate"
               data-test="add-template-submit-btn"
             />
@@ -154,7 +150,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="q-px-sm q-pt-sm">
+        <div
+          class="q-px-sm q-pt-sm tw-h-full tw-overflow-auto card-container"
+        >
           <div class="text-bold q-py-sm q-px-xs text-subtitle2">
             {{ t("alert_templates.variable_guide_header") }}
           </div>
@@ -280,30 +278,16 @@ onBeforeMount(() => {
   setupTemplateData();
 });
 
-const baseTabStyle = {
-  width: "fit-content",
-  padding: "4px 14px",
-  border: "none !important",
-};
-
 const tabs = computed(() => [
   {
     label: "Web Hook",
     value: "http",
-    style: {
-      ...baseTabStyle,
-      background: formData.value.type === "http" ? "#5960B2" : "",
-      color: formData.value.type === "http" ? "#ffffff !important" : "",
-    },
+    style: {},
   },
   {
     label: "Email",
     value: "email",
-    style: {
-      ...baseTabStyle,
-      background: formData.value.type === "email" ? "#5960B2" : "#ffffff",
-      color: formData.value.type === "email" ? "#ffffff !important" : "",
-    },
+    style: {},
   },
 ]);
 
@@ -394,7 +378,7 @@ const saveTemplate = () => {
       });
     track("Button Click", {
       button: "Update Template",
-      page: "Add Template"
+      page: "Add Template",
     });
   } else {
     {
@@ -430,7 +414,7 @@ const saveTemplate = () => {
         });
       track("Button Click", {
         button: "Create Template",
-        page: "Add Template"
+        page: "Add Template",
       });
     }
   }
@@ -450,6 +434,7 @@ const copyTemplateBody = (text: any) => {
   width: 100%;
   min-height: 310px !important;
   border-radius: 5px;
+  border: 1px solid var(--o2-border-color);
   // padding-bottom: 14px;
   resize: vertical;
   overflow: auto;

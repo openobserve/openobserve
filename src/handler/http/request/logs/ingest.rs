@@ -17,9 +17,13 @@ use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, http, http::header, post, web};
 use config::meta::otlp::OtlpRequestType;
+#[cfg(feature = "cloud")]
+use config::meta::stream::StreamType;
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
+#[cfg(feature = "cloud")]
+use crate::service::ingestion::check_ingestion_allowed;
 use crate::{
     common::{
         meta::{
@@ -69,6 +73,19 @@ pub async fn bulk(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let user_email = &user_email.user_id;
+
+    #[cfg(feature = "cloud")]
+    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
+    }
 
     // log start processing time
     let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
@@ -138,6 +155,19 @@ pub async fn multi(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let user_email = &user_email.user_id;
+
+    #[cfg(feature = "cloud")]
+    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
+    }
 
     // log start processing time
     let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
@@ -221,6 +251,19 @@ pub async fn json(
     let (org_id, stream_name) = path.into_inner();
     let user_email = &user_email.user_id;
 
+    #[cfg(feature = "cloud")]
+    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
+    }
+
     // log start processing time
     let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
         config::utils::time::now_micros()
@@ -286,9 +329,9 @@ pub async fn json(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
     ),
-    request_body(content = KinesisFHRequest, description = "Ingest data (json array)", content_type = "application/json"),
+    request_body(content = inline(KinesisFHRequest), description = "Ingest data (json array)", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = KinesisFHIngestionResponse, example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f","timestamp": 1578090903599_i64})),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(KinesisFHIngestionResponse), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f","timestamp": 1578090903599_i64})),
         (status = 500, description = "Failure", content_type = "application/json", body = (), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "error processing request"})),
     )
 )]
@@ -303,6 +346,20 @@ pub async fn handle_kinesis_request(
     let (org_id, stream_name) = path.into_inner();
     let user_email = &user_email.user_id;
     let request_id = post_data.request_id.clone();
+
+    #[cfg(feature = "cloud")]
+    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
+    }
+
     let request_time = post_data
         .timestamp
         .unwrap_or(chrono::Utc::now().timestamp_millis());
@@ -326,7 +383,7 @@ pub async fn handle_kinesis_request(
             Err(e) => {
                 // we do not want to log trial period expired errors
                 if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
-                    log::error!("Error processing kinesis request: {e}");
+                    log::error!("Error processing kinesis request:  org_id: {org_id} {e}");
                 }
                 if matches!(e, infra::errors::Error::ResourceError(_)) {
                     HttpResponse::ServiceUnavailable().json(KinesisFHIngestionResponse {
@@ -356,6 +413,20 @@ pub async fn handle_gcp_request(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let user_email = &user_email.user_id;
+
+    #[cfg(feature = "cloud")]
+    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
+    }
+
     Ok(
         match logs::ingest::ingest(
             **thread_id,
@@ -419,11 +490,24 @@ pub async fn otlp_logs_write(
         .get(&config::get_config().grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
 
+    #[cfg(feature = "cloud")]
+    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
+    }
+
     let (request, request_type) = match content_type {
         CONTENT_TYPE_PROTO => match ExportLogsServiceRequest::decode(body) {
             Ok(req) => (req, OtlpRequestType::HttpProtobuf),
             Err(e) => {
-                log::error!("[LOGS:OTLP] Invalid proto: {e}");
+                log::error!("[LOGS:OTLP] Invalid proto: org_id: {org_id} {e}");
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST,
                     format!("Invalid proto: {e}"),
@@ -434,7 +518,7 @@ pub async fn otlp_logs_write(
             match serde_json::from_slice::<ExportLogsServiceRequest>(body.as_ref()) {
                 Ok(req) => (req, OtlpRequestType::HttpJson),
                 Err(e) => {
-                    log::error!("[LOGS:OTLP] Invalid json: {e}");
+                    log::error!("[LOGS:OTLP] Invalid json: org_id: {org_id} {e}");
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                         http::StatusCode::BAD_REQUEST,
                         format!("Invalid json: {e}"),
@@ -500,8 +584,8 @@ pub async fn otlp_logs_write(
     ),
     request_body(content = String, description = "Ingest data (hec)"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HecResponse, example = json!({"text":"Success","code": 200})),
-        (status = 200, description = "Failure", content_type = "application/json", body = HecResponse, example = json!({"text":"Invalid data format","code": 400})),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"Success","code": 200})),
+        (status = 200, description = "Failure", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"Invalid data format","code": 400})),
     )
 )]
 #[post("/{org_id}/_hec")]
@@ -514,6 +598,19 @@ pub async fn hec(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let user_email = &user_email.user_id;
+
+    #[cfg(feature = "cloud")]
+    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
+    }
 
     // log start processing time
     let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {

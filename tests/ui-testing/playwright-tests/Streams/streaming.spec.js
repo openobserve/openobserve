@@ -13,7 +13,7 @@ test.describe("Streaming for logs", () => {
         await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.goToManagement();
         await page.waitForTimeout(3000);
-        await pm.streamsPage.checkStreaming();
+        // await pm.streamsPage.checkStreaming();
     });
 
     test("Run query after selecting two streams after enabling streaming", {

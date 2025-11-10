@@ -96,11 +96,49 @@ test.describe("Unflattened testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
+    await page.waitForTimeout(2000);
     pageManager = new PageManager(page);
     await page.waitForTimeout(500);
     await ingestion(page);
     // Wait for data to be indexed before navigating to logs
     await page.waitForTimeout(2000);
+
+    // Check and disable Store Original Data if it's enabled
+    testLogger.info('Navigating to Streams menu to check Store Original Data setting');
+    await pageManager.unflattenedPage.streamsMenu.waitFor();
+    await pageManager.unflattenedPage.streamsMenu.click();
+    await page.waitForTimeout(500);
+
+    testLogger.info('Searching for stream: e2e_automate');
+    await pageManager.unflattenedPage.searchStreamInput.waitFor();
+    await pageManager.unflattenedPage.searchStreamInput.click();
+    await pageManager.unflattenedPage.searchStreamInput.fill("e2e_automate");
+    await page.waitForTimeout(500);
+
+    testLogger.info('Opening stream detail dialog');
+    await pageManager.unflattenedPage.streamDetailButton.waitFor();
+    await pageManager.unflattenedPage.streamDetailButton.click();
+    await page.waitForTimeout(2000);
+
+    testLogger.info('Switching to Configuration tab');
+    await pageManager.unflattenedPage.configurationTab.waitFor({ state: "visible", timeout: 5000 });
+    await pageManager.unflattenedPage.configurationTab.click();
+    await page.waitForTimeout(1000);
+
+    testLogger.info('Checking Store Original Data toggle state');
+    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor({ state: "visible", timeout: 5000 });
+
+    const wasDisabled = await pageManager.unflattenedPage.ensureStoreOriginalDataDisabled();
+    if (wasDisabled) {
+      testLogger.info('Store Original Data was enabled, disabled it successfully');
+    } else {
+      testLogger.info('Store Original Data is already disabled');
+    }
+
+    testLogger.info('Closing stream details dialog');
+    await pageManager.unflattenedPage.closeButton.waitFor();
+    await pageManager.unflattenedPage.closeButton.click();
+    await page.waitForTimeout(500);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -111,7 +149,7 @@ test.describe("Unflattened testcases", () => {
   });
 
   test.afterEach(async ({ page }) => {
-    await pageManager.commonActions.flipStreaming();
+    // await pageManager.commonActions.flipStreaming();
   });
 
   test("stream to toggle store original data toggle and display o2 id", async ({ page }) => {
@@ -145,7 +183,7 @@ test.describe("Unflattened testcases", () => {
 
     testLogger.info('Waiting for Store Original Data toggle to be visible');
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor({ state: "visible", timeout: 5000 });
-    testLogger.info('Clicking Store Original Data toggle');
+    testLogger.info('Clicking Store Original Data toggle to enable');
     await pageManager.unflattenedPage.storeOriginalDataToggle.click();
     testLogger.info('Toggle clicked');
     await page.waitForTimeout(500);
@@ -284,21 +322,14 @@ test.describe("Unflattened testcases", () => {
 
     testLogger.info('Waiting for Store Original Data toggle to be visible');
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor({ state: "visible", timeout: 5000 });
-    testLogger.info('Clicking Store Original Data toggle');
-    await pageManager.unflattenedPage.storeOriginalDataToggle.click();
-    testLogger.info('Toggle clicked');
-    await page.waitForTimeout(500);
 
-    testLogger.info('Waiting for Update Settings button to be visible');
-    await pageManager.unflattenedPage.schemaUpdateButton.waitFor({ state: "visible", timeout: 5000 });
-    testLogger.info('Clicking Update Settings button');
-    await pageManager.unflattenedPage.schemaUpdateButton.click();
-    testLogger.info('Update Settings button clicked');
-
-    testLogger.info('Waiting for Stream settings updated snackbar');
-    await expect(pageManager.unflattenedPage.streamSettingsUpdatedSnackbar).toBeVisible({ timeout: 10000 });
-    testLogger.info('Stream settings successfully updated - snackbar confirmed');
-    await page.waitForTimeout(1000);
+    // Ensure Store Original Data is enabled
+    const wasEnabled = await pageManager.unflattenedPage.ensureStoreOriginalDataEnabled();
+    if (wasEnabled) {
+      testLogger.info('Store Original Data was disabled, enabled it successfully');
+    } else {
+      testLogger.info('Store Original Data is already enabled');
+    }
 
     testLogger.info('Closing stream details dialog');
     await pageManager.unflattenedPage.closeButton.waitFor();
