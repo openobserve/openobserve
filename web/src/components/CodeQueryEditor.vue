@@ -382,6 +382,13 @@ export default defineComponent({
       );
 
       editorObj.createContextKey("ctrlenter", true);
+      editorObj.addCommand(
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+        function () {
+          //this is because to not trigger the cmnd + enter and to avoid the blank space while cmd + enter
+        },
+        "ctrlenter",
+      );
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
       });
