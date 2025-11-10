@@ -358,12 +358,11 @@ jobs:
         run: |
           cd tests/ui-testing
           echo "::group::Caching test failure metadata to TestDino"
-          echo "::debug::Looking for JSON report at: report.json"
-          if [ -f "report.json" ]; then
-            echo "::notice::JSON report found at report.json"
-            ls -lh report.json
-            # tdpw cache auto-discovers JSON reports in standard locations (report.json in current dir)
-            if npx tdpw cache; then
+          if [ -f "playwright-results/report.json" ]; then
+            echo "::notice::JSON report found at playwright-results/report.json"
+            ls -lh playwright-results/report.json
+            # Point TestDino to the JSON report location
+            if npx tdpw cache playwright-results; then
               echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
               echo "::notice::This data will be used for optimized reruns if tests fail"
             else
@@ -371,7 +370,7 @@ jobs:
               echo "::warning::Rerun optimization may not work properly"
             fi
           else
-            echo "::error::JSON report not found at report.json"
+            echo "::error::JSON report not found at playwright-results/report.json"
             echo "::warning::Cannot cache test failures - skipping"
           fi
           echo "::endgroup::"
