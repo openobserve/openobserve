@@ -382,16 +382,6 @@ export default defineComponent({
       );
 
       editorObj.createContextKey("ctrlenter", true);
-      editorObj.addCommand(
-        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-        function () {
-          setTimeout(() => {
-            emit("run-query");
-          }, 300);
-        },
-        "ctrlenter",
-      );
-
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
       });
