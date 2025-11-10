@@ -197,79 +197,49 @@ pub async fn ingest(
     let mut json_data_by_stream = HashMap::new();
     let mut size_by_stream = HashMap::new();
 
-    // Collect items first (IngestionDataIter is a custom iterator that can't be parallelized)
-    let items: Vec<_> = data.iter().collect::<Result<Vec<_>, _>>().map_err(|e| {
-        log::error!("IngestionError: {e:?}");
-        Error::IngestionError(format!("Failed processing: {e:?}"))
-    })?;
+    // Configuration constants
+    const PARALLEL_THRESHOLD: usize = 1024;
+    const BATCH_SIZE: usize = 1024; // Process data in chunks to avoid memory exhaustion
 
-    // Threshold for parallel processing - below this, sequential is faster due to overhead
-    const PARALLEL_THRESHOLD: usize = 256;
-
-    // Clone and extend items - use parallel processing for large batches
-    let extended_items: Vec<_> = if items.len() >= PARALLEL_THRESHOLD {
-        use rayon::prelude::*;
-
-        items
-            .par_iter()
-            .map(|item| {
-                let mut cloned_item = item.clone();
-
-                // Apply extend_json if present
-                if let Some(extend) = extend_json.as_ref() {
-                    for (key, val) in extend.iter() {
-                        cloned_item[key] = val.clone();
-                    }
-                }
-
-                cloned_item
-            })
-            .collect()
+    // Flatten level cached before batch processing
+    let flatten_level = if executable_pipeline.is_none() {
+        Some(get_flatten_level(org_id, &stream_name, StreamType::Logs).await)
     } else {
-        // Sequential processing for small batches
-        items
-            .iter()
-            .map(|item| {
-                let mut cloned_item = item.clone();
-
-                // Apply extend_json if present
-                if let Some(extend) = extend_json.as_ref() {
-                    for (key, val) in extend.iter() {
-                        cloned_item[key] = val.clone();
-                    }
-                }
-
-                cloned_item
-            })
-            .collect()
+        None
     };
 
     if executable_pipeline.is_some() {
-        // Pipeline path: no flattening needed, just sequential processing
-        for item in extended_items {
-            // store a copy of original data before it's being transformed and/or flattened, when
-            // 1. original data is an object
-            let original_data = if item.is_object() {
-                // 3. with pipeline, storing original as long as streams_need_original_set is not
-                //    empty
-                // because not sure the pipeline destinations
-                store_original_when_pipeline_exists.then(|| item.to_string())
-            } else {
-                None // `item` won't be flattened, no need to store original
+        // Pipeline path: sequential processing without batching (pipeline handles its own batching)
+        for ret in data.iter() {
+            let mut item = match ret {
+                Ok(item) => item,
+                Err(e) => {
+                    log::error!("IngestionError: {e:?}");
+                    return Err(Error::IngestionError(format!("Failed processing: {e:?}")));
+                }
             };
 
-            // we report stream size before pushing data to pipeline
-            // this is to capture the actual size of stream at the time of ingestion
+            if let Some(extend) = extend_json.as_ref() {
+                for (key, val) in extend.iter() {
+                    item[key] = val.clone();
+                }
+            }
+
+            let original_data = if item.is_object() {
+                store_original_when_pipeline_exists.then(|| item.to_string())
+            } else {
+                None
+            };
+
             let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
             *_size += estimate_json_bytes(&item);
 
-            // buffer the records, timestamp, and originals for pipeline batch processing
             pipeline_inputs.push(item);
             original_options.push(original_data);
         }
     } else {
-        // Non-pipeline path: flattening and processing
-        let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+        // Non-pipeline path: batch processing in spawn_blocking
+        let flatten_level = flatten_level.unwrap();
         let needs_original = streams_need_original_map
             .get(&stream_name)
             .is_some_and(|v| *v);
@@ -277,261 +247,213 @@ pub async fn ingest(
             .get(&stream_name)
             .is_some_and(|v| *v);
 
-        // Use parallel or sequential processing based on batch size
-        if extended_items.len() >= PARALLEL_THRESHOLD {
-            // Parallel processing for large batches - use spawn_blocking to avoid blocking async runtime
-            use rayon::prelude::*;
+        // Collect all items first with extend_json applied
+        let mut all_items = Vec::new();
+        for ret in data.iter() {
+            let mut item = match ret {
+                Ok(item) => item,
+                Err(e) => {
+                    log::error!("IngestionError: {e:?}");
+                    stream_status.status.failed += 1;
+                    stream_status.status.error = format!("Failed processing: {e:?}");
+                    continue;
+                }
+            };
 
-            // Clone data needed in the blocking task
-            let org_id_owned = org_id.to_string();
-            let stream_name_owned = stream_name.clone();
-            let user_defined_schema_map_clone = user_defined_schema_map.clone();
+            // Apply extend_json
+            if let Some(extend) = extend_json.as_ref() {
+                for (key, val) in extend.iter() {
+                    item[key] = val.clone();
+                }
+            }
 
-            // Move the heavy compute work to a blocking thread pool
-            let (results, failed, total_size, error_message) = tokio::task::spawn_blocking(move || {
-                // Thread-safe accumulators
-                let failed_count = std::sync::atomic::AtomicU32::new(0);
-                let error_msg = parking_lot::Mutex::new(String::new());
-                let total_size = std::sync::atomic::AtomicUsize::new(0);
+            all_items.push(item);
+        }
 
-                // Process items in parallel using rayon
-                let results: Vec<_> = extended_items
-                    .into_par_iter()
-                    .enumerate()
-                    .filter_map(|(idx, item)| {
-                    // Calculate size
-                    let item_size = estimate_json_bytes(&item);
-                    total_size.fetch_add(item_size, std::sync::atomic::Ordering::Relaxed);
+        // Clone data for spawn_blocking
+        let org_id_owned = org_id.to_string();
+        let stream_name_owned = stream_name.clone();
+        let user_defined_schema_map_clone = user_defined_schema_map.clone();
 
-                    // store a copy of original data before it's being transformed and/or flattened,
-                    // when
-                    // 1. original data is an object
-                    let original_data = if item.is_object() {
-                        // 2. current stream does not have pipeline
-                        // current stream requires original
-                        needs_original.then(|| item.to_string())
-                    } else {
-                        None // `item` won't be flattened, no need to store original
-                    };
+        // Process all data in a single spawn_blocking with Rayon par_chunks
+        let (all_results, total_failed, total_size_computed, final_error) =
+            tokio::task::spawn_blocking(move || {
+                use rayon::prelude::*;
 
-                    // JSON Flattening - use per-stream flatten level (cached)
-                    let mut res = match flatten::flatten_with_level(item, flatten_level) {
-                        Ok(r) => r,
-                        Err(e) => {
-                            failed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            let err_str = e.to_string();
-                            let mut err = error_msg.lock();
-                            *err = err_str;
-                            return None;
-                        }
-                    };
+                // Add indices to items for order preservation
+                let indexed_items: Vec<_> = all_items.into_iter().enumerate().collect();
 
-                    // handle timestamp
-                    let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {
-                        Ok(ts) => ts,
-                        Err(e) => {
-                            failed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            let err_str = e.to_string();
-                            let mut err = error_msg.lock();
-                            *err = err_str.clone();
-                            metrics::INGEST_ERRORS
-                                .with_label_values(&[
-                                    org_id_owned.as_str(),
-                                    StreamType::Logs.as_str(),
-                                    stream_name_owned.as_str(),
-                                    TS_PARSE_FAILED,
-                                ])
-                                .inc();
-                            log_failed_record(log_ingestion_errors, &res, &err_str);
-                            return None;
-                        }
-                    };
+                // Thread-safe accumulators across all batches
+                let global_failed_count = std::sync::atomic::AtomicU32::new(0);
+                let global_error_msg = parking_lot::Mutex::new(String::new());
+                let global_total_size = std::sync::atomic::AtomicUsize::new(0);
 
-                    // get json object
-                    let mut local_val = match res.take() {
-                        json::Value::Object(val) => val,
-                        _ => unreachable!(),
-                    };
+                // Process in parallel chunks using Rayon - each chunk is processed in parallel
+                let all_results: Vec<_> = indexed_items
+                    .par_chunks(BATCH_SIZE)
+                    .flat_map(|chunk| {
+                        // Local accumulators for this chunk
+                        let chunk_failed_count = std::sync::atomic::AtomicU32::new(0);
+                        let chunk_error_msg = parking_lot::Mutex::new(String::new());
+                        let chunk_total_size = std::sync::atomic::AtomicUsize::new(0);
 
-                    if let Some(Some(fields)) = user_defined_schema_map_clone.get(&stream_name_owned) {
-                        local_val = crate::service::ingestion::refactor_map(local_val, fields);
-                    }
+                        // Process each item in the chunk
+                        let process_item = |(idx, item): &(usize, json::Value)| {
+                            let item_size = estimate_json_bytes(item);
+                            chunk_total_size
+                                .fetch_add(item_size, std::sync::atomic::Ordering::Relaxed);
 
-                    // add `_original` and '_record_id` if required by StreamSettings
-                    if needs_original && let Some(original_data) = original_data {
-                        local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
-                        let record_id = crate::service::ingestion::generate_record_id(
-                            &org_id_owned,
-                            &stream_name_owned,
-                            &StreamType::Logs,
-                        );
-                        local_val.insert(
-                            ID_COL_NAME.to_string(),
-                            json::Value::String(record_id.to_string()),
-                        );
-                    }
+                            let original_data = if item.is_object() {
+                                needs_original.then(|| item.to_string())
+                            } else {
+                                None
+                            };
 
-                    // add `_all_values` if required by StreamSettings
-                    if needs_all_values {
-                        let mut values = Vec::with_capacity(local_val.len());
-                        for (k, value) in local_val.iter() {
-                            if [
-                                TIMESTAMP_COL_NAME,
-                                ID_COL_NAME,
-                                ORIGINAL_DATA_COL_NAME,
-                                ALL_VALUES_COL_NAME,
-                            ]
-                            .contains(&k.as_str())
+                            let mut res =
+                                match flatten::flatten_with_level(item.clone(), flatten_level) {
+                                    Ok(r) => r,
+                                    Err(e) => {
+                                        chunk_failed_count
+                                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                        let mut err = chunk_error_msg.lock();
+                                        *err = e.to_string();
+                                        return None;
+                                    }
+                                };
+
+                            let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {
+                                Ok(ts) => ts,
+                                Err(e) => {
+                                    chunk_failed_count
+                                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                    let err_str = e.to_string();
+                                    let mut err = chunk_error_msg.lock();
+                                    *err = err_str.clone();
+                                    metrics::INGEST_ERRORS
+                                        .with_label_values(&[
+                                            org_id_owned.as_str(),
+                                            StreamType::Logs.as_str(),
+                                            stream_name_owned.as_str(),
+                                            TS_PARSE_FAILED,
+                                        ])
+                                        .inc();
+                                    log_failed_record(log_ingestion_errors, &res, &err_str);
+                                    return None;
+                                }
+                            };
+
+                            let mut local_val = match res.take() {
+                                json::Value::Object(val) => val,
+                                _ => unreachable!(),
+                            };
+
+                            if let Some(Some(fields)) =
+                                user_defined_schema_map_clone.get(&stream_name_owned)
                             {
-                                continue;
+                                local_val =
+                                    crate::service::ingestion::refactor_map(local_val, fields);
                             }
-                            values.push(value.to_string());
-                        }
-                        local_val.insert(
-                            ALL_VALUES_COL_NAME.to_string(),
-                            json::Value::String(values.join(" ")),
-                        );
-                    }
 
-                        // Return with original index to maintain order
-                        Some((idx, timestamp, local_val))
+                            if needs_original && let Some(original_data) = original_data {
+                                local_val.insert(
+                                    ORIGINAL_DATA_COL_NAME.to_string(),
+                                    original_data.into(),
+                                );
+                                let record_id = crate::service::ingestion::generate_record_id(
+                                    &org_id_owned,
+                                    &stream_name_owned,
+                                    &StreamType::Logs,
+                                );
+                                local_val.insert(
+                                    ID_COL_NAME.to_string(),
+                                    json::Value::String(record_id.to_string()),
+                                );
+                            }
+
+                            if needs_all_values {
+                                let mut values = Vec::with_capacity(local_val.len());
+                                for (k, value) in local_val.iter() {
+                                    if [
+                                        TIMESTAMP_COL_NAME,
+                                        ID_COL_NAME,
+                                        ORIGINAL_DATA_COL_NAME,
+                                        ALL_VALUES_COL_NAME,
+                                    ]
+                                    .contains(&k.as_str())
+                                    {
+                                        continue;
+                                    }
+                                    values.push(value.to_string());
+                                }
+                                local_val.insert(
+                                    ALL_VALUES_COL_NAME.to_string(),
+                                    json::Value::String(values.join(" ")),
+                                );
+                            }
+
+                            Some((*idx, timestamp, local_val))
+                        };
+
+                        // Process chunk with parallel or sequential strategy
+                        let mut chunk_results: Vec<_> = if chunk.len() >= PARALLEL_THRESHOLD {
+                            chunk.par_iter().filter_map(process_item).collect()
+                        } else {
+                            chunk.iter().filter_map(process_item).collect()
+                        };
+
+                        // Sort by original index to maintain order within chunk
+                        chunk_results.sort_by_key(|(idx, ..)| *idx);
+
+                        // Update global accumulators
+                        let chunk_failed =
+                            chunk_failed_count.load(std::sync::atomic::Ordering::Relaxed);
+                        let chunk_size =
+                            chunk_total_size.load(std::sync::atomic::Ordering::Relaxed);
+                        let chunk_error = chunk_error_msg.lock().clone();
+
+                        global_failed_count
+                            .fetch_add(chunk_failed, std::sync::atomic::Ordering::Relaxed);
+                        global_total_size
+                            .fetch_add(chunk_size, std::sync::atomic::Ordering::Relaxed);
+
+                        if !chunk_error.is_empty() {
+                            let mut err = global_error_msg.lock();
+                            *err = chunk_error;
+                        }
+
+                        chunk_results
                     })
                     .collect();
 
-                // Extract values to return from spawn_blocking
-                let failed = failed_count.load(std::sync::atomic::Ordering::Relaxed);
-                let size = total_size.load(std::sync::atomic::Ordering::Relaxed);
-                let error = error_msg.lock().clone();
+                let total_failed = global_failed_count.load(std::sync::atomic::Ordering::Relaxed);
+                let total_size = global_total_size.load(std::sync::atomic::Ordering::Relaxed);
+                let last_error = global_error_msg.lock().clone();
 
-                (results, failed, size, error)
+                (all_results, total_failed, total_size, last_error)
             })
             .await
             .expect("spawn_blocking task panicked");
 
-            // Update stream status with failed count
-            stream_status.status.failed += failed;
-            if failed > 0 {
-                stream_status.status.error = error_message;
-            }
-
-            // Update size
-            let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
-            *_size += total_size;
-
-            // Reconstruct results in original order
-            let (ts_data, fn_num) = json_data_by_stream
-                .entry(stream_name.clone())
-                .or_insert_with(|| (Vec::new(), None));
-
-            // Sort by original index and collect timestamp + value pairs
-            let mut sorted_results = results;
-            sorted_results.sort_by_key(|(idx, ..)| *idx);
-
-            for (_, timestamp, local_val) in sorted_results {
-                ts_data.push((timestamp, local_val));
-            }
-            *fn_num = need_usage_report.then_some(0); // no pl -> no func
-        } else {
-            // Sequential processing for small batches
-            for item in extended_items {
-                // Calculate size
-                let item_size = estimate_json_bytes(&item);
-                let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                *_size += item_size;
-
-                // store a copy of original data before it's being transformed and/or flattened,
-                // when
-                // 1. original data is an object
-                let original_data = if item.is_object() {
-                    // 2. current stream does not have pipeline
-                    // current stream requires original
-                    needs_original.then(|| item.to_string())
-                } else {
-                    None // `item` won't be flattened, no need to store original
-                };
-
-                // JSON Flattening - use per-stream flatten level (cached)
-                let mut res = match flatten::flatten_with_level(item, flatten_level) {
-                    Ok(r) => r,
-                    Err(e) => {
-                        stream_status.status.failed += 1;
-                        stream_status.status.error = e.to_string();
-                        continue;
-                    }
-                };
-
-                // handle timestamp
-                let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {
-                    Ok(ts) => ts,
-                    Err(e) => {
-                        stream_status.status.failed += 1;
-                        stream_status.status.error = e.to_string();
-                        metrics::INGEST_ERRORS
-                            .with_label_values(&[
-                                org_id,
-                                StreamType::Logs.as_str(),
-                                &stream_name,
-                                TS_PARSE_FAILED,
-                            ])
-                            .inc();
-                        log_failed_record(log_ingestion_errors, &res, &e.to_string());
-                        continue;
-                    }
-                };
-
-                // get json object
-                let mut local_val = match res.take() {
-                    json::Value::Object(val) => val,
-                    _ => unreachable!(),
-                };
-
-                if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
-                }
-
-                // add `_original` and '_record_id` if required by StreamSettings
-                if needs_original && let Some(original_data) = original_data {
-                    local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
-                    let record_id = crate::service::ingestion::generate_record_id(
-                        org_id,
-                        &stream_name,
-                        &StreamType::Logs,
-                    );
-                    local_val.insert(
-                        ID_COL_NAME.to_string(),
-                        json::Value::String(record_id.to_string()),
-                    );
-                }
-
-                // add `_all_values` if required by StreamSettings
-                if needs_all_values {
-                    let mut values = Vec::with_capacity(local_val.len());
-                    for (k, value) in local_val.iter() {
-                        if [
-                            TIMESTAMP_COL_NAME,
-                            ID_COL_NAME,
-                            ORIGINAL_DATA_COL_NAME,
-                            ALL_VALUES_COL_NAME,
-                        ]
-                        .contains(&k.as_str())
-                        {
-                            continue;
-                        }
-                        values.push(value.to_string());
-                    }
-                    local_val.insert(
-                        ALL_VALUES_COL_NAME.to_string(),
-                        json::Value::String(values.join(" ")),
-                    );
-                }
-
-                let (ts_data, fn_num) = json_data_by_stream
-                    .entry(stream_name.clone())
-                    .or_insert_with(|| (Vec::new(), None));
-                ts_data.push((timestamp, local_val));
-                *fn_num = need_usage_report.then_some(0); // no pl -> no func
-            }
+        // Update stream status
+        stream_status.status.failed += total_failed;
+        if total_failed > 0 {
+            stream_status.status.error = final_error;
         }
+
+        // Update size
+        let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+        *_size += total_size_computed;
+
+        // Store results
+        let (ts_data, fn_num) = json_data_by_stream
+            .entry(stream_name.clone())
+            .or_insert_with(|| (Vec::new(), None));
+
+        // Results are already sorted by index from process_batch
+        for (_, timestamp, local_val) in all_results {
+            ts_data.push((timestamp, local_val));
+        }
+        *fn_num = need_usage_report.then_some(0);
     }
 
     // batch process records through pipeline
