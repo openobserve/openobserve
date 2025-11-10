@@ -971,7 +971,7 @@ fn validate_field_index_uniqueness(settings: &UpdateStreamSettings) -> Result<()
     if !conflicting_fields.is_empty() {
         let field_names: Vec<String> = conflicting_fields
             .iter()
-            .map(|s| format!("'{}'", s))
+            .map(|s| format!("'{s}'"))
             .collect();
         return Err(format!(
             "Field(s) {} cannot have both Full Text Search and Secondary Index. Please choose only one index type per field.",
