@@ -450,6 +450,9 @@ pub async fn check_ingestion_allowed(
     // check memory circuit breaker
     ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
 
+    // check disk circuit breaker
+    ingester::check_disk_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
+
     // check memtable
     ingester::check_memtable_size().map_err(|e| Error::ResourceError(e.to_string()))?;
 
