@@ -812,6 +812,12 @@ pub async fn update_stream_settings(
         }
     }
 
+    // Validate that a field cannot have both Full Text Search and Secondary Index
+    if let Err(err) = validate_index_field_uniqueness(&settings) {
+        return Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err)));
+    }
+
     save_stream_settings(org_id, stream_name, stream_type, settings).await
 }
 
@@ -1066,6 +1072,33 @@ pub async fn update_fields_type(
         false,
     )
     .await?;
+
+    Ok(())
+}
+
+/// Validates that a field cannot have both Full Text Search and Secondary Index
+fn validate_index_field_uniqueness(
+    settings: &config::meta::stream::StreamSettings,
+) -> Result<(), String> {
+    use hashbrown::HashSet;
+
+    let fts_fields: HashSet<&String> = settings.full_text_search_keys.iter().collect();
+    let index_fields: HashSet<&String> = settings.index_fields.iter().collect();
+
+    // Find fields that exist in both Full Text Search and Secondary Index
+    let conflicting_fields: Vec<&String> =
+        fts_fields.intersection(&index_fields).copied().collect();
+
+    if !conflicting_fields.is_empty() {
+        let field_names: Vec<String> = conflicting_fields
+            .iter()
+            .map(|s| format!("'{s}'"))
+            .collect();
+        return Err(format!(
+            "Field(s) {} cannot have both Full Text Search and Secondary Index. Please choose only one index type per field.",
+            field_names.join(", ")
+        ));
+    }
 
     Ok(())
 }
