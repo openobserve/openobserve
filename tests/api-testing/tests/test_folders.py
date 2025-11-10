@@ -235,7 +235,7 @@ def test_e2e_movedashboard(create_session, base_url):
         resp_move_dashboard.status_code == 200
     ), f"Moved dashboard 200, but got {resp_move_dashboard.status_code} {resp_move_dashboard.content}"
     try:
-        dashboard_id = resp_create_dashboard.json()["v6"]["dashboardId"]
+        dashboard_id = resp_create_dashboard.json()["v7"]["dashboardId"]
     except KeyError:
         dashboard_id = None
     print(resp_move_dashboard.content)
