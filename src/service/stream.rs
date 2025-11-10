@@ -1082,8 +1082,6 @@ fn validate_index_field_conflicts(
     current_settings: &config::meta::stream::StreamSettings,
     new_settings: &config::meta::stream::UpdateStreamSettings,
 ) -> Result<(), String> {
-    use hashbrown::HashSet;
-
     // Simulate the final state after applying the update
     let mut final_fts_fields: HashSet<String> = current_settings
         .full_text_search_keys
