@@ -276,11 +276,14 @@ jobs:
           if [ "$IS_RERUN" = "true" ]; then
             echo "::group::Fetching last failed tests from TestDino"
             # Try to get last failed tests from TestDino
-            if npx tdpw last-failed > last-failed-flags.txt 2>&1; then
-              LAST_FAILED_FLAGS="$(cat last-failed-flags.txt)"
+            # Redirect stderr to /dev/null to avoid capturing npm warnings
+            if LAST_FAILED_FLAGS="$(npx tdpw last-failed 2>/dev/null)"; then
+              # Trim whitespace
+              LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
 
               if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
-                echo "::notice::Found failed tests from previous run. Running only: $LAST_FAILED_FLAGS"
+                echo "::notice::✅ Found failed tests from previous run."
+                echo "::notice::TestDino flags: $LAST_FAILED_FLAGS"
                 echo "RERUN_MODE=optimized" >> $GITHUB_ENV
                 echo "EXTRA_PW_FLAGS=$LAST_FAILED_FLAGS" >> $GITHUB_ENV
               else
@@ -290,8 +293,7 @@ jobs:
                 echo "EXTRA_PW_FLAGS=" >> $GITHUB_ENV
               fi
             else
-              echo "::error::Failed to fetch last failed tests from TestDino."
-              cat last-failed-flags.txt
+              echo "::error::Failed to fetch last failed tests from TestDino (exit code: $?)."
               echo "::warning::Falling back to running all tests in this matrix job."
               echo "::warning::This means you'll be billed for all tests. Please check TestDino integration."
               echo "RERUN_MODE=fallback" >> $GITHUB_ENV
