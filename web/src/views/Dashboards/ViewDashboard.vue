@@ -633,7 +633,12 @@ export default defineComponent({
 
       const normalizedCurrent = normalizeVariables(variablesData);
       const normalizedRefreshed = normalizeVariables(refreshedVariablesData);
-
+      console.log("[VariablesValueSelector] Comparing variables:", {
+        "current": normalizedCurrent,
+        "refreshed": normalizedRefreshed,
+        "isEqual": !isEqual(normalizedCurrent, normalizedRefreshed),
+        "variablesData": variablesData,
+      })
       return !isEqual(normalizedCurrent, normalizedRefreshed);
     });
     // ======= [START] default variable values

@@ -742,6 +742,7 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
+import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -913,16 +914,6 @@ export default defineComponent({
     });
 
     // Helper to determine scope type (matching VariableSettings.vue logic)
-    const getScopeType = (variable: any) => {
-      if (variable.panels && variable.panels.length > 0) {
-        return "panels";
-      } else if (variable.tabs && variable.tabs.length > 0) {
-        return "tabs";
-      } else {
-        return "global";
-      }
-    };
-
     // Computed property to filter variables for the current panel
     // Shows only: global variables + tab variables (for current tab) + panel variables (for current panel)
     const filteredVariablesConfig = computed(() => {
