@@ -48,29 +48,8 @@ env:
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
-  check_changes:
-    runs-on: ubuntu-latest
-    outputs:
-      has_changes: ${{ steps.check_changes.outputs.has_changes }}
-    steps:
-      - name: Clone the current repo
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Check if relevant code has changes
-        id: check_changes
-        run: |
-          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qvE '\.(md|yml|yaml)$'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-
   build_binary:
     name: build_binary
-    needs: check_changes
-    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on:
       labels: repo-openobserve-standard-16
 
@@ -418,7 +397,8 @@ jobs:
     name: Merge Reports and Upload to TestDino
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: repo-openobserve-standard-8
 
     steps:
       - name: Clone the current repo
@@ -503,21 +483,15 @@ jobs:
           retention-days: 7
 
   playwright_summary:
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: repo-openobserve-standard-8
     permissions: {}
-    needs: [check_changes, build_binary, ui_integration_tests, merge_and_upload_reports, generate_coverage_report]
+    needs: [build_binary, ui_integration_tests, merge_and_upload_reports, generate_coverage_report]
     if: always()
     steps:
       - name: Check test results
         run: |
-          # If no relevant changes, all tests are skipped - this is success
-          if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
-            echo "No relevant changes detected - tests skipped"
-            exit 0
-          fi
-
-          # If we have changes, check all job results
-          # Accept success or skipped for all jobs
+          # Check all job results - accept success or skipped for all jobs
           BUILD_OK=false
           UI_OK=false
           MERGE_OK=false
