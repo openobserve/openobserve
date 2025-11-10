@@ -30,6 +30,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::auth::validator::list_objects_for_user;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -45,7 +47,7 @@ use crate::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineHistoryQuery {
     /// Filter by specific pipeline name
-    pub pipeline_name: Option<String>,
+    pub pipeline_id: Option<String>,
     /// Start time in Unix timestamp microseconds
     pub start_time: Option<i64>,
     /// End time in Unix timestamp microseconds
@@ -103,7 +105,7 @@ pub struct PipelineHistoryResponse {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("pipeline_name" = Option<String>, Query, description = "Filter by specific pipeline name"),
+        ("pipeline_id" = Option<String>, Query, description = "Filter by specific pipeline id"),
         ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds"),
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds"),
         ("from" = Option<i64>, Query, description = "Pagination offset (default: 0)"),
@@ -141,37 +143,39 @@ pub async fn get_pipeline_history(
         return MetaHttpResponse::bad_request("start_time must be before end_time");
     }
 
-    // Get all pipeline names for the organization to validate the filter
-    let pipeline_names = match get_organization_pipeline_names(&org_id).await {
-        Ok(names) => names,
+    // Get all pipeline IDs for the organization to validate the filter
+    let pipeline_ids = match get_organization_pipeline_ids(&org_id).await {
+        Ok(ids) => ids,
         Err(e) => {
-            log::error!("Failed to get pipeline names for org {}: {}", org_id, e);
-            return MetaHttpResponse::internal_error(format!("Failed to get pipeline names: {e}"));
+            log::error!("Failed to get pipeline IDs for org {}: {}", org_id, e);
+            return MetaHttpResponse::internal_error(format!("Failed to get pipeline IDs: {e}"));
         }
     };
 
     // If pipeline_name filter is provided, validate it exists
-    if let Some(ref pipeline_name) = query.pipeline_name
-        && !pipeline_names.contains(pipeline_name)
+    if let Some(ref pipeline_id) = query.pipeline_id
+        && !pipeline_ids.contains(pipeline_id)
     {
         return MetaHttpResponse::not_found(format!(
-            "Pipeline '{pipeline_name}' not found in organization"
+            "Pipeline '{pipeline_id}' not found in organization"
         ));
     }
 
     // RBAC: Check permissions and filter by accessible pipelines
-    #[cfg(feature = "enterprise")]
-    let mut permitted_pipeline_names = pipeline_names;
     #[cfg(not(feature = "enterprise"))]
-    let permitted_pipeline_names = pipeline_names;
+    let permitted_pipeline_ids: Option<Vec<String>> = None;
 
     // RBAC: Check permissions for the requested pipeline(s)
     #[cfg(feature = "enterprise")]
-    let permitted_pipeline_names = {
-        let user_id = &user_email.user_id;
+    let permitted_pipeline_ids = {
+        use crate::common::utils::auth::is_root_user;
 
+        let user_id = &user_email.user_id;
+        if is_root_user(user_id) {
+            Ok(None)
+        }
         // If RBAC is enabled, check permissions
-        if get_openfga_config().enabled {
+        else if get_openfga_config().enabled {
             let user = match crate::service::users::get_user(Some(&org_id), user_id).await {
                 Some(user) => user,
                 None => {
@@ -182,7 +186,7 @@ pub async fn get_pipeline_history(
             let role = user.role.to_string();
 
             // If specific pipeline_name is requested, check access to it
-            if let Some(ref pipeline_name) = query.pipeline_name {
+            if let Some(ref pipeline_name) = query.pipeline_id {
                 let pipeline_obj = format!(
                     "{}:{}",
                     OFGA_MODELS.get("pipelines").unwrap().key,
@@ -205,48 +209,76 @@ pub async fn get_pipeline_history(
                     ));
                 }
 
-                pipeline_names
+                // Means the user has the permission
+                Ok::<Option<Vec<String>>, Error>(None)
             } else {
                 // List all history - filter by accessible pipelines
-                let mut accessible_pipelines = Vec::new();
+                let pipeline_object_type = OFGA_MODELS
+                    .get("pipelines")
+                    .map_or("pipelines", |model| model.key);
 
-                for pipeline_name in &pipeline_names {
-                    let pipeline_obj = format!(
-                        "{}:{}",
-                        OFGA_MODELS.get("pipelines").unwrap().key,
-                        pipeline_name
-                    );
+                match list_objects_for_user(&org_id, user_id, "GET", pipeline_object_type).await {
+                    Ok(Some(permitted)) => {
+                        // Check if user has access to all pipelines
+                        let all_pipelines_key = format!("{pipeline_object_type}:_all_{org_id}");
+                        if permitted.contains(&all_pipelines_key) {
+                            // User has access to all pipelines
+                            Ok(None)
+                        } else if permitted.is_empty() {
+                            // User has no access to any pipelines, return empty result
+                            return MetaHttpResponse::json(PipelineHistoryResponse {
+                                total: 0,
+                                from,
+                                size,
+                                hits: vec![],
+                            });
+                        } else {
+                            // Extract pipeline IDs from permitted list
+                            // Format: "{pipeline_object_type}:{pipeline_id}"
+                            let permitted_pipeline_ids: Vec<String> = permitted
+                                .iter()
+                                .filter_map(|perm| {
+                                    // Skip the _all_ entry if it somehow made it here
+                                    if perm.contains("_all_") {
+                                        return None;
+                                    }
+                                    // Extract the part after the colon
+                                    perm.split(':').nth(1).map(|s| s.to_string())
+                                })
+                                .collect();
 
-                    let has_permission = o2_openfga::authorizer::authz::is_allowed(
-                        &org_id,
-                        user_id,
-                        "GET",
-                        &pipeline_obj,
-                        "",
-                        &role,
-                    )
-                    .await;
+                            // Filter pipeline_ids to only include permitted ones
+                            let filtered_pipelines: Vec<String> = pipeline_ids
+                                .iter()
+                                .filter(|id| permitted_pipeline_ids.contains(id))
+                                .cloned()
+                                .collect();
 
-                    if has_permission {
-                        accessible_pipelines.push(pipeline_name.clone());
+                            if filtered_pipelines.is_empty() {
+                                // After filtering, user has no access to any existing pipelines
+                                return MetaHttpResponse::json(PipelineHistoryResponse {
+                                    total: 0,
+                                    from,
+                                    size,
+                                    hits: vec![],
+                                });
+                            }
+
+                            Ok(Some(filtered_pipelines))
+                        }
+                    }
+                    Ok(None) => {
+                        // RBAC is disabled or user is root - allow access to all pipelines
+                        Ok(None)
+                    }
+                    Err(e) => {
+                        return MetaHttpResponse::forbidden(e.to_string());
                     }
                 }
-
-                // If user has no access to any pipelines, return empty result
-                if accessible_pipelines.is_empty() {
-                    return MetaHttpResponse::json(PipelineHistoryResponse {
-                        total: 0,
-                        from,
-                        size,
-                        hits: vec![],
-                    });
-                }
-
-                accessible_pipelines
             }
         } else {
             // RBAC disabled, allow all pipelines
-            pipeline_names
+            Ok(None)
         }
     };
 
@@ -255,32 +287,36 @@ pub async fn get_pipeline_history(
         "(module in ('derived_stream', 'pipeline')) AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
 
-    // Add pipeline name filter if provided
-    // The key field contains the pipeline name in the format "pipeline_name/pipeline_id"
-    if let Some(ref pipeline_name) = query.pipeline_name {
-        // We need to filter where key starts with the pipeline name
-        let escaped_name = escape_like(pipeline_name);
-        where_clause.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
-    } else if !permitted_pipeline_names.is_empty() {
+    // Add pipeline ID filter if provided
+    // The key field contains the pipeline ID in the format "pipeline_name/pipeline_id"
+    if let Some(ref pipeline_id) = query.pipeline_id {
+        // We need to filter where key starts with the pipeline ID
+        let escaped_name = escape_like(pipeline_id);
+        where_clause.push_str(&format!(" AND key LIKE '%/{escaped_name}%'"));
+    } else if let Some(permitted_ids) = permitted_pipeline_ids {
         // Filter by permitted pipelines only
-        let pipeline_filter = permitted_pipeline_names
+        if permitted_ids.is_empty() {
+            // No accessible pipelines, return empty result
+            return MetaHttpResponse::json(PipelineHistoryResponse {
+                total: 0,
+                from,
+                size,
+                hits: vec![],
+            });
+        }
+
+        let pipeline_filter = permitted_ids
             .iter()
-            .map(|name| {
-                let escaped_name = escape_like(name);
-                format!("key LIKE '%{}%'", escaped_name.replace("'", "''"))
+            .map(|id| {
+                let escaped_id = escape_like(id);
+                format!("key LIKE '%{}%'", escaped_id.replace("'", "''"))
             })
             .collect::<Vec<_>>()
             .join(" OR ");
         where_clause.push_str(&format!(" AND ({pipeline_filter})"));
-    } else {
-        // No accessible pipelines, return empty result
-        return MetaHttpResponse::json(PipelineHistoryResponse {
-            total: 0,
-            from,
-            size,
-            hits: vec![],
-        });
     }
+    // If permitted_pipeline_ids is Ok(None), user has access to all pipelines
+    // No additional filter needed in WHERE clause
 
     // Get trace ID for the request
     let trace_id = get_or_create_trace_id(req.headers(), &Span::current());
@@ -288,6 +324,7 @@ pub async fn get_pipeline_history(
     // Step 1: Get the total count of matching records
     // Build count query (no LIMIT/OFFSET, will be rewritten to COUNT(*) by track_total_hits)
     let count_sql = format!("SELECT _timestamp FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause}");
+    log::info!("Pipeline history sql {count_sql}");
 
     let count_req = SearchRequest {
         query: Query {
@@ -346,6 +383,7 @@ pub async fn get_pipeline_history(
          WHERE {where_clause} \
          ORDER BY _timestamp DESC LIMIT {size} OFFSET {from}"
     );
+    log::info!("Pipeline history data_sql: {data_sql}");
 
     let data_req = SearchRequest {
         query: Query {
@@ -448,16 +486,13 @@ pub async fn get_pipeline_history(
     MetaHttpResponse::json(response)
 }
 
-/// Helper function to get all pipeline names for an organization
-async fn get_organization_pipeline_names(org_id: &str) -> Result<Vec<String>, anyhow::Error> {
+/// Helper function to get all pipeline IDs for an organization
+async fn get_organization_pipeline_ids(org_id: &str) -> Result<Vec<String>, anyhow::Error> {
     // Get all pipelines for the organization
     let pipelines = list_pipelines(org_id).await?;
 
-    // Extract pipeline names
-    let names: Vec<String> = pipelines
-        .into_iter()
-        .map(|pipeline| pipeline.name)
-        .collect();
+    // Extract pipeline IDs
+    let ids: Vec<String> = pipelines.into_iter().map(|pipeline| pipeline.id).collect();
 
-    Ok(names)
+    Ok(ids)
 }

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use actix_web::{HttpRequest, HttpResponse, get, web};
 use chrono::{Duration, Utc};
 use config::{
@@ -29,6 +31,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::auth::validator::list_objects_for_user;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -36,7 +40,7 @@ use crate::{
     },
     handler::http::extractors::Headers,
     service::{
-        db::alerts::alert::list as list_alerts,
+        alerts::alert::get_by_id,
         search::{self as SearchService},
     },
 };
@@ -44,7 +48,7 @@ use crate::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlertHistoryQuery {
     /// Filter by specific alert name
-    pub alert_name: Option<String>,
+    pub alert_id: Option<String>,
     /// Start time in Unix timestamp microseconds
     pub start_time: Option<i64>,
     /// End time in Unix timestamp microseconds
@@ -118,7 +122,7 @@ pub fn escape_like(input: impl AsRef<str>) -> String {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_name" = Option<String>, Query, description = "Filter by specific alert name"),
+        ("alert_id" = Option<String>, Query, description = "Filter by specific alert id"),
         ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds"),
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds"),
         ("from" = Option<i64>, Query, description = "Pagination offset (default: 0)"),
@@ -156,37 +160,43 @@ pub async fn get_alert_history(
         return MetaHttpResponse::bad_request("start_time must be before end_time");
     }
 
-    // Get all alert names for the organization to validate the filter
-    let alert_names = match get_organization_alert_names(&org_id).await {
-        Ok(names) => names,
-        Err(e) => {
-            log::error!("Failed to get alert names for org {}: {}", org_id, e);
-            return MetaHttpResponse::internal_error(format!("Failed to get alert names: {e}"));
+    // If alert_id filter is provided, validate it exists
+    if let Some(ref alert_id) = query.alert_id {
+        // Try to parse the alert_id as Ksuid
+        match svix_ksuid::Ksuid::from_str(alert_id) {
+            Ok(ksuid) => {
+                // Verify the alert exists in the organization
+                let conn = infra::db::ORM_CLIENT
+                    .get_or_init(infra::db::connect_to_orm)
+                    .await;
+                if get_by_id(conn, &org_id, ksuid).await.is_err() {
+                    return MetaHttpResponse::not_found(format!(
+                        "Alert '{alert_id}' not found in organization"
+                    ));
+                }
+            }
+            Err(_) => {
+                return MetaHttpResponse::bad_request(format!(
+                    "Invalid alert_id format: '{alert_id}'"
+                ));
+            }
         }
-    };
-
-    // If alert_name filter is provided, validate it exists
-    if let Some(ref alert_name) = query.alert_name
-        && !alert_names.contains(alert_name)
-    {
-        return MetaHttpResponse::not_found(format!(
-            "Alert '{alert_name}' not found in organization"
-        ));
     }
 
     // RBAC: Check permissions and filter by accessible alerts
-    #[cfg(feature = "enterprise")]
-    let mut permitted_alert_names = alert_names;
     #[cfg(not(feature = "enterprise"))]
-    let permitted_alert_names = alert_names;
+    let permitted_alert_ids: Option<Vec<String>> = None;
 
     // RBAC: Check permissions for the requested alert(s)
     #[cfg(feature = "enterprise")]
-    let permitted_alert_names = {
+    let permitted_alert_ids = {
         let user_id = &user_email.user_id;
-
+        use crate::common::utils::auth::is_root_user;
+        if is_root_user(user_id) {
+            Ok(None)
+        }
         // If RBAC is enabled, check permissions
-        if get_openfga_config().enabled {
+        else if get_openfga_config().enabled {
             let user = match crate::service::users::get_user(Some(&org_id), user_id).await {
                 Some(user) => user,
                 None => {
@@ -197,9 +207,9 @@ pub async fn get_alert_history(
             let role = user.role.to_string();
 
             // If specific alert_name is requested, check access to it
-            if let Some(ref alert_name) = query.alert_name {
-                let alert_obj =
-                    format!("{}:{}", OFGA_MODELS.get("alerts").unwrap().key, alert_name);
+            if let Some(ref alert_id) = query.alert_id {
+                let folder_id = query.folder_id.unwrap_or_default();
+                let alert_obj = format!("{}:{}", OFGA_MODELS.get("alerts").unwrap().key, alert_id);
 
                 let has_permission = o2_openfga::authorizer::authz::is_allowed(
                     &org_id, user_id, "GET", &alert_obj, "", &role,
@@ -208,44 +218,80 @@ pub async fn get_alert_history(
 
                 if !has_permission {
                     return MetaHttpResponse::forbidden(format!(
-                        "Access denied to alert '{alert_name}'"
+                        "Access denied to alert '{alert_id}'"
                     ));
                 }
 
-                alert_names
+                // Means the user has the permission
+                Ok::<Option<Vec<String>>, Error>(None)
             } else {
                 // List all history - filter by accessible alerts
-                let mut accessible_alerts = Vec::new();
+                let alert_object_type = OFGA_MODELS
+                    .get("alerts")
+                    .map_or("alerts", |model| model.key);
 
-                for alert_name in &alert_names {
-                    let alert_obj =
-                        format!("{}:{}", OFGA_MODELS.get("alerts").unwrap().key, alert_name);
+                match list_objects_for_user(&org_id, user_id, "GET", alert_object_type).await {
+                    Ok(Some(permitted)) => {
+                        // Check if user has access to all alerts
+                        let all_alerts_key = format!("{alert_object_type}:_all_{org_id}");
+                        if permitted.contains(&all_alerts_key) {
+                            // User has access to all alerts
+                            Ok(None)
+                        } else if permitted.is_empty() {
+                            // User has no access to any alerts, return empty result
+                            return MetaHttpResponse::json(AlertHistoryResponse {
+                                total: 0,
+                                from,
+                                size,
+                                hits: vec![],
+                            });
+                        } else {
+                            // Extract alert IDs from permitted list
+                            // Format: "{alert_object_type}:{alert_id}"
+                            let permitted_alert_ids: Vec<String> = permitted
+                                .iter()
+                                .filter_map(|perm| {
+                                    // Skip the _all_ entry if it somehow made it here
+                                    if perm.contains("_all_") {
+                                        return None;
+                                    }
+                                    // Extract the part after the colon
+                                    perm.split(':').nth(1).map(|s| s.to_string())
+                                })
+                                .collect();
 
-                    let has_permission = o2_openfga::authorizer::authz::is_allowed(
-                        &org_id, user_id, "GET", &alert_obj, "", &role,
-                    )
-                    .await;
+                            // Filter alert_ids to only include permitted ones
+                            let filtered_alerts: Vec<String> = alert_ids
+                                .iter()
+                                .filter(|id| permitted_alert_ids.contains(id))
+                                .cloned()
+                                .collect();
 
-                    if has_permission {
-                        accessible_alerts.push(alert_name.clone());
+                            if filtered_alerts.is_empty() {
+                                // After filtering, user has no access to any existing alerts
+                                return MetaHttpResponse::json(AlertHistoryResponse {
+                                    total: 0,
+                                    from,
+                                    size,
+                                    hits: vec![],
+                                });
+                            }
+
+                            Ok(Some(filtered_alerts))
+                        }
+                    }
+                    Ok(None) => {
+                        // RBAC is disabled or user is root - allow access to all alerts
+                        Ok(None)
+                    }
+                    Err(e) => {
+                        return MetaHttpResponse::forbidden(e.to_string());
                     }
                 }
-
-                // If user has no access to any alerts, return empty result
-                if accessible_alerts.is_empty() {
-                    return MetaHttpResponse::json(AlertHistoryResponse {
-                        total: 0,
-                        from,
-                        size,
-                        hits: vec![],
-                    });
-                }
-
-                accessible_alerts
             }
         } else {
             // RBAC disabled, allow all alerts
-            alert_names
+            Ok(None)
         }
     };
 
@@ -254,32 +300,36 @@ pub async fn get_alert_history(
         "module = 'alert' AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
 
-    // Add alert name filter if provided
-    // The key field contains the alert name in the format "alert_name/alert_id"
-    if let Some(ref alert_name) = query.alert_name {
-        // We need to filter where key starts with the alert name
+    // Add alert ID filter if provided
+    // The key field contains the alert ID in the format "alert_name/alert_id"
+    if let Some(ref alert_name) = query.alert_id {
+        // We need to filter where key starts with the alert ID
         let escaped_name = escape_like(alert_name);
         where_clause.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
-    } else if !permitted_alert_names.is_empty() {
+    } else if let Some(permitted_ids) = permitted_alert_ids {
         // Filter by permitted alerts only
-        let alert_filter = permitted_alert_names
+        if permitted_ids.is_empty() {
+            // No accessible alerts, return empty result
+            return MetaHttpResponse::json(AlertHistoryResponse {
+                total: 0,
+                from,
+                size,
+                hits: vec![],
+            });
+        }
+
+        let alert_filter = permitted_ids
             .iter()
-            .map(|name| {
-                let escaped_name = escape_like(name);
-                format!("key LIKE '{}/%'", escaped_name.replace("'", "''"))
+            .map(|id| {
+                let escaped_id = escape_like(id);
+                format!("key LIKE '%{}%'", escaped_id.replace("'", "''"))
             })
             .collect::<Vec<_>>()
             .join(" OR ");
         where_clause.push_str(&format!(" AND ({alert_filter})"));
-    } else {
-        // No accessible alerts, return empty result
-        return MetaHttpResponse::json(AlertHistoryResponse {
-            total: 0,
-            from,
-            size,
-            hits: vec![],
-        });
     }
+    // If permitted_alert_ids is Ok(None), user has access to all alerts
+    // No additional filter needed in WHERE clause
 
     // Get trace ID for the request
     let trace_id = get_or_create_trace_id(req.headers(), &Span::current());
@@ -447,17 +497,6 @@ pub async fn get_alert_history(
     MetaHttpResponse::json(response)
 }
 
-/// Helper function to get all alert names for an organization
-async fn get_organization_alert_names(org_id: &str) -> Result<Vec<String>, anyhow::Error> {
-    // Get all alerts for the organization
-    let alerts = list_alerts(org_id, None, None).await?;
-
-    // Extract alert names
-    let names: Vec<String> = alerts.into_iter().map(|alert| alert.name).collect();
-
-    Ok(names)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -465,14 +504,14 @@ mod tests {
     #[test]
     fn test_alert_history_query_defaults() {
         let query = AlertHistoryQuery {
-            alert_name: None,
+            alert_id: None,
             start_time: None,
             end_time: None,
             from: None,
             size: None,
         };
 
-        assert!(query.alert_name.is_none());
+        assert!(query.alert_id.is_none());
         assert!(query.start_time.is_none());
         assert!(query.end_time.is_none());
         assert!(query.from.is_none());
@@ -482,14 +521,14 @@ mod tests {
     #[test]
     fn test_alert_history_query_with_values() {
         let query = AlertHistoryQuery {
-            alert_name: Some("test_alert".to_string()),
+            alert_id: Some("test_alert".to_string()),
             start_time: Some(1234567890000000),
             end_time: Some(1234567990000000),
             from: Some(0),
             size: Some(50),
         };
 
-        assert_eq!(query.alert_name, Some("test_alert".to_string()));
+        assert_eq!(query.alert_id, Some("test_alert".to_string()));
         assert_eq!(query.start_time, Some(1234567890000000));
         assert_eq!(query.end_time, Some(1234567990000000));
         assert_eq!(query.from, Some(0));
@@ -575,27 +614,6 @@ mod tests {
         assert_eq!(response.hits[0].status, "ok");
     }
 
-    #[tokio::test]
-    async fn test_get_organization_alert_names_empty() {
-        // This test would require mocking the database
-        // For now, we're testing the structure exists
-        let result = get_organization_alert_names("test_org").await;
-        // In a real test environment with mocked DB, we would assert:
-        // assert!(result.is_ok());
-        // assert_eq!(result.unwrap().len(), 0);
-
-        // For now, just verify the function signature and error handling exists
-        match result {
-            Ok(_names) => {
-                // Success case - would have alerts
-            }
-            Err(_e) => {
-                // Expected in test environment without DB
-                // This is acceptable for unit testing
-            }
-        }
-    }
-
     #[test]
     fn test_alert_history_entry_with_error() {
         let entry = AlertHistoryEntry {
@@ -628,7 +646,7 @@ mod tests {
     fn test_alert_history_pagination() {
         // Test pagination parameters
         let query = AlertHistoryQuery {
-            alert_name: None,
+            alert_id: None,
             start_time: None,
             end_time: None,
             from: Some(100),
