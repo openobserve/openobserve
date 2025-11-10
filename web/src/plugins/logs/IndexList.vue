@@ -984,6 +984,10 @@ export default defineComponent({
       searchObj.loadingStream = false;
     };
 
+    const resetPagination = () => {
+      pagination.value.page = 1;
+    };
+
     watch(
       () => searchObj.meta.quickMode,
       (isActive) => {
@@ -1636,10 +1640,6 @@ export default defineComponent({
       // Reset pagination to page 1 before resetting fields
       resetPagination();
       resetFields();
-    };
-
-    const resetPagination = () => {
-      pagination.value.page = 1;
     };
 
     const hasUserDefinedSchemas = () => {
