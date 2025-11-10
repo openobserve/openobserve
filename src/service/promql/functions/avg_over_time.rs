@@ -17,7 +17,7 @@ use datafusion::error::Result;
 
 use crate::service::promql::{
     functions::RangeFunc,
-    value::{EvalContext, Labels, Sample, TimeWindow, Value},
+    value::{EvalContext, Sample, TimeWindow, Value},
 };
 
 /// Enhanced version that processes all timestamps at once for range queries
@@ -49,12 +49,7 @@ impl RangeFunc for AvgOverTimeFunc {
         "avg_over_time"
     }
 
-    fn exec(
-        &self,
-        _labels: &Labels,
-        samples: &[Sample],
-        _time_win: &Option<TimeWindow>,
-    ) -> Option<f64> {
+    fn exec(&self, samples: &[Sample], _time_win: &Option<TimeWindow>) -> Option<f64> {
         if samples.is_empty() {
             return None;
         }

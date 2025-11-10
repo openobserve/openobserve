@@ -17,7 +17,7 @@ use datafusion::error::Result;
 
 use crate::service::promql::{
     functions::RangeFunc,
-    value::{EvalContext, ExtrapolationKind, Labels, Sample, TimeWindow, Value, extrapolated_rate},
+    value::{EvalContext, ExtrapolationKind, Sample, TimeWindow, Value, extrapolated_rate},
 };
 
 /// Enhanced version that processes all timestamps at once for range queries
@@ -49,12 +49,7 @@ impl RangeFunc for DeltaFunc {
         "delta"
     }
 
-    fn exec(
-        &self,
-        _labels: &Labels,
-        samples: &[Sample],
-        time_win: &Option<TimeWindow>,
-    ) -> Option<f64> {
+    fn exec(&self, samples: &[Sample], time_win: &Option<TimeWindow>) -> Option<f64> {
         let tw = time_win
             .as_ref()
             .expect("BUG: `delta` function requires time window");

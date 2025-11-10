@@ -191,7 +191,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test count_values without label grouping
-        let result = count_values_range("value", &None, data.clone(), &eval_ctx).unwrap();
+        let result = count_values("value", &None, data.clone(), &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {
@@ -234,7 +234,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test count_values with invalid label name
-        let result = count_values_range("invalid-label-name!", &None, data, &eval_ctx);
+        let result = count_values("invalid-label-name!", &None, data, &eval_ctx);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("invalid"));
     }
@@ -249,7 +249,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test count_values with empty input
-        let result = count_values_range("value", &None, data, &eval_ctx).unwrap();
+        let result = count_values("value", &None, data, &eval_ctx).unwrap();
 
         match result {
             Value::None => {

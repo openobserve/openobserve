@@ -127,7 +127,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test count without label grouping - all samples should be counted together
-        let result = count_range(&None, data.clone(), &eval_ctx).unwrap();
+        let result = count(&None, data.clone(), &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {

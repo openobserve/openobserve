@@ -151,7 +151,7 @@ mod tests {
         let eval_ctx = EvalContext::new(ts1, ts3 + 1, 1000, "test".to_string());
 
         // Test 1: sum without label grouping (all series summed together)
-        let result = sum_range(&None, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+        let result = sum(&None, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(result_matrix) => {
@@ -173,7 +173,7 @@ mod tests {
         let param = Some(LabelModifier::Include(promql_parser::label::Labels {
             labels: vec!["job".to_string()],
         }));
-        let result = sum_range(&param, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+        let result = sum(&param, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(result_matrix) => {

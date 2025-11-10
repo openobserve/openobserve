@@ -18,7 +18,7 @@ use datafusion::error::Result;
 use crate::service::promql::{
     common::linear_regression,
     functions::RangeFunc,
-    value::{EvalContext, Labels, Sample, TimeWindow, Value},
+    value::{EvalContext, Sample, TimeWindow, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#predict_linear
@@ -53,12 +53,7 @@ impl RangeFunc for PredictLinearFunc {
         "predict_linear"
     }
 
-    fn exec(
-        &self,
-        _labels: &Labels,
-        samples: &[Sample],
-        time_win: &Option<TimeWindow>,
-    ) -> Option<f64> {
+    fn exec(&self, samples: &[Sample], time_win: &Option<TimeWindow>) -> Option<f64> {
         let eval_ts = time_win.as_ref()?.eval_ts;
         let (slope, intercept) = linear_regression(samples, eval_ts / 1000)?;
         Some(slope * self.duration + intercept)

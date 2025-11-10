@@ -128,7 +128,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test group without label grouping - should return 1.0 for each group
-        let result = group_range(&None, data.clone(), &eval_ctx).unwrap();
+        let result = group(&None, data.clone(), &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {

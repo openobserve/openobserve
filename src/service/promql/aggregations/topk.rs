@@ -200,7 +200,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test topk(2) without label grouping - should return 2 highest values
-        let result = topk_range(2, &None, data.clone(), &eval_ctx).unwrap();
+        let result = topk(2, &None, data.clone(), &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {
@@ -230,7 +230,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test topk(2) with empty input
-        let result = topk_range(2, &None, data, &eval_ctx).unwrap();
+        let result = topk(2, &None, data, &eval_ctx).unwrap();
 
         match result {
             Value::None => {
@@ -256,7 +256,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test topk(0) - should return None
-        let result = topk_range(0, &None, data, &eval_ctx).unwrap();
+        let result = topk(0, &None, data, &eval_ctx).unwrap();
 
         match result {
             Value::None => {

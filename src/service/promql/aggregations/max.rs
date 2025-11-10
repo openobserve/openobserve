@@ -132,7 +132,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test max without label grouping - should return the maximum value
-        let result = max_range(&None, data.clone(), &eval_ctx).unwrap();
+        let result = max(&None, data.clone(), &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {

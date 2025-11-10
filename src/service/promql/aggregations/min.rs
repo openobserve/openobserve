@@ -129,7 +129,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test min without label grouping - should return the minimum value
-        let result = min_range(&None, data.clone(), &eval_ctx).unwrap();
+        let result = min(&None, data.clone(), &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {

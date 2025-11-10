@@ -17,7 +17,7 @@ use datafusion::error::Result;
 
 use crate::service::promql::{
     functions::RangeFunc,
-    value::{EvalContext, Labels, Sample, TimeWindow, Value},
+    value::{EvalContext, Sample, TimeWindow, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#resets
@@ -50,12 +50,7 @@ impl RangeFunc for ResetsFunc {
         "resets"
     }
 
-    fn exec(
-        &self,
-        _labels: &Labels,
-        samples: &[Sample],
-        _time_win: &Option<TimeWindow>,
-    ) -> Option<f64> {
+    fn exec(&self, samples: &[Sample], _time_win: &Option<TimeWindow>) -> Option<f64> {
         let resets = samples
             .iter()
             .zip(samples.iter().skip(1))
@@ -91,24 +86,15 @@ mod tests {
 
         // Monotonically increasing - should have 0 resets
         let data = create_range_value(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(0.0)
-        );
+        assert_eq!(func.exec(&data.samples, &None), Some(0.0));
 
         // Constant values - should have 0 resets
         let data = create_range_value(vec![5.0, 5.0, 5.0, 5.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(0.0)
-        );
+        assert_eq!(func.exec(&data.samples, &None), Some(0.0));
 
         // Mixed increasing and constant - should have 0 resets
         let data = create_range_value(vec![1.0, 2.0, 2.0, 3.0, 4.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(0.0)
-        );
+        assert_eq!(func.exec(&data.samples, &None), Some(0.0));
     }
 
     #[test]
@@ -117,24 +103,15 @@ mod tests {
 
         // One reset: values go up then down
         let data = create_range_value(vec![1.0, 2.0, 3.0, 1.0, 2.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(1.0)
-        );
+        assert_eq!(func.exec(&data.samples, &None), Some(1.0));
 
         // One reset at the end
         let data = create_range_value(vec![1.0, 2.0, 3.0, 4.0, 2.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(1.0)
-        );
+        assert_eq!(func.exec(&data.samples, &None), Some(1.0));
 
         // One reset at the beginning
         let data = create_range_value(vec![5.0, 3.0, 4.0, 5.0, 6.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(1.0)
-        );
+        assert_eq!(func.exec(&data.samples, &None), Some(1.0));
     }
 
     #[test]
@@ -143,24 +120,15 @@ mod tests {
 
         // Multiple resets: up-down-up-down pattern
         let data = create_range_value(vec![1.0, 5.0, 2.0, 6.0, 3.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(2.0)
-        ); // 5→2 and 6→3
+        assert_eq!(func.exec(&data.samples, &None), Some(2.0)); // 5→2 and 6→3
 
         // Counter-like behavior with resets
         let data = create_range_value(vec![100.0, 150.0, 200.0, 50.0, 100.0, 120.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(1.0)
-        ); // 200→50
+        assert_eq!(func.exec(&data.samples, &None), Some(1.0)); // 200→50
 
         // All decreasing values
         let data = create_range_value(vec![10.0, 9.0, 8.0, 7.0, 6.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(4.0)
-        ); // Each step is a reset
+        assert_eq!(func.exec(&data.samples, &None), Some(4.0)); // Each step is a reset
     }
 
     #[test]
@@ -169,31 +137,19 @@ mod tests {
 
         // Single sample - should have 0 resets (no pairs to compare)
         let data = create_range_value(vec![42.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(0.0)
-        );
+        assert_eq!(func.exec(&data.samples, &None), Some(0.0));
 
         // Two samples - no reset
         let data = create_range_value(vec![1.0, 2.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(0.0)
-        );
+        assert_eq!(func.exec(&data.samples, &None), Some(0.0));
 
         // Two samples - with reset
         let data = create_range_value(vec![2.0, 1.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(1.0)
-        );
+        assert_eq!(func.exec(&data.samples, &None), Some(1.0));
 
         // Empty samples (should not happen in practice, but test for safety)
         let data = create_range_value(vec![]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(0.0)
-        );
+        assert_eq!(func.exec(&data.samples, &None), Some(0.0));
     }
 
     #[test]
@@ -202,24 +158,15 @@ mod tests {
 
         // All negative values - decreasing (more negative)
         let data = create_range_value(vec![-1.0, -2.0, -3.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(2.0)
-        ); // Each step down is a "reset"
+        assert_eq!(func.exec(&data.samples, &None), Some(2.0)); // Each step down is a "reset"
 
         // All negative values - increasing (less negative)
         let data = create_range_value(vec![-3.0, -2.0, -1.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(0.0)
-        );
+        assert_eq!(func.exec(&data.samples, &None), Some(0.0));
 
         // Mixed positive and negative
         let data = create_range_value(vec![1.0, -1.0, 2.0, -2.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(2.0)
-        ); // 1→-1 and 2→-2
+        assert_eq!(func.exec(&data.samples, &None), Some(2.0)); // 1→-1 and 2→-2
     }
 
     #[test]
@@ -228,17 +175,11 @@ mod tests {
 
         // Test with very close floating point values
         let data = create_range_value(vec![1.0000001, 1.0000002, 1.0000001]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(1.0)
-        ); // 1.0000002 → 1.0000001
+        assert_eq!(func.exec(&data.samples, &None), Some(1.0)); // 1.0000002 → 1.0000001
 
         // Test with identical floating point values (no reset)
         let data = create_range_value(vec![1.0000001, 1.0000001, 1.0000001]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(0.0)
-        );
+        assert_eq!(func.exec(&data.samples, &None), Some(0.0));
     }
 
     #[test]
@@ -247,24 +188,15 @@ mod tests {
 
         // Test with infinity
         let data = create_range_value(vec![1.0, f64::INFINITY, 2.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(1.0)
-        ); // INFINITY → 2.0
+        assert_eq!(func.exec(&data.samples, &None), Some(1.0)); // INFINITY → 2.0
 
         // Test with NaN (comparison with NaN is always false)
         let data = create_range_value(vec![1.0, f64::NAN, 2.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(0.0)
-        ); // NaN comparisons are false
+        assert_eq!(func.exec(&data.samples, &None), Some(0.0)); // NaN comparisons are false
 
         // Test decreasing to zero
         let data = create_range_value(vec![5.0, 3.0, 1.0, 0.0]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(3.0)
-        ); // Each step down
+        assert_eq!(func.exec(&data.samples, &None), Some(3.0)); // Each step down
     }
 
     #[test]
@@ -277,10 +209,7 @@ mod tests {
             100.0,  // Counter reset/overflow
             200.0, 300.0, 400.0, // Continue from new base
         ]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(1.0)
-        ); // Only 1300 → 100
+        assert_eq!(func.exec(&data.samples, &None), Some(1.0)); // Only 1300 → 100
 
         // Multiple counter overflows
         let data = create_range_value(vec![
@@ -288,9 +217,6 @@ mod tests {
             50.0, 150.0, // Reset and continue
             25.0, 125.0, // Another reset
         ]);
-        assert_eq!(
-            func.exec(&Labels::default(), &data.samples, &None),
-            Some(2.0)
-        ); // 200→50 and 150→25
+        assert_eq!(func.exec(&data.samples, &None), Some(2.0)); // 200→50 and 150→25
     }
 }

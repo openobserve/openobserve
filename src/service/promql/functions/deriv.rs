@@ -18,7 +18,7 @@ use datafusion::error::Result;
 use crate::service::promql::{
     common::linear_regression,
     functions::RangeFunc,
-    value::{EvalContext, Labels, Sample, TimeWindow, Value},
+    value::{EvalContext, Sample, TimeWindow, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#deriv
@@ -51,12 +51,7 @@ impl RangeFunc for DerivFunc {
         "deriv"
     }
 
-    fn exec(
-        &self,
-        _labels: &Labels,
-        samples: &[Sample],
-        _time_win: &Option<TimeWindow>,
-    ) -> Option<f64> {
+    fn exec(&self, samples: &[Sample], _time_win: &Option<TimeWindow>) -> Option<f64> {
         if samples.len() < 2 {
             return None;
         }

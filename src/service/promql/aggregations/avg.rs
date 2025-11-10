@@ -135,7 +135,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test avg without label grouping - all samples should be averaged together
-        let result = avg_range(&None, data.clone(), &eval_ctx).unwrap();
+        let result = avg(&None, data.clone(), &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {

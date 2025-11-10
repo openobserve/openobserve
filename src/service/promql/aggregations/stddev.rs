@@ -140,7 +140,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test stddev without label grouping - should return standard deviation
-        let result = stddev_range(&None, data.clone(), &eval_ctx).unwrap();
+        let result = stddev(&None, data.clone(), &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {

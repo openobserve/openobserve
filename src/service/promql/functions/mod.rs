@@ -22,7 +22,7 @@ use strum::EnumString;
 
 use crate::service::promql::{
     micros,
-    value::{EvalContext, Labels, LabelsExt, RangeValue, Sample, TimeWindow, Value},
+    value::{EvalContext, LabelsExt, RangeValue, Sample, TimeWindow, Value},
 };
 
 mod absent;
@@ -149,12 +149,7 @@ pub static KEEP_METRIC_NAME_FUNC: Lazy<HashSet<&str>> =
 pub trait RangeFunc: Sync {
     fn name(&self) -> &'static str;
 
-    fn exec(
-        &self,
-        labels: &Labels,
-        samples: &[Sample],
-        time_win: &Option<TimeWindow>,
-    ) -> Option<f64>;
+    fn exec(&self, samples: &[Sample], time_win: &Option<TimeWindow>) -> Option<f64>;
 }
 
 /// Enhanced version that processes all timestamps at once for range queries
@@ -248,7 +243,6 @@ where
                         }
 
                         if let Some(value) = func.exec(
-                            &labels,
                             window_samples,
                             &Some(TimeWindow {
                                 eval_ts,

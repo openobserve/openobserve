@@ -18,7 +18,7 @@ use datafusion::error::Result;
 use crate::service::promql::{
     common::calculate_trend,
     functions::RangeFunc,
-    value::{EvalContext, Labels, Sample, TimeWindow, Value},
+    value::{EvalContext, Sample, TimeWindow, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#holt_winters
@@ -66,12 +66,7 @@ impl RangeFunc for HoltWintersFunc {
         "holt_winters"
     }
 
-    fn exec(
-        &self,
-        _labels: &Labels,
-        samples: &[Sample],
-        _time_win: &Option<TimeWindow>,
-    ) -> Option<f64> {
+    fn exec(&self, samples: &[Sample], _time_win: &Option<TimeWindow>) -> Option<f64> {
         holt_winters_calculation(samples, self.scaling_factor, self.trend_factor)
     }
 }

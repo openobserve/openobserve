@@ -193,7 +193,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test bottomk(2) without label grouping - should return 2 lowest values
-        let result = bottomk_range(2, &None, data.clone(), &eval_ctx).unwrap();
+        let result = bottomk(2, &None, data.clone(), &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {
@@ -223,7 +223,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test bottomk(2) with empty input
-        let result = bottomk_range(2, &None, data, &eval_ctx).unwrap();
+        let result = bottomk(2, &None, data, &eval_ctx).unwrap();
 
         match result {
             Value::None => {
@@ -249,7 +249,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test bottomk(0) - should return None
-        let result = bottomk_range(0, &None, data, &eval_ctx).unwrap();
+        let result = bottomk(0, &None, data, &eval_ctx).unwrap();
 
         match result {
             Value::None => {
