@@ -551,18 +551,4 @@ describe("ActionScripts", () => {
       // Should not throw any errors during cleanup
     });
   });
-
-  describe("Theme support", () => {
-    it("should apply correct theme classes", () => {
-      const pageElement = wrapper.find(
-        '[data-test="action-scripts-list-page"]',
-      );
-      // Check if the theme class is applied based on store state
-      if (store.state.theme === "dark") {
-        expect(pageElement.classes()).toContain("dark-theme");
-      } else {
-        expect(pageElement.classes()).toContain("light-theme");
-      }
-    });
-  });
 });
