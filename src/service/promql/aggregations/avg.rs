@@ -38,7 +38,7 @@ pub fn avg_range(
         eval_ctx.trace_id,
     );
 
-    let result = super::eval_arithmetic_range(param, data, Avg, eval_ctx);
+    let result = super::eval_aggregate(param, data, Avg, eval_ctx);
     log::info!(
         "[trace_id: {}] [PromQL Timing] avg_range() execution took: {:?}",
         eval_ctx.trace_id,

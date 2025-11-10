@@ -56,7 +56,7 @@ pub fn quantile_range(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result
         return Ok(Value::Matrix(vec![range_value]));
     }
 
-    let result = super::eval_arithmetic_range(&None, data, Quantile { qtile }, eval_ctx);
+    let result = super::eval_aggregate(&None, data, Quantile { qtile }, eval_ctx);
     log::info!(
         "[trace_id: {}] [PromQL Timing] quantile_range({qtile}) execution took: {:?}",
         eval_ctx.trace_id,

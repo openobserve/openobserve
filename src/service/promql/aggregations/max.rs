@@ -38,7 +38,7 @@ pub fn max_range(
         eval_ctx.trace_id,
     );
 
-    let result = super::eval_arithmetic_range(param, data, Max, eval_ctx);
+    let result = super::eval_aggregate(param, data, Max, eval_ctx);
     log::info!(
         "[trace_id: {}] [PromQL Timing] max_range() execution took: {:?}",
         eval_ctx.trace_id,

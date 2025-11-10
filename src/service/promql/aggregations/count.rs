@@ -38,7 +38,7 @@ pub fn count_range(
         eval_ctx.trace_id,
     );
 
-    let result = super::eval_arithmetic_range(param, data, Count, eval_ctx);
+    let result = super::eval_aggregate(param, data, Count, eval_ctx);
     log::info!(
         "[trace_id: {}] [PromQL Timing] count_range() execution took: {:?}",
         eval_ctx.trace_id,

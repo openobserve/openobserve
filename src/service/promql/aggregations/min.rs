@@ -38,7 +38,7 @@ pub fn min_range(
         eval_ctx.trace_id
     );
 
-    let result = super::eval_arithmetic_range(param, data, Min, eval_ctx);
+    let result = super::eval_aggregate(param, data, Min, eval_ctx);
     log::info!(
         "[trace_id: {}] [PromQL Timing] min_range() execution took: {:?}",
         eval_ctx.trace_id,

@@ -38,7 +38,7 @@ pub fn sum_range(
         eval_ctx.trace_id
     );
 
-    let result = super::eval_arithmetic_range(param, data, Sum, eval_ctx);
+    let result = super::eval_aggregate(param, data, Sum, eval_ctx);
     log::info!(
         "[trace_id: {}] [PromQL Timing] sum_range() execution took: {:?}",
         eval_ctx.trace_id,

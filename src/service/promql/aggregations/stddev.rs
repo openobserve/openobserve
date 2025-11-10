@@ -39,7 +39,7 @@ pub fn stddev_range(
         eval_ctx.trace_id,
     );
 
-    let result = super::eval_arithmetic_range(param, data, Stddev, eval_ctx);
+    let result = super::eval_aggregate(param, data, Stddev, eval_ctx);
     log::info!(
         "[trace_id: {}] [PromQL Timing] stddev_range() execution took: {:?}",
         eval_ctx.trace_id,

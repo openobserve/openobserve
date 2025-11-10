@@ -39,7 +39,7 @@ pub fn group_range(
         eval_ctx.trace_id,
     );
 
-    let result = super::eval_arithmetic_range(param, data, Group, eval_ctx);
+    let result = super::eval_aggregate(param, data, Group, eval_ctx);
     log::info!(
         "[trace_id: {}] [PromQL Timing] group_range() execution took: {:?}",
         eval_ctx.trace_id,
