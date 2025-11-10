@@ -832,6 +832,24 @@ pub static NODE_MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static NODE_DISK_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_disk_total", "Total disk space")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static NODE_DISK_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_disk_usage", "Disk usage")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
 pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("node_tcp_connections", "TCP connections")
@@ -1349,6 +1367,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_MEMORY_USAGE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_DISK_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_DISK_USAGE.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_TCP_CONNECTIONS.clone()))

@@ -117,6 +117,8 @@ pub enum Error {
     MemoryTableOverflowError {},
     #[snafu(display("MemoryCircuitBreakerError"))]
     MemoryCircuitBreakerError {},
+    #[snafu(display("DiskCircuitBreakerError"))]
+    DiskCircuitBreakerError {},
     ExternalError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },

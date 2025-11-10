@@ -90,6 +90,42 @@ pub fn check_memory_circuit_breaker() -> Result<()> {
     }
 }
 
+// check disk space availability
+// Threshold interpretation (similar to memory circuit breaker):
+// - Values < 100: treated as percentage of disk used (e.g., 90 = trigger when 90% full)
+// - Values >= 100: treated as absolute MB remaining (e.g., 500 = trigger when < 500MB free)
+// Reads from atomic metrics updated every 60 seconds to avoid expensive syscalls
+pub fn check_disk_circuit_breaker() -> Result<()> {
+    let cfg = get_config();
+    if !cfg.common.disk_circuit_breaker_enabled {
+        return Ok(());
+    }
+
+    let threshold = cfg.common.disk_circuit_breaker_threshold;
+    let total_space = metrics::NODE_DISK_TOTAL
+        .with_label_values::<&str>(&[])
+        .get() as u64;
+    let used_space = metrics::NODE_DISK_USAGE
+        .with_label_values::<&str>(&[])
+        .get() as u64;
+
+    let triggered = if threshold < 100 {
+        // Percentage mode: trigger when disk usage exceeds threshold%
+        // e.g., threshold=90 means trigger when disk is >90% full
+        used_space > total_space / 100 * threshold as u64
+    } else {
+        // Absolute MB mode: trigger when free space is less than threshold MB
+        let available_space = total_space.saturating_sub(used_space);
+        available_space < (threshold as u64) * 1024 * 1024
+    };
+
+    if triggered {
+        Err(Error::DiskCircuitBreakerError {})
+    } else {
+        Ok(())
+    }
+}
+
 fn get_table_idx(thread_id: usize, org_id: &str, stream_name: &str) -> usize {
     if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
         *idx
