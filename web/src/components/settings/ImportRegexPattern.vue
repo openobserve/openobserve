@@ -642,7 +642,7 @@ export default defineComponent({
           if (errorMessage.includes("already exists")) {
             q.notify({
               message: `Pattern "${jsonObj.name}" already exists. Please use a different name.`,
-              color: "warning",
+              color: "negative",
               position: "bottom",
               timeout: 4000,
             });
