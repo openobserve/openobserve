@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-py-[0.375rem] tw-shrink-0 tw-bg-[var(--o2-hover-accent)]" data-test="pattern-statistics">
-    <div class="row q-col-gutter-md !tw-ml-0">
+  <div class="tw-py-[0.375rem] tw-shrink-0 tw-bg-[var(--o2-bg-gray)]" data-test="pattern-statistics">
+    <div class="row q-col-gutter-md !tw-mx-[0.375rem]">
       <!-- Logs Analyzed Card -->
       <div class="col-3 !tw-pl-0">
         <q-card
           flat
-          :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
+          class="tw-bg-[var(--o2-card-bg)]"
           data-test="pattern-stats-logs-analyzed-card"
         >
           <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="col-3 !tw-pl-[0.375rem]">
         <q-card
           flat
-          :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
+          class="tw-bg-[var(--o2-card-bg)]"
           data-test="pattern-stats-patterns-found-card"
         >
           <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="col-3 !tw-pl-[0.375rem]">
         <q-card
           flat
-          :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
+          class="tw-bg-[var(--o2-card-bg)]"
           data-test="pattern-stats-coverage-card"
         >
           <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="col-3 !tw-pl-[0.375rem]">
         <q-card
           flat
-          :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-white'"
+          class="tw-bg-[var(--o2-card-bg)]"
           data-test="pattern-stats-processing-time-card"
         >
           <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">

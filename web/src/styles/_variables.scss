@@ -311,7 +311,10 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-destructive-foreground: #{$o2-gray-100}; // Text on destructive buttons
   --o2-focus-ring: #{$o2-iris-1200};        // Focus state indicator
   --o2-hover-shadow: #dddddd;
-  --o2-hover-gray: color-mix(in srgb, #{$theme-color} 5%, rgb(247, 247, 247));
+
+  --o2-hover-gray: color-mix(in srgb, #{$theme-color} 2%, rgb(244, 244, 244));
+
+  --o2-bg-gray: color-mix(in srgb, #{$theme-color} 10%, rgb(237, 237, 237));
 
 
   --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
@@ -395,11 +398,13 @@ $json-object-dark: #D1D5DB;         // Light gray
   // Interactive Elements
   --o2-primary-color: #{$o2-dark-iris-1000};  // Primary actions
   --o2-primary-foreground: #{$o2-dark-gray-100}; // Text on primary
-  --o2-hover-accent: color-mix(in srgb, #{$theme-color} 25%, rgb(0, 0, 0));   // Hover accents
+  --o2-hover-accent: color-mix(in srgb, #{$theme-color} 20%, rgb(39, 39, 39));   // Hover accents
   --o2-destructive-foreground: #{$o2-dark-gray-100}; // Destructive text
   --o2-focus-ring: #{$o2-dark-iris-600};      // Focus indicators
   --o2-hover-shadow: rgba(0, 0, 0, 0.6);
-  --o2-hover-gray: color-mix(in srgb, #{$theme-color} 20%, rgb(39, 39, 39));
+  --o2-hover-gray: color-mix(in srgb, #{$theme-color} 8%, rgb(38, 38, 38));
+
+  --o2-bg-gray: color-mix(in srgb, #{$theme-color} 5%, rgb(42, 42, 42));
 
   --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
   --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
