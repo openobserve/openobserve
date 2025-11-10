@@ -228,7 +228,7 @@ async fn recursive_process_multiple_metas(
                     )
                 };
                 log::info!(
-                    "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} , len {}",
+                    "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {}, len {}",
                     query_key,
                     matching_cache_meta.start_time,
                     matching_cache_meta.end_time,

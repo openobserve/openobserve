@@ -877,7 +877,7 @@ pub async fn filter_file_list_by_tantivy_index(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} , is_add_filter_back: {}, file_num: {}, took: {} ms",
+                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {}, is_add_filter_back: {}, file_num: {}, took: {} ms",
                 query.trace_id,
                 index_condition,
                 tantivy_result,
@@ -891,7 +891,7 @@ pub async fn filter_file_list_by_tantivy_index(
                 .search_role("follower".to_string())
                 .duration(search_start.elapsed().as_millis() as usize)
                 .desc(format!(
-                    "found {} , is_add_filter_back: {}, file_num: {}",
+                    "found {}, is_add_filter_back: {}, file_num: {}",
                     tantivy_result,
                     is_add_filter_back,
                     file_list_map.len(),

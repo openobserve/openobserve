@@ -20,6 +20,10 @@ where
     if v == Default::default() { def } else { v }
 }
 
+pub fn is_power_of_two(n: u64) -> bool {
+    n == 0 || (n & (n - 1)) == 0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -33,5 +37,18 @@ mod tests {
         assert_eq!(zero_or(2.1, 1.1), 2.1);
         assert_eq!(zero_or("", "v"), "v");
         assert_eq!(zero_or("vv", "v"), "vv");
+    }
+
+    #[test]
+    fn test_is_power_of_two() {
+        assert!(is_power_of_two(0));
+        assert!(is_power_of_two(1));
+        assert!(is_power_of_two(2));
+        assert!(!is_power_of_two(3));
+        assert!(is_power_of_two(4));
+        assert!(!is_power_of_two(5));
+        assert!(!is_power_of_two(6));
+        assert!(!is_power_of_two(7));
+        assert!(is_power_of_two(8));
     }
 }
