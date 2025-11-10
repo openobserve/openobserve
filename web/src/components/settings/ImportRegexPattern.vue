@@ -636,9 +636,29 @@ export default defineComponent({
           });
           return true;
       } catch (error: any) {
+          const errorMessage = error?.response?.data?.message || "Unknown Error";
+
+          // Check if it's a duplicate pattern error
+          if (errorMessage.includes("already exists")) {
+            q.notify({
+              message: `Pattern "${jsonObj.name}" already exists. Please use a different name.`,
+              color: "negative",
+              position: "bottom",
+              timeout: 4000,
+            });
+          } else {
+            // Show generic error notification for other errors
+            q.notify({
+              message: `Failed to import pattern "${jsonObj.name}": ${errorMessage}`,
+              color: "negative",
+              position: "bottom",
+              timeout: 4000,
+            });
+          }
+
           regexPatternCreators.value.push({
               success: false,
-              message: `Regex pattern - ${index}: "${jsonObj.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
+              message: `Regex pattern - ${index}: "${jsonObj.name}" creation failed --> \n Reason: ${errorMessage}`,
           });
           return false;
       }
