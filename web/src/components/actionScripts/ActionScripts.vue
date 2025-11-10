@@ -650,6 +650,7 @@ export default defineComponent({
       templates,
       visibleRows,
       hasVisibleRows,
+      getAlertByName,
     };
   },
 });
