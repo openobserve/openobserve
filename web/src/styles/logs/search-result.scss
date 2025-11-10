@@ -260,3 +260,13 @@
     }
   }
 }
+
+// Pattern block actions - show on hover
+.pattern-block-actions {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.q-card:hover .pattern-block-actions {
+  opacity: 1;
+}
