@@ -483,6 +483,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(dashboards::reports::update_report)
         .service(dashboards::reports::get_report)
         .service(dashboards::reports::list_reports)
+        .service(dashboards::reports::delete_report_bulk)
         .service(dashboards::reports::delete_report)
         .service(dashboards::reports::enable_report)
         .service(dashboards::reports::trigger_report)

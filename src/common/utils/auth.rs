@@ -720,7 +720,8 @@ impl FromRequest for AuthExtractor {
                         || path.contains("/roles/bulk")
                         || path.contains("/service_accounts/bulk")
                         || path.contains("/functions/bulk")
-                        || path.contains("/users/bulk"));
+                        || path.contains("/users/bulk")
+                        || path.contains("/reports/bulk"));
 
                 if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
                     || (method.eq("POST")

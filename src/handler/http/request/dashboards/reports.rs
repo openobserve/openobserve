@@ -17,10 +17,14 @@ use std::{collections::HashMap, io::Error};
 
 use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 use config::meta::{
-    dashboards::reports::{Report, ReportListFilters},
+    dashboards::reports::{
+        Report, ReportBulkDeleteRequest, ReportBulkDeleteResponse, ReportListFilters,
+    },
     triggers::{Trigger, TriggerModule},
 };
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
@@ -328,6 +332,76 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
             e => Ok(MetaHttpResponse::internal_error(e)),
         },
     }
+}
+
+/// DeleteReportBulk
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "DeleteReportBulk",
+    summary = "Delete multiple dashboard reports",
+    description = "Removes multiple dashboard reports configuration from the organization. This action cancels any scheduled \
+                   report deliveries and permanently removes the report configuration. Recipients will no longer receive \
+                   automated report deliveries, and the report configuration cannot be recovered once deleted.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(
+        content = ReportBulkDeleteRequest,
+        description = "Reports to delete",
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Success", body = ReportBulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"}))
+    )
+)]
+#[delete("/{org_id}/reports/bulk")]
+async fn delete_report_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<ReportBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let _user_id = user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
+        if let Some(res) =
+            check_resource_permissions(&org_id, &_user_id, "reports", id, "DELETE").await
+        {
+            return Ok(res);
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for name in req.ids {
+        match reports::delete(&org_id, &name).await {
+            Ok(_) => successful.push(name),
+            Err(e) => match e {
+                ReportError::ReportNotFound => successful.push(name),
+                e => {
+                    log::error!("error in deleting report {org_id}/{name} : {e}");
+                    unsuccessful.push(name);
+                    err = Some(e.to_string());
+                }
+            },
+        }
+    }
+    Ok(MetaHttpResponse::json(ReportBulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }
 
 /// EnableReport
