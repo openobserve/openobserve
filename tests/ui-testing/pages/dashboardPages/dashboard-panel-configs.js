@@ -397,4 +397,85 @@ export default class DashboardPanelConfigs {
     return isChecked;
   }
 
+  // Configure drill-down feature for dashboard panels
+  // Options: type ('logs', 'dashboard', 'url'), mode ('auto', 'custom'), customQuery (string), openInNewTab (boolean)
+  // Example: configureDrillDown({ type: 'logs', mode: 'auto', openInNewTab: true })
+  async configureDrillDown({ type = 'logs', mode = 'auto', customQuery = '', openInNewTab = true }) {
+    // Click the add drill-down button
+    await this.page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]')
+      .waitFor({ state: "visible" });
+    await this.page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').click();
+
+    // Select drill-down type
+    switch (type.toLowerCase()) {
+      case 'dashboard':
+        await this.page.locator('[data-test="dashboard-drilldown-by-dashboard-btn"]').click();
+        break;
+      case 'url':
+        await this.page.locator('[data-test="dashboard-drilldown-by-url-btn"]').click();
+        break;
+      case 'logs':
+      default:
+        await this.page.locator('[data-test="dashboard-drilldown-by-logs-btn"]').click();
+
+        // Handle logs-specific configuration
+        const popup = this.page.locator('[data-test="dashboard-drilldown-popup"]');
+        await popup.waitFor({ state: "visible" });
+
+        // Select mode (Auto or Custom)
+        if (mode.toLowerCase() === 'custom') {
+          await popup.getByRole('button', { name: 'Custom' }).click();
+
+          // If custom query is provided, enter it
+          if (customQuery) {
+            await this.page.locator('#alerts-query-editor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line')
+              .click();
+            await this.page.locator('[data-test="scheduled-alert-sql-editor"]')
+              .getByRole('textbox', { name: 'Editor content;Press Alt+F1' })
+              .fill(customQuery);
+          }
+
+          // Select new tab option for custom mode
+          if (openInNewTab) {
+            await this.page.locator('[data-test="dashboard-drilldown-open-in-new-tab"] div').first().click();
+          }
+        } else {
+          // Auto mode
+          await popup.getByRole('button', { name: 'Auto' }).click();
+
+          // Select new tab option for auto mode
+          if (openInNewTab) {
+            await this.page.locator('[data-test="dashboard-drilldown-open-in-new-tab"] div').nth(2).click();
+          }
+        }
+        break;
+    }
+
+    // Click confirm button to save drill-down configuration
+    await this.page.locator('[data-test="confirm-button"]').click();
+  }
+
+  // Click on a chart point and handle drill-down link opening in new tab
+  // Returns the new page object for the opened tab
+  // Example: const newPage = await clickChartPointAndOpenDrillDown('.chart-container', '[data-test="drilldown-link"]')
+  async clickChartPointAndOpenDrillDown(chartSelector, drillDownLinkSelector) {
+    // Click on chart point
+    await this.page.locator(chartSelector).waitFor({ state: "visible" });
+    await this.page.locator(chartSelector).click();
+
+    // Wait for drill-down link to appear
+    await this.page.locator(drillDownLinkSelector).waitFor({ state: "visible" });
+
+    // Listen for new page and click the drill-down link
+    const [newPage] = await Promise.all([
+      this.page.context().waitForEvent('page'),
+      this.page.locator(drillDownLinkSelector).click()
+    ]);
+
+    // Wait for the new page to load
+    await newPage.waitForLoadState('domcontentloaded');
+
+    return newPage;
+  }
+
 }
