@@ -172,7 +172,7 @@ pub async fn get_pipeline_history(
 
         let user_id = &user_email.user_id;
         if is_root_user(user_id) {
-            Ok(None)
+            None
         }
         // If RBAC is enabled, check permissions
         else if get_openfga_config().enabled {
@@ -210,7 +210,7 @@ pub async fn get_pipeline_history(
                 }
 
                 // Means the user has the permission
-                Ok::<Option<Vec<String>>, Error>(None)
+                None
             } else {
                 // List all history - filter by accessible pipelines
                 let pipeline_object_type = OFGA_MODELS
@@ -223,7 +223,7 @@ pub async fn get_pipeline_history(
                         let all_pipelines_key = format!("{pipeline_object_type}:_all_{org_id}");
                         if permitted.contains(&all_pipelines_key) {
                             // User has access to all pipelines
-                            Ok(None)
+                            None
                         } else if permitted.is_empty() {
                             // User has no access to any pipelines, return empty result
                             return MetaHttpResponse::json(PipelineHistoryResponse {
@@ -264,12 +264,12 @@ pub async fn get_pipeline_history(
                                 });
                             }
 
-                            Ok(Some(filtered_pipelines))
+                            Some(filtered_pipelines)
                         }
                     }
                     Ok(None) => {
                         // RBAC is disabled or user is root - allow access to all pipelines
-                        Ok(None)
+                        None
                     }
                     Err(e) => {
                         return MetaHttpResponse::forbidden(e.to_string());
@@ -278,7 +278,7 @@ pub async fn get_pipeline_history(
             }
         } else {
             // RBAC disabled, allow all pipelines
-            Ok(None)
+            None
         }
     };
 

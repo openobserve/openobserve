@@ -161,7 +161,7 @@ pub async fn get_alert_history(
     }
 
     // If alert_id filter is provided, validate it exists
-    if let Some(ref alert_id) = query.alert_id {
+    let folder_id = if let Some(ref alert_id) = query.alert_id {
         // Try to parse the alert_id as Ksuid
         match svix_ksuid::Ksuid::from_str(alert_id) {
             Ok(ksuid) => {
@@ -169,10 +169,13 @@ pub async fn get_alert_history(
                 let conn = infra::db::ORM_CLIENT
                     .get_or_init(infra::db::connect_to_orm)
                     .await;
-                if get_by_id(conn, &org_id, ksuid).await.is_err() {
-                    return MetaHttpResponse::not_found(format!(
-                        "Alert '{alert_id}' not found in organization"
-                    ));
+                match get_by_id(conn, &org_id, ksuid).await {
+                    Ok((f, _)) => Some(f.folder_id),
+                    Err(_) => {
+                        return MetaHttpResponse::not_found(format!(
+                            "Alert '{alert_id}' not found in organization"
+                        ));
+                    }
                 }
             }
             Err(_) => {
@@ -181,7 +184,9 @@ pub async fn get_alert_history(
                 ));
             }
         }
-    }
+    } else {
+        None
+    };
 
     // RBAC: Check permissions and filter by accessible alerts
     #[cfg(not(feature = "enterprise"))]
@@ -193,7 +198,7 @@ pub async fn get_alert_history(
         let user_id = &user_email.user_id;
         use crate::common::utils::auth::is_root_user;
         if is_root_user(user_id) {
-            Ok(None)
+            None
         }
         // If RBAC is enabled, check permissions
         else if get_openfga_config().enabled {
@@ -208,11 +213,11 @@ pub async fn get_alert_history(
 
             // If specific alert_name is requested, check access to it
             if let Some(ref alert_id) = query.alert_id {
-                let folder_id = query.folder_id.unwrap_or_default();
+                let folder_id = folder_id.unwrap_or_default();
                 let alert_obj = format!("{}:{}", OFGA_MODELS.get("alerts").unwrap().key, alert_id);
 
                 let has_permission = o2_openfga::authorizer::authz::is_allowed(
-                    &org_id, user_id, "GET", &alert_obj, "", &role,
+                    &org_id, user_id, "GET", &alert_obj, &folder_id, &role,
                 )
                 .await;
 
@@ -223,7 +228,7 @@ pub async fn get_alert_history(
                 }
 
                 // Means the user has the permission
-                Ok::<Option<Vec<String>>, Error>(None)
+                None
             } else {
                 // List all history - filter by accessible alerts
                 let alert_object_type = OFGA_MODELS
@@ -236,7 +241,7 @@ pub async fn get_alert_history(
                         let all_alerts_key = format!("{alert_object_type}:_all_{org_id}");
                         if permitted.contains(&all_alerts_key) {
                             // User has access to all alerts
-                            Ok(None)
+                            None
                         } else if permitted.is_empty() {
                             // User has no access to any alerts, return empty result
                             return MetaHttpResponse::json(AlertHistoryResponse {
@@ -260,29 +265,12 @@ pub async fn get_alert_history(
                                 })
                                 .collect();
 
-                            // Filter alert_ids to only include permitted ones
-                            let filtered_alerts: Vec<String> = alert_ids
-                                .iter()
-                                .filter(|id| permitted_alert_ids.contains(id))
-                                .cloned()
-                                .collect();
-
-                            if filtered_alerts.is_empty() {
-                                // After filtering, user has no access to any existing alerts
-                                return MetaHttpResponse::json(AlertHistoryResponse {
-                                    total: 0,
-                                    from,
-                                    size,
-                                    hits: vec![],
-                                });
-                            }
-
-                            Ok(Some(filtered_alerts))
+                            Some(permitted_alert_ids)
                         }
                     }
                     Ok(None) => {
                         // RBAC is disabled or user is root - allow access to all alerts
-                        Ok(None)
+                        None
                     }
                     Err(e) => {
                         return MetaHttpResponse::forbidden(e.to_string());
@@ -291,7 +279,7 @@ pub async fn get_alert_history(
             }
         } else {
             // RBAC disabled, allow all alerts
-            Ok(None)
+            None
         }
     };
 
