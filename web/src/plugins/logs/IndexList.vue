@@ -930,6 +930,11 @@ export default defineComponent({
       };
     }> = ref({});
 
+    const pagination = ref({
+      page: 1,
+      rowsPerPage: 25,
+    });
+
     const streamTypes = [
       { label: t("search.logs"), value: "logs" },
       { label: t("search.enrichmentTables"), value: "enrichment_tables" },
@@ -982,6 +987,7 @@ export default defineComponent({
     watch(
       () => searchObj.meta.quickMode,
       (isActive) => {
+
         if (isActive) {
           // check if its present in the array dont add it again
           if (
@@ -995,7 +1001,6 @@ export default defineComponent({
               slot: "interesting_fields_slot",
             });
           }
-
           setDefaultFieldTab();
         } else {
           userDefinedSchemaBtnGroupOption.value =
@@ -1004,6 +1009,8 @@ export default defineComponent({
             );
 
           if (searchObj.meta.useUserDefinedSchemas === "interesting_fields") {
+            // As we are changing the tab reset the pagination
+            if (pagination.value) resetPagination();
             searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
           }
           showOnlyInterestingFields.value = false;
@@ -1062,9 +1069,13 @@ export default defineComponent({
     // store.state.zoConfig.interesting_field_enabled was set as interesting fields was getting set by default with _timestamp field
     function setDefaultFieldTab() {
       if (store.state.zoConfig.log_page_default_field_list === "uds") {
+        // reset pagination only if tab has changed
+        if(searchObj.meta.useUserDefinedSchemas !== 'user_defined_schema') resetPagination();
         searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
         showOnlyInterestingFields.value = false;
       } else {
+        // reset pagination only if tab has changed
+        if(searchObj.meta.useUserDefinedSchemas !== 'interesting_fields') resetPagination();
         searchObj.meta.useUserDefinedSchemas = "interesting_fields";
         showOnlyInterestingFields.value = true;
       }
@@ -1603,14 +1614,10 @@ export default defineComponent({
         ] + 1;
     };
 
-    const pagination = ref({
-      page: 1,
-      rowsPerPage: 25,
-    });
 
     const toggleSchema = async () => {
       // Reset pagination to page 1 before resetting fields
-      pagination.value.page = 1;
+      resetPagination();
 
       const isInterestingFields =
         searchObj.meta.useUserDefinedSchemas === "interesting_fields";
@@ -1622,13 +1629,17 @@ export default defineComponent({
       }
 
       await resetFields();
+      
     };
 
     const toggleInterestingFields = () => {
       // Reset pagination to page 1 before resetting fields
-      pagination.value.page = 1;
-
+      resetPagination();
       resetFields();
+    };
+
+    const resetPagination = () => {
+      pagination.value.page = 1;
     };
 
     const hasUserDefinedSchemas = () => {
