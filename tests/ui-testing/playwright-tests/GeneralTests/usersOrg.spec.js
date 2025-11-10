@@ -246,7 +246,7 @@ test.describe("Users and Organizations", () => {
         testLogger.info('Test completed successfully');
     });
 
-    test.skip('Add Organization Successfully', async ({ page }, testInfo) => {
+    test('Add Organization Successfully', async ({ page }, testInfo) => {
         const uniqueOrgName = `Org${Date.now()}_${Math.floor(Math.random() * 10000)}`;
         testLogger.testStart(testInfo.title, testInfo.file);
         

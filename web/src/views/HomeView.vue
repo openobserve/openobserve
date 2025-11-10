@@ -39,7 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="arrow_forward" class="view-arrow-icon" />
                 <router-link
                   exact
-                  :to="{ name: 'logstreams' }"
+                  :to="{
+                    name: 'logstreams',
+                    query: { org_identifier: store.state.selectedOrganization?.identifier }
+                  }"
                   class="absolute full-width full-height"
                   aria-label="Navigate to streams page"
                 ></router-link>
@@ -214,21 +217,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Functions count statistics">
               <div class="column justify-between">
-                <div class="row justify-between tw-items-center">
-                  <div class="row tw-items-center tw-gap-5">
-                    <div class="tile-icon icon-bg-orange" aria-hidden="true">
-                      <img :src="functionsIcon" alt="" />
-                    </div>
-                    <div class="tile-title">{{ t("home.functionTitle") }}</div>
+                <div class="row tw-items-center tw-gap-2 tw-flex-nowrap full-width">
+                  <div class="tile-icon icon-bg-orange tw-flex-shrink-0" aria-hidden="true">
+                    <img :src="functionsIcon" alt="" />
                   </div>
+                  <div class="tile-title tw-flex-1 tw-text-left tw-whitespace-nowrap tw-overflow-hidden tw-text-ellipsis">{{ t("home.functionTitle") }}</div>
                   <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                   aria-label="View all functions"
+                  class="tw-flex-shrink-0"
                   >
                       <q-tooltip>View</q-tooltip>
                       <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
                       exact
-                      :to="{ name: 'functionList' }"
+                      :to="{
+                        name: 'functionList',
+                        query: { org_identifier: store.state.selectedOrganization?.identifier }
+                      }"
                       class="absolute full-width full-height"
                       aria-label="Navigate to functions page"
                     ></router-link>
@@ -248,21 +253,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Dashboards count statistics">
               <div class="column justify-between">
-                <div class="row justify-between tw-items-center">
-                  <div class="row tw-items-center tw-gap-1">
-                    <div class="tile-icon icon-bg-orange" aria-hidden="true">
-                      <img :src="dashboardsIcon" alt="" />
-                    </div>
-                    <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
+                <div class="row tw-items-center tw-gap-2 tw-flex-nowrap full-width">
+                  <div class="tile-icon icon-bg-orange tw-flex-shrink-0" aria-hidden="true">
+                    <img :src="dashboardsIcon" alt="" />
                   </div>
+                  <div class="tile-title tw-flex-1 tw-text-left tw-whitespace-nowrap tw-overflow-hidden tw-text-ellipsis">{{ t("home.dashboardTitle") }}</div>
                   <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                   aria-label="View all dashboards"
+                  class="tw-flex-shrink-0"
                   >
                   <q-tooltip>View</q-tooltip>
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
                       exact
-                      :to="{ name: 'dashboards' }"
+                      :to="{
+                        name: 'dashboards',
+                        query: { org_identifier: store.state.selectedOrganization?.identifier }
+                      }"
                       class="absolute full-width full-height"
                       aria-label="Navigate to dashboards page"
                     ></router-link>
@@ -295,7 +302,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
-                    :to="{ name: 'alertList' }"
+                    :to="{
+                      name: 'alertList',
+                      query: { org_identifier: store.state.selectedOrganization?.identifier }
+                    }"
                     class="absolute full-width full-height"
                     aria-label="Navigate to alerts page"
                   ></router-link>
@@ -340,7 +350,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
-                    :to="{ name: 'pipelines' }"
+                    :to="{
+                      name: 'pipelines',
+                      query: { org_identifier: store.state.selectedOrganization?.identifier }
+                    }"
                     class="absolute full-width full-height"
                     aria-label="Navigate to pipelines page"
                   ></router-link>
@@ -1235,6 +1248,11 @@ export default defineComponent({
   flex: 1;
   display: flex;
   min-width: 0;
+  width: 100%;
+
+  .feature-card {
+    width: 100%;
+  }
 }
 
 // .functions-tile-content,

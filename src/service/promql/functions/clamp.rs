@@ -15,7 +15,7 @@
 
 use datafusion::error::{DataFusionError, Result};
 
-use crate::service::promql::value::{InstantValue, Sample, Value};
+use crate::service::promql::value::{InstantValue, LabelsExt, Sample, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#clamp
 pub(crate) fn clamp(data: Value, min: f64, max: f64) -> Result<Value> {
@@ -33,8 +33,9 @@ pub(crate) fn clamp(data: Value, min: f64, max: f64) -> Result<Value> {
         .into_iter()
         .map(|mut instant| {
             let value = instant.sample.value.clamp(min, max);
+            let labels = std::mem::take(&mut instant.labels);
             InstantValue {
-                labels: std::mem::take(&mut instant.labels),
+                labels: labels.without_metric_name(),
                 sample: Sample::new(instant.sample.timestamp, value),
             }
         })

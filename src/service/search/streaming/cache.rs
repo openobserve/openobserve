@@ -39,6 +39,7 @@ pub async fn write_results_to_cache(
     start_time: i64,
     end_time: i64,
     accumulated_results: &mut Vec<SearchResultType>,
+    clear_cache: bool,
 ) -> Result<(), infra::errors::Error> {
     if accumulated_results.is_empty() {
         return Ok(());
@@ -98,6 +99,7 @@ pub async fn write_results_to_cache(
             c_resp.file_path.clone(),
             c_resp.is_aggregate,
             c_resp.is_descending,
+            clear_cache,
             is_histogram_non_ts_order,
         )
         .await;
@@ -472,6 +474,7 @@ pub async fn write_partial_results_to_cache(
     start_time: i64,
     end_time: i64,
     accumulated_results: &mut Vec<SearchResultType>,
+    clear_cache: bool,
 ) {
     // TEMPORARY: disable writing partial cache
     return;
@@ -484,7 +487,15 @@ pub async fn write_partial_results_to_cache(
                 "[HTTP2_STREAM trace_id {trace_id}] Search cancelled, writing results to cache",
             );
             // write the result to cache
-            match write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await {
+            match write_results_to_cache(
+                c_resp,
+                start_time,
+                end_time,
+                accumulated_results,
+                clear_cache,
+            )
+            .await
+            {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!(

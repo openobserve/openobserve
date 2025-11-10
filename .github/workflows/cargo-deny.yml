@@ -7,6 +7,10 @@ on:
       - "deny.toml"
       - ".github/workflows/cargo-deny.yml" # run when this file changes, so we know nothing is broken
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubicloud-standard-8

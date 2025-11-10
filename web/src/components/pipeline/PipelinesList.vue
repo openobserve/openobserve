@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-input>
                 <q-btn
                     data-test="pipeline-list-history-btn"
-                    class="q-ml-md o2-secondary-button tw-h-[36px]"
+                    class="q-ml-sm o2-secondary-button tw-h-[36px]"
                     :class="
                         store.state.theme === 'dark'
                         ? 'o2-secondary-button-dark'
@@ -208,6 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         round
                         flat
+                        color="negative"
                          icon="error"
                         @click.stop="showErrorDialog(props.row)"
                       >
@@ -1191,7 +1192,6 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
 }
 
 .pipeline-error-indicator {
-  color: #ef4444 !important;
   cursor: pointer !important;
 
   &:hover {

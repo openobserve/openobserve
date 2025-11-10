@@ -1,0 +1,34 @@
+name: Log FEAT/PERF Merges to Google Sheet
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  log_to_sheet:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title
+        id: check_title
+        run: |
+          title="${{ github.event.pull_request.title }}"
+          if [[ "$title" =~ ^(FEAT|PERF|feat|perf): ]]; then
+            echo "match=true" >> $GITHUB_OUTPUT
+          else
+            echo "match=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Log to Google Sheet
+        if: steps.check_title.outputs.match == 'true'
+        env:
+          PR_LOG_SHEET_WEBHOOK_URL: ${{ secrets.PR_LOG_SHEET_WEBHOOK_URL }}
+        run: |
+          curl -X POST -H 'Content-Type: application/json' \
+          -d '{
+            "title": "${{ github.event.pull_request.title }}",
+            "author": "${{ github.event.pull_request.user.login }}",
+            "url": "${{ github.event.pull_request.html_url }}",
+            "branch": "${{ github.event.pull_request.base.ref }}"
+          }' \
+          $PR_LOG_SHEET_WEBHOOK_URL

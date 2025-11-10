@@ -183,83 +183,89 @@ class="warning" />{{
                 self="top middle"
                 class="organization-menu-o2"
               >
-                <q-table
-                  data-test="organization-menu-table"
-                  :rows="filteredOrganizations"
-                  :row-key="(row) => 'org_' + row.identifier"
-                  :columns="[{ name: 'label', field: 'label', align: 'left' }]"
-                  :visible-columns="['label']"
-                  hide-header
-                  :pagination="{ rowsPerPage }"
-                  :rows-per-page-options="[]"
-                  class="org-table"
-                  style="width: 470px"
-                >
-                  <template #top>
-                    <div class="full-width">
-                      <q-input
-                        data-test="organization-search-input"
-                        v-model="searchQuery"
-                        data-cy="index-field-search-input"
-                        borderless
-                        dense
-                        clearable
-                        debounce="1"
-                        autofocus
-                        :placeholder="'Search Organization'"
-                      >
-                        <template #prepend>
-                          <q-icon name="search" />
-                        </template>
-                      </q-input>
-                    </div>
-                  </template>
-
-                  <template v-slot:body-cell-label="props">
-                    <q-td
-                      :props="props"
-                      class="org-list-item-cell"
-                      @click="
-                        selectedOrg = props.row;
-                        updateOrganization();
-                      "
-                    >
-                      <div
-                        class="org-menu-item"
-                        v-close-popup
-                        data-test="organization-menu-item-label-item-label"
-                        :class="{
-                          'org-menu-item--active':
-                            props.row.identifier === userClickedOrg?.identifier,
-                        }"
-                      >
-                        {{
-                          props.row.label.length > 30
-                            ? props.row.label.substring(0, 30) +
-                              "... | " +
-                              props.row.identifier
-                            : props.row.label + " | " + props.row.identifier
-                        }}
-                        <q-tooltip
-                          v-if="props.row.label.length > 30"
-                          anchor="bottom middle"
-                          self="top start"
+              <q-list data-test="organization-menu-list" style="width: 100%">
+                <q-item data-test="organization-menu-item" style="padding: 0">
+                  <q-item-section data-test="organization-menu-item-section" class="column" style="padding: 0px">
+                  <q-table
+                    data-test="organization-menu-table"
+                    :rows="filteredOrganizations"
+                    :row-key="(row) => 'org_' + row.identifier"
+                    :columns="[{ name: 'label', field: 'label', align: 'left' }]"
+                    :visible-columns="['label']"
+                    hide-header
+                    :pagination="{ rowsPerPage }"
+                    :rows-per-page-options="[]"
+                    class="org-table"
+                    style="width: 470px"
+                  >
+                    <template #top>
+                      <div class="full-width">
+                        <q-input
+                          data-test="organization-search-input"
+                          v-model="searchQuery"
+                          data-cy="index-field-search-input"
+                          borderless
+                          dense
+                          clearable
+                          debounce="1"
+                          autofocus
+                          :placeholder="'Search Organization'"
                         >
-                          {{ props.row.label }}
-                        </q-tooltip>
+                          <template #prepend>
+                            <q-icon name="search" />
+                          </template>
+                        </q-input>
                       </div>
-                    </q-td>
-                  </template>
+                    </template>
 
-                  <template v-slot:no-data>
-                    <div
-                      data-test="organization-menu-no-data"
-                      class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center"
-                    >
-                      No organizations found
-                    </div>
-                  </template>
-                </q-table>
+                    <template v-slot:body-cell-label="props">
+                      <q-td
+                        :props="props"
+                        class="org-list-item-cell"
+                        @click="
+                          selectedOrg = props.row;
+                          updateOrganization();
+                        "
+                      >
+                        <div
+                          class="org-menu-item"
+                          v-close-popup
+                          data-test="organization-menu-item-label-item-label"
+                          :class="{
+                            'org-menu-item--active':
+                              props.row.identifier === userClickedOrg?.identifier,
+                          }"
+                        >
+                          {{
+                            props.row.label.length > 30
+                              ? props.row.label.substring(0, 30) +
+                                "... | " +
+                                props.row.identifier
+                              : props.row.label + " | " + props.row.identifier
+                          }}
+                          <q-tooltip
+                            v-if="props.row.label.length > 30"
+                            anchor="bottom middle"
+                            self="top start"
+                          >
+                            {{ props.row.label }}
+                          </q-tooltip>
+                        </div>
+                      </q-td>
+                    </template>
+
+                    <template v-slot:no-data>
+                      <div
+                        data-test="organization-menu-no-data"
+                        class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center"
+                      >
+                        No organizations found
+                      </div>
+                    </template>
+                  </q-table>
+              </q-item-section>
+            </q-item>
+           </q-list>
               </q-menu>
             </q-btn>
           </div>
@@ -633,7 +639,6 @@ import {
   outlinedDescription,
   outlinedCode,
   outlinedDevices,
-  outlinedBubbleChart,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -816,12 +821,6 @@ export default defineComponent({
           icon: outlinedAccountTree,
           link: "/traces",
           name: "traces",
-        },
-        {
-          title: "Service Graph",
-          icon: outlinedBubbleChart,
-          link: "/service-graph",
-          name: "serviceGraph",
         },
         {
           title: t("menu.rum"),
@@ -1712,7 +1711,7 @@ export default defineComponent({
 
           // Light mode: make text blue for readability
           body.body--light & {
-            color: var(--o2-menu-color) !important;
+            color: #19191e !important;
           }
         }
         color: var(--o2-menu-color);
@@ -1722,7 +1721,7 @@ export default defineComponent({
           color: var(--o2-menu-color) !important;
 
           .q-icon {
-            color: var(--o2-menu-color) !important;
+            color: #19191e !important;
           }
         }
       }
@@ -1974,6 +1973,29 @@ body.ai-chat-open {
 }
 
 .organization-menu-o2 {
+  // Disable hover for organization menu dropdown
+  // Disable table row hover
+  .q-tr:hover,
+  tr:hover,
+  tbody tr:hover,
+  tbody .q-tr:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+
+  td:hover,
+  .q-td:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+
+  // Disable default q-item hover
+  .q-item:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: inherit !important;
+  }
+
   .org-table {
     // Disable global table row hover
     tbody .q-tr:hover {
@@ -2035,13 +2057,10 @@ body.ai-chat-open {
       white-space: nowrap;
       font-size: 13px;
 
-      // Hover effect only on the div
+      // Enable hover only for individual org menu items
       &:hover {
-        background: color-mix(
-          in srgb,
-          var(--o2-theme-color) 5%,
-          var(--o2-theme-mode) 90%
-        ) !important;
+        background-color: var(--o2-hover-accent) !important;
+        border-radius: 4px;
       }
 
       // Active/selected state

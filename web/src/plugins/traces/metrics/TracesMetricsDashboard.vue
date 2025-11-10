@@ -472,9 +472,8 @@ body.body--dark {
   }
 
   .filter-chip {
-    background-color: #1e3a5f;
-    border-color: #2c5282;
-    color: #90caf9;
+    border-color: var(--o2-border-color);
+    color: var(--o2-card-text);
 
     .chip-close-icon:hover {
       color: #ffffff;
