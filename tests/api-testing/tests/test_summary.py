@@ -460,9 +460,11 @@ def test_summary(create_session, base_url, base_url_sc, org_id):
     dashboards = dashboards_response.get('dashboards', [])
     if dashboards:
         dashboard = dashboards[0]
-        # Try v6 first, then v5
+        # Try v7 first, then v6, then v5
         dashboard_id = None
-        if dashboard.get('v6'):
+        if dashboard.get('v7'):
+            dashboard_id = dashboard['v7']['dashboardId']
+        elif dashboard.get('v6'):
             dashboard_id = dashboard['v6']['dashboardId']
         elif dashboard.get('v5'):
             dashboard_id = dashboard['v5']['dashboardId']
