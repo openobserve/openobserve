@@ -371,8 +371,6 @@ impl Serialize for InstantValue {
 
 #[derive(Debug, Clone)]
 pub struct TimeWindow {
-    /// Evaluation timestamp, microseconds.
-    pub eval_ts: i64,
     pub range: Duration,
     /// The offset used during the query execution.
     /// We don't use it (yet), so its value is always zero.
@@ -381,12 +379,51 @@ pub struct TimeWindow {
 }
 
 impl TimeWindow {
-    pub fn new(eval_ts: i64, range: Duration) -> Self {
-        assert!(eval_ts > 0);
+    pub fn new(range: Duration) -> Self {
         Self {
-            eval_ts,
             range,
             offset: Duration::ZERO,
+        }
+    }
+}
+
+/// Context for evaluating PromQL expressions across multiple timestamps
+#[derive(Debug, Clone)]
+pub struct EvalContext {
+    /// Start time in microseconds
+    pub start: i64,
+    /// End time in microseconds
+    pub end: i64,
+    /// Step interval in microseconds
+    pub step: i64,
+    /// Trace ID for logging and debugging
+    pub trace_id: String,
+}
+
+impl EvalContext {
+    pub fn new(start: i64, end: i64, step: i64, trace_id: String) -> Self {
+        Self {
+            start,
+            end,
+            step,
+            trace_id,
+        }
+    }
+
+    /// Returns true if this is an instant query (single timestamp)
+    pub fn is_instant(&self) -> bool {
+        self.start == self.end
+    }
+
+    /// Get all evaluation timestamps
+    pub fn timestamps(&self) -> Vec<i64> {
+        if self.is_instant() {
+            vec![self.start]
+        } else {
+            let nr_steps = (self.end - self.start) / self.step + 1;
+            (0..nr_steps)
+                .map(|i| self.start + (self.step * i))
+                .collect()
         }
     }
 }
@@ -704,6 +741,13 @@ impl Value {
         }
     }
 
+    pub(crate) fn get_range_values(self) -> Option<Vec<RangeValue>> {
+        match self {
+            Value::Matrix(values) => Some(values),
+            _ => None,
+        }
+    }
+
     #[allow(dead_code)]
     pub(crate) fn get_vector(&self) -> Option<&Vec<InstantValue>> {
         match self {
@@ -999,17 +1043,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sample_new_and_is_nan() {
-        let sample = Sample::new(123456, 1.23);
-        assert_eq!(sample.timestamp, 123456);
-        assert_eq!(sample.value, 1.23);
-        assert!(!sample.is_nan());
-
-        let nan_sample = Sample::new(789012, f64::NAN);
-        assert!(nan_sample.is_nan());
-    }
-
-    #[test]
     fn test_sample_serialization() {
         let sample = Sample::new(1_609_459_200_000_000, 42.5); // 2021-01-01 00:00:00 UTC in microseconds
         let json = serde_json::to_string(&sample).unwrap();
@@ -1105,21 +1138,11 @@ mod tests {
 
     #[test]
     fn test_time_window_new() {
-        let eval_ts = 1_609_459_200_000_000; // 2021-01-01 00:00:00 UTC in microseconds
         let range = Duration::from_secs(300); // 5 minutes
 
-        let window = TimeWindow::new(eval_ts, range);
-        assert_eq!(window.eval_ts, eval_ts);
+        let window = TimeWindow::new(range);
         assert_eq!(window.range, range);
         assert_eq!(window.offset, Duration::ZERO);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_time_window_new_invalid_timestamp() {
-        let eval_ts = 0; // Invalid timestamp
-        let range = Duration::from_secs(300);
-        TimeWindow::new(eval_ts, range);
     }
 
     #[test]

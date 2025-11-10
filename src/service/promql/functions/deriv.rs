@@ -13,27 +13,56 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use datafusion::error::Result;
 
 use crate::service::promql::{
     common::linear_regression,
-    value::{RangeValue, Value},
+    functions::RangeFunc,
+    value::{EvalContext, Sample, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#deriv
-pub(crate) fn deriv(data: Value) -> Result<Value> {
-    super::eval_idelta(data, "deriv", exec, false)
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn deriv(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] deriv() started",
+        eval_ctx.trace_id
+    );
+    let result = super::eval_range(data, DerivFunc::new(), eval_ctx);
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] deriv() execution took: {:?}",
+        eval_ctx.trace_id,
+        start.elapsed()
+    );
+    result
 }
 
-fn exec(data: RangeValue) -> Option<f64> {
-    if data.samples.len() < 2 {
-        return None;
+pub struct DerivFunc;
+
+impl DerivFunc {
+    pub fn new() -> Self {
+        DerivFunc {}
     }
-    // https://github.com/prometheus/prometheus/issues/2674
-    let value = linear_regression(&data.samples, data.samples[0].timestamp / 1000);
-    match value {
-        Some((slope, _)) => Some(slope),
-        _ => None,
+}
+
+impl RangeFunc for DerivFunc {
+    fn name(&self) -> &'static str {
+        "deriv"
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        if samples.len() < 2 {
+            return None;
+        }
+        // https://github.com/prometheus/prometheus/issues/2674
+        let value = linear_regression(samples, samples[0].timestamp / 1000);
+        match value {
+            Some((slope, _)) => Some(slope),
+            _ => None,
+        }
     }
 }
 
@@ -43,6 +72,11 @@ mod tests {
 
     use super::*;
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+    // Test helper
+    fn deriv_test_helper(data: Value) -> Result<Value> {
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
+        deriv(data, &eval_ctx)
+    }
 
     #[test]
     fn test_deriv_function() {
@@ -58,24 +92,24 @@ mod tests {
             samples,
             exemplars: None,
             time_window: Some(TimeWindow {
-                eval_ts: 3000,
                 range: Duration::from_secs(2),
                 offset: Duration::ZERO,
             }),
         };
 
         let matrix = Value::Matrix(vec![range_value]);
-        let result = deriv(matrix).unwrap();
+        let result = deriv_test_helper(matrix).unwrap();
 
-        // Should return a vector with derivative value
+        // Should return a matrix with derivative value
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 1);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert_eq!(m[0].samples.len(), 1);
                 // Derivative should be positive for increasing trend
-                assert!(v[0].sample.value > 0.0);
-                assert_eq!(v[0].sample.timestamp, 3000);
+                assert!(m[0].samples[0].value > 0.0);
+                assert_eq!(m[0].samples[0].timestamp, 3000);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }
