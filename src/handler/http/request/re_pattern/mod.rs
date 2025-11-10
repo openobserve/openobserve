@@ -405,6 +405,11 @@ pub async fn delete_bulk(
             );
         }
     };
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
     for id in &req.ids {
         if let Some(res) =
             check_resource_permissions(&org_id, &user_id, "re_patterns", id, "DELETE").await
@@ -421,16 +426,19 @@ pub async fn delete_bulk(
             (&pattern_usage[0..], "".to_string())
         };
         if !pattern_usage.is_empty() {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("Cannot delete pattern, associated with {pattern_streams:?}{extra}",),
-            )));
+            unsuccessful.push(id);
+            err = Some(format!(
+                "Cannot delete pattern, associated with {pattern_streams:?}{extra}"
+            ));
         }
     }
-
-    let mut successful = Vec::with_capacity(req.ids.len());
-    let mut unsuccessful = Vec::with_capacity(req.ids.len());
-    let mut err = None;
+    if !unsuccessful.is_empty() {
+        return Ok(MetaHttpResponse::json(PatternBulkDeleteResponse {
+            successful,
+            unsuccessful,
+            err,
+        }));
+    }
 
     for id in req.ids {
         match crate::service::db::re_pattern::remove(&id).await {
