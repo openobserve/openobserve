@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-card
       v-if="selectedPattern"
-      class="column full-height no-wrap detail-table-dialog !tw-w-[90vw] !tw-max-w-[90vw]"
-      :style="{ borderTop: `4px solid var(--q-primary)` }"
+      class="column full-height no-wrap detail-table-dialog !tw-w-[90vw] !tw-max-w-[90vw] tw-border-t-4 tw-border-t-[var(--q-primary)] tw-border-solid"
     >
       <!-- Header -->
       <q-card-section class="q-px-md q-pb-sm">
@@ -57,8 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Content - Single Scrollable View -->
       <q-card-section
-        class="tw-py-[0.375rem] tw-px-[0.625rem]"
-        style="flex: 1; overflow-y: auto"
+        class="tw-py-[0.375rem] tw-px-[0.625rem] tw-flex-1 tw-overflow-y-auto"
       >
         <!-- Statistics -->
         <div class="tw-mb-[1rem]">
@@ -69,10 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="col-6">
               <q-card
                 flat
-                bordered
-                :class="
-                  store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'
-                "
+                class="tw-bg-[var(--o2-card-bg)] tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
               >
                 <q-card-section class="tw-p-[0.375rem]">
                   <div
@@ -96,13 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-card>
             </div>
             <div class="col-6">
-              <q-card
-                flat
-                bordered
-                :class="
-                  store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'
-                "
-              >
+              <q-card flat class="tw-bg-[var(--o2-card-bg)] tw-border tw-border-solid tw-border-[var(--o2-border-color)]">
                 <q-card-section class="tw-p-[0.375rem]">
                   <div
                     class="text-caption"
@@ -142,14 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Description
           </div>
           <div
-            class="tw-px-[0.625rem] tw-py-[0.375rem]"
+            class="tw-px-[0.625rem] tw-py-[0.375rem] tw-rounded tw-border-l-[0.25rem] tw-border-solid tw-border-l-[var(--q-primary)]"
             :class="
               store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
-            "
-            style="
-              border-radius: 0.25rem;
-              border-left: 0.25rem solid;
-              border-color: var(--q-primary);
             "
           >
             {{
@@ -165,21 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Pattern Template
           </div>
           <div
-            class="tw-px-[0.625rem] tw-py-[0.375rem]"
+            class="tw-px-[0.625rem] tw-py-[0.375rem] o2-monospace-font tw-text-[0.8125rem] tw-leading-[1.6] tw-rounded tw-border-l-[0.25rem] tw-border-solid tw-border-l-[var(--q-primary)] tw-break-all tw-whitespace-pre-wrap"
             :class="
               store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
-            "
-            style="
-              font-family:
-                &quot;Monaco&quot;, &quot;Menlo&quot;,
-                &quot;Courier New&quot;, monospace;
-              font-size: 0.8125rem;
-              line-height: 1.6;
-              border-radius: 0.25rem;
-              border-left: 0.25rem solid;
-              word-break: break-all;
-              white-space: pre-wrap;
-              border-color: var(--q-primary);
             "
           >
             {{ selectedPattern.pattern.template }}
@@ -242,25 +214,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(example, exIdx) in selectedPattern.pattern.examples"
             :key="exIdx"
-            class="tw-px-[0.625rem] tw-py-[0.375rem] tw-mb-[0.375rem]"
-            :class="
-              store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-1'
-            "
-            style="
-              font-family:
-                &quot;Monaco&quot;, &quot;Menlo&quot;,
-                &quot;Courier New&quot;, monospace;
-              font-size: 0.75rem;
-              line-height: 1.6;
-              border-radius: 0.25rem;
-              word-break: break-all;
-              white-space: pre-wrap;
-              border-left: 0.1875rem solid;
-            "
-            :style="{
-              borderColor:
-                store.state.theme === 'dark' ? '#3a3a3a' : '#e0e0e0',
-            }"
+            class="tw-px-[0.625rem] tw-py-[0.375rem] tw-mb-[0.375rem] o2-monospace-font tw-text-[0.75rem] tw-leading-[1.6] tw-rounded tw-break-all tw-whitespace-pre-wrap tw-border-l-[0.1875rem] tw-border-solid"
+            :class="[
+              store.state.theme === 'dark' ? 'bg-grey-10 tw-border-l-[#3a3a3a]' : 'bg-grey-1 tw-border-l-[#e0e0e0]'
+            ]"
           >
             {{ example.log_message }}
           </div>

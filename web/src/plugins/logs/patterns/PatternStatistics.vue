@@ -65,8 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Edit Mode -->
               <div
                 v-else
-                class="row items-center no-wrap logs-analyzed-input"
-                style="gap: 0.25rem"
+                class="row items-center no-wrap logs-analyzed-input tw-gap-[0.25rem]"
                 data-test="pattern-stats-scan-size-edit"
               >
                 <q-input
@@ -76,8 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   outlined
                   :min="100"
                   :max="20000"
-                  class="!tw-text-[1.2rem] text-weight-bold"
-                  style="max-width: 120px"
+                  class="!tw-text-[1.2rem] text-weight-bold tw-max-w-[7.5rem]"
                   autofocus
                   @keyup.escape="cancelEditScanSize"
                   @blur="updateScanSize"

@@ -39,15 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Template shown first with info icon -->
           <div class="tw-flex tw-items-center q-mb-xs">
             <div
-              class="text-body2 ellipsis"
+              class="text-body2 ellipsis tw-text-[0.8rem] o2-monospace-font"
               :class="
                 store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'
-              "
-              style="
-                font-family:
-                  &quot;Monaco&quot;, &quot;Menlo&quot;,
-                  &quot;Courier New&quot;, monospace;
-                font-size: 0.8125rem;
               "
               :data-test="`pattern-card-${index}-template`"
             >
@@ -55,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <q-icon
               :name="outlinedInfo"
-              size="17px"
+              size="1rem"
               class="q-ml-xs cursor-pointer"
               :class="
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
@@ -65,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tooltip
                 anchor="center right"
                 self="center left"
-                max-width="300px"
-                style="font-size: 12px"
+                max-width="18.75rem"
+                class="tw-text-[0.75rem]"
               >
                 <div class="text-weight-bold q-mb-xs">
                   Template vs Description

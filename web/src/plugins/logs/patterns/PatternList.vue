@@ -15,15 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="flex: 1; overflow: hidden" class="tw-py-[0.375rem]">
+  <div class="tw-flex-1 tw-overflow-hidden tw-py-[0.375rem]">
     <!-- Patterns List with Virtual Scroll -->
     <q-virtual-scroll
       v-if="patterns?.length > 0"
       :items="patterns"
         virtual-scroll-slice-size="5"
         v-slot="{ item: pattern, index }"
-        style="height: 100%"
-        class="tw-pl-[0.375rem] tw-pr-[0.625rem]"
+        class="tw-h-full tw-pl-[0.375rem] tw-pr-[0.625rem]"
       >
         <PatternCard
           :pattern="pattern"
@@ -37,13 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Loading State -->
     <div
       v-else-if="loading"
-      style="
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-      "
+      class="tw-flex-1 tw-flex tw-flex-col tw-items-center tw-justify-center"
     >
       <q-spinner-hourglass color="primary" size="3.125rem" />
       <div
@@ -57,17 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty State -->
     <div
       v-else
-      style="
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 1.25rem;
-        text-align: center;
-      "
+      class="tw-flex-1 tw-flex tw-flex-col tw-items-center tw-justify-center tw-p-[1.25rem] tw-text-center"
     >
-      <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3">📊</div>
+      <div class="tw-text-[3rem] tw-mb-[1rem] tw-opacity-30">📊</div>
       <div
         class="text-h6 q-mb-sm"
         :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
@@ -75,9 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         No patterns found
       </div>
       <div
-        class="text-body2"
+        class="text-body2 tw-max-w-[31.25rem]"
         :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-8'"
-        style="max-width: 31.25rem"
       >
         <div v-if="totalLogsAnalyzed">
           Only {{ totalLogsAnalyzed }} logs were analyzed.
