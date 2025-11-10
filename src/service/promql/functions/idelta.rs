@@ -13,21 +13,52 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use datafusion::error::Result;
 
-use crate::service::promql::value::{RangeValue, Value};
+use crate::service::promql::{
+    functions::RangeFunc,
+    value::{EvalContext, Sample, Value},
+};
 
-pub(crate) fn idelta(data: Value) -> Result<Value> {
-    super::eval_idelta(data, "idelta", exec, false)
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn idelta(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] idelta() started",
+        eval_ctx.trace_id
+    );
+    let result = super::eval_range(data, IdeltaFunc::new(), eval_ctx);
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] idelta() execution took: {:?}",
+        eval_ctx.trace_id,
+        start.elapsed()
+    );
+    result
 }
 
-fn exec(data: RangeValue) -> Option<f64> {
-    if data.samples.len() < 2 {
-        return None;
+pub struct IdeltaFunc;
+
+impl IdeltaFunc {
+    pub fn new() -> Self {
+        IdeltaFunc {}
     }
-    let last = data.samples.last().unwrap();
-    let previous = data.samples.get(data.samples.len() - 2).unwrap();
-    Some(last.value - previous.value)
+}
+
+impl RangeFunc for IdeltaFunc {
+    fn name(&self) -> &'static str {
+        "idelta"
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        if samples.len() < 2 {
+            return None;
+        }
+        let last = samples.last().unwrap();
+        let previous = samples.get(samples.len() - 2).unwrap();
+        Some(last.value - previous.value)
+    }
 }
 
 #[cfg(test)]
@@ -36,6 +67,11 @@ mod tests {
 
     use super::*;
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+    // Test helper
+    fn idelta_test_helper(data: Value) -> Result<Value> {
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
+        idelta(data, &eval_ctx)
+    }
 
     #[test]
     fn test_idelta_function() {
@@ -51,24 +87,24 @@ mod tests {
             samples,
             exemplars: None,
             time_window: Some(TimeWindow {
-                eval_ts: 3000,
                 range: Duration::from_secs(2),
                 offset: Duration::ZERO,
             }),
         };
 
         let matrix = Value::Matrix(vec![range_value]);
-        let result = idelta(matrix).unwrap();
+        let result = idelta_test_helper(matrix).unwrap();
 
-        // Should return a vector with idelta value
+        // Should return a matrix with idelta value
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 1);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert_eq!(m[0].samples.len(), 1);
                 // Idelta should be 25.0 - 15.0 = 10.0
-                assert!((v[0].sample.value - 10.0).abs() < 0.001);
-                assert_eq!(v[0].sample.timestamp, 3000);
+                assert!((m[0].samples[0].value - 10.0).abs() < 0.001);
+                assert_eq!(m[0].samples[0].timestamp, 3000);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }
