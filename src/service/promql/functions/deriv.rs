@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use datafusion::error::Result;
 
 use crate::service::promql::{
     common::linear_regression,
     functions::RangeFunc,
-    value::{EvalContext, Sample, TimeWindow, Value},
+    value::{EvalContext, Sample, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#deriv
@@ -51,7 +53,7 @@ impl RangeFunc for DerivFunc {
         "deriv"
     }
 
-    fn exec(&self, samples: &[Sample], _time_win: &Option<TimeWindow>) -> Option<f64> {
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
         if samples.len() < 2 {
             return None;
         }
@@ -90,7 +92,6 @@ mod tests {
             samples,
             exemplars: None,
             time_window: Some(TimeWindow {
-                eval_ts: 3000,
                 range: Duration::from_secs(2),
                 offset: Duration::ZERO,
             }),
@@ -99,15 +100,16 @@ mod tests {
         let matrix = Value::Matrix(vec![range_value]);
         let result = deriv_test_helper(matrix).unwrap();
 
-        // Should return a vector with derivative value
+        // Should return a matrix with derivative value
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 1);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert_eq!(m[0].samples.len(), 1);
                 // Derivative should be positive for increasing trend
-                assert!(v[0].sample.value > 0.0);
-                assert_eq!(v[0].sample.timestamp, 3000);
+                assert!(m[0].samples[0].value > 0.0);
+                assert_eq!(m[0].samples[0].timestamp, 3000);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }

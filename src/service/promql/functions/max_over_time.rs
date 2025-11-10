@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use config::utils::sort::sort_float;
 use datafusion::error::Result;
 
 use crate::service::promql::{
     functions::RangeFunc,
-    value::{EvalContext, Sample, TimeWindow, Value},
+    value::{EvalContext, Sample, Value},
 };
 
 /// Enhanced version that processes all timestamps at once for range queries
@@ -50,7 +52,7 @@ impl RangeFunc for MaxOverTimeFunc {
         "max_over_time"
     }
 
-    fn exec(&self, samples: &[Sample], _time_win: &Option<TimeWindow>) -> Option<f64> {
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
         if samples.is_empty() {
             return None;
         }
@@ -84,7 +86,6 @@ mod tests {
             samples,
             exemplars: None,
             time_window: Some(TimeWindow {
-                eval_ts: 3000,
                 range: Duration::from_secs(2),
                 offset: Duration::ZERO,
             }),
@@ -93,15 +94,16 @@ mod tests {
         let matrix = Value::Matrix(vec![range_value]);
         let result = max_over_time_test_helper(matrix).unwrap();
 
-        // Should return a vector with max value
+        // Should return a matrix with max value
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 1);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert_eq!(m[0].samples.len(), 1);
                 // Should return the max value: 30.0
-                assert!((v[0].sample.value - 30.0).abs() < 0.001);
-                assert_eq!(v[0].sample.timestamp, 3000);
+                assert!((m[0].samples[0].value - 30.0).abs() < 0.001);
+                assert_eq!(m[0].samples[0].timestamp, 3000);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }

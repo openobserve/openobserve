@@ -371,8 +371,6 @@ impl Serialize for InstantValue {
 
 #[derive(Debug, Clone)]
 pub struct TimeWindow {
-    /// Evaluation timestamp, microseconds.
-    pub eval_ts: i64,
     pub range: Duration,
     /// The offset used during the query execution.
     /// We don't use it (yet), so its value is always zero.
@@ -381,18 +379,8 @@ pub struct TimeWindow {
 }
 
 impl TimeWindow {
-    pub fn new(eval_ts: i64, range: Duration) -> Self {
-        assert!(eval_ts > 0);
+    pub fn new(range: Duration) -> Self {
         Self {
-            eval_ts,
-            range,
-            offset: Duration::ZERO,
-        }
-    }
-
-    pub fn new_range(range: Duration) -> Self {
-        Self {
-            eval_ts: 0,
             range,
             offset: Duration::ZERO,
         }
@@ -1150,21 +1138,11 @@ mod tests {
 
     #[test]
     fn test_time_window_new() {
-        let eval_ts = 1_609_459_200_000_000; // 2021-01-01 00:00:00 UTC in microseconds
         let range = Duration::from_secs(300); // 5 minutes
 
-        let window = TimeWindow::new(eval_ts, range);
-        assert_eq!(window.eval_ts, eval_ts);
+        let window = TimeWindow::new(range);
         assert_eq!(window.range, range);
         assert_eq!(window.offset, Duration::ZERO);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_time_window_new_invalid_timestamp() {
-        let eval_ts = 0; // Invalid timestamp
-        let range = Duration::from_secs(300);
-        TimeWindow::new(eval_ts, range);
     }
 
     #[test]

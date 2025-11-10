@@ -270,19 +270,11 @@ impl Engine {
                 let range = expr.range;
                 let matrix = match val {
                     Value::Matrix(vs) => {
-                        // For matrix type, update the time_window range but preserve eval_ts
+                        // For matrix type, update the time_window range
                         vs.into_iter()
                             .map(|mut rv| {
-                                // Update time_window with new range while keeping eval_ts
-                                if let Some(tw) = rv.time_window {
-                                    rv.time_window = Some(TimeWindow {
-                                        eval_ts: tw.eval_ts,
-                                        range,
-                                        offset: tw.offset,
-                                    });
-                                } else {
-                                    rv.time_window = Some(TimeWindow::new_range(range));
-                                }
+                                // Update time_window with new range
+                                rv.time_window = Some(TimeWindow::new(range));
                                 rv
                             })
                             .collect()
@@ -468,7 +460,7 @@ impl Engine {
                 labels: rv.labels,
                 samples: rv.samples,
                 exemplars: rv.exemplars,
-                time_window: Some(TimeWindow::new_range(range)),
+                time_window: Some(TimeWindow::new(range)),
             })
             .collect::<Vec<_>>();
 

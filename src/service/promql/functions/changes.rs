@@ -13,11 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use datafusion::error::Result;
 
 use crate::service::promql::{
     functions::RangeFunc,
-    value::{EvalContext, Sample, TimeWindow, Value},
+    value::{EvalContext, Sample, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#changes
@@ -50,7 +52,7 @@ impl RangeFunc for ChangesFunc {
         "changes"
     }
 
-    fn exec(&self, samples: &[Sample], _time_win: &Option<TimeWindow>) -> Option<f64> {
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
         let changes = samples
             .iter()
             .zip(samples.iter().skip(1))
@@ -87,7 +89,6 @@ mod tests {
             samples,
             exemplars: None,
             time_window: Some(TimeWindow {
-                eval_ts: 4000,
                 range: Duration::from_secs(3),
                 offset: Duration::ZERO,
             }),
@@ -96,12 +97,13 @@ mod tests {
         let matrix = Value::Matrix(vec![range_value]);
         let result = changes_test_helper(matrix).unwrap();
 
-        // Should return a vector with number of changes
+        // Should return a matrix with number of changes
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 1);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert!(m[0].samples.len() > 0);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }

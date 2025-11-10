@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use datafusion::error::Result;
 
 use crate::service::promql::{
     common::linear_regression,
     functions::RangeFunc,
-    value::{EvalContext, Sample, TimeWindow, Value},
+    value::{EvalContext, Sample, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#predict_linear
@@ -53,8 +55,7 @@ impl RangeFunc for PredictLinearFunc {
         "predict_linear"
     }
 
-    fn exec(&self, samples: &[Sample], time_win: &Option<TimeWindow>) -> Option<f64> {
-        let eval_ts = time_win.as_ref()?.eval_ts;
+    fn exec(&self, samples: &[Sample], eval_ts: i64, _range: &Duration) -> Option<f64> {
         let (slope, intercept) = linear_regression(samples, eval_ts / 1000)?;
         Some(slope * self.duration + intercept)
     }
@@ -86,7 +87,6 @@ mod tests {
             samples,
             exemplars: None,
             time_window: Some(TimeWindow {
-                eval_ts: 3000,
                 range: Duration::from_secs(2),
                 offset: Duration::ZERO,
             }),
@@ -95,13 +95,14 @@ mod tests {
         let duration = 10.0;
         let result = predict_linear_test_helper(matrix, duration).unwrap();
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 1);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert_eq!(m[0].samples.len(), 1);
                 // Should return a predicted value (should be finite)
-                assert!(v[0].sample.value.is_finite());
-                assert_eq!(v[0].sample.timestamp, 3000);
+                assert!(m[0].samples[0].value.is_finite());
+                assert_eq!(m[0].samples[0].timestamp, 3000);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }

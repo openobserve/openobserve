@@ -13,11 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use datafusion::error::Result;
 
 use crate::service::promql::{
     functions::RangeFunc,
-    value::{EvalContext, Sample, TimeWindow, Value},
+    value::{EvalContext, Sample, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent_over_time
@@ -50,7 +52,7 @@ impl RangeFunc for AbsentOverTimeFunc {
         "absent_over_time"
     }
 
-    fn exec(&self, samples: &[Sample], _time_win: &Option<TimeWindow>) -> Option<f64> {
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
         if samples.is_empty() {
             return Some(1.0);
         }
@@ -75,10 +77,10 @@ mod tests {
         let result = absent_over_time_test_helper(empty_matrix).unwrap();
 
         match result {
-            Value::Vector(v) => {
+            Value::Matrix(v) => {
                 assert_eq!(v.len(), 0);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }

@@ -69,7 +69,6 @@ mod tests {
                 samples: vec![Sample::new(eval_ts, val)],
                 exemplars: None,
                 time_window: Some(TimeWindow {
-                    eval_ts,
                     range: Duration::from_secs(5),
                     offset: Duration::ZERO,
                 }),

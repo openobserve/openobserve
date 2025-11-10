@@ -13,11 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use datafusion::error::Result;
 
 use crate::service::promql::{
     functions::RangeFunc,
-    value::{EvalContext, ExtrapolationKind, Sample, TimeWindow, Value, extrapolated_rate},
+    value::{EvalContext, ExtrapolationKind, Sample, Value, extrapolated_rate},
 };
 
 /// Enhanced version that processes all timestamps at once for range queries
@@ -49,15 +51,12 @@ impl RangeFunc for DeltaFunc {
         "delta"
     }
 
-    fn exec(&self, samples: &[Sample], time_win: &Option<TimeWindow>) -> Option<f64> {
-        let tw = time_win
-            .as_ref()
-            .expect("BUG: `delta` function requires time window");
+    fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64> {
         extrapolated_rate(
             samples,
-            tw.eval_ts,
-            tw.range,
-            tw.offset,
+            eval_ts,
+            *range,
+            Duration::ZERO,
             ExtrapolationKind::Delta,
         )
     }
