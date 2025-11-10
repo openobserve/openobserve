@@ -26,23 +26,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row items-center no-wrap q-mx-md q-pb-sm q-pl-md q-pt-md">
           <div class="flex items-center tw-w-full">
             <div class="tw-w-full" data-test="add-destination-title">
-              <div class="tw-text-[18px] tw-flex tw-items-center tw-justify-between">
+              <div
+                class="tw-text-[18px] tw-flex tw-items-center tw-justify-between"
+              >
                 External Destination
                 <div>
-                  <q-btn v-close-popup="true" round flat icon="cancel" >
-                  </q-btn>
+                  <q-btn v-close-popup="true" round flat icon="cancel"> </q-btn>
                 </div>
               </div>
             </div>
           </div>
         </div>
         <q-separator />
-        <div class="row q-col-gutter-sm q-px-lg q-my-sm">
+        <div class="row q-col-gutter-sm q-px-lg">
           <q-toggle
             data-test="create-stream-toggle"
-            class="q-mb-sm tw-h-[36px] o2-toggle-button-lg tw-mr-3 -tw-ml-4"
-            size="lg"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+            class="q-mb-sm tw-h-[36px] o2-toggle-button-xs tw-mr-3"
+            size="xs"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
             :label="'Create new Destination'"
             v-model="createNewDestination"
           />
@@ -64,6 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               tabindex="0"
             >
+              <template #prepend>
+                <q-icon name="storage" />
+              </template>
               <template v-slot:option="scope">
                 <q-item
                   style="max-width: calc(40vw - 42px)"
@@ -86,204 +94,451 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="col-12"
           >
-            <div
+            <!-- Stepper for Create New Destination -->
+            <q-stepper
               v-if="createNewDestination"
-              class="col-12 q-py-xs destination-method-select"
+              v-model="step"
+              ref="stepper"
+              color="primary"
+              animated
+              flat
+              class="modern-stepper"
             >
-              <q-select
-                data-test="add-destination-type-select"
-                v-model="formData.destination_type"
-                :label="t('pipeline.destination_type') + ' *'"
-                :options="destinationTypes"
-                bg-color="input-bg"
-                class="showLabelOnTop"
-                stack-label
-                outlined
-                filled
-                dense
-                emit-value
-                map-options
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                tabindex="0"
-              />
-            </div>
-            <div class="col-12 q-py-xs">
-              <q-input
-                v-if="createNewDestination"
-                data-test="add-destination-name-input"
-                v-model="formData.name"
-                :label="t('alerts.name') + ' *'"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop"
-                stack-label
-                outlined
-                filled
-                dense
-                :rules="[
-                  (val: any) =>
-                    !!val
-                      ? isValidResourceName(val) ||
-                        `Characters like :, ?, /, #, and spaces are not allowed.`
-                      : t('common.nameRequired'),
-                ]"
-                tabindex="0"
-              />
-            </div>
-            <div v-if="createNewDestination" class="col-12 q-py-xs">
-              <q-input
-                data-test="add-destination-url-input"
-                v-model="formData.url"
-                :label="t('alert_destinations.url') + ' *'"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop"
-                stack-label
-                outlined
-                filled
-                dense
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                tabindex="0"
-                :suffix="urlSuffix"
-              />
-            </div>
-            <div class="tw-flex tw-flex-row tw-gap-x-2">
-              <div
-              v-if="createNewDestination"
-              class="tw-w-1/2 q-py-xs destination-method-select"
-            >
-              <q-select
-                data-test="add-destination-method-select"
-                v-model="formData.method"
-                :label="t('alert_destinations.method') + ' *'"
-                :options="apiMethods"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop"
-                stack-label
-                outlined
-                :popup-content-style="{ textTransform: 'uppercase' }"
-                filled
-                dense
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                tabindex="0"
-              />
-            </div>
-            <div
-              v-if="createNewDestination"
-              class="tw-w-1/2 q-py-xs destination-method-select"
-            >
-              <q-select
-                data-test="add-destination-output-format-select"
-                v-model="formData.output_format"
-                :label="t('alert_destinations.output_format') + ' *'"
-                :options="outputFormats"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop "
-                stack-label
-                outlined
-                :popup-content-style="{ textTransform: 'uppercase' }"
-                filled
-                dense
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                tabindex="0"
-              />
-            </div>
-            </div>
-
-            <div v-if="createNewDestination" class="col-12 q-py-sm">
-              <div class="text-bold q-py-xs" style="paddingleft: 10px">
-                Headers
-              </div>
-              <div
-                v-for="(header, index) in apiHeaders"
-                :key="header.uuid"
-                class="row q-col-gutter-sm q-pb-sm wrap"
+              <!-- Step 1: Choose Destination Type -->
+              <q-step
+                :name="1"
+                title="Choose Type"
+                icon="category"
+                :done="step > 1"
+                :header-nav="step > 1"
               >
-                <div class="col-5 q-ml-none">
+                <div class="text-subtitle2 q-mb-md" style="font-weight: 500">
+                  Select Destination Type <span class="text-red">*</span>
+                </div>
+                <div class="destination-type-grid">
+                  <div
+                    v-for="destType in destinationTypes"
+                    :key="destType.value"
+                    :data-test="`destination-type-card-${destType.value}`"
+                    class="destination-type-card"
+                    :class="{
+                      selected: formData.destination_type === destType.value,
+                      'dark-mode': store.state.theme === 'dark',
+                    }"
+                    @click="formData.destination_type = destType.value"
+                  >
+                    <q-icon
+                      :name="destType.icon"
+                      size="28px"
+                      class="card-icon"
+                    />
+                    <div class="card-label">{{ destType.label }}</div>
+                    <div
+                      v-if="formData.destination_type === destType.value"
+                      class="check-icon"
+                    >
+                      <q-icon
+                        name="check_circle"
+                        size="20px"
+                        color="positive"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <q-stepper-navigation class="q-mt-lg">
+                  <q-btn
+                    data-test="step1-continue-btn"
+                    @click="nextStep"
+                    :disable="!canProceedStep1"
+                    label="Continue"
+                    class="no-border q-ml-md o2-primary-button tw-h-[36px]"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-primary-button-dark'
+                        : 'o2-primary-button-light'
+                    "
+                    flat
+                    no-caps
+                    icon-right="arrow_forward"
+                  />
+                </q-stepper-navigation>
+              </q-step>
+
+              <!-- Step 2: Connection Details -->
+              <q-step
+                :name="2"
+                title="Connection"
+                icon="settings_ethernet"
+                :done="step > 2"
+                :header-nav="step > 2"
+              >
+                <div class="text-subtitle2 q-mb-md" style="font-weight: 500">
+                  Connection Details
+                </div>
+
+                <!-- Connection Notes Card -->
+                <q-card
+                  flat
+                  bordered
+                  class="connection-notes-card q-mb-lg"
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-blue-1'
+                  "
+                >
+                  <q-card-section>
+                    <div class="row items-center q-mb-sm">
+                      <q-icon
+                        name="info"
+                        color="primary"
+                        size="20px"
+                        class="q-mr-sm"
+                      />
+                      <div class="text-subtitle2 text-weight-medium">
+                        {{ connectionNotes.title }}
+                      </div>
+                    </div>
+                    <div class="text-body2">
+                      <ol class="connection-steps q-pl-md q-mb-none">
+                        <li
+                          v-for="(stepText, index) in connectionNotes.steps"
+                          :key="index"
+                          class="q-mb-xs"
+                        >
+                          {{ stepText }}
+                        </li>
+                      </ol>
+                      <div
+                        v-if="connectionNotes.example"
+                        class="q-mt-sm q-pa-sm example-url"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'bg-grey-8'
+                            : 'bg-white'
+                        "
+                      >
+                        <strong>Example:</strong>
+                        <code class="q-ml-xs">{{
+                          connectionNotes.example
+                        }}</code>
+                      </div>
+                    </div>
+                  </q-card-section>
+                </q-card>
+
+                <div class="q-gutter-md">
                   <q-input
-                    :data-test="`add-destination-header-${header['key']}-key-input`"
-                    v-model="header.key"
+                    data-test="add-destination-name-input"
+                    v-model="formData.name"
+                    :label="t('alerts.name') + ' *'"
                     color="input-border"
                     bg-color="input-bg"
+                    class="showLabelOnTop"
                     stack-label
                     outlined
                     filled
-                    :placeholder="t('alert_destinations.api_header')"
                     dense
+                    :rules="[
+                      (val: any) =>
+                        !!val
+                          ? isValidResourceName(val) ||
+                            `Characters like :, ?, /, #, and spaces are not allowed.`
+                          : t('common.nameRequired'),
+                    ]"
                     tabindex="0"
-                  />
-                </div>
-                <div class="col-5 q-ml-none">
+                  >
+                    <template #prepend>
+                      <q-icon name="badge" />
+                    </template>
+                  </q-input>
+
                   <q-input
-                    :data-test="`add-destination-header-${header['key']}-value-input`"
-                    v-model="header.value"
-                    :placeholder="t('alert_destinations.api_header_value')"
+                    data-test="add-destination-url-input"
+                    v-model="formData.url"
+                    :label="t('alert_destinations.url') + ' *'"
                     color="input-border"
                     bg-color="input-bg"
+                    class="showLabelOnTop"
                     stack-label
                     outlined
                     filled
                     dense
-                    isUpdatingDestination
+                    :rules="[
+                      (val: any) => !!val.trim() || 'Field is required!',
+                    ]"
                     tabindex="0"
+                    :suffix="urlSuffix"
+                  >
+                    <template #prepend>
+                      <q-icon name="link" />
+                    </template>
+                    <template #hint>
+                      <span class="text-caption"
+                        >Example: https://your-domain.com</span
+                      >
+                    </template>
+                  </q-input>
+
+                  <div class="row q-col-gutter-md">
+                    <div class="col-6">
+                      <q-select
+                        data-test="add-destination-method-select"
+                        v-model="formData.method"
+                        :label="t('alert_destinations.method') + ' *'"
+                        :options="apiMethods"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="showLabelOnTop destination-method-select"
+                        stack-label
+                        outlined
+                        :popup-content-style="{ textTransform: 'uppercase' }"
+                        filled
+                        dense
+                        :rules="[(val: any) => !!val || 'Field is required!']"
+                        tabindex="0"
+                      />
+                    </div>
+                    <div class="col-6">
+                      <q-select
+                        data-test="add-destination-output-format-select"
+                        v-model="formData.output_format"
+                        :label="t('alert_destinations.output_format') + ' *'"
+                        :options="outputFormats"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="showLabelOnTop destination-method-select"
+                        stack-label
+                        outlined
+                        :popup-content-style="{ textTransform: 'uppercase' }"
+                        filled
+                        dense
+                        :rules="[(val: any) => !!val || 'Field is required!']"
+                        tabindex="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <q-stepper-navigation class="q-mt-lg">
+                  <q-btn
+                    data-test="step2-back-btn"
+                    @click="prevStep"
+                    label="Back"
+                    class="o2-secondary-button tw-h-[36px]"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-secondary-button-dark'
+                        : 'o2-secondary-button-light'
+                    "
+                    flat
+                    no-caps
+                  />
+                  <q-btn
+                    data-test="step2-continue-btn"
+                    @click="nextStep"
+                    :disable="!canProceedStep2"
+                    label="Continue"
+                    class="no-border q-ml-md o2-primary-button tw-h-[36px]"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-primary-button-dark'
+                        : 'o2-primary-button-light'
+                    "
+                    flat
+                    no-caps
+                    icon-right="arrow_forward"
+                  />
+                </q-stepper-navigation>
+              </q-step>
+
+              <!-- Step 3: Advanced Settings -->
+              <q-step :name="3" title="Advanced" icon="tune">
+                <div class="text-subtitle2 q-mb-md" style="font-weight: 500">
+                  Advanced Settings
+                </div>
+
+                <!-- Connection Notes Card (repeated for reference) -->
+                <q-card
+                  flat
+                  bordered
+                  class="connection-notes-card q-mb-lg"
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-blue-1'
+                  "
+                >
+                  <q-card-section>
+                    <div class="row items-center q-mb-sm">
+                      <q-icon
+                        name="info"
+                        color="primary"
+                        size="20px"
+                        class="q-mr-sm"
+                      />
+                      <div class="text-subtitle2 text-weight-medium">
+                        {{ connectionNotes.title }}
+                      </div>
+                    </div>
+                    <div class="text-body2">
+                      <ol class="connection-steps q-pl-md q-mb-none">
+                        <li
+                          v-for="(stepText, index) in connectionNotes.steps"
+                          :key="index"
+                          class="q-mb-xs"
+                        >
+                          {{ stepText }}
+                        </li>
+                      </ol>
+                      <div
+                        v-if="connectionNotes.example"
+                        class="q-mt-sm q-pa-sm example-url"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'bg-grey-8'
+                            : 'bg-white'
+                        "
+                      >
+                        <strong>Example:</strong>
+                        <code class="q-ml-xs">{{
+                          connectionNotes.example
+                        }}</code>
+                      </div>
+                    </div>
+                  </q-card-section>
+                </q-card>
+
+                <div class="q-gutter-md">
+                  <div
+                    v-for="(header, index) in apiHeaders"
+                    :key="header.uuid"
+                    class="row q-col-gutter-sm"
+                  >
+                    <div class="col-5">
+                      <q-input
+                        :data-test="`add-destination-header-${header['key']}-key-input`"
+                        v-model="header.key"
+                        color="input-border"
+                        bg-color="input-bg"
+                        stack-label
+                        outlined
+                        filled
+                        :placeholder="t('alert_destinations.api_header')"
+                        dense
+                        tabindex="0"
+                      />
+                    </div>
+                    <div class="col-5">
+                      <q-input
+                        :data-test="`add-destination-header-${header['key']}-value-input`"
+                        v-model="header.value"
+                        :placeholder="t('alert_destinations.api_header_value')"
+                        color="input-border"
+                        bg-color="input-bg"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        tabindex="0"
+                      />
+                    </div>
+                    <div class="col-2 headers-btns">
+                      <q-btn
+                        :data-test="`add-destination-header-${header['key']}-delete-btn`"
+                        icon="delete"
+                        class="q-ml-xs iconHoverBtn"
+                        :class="
+                          store.state?.theme === 'dark' ? 'icon-dark' : ''
+                        "
+                        padding="sm"
+                        unelevated
+                        size="sm"
+                        round
+                        flat
+                        :title="t('alert_templates.edit')"
+                        @click="deleteApiHeader(header)"
+                      />
+                      <q-btn
+                        data-test="add-destination-add-header-btn"
+                        v-if="index === apiHeaders.length - 1"
+                        icon="add"
+                        :class="
+                          store.state?.theme === 'dark' ? 'icon-dark' : ''
+                        "
+                        class="q-ml-xs iconHoverBtn"
+                        padding="sm"
+                        unelevated
+                        size="sm"
+                        round
+                        flat
+                        :title="t('alert_templates.edit')"
+                        @click="addApiHeader()"
+                      />
+                    </div>
+                  </div>
+
+                  <q-toggle
+                    data-test="add-destination-skip-tls-verify-toggle"
+                    class="tw-h-[36px] o2-toggle-button-lg tw-mr-3 -tw-ml-4 q-mt-md"
+                    size="lg"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-toggle-button-lg-dark'
+                        : 'o2-toggle-button-lg-light'
+                    "
+                    v-model="formData.skip_tls_verify"
+                    :label="t('alert_destinations.skip_tls_verify')"
                   />
                 </div>
-                <div class="col-2 q-ml-none headers-btns">
+
+                <q-stepper-navigation class="q-mt-lg">
                   <q-btn
-                    :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                    icon="delete"
-                    class="q-ml-xs iconHoverBtn"
-                    :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
+                    data-test="step3-back-btn"
+                    @click="prevStep"
+                    label="Back"
+                    class="o2-secondary-button tw-h-[36px]"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-secondary-button-dark'
+                        : 'o2-secondary-button-light'
+                    "
                     flat
-                    :title="t('alert_templates.edit')"
-                    @click="deleteApiHeader(header)"
+                    no-caps
                   />
                   <q-btn
-                    data-test="add-destination-add-header-btn"
-                    v-if="index === apiHeaders.length - 1"
-                    icon="add"
-                    :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                    class="q-ml-xs iconHoverBtn"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
+                    data-test="step3-save-btn"
+                    @click="createDestination"
+                    label="Save Destination"
+                    class="no-border q-ml-md o2-primary-button tw-h-[36px]"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-primary-button-dark'
+                        : 'o2-primary-button-light'
+                    "
                     flat
-                    :title="t('alert_templates.edit')"
-                    @click="addApiHeader()"
+                    no-caps
+                    icon-right="save"
                   />
-                </div>
-              </div>
-            </div>
-            <div v-if="createNewDestination" class="col-12 q-py-sm">
-                <q-toggle
-                  data-test="add-destination-skip-tls-verify-toggle"
-                  class=" tw-h-[36px] o2-toggle-button-lg tw-mr-3 -tw-ml-4"
-                  size="lg"
-                  :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-                  v-model="formData.skip_tls_verify"
-                  :label="t('alert_destinations.skip_tls_verify')"
-                />
-            </div>
+                </q-stepper-navigation>
+              </q-step>
+            </q-stepper>
+
+            <!-- Original form buttons for existing destination selection -->
             <div class="flex justify-start">
               <q-btn
-                  v-if="pipelineObj.isEditNode && !createNewDestination"
-                  data-test="add-destination-delete-btn"
-                  class="o2-secondary-button tw-h-[36px] q-mr-md"
-                  color="negative"
-                  flat
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  no-caps
-                  @click="openDeleteDialog"
-                >
+                v-if="pipelineObj.isEditNode && !createNewDestination"
+                data-test="add-destination-delete-btn"
+                class="o2-secondary-button tw-h-[36px] q-mr-md"
+                color="negative"
+                flat
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-secondary-button-dark'
+                    : 'o2-secondary-button-light'
+                "
+                no-caps
+                @click="openDeleteDialog"
+              >
                 <q-icon name="delete" class="q-mr-xs" />
-                {{ t('pipeline.deleteNode') }}
+                {{ t("pipeline.deleteNode") }}
               </q-btn>
               <q-btn
                 data-test="add-destination-cancel-btn"
@@ -291,7 +546,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="o2-secondary-button tw-h-[36px]"
                 :label="t('alerts.cancel')"
                 flat
-                :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-secondary-button-dark'
+                    : 'o2-secondary-button-light'
+                "
                 no-caps
                 @click="$emit('cancel:hideform')"
               />
@@ -299,7 +558,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="add-destination-submit-btn"
                 :label="t('alerts.save')"
                 class="no-border q-ml-md o2-primary-button tw-h-[36px]"
-                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-primary-button-dark'
+                    : 'o2-primary-button-light'
+                "
                 flat
                 type="submit"
                 no-caps
@@ -319,13 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import {
-  ref,
-  computed,
-  onBeforeMount,
-  onActivated,
-  watch,
-} from "vue";
+import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
@@ -349,13 +606,17 @@ const q = useQuasar();
 const apiMethods = ["get", "post", "put"];
 const outputFormats = ["json", "ndjson"];
 const destinationTypes = [
-  { label: "OpenObserve", value: "openobserve" },
-  { label: "Splunk", value: "splunk" },
-  { label: "Elasticsearch / OpenSearch", value: "elasticsearch" },
-  { label: "Datadog", value: "datadog" },
-  { label: "Dynatrace", value: "dynatrace" },
-  { label: "Newrelic", value: "newrelic" },
-  { label: "Custom", value: "custom" },
+  { label: "OpenObserve", value: "openobserve", icon: "insights" },
+  { label: "Splunk", value: "splunk", icon: "analytics" },
+  {
+    label: "Elasticsearch / OpenSearch",
+    value: "elasticsearch",
+    icon: "search",
+  },
+  { label: "Datadog", value: "datadog", icon: "pets" },
+  { label: "Dynatrace", value: "dynatrace", icon: "speed" },
+  { label: "Newrelic", value: "newrelic", icon: "monitor_heart" },
+  { label: "Custom", value: "custom", icon: "settings" },
 ];
 const store = useStore();
 const { t } = useI18n();
@@ -374,6 +635,7 @@ const formData: Ref<DestinationData> = ref({
 const isUpdatingDestination = ref(false);
 const createNewDestination = ref(false);
 const destinationForm = ref(null);
+const step = ref(1);
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 const retries = ref(0);
 const selectedDestination: any = ref(
@@ -429,6 +691,7 @@ watch(
         destination_type: "openobserve",
       };
       apiHeaders.value = [{ key: "", value: "", uuid: getUUID() }];
+      step.value = 1; // Reset to first step
     }
   },
 );
@@ -455,6 +718,138 @@ const urlSuffix = computed(() => {
       return "";
     default:
       return "";
+  }
+});
+
+// Step validation
+const canProceedStep1 = computed(() => {
+  return !!formData.value.destination_type;
+});
+
+const canProceedStep2 = computed(() => {
+  return (
+    formData.value.name &&
+    isValidResourceName(formData.value.name) &&
+    formData.value.url &&
+    formData.value.method &&
+    formData.value.output_format
+  );
+});
+
+// Navigation functions
+const nextStep = () => {
+  if (step.value === 1 && canProceedStep1.value) {
+    step.value = 2;
+  }
+};
+
+const prevStep = () => {
+  if (step.value > 1) {
+    step.value--;
+  }
+};
+
+// Connection notes for each destination type
+const connectionNotes = computed(() => {
+  switch (formData.value.destination_type) {
+    case "openobserve":
+      return {
+        title: "OpenObserve Connection Details",
+        steps: [
+          "Log in to your OpenObserve instance",
+          "Navigate to Settings → API Keys",
+          "Create a new API key or use an existing one",
+          "Use your OpenObserve instance URL (e.g., https://your-instance.openobserve.ai)",
+          "The endpoint suffix will be automatically added: /api/default/_json",
+          "Add headers: Authorization: Basic <base64(email:api_key)>",
+        ],
+        example: "https://your-instance.openobserve.ai",
+      };
+    case "splunk":
+      return {
+        title: "Splunk HEC Connection Details",
+        steps: [
+          "Log in to your Splunk instance as an admin",
+          "Go to Settings → Data Inputs → HTTP Event Collector",
+          "Click 'New Token' to create a new HEC token",
+          "Configure the token settings and save",
+          "Use your Splunk HEC endpoint URL",
+          "Add the HEC token in the Headers section (Authorization: Splunk <token>)",
+        ],
+        example: "https://your-splunk.com:8088",
+      };
+    case "elasticsearch":
+      return {
+        title: "Elasticsearch Connection Details",
+        steps: [
+          "Locate your Elasticsearch cluster endpoint",
+          "Ensure the cluster is accessible from this network",
+          "Create an API key or use basic authentication",
+          "For Cloud: Get the endpoint from your cloud console",
+          "For self-hosted: Use your cluster URL with port (typically 9200)",
+          "Add authentication in the Headers section",
+        ],
+        example: "https://your-cluster.es.io:9200",
+      };
+    case "datadog":
+      return {
+        title: "Datadog Connection Details",
+        steps: [
+          "Log in to your Datadog account",
+          "Navigate to Organization Settings → API Keys",
+          "Create a new API key or copy an existing one",
+          "Use the Datadog intake URL for your region",
+          "US: https://http-intake.logs.datadoghq.com",
+          "EU: https://http-intake.logs.datadoghq.eu",
+          "Add the API key in Headers: DD-API-KEY: <your-key>",
+        ],
+        example: "https://http-intake.logs.datadoghq.com",
+      };
+    case "dynatrace":
+      return {
+        title: "Dynatrace Connection Details",
+        steps: [
+          "Log in to your Dynatrace environment",
+          "Navigate to Settings → Integration → Dynatrace API",
+          "Create a new API token with logs.ingest permission",
+          "Use your environment URL",
+          "Format: https://{your-environment-id}.live.dynatrace.com",
+          "Add the token in Headers: Authorization: Api-Token <token>",
+        ],
+        example: "https://abc12345.live.dynatrace.com",
+      };
+    case "newrelic":
+      return {
+        title: "New Relic Connection Details",
+        steps: [
+          "Log in to your New Relic account",
+          "Navigate to API Keys section",
+          "Create or copy a License Key (Ingest - License)",
+          "US endpoint: https://log-api.newrelic.com",
+          "EU endpoint: https://log-api.eu.newrelic.com",
+          "Add the license key in Headers: Api-Key: <your-license-key>",
+        ],
+        example: "https://log-api.newrelic.com",
+      };
+    case "custom":
+      return {
+        title: "Custom Endpoint Connection",
+        steps: [
+          "Enter your custom endpoint URL",
+          "Ensure the endpoint accepts HTTP/HTTPS requests",
+          "Select the appropriate HTTP method (GET, POST, PUT)",
+          "Configure any required headers for authentication",
+          "Choose the output format (JSON or NDJSON)",
+          "Test the connection to verify it works",
+        ],
+        example: "https://your-custom-endpoint.com/logs",
+      };
+    default:
+      return {
+        title: "Connection Details",
+        steps: ["Select a destination type to see specific instructions"],
+        example: "",
+      };
   }
 });
 const createDestination = () => {
@@ -640,10 +1035,161 @@ defineExpose({
   retries,
   apiMethods,
   outputFormats,
-  pipelineObj
+  pipelineObj,
+  step,
+  nextStep,
+  prevStep,
+  canProceedStep1,
+  canProceedStep2,
+  connectionNotes,
 });
 </script>
 <style lang="scss" scoped>
+// Destination Type Cards Grid
+.destination-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.destination-type-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 120px;
+
+  &:hover {
+    border-color: #1976d2;
+    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
+    transform: translateY(-2px);
+  }
+
+  &.selected {
+    border-color: #1976d2;
+    background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+    box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
+
+    .card-icon {
+      color: #1976d2;
+    }
+  }
+
+  &.dark-mode {
+    background: #1e1e1e;
+    border-color: #424242;
+
+    &:hover {
+      border-color: #5d9cec;
+      box-shadow: 0 4px 12px rgba(93, 156, 236, 0.2);
+    }
+
+    &.selected {
+      border-color: #5d9cec;
+      background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%);
+      box-shadow: 0 4px 16px rgba(93, 156, 236, 0.25);
+
+      .card-icon {
+        color: #5d9cec;
+      }
+    }
+  }
+
+  .card-icon {
+    margin-bottom: 8px;
+    color: #666;
+    transition: color 0.3s ease;
+  }
+
+  .card-label {
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.3;
+    margin-top: 4px;
+  }
+
+  .check-icon {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+  }
+}
+
+// Stepper Styles
+.modern-stepper {
+  box-shadow: none;
+
+  :deep(.q-stepper__header) {
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  :deep(.q-stepper__tab) {
+    padding: 16px 24px;
+  }
+
+  :deep(.q-stepper__tab--active) {
+    color: #1976d2;
+    font-weight: 600;
+  }
+
+  :deep(.q-stepper__tab--done) {
+    color: #4caf50;
+  }
+
+  :deep(.q-stepper__dot) {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  :deep(.q-stepper__step-inner) {
+    padding: 24px 0;
+  }
+}
+
+// Connection Notes Card
+.connection-notes-card {
+  border-radius: 8px;
+  border: 1px solid #e3f2fd;
+
+  .connection-steps {
+    line-height: 1.8;
+
+    li {
+      margin-bottom: 8px;
+      color: inherit;
+    }
+  }
+
+  .example-url {
+    border-radius: 6px;
+    font-size: 13px;
+
+    code {
+      background: transparent;
+      padding: 0;
+      font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+      color: #1976d2;
+    }
+  }
+}
+
+// Enhanced input fields
+.showLabelOnTop {
+  :deep(.q-field__prepend) {
+    padding-right: 8px;
+  }
+}
+
 .destination-method-select {
   .q-field__native > :first-child {
     text-transform: uppercase !important;
@@ -653,6 +1199,7 @@ defineExpose({
 .no-case .q-field__native span {
   text-transform: none !important;
 }
+
 .headers-btns {
   .q-btn {
     &.icon-dark {
@@ -660,9 +1207,10 @@ defineExpose({
     }
   }
 }
+
 .truncate-url {
   display: inline-block;
-  max-width: calc(40vw - 200px); /* Adjust the width as needed */
+  max-width: calc(40vw - 200px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
