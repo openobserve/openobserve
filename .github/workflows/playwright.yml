@@ -336,15 +336,20 @@ jobs:
 
             # Determine what to run based on rerun mode
             if [ "$RERUN_MODE" = "optimized" ]; then
-              # TestDino returns paths relative to test directory (e.g., "Pipelines/pipeline-core.spec.js")
-              # We need to prepend "./playwright-tests/" to make it work
-              # Extract file path and grep pattern from EXTRA_PW_FLAGS
-              FIXED_FLAGS=$(echo "$EXTRA_PW_FLAGS" | sed 's|^\([^ ]*\)|./playwright-tests/\1|')
+              # TestDino returns: "Pipelines/pipeline-core.spec.js -g test name here"
+              # We need to: "./playwright-tests/Pipelines/pipeline-core.spec.js" "-g" "test name here"
+              # Extract file path (before -g) and test name (after -g)
+              FILE_PATH=$(echo "$EXTRA_PW_FLAGS" | sed 's/ -g.*//')
+              TEST_NAME=$(echo "$EXTRA_PW_FLAGS" | sed 's/.*-g //')
+
+              FIXED_FILE_PATH="./playwright-tests/$FILE_PATH"
+
               echo "::notice::🎯 OPTIMIZED RERUN: Running only failed tests"
               echo "DEBUG: Original TestDino flags: $EXTRA_PW_FLAGS"
-              echo "DEBUG: Fixed flags with correct path: $FIXED_FLAGS"
-              echo "DEBUG: Final command: npx playwright test $FIXED_FLAGS"
-              npx playwright test $FIXED_FLAGS
+              echo "DEBUG: File path: $FIXED_FILE_PATH"
+              echo "DEBUG: Test name: $TEST_NAME"
+              echo "DEBUG: Final command: npx playwright test \"$FIXED_FILE_PATH\" -g \"$TEST_NAME\""
+              npx playwright test "$FIXED_FILE_PATH" -g "$TEST_NAME"
             else
               # Normal run or fallback
               if [ "$RERUN_MODE" = "fallback" ]; then
