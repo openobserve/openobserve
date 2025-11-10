@@ -420,5 +420,62 @@ describe("Cookie Utilities", () => {
       removeToken();
       expect(Cookies.remove).toHaveBeenCalledWith(Keys.tokenKey);
     });
+
+    it("should handle empty string values", () => {
+      (Cookies.get as any).mockReturnValue("");
+      setLanguage("");
+      const result = getLanguage();
+      expect(result).toBe("");
+    });
+
+    it("should handle special characters in values", () => {
+      const specialValue = "test@#$%^&*()";
+      (Cookies.get as any).mockReturnValue(specialValue);
+      setToken(specialValue);
+      const result = getToken();
+      expect(result).toBe(specialValue);
+    });
+
+    it("should handle very long token strings", () => {
+      const longToken = "a".repeat(1000);
+      (Cookies.get as any).mockReturnValue(longToken);
+      setToken(longToken);
+      const result = getToken();
+      expect(result).toBe(longToken);
+    });
+
+    it("should handle multiple consecutive sets", () => {
+      setLanguage("en");
+      setLanguage("es");
+      setLanguage("fr");
+      expect(Cookies.set).toHaveBeenCalledTimes(3);
+    });
+
+    it("should handle remove before set", () => {
+      removeToken();
+      expect(Cookies.remove).toHaveBeenCalledWith(Keys.tokenKey);
+      setToken("new-token");
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.tokenKey, "new-token", { path: "/" });
+    });
+
+    it("should handle Unicode characters", () => {
+      const unicode = "测试中文";
+      (Cookies.get as any).mockReturnValue(unicode);
+      setLanguage(unicode);
+      const result = getLanguage();
+      expect(result).toBe(unicode);
+    });
+
+    it("should handle null when getting non-existent cookie", () => {
+      (Cookies.get as any).mockReturnValue(null);
+      const result = getToken();
+      expect(result).toBeNull();
+    });
+
+    it("should handle undefined when getting non-existent cookie", () => {
+      (Cookies.get as any).mockReturnValue(undefined);
+      const result = getSize();
+      expect(result).toBeUndefined();
+    });
   });
 });

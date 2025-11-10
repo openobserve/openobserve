@@ -23,6 +23,17 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 /// Organization-level correlation configuration
+///
+/// # Naming Convention
+///
+/// This config uses `correlation_dimensions` (not `correlation_fields`) to distinguish
+/// from `DeduplicationConfig::fingerprint_fields`:
+/// - **correlation_dimensions**: Semantic group IDs used for *matching* alerts to incidents
+/// - **fingerprint_fields**: Semantic group IDs used for *identifying* duplicate alert firings
+///
+/// While both reference semantic group IDs, they serve different purposes:
+/// - Correlation: "Do these alerts belong to the same incident?"
+/// - Deduplication: "Is this the same alert firing again?"
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CorrelationConfig {
@@ -30,24 +41,43 @@ pub struct CorrelationConfig {
     pub enabled: bool,
 
     /// Semantic group IDs to use for correlation matching
-    /// Example: ["service", "host", "k8s-cluster"]
+    ///
+    /// These define which dimensions must match for alerts to be grouped into
+    /// the same incident. References semantic group IDs from deduplication config.
+    ///
+    /// Example: `["service", "host", "k8s-cluster"]`
+    ///
+    /// Note: Called "dimensions" (not "fields") to emphasize the semantic grouping aspect.
     #[serde(default)]
     pub correlation_dimensions: Vec<String>,
 
     /// Whether all dimensions must match (true) or just any (false)
+    ///
+    /// - `true`: ALL correlation_dimensions must match (AND logic)
+    /// - `false`: ANY correlation_dimension can match (OR logic)
     #[serde(default)]
     pub require_dimension_match: bool,
 
     /// Enable temporal correlation as a fallback when no semantic match found
+    ///
+    /// When enabled, alerts that arrive within the temporal window will be
+    /// grouped even if dimensions don't match (lower confidence).
     #[serde(default)]
     pub temporal_fallback_enabled: bool,
 
     /// Time window in seconds for temporal correlation
-    /// Alerts within this window may be grouped even without dimension match
+    ///
+    /// Alerts within this window may be grouped even without dimension match.
+    /// Recommended: 300s (5 minutes) for related failures, 60s (1 minute) for cascading failures.
     #[serde(default = "default_temporal_window")]
     pub temporal_window_seconds: i64,
 
     /// Minimum number of alerts required to create an incident
+    ///
+    /// Alerts below this threshold are tracked but don't create incidents.
+    /// Recommended: 2 (prevents single noisy alert from creating incident).
+    ///
+    /// **Note**: Current implementation drops alerts below threshold (see Issue #7).
     #[serde(default = "default_min_alerts")]
     pub min_alerts_for_incident: usize,
 }
@@ -91,8 +121,7 @@ impl CorrelationConfig {
                         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
                     {
                         return Err(format!(
-                            "Invalid correlation dimension ID '{}': must be lowercase with dashes only",
-                            dim
+                            "Invalid correlation dimension ID '{dim}': must be lowercase with dashes only"
                         ));
                     }
                 }
@@ -186,7 +215,7 @@ impl std::str::FromStr for IncidentStatus {
             "open" => Ok(Self::Open),
             "acknowledged" => Ok(Self::Acknowledged),
             "resolved" => Ok(Self::Resolved),
-            _ => Err(format!("Invalid incident status: {}", s)),
+            _ => Err(format!("Invalid incident status: {s}")),
         }
     }
 }

@@ -366,5 +366,112 @@ describe("Common Utils", () => {
       await getDefaultOrganization({email: "test@test.com"}, "org");
       expect(mockOrganizationsService.os_list).toHaveBeenCalled();
     });
+
+    it("should handle timeout errors", async () => {
+      const timeoutError = new Error("Request timeout");
+      mockOrganizationsService.os_list = vi.fn().mockRejectedValue(timeoutError);
+
+      await expect(getDefaultOrganization({email: "test@test.com"}, "org"))
+        .rejects.toThrow("Request timeout");
+    });
+
+    it("should handle undefined error codes gracefully", () => {
+      const message = logsErrorMessage(999999);
+      expect(typeof message).toBe("string");
+      // Unknown error codes return empty string
+      expect(message).toBe("");
+    });
+
+    it("should handle negative error codes", () => {
+      const message = logsErrorMessage(-1);
+      expect(typeof message).toBe("string");
+      expect(message).toBe("");
+    });
+
+    it("should handle zero error code", () => {
+      const message = logsErrorMessage(0);
+      expect(typeof message).toBe("string");
+      expect(message).toBe("");
+    });
+  });
+
+  describe("Edge Cases", () => {
+    it("should handle empty user object", async () => {
+      const response = {
+        data: {
+          data: [{ id: "1", name: "Test Org", identifier: "test" }]
+        }
+      };
+      mockOrganizationsService.os_list = vi.fn().mockResolvedValue(response);
+      mockZincutils.useLocalOrganization = vi.fn().mockReturnValue({ value: null });
+
+      await getDefaultOrganization({} as any, "org");
+      expect(mockOrganizationsService.os_list).toHaveBeenCalled();
+    });
+
+    it("should handle organization with empty name", async () => {
+      const response = {
+        data: {
+          data: [{ id: "1", name: "", identifier: "test" }]
+        }
+      };
+      mockOrganizationsService.os_list = vi.fn().mockResolvedValue(response);
+      mockZincutils.useLocalOrganization = vi.fn().mockReturnValue({ value: null });
+
+      await getDefaultOrganization({email: "test@test.com"}, "org");
+      expect(mockOrganizationsService.os_list).toHaveBeenCalled();
+    });
+
+    it("should handle organization with special characters", async () => {
+      const response = {
+        data: {
+          data: [{
+            id: "1",
+            name: "Test@Org#123",
+            identifier: "test-org-123"
+          }]
+        }
+      };
+      mockOrganizationsService.os_list = vi.fn().mockResolvedValue(response);
+      mockZincutils.useLocalOrganization = vi.fn().mockReturnValue({ value: null });
+
+      await getDefaultOrganization({email: "test@test.com"}, "org");
+      expect(mockOrganizationsService.os_list).toHaveBeenCalled();
+    });
+
+    it("should handle very long organization names", async () => {
+      const longName = "A".repeat(500);
+      const response = {
+        data: {
+          data: [{
+            id: "1",
+            name: longName,
+            identifier: "test"
+          }]
+        }
+      };
+      mockOrganizationsService.os_list = vi.fn().mockResolvedValue(response);
+      mockZincutils.useLocalOrganization = vi.fn().mockReturnValue({ value: null });
+
+      await getDefaultOrganization({email: "test@test.com"}, "org");
+      expect(mockOrganizationsService.os_list).toHaveBeenCalled();
+    });
+
+    it("should handle Unicode in organization names", async () => {
+      const response = {
+        data: {
+          data: [{
+            id: "1",
+            name: "测试组织",
+            identifier: "test"
+          }]
+        }
+      };
+      mockOrganizationsService.os_list = vi.fn().mockResolvedValue(response);
+      mockZincutils.useLocalOrganization = vi.fn().mockReturnValue({ value: null });
+
+      await getDefaultOrganization({email: "test@test.com"}, "org");
+      expect(mockOrganizationsService.os_list).toHaveBeenCalled();
+    });
   });
 });
