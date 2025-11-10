@@ -161,6 +161,9 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectLogs();
 
+    // INTENTIONAL BUG FOR TESTING RERUN OPTIMIZATION
+    expect(1).toBe(2); // This will fail
+
     await pageManager.pipelinesPage.enterStreamName("e2e");
     await pageManager.pipelinesPage.enterStreamName("e2e_automate3");
     await page.waitForTimeout(2000);
