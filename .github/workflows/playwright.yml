@@ -358,7 +358,7 @@ jobs:
         run: |
           cd tests/ui-testing
           echo "::group::Caching test failure metadata to TestDino"
-          if npx tdpw cache; then
+          if npx tdpw cache --json-report playwright-results/report.json; then
             echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
             echo "::notice::This data will be used for optimized reruns if tests fail"
           else
