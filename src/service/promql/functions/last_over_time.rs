@@ -13,25 +13,55 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use datafusion::error::Result;
 
-use crate::service::promql::value::{RangeValue, Value};
+use crate::service::promql::{
+    functions::RangeFunc,
+    value::{EvalContext, Sample, Value},
+};
 
-pub(crate) fn last_over_time(data: Value) -> Result<Value> {
-    // NOTE: Comment taken from prometheus golang source.
-    // The last_over_time function acts like offset; thus, it
-    // should keep the metric name.  For all the other range
-    // vector functions, the only change needed is to drop the
-    // metric name in the output.
-    // i.e. keep_name_label = true
-    super::eval_idelta(data, "last_over_time", exec, true)
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn last_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] last_over_time() started",
+        eval_ctx.trace_id
+    );
+    let result = super::eval_range(data, LastOverTimeFunc::new(), eval_ctx);
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] last_over_time() execution took: {:?}",
+        eval_ctx.trace_id,
+        start.elapsed()
+    );
+    result
 }
 
-fn exec(data: RangeValue) -> Option<f64> {
-    if data.samples.is_empty() {
-        return None;
+pub struct LastOverTimeFunc;
+
+impl LastOverTimeFunc {
+    pub fn new() -> Self {
+        LastOverTimeFunc {}
     }
-    Some(data.samples.last().unwrap().value)
+}
+
+impl RangeFunc for LastOverTimeFunc {
+    fn name(&self) -> &'static str {
+        "last_over_time"
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        if samples.is_empty() {
+            return None;
+        }
+        // NOTE: Comment taken from prometheus golang source.
+        // The last_over_time function acts like offset; thus, it
+        // should keep the metric name.  For all the other range
+        // vector functions, the only change needed is to drop the
+        // metric name in the output.
+        Some(samples.last().unwrap().value)
+    }
 }
 
 #[cfg(test)]
@@ -40,6 +70,12 @@ mod tests {
 
     use super::*;
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+
+    // Test helper
+    fn last_over_time_test_helper(data: Value) -> Result<Value> {
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
+        last_over_time(data, &eval_ctx)
+    }
 
     #[test]
     fn test_last_over_time_function() {
@@ -55,24 +91,24 @@ mod tests {
             samples,
             exemplars: None,
             time_window: Some(TimeWindow {
-                eval_ts: 3000,
                 range: Duration::from_secs(2),
                 offset: Duration::ZERO,
             }),
         };
 
         let matrix = Value::Matrix(vec![range_value]);
-        let result = last_over_time(matrix).unwrap();
+        let result = last_over_time_test_helper(matrix).unwrap();
 
-        // Should return a vector with last value
+        // Should return a matrix with last value
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 1);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert_eq!(m[0].samples.len(), 1);
                 // Should return the last value: 30.0
-                assert!((v[0].sample.value - 30.0).abs() < 0.001);
-                assert_eq!(v[0].sample.timestamp, 3000);
+                assert!((m[0].samples[0].value - 30.0).abs() < 0.001);
+                assert_eq!(m[0].samples[0].timestamp, 3000);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }
