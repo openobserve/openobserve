@@ -17,7 +17,7 @@ use datafusion::error::{DataFusionError, Result};
 
 use crate::service::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 
-pub(crate) fn vector_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+pub(crate) fn vector(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let value = match data {
         Value::Float(f) => f,
         _ => {

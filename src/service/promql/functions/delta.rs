@@ -21,15 +21,15 @@ use crate::service::promql::{
 };
 
 /// Enhanced version that processes all timestamps at once for range queries
-pub(crate) fn delta_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+pub(crate) fn delta(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
     log::info!(
-        "[trace_id: {}] [PromQL Timing] delta_range() started",
+        "[trace_id: {}] [PromQL Timing] delta() started",
         eval_ctx.trace_id
     );
     let result = super::eval_range(data, DeltaFunc::new(), eval_ctx);
     log::info!(
-        "[trace_id: {}] [PromQL Timing] delta_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] delta() execution took: {:?}",
         eval_ctx.trace_id,
         start.elapsed()
     );

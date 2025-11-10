@@ -23,7 +23,7 @@ use crate::service::promql::{
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#holt_winters
 /// Enhanced version that processes all timestamps at once for range queries
-pub(crate) fn holt_winters_range(
+pub(crate) fn holt_winters(
     data: Value,
     scaling_factor: f64,
     trend_factor: f64,
@@ -31,7 +31,7 @@ pub(crate) fn holt_winters_range(
 ) -> Result<Value> {
     let start = std::time::Instant::now();
     log::info!(
-        "[trace_id: {}] [PromQL Timing] holt_winters_range() started",
+        "[trace_id: {}] [PromQL Timing] holt_winters() started",
         eval_ctx.trace_id
     );
     let result = super::eval_range(
@@ -40,7 +40,7 @@ pub(crate) fn holt_winters_range(
         eval_ctx,
     );
     log::info!(
-        "[trace_id: {}] [PromQL Timing] holt_winters_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] holt_winters() execution took: {:?}",
         eval_ctx.trace_id,
         start.elapsed()
     );
@@ -120,7 +120,7 @@ mod tests {
         trend_factor: f64,
     ) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
-        holt_winters_range(data, scaling_factor, trend_factor, &eval_ctx)
+        holt_winters(data, scaling_factor, trend_factor, &eval_ctx)
     }
 
     #[test]

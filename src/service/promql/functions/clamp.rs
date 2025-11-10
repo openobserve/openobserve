@@ -19,7 +19,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use crate::service::promql::value::{LabelsExt, RangeValue, Sample, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#clamp
-pub(crate) fn clamp_range(data: Value, min: f64, max: f64) -> Result<Value> {
+pub(crate) fn clamp(data: Value, min: f64, max: f64) -> Result<Value> {
     match data {
         Value::Matrix(matrix) => {
             let out: Vec<RangeValue> = matrix
@@ -82,7 +82,7 @@ mod tests {
     fn test_clamp_function() {
         let eval_ts = 1000;
         let matrix = create_matrix(eval_ts, vec![5.0, 15.0, 25.0]);
-        let result = clamp_range(matrix, 10.0, 20.0).unwrap();
+        let result = clamp(matrix, 10.0, 20.0).unwrap();
 
         match result {
             Value::Matrix(m) => {

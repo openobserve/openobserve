@@ -21,15 +21,15 @@ use crate::service::promql::{
 };
 
 /// Enhanced version that processes all timestamps at once for range queries
-pub(crate) fn irate_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+pub(crate) fn irate(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
     log::info!(
-        "[trace_id: {}] [PromQL Timing] irate_range() started",
+        "[trace_id: {}] [PromQL Timing] irate() started",
         eval_ctx.trace_id
     );
     let result = super::eval_range(data, IrateFunc::new(), eval_ctx);
     log::info!(
-        "[trace_id: {}] [PromQL Timing] irate_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] irate() execution took: {:?}",
         eval_ctx.trace_id,
         start.elapsed()
     );
@@ -83,7 +83,7 @@ mod tests {
     // Test helper function that creates an EvalContext for instant queries
     fn irate_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
-        irate_range(data, &eval_ctx)
+        irate(data, &eval_ctx)
     }
 
     #[test]

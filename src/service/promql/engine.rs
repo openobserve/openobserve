@@ -867,12 +867,12 @@ impl Engine {
         };
 
         Ok(match func_name {
-            Func::Abs => functions::abs_range(input)?,
-            Func::Absent => functions::absent_range(input, &self.eval_ctx)?,
-            Func::AbsentOverTime => functions::absent_over_time_range(input, &self.eval_ctx)?,
-            Func::AvgOverTime => functions::avg_over_time_range(input, &self.eval_ctx)?,
-            Func::Ceil => functions::ceil_range(input)?,
-            Func::Changes => functions::changes_range(input, &self.eval_ctx)?,
+            Func::Abs => functions::abs(input)?,
+            Func::Absent => functions::absent(input, &self.eval_ctx)?,
+            Func::AbsentOverTime => functions::absent_over_time(input, &self.eval_ctx)?,
+            Func::AvgOverTime => functions::avg_over_time(input, &self.eval_ctx)?,
+            Func::Ceil => functions::ceil(input)?,
+            Func::Changes => functions::changes(input, &self.eval_ctx)?,
             Func::Clamp => {
                 let err =
                     "Invalid args, expected \"clamp(v instant-vector, min scalar, max scalar)\"";
@@ -893,7 +893,7 @@ impl Engine {
                         return Err(DataFusionError::NotImplemented(err.into()));
                     }
                 };
-                functions::clamp_range(input, min_f, max_f)?
+                functions::clamp(input, min_f, max_f)?
             }
             Func::ClampMax => {
                 let err = "Invalid args, expected \"clamp(v instant-vector, max scalar)\"";
@@ -907,7 +907,7 @@ impl Engine {
                         return Err(DataFusionError::NotImplemented(err.into()));
                     }
                 };
-                functions::clamp_range(input, f64::MIN, max_f)?
+                functions::clamp(input, f64::MIN, max_f)?
             }
             Func::ClampMin => {
                 let err = "Invalid args, expected \"clamp(v instant-vector, min scalar)\"";
@@ -921,17 +921,17 @@ impl Engine {
                         return Err(DataFusionError::NotImplemented(err.into()));
                     }
                 };
-                functions::clamp_range(input, min_f, f64::MAX)?
+                functions::clamp(input, min_f, f64::MAX)?
             }
-            Func::CountOverTime => functions::count_over_time_range(input, &self.eval_ctx)?,
-            Func::DayOfMonth => functions::day_of_month_range(input)?,
-            Func::DayOfWeek => functions::day_of_week_range(input)?,
-            Func::DayOfYear => functions::day_of_year_range(input)?,
-            Func::DaysInMonth => functions::days_in_month_range(input)?,
-            Func::Delta => functions::delta_range(input, &self.eval_ctx)?,
-            Func::Deriv => functions::deriv_range(input, &self.eval_ctx)?,
-            Func::Exp => functions::exp_range(input)?,
-            Func::Floor => functions::floor_range(input)?,
+            Func::CountOverTime => functions::count_over_time(input, &self.eval_ctx)?,
+            Func::DayOfMonth => functions::day_of_month(input)?,
+            Func::DayOfWeek => functions::day_of_week(input)?,
+            Func::DayOfYear => functions::day_of_year(input)?,
+            Func::DaysInMonth => functions::days_in_month(input)?,
+            Func::Delta => functions::delta(input, &self.eval_ctx)?,
+            Func::Deriv => functions::deriv(input, &self.eval_ctx)?,
+            Func::Exp => functions::exp(input)?,
+            Func::Floor => functions::floor(input)?,
             Func::HistogramCount => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Function: {func_name:?}"
@@ -964,7 +964,7 @@ impl Engine {
                 };
 
                 // Use range version if we have an eval context
-                functions::histogram_quantile_range(phi, input, &self.eval_ctx)?
+                functions::histogram_quantile(phi, input, &self.eval_ctx)?
             }
             Func::HistogramSum => {
                 return Err(DataFusionError::NotImplemented(format!(
@@ -983,12 +983,12 @@ impl Engine {
                 let scaling_factor = self.parse_f64_else_err(&sf, err)?;
                 let trend_factor = self.parse_f64_else_err(&tf, err)?;
 
-                functions::holt_winters_range(input, scaling_factor, trend_factor, &self.eval_ctx)?
+                functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx)?
             }
-            Func::Hour => functions::hour_range(input)?,
-            Func::Idelta => functions::idelta_range(input, &self.eval_ctx)?,
-            Func::Increase => functions::increase_range(input, &self.eval_ctx)?,
-            Func::Irate => functions::irate_range(input, &self.eval_ctx)?,
+            Func::Hour => functions::hour(input)?,
+            Func::Idelta => functions::idelta(input, &self.eval_ctx)?,
+            Func::Increase => functions::increase(input, &self.eval_ctx)?,
+            Func::Irate => functions::irate(input, &self.eval_ctx)?,
             Func::LabelJoin => {
                 let err = "Invalid args, expected \"label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)\"";
                 self.ensure_ge_three_args(args, err)?;
@@ -1037,14 +1037,14 @@ impl Engine {
 
                 functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)?
             }
-            Func::LastOverTime => functions::last_over_time_range(input, &self.eval_ctx)?,
-            Func::Ln => functions::ln_range(input)?,
-            Func::Log10 => functions::log10_range(input)?,
-            Func::Log2 => functions::log2_range(input)?,
-            Func::MaxOverTime => functions::max_over_time_range(input, &self.eval_ctx)?,
-            Func::MinOverTime => functions::min_over_time_range(input, &self.eval_ctx)?,
-            Func::Minute => functions::minute_range(input)?,
-            Func::Month => functions::month_range(input)?,
+            Func::LastOverTime => functions::last_over_time(input, &self.eval_ctx)?,
+            Func::Ln => functions::ln(input)?,
+            Func::Log10 => functions::log10(input)?,
+            Func::Log2 => functions::log2(input)?,
+            Func::MaxOverTime => functions::max_over_time(input, &self.eval_ctx)?,
+            Func::MinOverTime => functions::min_over_time(input, &self.eval_ctx)?,
+            Func::Minute => functions::minute(input)?,
+            Func::Month => functions::month(input)?,
             Func::PredictLinear => {
                 let err = "Invalid args, expected \"predict_linear(v range-vector, t scalar)\"";
 
@@ -1056,7 +1056,7 @@ impl Engine {
                         "Invalid prediction_steps, f64 expected".into(),
                     ),
                 )?;
-                functions::predict_linear_range(input, prediction_steps, &self.eval_ctx)?
+                functions::predict_linear(input, prediction_steps, &self.eval_ctx)?
             }
             Func::QuantileOverTime => {
                 let err = "Invalid args, expected \"quantile_over_time(scalar, range-vector)\"";
@@ -1071,11 +1071,11 @@ impl Engine {
                     }
                 };
                 let input = self.call_expr_second_arg(args).await?;
-                functions::quantile_over_time_range(phi_quantile, input, &self.eval_ctx)?
+                functions::quantile_over_time(phi_quantile, input, &self.eval_ctx)?
             }
-            Func::Rate => functions::rate_range(input, &self.eval_ctx)?,
-            Func::Resets => functions::resets_range(input, &self.eval_ctx)?,
-            Func::Round => functions::round_range(input)?,
+            Func::Rate => functions::rate(input, &self.eval_ctx)?,
+            Func::Resets => functions::resets(input, &self.eval_ctx)?,
+            Func::Round => functions::round(input)?,
             Func::Scalar => match input {
                 Value::Float(_) => input,
                 _ => {
@@ -1084,7 +1084,7 @@ impl Engine {
                     )));
                 }
             },
-            Func::Sgn => functions::sgn_range(input)?,
+            Func::Sgn => functions::sgn(input)?,
             Func::Sort => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Function: {func_name:?}"
@@ -1095,15 +1095,15 @@ impl Engine {
                     "Unsupported Function: {func_name:?}"
                 )));
             }
-            Func::Sqrt => functions::sqrt_range(input)?,
-            Func::StddevOverTime => functions::stddev_over_time_range(input, &self.eval_ctx)?,
-            Func::StdvarOverTime => functions::stdvar_over_time_range(input, &self.eval_ctx)?,
-            Func::SumOverTime => functions::sum_over_time_range(input, &self.eval_ctx)?,
+            Func::Sqrt => functions::sqrt(input)?,
+            Func::StddevOverTime => functions::stddev_over_time(input, &self.eval_ctx)?,
+            Func::StdvarOverTime => functions::stdvar_over_time(input, &self.eval_ctx)?,
+            Func::SumOverTime => functions::sum_over_time(input, &self.eval_ctx)?,
             // TODO: check this implementation
             Func::Time => Value::Float((self.eval_ctx.start / 1_000_000) as f64),
-            Func::Timestamp => functions::timestamp_range(input)?,
-            Func::Vector => functions::vector_range(input, &self.eval_ctx)?,
-            Func::Year => functions::year_range(input)?,
+            Func::Timestamp => functions::timestamp(input)?,
+            Func::Vector => functions::vector(input, &self.eval_ctx)?,
+            Func::Year => functions::year(input)?,
         })
     }
 }

@@ -64,39 +64,39 @@ impl TimeOperationType {
     }
 }
 
-pub(crate) fn minute_range(data: Value) -> Result<Value> {
+pub(crate) fn minute(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::Minute)
 }
 
-pub(crate) fn hour_range(data: Value) -> Result<Value> {
+pub(crate) fn hour(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::Hour)
 }
 
-pub(crate) fn month_range(data: Value) -> Result<Value> {
+pub(crate) fn month(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::Month)
 }
 
-pub(crate) fn year_range(data: Value) -> Result<Value> {
+pub(crate) fn year(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::Year)
 }
 
-pub(crate) fn day_of_month_range(data: Value) -> Result<Value> {
+pub(crate) fn day_of_month(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::DayOfMonth)
 }
 
-pub(crate) fn day_of_week_range(data: Value) -> Result<Value> {
+pub(crate) fn day_of_week(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::DayOfWeek)
 }
 
-pub(crate) fn day_of_year_range(data: Value) -> Result<Value> {
+pub(crate) fn day_of_year(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::DayOfYear)
 }
 
-pub(crate) fn days_in_month_range(data: Value) -> Result<Value> {
+pub(crate) fn days_in_month(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::DaysInMonth)
 }
 
-pub(crate) fn timestamp_range(data: Value) -> Result<Value> {
+pub(crate) fn timestamp(data: Value) -> Result<Value> {
     match data {
         Value::Matrix(matrix) => {
             let out: Vec<RangeValue> = matrix

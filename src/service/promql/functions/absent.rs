@@ -40,7 +40,7 @@ fn generate_absent_matrix(eval_ctx: &EvalContext) -> Value {
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent
 /// Returns 1 for each timestamp where the input vector has no data
-pub(crate) fn absent_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+pub(crate) fn absent(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     match data {
         Value::Matrix(matrix) => {
             // If the matrix is completely empty, return 1 for all timestamps
@@ -110,7 +110,7 @@ mod tests {
         // Empty matrix should return 1.0 for all timestamps in range
         let eval_ctx = create_eval_ctx();
         let value = Value::Matrix(vec![]);
-        let result = absent_range(value, &eval_ctx).unwrap();
+        let result = absent(value, &eval_ctx).unwrap();
 
         if let Value::Matrix(matrix) = result {
             assert_eq!(matrix.len(), 1);
@@ -132,7 +132,7 @@ mod tests {
         // None should return 1.0 for all timestamps
         let eval_ctx = create_eval_ctx();
         let value = Value::None;
-        let result = absent_range(value, &eval_ctx).unwrap();
+        let result = absent(value, &eval_ctx).unwrap();
 
         if let Value::Matrix(matrix) = result {
             assert_eq!(matrix.len(), 1);
@@ -160,7 +160,7 @@ mod tests {
             exemplars: None,
             time_window: None,
         }]);
-        let result = absent_range(value, &eval_ctx).unwrap();
+        let result = absent(value, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -178,7 +178,7 @@ mod tests {
             exemplars: None,
             time_window: None,
         }]);
-        let result = absent_range(value, &eval_ctx).unwrap();
+        let result = absent(value, &eval_ctx).unwrap();
 
         if let Value::Matrix(matrix) = result {
             assert_eq!(matrix.len(), 1);
@@ -196,7 +196,7 @@ mod tests {
         // Invalid input type should return error
         let eval_ctx = create_eval_ctx();
         let value = Value::Float(5.0);
-        let result = absent_range(value, &eval_ctx);
+        let result = absent(value, &eval_ctx);
         assert!(result.is_err());
     }
 }

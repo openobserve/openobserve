@@ -23,15 +23,15 @@ use crate::service::promql::{
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#deriv
 /// Enhanced version that processes all timestamps at once for range queries
-pub(crate) fn deriv_range(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+pub(crate) fn deriv(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
     log::info!(
-        "[trace_id: {}] [PromQL Timing] deriv_range() started",
+        "[trace_id: {}] [PromQL Timing] deriv() started",
         eval_ctx.trace_id
     );
     let result = super::eval_range(data, DerivFunc::new(), eval_ctx);
     log::info!(
-        "[trace_id: {}] [PromQL Timing] deriv_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] deriv() execution took: {:?}",
         eval_ctx.trace_id,
         start.elapsed()
     );
@@ -78,7 +78,7 @@ mod tests {
     // Test helper
     fn deriv_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
-        deriv_range(data, &eval_ctx)
+        deriv(data, &eval_ctx)
     }
 
     #[test]

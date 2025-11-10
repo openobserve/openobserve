@@ -51,43 +51,43 @@ impl MathOperationsType {
     }
 }
 
-pub(crate) fn abs_range(data: Value) -> Result<Value> {
+pub(crate) fn abs(data: Value) -> Result<Value> {
     exec(data, &MathOperationsType::Abs)
 }
 
-pub(crate) fn ceil_range(data: Value) -> Result<Value> {
+pub(crate) fn ceil(data: Value) -> Result<Value> {
     exec(data, &MathOperationsType::Ceil)
 }
 
-pub(crate) fn floor_range(data: Value) -> Result<Value> {
+pub(crate) fn floor(data: Value) -> Result<Value> {
     exec(data, &MathOperationsType::Floor)
 }
 
-pub(crate) fn exp_range(data: Value) -> Result<Value> {
+pub(crate) fn exp(data: Value) -> Result<Value> {
     exec(data, &MathOperationsType::Exp)
 }
 
-pub(crate) fn ln_range(data: Value) -> Result<Value> {
+pub(crate) fn ln(data: Value) -> Result<Value> {
     exec(data, &MathOperationsType::Ln)
 }
 
-pub(crate) fn log2_range(data: Value) -> Result<Value> {
+pub(crate) fn log2(data: Value) -> Result<Value> {
     exec(data, &MathOperationsType::Log2)
 }
 
-pub(crate) fn log10_range(data: Value) -> Result<Value> {
+pub(crate) fn log10(data: Value) -> Result<Value> {
     exec(data, &MathOperationsType::Log10)
 }
 
-pub(crate) fn sqrt_range(data: Value) -> Result<Value> {
+pub(crate) fn sqrt(data: Value) -> Result<Value> {
     exec(data, &MathOperationsType::Sqrt)
 }
 
-pub(crate) fn round_range(data: Value) -> Result<Value> {
+pub(crate) fn round(data: Value) -> Result<Value> {
     exec(data, &MathOperationsType::Round)
 }
 
-pub(crate) fn sgn_range(data: Value) -> Result<Value> {
+pub(crate) fn sgn(data: Value) -> Result<Value> {
     exec(data, &MathOperationsType::Sgn)
 }
 
@@ -201,7 +201,7 @@ mod tests {
     fn test_abs() {
         let eval_ts = 1000;
         let value = create_matrix(eval_ts, vec![-5.0, 3.0]);
-        let result = abs_range(value).unwrap();
+        let result = abs(value).unwrap();
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 2);
@@ -216,7 +216,7 @@ mod tests {
     fn test_ceil() {
         let eval_ts = 1000;
         let value = create_matrix(eval_ts, vec![3.2, -3.2]);
-        let result = ceil_range(value).unwrap();
+        let result = ceil(value).unwrap();
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 2);
@@ -231,7 +231,7 @@ mod tests {
     fn test_floor() {
         let eval_ts = 1000;
         let value = create_matrix(eval_ts, vec![3.2, -3.2]);
-        let result = floor_range(value).unwrap();
+        let result = floor(value).unwrap();
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 2);
@@ -246,7 +246,7 @@ mod tests {
     fn test_exp() {
         let eval_ts = 1000;
         let value = create_matrix(eval_ts, vec![0.0, 1.0]);
-        let result = exp_range(value).unwrap();
+        let result = exp(value).unwrap();
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 2);
@@ -261,7 +261,7 @@ mod tests {
     fn test_ln() {
         let eval_ts = 1000;
         let value = create_matrix(eval_ts, vec![1.0, std::f64::consts::E]);
-        let result = ln_range(value).unwrap();
+        let result = ln(value).unwrap();
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 2);
@@ -276,7 +276,7 @@ mod tests {
     fn test_log2() {
         let eval_ts = 1000;
         let value = create_matrix(eval_ts, vec![1.0, 2.0, 4.0]);
-        let result = log2_range(value).unwrap();
+        let result = log2(value).unwrap();
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 3);
@@ -292,7 +292,7 @@ mod tests {
     fn test_log10() {
         let eval_ts = 1000;
         let value = create_matrix(eval_ts, vec![1.0, 10.0, 100.0]);
-        let result = log10_range(value).unwrap();
+        let result = log10(value).unwrap();
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 3);
@@ -308,7 +308,7 @@ mod tests {
     fn test_sqrt() {
         let eval_ts = 1000;
         let value = create_matrix(eval_ts, vec![0.0, 1.0, 4.0]);
-        let result = sqrt_range(value).unwrap();
+        let result = sqrt(value).unwrap();
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 3);
@@ -324,7 +324,7 @@ mod tests {
     fn test_round() {
         let eval_ts = 1000;
         let value = create_matrix(eval_ts, vec![3.2, 3.5, -3.2]);
-        let result = round_range(value).unwrap();
+        let result = round(value).unwrap();
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 3);
@@ -340,7 +340,7 @@ mod tests {
     fn test_sgn() {
         let eval_ts = 1000;
         let value = create_matrix(eval_ts, vec![5.0, -5.0, 0.0]);
-        let result = sgn_range(value).unwrap();
+        let result = sgn(value).unwrap();
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 3);
@@ -355,14 +355,14 @@ mod tests {
     #[test]
     fn test_none_value() {
         let value = Value::None;
-        let result = abs_range(value).unwrap();
+        let result = abs(value).unwrap();
         assert!(matches!(result, Value::None));
     }
 
     #[test]
     fn test_invalid_input() {
         let value = Value::Float(5.0);
-        let result = abs_range(value);
+        let result = abs(value);
         assert!(result.is_err());
     }
 }

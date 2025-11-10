@@ -38,14 +38,10 @@ impl Bucket {
 }
 
 /// Enhanced version that processes all timestamps at once for range queries
-pub(crate) fn histogram_quantile_range(
-    phi: f64,
-    data: Value,
-    eval_ctx: &EvalContext,
-) -> Result<Value> {
+pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
     log::info!(
-        "[trace_id: {}] [PromQL Timing] histogram_quantile_range() started with phi={phi}, {} time points",
+        "[trace_id: {}] [PromQL Timing] histogram_quantile() started with phi={phi}, {} time points",
         eval_ctx.trace_id,
         eval_ctx.timestamps().len()
     );
@@ -54,7 +50,7 @@ pub(crate) fn histogram_quantile_range(
     let in_matrix = match data {
         Value::Matrix(m) => {
             log::info!(
-                "[trace_id: {}] [PromQL Timing] histogram_quantile_range() processing {} series",
+                "[trace_id: {}] [PromQL Timing] histogram_quantile() processing {} series",
                 eval_ctx.trace_id,
                 m.len()
             );
@@ -62,7 +58,7 @@ pub(crate) fn histogram_quantile_range(
         }
         Value::None => {
             log::info!(
-                "[trace_id: {}] [PromQL Timing] histogram_quantile_range() received None input",
+                "[trace_id: {}] [PromQL Timing] histogram_quantile() received None input",
                 eval_ctx.trace_id
             );
             return Ok(Value::None);
@@ -139,7 +135,7 @@ pub(crate) fn histogram_quantile_range(
     }
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] histogram_quantile_range() total execution took: {:?}, produced {} series",
+        "[trace_id: {}] [PromQL Timing] histogram_quantile() total execution took: {:?}, produced {} series",
         eval_ctx.trace_id,
         start.elapsed(),
         range_values.len()
