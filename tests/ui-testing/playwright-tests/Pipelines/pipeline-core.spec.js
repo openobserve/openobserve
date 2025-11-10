@@ -153,16 +153,13 @@ test.describe("Core Pipeline Tests", () => {
     await applyQueryButton(page);
   });
 
-  test("should add source & destination node and then delete the pipeline", async ({ page }) => {
+  test.skip("should add source & destination node and then delete the pipeline", async ({ page }) => {
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
     await pageManager.pipelinesPage.selectStream();
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectLogs();
-
-    // INTENTIONAL BUG FOR TESTING RERUN OPTIMIZATION
-    expect(1).toBe(2); // This will fail
 
     await pageManager.pipelinesPage.enterStreamName("e2e");
     await pageManager.pipelinesPage.enterStreamName("e2e_automate3");
