@@ -284,25 +284,25 @@ jobs:
               if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
                 echo "::notice::✅ Found failed tests from previous run."
                 echo "::notice::TestDino flags: $LAST_FAILED_FLAGS"
-                echo "RERUN_MODE=optimized" >> $GITHUB_ENV
-                echo "EXTRA_PW_FLAGS=$LAST_FAILED_FLAGS" >> $GITHUB_ENV
+                RERUN_MODE="optimized"
+                EXTRA_PW_FLAGS="$LAST_FAILED_FLAGS"
               else
                 echo "::warning::TestDino returned no failed tests. Falling back to running all tests in this matrix job."
                 echo "::warning::This means you'll be billed for all tests. Please investigate why last-failed returned empty."
-                echo "RERUN_MODE=fallback" >> $GITHUB_ENV
-                echo "EXTRA_PW_FLAGS=" >> $GITHUB_ENV
+                RERUN_MODE="fallback"
+                EXTRA_PW_FLAGS=""
               fi
             else
               echo "::error::Failed to fetch last failed tests from TestDino (exit code: $?)."
               echo "::warning::Falling back to running all tests in this matrix job."
               echo "::warning::This means you'll be billed for all tests. Please check TestDino integration."
-              echo "RERUN_MODE=fallback" >> $GITHUB_ENV
-              echo "EXTRA_PW_FLAGS=" >> $GITHUB_ENV
+              RERUN_MODE="fallback"
+              EXTRA_PW_FLAGS=""
             fi
             echo "::endgroup::"
           else
-            echo "RERUN_MODE=normal" >> $GITHUB_ENV
-            echo "EXTRA_PW_FLAGS=" >> $GITHUB_ENV
+            RERUN_MODE="normal"
+            EXTRA_PW_FLAGS=""
           fi
 
           # Get list of files to run using join function
