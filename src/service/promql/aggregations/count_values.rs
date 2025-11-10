@@ -25,7 +25,7 @@ use crate::service::promql::{
 
 /// Aggregates Matrix input for range queries
 /// count_values creates a new label with the metric value as the label value
-pub fn count_values_range(
+pub fn count_values(
     label_name: &str,
     modifier: &Option<LabelModifier>,
     data: Value,

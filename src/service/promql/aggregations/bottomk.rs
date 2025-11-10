@@ -22,7 +22,7 @@ use crate::service::promql::value::{EvalContext, RangeValue, Value};
 
 /// Aggregates Matrix input for range queries
 /// For each timestamp, selects the bottom K series by value
-pub fn bottomk_range(
+pub fn bottomk(
     k: usize,
     modifier: &Option<LabelModifier>,
     data: Value,

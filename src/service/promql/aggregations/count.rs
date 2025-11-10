@@ -23,24 +23,20 @@ use crate::service::promql::{
 };
 
 /// Aggregates Matrix input for range queries
-pub fn count_range(
-    param: &Option<LabelModifier>,
-    data: Value,
-    eval_ctx: &EvalContext,
-) -> Result<Value> {
+pub fn count(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
     let (input_size, timestamps_count) = match &data {
         Value::Matrix(m) => (m.len(), eval_ctx.timestamps().len()),
         _ => (0, 0),
     };
     log::info!(
-        "[trace_id: {}] [PromQL Timing] count_range() started with {input_size} series and {timestamps_count} timestamps",
+        "[trace_id: {}] [PromQL Timing] count() started with {input_size} series and {timestamps_count} timestamps",
         eval_ctx.trace_id,
     );
 
     let result = super::eval_aggregate(param, data, Count, eval_ctx);
     log::info!(
-        "[trace_id: {}] [PromQL Timing] count_range() execution took: {:?}",
+        "[trace_id: {}] [PromQL Timing] count() execution took: {:?}",
         eval_ctx.trace_id,
         start.elapsed()
     );

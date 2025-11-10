@@ -686,14 +686,14 @@ impl Engine {
         let eval_ctx = self.eval_ctx.clone();
 
         Ok(match op.id() {
-            token::T_SUM => aggregations::sum_range(modifier, input, &eval_ctx)?,
-            token::T_AVG => aggregations::avg_range(modifier, input, &eval_ctx)?,
-            token::T_COUNT => aggregations::count_range(modifier, input, &eval_ctx)?,
-            token::T_MIN => aggregations::min_range(modifier, input, &eval_ctx)?,
-            token::T_MAX => aggregations::max_range(modifier, input, &eval_ctx)?,
-            token::T_GROUP => aggregations::group_range(modifier, input, &eval_ctx)?,
-            token::T_STDDEV => aggregations::stddev_range(modifier, input, &eval_ctx)?,
-            token::T_STDVAR => aggregations::stdvar_range(modifier, input, &eval_ctx)?,
+            token::T_SUM => aggregations::sum(modifier, input, &eval_ctx)?,
+            token::T_AVG => aggregations::avg(modifier, input, &eval_ctx)?,
+            token::T_COUNT => aggregations::count(modifier, input, &eval_ctx)?,
+            token::T_MIN => aggregations::min(modifier, input, &eval_ctx)?,
+            token::T_MAX => aggregations::max(modifier, input, &eval_ctx)?,
+            token::T_GROUP => aggregations::group(modifier, input, &eval_ctx)?,
+            token::T_STDDEV => aggregations::stddev(modifier, input, &eval_ctx)?,
+            token::T_STDVAR => aggregations::stdvar(modifier, input, &eval_ctx)?,
             token::T_TOPK => {
                 let param_expr = param.clone().unwrap();
                 let k_value = self.exec_expr(&param_expr).await?;
@@ -705,7 +705,7 @@ impl Engine {
                         ));
                     }
                 };
-                aggregations::topk_range(k, modifier, input, &eval_ctx)?
+                aggregations::topk(k, modifier, input, &eval_ctx)?
             }
             token::T_BOTTOMK => {
                 let param_expr = param.clone().unwrap();
@@ -718,7 +718,7 @@ impl Engine {
                         ));
                     }
                 };
-                aggregations::bottomk_range(k, modifier, input, &eval_ctx)?
+                aggregations::bottomk(k, modifier, input, &eval_ctx)?
             }
             token::T_COUNT_VALUES => {
                 let param_expr = param.clone().unwrap();
@@ -731,7 +731,7 @@ impl Engine {
                         ));
                     }
                 };
-                aggregations::count_values_range(&label_name_str, modifier, input, &eval_ctx)?
+                aggregations::count_values(&label_name_str, modifier, input, &eval_ctx)?
             }
             token::T_QUANTILE => {
                 let param_expr = param.clone().unwrap();
@@ -744,7 +744,7 @@ impl Engine {
                         ));
                     }
                 };
-                aggregations::quantile_range(qtile, input, &eval_ctx)?
+                aggregations::quantile(qtile, input, &eval_ctx)?
             }
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(

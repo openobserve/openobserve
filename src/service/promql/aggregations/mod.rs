@@ -37,18 +37,18 @@ mod stdvar;
 mod sum;
 mod topk;
 
-pub(crate) use avg::avg_range;
-pub(crate) use bottomk::bottomk_range;
-pub(crate) use count::count_range;
-pub(crate) use count_values::count_values_range;
-pub(crate) use group::group_range;
-pub(crate) use max::max_range;
-pub(crate) use min::min_range;
-pub(crate) use quantile::quantile_range;
-pub(crate) use stddev::stddev_range;
-pub(crate) use stdvar::stdvar_range;
-pub(crate) use sum::sum_range;
-pub(crate) use topk::topk_range;
+pub(crate) use avg::avg;
+pub(crate) use bottomk::bottomk;
+pub(crate) use count::count;
+pub(crate) use count_values::count_values;
+pub(crate) use group::group;
+pub(crate) use max::max;
+pub(crate) use min::min;
+pub(crate) use quantile::quantile;
+pub(crate) use stddev::stddev;
+pub(crate) use stdvar::stdvar;
+pub(crate) use sum::sum;
+pub(crate) use topk::topk;
 
 pub trait AggFunc: Sync {
     fn name(&self) -> &'static str;
