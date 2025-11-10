@@ -503,6 +503,13 @@ pub async fn update_stream_settings(
         )));
     };
 
+    // Validate index field uniqueness BEFORE any DB writes
+    // This prevents inconsistent state if validation fails
+    if let Err(err) = validate_index_field_conflicts(&settings, &new_settings) {
+        return Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err)));
+    }
+
     // process new fields first
     let new_fields = std::mem::take(&mut new_settings.fields);
     if !new_fields.add.is_empty() {
@@ -812,12 +819,6 @@ pub async fn update_stream_settings(
         }
     }
 
-    // Validate that a field cannot have both Full Text Search and Secondary Index
-    if let Err(err) = validate_index_field_uniqueness(&settings) {
-        return Ok(HttpResponse::BadRequest()
-            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err)));
-    }
-
     save_stream_settings(org_id, stream_name, stream_type, settings).await
 }
 
@@ -1077,17 +1078,42 @@ pub async fn update_fields_type(
 }
 
 /// Validates that a field cannot have both Full Text Search and Secondary Index
-fn validate_index_field_uniqueness(
-    settings: &config::meta::stream::StreamSettings,
+fn validate_index_field_conflicts(
+    current_settings: &config::meta::stream::StreamSettings,
+    new_settings: &config::meta::stream::UpdateStreamSettings,
 ) -> Result<(), String> {
     use hashbrown::HashSet;
 
-    let fts_fields: HashSet<&String> = settings.full_text_search_keys.iter().collect();
-    let index_fields: HashSet<&String> = settings.index_fields.iter().collect();
+    // Simulate the final state after applying the update
+    let mut final_fts_fields: HashSet<String> = current_settings
+        .full_text_search_keys
+        .iter()
+        .cloned()
+        .collect();
+    let mut final_index_fields: HashSet<String> =
+        current_settings.index_fields.iter().cloned().collect();
 
-    // Find fields that exist in both Full Text Search and Secondary Index
-    let conflicting_fields: Vec<&String> =
-        fts_fields.intersection(&index_fields).copied().collect();
+    // Apply removes
+    for field in &new_settings.full_text_search_keys.remove {
+        final_fts_fields.remove(field);
+    }
+    for field in &new_settings.index_fields.remove {
+        final_index_fields.remove(field);
+    }
+
+    // Apply adds
+    for field in &new_settings.full_text_search_keys.add {
+        final_fts_fields.insert(field.clone());
+    }
+    for field in &new_settings.index_fields.add {
+        final_index_fields.insert(field.clone());
+    }
+
+    // Find fields that would exist in both FTS and Secondary Index
+    let conflicting_fields: Vec<String> = final_fts_fields
+        .intersection(&final_index_fields)
+        .cloned()
+        .collect();
 
     if !conflicting_fields.is_empty() {
         let field_names: Vec<String> = conflicting_fields
