@@ -1078,18 +1078,34 @@ pub async fn update_fields_type(
 }
 
 /// Validates that a field cannot have both Full Text Search and Secondary Index
+///
+/// IMPORTANT: This validation must account for DEFAULT index fields:
+/// - `_DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS` Default FTS fields: log, message, msg, content, data,
+///   body, json, error, errors
+/// - `_DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS` Default Index fields: trace_id, service_name,
+///   operation_name
+/// - Plus any configured via ZO_FEATURE_FULLTEXT_EXTRA_FIELDS or
+///   ZO_FEATURE_SECONDARY_INDEX_EXTRA_FIELDS
+///
+/// These defaults are not stored in StreamSettings but are applied at runtime,
+/// so we must use get_stream_setting_fts_fields() and get_stream_setting_index_fields()
+/// to get the complete list including defaults.
+///
+/// Note: Bloom Filter is independent and can coexist with either FTS or Secondary Index
 fn validate_index_field_conflicts(
     current_settings: &config::meta::stream::StreamSettings,
     new_settings: &config::meta::stream::UpdateStreamSettings,
 ) -> Result<(), String> {
+    // Get the actual FTS and Index fields including defaults
+    let current_fts_with_defaults =
+        infra::schema::get_stream_setting_fts_fields(&Some(current_settings.clone()));
+    let current_index_with_defaults =
+        infra::schema::get_stream_setting_index_fields(&Some(current_settings.clone()));
+
     // Simulate the final state after applying the update
-    let mut final_fts_fields: HashSet<String> = current_settings
-        .full_text_search_keys
-        .iter()
-        .cloned()
-        .collect();
+    let mut final_fts_fields: HashSet<String> = current_fts_with_defaults.iter().cloned().collect();
     let mut final_index_fields: HashSet<String> =
-        current_settings.index_fields.iter().cloned().collect();
+        current_index_with_defaults.iter().cloned().collect();
 
     // Apply removes
     for field in &new_settings.full_text_search_keys.remove {
