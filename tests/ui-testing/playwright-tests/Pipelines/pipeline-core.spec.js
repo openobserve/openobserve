@@ -153,7 +153,7 @@ test.describe("Core Pipeline Tests", () => {
     await applyQueryButton(page);
   });
 
-  test.skip("should add source & destination node and then delete the pipeline", async ({ page }) => {
+  test("should add source & destination node and then delete the pipeline", async ({ page }) => {
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
