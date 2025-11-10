@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export const CURRENT_DASHBOARD_SCHEMA_VERSION = 6;
+export const CURRENT_DASHBOARD_SCHEMA_VERSION = 7;
 
 const convertPanelSchemaVersion = (data: any) => {
   if (!data || (typeof data === "object" && Object.keys(data).length === 0)) {
@@ -185,6 +185,21 @@ export function convertDashboardSchemaVersion(data: any) {
 
       // update the version
       data.version = 6;
+    }
+    case 6: {
+      // Fix for existing v6 dashboards: Y coordinate was not scaled during v5->v6 migration
+      // Since cell height changed from 34px to 17px (halved), and h was doubled,
+      // y must also be doubled to maintain the same visual position:
+      // Old position: y × 34px
+      // New position: (y × 2) × 17px = y × 34px ✓
+      data.tabs.forEach((tabItem: any) => {
+        tabItem.panels.forEach((panelItem: any) => {
+          panelItem.layout.y = panelItem.layout.y * 2;
+        });
+      });
+
+      // update the version
+      data.version = 7;
     }
   }
 
