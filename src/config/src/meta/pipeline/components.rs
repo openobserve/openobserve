@@ -167,7 +167,7 @@ pub struct FunctionParams {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct ConditionParams {
-    pub condition: ConditionList,
+    pub conditions: ConditionList,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
