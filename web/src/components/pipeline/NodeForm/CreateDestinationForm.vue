@@ -393,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
@@ -457,7 +457,7 @@ const destinationTypes = [
     label: "Custom",
     value: "custom",
     icon: "settings",
-    image: getImageURL("images/pipeline/custom.png"),
+    image: null, // No image for custom, will use icon
   },
 ];
 
@@ -476,6 +476,8 @@ const formData: Ref<DestinationData> = ref({
   type: "http",
   output_format: "json",
   destination_type: "openobserve",
+  org_identifier: "default",
+  stream_name: "default",
 });
 
 // TODO OK: Use UUID package instead of this and move this method in utils
