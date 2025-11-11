@@ -749,7 +749,7 @@ describe('ImportPipeline.vue - OR Operator Tests', () => {
     it('should import pipeline with multiple condition nodes containing OR', () => {
       wrapper = createWrapper();
 
-      const multipleCon ditionsPipeline = {
+      const multipleConditionsPipeline = {
         name: 'multi-condition-pipeline',
         nodes: [
           {

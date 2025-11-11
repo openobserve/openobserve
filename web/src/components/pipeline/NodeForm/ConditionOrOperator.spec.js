@@ -152,13 +152,14 @@ describe("Condition Component - OR Operator Tests", () => {
 
   describe("OR Operator in Condition Node - Basic Functionality", () => {
     it("should initialize conditions with nested OR group structure", () => {
-      const streamRoute = wrapper.vm.streamRoute;
-      expect(streamRoute.conditions).toBeDefined();
-      expect(Array.isArray(streamRoute.conditions)).toBe(true);
+      const conditionGroup = wrapper.vm.conditionGroup;
+      expect(conditionGroup).toBeDefined();
+      expect(conditionGroup.items).toBeDefined();
+      expect(Array.isArray(conditionGroup.items)).toBe(true);
     });
 
     it("should support OR condition with multiple fields", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'root-group',
         label: 'or',
         items: [
@@ -167,12 +168,12 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.label).toBe('or');
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(2);
+      expect(wrapper.vm.conditionGroup.label).toBe('or');
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(2);
     });
 
     it("should support AND condition within condition node", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'root-group',
         label: 'and',
         items: [
@@ -181,12 +182,12 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.label).toBe('and');
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(2);
+      expect(wrapper.vm.conditionGroup.label).toBe('and');
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(2);
     });
 
     it("should support nested OR within AND condition", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'root-and',
         label: 'and',
         items: [
@@ -202,13 +203,13 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(2);
-      expect(wrapper.vm.streamRoute.conditions.items[1].label).toBe('or');
-      expect(wrapper.vm.streamRoute.conditions.items[1].items).toHaveLength(2);
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(2);
+      expect(wrapper.vm.conditionGroup.items[1].label).toBe('or');
+      expect(wrapper.vm.conditionGroup.items[1].items).toHaveLength(2);
     });
 
     it("should support nested AND within OR condition", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'root-or',
         label: 'or',
         items: [
@@ -224,15 +225,15 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(2);
-      expect(wrapper.vm.streamRoute.conditions.items[1].label).toBe('and');
-      expect(wrapper.vm.streamRoute.conditions.items[1].items).toHaveLength(2);
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(2);
+      expect(wrapper.vm.conditionGroup.items[1].label).toBe('and');
+      expect(wrapper.vm.conditionGroup.items[1].items).toHaveLength(2);
     });
   });
 
   describe("OR Operator - Multiple Conditions Scenarios", () => {
     it("should handle OR with three conditions", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -242,14 +243,14 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(3);
-      wrapper.vm.streamRoute.conditions.items.forEach(item => {
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(3);
+      wrapper.vm.conditionGroup.items.forEach(item => {
         expect(item.column).toBe('status_code');
       });
     });
 
     it("should handle OR with different operators", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -259,13 +260,13 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items[0].operator).toBe('>=');
-      expect(wrapper.vm.streamRoute.conditions.items[1].operator).toBe('Contains');
-      expect(wrapper.vm.streamRoute.conditions.items[2].operator).toBe('=');
+      expect(wrapper.vm.conditionGroup.items[0].operator).toBe('>=');
+      expect(wrapper.vm.conditionGroup.items[1].operator).toBe('Contains');
+      expect(wrapper.vm.conditionGroup.items[2].operator).toBe('=');
     });
 
     it("should handle OR with mixed case sensitivity", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -275,13 +276,13 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items[0].ignore_case).toBe(true);
-      expect(wrapper.vm.streamRoute.conditions.items[1].ignore_case).toBe(false);
-      expect(wrapper.vm.streamRoute.conditions.items[2].ignore_case).toBe(true);
+      expect(wrapper.vm.conditionGroup.items[0].ignore_case).toBe(true);
+      expect(wrapper.vm.conditionGroup.items[1].ignore_case).toBe(false);
+      expect(wrapper.vm.conditionGroup.items[2].ignore_case).toBe(true);
     });
 
     it("should handle OR with NotContains operator", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -290,12 +291,12 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items[0].operator).toBe('NotContains');
-      expect(wrapper.vm.streamRoute.conditions.items[1].operator).toBe('NotContains');
+      expect(wrapper.vm.conditionGroup.items[0].operator).toBe('NotContains');
+      expect(wrapper.vm.conditionGroup.items[1].operator).toBe('NotContains');
     });
 
     it("should handle OR with != (not equals) operator", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -304,7 +305,7 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      wrapper.vm.streamRoute.conditions.items.forEach(item => {
+      wrapper.vm.conditionGroup.items.forEach(item => {
         expect(item.operator).toBe('!=');
       });
     });
@@ -312,7 +313,7 @@ describe("Condition Component - OR Operator Tests", () => {
 
   describe("OR Operator - Complex Nested Structures", () => {
     it("should handle deeply nested OR-AND-OR structure", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'root',
         label: 'or',
         items: [
@@ -335,14 +336,14 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      const rootItems = wrapper.vm.streamRoute.conditions.items;
+      const rootItems = wrapper.vm.conditionGroup.items;
       expect(rootItems).toHaveLength(2);
       expect(rootItems[1].items[1].label).toBe('or');
       expect(rootItems[1].items[1].items).toHaveLength(2);
     });
 
     it("should handle multiple OR groups at same level", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'root-and',
         label: 'and',
         items: [
@@ -365,14 +366,14 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      const items = wrapper.vm.streamRoute.conditions.items;
+      const items = wrapper.vm.conditionGroup.items;
       expect(items).toHaveLength(2);
       expect(items[0].label).toBe('or');
       expect(items[1].label).toBe('or');
     });
 
     it("should handle OR with empty value (checking for empty strings)", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -381,12 +382,12 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items[0].value).toBe('""');
-      expect(wrapper.vm.streamRoute.conditions.items[1].value).toBe('null');
+      expect(wrapper.vm.conditionGroup.items[0].value).toBe('""');
+      expect(wrapper.vm.conditionGroup.items[1].value).toBe('null');
     });
 
     it("should handle OR with numeric comparison operators", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -397,14 +398,14 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      const operators = wrapper.vm.streamRoute.conditions.items.map(item => item.operator);
+      const operators = wrapper.vm.conditionGroup.items.map(item => item.operator);
       expect(operators).toEqual(['>', '<', '>=', '<=']);
     });
   });
 
   describe("OR Operator - Edge Cases", () => {
     it("should handle single OR condition", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -412,12 +413,12 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(1);
-      expect(wrapper.vm.streamRoute.conditions.label).toBe('or');
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(1);
+      expect(wrapper.vm.conditionGroup.label).toBe('or');
     });
 
     it("should handle OR with special characters in values", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -426,12 +427,12 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items[0].value).toContain('!');
-      expect(wrapper.vm.streamRoute.conditions.items[1].value).toContain('@#$%^&*()');
+      expect(wrapper.vm.conditionGroup.items[0].value).toContain('!');
+      expect(wrapper.vm.conditionGroup.items[1].value).toContain('@#$%^&*()');
     });
 
     it("should handle OR with unicode characters", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -441,14 +442,14 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(3);
-      expect(wrapper.vm.streamRoute.conditions.items[0].value).toBe('错误');
-      expect(wrapper.vm.streamRoute.conditions.items[1].value).toBe('エラー');
-      expect(wrapper.vm.streamRoute.conditions.items[2].value).toBe('خطأ');
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(3);
+      expect(wrapper.vm.conditionGroup.items[0].value).toBe('错误');
+      expect(wrapper.vm.conditionGroup.items[1].value).toBe('エラー');
+      expect(wrapper.vm.conditionGroup.items[2].value).toBe('خطأ');
     });
 
     it("should handle OR with whitespace in values", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -458,13 +459,13 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items[0].value).toBe('   leading spaces');
-      expect(wrapper.vm.streamRoute.conditions.items[1].value).toBe('trailing spaces   ');
-      expect(wrapper.vm.streamRoute.conditions.items[2].value).toBe('  both sides  ');
+      expect(wrapper.vm.conditionGroup.items[0].value).toBe('   leading spaces');
+      expect(wrapper.vm.conditionGroup.items[1].value).toBe('trailing spaces   ');
+      expect(wrapper.vm.conditionGroup.items[2].value).toBe('  both sides  ');
     });
 
     it("should handle OR with numeric string values", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -474,13 +475,13 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items[0].value).toBe('100');
-      expect(wrapper.vm.streamRoute.conditions.items[1].value).toBe('1000.50');
-      expect(wrapper.vm.streamRoute.conditions.items[2].value).toBe('-50');
+      expect(wrapper.vm.conditionGroup.items[0].value).toBe('100');
+      expect(wrapper.vm.conditionGroup.items[1].value).toBe('1000.50');
+      expect(wrapper.vm.conditionGroup.items[2].value).toBe('-50');
     });
 
     it("should handle OR with boolean-like string values", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'group-1',
         label: 'or',
         items: [
@@ -489,14 +490,14 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items[0].value).toBe('true');
-      expect(wrapper.vm.streamRoute.conditions.items[1].value).toBe('false');
+      expect(wrapper.vm.conditionGroup.items[0].value).toBe('true');
+      expect(wrapper.vm.conditionGroup.items[1].value).toBe('false');
     });
   });
 
   describe("OR Operator - Real-World Scenarios", () => {
     it("should handle HTTP error codes OR condition", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'http-errors',
         label: 'or',
         items: [
@@ -510,12 +511,12 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(7);
-      expect(wrapper.vm.streamRoute.conditions.label).toBe('or');
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(7);
+      expect(wrapper.vm.conditionGroup.label).toBe('or');
     });
 
     it("should handle log level filtering with OR", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'log-levels',
         label: 'or',
         items: [
@@ -526,14 +527,14 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(4);
-      wrapper.vm.streamRoute.conditions.items.forEach(item => {
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(4);
+      wrapper.vm.conditionGroup.items.forEach(item => {
         expect(item.ignore_case).toBe(true);
       });
     });
 
     it("should handle multi-region filtering", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'regions',
         label: 'or',
         items: [
@@ -544,12 +545,12 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(4);
-      expect(wrapper.vm.streamRoute.conditions.items.every(item => item.column === 'region')).toBe(true);
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(4);
+      expect(wrapper.vm.conditionGroup.items.every(item => item.column === 'region')).toBe(true);
     });
 
     it("should handle complex alert condition: critical errors OR high response time AND specific region", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'root-or',
         label: 'or',
         items: [
@@ -572,13 +573,13 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(2);
-      expect(wrapper.vm.streamRoute.conditions.items[0].label).toBe('and');
-      expect(wrapper.vm.streamRoute.conditions.items[1].label).toBe('and');
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(2);
+      expect(wrapper.vm.conditionGroup.items[0].label).toBe('and');
+      expect(wrapper.vm.conditionGroup.items[1].label).toBe('and');
     });
 
     it("should handle error pattern matching with OR", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'error-patterns',
         label: 'or',
         items: [
@@ -589,12 +590,12 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(4);
-      expect(wrapper.vm.streamRoute.conditions.items.every(item => item.operator === 'Contains')).toBe(true);
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(4);
+      expect(wrapper.vm.conditionGroup.items.every(item => item.operator === 'Contains')).toBe(true);
     });
 
     it("should handle service status monitoring", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'root-and',
         label: 'and',
         items: [
@@ -611,14 +612,14 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(2);
-      expect(wrapper.vm.streamRoute.conditions.items[1].items).toHaveLength(3);
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(2);
+      expect(wrapper.vm.conditionGroup.items[1].items).toHaveLength(3);
     });
   });
 
   describe("OR Operator - Data Validation", () => {
     it("should validate OR conditions with valid data", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'valid-or',
         label: 'or',
         items: [
@@ -627,7 +628,7 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      const isValid = wrapper.vm.streamRoute.conditions.items.every(item =>
+      const isValid = wrapper.vm.conditionGroup.items.every(item =>
         item.column && item.operator && item.value !== undefined
       );
 
@@ -635,7 +636,7 @@ describe("Condition Component - OR Operator Tests", () => {
     });
 
     it("should handle OR conditions with missing column", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'invalid-or',
         label: 'or',
         items: [
@@ -644,12 +645,12 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      const hasInvalid = wrapper.vm.streamRoute.conditions.items.some(item => !item.column);
+      const hasInvalid = wrapper.vm.conditionGroup.items.some(item => !item.column);
       expect(hasInvalid).toBe(true);
     });
 
     it("should handle OR conditions with missing operator", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'invalid-or',
         label: 'or',
         items: [
@@ -658,12 +659,12 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      const hasInvalid = wrapper.vm.streamRoute.conditions.items.some(item => !item.operator);
+      const hasInvalid = wrapper.vm.conditionGroup.items.some(item => !item.operator);
       expect(hasInvalid).toBe(true);
     });
 
     it("should allow OR conditions with empty string value when checking for empty", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'empty-check',
         label: 'or',
         items: [
@@ -672,8 +673,8 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items[0].value).toBe('""');
-      expect(wrapper.vm.streamRoute.conditions.items[1].value).toBe('""');
+      expect(wrapper.vm.conditionGroup.items[0].value).toBe('""');
+      expect(wrapper.vm.conditionGroup.items[1].value).toBe('""');
     });
   });
 
@@ -687,17 +688,17 @@ describe("Condition Component - OR Operator Tests", () => {
         ignore_case: false
       }));
 
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'many-conditions',
         label: 'or',
         items
       };
 
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(15);
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(15);
     });
 
     it("should handle deeply nested structure (3 levels)", () => {
-      wrapper.vm.streamRoute.conditions = {
+      wrapper.vm.conditionGroup = {
         groupId: 'level-1-or',
         label: 'or',
         items: [
@@ -721,7 +722,7 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      const level1 = wrapper.vm.streamRoute.conditions;
+      const level1 = wrapper.vm.conditionGroup;
       const level2 = level1.items[1];
       const level3 = level2.items[1];
 
@@ -743,10 +744,10 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      wrapper.vm.streamRoute.conditions = orCondition;
+      wrapper.vm.conditionGroup = orCondition;
 
-      expect(wrapper.vm.streamRoute.conditions).toEqual(orCondition);
-      expect(wrapper.vm.streamRoute.conditions.label).toBe('or');
+      expect(wrapper.vm.conditionGroup).toEqual(orCondition);
+      expect(wrapper.vm.conditionGroup.label).toBe('or');
     });
 
     it("should handle updating existing condition node with OR", () => {
@@ -775,10 +776,10 @@ describe("Condition Component - OR Operator Tests", () => {
         ]
       };
 
-      wrapper.vm.streamRoute.conditions = newOrCondition;
+      wrapper.vm.conditionGroup = newOrCondition;
 
-      expect(wrapper.vm.streamRoute.conditions.label).toBe('or');
-      expect(wrapper.vm.streamRoute.conditions.items).toHaveLength(2);
+      expect(wrapper.vm.conditionGroup.label).toBe('or');
+      expect(wrapper.vm.conditionGroup.items).toHaveLength(2);
     });
   });
 });
