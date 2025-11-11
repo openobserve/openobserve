@@ -145,7 +145,7 @@ async function verifyMultipleFieldsDrop(page, pm, streamName, fieldsToVerify) {
 }
 
 
-test.describe("Query Time Drop - Combined Test", () => {
+test.describe("Query Time Drop - Combined Test", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
 

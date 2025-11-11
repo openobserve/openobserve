@@ -101,10 +101,21 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         report_data.push(usage_data);
     }
 
+    let cfg = get_config();
+    #[cfg(not(feature = "enterprise"))]
+    let usage_reporting_mode = &cfg.common.usage_reporting_mode;
+    #[cfg(feature = "enterprise")]
+    let usage_reporting_mode = {
+        if cfg.common.usage_reporting_mode == "local" {
+            "local"
+        } else {
+            "both"
+        }
+    };
+
     // Push all the search events
     report_data.append(&mut search_events);
-    let cfg = get_config();
-    if &cfg.common.usage_reporting_mode != "local"
+    if usage_reporting_mode != "local"
         && !cfg.common.usage_reporting_url.is_empty()
         && !cfg.common.usage_reporting_creds.is_empty()
     {
@@ -131,7 +142,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                             .await
                             .unwrap_or_else(|_| resp_status.to_string())
                     );
-                    if &cfg.common.usage_reporting_mode != "both" {
+                    if usage_reporting_mode != "both" {
                         // on error in ingesting usage data, push back the data
                         let curr_usages = curr_usages.clone();
                         for usage_data in curr_usages {
@@ -149,7 +160,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             }
             Err(e) => {
                 log::error!("[SELF-REPORTING] Error in ingesting usage data to external URL {e:?}");
-                if &cfg.common.usage_reporting_mode != "both" {
+                if usage_reporting_mode != "both" {
                     // on error in ingesting usage data, push back the data
                     let curr_usages = curr_usages.clone();
                     for usage_data in curr_usages {
@@ -167,7 +178,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         }
     }
 
-    if &cfg.common.usage_reporting_mode != "remote" {
+    if usage_reporting_mode != "remote" {
         let report_data = report_data
             .iter()
             .map(|usage| json::to_value(usage).unwrap())
@@ -177,7 +188,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         if ingest_reporting_data(report_data, usage_stream)
             .await
             .is_err()
-            && &cfg.common.usage_reporting_mode != "both"
+            && usage_reporting_mode != "both"
         {
             // on error in ingesting usage data, push back the data
             for usage_data in curr_usages {
