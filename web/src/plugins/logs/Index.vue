@@ -712,11 +712,11 @@ export default defineComponent({
 
     const handleAiAssistantToggle = (isVisible) => {
       if (isVisible) {
-        // AI is opened, increase splitter by 10%
-        splitterModel.value = Math.min(splitterModel.value + 10, 90);
+        // AI is opened, increase splitter by 15%
+        splitterModel.value = Math.min(splitterModel.value + 15, 90);
       } else {
-        // AI is closed, decrease splitter by 10%
-        splitterModel.value = Math.max(splitterModel.value - 10, 5);
+        // AI is closed, decrease splitter by 15%
+        splitterModel.value = Math.max(splitterModel.value - 15, 5);
       }
     };
 

@@ -1128,10 +1128,105 @@ class="q-pr-sm q-pt-xs" />
         </div>
       </div>
     </div>
-    <div class="row query-editor-container">
+
+    <!-- AI Assistant Horizontal Bar -->
+    <div
+      v-if="isAiAssistantVisible"
+      ref="aiBarRef"
+      class="ai-assistant-horizontal-bar"
+      :class="[
+        store.state.theme === 'dark' ? 'dark-theme' : '',
+        { 'ai-input-focused': isAiFocused }
+      ]"
+    >
+      <div class="ai-assistant-horizontal-content">
+        <q-input
+          v-model="aiAssistantQuery"
+          placeholder="Ask AI to help with your query..."
+          type="textarea"
+          filled
+          dense
+          autogrow
+          :max-rows="2"
+          class="ai-assistant-input-fullwidth"
+          :dark="store.state.theme === 'dark'"
+          @keydown="handleAiInputKeydown"
+          @focus="isAiFocused = true"
+          @blur="isAiFocused = false"
+        >
+          <template v-slot:prepend>
+            <q-icon name="auto_awesome" class="ai-prepend-icon" size="18px" aria-hidden="true" />
+          </template>
+          <template v-slot:append>
+            <div class="ai-horizontal-controls">
+              <q-btn-toggle
+                v-model="aiAssistantMode"
+                toggle-color="primary"
+                :options="[
+                  {label: 'SQL', value: 'sql'},
+                  {label: 'VRL', value: 'vrl'}
+                ]"
+                dense
+                no-caps
+                size="xs"
+                class="ai-mode-toggle-horizontal"
+                :class="store.state.theme === 'dark' ? 'ai-mode-toggle-horizontal-dark' : 'ai-mode-toggle-horizontal-light'"
+              />
+              <q-btn
+                v-if="!isAiLoading"
+                icon="send"
+                color="primary"
+                flat
+                dense
+                round
+                size="sm"
+                @click="sendAiQuery"
+                :disable="!aiAssistantQuery.trim()"
+                class="ai-send-btn"
+              >
+                <q-tooltip>Send Query</q-tooltip>
+              </q-btn>
+              <q-btn
+                v-if="isAiLoading"
+                icon="stop"
+                color="negative"
+                flat
+                dense
+                round
+                size="sm"
+                @click="stopAiQuery"
+                class="ai-stop-btn"
+              >
+                <q-tooltip>Stop Generation</q-tooltip>
+              </q-btn>
+              <div class="ai-arrows-stack">
+                <q-btn
+                  flat
+                  dense
+                  round
+                  size="sm"
+                  @click="toggleAiAssistant"
+                  class="ai-arrow-btn"
+                >
+                <q-icon :name="symOutlinedCollapseAll" />
+                  <q-tooltip>Collapse AI Assistant</q-tooltip>
+                </q-btn>
+              </div>
+            </div>
+          </template>
+        </q-input>
+      </div>
+    </div>
+
+    <div
+      class="row query-editor-container"
+    >
       <div
-        class="col tw-h-full"
+        class="col"
         :class="{ 'expand-on-focus': isFocused }"
+        :style="{
+          height: isAiAssistantVisible ? `calc(100% - ${aiBarHeight}px)` : '100%'
+        }"
       >
         <q-splitter
           class="logs-search-splitter !tw-h-full"
@@ -1254,11 +1349,10 @@ class="q-pr-sm q-pt-xs" />
         icon="auto_awesome"
         title="Show AI Assistant"
         dense
-        size="10px"
+        size="6px"
         color="primary"
         @click="toggleAiAssistant"
-        class="ai-toggle-icon-btn"
-        style="position: absolute; top: 10px; right: 39px; z-index: 20"
+        class="tw-absolute tw-top-[3.1rem] tw-right-[3rem] tw-z-50"
         aria-label="Show AI Assistant"
       ></q-btn>
       <q-btn
@@ -1746,6 +1840,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { Bookmark, ChartLine, ChartNoAxesColumn, RefreshCcw, ScanSearch, Share, Menu, Maximize, Minimize } from "lucide-vue-next";
 import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
 import useAiChat from "@/composables/useAiChat";
+import { symOutlinedCollapseAll } from "@quasar/extras/material-symbols-outlined";
 
 const defaultValue: any = () => {
   return {
@@ -2135,9 +2230,12 @@ export default defineComponent({
     const hasAiError = ref(false);
     const showErrorNotificationDot = ref(false);
     const aiBarHeight = computed(() => {
-      if (!isAiAssistantVisible.value) return 56;
+      if (!isAiAssistantVisible.value) return 0;
       const newlineCount = (aiAssistantQuery.value.match(/\n/g) || []).length;
-      return 56 + (newlineCount * 10);
+      // Limit to maximum 2 lines (1 newline)
+      const limitedNewlines = Math.min(newlineCount, 1);
+      // Base height: 66px for 1 line, add 20px for each additional line (max 1)
+      return 66 + (limitedNewlines * 20);
     });
     const aiBarRef = ref(null);
 
@@ -4786,6 +4884,7 @@ export default defineComponent({
       outlinedShowChart,
       showErrorNotificationDot,
       openAiChatSidebar,
+      symOutlinedCollapseAll,
     };
   },
   computed: {
@@ -5164,7 +5263,7 @@ export default defineComponent({
   transition: box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
   animation: aiBarSlideDown 0.28s ease-out;
   box-shadow: none;
-  margin: 0; /* align with surrounding layout */
+  margin: 0 0 10px 0; /* add bottom margin for spacing */
   padding: 0 12px 8px; /* horizontal spacing with a little bottom breathing room */
   backdrop-filter: none;
 }
@@ -5181,12 +5280,12 @@ export default defineComponent({
 
 .ai-assistant-input-fullwidth {
   width: 100%;
-  max-height: 112px;
+  max-height: 50px;
 }
 
 .ai-assistant-input-fullwidth :deep(.q-field__control-container) {
-  max-height: 112px !important;
-  overflow-y: auto;
+  max-height: 50px !important;
+  overflow: visible;
 }
 
 .ai-assistant-input-fullwidth :deep(.q-field__control) {
@@ -5197,8 +5296,8 @@ export default defineComponent({
   background: linear-gradient(180deg, #f8faff 0%, #eef2ff 100%);
   box-shadow: inset 0 0 0 1px rgba(102, 126, 234, 0.08);
   padding: 8px 10px !important;
-  display: flex;               /* ensure vertical centering */
-  align-items: center;         /* center textarea content vertically */
+  display: flex;
+  align-items: flex-start;     /* align to top for proper scrolling */
 }
 
 /* Remove Quasar default bottom/underline for filled inputs */
@@ -5215,6 +5314,8 @@ export default defineComponent({
   padding: 4px 0 !important;   /* slight vertical padding for balanced caret */
   margin: 0 !important;
   min-height: 28px !important;
+  max-height: 50px !important;
+  overflow-y: auto !important;
   font-size: 14px !important;              /* increased for readability */
   line-height: 1.65 !important;            /* adjust for visual balance */
 }
@@ -5223,6 +5324,7 @@ export default defineComponent({
 .ai-assistant-input-fullwidth :deep(.q-field__native textarea) {
   font-size: 14px !important;
   line-height: 1.65 !important;
+  overflow: visible !important;
 }
 
 .ai-assistant-input-fullwidth :deep(.q-field__native textarea::placeholder) {
