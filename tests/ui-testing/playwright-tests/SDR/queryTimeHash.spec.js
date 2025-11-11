@@ -182,7 +182,7 @@ async function verifyMultipleFieldsRedaction(page, pm, streamName, fieldsToVerif
 }
 
 
-test.describe("Query Time Hash - Combined Test", () => {
+test.describe("Query Time Hash - Combined Test", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
 

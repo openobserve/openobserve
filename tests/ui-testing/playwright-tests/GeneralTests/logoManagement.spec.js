@@ -19,7 +19,7 @@ function generateRandomLogoName() {
 }
 
 
-test('Logo Upload on Management ', async ({ page }) => {
+test('Logo Upload on Management ', { tag: '@enterprise' }, async ({ page }) => {
     // Create page object instances
     const filePath = path.resolve(__dirname, '../attachment/imagesAuto.png');
 
