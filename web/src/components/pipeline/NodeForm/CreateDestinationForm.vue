@@ -820,6 +820,7 @@ const createDestination = () => {
 
   const payload: any = {
     url: formData.value.url,
+    url_suffix: urlSuffix.value,
     method: formData.value.method,
     skip_tls_verify: formData.value.skip_tls_verify,
     template: formData.value.template,
