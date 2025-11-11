@@ -48,29 +48,8 @@ env:
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
-  check_changes:
-    runs-on: ubuntu-latest
-    outputs:
-      has_changes: ${{ steps.check_changes.outputs.has_changes }}
-    steps:
-      - name: Clone the current repo
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Check if relevant code has changes
-        id: check_changes
-        run: |
-          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qvE '\.(md|yml|yaml)$'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-
   build_binary:
     name: build_binary
-    needs: check_changes
-    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on:
       labels: repo-openobserve-standard-16
 
@@ -261,7 +240,21 @@ jobs:
         with:
           node-version: 22
 
+      - name: Check if this is a rerun
+        id: check_rerun
+        run: |
+          echo "::notice::GitHub run attempt: ${{ github.run_attempt }}"
+          if [ "${{ github.run_attempt }}" -gt "1" ]; then
+            echo "is_rerun=true" >> $GITHUB_OUTPUT
+            echo "::notice::This is a rerun (attempt ${{ github.run_attempt }}). Will attempt to run only failed tests."
+          else
+            echo "is_rerun=false" >> $GITHUB_OUTPUT
+            echo "::notice::This is the first run. Will run all tests in matrix."
+          fi
+
       - name: Install dependencies and run ui-tests
+        env:
+          TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
         run: |
           touch .env
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
@@ -275,7 +268,43 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
-          npx playwright install --with-deps chromium 
+          npx playwright install --with-deps chromium
+
+          # Check if this is a rerun
+          IS_RERUN="${{ steps.check_rerun.outputs.is_rerun }}"
+
+          if [ "$IS_RERUN" = "true" ]; then
+            echo "::group::Fetching last failed tests from TestDino"
+            # Try to get last failed tests from TestDino
+            # Redirect stderr to /dev/null to avoid capturing npm warnings
+            if LAST_FAILED_FLAGS="$(npx tdpw last-failed 2>/dev/null)"; then
+              # Trim whitespace
+              LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
+
+              if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
+                echo "::notice::✅ Found failed tests from previous run."
+                echo "::notice::TestDino flags: $LAST_FAILED_FLAGS"
+                RERUN_MODE="optimized"
+                EXTRA_PW_FLAGS="$LAST_FAILED_FLAGS"
+              else
+                echo "::warning::TestDino returned no failed tests. Falling back to running all tests in this matrix job."
+                echo "::warning::This means you'll be billed for all tests. Please investigate why last-failed returned empty."
+                RERUN_MODE="fallback"
+                EXTRA_PW_FLAGS=""
+              fi
+            else
+              echo "::error::Failed to fetch last failed tests from TestDino (exit code: $?)."
+              echo "::warning::Falling back to running all tests in this matrix job."
+              echo "::warning::This means you'll be billed for all tests. Please check TestDino integration."
+              RERUN_MODE="fallback"
+              EXTRA_PW_FLAGS=""
+            fi
+            echo "::endgroup::"
+          else
+            RERUN_MODE="normal"
+            EXTRA_PW_FLAGS=""
+          fi
+
           # Get list of files to run using join function
           FILE_LIST="${{ join(matrix.run_files, ' ') }}"
           echo "DEBUG: FILE_LIST = $FILE_LIST"
@@ -294,9 +323,9 @@ jobs:
                 ACTUAL_FOLDER="${{ matrix.testfolder }}"
                 ;;
             esac
-            
+
             echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
-            
+
             # Build file paths
             FILE_PATHS=""
             for file in $FILE_LIST; do
@@ -304,13 +333,60 @@ jobs:
               echo "DEBUG: Will run file: $FILE_PATH"
               FILE_PATHS="$FILE_PATHS $FILE_PATH"
             done
-            
-            # Run all specified files at once
-            echo "DEBUG: Final command: npx playwright test$FILE_PATHS"
-            npx playwright test $FILE_PATHS
+
+            # Determine what to run based on rerun mode
+            if [ "$RERUN_MODE" = "optimized" ]; then
+              # TestDino returns: "Pipelines/pipeline-core.spec.js -g test name here"
+              # We need to: "./playwright-tests/Pipelines/pipeline-core.spec.js" "-g" "test name here"
+              # Extract file path (before -g) and test name (after -g)
+              FILE_PATH=$(echo "$EXTRA_PW_FLAGS" | sed 's/ -g.*//')
+              TEST_NAME=$(echo "$EXTRA_PW_FLAGS" | sed 's/.*-g //')
+
+              FIXED_FILE_PATH="./playwright-tests/$FILE_PATH"
+
+              echo "::notice::🎯 OPTIMIZED RERUN: Running only failed tests"
+              echo "DEBUG: Original TestDino flags: $EXTRA_PW_FLAGS"
+              echo "DEBUG: File path: $FIXED_FILE_PATH"
+              echo "DEBUG: Test name: $TEST_NAME"
+              echo "DEBUG: Final command: npx playwright test \"$FIXED_FILE_PATH\" -g \"$TEST_NAME\""
+              npx playwright test "$FIXED_FILE_PATH" -g "$TEST_NAME"
+            else
+              # Normal run or fallback
+              if [ "$RERUN_MODE" = "fallback" ]; then
+                echo "::warning::⚠️ FALLBACK RERUN: Running all tests in matrix (TestDino optimization failed)"
+              fi
+              echo "DEBUG: Final command: npx playwright test$FILE_PATHS"
+              npx playwright test $FILE_PATHS
+            fi
           else
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
+          fi 
+
+      - name: Cache test failures to TestDino
+        if: always()
+        env:
+          TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
+        run: |
+          cd tests/ui-testing
+          echo "::group::Caching test failure metadata to TestDino"
+          if [ -f "playwright-results/report.json" ]; then
+            echo "::notice::JSON report found at playwright-results/report.json"
+            ls -lh playwright-results/report.json
+            # tdpw cache expects to be run from the directory containing report.json
+            # Change to playwright-results directory where report.json lives
+            cd playwright-results
+            if npx tdpw cache; then
+              echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
+              echo "::notice::This data will be used for optimized reruns if tests fail"
+            else
+              echo "::warning::⚠️ Failed to cache test metadata to TestDino"
+              echo "::warning::Rerun optimization may not work properly"
+            fi
+          else
+            echo "::error::JSON report not found at playwright-results/report.json"
+            echo "::warning::Cannot cache test failures - skipping"
           fi
+          echo "::endgroup::"
 
       - name: Sanitize Test Folder Name
         shell: bash
@@ -346,7 +422,8 @@ jobs:
     name: Merge Reports and Upload to TestDino
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: repo-openobserve-standard-8
 
     steps:
       - name: Clone the current repo
@@ -431,21 +508,15 @@ jobs:
           retention-days: 7
 
   playwright_summary:
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: repo-openobserve-standard-8
     permissions: {}
-    needs: [check_changes, build_binary, ui_integration_tests, merge_and_upload_reports, generate_coverage_report]
+    needs: [build_binary, ui_integration_tests, merge_and_upload_reports, generate_coverage_report]
     if: always()
     steps:
       - name: Check test results
         run: |
-          # If no relevant changes, all tests are skipped - this is success
-          if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
-            echo "No relevant changes detected - tests skipped"
-            exit 0
-          fi
-
-          # If we have changes, check all job results
-          # Accept success or skipped for all jobs
+          # Check all job results - accept success or skipped for all jobs
           BUILD_OK=false
           UI_OK=false
           MERGE_OK=false
