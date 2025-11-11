@@ -1344,7 +1344,7 @@ class="q-pr-sm q-pt-xs" />
         </q-splitter>
       </div>
       <q-btn
-        v-if="!isAiAssistantVisible && config.isEnterprise == 'true' && store.state.isAiChatEnabled"
+        v-if="!isAiAssistantVisible && config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
         data-test="logs-query-editor-ai-assistant-btn"
         icon="auto_awesome"
         title="Show AI Assistant"
