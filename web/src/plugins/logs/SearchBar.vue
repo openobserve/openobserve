@@ -2872,7 +2872,6 @@ export default defineComponent({
           if (res.status == 200) {
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
-            console.log(searchObj.data.datetime.startTime,'here it is')
 
             // Resetting columns as its not required in searchObj
             // As we reassign columns from selectedFields and search results
