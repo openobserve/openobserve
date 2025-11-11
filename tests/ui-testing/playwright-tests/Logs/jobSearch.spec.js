@@ -7,7 +7,7 @@ import { LogsPageEP } from '../../pages/logsPages/logsPageEP.js';
 
 test.describe.configure({ mode: 'parallel' });
 
-test.describe("Job Search for schedule query", () => {
+test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
     let loginPage, logsPage, ingestionPage, jobSchedulerPage, logsPageEP;
     const stream = "e2e_automate";
     test.beforeEach(async ({ page }) => {

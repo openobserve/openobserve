@@ -4,7 +4,7 @@ const PageManager = require('../../pages/page-manager.js');
 const testData = require("../../../test-data/sdr_test_data.json");
 const path = require('path');
 
-test.describe("Regex Pattern Management Tests", () => {
+test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
 

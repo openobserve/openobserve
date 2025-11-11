@@ -150,6 +150,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </q-route-tab>
                 <q-route-tab
+                    v-if="config.isEnterprise == 'true' && isMetaOrg"
+                    data-test="license-tab"
+                    name="license"
+                    :to="{
+                      name: 'license',
+                      query: {
+                        org_identifier: store.state.selectedOrganization?.identifier,
+                      },
+                    }"
+                    icon="card_membership"
+                    :label="t('settings.license')"
+                    content-class="tab_content"
+                  />
+                <q-route-tab
                   v-if="config.isCloud == 'true' && isMetaOrg"
                   data-test="organization-management-tab"
                   name="organization_management"
@@ -282,6 +296,19 @@ export default defineComponent({
         }
 
       }
+      else if (router.currentRoute.value.name === "license") {
+        if(!isMetaOrg.value || config.isEnterprise === "false") {
+          settingsTab.value = "general";
+          router.push({
+            path: "/settings/general",
+            query: {
+              org_identifier: store.state.selectedOrganization?.identifier,
+            },
+          });
+        }
+
+      }
+
     };
 
     onBeforeMount(() => {

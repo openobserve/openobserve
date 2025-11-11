@@ -5,7 +5,7 @@ import { IngestionPage } from '../../pages/generalPages/ingestionPage.js';
 import { LogsPage } from '../../pages/logsPages/logsPage.js';
 import { LogsPageEP } from '../../pages/logsPages/logsPageEP.js';
 
-test.describe("Cipher Keys for security", () => {
+test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
 
   let loginPage, ingestionPage, cipherKeys, logsPage, logsPageEP;
   const cipherName = `c${Date.now()}-${Math.random().toString(36).substring(7)}`;

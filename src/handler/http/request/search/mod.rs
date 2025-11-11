@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, get, post, web};
+use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
 use arrow_schema::Schema;
 use chrono::Utc;
 use config::{
@@ -36,9 +36,9 @@ use hashbrown::HashMap;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::check_stream_permissions;
-#[cfg(feature = "cloud")]
-use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
+#[cfg(feature = "cloud")]
+use crate::service::organization::is_org_in_free_trial_period;
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
@@ -282,6 +282,20 @@ pub async fn search(
         }
     };
 
+    #[cfg(feature = "enterprise")]
+    for stream in stream_names.iter() {
+        {
+            if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+                return Ok(
+                    HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                        StatusCode::TOO_MANY_REQUESTS,
+                        e.to_string(),
+                    )),
+                );
+            }
+        }
+    }
+
     // Handle histogram data for UI
     let mut converted_histogram_query: Option<String> = None;
     if is_ui_histogram {
@@ -344,8 +358,6 @@ pub async fn search(
 
     #[cfg(feature = "enterprise")]
     {
-        use actix_http::StatusCode;
-
         use crate::common::meta;
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
@@ -512,6 +524,19 @@ pub async fn around_v1(
     let start = std::time::Instant::now();
 
     let (org_id, stream_name) = path.into_inner();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
+    }
+
     let http_span = if get_config().common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
@@ -623,6 +648,19 @@ pub async fn around_v2(
     let start = std::time::Instant::now();
 
     let (org_id, stream_name) = path.into_inner();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
+    }
+
     let http_span = if get_config().common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
@@ -715,6 +753,18 @@ pub async fn values(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
+    }
 
     let user_id = &user_email.user_id;
     let http_span = if config::get_config().common.tracing_search_enabled {
@@ -1398,6 +1448,26 @@ pub async fn search_partition(
         return Ok(MetaHttpResponse::bad_request(e));
     }
 
+    #[cfg(feature = "enterprise")]
+    {
+        let stream_names = match resolve_stream_names(&req.sql) {
+            Ok(v) => v.clone(),
+            Err(e) => {
+                return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
+            }
+        };
+        for stream in stream_names.iter() {
+            if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+                return Ok(
+                    HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                        StatusCode::TOO_MANY_REQUESTS,
+                        e.to_string(),
+                    )),
+                );
+            }
+        }
+    }
+
     let search_res = SearchService::search_partition(
         &trace_id,
         &org_id,
@@ -1764,8 +1834,6 @@ pub async fn result_schema(
 
     #[cfg(feature = "enterprise")]
     {
-        use actix_http::StatusCode;
-
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
@@ -1824,20 +1892,16 @@ pub async fn result_schema(
             Ok(v) => v,
             Err(e) => {
                 log::error!("Error parsing sql: {e}");
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    actix_web::http::StatusCode::BAD_REQUEST,
-                    e,
-                )));
+                return Ok(HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
             }
         };
 
     let res_schema = match get_result_schema(sql, is_streaming, use_cache).await {
         Ok(v) => v,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::BAD_REQUEST,
-                e,
-            )));
+            return Ok(HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
         }
     };
 

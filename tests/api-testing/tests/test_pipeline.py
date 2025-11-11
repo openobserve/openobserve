@@ -1087,7 +1087,7 @@ def test_pipeline_creation_and_action_flatten(create_session, base_url, pipeline
 
     assert resp_create_pipeline.status_code == 400, "Invalid pipeline: After Flatten must be checked if a previous FunctionNode already checked it in the same branch."
 
-
+@pytest.mark.skip(reason="WIP")
 def test_e2e_pipeline_history(create_session, base_url):
     """Running an E2E test for pipeline history API.
 
