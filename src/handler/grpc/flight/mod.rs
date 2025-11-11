@@ -29,11 +29,11 @@ use arrow_flight::{
     encode::FlightDataEncoderBuilder, error::FlightError, flight_service_server::FlightService,
 };
 use arrow_schema::Schema;
-use config::{cluster::LOCAL_NODE, meta::search::ScanStats, metrics};
+use config::{PARQUET_BATCH_SIZE, cluster::LOCAL_NODE, meta::search::ScanStats, metrics};
 use datafusion::{
     common::{DataFusionError, Result},
     execution::SendableRecordBatchStream,
-    physical_plan::execute_stream,
+    physical_plan::{coalesce_batches::CoalesceBatchesExec, execute_stream},
 };
 use futures::{Stream, StreamExt, TryStreamExt, stream::BoxStream};
 use prost::Message;
@@ -132,7 +132,7 @@ impl FlightService for FlightServiceImpl {
         }
 
         // 2. prepare dataufion context
-        let (ctx, physical_plan, defer, scan_stats) = match result {
+        let (ctx, mut physical_plan, defer, scan_stats) = match result {
             Ok(v) => v,
             Err(e) => {
                 // clear session data
@@ -150,6 +150,9 @@ impl FlightService for FlightServiceImpl {
             trace_id,
             is_super_cluster
         );
+
+        // add coalesce batch exec to optimize small batches
+        physical_plan = Arc::new(CoalesceBatchesExec::new(physical_plan, PARQUET_BATCH_SIZE));
 
         let mut schema = physical_plan.schema();
 
