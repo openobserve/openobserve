@@ -186,7 +186,7 @@ const alerts = {
   },
   getHistory: (org_identifier: string, query: any) => {
     const params = new URLSearchParams();
-    if (query.alert_name) params.append("alert_name", query.alert_name);
+    if (query.alert_id) params.append("alert_id", query.alert_id);
     if (query.start_time) params.append("start_time", query.start_time);
     if (query.end_time) params.append("end_time", query.end_time);
     params.append("from", query.from || "0");
