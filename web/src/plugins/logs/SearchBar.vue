@@ -3000,7 +3000,6 @@ export default defineComponent({
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
               }
-              debugger;
 
 
               //here we are getting data so we need to check here
