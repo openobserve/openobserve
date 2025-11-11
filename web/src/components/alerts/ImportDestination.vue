@@ -499,9 +499,11 @@ export default defineComponent({
     const updateDestinationType = (type: any, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].destination_type = type;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };
@@ -509,9 +511,11 @@ export default defineComponent({
     const updateDestinationMethod = (method: any, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].method = method;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };
@@ -519,9 +523,11 @@ export default defineComponent({
     const updateDestinationName = (destinationName: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].name = destinationName;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };
@@ -529,9 +535,11 @@ export default defineComponent({
     const updateDestinationUrl = (url: any, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].url = url;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };
@@ -539,9 +547,11 @@ export default defineComponent({
     const updateDestinationTemplate = (template: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].template = template;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };
@@ -549,9 +559,11 @@ export default defineComponent({
     const updateDestinationAction = (id: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].action_id = id;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };
@@ -561,9 +573,11 @@ export default defineComponent({
         baseImportRef.value.jsonArrayOfObj[index].emails = emails
           .split(",")
           .map((email) => email.trim());
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };
@@ -572,9 +586,11 @@ export default defineComponent({
       userSelectedSkipTlsVerify.value[index] = value;
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].skip_tls_verify = value;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };

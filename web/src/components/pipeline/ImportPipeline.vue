@@ -564,7 +564,12 @@ export default defineComponent({
             node.data.query_condition.sql = sqlQuery;
           }
         });
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
@@ -583,7 +588,12 @@ export default defineComponent({
           }
         });
         baseImportRef.value.jsonArrayOfObj[index].stream_name = stream_name;
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
@@ -597,7 +607,12 @@ export default defineComponent({
             node.data.destination_name = remoteDestination;
           }
         });
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
@@ -608,14 +623,24 @@ export default defineComponent({
             node.data.stream_name = streamName;
           }
         });
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
     const updatePipelineName = (pipelineName: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].name = pipelineName;
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
@@ -635,7 +660,12 @@ export default defineComponent({
           node.data.name = functionName;
         }
 
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
@@ -1176,7 +1206,12 @@ export default defineComponent({
             node.data.stream_type = streamType;
           }
         });
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
       try {
         const streamResponse: any = await getStreams(streamType, false);
@@ -1215,7 +1250,12 @@ export default defineComponent({
             node.data.stream_type = streamType;
           }
         });
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
       try {
         const streamResponse: any = await getStreams(streamType, false);
@@ -1241,7 +1281,12 @@ export default defineComponent({
           }
         });
 
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
       try {
         const streamResponse: any = await getStreams(streamType, false);
@@ -1261,7 +1306,12 @@ export default defineComponent({
             node.data.trigger_condition.timezone = timezone;
           }
         });
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
@@ -1274,7 +1324,12 @@ export default defineComponent({
             node.data.stream_name = streamName;
           }
         });
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
@@ -1297,7 +1352,12 @@ export default defineComponent({
             node.data.org_id = orgId;
           }
         });
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 

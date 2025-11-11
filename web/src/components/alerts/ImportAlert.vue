@@ -529,22 +529,36 @@ export default defineComponent({
     ) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].destinations = destinations;
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
     const updateStreamFields = (stream_name: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].stream_name = stream_name;
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
     const updateAlertName = (alertName: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].name = alertName;
-        // Don't force editor update if importing
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
@@ -1007,7 +1021,12 @@ export default defineComponent({
     const updateStreams = async (streamType: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].stream_type = streamType;
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
 
       try {
@@ -1059,7 +1078,12 @@ export default defineComponent({
           baseImportRef.value.jsonArrayOfObj[index].trigger_condition = {};
         }
         baseImportRef.value.jsonArrayOfObj[index].trigger_condition.timezone = timezone;
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
@@ -1109,7 +1133,12 @@ export default defineComponent({
     const updateOrgId = (orgId: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].org_id = orgId;
-        baseImportRef.value.updateJsonArray(baseImportRef.value.jsonArrayOfObj, baseImportRef.value.isImporting);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 

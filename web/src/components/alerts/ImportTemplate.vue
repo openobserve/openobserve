@@ -295,9 +295,11 @@ export default defineComponent({
     const updateTemplateType = (type: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].type = type;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };
@@ -305,9 +307,11 @@ export default defineComponent({
     const updateTemplateName = (name: any, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].name = name;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };
@@ -315,9 +319,11 @@ export default defineComponent({
     const updateTemplateBody = (body: any, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].body = body;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };
@@ -325,9 +331,11 @@ export default defineComponent({
     const updateTemplateTitle = (title: any, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].title = title;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };

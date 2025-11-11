@@ -325,9 +325,11 @@ export default defineComponent({
     ) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].name = regexPatternName;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };
@@ -335,9 +337,11 @@ export default defineComponent({
     const updateRegexPattern = (regexPattern: any, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].pattern = regexPattern;
-        baseImportRef.value.updateJsonArray(
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
-          baseImportRef.value.isImporting
+          null,
+          2
         );
       }
     };
