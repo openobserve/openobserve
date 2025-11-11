@@ -212,52 +212,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </template>
 
-          <!-- <template #body-cell-error="props">
+          <template #body-cell-is_partial="props">
             <q-td :props="props">
               <q-icon
-                v-if="props.row.error"
-                name="error"
-                color="negative"
-                size="sm"
-                class="cursor-pointer"
-                @click="showErrorDialog(props.row.error)"
-              >
-                <q-tooltip>Click to view error</q-tooltip>
-              </q-icon>
-            </q-td>
-          </template> -->
-
-          <template #body-cell-actions="props">
-            <q-td :props="props">
-              <q-btn
-                icon="visibility"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                @click="showDetailsDialog(props.row)"
-                data-test="pipeline-history-view-details"
-              >
-                <q-tooltip>View Details</q-tooltip>
-              </q-btn>
-
-              <q-btn
-                v-if="props.row.error"
-                :data-test="`pipeline-list-${props.row.name}-error-indicator`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                color="negative"
-                icon="error"
-                @click.stop="showErrorDialog(props.row)"
+                v-if="props.row.is_partial !== null && props.row.is_partial !== undefined"
+                :name="props.row.is_partial ? 'warning' : 'check_circle'"
+                :color="props.row.is_partial ? 'warning' : 'positive'"
+                size="xs"
               >
                 <q-tooltip>
-                  Last error: {{ new Date(props.row.timestamp / 1000).toLocaleString() }}
+                  {{ props.row.is_partial ? "Partial Results" : "Complete Results" }}
                 </q-tooltip>
-              </q-btn>
+              </q-icon>
+              <span v-else>-</span>
+            </q-td>
+          </template>
+
+          <template #body-cell-delay_in_secs="props">
+            <q-td :props="props">
+              {{ props.row.delay_in_secs !== null && props.row.delay_in_secs !== undefined ? props.row.delay_in_secs + 's' : '-' }}
+            </q-td>
+          </template>
+
+          <template #body-cell-evaluation_took_in_secs="props">
+            <q-td :props="props">
+              {{ props.row.evaluation_took_in_secs !== null && props.row.evaluation_took_in_secs !== undefined ? props.row.evaluation_took_in_secs.toFixed(2) + 's' : '-' }}
+            </q-td>
+          </template>
+
+          <template #body-cell-query_took="props">
+            <q-td :props="props">
+              {{ props.row.query_took !== null && props.row.query_took !== undefined ? (props.row.query_took / 1000).toFixed(2) + 'ms' : '-' }}
             </q-td>
           </template>
 
@@ -388,7 +373,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="
                 selectedRow.evaluation_took_in_secs ||
                 selectedRow.query_took ||
-                selectedRow.retries > 0
+                selectedRow.retries > 0 ||
+                selectedRow.delay_in_secs ||
+                selectedRow.is_partial !== null && selectedRow.is_partial !== undefined
               "
             >
               <q-separator class="q-my-sm" />
@@ -413,6 +400,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div v-if="selectedRow.retries > 0" class="col-4">
                     <div class="text-caption text-grey-7 q-mb-xs">Retries</div>
                     <div class="text-body2">{{ selectedRow.retries }}</div>
+                  </div>
+                  <div v-if="selectedRow.delay_in_secs" class="col-4">
+                    <div class="text-caption text-grey-7 q-mb-xs">
+                      Delay
+                    </div>
+                    <div class="text-body2">
+                      {{ selectedRow.delay_in_secs }}s
+                    </div>
+                  </div>
+                  <div v-if="selectedRow.is_partial !== null && selectedRow.is_partial !== undefined" class="col-4">
+                    <div class="text-caption text-grey-7 q-mb-xs">
+                      Result Status
+                    </div>
+                    <div class="text-body2">
+                      <q-icon
+                        :name="selectedRow.is_partial ? 'warning' : 'check_circle'"
+                        :color="selectedRow.is_partial ? 'warning' : 'positive'"
+                        size="xs"
+                        class="q-mr-xs"
+                      />
+                      {{ selectedRow.is_partial ? 'Partial' : 'Complete' }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -684,20 +693,37 @@ const columns = ref([
     sortable: false,
     style: "width: 50px;",
   },
-  // {
-  //   name: "error",
-  //   label: "Errors",
-  //   field: "error",
-  //   align: "center",
-  //   sortable: false,
-  // },
   {
-    name: "actions",
-    label: "Actions",
-    field: "actions",
+    name: "is_partial",
+    label: "Partial",
+    field: "is_partial",
     align: "center",
     sortable: false,
-    style: "width: 50px;",
+    style: "width: 60px;",
+  },
+  {
+    name: "delay_in_secs",
+    label: "Delay (s)",
+    field: "delay_in_secs",
+    align: "right",
+    sortable: false,
+    style: "width: 80px;",
+  },
+  {
+    name: "evaluation_took_in_secs",
+    label: "Eval Time (s)",
+    field: "evaluation_took_in_secs",
+    align: "right",
+    sortable: false,
+    style: "width: 100px;",
+  },
+  {
+    name: "query_took",
+    label: "Query Time (ms)",
+    field: "query_took",
+    align: "right",
+    sortable: false,
+    style: "width: 110px;",
   },
 ]);
 
