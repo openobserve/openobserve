@@ -79,6 +79,9 @@ export const useSearchQuery = () => {
       if (!notificationMsg.value) {
         notificationMsg.value = "Search query is empty or invalid.";
       }
+      else{
+        searchObj.data.errorMsg = notificationMsg.value;
+      }
       return null;
     }
 
@@ -326,9 +329,10 @@ export const useSearchQuery = () => {
     const parsedSQL: any = fnParsedSQL();
 
     if (parsedSQL != undefined) {
+
       if (Array.isArray(parsedSQL) && parsedSQL.length == 0) {
         notificationMsg.value =
-          "SQL query is missing or invalid. Please submit a valid SQL statement.";
+          "SQL query is missing or invalid.";
         return null;
       }
 
