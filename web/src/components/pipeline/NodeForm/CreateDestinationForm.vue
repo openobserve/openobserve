@@ -602,7 +602,7 @@ const urlSuffix = computed(() => {
       return `/api/${org}/${stream}/_json`;
     }
     case "splunk":
-      return "/services/collector/raw";
+      return "/services/collector";
     case "elasticsearch":
       return "/_bulk";
     case "datadog":
@@ -1032,5 +1032,11 @@ defineExpose({
 .pipeline-add-remote-destination-form .modern-stepper .q-stepper__tab {
   padding: 5px 5px 15px 5px !important;
   min-height: 35px !important;
+}
+
+.modern-stepper {
+  .q-stepper {
+    background: transparent !important;
+  }
 }
 </style>

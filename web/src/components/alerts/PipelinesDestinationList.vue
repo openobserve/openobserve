@@ -122,12 +122,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-table>
     </div>
     <div v-else>
-      <AddDestination
-        :is-alerts="false"
+      <PipelineDestinationEditor
         :destination="editingDestination"
-        :templates="templates"
-        @cancel:hideform="toggleDestinationEditor"
-        @get:destinations="getDestinations"
+        @cancel="toggleDestinationEditor"
+        @created="handleDestinationCreated"
       />
     </div>
 
@@ -147,7 +145,7 @@ import { useI18n } from "vue-i18n";
 import { useQuasar, type QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { getImageURL } from "@/utils/zincutils";
-import AddDestination from "./AddDestination.vue";
+import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
@@ -166,7 +164,12 @@ interface ConformDelete {
 }
 export default defineComponent({
   name: "PageAlerts",
-  components: { AddDestination, NoData, ConfirmDialog, QTablePagination },
+  components: {
+    PipelineDestinationEditor,
+    NoData,
+    ConfirmDialog,
+    QTablePagination,
+  },
   setup() {
     const qTable = ref();
     const store = useStore();
@@ -394,6 +397,17 @@ export default defineComponent({
           },
         });
     };
+
+    const handleDestinationCreated = (destinationName: string) => {
+      // Close the editor and refresh the list
+      toggleDestinationEditor();
+      getDestinations();
+
+      q.notify({
+        type: "positive",
+        message: `Destination "${destinationName}" created successfully.`,
+      });
+    };
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
@@ -445,6 +459,7 @@ export default defineComponent({
       editingDestination,
       templates,
       toggleDestinationEditor,
+      handleDestinationCreated,
       getDestinations,
       deleteDestination,
       cancelDeleteDestination,
