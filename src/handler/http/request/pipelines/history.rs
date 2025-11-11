@@ -56,6 +56,10 @@ pub struct PipelineHistoryQuery {
     pub from: Option<i64>,
     /// Number of results to return
     pub size: Option<i64>,
+    /// Field to sort by (timestamp, pipeline_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took, is_partial)
+    pub sort_by: Option<String>,
+    /// Sort order (asc or desc, default: desc)
+    pub sort_order: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -110,6 +114,8 @@ pub struct PipelineHistoryResponse {
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds"),
         ("from" = Option<i64>, Query, description = "Pagination offset (default: 0)"),
         ("size" = Option<i64>, Query, description = "Number of results to return (default: 100, max: 1000)"),
+        ("sort_by" = Option<String>, Query, description = "Field to sort by: timestamp, pipeline_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took, is_partial (default: timestamp)"),
+        ("sort_order" = Option<String>, Query, description = "Sort order: asc or desc (default: desc)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PipelineHistoryResponse),
@@ -142,6 +148,50 @@ pub async fn get_pipeline_history(
     if start_time >= end_time {
         return MetaHttpResponse::bad_request("start_time must be before end_time");
     }
+
+    // Validate and map sort_by field to SQL column name or expression
+    let sort_column = if let Some(ref sort_by) = query.sort_by {
+        match sort_by.to_lowercase().as_str() {
+            "timestamp" => "_timestamp",
+            "pipeline_name" => "key", // pipeline_name is extracted from key field
+            "status" => "status",
+            "is_realtime" => "is_realtime",
+            "is_silenced" => "is_silenced",
+            "start_time" => "start_time",
+            "end_time" => "end_time",
+            "duration" => "(end_time - start_time)", // Calculated field
+            "retries" => "retries",
+            "delay_in_secs" => "delay_in_secs",
+            "evaluation_took_in_secs" => "evaluation_took_in_secs",
+            "source_node" => "source_node",
+            "query_took" => "query_took",
+            "is_partial" => "is_partial",
+            _ => {
+                return MetaHttpResponse::bad_request(format!(
+                    "Invalid sort_by field: '{}'. Valid fields are: timestamp, pipeline_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took, is_partial",
+                    sort_by
+                ));
+            }
+        }
+    } else {
+        "_timestamp" // Default sort by timestamp
+    };
+
+    // Validate sort_order
+    let sort_order = if let Some(ref order) = query.sort_order {
+        match order.to_lowercase().as_str() {
+            "asc" => "ASC",
+            "desc" => "DESC",
+            _ => {
+                return MetaHttpResponse::bad_request(format!(
+                    "Invalid sort_order: '{}'. Valid values are: asc, desc",
+                    order
+                ));
+            }
+        }
+    } else {
+        "DESC" // Default sort order
+    };
 
     // Get all pipeline IDs for the organization to validate the filter
     let pipeline_ids = match get_organization_pipeline_ids(&org_id).await {
@@ -381,7 +431,7 @@ pub async fn get_pipeline_history(
          source_node, query_took \
          FROM \"{TRIGGERS_STREAM}\" \
          WHERE {where_clause} \
-         ORDER BY _timestamp DESC LIMIT {size} OFFSET {from}"
+         ORDER BY {sort_column} {sort_order} LIMIT {size} OFFSET {from}"
     );
     log::info!("Pipeline history data_sql: {data_sql}");
 
@@ -495,4 +545,114 @@ async fn get_organization_pipeline_ids(org_id: &str) -> Result<Vec<String>, anyh
     let ids: Vec<String> = pipelines.into_iter().map(|pipeline| pipeline.id).collect();
 
     Ok(ids)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pipeline_history_query_defaults() {
+        let query = PipelineHistoryQuery {
+            pipeline_id: None,
+            start_time: None,
+            end_time: None,
+            from: None,
+            size: None,
+            sort_by: None,
+            sort_order: None,
+        };
+
+        assert!(query.pipeline_id.is_none());
+        assert!(query.start_time.is_none());
+        assert!(query.end_time.is_none());
+        assert!(query.from.is_none());
+        assert!(query.size.is_none());
+        assert!(query.sort_by.is_none());
+        assert!(query.sort_order.is_none());
+    }
+
+    #[test]
+    fn test_pipeline_history_query_with_values() {
+        let query = PipelineHistoryQuery {
+            pipeline_id: Some("test_pipeline".to_string()),
+            start_time: Some(1234567890000000),
+            end_time: Some(1234567990000000),
+            from: Some(0),
+            size: Some(50),
+            sort_by: Some("status".to_string()),
+            sort_order: Some("asc".to_string()),
+        };
+
+        assert_eq!(query.pipeline_id, Some("test_pipeline".to_string()));
+        assert_eq!(query.start_time, Some(1234567890000000));
+        assert_eq!(query.end_time, Some(1234567990000000));
+        assert_eq!(query.from, Some(0));
+        assert_eq!(query.size, Some(50));
+        assert_eq!(query.sort_by, Some("status".to_string()));
+        assert_eq!(query.sort_order, Some("asc".to_string()));
+    }
+
+    #[test]
+    fn test_pipeline_history_query_with_sorting() {
+        // Test sorting parameters for different fields
+        let sort_fields = vec![
+            "timestamp",
+            "pipeline_name",
+            "status",
+            "is_realtime",
+            "is_silenced",
+            "start_time",
+            "end_time",
+            "duration",
+            "retries",
+            "delay_in_secs",
+            "evaluation_took_in_secs",
+            "source_node",
+            "query_took",
+            "is_partial",
+        ];
+
+        for field in sort_fields {
+            let query = PipelineHistoryQuery {
+                pipeline_id: None,
+                start_time: None,
+                end_time: None,
+                from: None,
+                size: None,
+                sort_by: Some(field.to_string()),
+                sort_order: Some("asc".to_string()),
+            };
+
+            assert_eq!(query.sort_by, Some(field.to_string()));
+            assert_eq!(query.sort_order, Some("asc".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_pipeline_history_query_sort_order_options() {
+        // Test ascending order
+        let query_asc = PipelineHistoryQuery {
+            pipeline_id: None,
+            start_time: None,
+            end_time: None,
+            from: None,
+            size: None,
+            sort_by: Some("timestamp".to_string()),
+            sort_order: Some("asc".to_string()),
+        };
+        assert_eq!(query_asc.sort_order, Some("asc".to_string()));
+
+        // Test descending order
+        let query_desc = PipelineHistoryQuery {
+            pipeline_id: None,
+            start_time: None,
+            end_time: None,
+            from: None,
+            size: None,
+            sort_by: Some("timestamp".to_string()),
+            sort_order: Some("desc".to_string()),
+        };
+        assert_eq!(query_desc.sort_order, Some("desc".to_string()));
+    }
 }

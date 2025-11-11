@@ -136,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:pagination="pagination"
           :rows-per-page-options="rowsPerPageOptions"
           @request="onRequest"
+          :loading="loading"
           binary-state-sort
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           style="width: 100%; height: calc(100vh - 105px)"
@@ -583,8 +584,8 @@ const pagination = ref({
   page: 1,
   rowsPerPage: 20,
   rowsNumber: 0,
-  sortBy: null,
-  descending: false,
+  sortBy: "timestamp",
+  descending: true,
 });
 
 const rowsPerPageOptions = [
@@ -627,14 +628,14 @@ const columns = ref([
     label: "Pipeline Name",
     field: "pipeline_name",
     align: "left",
-    sortable: false,
+    sortable: true,
   },
   {
     name: "is_realtime",
     label: "Type",
     field: "is_realtime",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 37px;",
   },
   {
@@ -642,7 +643,7 @@ const columns = ref([
     label: "Is Silenced",
     field: "is_silenced",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 37px;",
   },
   {
@@ -650,7 +651,7 @@ const columns = ref([
     label: "Timestamp",
     field: "timestamp",
     align: "left",
-    sortable: false,
+    sortable: true,
     style: "width: 160px;",
   },
   {
@@ -658,7 +659,7 @@ const columns = ref([
     label: "Start Time",
     field: "start_time",
     align: "left",
-    sortable: false,
+    sortable: true,
     style: "width: 160px;",
   },
   {
@@ -666,7 +667,7 @@ const columns = ref([
     label: "End Time",
     field: "end_time",
     align: "left",
-    sortable: false,
+    sortable: true,
     style: "width: 160px;",
   },
   {
@@ -674,7 +675,7 @@ const columns = ref([
     label: "Duration",
     field: (row: any) => row.end_time - row.start_time,
     align: "right",
-    sortable: false,
+    sortable: true,
     style: "width: 50px;",
   },
   {
@@ -682,7 +683,7 @@ const columns = ref([
     label: "Status",
     field: "status",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 150px;",
   },
   {
@@ -690,7 +691,7 @@ const columns = ref([
     label: "Retries",
     field: "retries",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 50px;",
   },
   {
@@ -698,7 +699,7 @@ const columns = ref([
     label: "Partial",
     field: "is_partial",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 60px;",
   },
   {
@@ -706,7 +707,7 @@ const columns = ref([
     label: "Delay (s)",
     field: "delay_in_secs",
     align: "right",
-    sortable: false,
+    sortable: true,
     style: "width: 80px;",
   },
   {
@@ -714,7 +715,7 @@ const columns = ref([
     label: "Eval Time (s)",
     field: "evaluation_took_in_secs",
     align: "right",
-    sortable: false,
+    sortable: true,
     style: "width: 100px;",
   },
   {
@@ -722,7 +723,7 @@ const columns = ref([
     label: "Query Time (ms)",
     field: "query_took",
     align: "right",
-    sortable: false,
+    sortable: true,
     style: "width: 110px;",
   },
 ]);
@@ -806,6 +807,14 @@ const fetchPipelineHistory = async () => {
     if (searchQuery.value && searchQuery.value.trim()) {
       params.pipeline_id = searchQuery.value.trim();
     }
+
+    // Add sorting parameters
+    if (pagination.value.sortBy) {
+      params.sort_by = pagination.value.sortBy;
+      params.sort_order = pagination.value.descending ? "desc" : "asc";
+    }
+
+    console.log("Fetching pipeline history with params:", params);
 
     const url = `/api/${org}/pipelines/history`;
     const response = await http().get(url, { params });
