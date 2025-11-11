@@ -1311,6 +1311,18 @@ export default defineComponent({
 
         variableData.panels = panels;
       }
+      
+      // If called from Add Panel, emit the variable data instead of saving to DB
+      if (props.isFromAddPanel) {
+        emit("save", {
+          variableData: toRaw(variableData),
+          isEdit: editMode.value,
+          oldVariableName: props.variableName,
+        });
+        return;
+      }
+      
+      // Original logic: save to database via API
       if (editMode.value) {
         try {
           await updateVariable(
