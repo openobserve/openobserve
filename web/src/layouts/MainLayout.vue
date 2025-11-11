@@ -524,6 +524,7 @@ class="padding-none" />
           :link-name="nav.name"
           :animation-index="index"
           v-bind="{ ...nav, mini: miniMode }"
+          @mouseenter="handleMenuHover(nav.link)"
         />
       </q-list>
     </q-drawer>
@@ -654,6 +655,7 @@ import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
+import useRoutePrefetch from "@/composables/useRoutePrefetch";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -739,6 +741,7 @@ export default defineComponent({
     const { getStreams, resetStreams } = useStreams();
     const { closeSocket } = useSearchWebSocket();
     const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
+    const { prefetchRoute } = useRoutePrefetch();
 
     const isMonacoEditorLoaded = ref(false);
     const showGetStarted = ref(
@@ -1451,6 +1454,15 @@ export default defineComponent({
     const openPredefinedThemes = () => {
       toggleThemes();
     };
+
+    /**
+     * Prefetch route module on menu hover
+     * @param routePath - The route path from the menu link
+     */
+    const handleMenuHover = (routePath: string) => {
+      prefetchRoute(routePath);
+    };
+
     //this is the used to set the selected org to the user clicked org because all the operations are happening on the selected org
     //to make sync with the user clicked org
     //we dont need search query after selectedOrg has been changed so resetting it
@@ -1510,6 +1522,8 @@ export default defineComponent({
       setRumUser,
       openPredefinedThemes,
       isPredefinedThemesOpen,
+      showThemes,
+      handleMenuHover,
     };
   },
   computed: {

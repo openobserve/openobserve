@@ -418,7 +418,6 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
-import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -452,24 +451,26 @@ import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
+import IndexList from "@/plugins/logs/IndexList.vue";
 
 export default defineComponent({
   name: "PageSearch",
   components: {
     SearchBar,
-    SearchSchedulersList,
-    IndexList: defineAsyncComponent(
-      () => import("@/plugins/logs/IndexList.vue"),
-    ),
+    IndexList,
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue"),
     ),
-    ConfirmDialog: defineAsyncComponent(
-      () => import("@/components/ConfirmDialog.vue"),
+    SearchSchedulersList: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchSchedulersList.vue"),
     ),
     SanitizedHtmlRenderer,
-    VisualizeLogsQuery,
-    SearchHistory,
+    VisualizeLogsQuery: defineAsyncComponent(
+      () => import("@/plugins/logs/VisualizeLogsQuery.vue"),
+    ),
+    SearchHistory: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchHistory.vue"),
+    ),
   },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
