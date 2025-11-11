@@ -814,6 +814,16 @@ watch(
   { immediate: true },
 );
 
+// Watch destination_type changes to ensure method is set to "post" for non-custom types
+watch(
+  () => formData.value.destination_type,
+  (newType) => {
+    if (newType !== "custom") {
+      formData.value.method = "post";
+    }
+  },
+);
+
 const isValidDestination = computed(
   () => formData.value.name && formData.value.url && formData.value.method,
 );
