@@ -1787,6 +1787,7 @@ export default defineComponent({
     "showSearchHistory",
     "extractPatterns",
     "onAiAssistantToggle",
+    "openAiChatSidebar",
   ],
   methods: {
     searchData() {
@@ -1908,6 +1909,170 @@ export default defineComponent({
     const store = useStore();
     const { showErrorNotification } = useNotifications();
     const { fetchAiChat } = useAiChat();
+    
+    // DB constants for AI chat history (same as O2AiChat.vue)
+    const DB_NAME = 'o2ChatDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'chatHistory';
+    
+    // AI chat history functions
+    const initDB = () => {
+      return new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (event) => {
+          const db = (event.target as IDBOpenDBRequest).result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+            store.createIndex('timestamp', 'timestamp', { unique: false });
+            store.createIndex('title', 'title', { unique: false });
+          }
+        };
+      });
+    };
+    
+    let searchBarChatId = ref<number | null>(null);
+    
+    // SQL detection function
+    const isValidSqlQuery = (response: string) => {
+      const lowerResponse = response.toLowerCase().trim();
+      
+      // Check for basic SQL keywords - must have SELECT and FROM, or WITH and FROM
+      const hasSelect = lowerResponse.includes('select');
+      const hasFrom = lowerResponse.includes('from');
+      const hasWith = lowerResponse.includes('with');
+      
+      // More lenient check - if it has any SQL keywords, consider it valid
+      // This prevents false positives during streaming
+      return hasSelect || hasFrom || hasWith || 
+             lowerResponse.includes('where') || 
+             lowerResponse.includes('group by') || 
+             lowerResponse.includes('order by') ||
+             lowerResponse.includes('insert') ||
+             lowerResponse.includes('update') ||
+             lowerResponse.includes('delete');
+    };
+    
+    // Function to open AI chat sidebar
+    const openAiChatSidebar = async () => {
+      try {
+          // Ensure AI chat sidebar feature is enabled
+          store.state.isAiChatEnabled = true;
+        // Get the logs page chat ID from our SearchBar AI conversation
+        if (!searchBarChatId.value) {
+          await findOrCreateSearchBarChat();
+        }
+        
+        // Inform O2AIChat to load this chat
+        if (searchBarChatId.value) {
+          store.dispatch('setCurrentChatTimestamp', searchBarChatId.value);
+          store.dispatch('setChatUpdated', true);
+        }
+
+        // Emit event to parent component to open the AI chat sidebar
+        // with our SearchBar chat ID
+        emit('openAiChatSidebar', {
+          chatId: searchBarChatId.value,
+          source: 'logs-page-ai-assistant'
+        });
+        
+        // Reset the error state after opening chat
+        showErrorNotificationDot.value = false;
+      } catch (error) {
+        console.error('Error opening AI chat sidebar:', error);
+      }
+    };
+    
+    const findOrCreateSearchBarChat = async () => {
+      try {
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readonly');
+        const dbStore = transaction.objectStore(STORE_NAME);
+        
+        // Find existing SearchBar AI chat
+        const request = dbStore.openCursor();
+        return new Promise<number>((resolve) => {
+          request.onsuccess = async (event) => {
+            const cursor = (event.target as IDBRequest).result;
+            if (cursor) {
+              const chat = cursor.value;
+              if (chat.model === 'logs-page-ai-assistant') {
+                searchBarChatId.value = chat.id;
+                resolve(chat.id);
+                return;
+              }
+              cursor.continue();
+            } else {
+              // No existing chat found, create new one
+              const writeTransaction = db.transaction(STORE_NAME, 'readwrite');
+              const writeStore = writeTransaction.objectStore(STORE_NAME);
+              
+              const newChat = {
+                title: 'Logs Page AI Assistant',
+                timestamp: new Date().toISOString(),
+                model: 'logs-page-ai-assistant',
+                messages: []
+              };
+              
+              const addRequest = writeStore.add(newChat);
+              addRequest.onsuccess = () => {
+                searchBarChatId.value = addRequest.result as number;
+                resolve(addRequest.result as number);
+              };
+            }
+          };
+        });
+      } catch (error) {
+        console.error('Error finding/creating SearchBar chat:', error);
+        return null;
+      }
+    };
+    
+    const saveSearchBarAiToHistory = async (userMessage: string, aiResponse: string, mode: string) => {
+      try {
+        // Find or create the SearchBar chat entry
+        let chatId = searchBarChatId.value;
+        if (!chatId) {
+          chatId = await findOrCreateSearchBarChat();
+        }
+        
+        if (!chatId) return;
+        
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const dbStore = transaction.objectStore(STORE_NAME);
+        
+        // Get existing chat
+        const getRequest = dbStore.get(chatId);
+        getRequest.onsuccess = () => {
+          const existingChat = getRequest.result;
+          if (existingChat) {
+            // Append new messages
+            existingChat.messages.push(
+              { role: 'user', content: userMessage },
+              { role: 'assistant', content: aiResponse }
+            );
+            
+            // Update timestamp
+            existingChat.timestamp = new Date().toISOString();
+            
+            // Save updated chat
+            const updateRequest = dbStore.put(existingChat);
+            updateRequest.onsuccess = () => {
+              console.log('SearchBar AI messages appended to existing chat');
+            };
+            updateRequest.onerror = () => {
+              console.error('Error updating SearchBar AI chat:', updateRequest.error);
+            };
+          }
+        };
+        
+      } catch (error) {
+        console.error('Error saving SearchBar AI chat to history:', error);
+      }
+    };
+    
     const rowsPerPage = ref(10);
     const regionFilter = ref();
     const regionFilterRef = ref(null);
@@ -1967,6 +2132,8 @@ export default defineComponent({
     const aiAssistantMode = ref("sql");
     const isAiLoading = ref(false);
     const isAiFocused = ref(false);
+    const hasAiError = ref(false);
+    const showErrorNotificationDot = ref(false);
     const aiBarHeight = computed(() => {
       if (!isAiAssistantVisible.value) return 56;
       const newlineCount = (aiAssistantQuery.value.match(/\n/g) || []).length;
@@ -1982,6 +2149,10 @@ export default defineComponent({
 
     const sendAiQuery = async () => {
       if (!aiAssistantQuery.value.trim()) return;
+      
+      // Store original query for history saving
+      const originalQuery = aiAssistantQuery.value.trim();
+      const selectedMode = aiAssistantMode.value;
       
       // Auto-switch editor modes based on AI mode selection
       if (aiAssistantMode.value === 'sql') {
@@ -2064,6 +2235,47 @@ export default defineComponent({
               }
             }
           }
+        }
+        
+        // After streaming is complete, check if SQL mode and validate the response
+        if (aiAssistantMode.value === 'sql' && aiResponse.trim()) {
+          // Simple test - if response doesn't contain basic SQL keywords, show error
+          const hasBasicSql = aiResponse.toLowerCase().includes('select') || 
+                             aiResponse.toLowerCase().includes('from') || 
+                             aiResponse.toLowerCase().includes('where') ||
+                             aiResponse.toLowerCase().includes('insert') ||
+                             aiResponse.toLowerCase().includes('update') ||
+                             aiResponse.toLowerCase().includes('delete');
+          
+          console.log('SQL Detection Debug:', {
+            mode: aiAssistantMode.value,
+            responseLength: aiResponse.length,
+            firstChars: aiResponse.substring(0, 50),
+            hasBasicSql: hasBasicSql,
+            currentErrorState: showErrorNotificationDot.value
+          });
+          
+          if (!hasBasicSql) {
+            showErrorNotificationDot.value = true;
+            console.log('🚨 NON-SQL DETECTED! Setting error notification to TRUE');
+          } else {
+            showErrorNotificationDot.value = false;
+            console.log('✅ SQL DETECTED! Setting error notification to FALSE');
+          }
+          
+          // Force reactivity update
+          nextTick(() => {
+            console.log('After nextTick - showErrorNotificationDot:', showErrorNotificationDot.value);
+          });
+        }
+        
+        // Save the conversation to history
+        if (aiResponse.trim()) {
+          await saveSearchBarAiToHistory(
+            originalQuery, 
+            aiResponse.trim(), 
+            selectedMode
+          );
         }
         
         aiAssistantQuery.value = '';
@@ -4572,6 +4784,8 @@ export default defineComponent({
       showExplainDialog,
       openExplainDialog,
       outlinedShowChart,
+      showErrorNotificationDot,
+      openAiChatSidebar,
     };
   },
   computed: {
@@ -5221,12 +5435,36 @@ export default defineComponent({
   color: #94a3b8 !important;
 }
 
-/* Buttons: send/stop/collapse */
+/* Buttons: send/stop/collapse/error */
 .ai-send-btn :deep(.q-btn__content),
 .ai-stop-btn :deep(.q-btn__content),
-.ai-collapse-btn :deep(.q-btn__content) {
+.ai-collapse-btn :deep(.q-btn__content),
+.ai-error-btn :deep(.q-btn__content) {
   transition: transform 0.12s ease, filter 0.12s ease;
 }
+
+/* Error button styling */
+.ai-error-btn {
+  position: relative;
+  transition: all 0.2s ease;
+    min-width: 26px;
+    min-height: 26px;
+}
+
+.ai-error-btn:hover {
+  background-color: rgba(255, 152, 0, 0.1);
+  transform: scale(1.05);
+}
+
+  /* Notification dot small and aligned */
+  .ai-error-dot-badge {
+    width: 6px !important;
+    height: 6px !important;
+    min-width: 6px !important;
+    min-height: 6px !important;
+    padding: 0 !important;
+    border: 2px solid var(--q-negative);
+  }
 
 .ai-send-btn:hover :deep(.q-btn__content),
 .ai-stop-btn:hover :deep(.q-btn__content),
