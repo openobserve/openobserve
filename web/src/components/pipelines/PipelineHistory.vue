@@ -67,8 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               fill-input
               input-debounce="0"
               :options="filteredPipelineOptions"
+              option-label="label"
+              option-value="value"
               @filter="filterPipelineOptions"
-              @input-value="setSearchQuery"
               @update:model-value="onPipelineSelected"
               :placeholder="
                 t(`pipeline.searchHistory`) || 'Select or search pipeline...'
@@ -566,9 +567,9 @@ const $q = useQuasar();
 const loading = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
-const selectedPipeline = ref<string | null>(null);
+const selectedPipeline = ref<any>(null);
 const allPipelines = ref<any[]>([]);
-const filteredPipelineOptions = ref<string[]>([]);
+const filteredPipelineOptions = ref<any[]>([]);
 const pagination = ref({
   page: 1,
   rowsPerPage: 20,
@@ -715,10 +716,13 @@ const fetchPipelinesList = async () => {
     const res = await pipelinesService.getPipelines(org);
 
     if (res.data && res.data.list) {
-      // Extract pipeline names and sort them
+      // Store complete pipeline objects and sort by name
       allPipelines.value = res.data.list
-        .map((pipeline: any) => pipeline.name)
-        .sort();
+        .map((pipeline: any) => ({
+          label: pipeline.name,
+          value: pipeline.pipeline_id,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
       filteredPipelineOptions.value = [...allPipelines.value];
     }
   } catch (error: any) {
@@ -731,18 +735,15 @@ const filterPipelineOptions = (val: string, update: any) => {
   update(() => {
     const needle = val.toLowerCase();
     filteredPipelineOptions.value = allPipelines.value.filter((v) =>
-      v.toLowerCase().includes(needle),
+      v.label.toLowerCase().includes(needle),
     );
   });
 };
 
-const setSearchQuery = (val: string) => {
-  searchQuery.value = val;
-};
-
-const onPipelineSelected = (val: string | null) => {
-  if (val) {
-    searchQuery.value = val;
+const onPipelineSelected = (val: any) => {
+  if (val && val.value) {
+    // Store the pipeline ID for the API call
+    searchQuery.value = val.value;
   }
 };
 
@@ -777,7 +778,7 @@ const fetchPipelineHistory = async () => {
 
     // Add pipeline_name filter if search query is provided
     if (searchQuery.value && searchQuery.value.trim()) {
-      params.pipeline_name = searchQuery.value.trim();
+      params.pipeline_id = searchQuery.value.trim();
     }
 
     const url = `/api/${org}/pipelines/history`;

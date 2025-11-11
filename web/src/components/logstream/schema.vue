@@ -481,12 +481,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template v-slot:body-cell-type="props">
                     <q-td>
-                      <span 
+                      <span
                         class="field-type-badge"
                         :class="{
                           'badge-int64': props.row.type === 'Int64',
-                          'badge-float64': props.row.type === 'Float64', 
-                          'badge-utf8': props.row.type === 'Utf8'
+                          'badge-float64': props.row.type === 'Float64',
+                          'badge-utf8': props.row.type === 'Utf8',
+                          'badge-bool': props.row.type === 'Boolean'
                         }"
                       >
                         {{ props.row.type }}
