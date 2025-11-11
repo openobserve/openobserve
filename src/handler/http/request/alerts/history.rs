@@ -57,7 +57,9 @@ pub struct AlertHistoryQuery {
     pub from: Option<i64>,
     /// Number of results to return
     pub size: Option<i64>,
-    /// Field to sort by (timestamp, alert_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took)
+    /// Field to sort by (timestamp, alert_name, status, is_realtime, is_silenced, start_time,
+    /// end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node,
+    /// query_took)
     pub sort_by: Option<String>,
     /// Sort order (asc or desc, default: desc)
     pub sort_order: Option<String>,
@@ -184,8 +186,7 @@ pub async fn get_alert_history(
             "query_took" => "query_took",
             _ => {
                 return MetaHttpResponse::bad_request(format!(
-                    "Invalid sort_by field: '{}'. Valid fields are: timestamp, alert_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took",
-                    sort_by
+                    "Invalid sort_by field: '{sort_by}'. Valid fields are: timestamp, alert_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took"
                 ));
             }
         }
@@ -200,8 +201,7 @@ pub async fn get_alert_history(
             "desc" => "DESC",
             _ => {
                 return MetaHttpResponse::bad_request(format!(
-                    "Invalid sort_order: '{}'. Valid values are: asc, desc",
-                    order
+                    "Invalid sort_order: '{order}'. Valid values are: asc, desc"
                 ));
             }
         }

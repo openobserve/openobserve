@@ -56,7 +56,9 @@ pub struct PipelineHistoryQuery {
     pub from: Option<i64>,
     /// Number of results to return
     pub size: Option<i64>,
-    /// Field to sort by (timestamp, pipeline_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took, is_partial)
+    /// Field to sort by (timestamp, pipeline_name, status, is_realtime, is_silenced, start_time,
+    /// end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node,
+    /// query_took, is_partial)
     pub sort_by: Option<String>,
     /// Sort order (asc or desc, default: desc)
     pub sort_order: Option<String>,
@@ -167,8 +169,7 @@ pub async fn get_pipeline_history(
             "query_took" => "query_took",
             _ => {
                 return MetaHttpResponse::bad_request(format!(
-                    "Invalid sort_by field: '{}'. Valid fields are: timestamp, pipeline_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took",
-                    sort_by
+                    "Invalid sort_by field: '{sort_by}'. Valid fields are: timestamp, pipeline_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took"
                 ));
             }
         }
@@ -183,8 +184,7 @@ pub async fn get_pipeline_history(
             "desc" => "DESC",
             _ => {
                 return MetaHttpResponse::bad_request(format!(
-                    "Invalid sort_order: '{}'. Valid values are: asc, desc",
-                    order
+                    "Invalid sort_order: '{order}'. Valid values are: asc, desc"
                 ));
             }
         }
