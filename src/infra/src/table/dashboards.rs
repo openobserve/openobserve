@@ -17,7 +17,7 @@ use config::meta::{
     dashboards::{
         Dashboard, ListDashboardsParams, v1::Dashboard as DashboardV1,
         v2::Dashboard as DashboardV2, v3::Dashboard as DashboardV3, v4::Dashboard as DashboardV4,
-        v5::Dashboard as DashboardV5, v6::Dashboard as DashboardV6, v7::Dashboard as DashboardV7
+        v5::Dashboard as DashboardV5, v6::Dashboard as DashboardV6, v7::Dashboard as DashboardV7,
     },
     folder::{Folder, FolderType},
 };

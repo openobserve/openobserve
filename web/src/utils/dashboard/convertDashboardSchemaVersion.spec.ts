@@ -30,6 +30,7 @@ describe("convertDashboardSchemaVersion", () => {
   // Test 1: Basic functionality - constants
   it("should have correct current schema version", () => {
     expect(CURRENT_DASHBOARD_SCHEMA_VERSION).toBe(7);
+    expect(CURRENT_DASHBOARD_SCHEMA_VERSION).toBe(7);
   });
 
   // Test 2: Edge cases - null/undefined data
@@ -50,7 +51,7 @@ describe("convertDashboardSchemaVersion", () => {
       layouts: [],
       panels: []
     };
-    
+
     const result = convertDashboardSchemaVersion(dataWithoutVersion);
     expect(result.version).toBe(7); // Should be upgraded to version 7 through the switch cases
   });
@@ -105,7 +106,7 @@ describe("convertDashboardSchemaVersion", () => {
     expect(result.tabs).toBeDefined();
     expect(result.tabs[0].panels[0].layout).toEqual({
       x: 0, // After version 2 and 5 conversion: 0 * 4 * 4 = 0
-      y: 0,
+      y: 0, // After version 6 conversion: 0 * 2 = 0
       h: 6, // After version 5 conversion: 3 * 2 = 6
       w: 96, // After version 2 and 5 conversion: 6 * 4 * 4 = 96
       i: "panel-1"
@@ -189,6 +190,7 @@ describe("convertDashboardSchemaVersion", () => {
     expect(result.tabs[0].name).toBe("Default");
     expect(result.tabs[0].tabId).toBe("default");
     expect(result.tabs[0].panels[0].layout.x).toBe(32); // 2 * 4 * 4 = 32
+    expect(result.tabs[0].panels[0].layout.y).toBe(2); // 1 * 2 = 2 (v6 migration)
     expect(result.tabs[0].panels[0].layout.w).toBe(48); // 3 * 4 * 4 = 48
   });
 
@@ -466,7 +468,7 @@ describe("convertDashboardSchemaVersion", () => {
   });
 
   // Test 7: Already converted versions (should not change)
-  it("should not modify data that is already version 5 (should upgrade to 6)", () => {
+  it("should not modify data that is already version 5 (should upgrade to 7)", () => {
     const dataV5 = {
       version: 5,
       title: "Test Dashboard",
@@ -509,19 +511,53 @@ describe("convertDashboardSchemaVersion", () => {
     expect(result.tabs[0].panels[0].layout.w).toBe(48); // 12 * 4
     expect(result.tabs[0].panels[0].layout.x).toBe(8); // 2 * 4
     expect(result.tabs[0].panels[0].layout.h).toBe(8); // 4 * 2
+    expect(result.tabs[0].panels[0].layout.y).toBe(2); // 1 * 2 (v6 migration)
+  });
+
+  it("should upgrade version 6 dashboard to version 7 (y coordinate fix)", () => {
+    const dataV6 = {
+      version: 6,
+      title: "Test Dashboard",
+      tabs: [
+        {
+          panels: [
+            {
+              id: "panel-1",
+              type: "bar",
+              layout: {
+                x: 8,
+                y: 5,
+                h: 8,
+                w: 48,
+                i: "panel-1"
+              },
+              queries: []
+            }
+          ]
+        }
+      ]
+    };
+
+    const result = convertDashboardSchemaVersion(dataV6);
+
+    expect(result.version).toBe(7);
+    expect(result.tabs[0].panels[0].layout.y).toBe(10); // 5 * 2 = 10 (y coordinate doubled in v6->v7)
+    expect(result.tabs[0].panels[0].layout.x).toBe(8); // x unchanged
+    expect(result.tabs[0].panels[0].layout.h).toBe(8); // h unchanged
+    expect(result.tabs[0].panels[0].layout.w).toBe(48); // w unchanged
   });
 
   it("should handle version higher than current schema version", () => {
-    const dataV6 = {
-      version: 6,
+    const dataV7 = {
+      version: 7,
       title: "Test Dashboard",
       tabs: []
     };
 
-    const result = convertDashboardSchemaVersion(dataV6);
-    
+    const result = convertDashboardSchemaVersion(dataV7);
+
     expect(result.version).toBe(7);
-    expect(result).toEqual(dataV6); // Should be unchanged
+    expect(result).toEqual(dataV7); // Should be unchanged
   });
 
   // Test 8: Additional edge cases for complete coverage

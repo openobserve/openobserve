@@ -282,8 +282,23 @@ export function convertDashboardSchemaVersion(data: any) {
       // update the version
       data.version = 6;
     }
-
     case 6: {
+      // Fix for existing v6 dashboards: Y coordinate was not scaled during v5->v6 migration
+      // Since cell height changed from 34px to 17px (halved), and h was doubled,
+      // y must also be doubled to maintain the same visual position:
+      // Old position: y × 34px
+      // New position: (y × 2) × 17px = y × 34px ✓
+      data.tabs.forEach((tabItem: any) => {
+        tabItem.panels.forEach((panelItem: any) => {
+          panelItem.layout.y = panelItem.layout.y * 2;
+        });
+      });
+
+      // update the version
+      data.version = 7;
+    }
+
+    case 7: {
       // need to traverse all panels
       // for each panel
       //   for each query

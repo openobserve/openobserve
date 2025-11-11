@@ -17,7 +17,7 @@ use datafusion::error::{DataFusionError, Result};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use strum::EnumIter;
 
-use crate::service::promql::value::{InstantValue, LabelsExt, Sample, Value};
+use crate::service::promql::value::{LabelsExt, RangeValue, Sample, Value};
 
 #[derive(Debug, EnumIter)]
 pub enum MathOperationsType {
@@ -93,31 +93,61 @@ pub(crate) fn sgn(data: Value) -> Result<Value> {
 
 fn exec(data: Value, op: &MathOperationsType) -> Result<Value> {
     match data {
-        Value::Vector(v) => {
-            let out = v
+        Value::Matrix(matrix) => {
+            let out: Vec<RangeValue> = matrix
                 .into_par_iter()
-                .map(|mut instant| {
-                    let val = op.apply(instant.sample.value);
-                    let labels = std::mem::take(&mut instant.labels);
-                    InstantValue {
-                        labels: labels.without_metric_name(),
-                        sample: Sample::new(instant.sample.timestamp, val),
+                .map(|mut range_value| {
+                    // Apply the math operation to all samples in this range
+                    let samples: Vec<Sample> = range_value
+                        .samples
+                        .into_iter()
+                        .map(|sample| {
+                            let val = op.apply(sample.value);
+                            Sample::new(sample.timestamp, val)
+                        })
+                        .collect();
+
+                    RangeValue {
+                        labels: std::mem::take(&mut range_value.labels).without_metric_name(),
+                        samples,
+                        exemplars: range_value.exemplars,
+                        time_window: range_value.time_window,
                     }
                 })
                 .collect();
-            Ok(Value::Vector(out))
+            Ok(Value::Matrix(out))
         }
         Value::None => Ok(Value::None),
-        _ => Err(DataFusionError::NotImplemented(format!(
-            "Invalid input for minute value: {data:?}"
+        _ => Err(DataFusionError::Plan(format!(
+            "Invalid input for math operation, expected matrix but got: {:?}",
+            data.get_type()
         ))),
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
-    use crate::service::promql::value::{InstantValue, Labels, Sample, Value};
+    use crate::service::promql::value::{Labels, RangeValue, Sample, TimeWindow, Value};
+
+    // Helper function to create a matrix from sample values
+    fn create_matrix(eval_ts: i64, values: Vec<f64>) -> Value {
+        let range_values: Vec<RangeValue> = values
+            .into_iter()
+            .map(|val| RangeValue {
+                labels: Labels::default(),
+                samples: vec![Sample::new(eval_ts, val)],
+                exemplars: None,
+                time_window: Some(TimeWindow {
+                    range: Duration::from_secs(5),
+                    offset: Duration::ZERO,
+                }),
+            })
+            .collect();
+        Value::Matrix(range_values)
+    }
 
     #[test]
     fn test_math_operations_type_apply() {
@@ -168,266 +198,156 @@ mod tests {
 
     #[test]
     fn test_abs() {
-        let vector = vec![
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(1000, -5.0),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(2000, 3.0),
-            },
-        ];
-        let value = Value::Vector(vector);
+        let eval_ts = 1000;
+        let value = create_matrix(eval_ts, vec![-5.0, 3.0]);
         let result = abs(value).unwrap();
 
-        if let Value::Vector(result_vector) = result {
-            assert_eq!(result_vector.len(), 2);
-            assert_eq!(result_vector[0].sample.value, 5.0);
-            assert_eq!(result_vector[1].sample.value, 3.0);
+        if let Value::Matrix(result_matrix) = result {
+            assert_eq!(result_matrix.len(), 2);
+            assert_eq!(result_matrix[0].samples[0].value, 5.0);
+            assert_eq!(result_matrix[1].samples[0].value, 3.0);
         } else {
-            panic!("Expected Vector result");
+            panic!("Expected Matrix result");
         }
     }
 
     #[test]
     fn test_ceil() {
-        let vector = vec![
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(1000, 3.2),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(2000, -3.2),
-            },
-        ];
-        let value = Value::Vector(vector);
+        let eval_ts = 1000;
+        let value = create_matrix(eval_ts, vec![3.2, -3.2]);
         let result = ceil(value).unwrap();
 
-        if let Value::Vector(result_vector) = result {
-            assert_eq!(result_vector.len(), 2);
-            assert_eq!(result_vector[0].sample.value, 4.0);
-            assert_eq!(result_vector[1].sample.value, -3.0);
+        if let Value::Matrix(result_matrix) = result {
+            assert_eq!(result_matrix.len(), 2);
+            assert_eq!(result_matrix[0].samples[0].value, 4.0);
+            assert_eq!(result_matrix[1].samples[0].value, -3.0);
         } else {
-            panic!("Expected Vector result");
+            panic!("Expected Matrix result");
         }
     }
 
     #[test]
     fn test_floor() {
-        let vector = vec![
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(1000, 3.2),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(2000, -3.2),
-            },
-        ];
-        let value = Value::Vector(vector);
+        let eval_ts = 1000;
+        let value = create_matrix(eval_ts, vec![3.2, -3.2]);
         let result = floor(value).unwrap();
 
-        if let Value::Vector(result_vector) = result {
-            assert_eq!(result_vector.len(), 2);
-            assert_eq!(result_vector[0].sample.value, 3.0);
-            assert_eq!(result_vector[1].sample.value, -4.0);
+        if let Value::Matrix(result_matrix) = result {
+            assert_eq!(result_matrix.len(), 2);
+            assert_eq!(result_matrix[0].samples[0].value, 3.0);
+            assert_eq!(result_matrix[1].samples[0].value, -4.0);
         } else {
-            panic!("Expected Vector result");
+            panic!("Expected Matrix result");
         }
     }
 
     #[test]
     fn test_exp() {
-        let vector = vec![
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(1000, 0.0),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(2000, 1.0),
-            },
-        ];
-        let value = Value::Vector(vector);
+        let eval_ts = 1000;
+        let value = create_matrix(eval_ts, vec![0.0, 1.0]);
         let result = exp(value).unwrap();
 
-        if let Value::Vector(result_vector) = result {
-            assert_eq!(result_vector.len(), 2);
-            assert_eq!(result_vector[0].sample.value, 1.0);
-            assert_eq!(result_vector[1].sample.value, std::f64::consts::E);
+        if let Value::Matrix(result_matrix) = result {
+            assert_eq!(result_matrix.len(), 2);
+            assert_eq!(result_matrix[0].samples[0].value, 1.0);
+            assert_eq!(result_matrix[1].samples[0].value, std::f64::consts::E);
         } else {
-            panic!("Expected Vector result");
+            panic!("Expected Matrix result");
         }
     }
 
     #[test]
     fn test_ln() {
-        let vector = vec![
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(1000, 1.0),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(2000, std::f64::consts::E),
-            },
-        ];
-        let value = Value::Vector(vector);
+        let eval_ts = 1000;
+        let value = create_matrix(eval_ts, vec![1.0, std::f64::consts::E]);
         let result = ln(value).unwrap();
 
-        if let Value::Vector(result_vector) = result {
-            assert_eq!(result_vector.len(), 2);
-            assert_eq!(result_vector[0].sample.value, 0.0);
-            assert_eq!(result_vector[1].sample.value, 1.0);
+        if let Value::Matrix(result_matrix) = result {
+            assert_eq!(result_matrix.len(), 2);
+            assert_eq!(result_matrix[0].samples[0].value, 0.0);
+            assert_eq!(result_matrix[1].samples[0].value, 1.0);
         } else {
-            panic!("Expected Vector result");
+            panic!("Expected Matrix result");
         }
     }
 
     #[test]
     fn test_log2() {
-        let vector = vec![
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(1000, 1.0),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(2000, 2.0),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(3000, 4.0),
-            },
-        ];
-        let value = Value::Vector(vector);
+        let eval_ts = 1000;
+        let value = create_matrix(eval_ts, vec![1.0, 2.0, 4.0]);
         let result = log2(value).unwrap();
 
-        if let Value::Vector(result_vector) = result {
-            assert_eq!(result_vector.len(), 3);
-            assert_eq!(result_vector[0].sample.value, 0.0);
-            assert_eq!(result_vector[1].sample.value, 1.0);
-            assert_eq!(result_vector[2].sample.value, 2.0);
+        if let Value::Matrix(result_matrix) = result {
+            assert_eq!(result_matrix.len(), 3);
+            assert_eq!(result_matrix[0].samples[0].value, 0.0);
+            assert_eq!(result_matrix[1].samples[0].value, 1.0);
+            assert_eq!(result_matrix[2].samples[0].value, 2.0);
         } else {
-            panic!("Expected Vector result");
+            panic!("Expected Matrix result");
         }
     }
 
     #[test]
     fn test_log10() {
-        let vector = vec![
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(1000, 1.0),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(2000, 10.0),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(3000, 100.0),
-            },
-        ];
-        let value = Value::Vector(vector);
+        let eval_ts = 1000;
+        let value = create_matrix(eval_ts, vec![1.0, 10.0, 100.0]);
         let result = log10(value).unwrap();
 
-        if let Value::Vector(result_vector) = result {
-            assert_eq!(result_vector.len(), 3);
-            assert_eq!(result_vector[0].sample.value, 0.0);
-            assert_eq!(result_vector[1].sample.value, 1.0);
-            assert_eq!(result_vector[2].sample.value, 2.0);
+        if let Value::Matrix(result_matrix) = result {
+            assert_eq!(result_matrix.len(), 3);
+            assert_eq!(result_matrix[0].samples[0].value, 0.0);
+            assert_eq!(result_matrix[1].samples[0].value, 1.0);
+            assert_eq!(result_matrix[2].samples[0].value, 2.0);
         } else {
-            panic!("Expected Vector result");
+            panic!("Expected Matrix result");
         }
     }
 
     #[test]
     fn test_sqrt() {
-        let vector = vec![
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(1000, 0.0),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(2000, 1.0),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(3000, 4.0),
-            },
-        ];
-        let value = Value::Vector(vector);
+        let eval_ts = 1000;
+        let value = create_matrix(eval_ts, vec![0.0, 1.0, 4.0]);
         let result = sqrt(value).unwrap();
 
-        if let Value::Vector(result_vector) = result {
-            assert_eq!(result_vector.len(), 3);
-            assert_eq!(result_vector[0].sample.value, 0.0);
-            assert_eq!(result_vector[1].sample.value, 1.0);
-            assert_eq!(result_vector[2].sample.value, 2.0);
+        if let Value::Matrix(result_matrix) = result {
+            assert_eq!(result_matrix.len(), 3);
+            assert_eq!(result_matrix[0].samples[0].value, 0.0);
+            assert_eq!(result_matrix[1].samples[0].value, 1.0);
+            assert_eq!(result_matrix[2].samples[0].value, 2.0);
         } else {
-            panic!("Expected Vector result");
+            panic!("Expected Matrix result");
         }
     }
 
     #[test]
     fn test_round() {
-        let vector = vec![
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(1000, 3.2),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(2000, 3.5),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(3000, -3.2),
-            },
-        ];
-        let value = Value::Vector(vector);
+        let eval_ts = 1000;
+        let value = create_matrix(eval_ts, vec![3.2, 3.5, -3.2]);
         let result = round(value).unwrap();
 
-        if let Value::Vector(result_vector) = result {
-            assert_eq!(result_vector.len(), 3);
-            assert_eq!(result_vector[0].sample.value, 3.0);
-            assert_eq!(result_vector[1].sample.value, 4.0);
-            assert_eq!(result_vector[2].sample.value, -3.0);
+        if let Value::Matrix(result_matrix) = result {
+            assert_eq!(result_matrix.len(), 3);
+            assert_eq!(result_matrix[0].samples[0].value, 3.0);
+            assert_eq!(result_matrix[1].samples[0].value, 4.0);
+            assert_eq!(result_matrix[2].samples[0].value, -3.0);
         } else {
-            panic!("Expected Vector result");
+            panic!("Expected Matrix result");
         }
     }
 
     #[test]
     fn test_sgn() {
-        let vector = vec![
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(1000, 5.0),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(2000, -5.0),
-            },
-            InstantValue {
-                labels: Labels::default(),
-                sample: Sample::new(3000, 0.0),
-            },
-        ];
-        let value = Value::Vector(vector);
+        let eval_ts = 1000;
+        let value = create_matrix(eval_ts, vec![5.0, -5.0, 0.0]);
         let result = sgn(value).unwrap();
 
-        if let Value::Vector(result_vector) = result {
-            assert_eq!(result_vector.len(), 3);
-            assert_eq!(result_vector[0].sample.value, 1.0);
-            assert_eq!(result_vector[1].sample.value, -1.0);
-            assert_eq!(result_vector[2].sample.value, 1.0);
+        if let Value::Matrix(result_matrix) = result {
+            assert_eq!(result_matrix.len(), 3);
+            assert_eq!(result_matrix[0].samples[0].value, 1.0);
+            assert_eq!(result_matrix[1].samples[0].value, -1.0);
+            assert_eq!(result_matrix[2].samples[0].value, 1.0);
         } else {
-            panic!("Expected Vector result");
+            panic!("Expected Matrix result");
         }
     }
 

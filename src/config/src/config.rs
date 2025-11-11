@@ -1029,6 +1029,14 @@ pub struct Common {
     pub memory_circuit_breaker_enabled: bool,
     #[env_config(name = "ZO_MEMORY_CIRCUIT_BREAKER_RATIO", default = 90)]
     pub memory_circuit_breaker_ratio: usize,
+    #[env_config(name = "ZO_DISK_CIRCUIT_BREAKER_ENABLED", default = false)]
+    pub disk_circuit_breaker_enabled: bool,
+    #[env_config(
+        name = "ZO_DISK_CIRCUIT_BREAKER_THRESHOLD",
+        default = 90,
+        help = "Disk space threshold. Values < 100 are treated as percentage of total disk space used (e.g., 90 = trigger at 90% usage), values >= 100 are treated as absolute MB of required free space"
+    )]
+    pub disk_circuit_breaker_threshold: usize,
     #[env_config(
         name = "ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA",
         default = false,
