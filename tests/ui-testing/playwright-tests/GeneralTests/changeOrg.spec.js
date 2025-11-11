@@ -33,7 +33,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('Home page default validation completed');
     });
 
-    test.skip("Home Page change organisation validation", async ({ page }) => {
+    test("Home Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing home page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -51,7 +51,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('Logs page default validation completed');
     });
 
-    test.skip("Logs Page change organisation validation", async ({ page }) => {
+    test("Logs Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing logs page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -69,7 +69,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('Metrics page default validation completed');
     });
 
-    test.skip("Metrics Page change organisation validation", async ({ page }) => {
+    test("Metrics Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing metrics page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -87,7 +87,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('Traces page default validation completed');
     });
 
-    test.skip("Traces Page change organisation validation", async ({ page }) => {
+    test("Traces Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing traces page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -105,7 +105,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('RUM page default validation completed');
     });
 
-    test.skip("RUM Page change organisation validation", async ({ page }) => {
+    test("RUM Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing RUM page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -123,7 +123,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('Pipelines page default validation completed');
     });
 
-    test.skip("Pipelines Page change organisation validation", async ({ page }) => {
+    test("Pipelines Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing pipelines page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -141,7 +141,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('Dashboard page default validation completed');
     });
 
-    test.skip("Dashboard Page change organisation validation", async ({ page }) => {
+    test("Dashboard Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing dashboard page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -159,7 +159,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('Streams page default validation completed');
     });
 
-    test.skip("Streams Page change organisation validation", async ({ page }) => {
+    test("Streams Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing streams page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -177,7 +177,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('Reports page default validation completed');
     });
 
-    test.skip("Reports Page change organisation validation", async ({ page }) => {
+    test("Reports Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing reports page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -195,7 +195,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('Alerts page default validation completed');
     });
 
-    test.skip("Alerts Page change organisation validation", async ({ page }) => {
+    test("Alerts Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing alerts page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -213,7 +213,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('Data sources page default validation completed');
     });
 
-    test.skip("Data sources Page change organisation validation", async ({ page }) => {
+    test("Data sources Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing data sources page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -231,7 +231,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('IAM page default validation completed');
     });
 
-    test.skip("IAM Page change organisation validation", async ({ page }) => {
+    test("IAM Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing IAM page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -249,7 +249,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('Management page default validation completed');
     });
 
-    test.skip("Management Page change organisation validation", async ({ page }) => {
+    test("Management Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing management page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);
@@ -267,7 +267,7 @@ test.describe("Change Organisation", () => {
         testLogger.info('About page default validation completed');
     });
 
-    test.skip("About Page change organisation validation", async ({ page }) => {
+    test("About Page change organisation validation", async ({ page }) => {
         testLogger.info('Testing about page organization change validation');
         
         multiOrgIdentifier = await pm.changeOrgPage.createOrgAndSetupIngestion(pm, newOrgName);

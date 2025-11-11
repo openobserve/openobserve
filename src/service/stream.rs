@@ -367,11 +367,11 @@ pub async fn save_stream_settings(
             )));
     }
 
-    // only allow setting user defined schema for logs stream
-    if stream_type != StreamType::Logs && !settings.defined_schema_fields.is_empty() {
+    // only allow setting user defined schema for supported stream
+    if !stream_type.support_uds() && !settings.defined_schema_fields.is_empty() {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
-            "only logs stream can have user defined schema",
+            format!("stream type [{stream_type}] don't support user defined schema"),
         )));
     }
 
@@ -503,6 +503,13 @@ pub async fn update_stream_settings(
         )));
     };
 
+    // Validate index field uniqueness BEFORE any DB writes
+    // This prevents inconsistent state if validation fails
+    if let Err(err) = validate_index_field_conflicts(&settings, &new_settings) {
+        return Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err)));
+    }
+
     // process new fields first
     let new_fields = std::mem::take(&mut new_settings.fields);
     if !new_fields.add.is_empty() {
@@ -583,22 +590,29 @@ pub async fn update_stream_settings(
         settings
             .defined_schema_fields
             .extend(new_settings.defined_schema_fields.add);
-        settings.defined_schema_fields.sort();
-        settings.defined_schema_fields.dedup();
+    }
+    if !new_settings.defined_schema_fields.remove.is_empty() {
+        settings
+            .defined_schema_fields
+            .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
+    }
+    if !settings.defined_schema_fields.is_empty() {
+        // check fields with stream type
+        let fields = super::schema::check_schema_for_defined_schema_fields(
+            stream_type,
+            settings.defined_schema_fields.to_vec(),
+        );
+
         // remove the fields that are not in the new schema
         let schema_fields = schema
             .fields()
             .iter()
             .map(|f| f.name())
             .collect::<HashSet<_>>();
-        settings
-            .defined_schema_fields
-            .retain(|field| schema_fields.contains(field));
-    }
-    if !new_settings.defined_schema_fields.remove.is_empty() {
-        settings
-            .defined_schema_fields
-            .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
+        let mut fields: Vec<_> = fields.into_iter().collect();
+        fields.sort();
+        fields.retain(|field| schema_fields.contains(field));
+        settings.defined_schema_fields = fields;
     }
     if settings.defined_schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -1059,6 +1073,72 @@ pub async fn update_fields_type(
         false,
     )
     .await?;
+
+    Ok(())
+}
+
+/// Validates that a field cannot have both Full Text Search and Secondary Index
+///
+/// IMPORTANT: This validation must account for DEFAULT index fields:
+/// - `_DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS` Default FTS fields: log, message, msg, content, data,
+///   body, json, error, errors
+/// - `_DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS` Default Index fields: trace_id, service_name,
+///   operation_name
+/// - Plus any configured via ZO_FEATURE_FULLTEXT_EXTRA_FIELDS or
+///   ZO_FEATURE_SECONDARY_INDEX_EXTRA_FIELDS
+///
+/// These defaults are not stored in StreamSettings but are applied at runtime,
+/// so we must use get_stream_setting_fts_fields() and get_stream_setting_index_fields()
+/// to get the complete list including defaults.
+///
+/// Note: Bloom Filter is independent and can coexist with either FTS or Secondary Index
+fn validate_index_field_conflicts(
+    current_settings: &config::meta::stream::StreamSettings,
+    new_settings: &config::meta::stream::UpdateStreamSettings,
+) -> Result<(), String> {
+    // Get the actual FTS and Index fields including defaults
+    let current_fts_with_defaults =
+        infra::schema::get_stream_setting_fts_fields(&Some(current_settings.clone()));
+    let current_index_with_defaults =
+        infra::schema::get_stream_setting_index_fields(&Some(current_settings.clone()));
+
+    // Simulate the final state after applying the update
+    let mut final_fts_fields: HashSet<String> = current_fts_with_defaults.iter().cloned().collect();
+    let mut final_index_fields: HashSet<String> =
+        current_index_with_defaults.iter().cloned().collect();
+
+    // Apply removes
+    for field in &new_settings.full_text_search_keys.remove {
+        final_fts_fields.remove(field);
+    }
+    for field in &new_settings.index_fields.remove {
+        final_index_fields.remove(field);
+    }
+
+    // Apply adds
+    for field in &new_settings.full_text_search_keys.add {
+        final_fts_fields.insert(field.clone());
+    }
+    for field in &new_settings.index_fields.add {
+        final_index_fields.insert(field.clone());
+    }
+
+    // Find fields that would exist in both FTS and Secondary Index
+    let conflicting_fields: Vec<String> = final_fts_fields
+        .intersection(&final_index_fields)
+        .cloned()
+        .collect();
+
+    if !conflicting_fields.is_empty() {
+        let field_names: Vec<String> = conflicting_fields
+            .iter()
+            .map(|s| format!("'{s}'"))
+            .collect();
+        return Err(format!(
+            "Field(s) {} cannot have both Full Text Search and Secondary Index. Please choose only one index type per field.",
+            field_names.join(", ")
+        ));
+    }
 
     Ok(())
 }

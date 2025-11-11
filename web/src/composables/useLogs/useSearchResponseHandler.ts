@@ -144,7 +144,6 @@ export const useSearchResponseHandler = () => {
       return;
     }
 
-    console.log("Page count", payload, response);
     if (
       payload.type === "pageCount" &&
       response?.type === "search_response_hits"

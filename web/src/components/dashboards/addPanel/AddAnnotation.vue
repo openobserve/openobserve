@@ -76,7 +76,7 @@
             </template>
           </q-select>
         </div>
-        <div class="text-caption q-mt-sm">
+        <div class="text-caption q-mt-md">
           Timestamp: {{ annotationDateString }}
         </div>
       </q-card-section>

@@ -318,6 +318,7 @@ size="md" />
               :errorData="visualizeErrorData"
               :searchResponse="searchResponseForVisualization"
               :is_ui_histogram="shouldUseHistogramQuery"
+              :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
             ></VisualizeLogsQuery>
           </div>
         </template>
@@ -909,7 +910,7 @@ export default defineComponent({
      * Common method to extract patterns
      * Handles validation, loading states, and error handling
      */
-    const extractPatternsForCurrentQuery = async () => {
+    const extractPatternsForCurrentQuery = async (clear_cache = false) => {
       console.log("[Index] Extracting patterns for current query");
       searchObj.meta.resultGrid.showPagination = false;
       searchObj.loading = true;
@@ -940,6 +941,8 @@ export default defineComponent({
         );
         searchObj.loading = false;
 
+        // Set clear_cache flag before calling getQueryData
+        searchObj.meta.clearCache = clear_cache;
         searchObj.meta.refreshHistogram = true;
         await getQueryData();
         refreshHistogramChart();
@@ -1556,6 +1559,7 @@ export default defineComponent({
     const searchResponseForVisualization = ref({});
 
     const shouldUseHistogramQuery = ref(false);
+    const shouldRefreshWithoutCache = ref(false);
 
     // Flag to prevent unnecessary chart type changes during URL restoration
     const isRestoringFromUrl = ref(false);
@@ -1924,8 +1928,10 @@ export default defineComponent({
       { deep: true },
     );
 
-    const handleRunQueryFn = async () => {
+    const handleRunQueryFn = async (clear_cache = false) => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
+        // Set the shouldRefreshWithoutCache flag
+        shouldRefreshWithoutCache.value = clear_cache;
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
           let logsPageQuery = "";
@@ -2014,7 +2020,7 @@ export default defineComponent({
 
       if (searchObj.meta.logsVisualizeToggle == "patterns") {
         // Extract patterns when user clicks run query in patterns mode
-        await extractPatternsForCurrentQuery();
+        await extractPatternsForCurrentQuery(clear_cache);
       }
     };
 
@@ -2495,6 +2501,7 @@ export default defineComponent({
       processHttpHistogramResults,
       searchResponseForVisualization,
       shouldUseHistogramQuery,
+      shouldRefreshWithoutCache,
       clearSchemaCache,
       getHistogramData,
       extractPatternsForCurrentQuery,

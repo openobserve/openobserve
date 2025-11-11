@@ -368,6 +368,7 @@ pub async fn process_search_stream_request(
                     start_time,
                     end_time,
                     &mut accumulated_results,
+                    req.clear_cache,
                 )
                 .await;
 
@@ -447,6 +448,7 @@ pub async fn process_search_stream_request(
                     start_time,
                     end_time,
                     &mut accumulated_results,
+                    req.clear_cache,
                 )
                 .await;
 
@@ -466,6 +468,7 @@ pub async fn process_search_stream_request(
                 start_time,
                 end_time,
                 &mut accumulated_results,
+                req.clear_cache,
             )
             .instrument(search_span.clone())
             .await

@@ -146,6 +146,7 @@ export const DEFAULT_LOGS_CONFIG = {
     toggleFunction: false, // DEPRECATED use showTransformEditor instead
     isActionsEnabled: false,
     resetPlotChart: false,
+    clearCache: false,
   },
   data: {
     query: "" as any,

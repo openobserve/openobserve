@@ -65,6 +65,9 @@ export const useSearchHistogramManager = () => {
       onComplete: (payload: any, response: any) => void;
       onReset: (data: any, traceId?: string) => void;
     },
+    meta? : {
+      clear_cache?: Boolean
+    }
   ) => {
     const parsedSQL: any = fnParsedSQL();
 
@@ -105,6 +108,8 @@ export const useSearchHistogramManager = () => {
           searchObj.data.histogramQuery,
           false,
           "histogram",
+          {},
+           meta?.clear_cache
         );
 
         if (callbacks) {

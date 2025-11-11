@@ -183,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outline
           size="sm"
           @click="toggleAddAnnotationMode"
+          class="el-border"
         >
           <q-tooltip anchor="top middle" self="bottom right">
             {{
@@ -308,7 +309,7 @@ import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
-import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { getUTCTimestampFromZonedTimestamp, validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 import { exportFile } from "quasar";
@@ -443,6 +444,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    shouldRefreshWithoutCache: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -503,6 +509,7 @@ export default defineComponent({
       folderName,
       searchResponse,
       is_ui_histogram,
+      shouldRefreshWithoutCache,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -534,6 +541,7 @@ export default defineComponent({
       is_ui_histogram,
       dashboardName,
       folderName,
+      shouldRefreshWithoutCache,
     );
 
     const {
@@ -1339,7 +1347,7 @@ export default defineComponent({
       interval: number | undefined,
     ) => {
       if (interval && hoveredTimestamp) {
-        const startTime = hoveredTimestamp * 1000; // Convert to microseconds
+        const startTime = hoveredTimestamp; // hovertedTimestamp is in microseconds
         return {
           startTime,
           endTime: startTime + interval,
@@ -1525,7 +1533,10 @@ export default defineComponent({
 
           const hoveredTime = drilldownParams[0]?.value?.[0];
           const hoveredTimestamp = hoveredTime
-            ? new Date(hoveredTime).getTime()
+            ? getUTCTimestampFromZonedTimestamp(
+                hoveredTime,
+                store.state.timezone,
+              )
             : null;
           const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 

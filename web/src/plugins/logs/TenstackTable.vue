@@ -236,18 +236,9 @@ name="warning" class="q-mr-xs" />
             :data-expanded="
               formattedRows?.[virtualRow.index]?.original?.isExpandedRow
             "
-            :ref="
-              (node: any) =>
-                node &&
-                (formattedRows?.[virtualRow.index]?.original?.isExpandedRow ||
-                  props.wrap) &&
-                rowVirtualizer.measureElement(node)
-            "
-            class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b tw-cursor-pointer"
+            :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
+            class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b tw-cursor-pointer hover:tw-bg-[var(--o2-hover-gray)]"
             :class="[
-              store.state.theme === 'dark'
-                ? 'w-border-gray-800  hover:tw-bg-zinc-800'
-                : 'w-border-gray-100 hover:tw-bg-zinc-200',
               defaultColumns &&
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
@@ -723,7 +714,7 @@ const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
-    estimateSize: () => 22,
+    estimateSize: () => 24,
     overscan: 20,
     measureElement:
       typeof window !== "undefined" && !isFirefox.value
@@ -731,7 +722,7 @@ const rowVirtualizerOptions = computed(() => {
             if (element.dataset.expanded == "true" || props.wrap) {
               return element?.getBoundingClientRect().height;
             } else {
-              return 22;
+              return 24;
             }
           }
         : undefined,
