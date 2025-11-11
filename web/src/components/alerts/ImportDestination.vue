@@ -498,7 +498,7 @@ export default defineComponent({
 
     const updateDestinationType = (type: any, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].destination_type = type;
+        baseImportRef.value.jsonArrayOfObj[index].type = type;
         // Directly update jsonStr without triggering editor re-render
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
@@ -737,15 +737,15 @@ export default defineComponent({
         });
       }
 
-      // Validate destination_type (called 'type' in error but stored as destination_type)
+      // Validate type
       if (
-        !input.destination_type ||
-        (input.destination_type !== "email" &&
-         input.destination_type !== "http" &&
-         input.destination_type !== "action")
+        !input.type ||
+        (input.type !== "email" &&
+         input.type !== "http" &&
+         input.type !== "action")
       ) {
         destinationErrors.push({
-          message: `Destination - ${index}: The "destination_type" field must be either "email", "http", or "action"`,
+          message: `Destination - ${index}: The "type" field must be either "email", "http", or "action"`,
           field: "type",
         });
       }
@@ -757,17 +757,17 @@ export default defineComponent({
 
       if (
         isActionsEnabled.value &&
-        input.destination_type === "action" &&
+        input.type === "action" &&
         !availableActions.includes(input.action_id)
       ) {
         destinationErrors.push({
-          message: `Destination - ${index}: action "${input.action_id}" does not exist for type "${input.destination_type}"`,
+          message: `Destination - ${index}: action "${input.action_id}" does not exist for type "${input.type}"`,
           field: "action_id",
         });
       }
 
       // Validate URL for http type
-      if (input.destination_type === "http") {
+      if (input.type === "http") {
         if (!input.url || typeof input.url !== "string" || input.url.trim() === "") {
           destinationErrors.push({
             message: `Destination - ${index}: The "url" field is required for http type destinations.`,
@@ -805,7 +805,7 @@ export default defineComponent({
       }
 
       // Validate email type
-      if (input.destination_type === "email") {
+      if (input.type === "email") {
         if (!input.emails || !Array.isArray(input.emails) || input.emails.length === 0) {
           destinationErrors.push({
             message: `Destination - ${index}: The "emails" field is required and should be an array for email type destinations.`,
