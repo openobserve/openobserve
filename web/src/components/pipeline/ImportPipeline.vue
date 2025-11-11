@@ -659,6 +659,30 @@ export default defineComponent({
     const queryEditorPlaceholderFlag = ref(true);
     const streamList = ref<any>([]);
     const streamData = ref<any>([]);
+
+    // Migration function to convert old conditions format to new condition format
+    const migratePipelineConditions = (pipelines: any[]) => {
+      return pipelines.map((pipeline: any) => {
+        if (pipeline.nodes && Array.isArray(pipeline.nodes)) {
+          pipeline.nodes = pipeline.nodes.map((node: any) => {
+            // Check if this is a condition node with old format
+            if (node.data?.node_type === "condition" && node.data.conditions) {
+              // Old format detected - migrate to new format
+              if (Array.isArray(node.data.conditions) && node.data.conditions.length > 0) {
+                // Convert array of conditions to new nested format (implicit AND)
+                node.data.condition = {
+                  and: node.data.conditions
+                };
+                // Remove old format
+                delete node.data.conditions;
+              }
+            }
+            return node;
+          });
+        }
+        return pipeline;
+      });
+    };
     const userSelectedStreamName = ref<string[]>([]);
     const userSelectedDestinationStreamName = ref<string[]>([]);
     const userSelectedStreamType = ref<string[]>([]);
@@ -817,9 +841,11 @@ export default defineComponent({
                 try {
                   const parsedJson = JSON.parse(e.target.result);
                   // Convert to array if it's a single object
-                  const jsonArray = Array.isArray(parsedJson)
+                  let jsonArray = Array.isArray(parsedJson)
                     ? parsedJson
                     : [parsedJson];
+                  // Migrate old conditions format to new condition format
+                  jsonArray = migratePipelineConditions(jsonArray);
                   resolve(jsonArray);
                 } catch (error) {
                   q.notify({
@@ -856,8 +882,12 @@ export default defineComponent({
               response.headers["content-type"].includes("application/json") ||
               response.headers["content-type"].includes("text/plain")
             ) {
-              jsonStr.value = JSON.stringify(response.data, null, 2);
-              jsonArrayOfObj.value = response.data;
+              // Migrate old format if needed
+              const migratedData = Array.isArray(response.data)
+                ? migratePipelineConditions(response.data)
+                : migratePipelineConditions([response.data]);
+              jsonStr.value = JSON.stringify(migratedData, null, 2);
+              jsonArrayOfObj.value = migratedData;
             } else {
               q.notify({
                 message: "Invalid JSON format in the URL",
@@ -949,9 +979,11 @@ export default defineComponent({
         } else {
           const parsedJson = JSON.parse(jsonStr.value);
           // Convert single object to array if needed
-          jsonArrayOfObj.value = Array.isArray(parsedJson)
+          let jsonArray = Array.isArray(parsedJson)
             ? parsedJson
             : [parsedJson];
+          // Migrate old conditions format to new condition format
+          jsonArrayOfObj.value = migratePipelineConditions(jsonArray);
         }
       } catch (e: any) {
         q.notify({
@@ -1321,17 +1353,6 @@ export default defineComponent({
             "traces",
             "enrichment_tables",
           ];
-
-          if (
-            node.io_type == "output" &&
-            node.data.node_type == "stream" &&
-            !validDestinationStreamTypes.includes(node.data.stream_type)
-          ) {
-            pipelineErrors.push({
-              message: `Pipeline - ${index}: Destination Stream type is required`,
-              field: "destination_stream_type",
-            });
-          }
         });
         // Wait for all validation to complete
         await Promise.all(validationPromises);
@@ -1370,7 +1391,7 @@ export default defineComponent({
           return (
             node.io_type == "default" &&
             node.data.node_type == "condition" &&
-            (!node.data.conditions || node.data.conditions.length === 0)
+            !node.data.condition
           );
         });
         return isValid;

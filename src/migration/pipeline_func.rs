@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use config::{
     ider,
     meta::{
+        alerts::ConditionList,
         function,
         pipeline::{
             Pipeline,
@@ -241,7 +242,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                     let condition_node = Node::new(
                         ider::uuid(),
                         NodeData::Condition(ConditionParams {
-                            conditions: routing_conditions,
+                            condition: ConditionList::LegacyConditions(routing_conditions),
                         }),
                         pos_x,
                         pos_y,
@@ -398,8 +399,8 @@ mod legacy_pipeline {
 
     use config::{
         meta::{
-            alerts::{QueryCondition, TriggerCondition},
-            stream::{RoutingCondition, StreamParams, StreamType},
+            alerts::{Condition, QueryCondition, TriggerCondition},
+            stream::{StreamParams, StreamType},
         },
         utils::json::Value,
     };
@@ -415,7 +416,7 @@ mod legacy_pipeline {
         #[serde(default)]
         pub stream_type: StreamType,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub routing: Option<HashMap<String, Vec<RoutingCondition>>>,
+        pub routing: Option<HashMap<String, Vec<Condition>>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub derived_streams: Option<Vec<DerivedStreamMeta>>,
         #[serde(skip_serializing_if = "Option::is_none")]
