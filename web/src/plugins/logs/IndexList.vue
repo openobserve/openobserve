@@ -99,8 +99,15 @@ size="xs" /> No field found in
       >
         <template #body-cell-name="props">
           <q-tr
+            v-if="props.row.name === 'no-fields-found'"
+            class="tw-text-center tw-py-[0.725rem] tw-flex tw-items-center tw-justify-center"
+          >
+            <q-icon name="info" color="primary" size="xs" />
+            <span class="tw-pl-[0.375rem]">No matching fields found.</span>
+          </q-tr>
+          <q-tr
             :props="props"
-            v-if="
+            v-else-if="
               props.row.label &&
               (showOnlyInterestingFields
                 ? searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
@@ -551,7 +558,14 @@ style="opacity: 0.7">
           </q-tr>
         </template>
         <template v-slot:pagination="scope">
-          <div class="tw-pt-[0.375rem] tw-justify-between tw-w-full" :class="showUserDefinedSchemaToggle || searchObj.meta.quickMode ? 'tw-flex' : ''">
+          <div
+            class="tw-pt-[0.375rem] tw-justify-between tw-w-full"
+            :class="
+              showUserDefinedSchemaToggle || searchObj.meta.quickMode
+                ? 'tw-flex'
+                : ''
+            "
+          >
             <div v-if="showUserDefinedSchemaToggle">
               <q-btn-toggle
                 no-caps
@@ -1102,6 +1116,9 @@ export default defineComponent({
             includedFields.push(rows[i]["name"]);
           }
         }
+      }
+      if(!filtered.length){
+        return [{name: "no-fields-found", label: "No matching fields found"}];
       }
       return filtered;
     };
@@ -2000,7 +2017,6 @@ export default defineComponent({
           }
           count++;
         }
-        // console.log(JSON.parse(JSON.stringify(selectedStreamFields)));
         return selectedStreamFields;
       }),
       formatLargeNumber,
