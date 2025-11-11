@@ -374,6 +374,8 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-json-null: #{$json-null-light};
   --o2-json-object: #{$json-object-light};
 
+  --o2-input-label-text-color: #636464;
+
 }
 
 // Semantic Colors - Dark Mode
@@ -462,4 +464,6 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-json-boolean: #{$json-boolean-dark};
   --o2-json-null: #{$json-null-dark};
   --o2-json-object: #{$json-object-dark};
+
+  --o2-input-label-text-color: #BDBDBD;
 }
