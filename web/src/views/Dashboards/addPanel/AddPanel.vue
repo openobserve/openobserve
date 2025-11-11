@@ -874,14 +874,6 @@ export default defineComponent({
       // Only update URL for variables at the current level (_isCurrentLevel === true or undefined)
       const variableObj: any = {};
 
-      // Debug: Log variables and their _isCurrentLevel flag
-      console.log('[AddPanel] Variables update:', data.values.map((v: any) => ({
-        name: v.name,
-        value: v.value,
-        _isCurrentLevel: v._isCurrentLevel,
-        type: v.type
-      })));
-
       data.values.forEach((variable: any) => {
         // Skip variables that are explicitly marked as parent dependencies
         // _isCurrentLevel can be: true (current level), false (parent), or undefined (also current level)
@@ -907,8 +899,6 @@ export default defineComponent({
         }
       });
 
-      console.log('[AddPanel] URL variables to update:', variableObj);
-
       router.replace({
         query: {
           ...route.query,
@@ -932,35 +922,30 @@ export default defineComponent({
       data: {},
     });
 
-    // Helper to create config with ALL variables for dependency resolution
-    // but only current level visible for UI (similar to RenderDashboardCharts)
+    // Helper to create config for AddPanel mode
+    // In AddPanel, ALL variables (global + tab + panel) should be visible and loaded
+    // But only urlSyncVars should update URL
     const createConfigWithAllVariables = (
-      levelVars: any[],
-      allVars: any[],
+      urlSyncVars: any[],  // Variables that update URL when changed
+      allVars: any[],      // All variables to show
       showFilters = false,
     ) => {
-      console.log('[AddPanel] createConfigWithAllVariables:', {
-        levelVarsCount: levelVars.length,
-        levelVarsNames: levelVars.map((v: any) => v.name),
-        allVarsCount: allVars.length
-      });
-
-      // Mark which variables belong to current level (for rendering)
+      // Mark which variables should update URL
+      // But ALL variables are marked as renderable (no _isCurrentLevel: false filtering needed)
       const configList = allVars.map((v: any) => ({
         ...v,
-        _isCurrentLevel: levelVars.some((lv: any) => lv.name === v.name),
+        // _isCurrentLevel: true means "show this variable"
+        // For AddPanel, ALL variables should be shown, so all get true
+        _isCurrentLevel: true,
+        // _shouldUpdateUrl: flag to indicate which vars update URL
+        _shouldUpdateUrl: urlSyncVars.some((lv: any) => lv.name === v.name),
       }));
-
-      console.log('[AddPanel] createConfigWithAllVariables result:', {
-        configWithTrue: configList.filter((v: any) => v._isCurrentLevel === true).map((v: any) => v.name),
-        configWithFalse: configList.filter((v: any) => v._isCurrentLevel === false).map((v: any) => v.name)
-      });
 
       return {
         ...currentDashboardData.data.variables,
         list: configList,
         showDynamicFilters: showFilters,
-        _levelVariables: levelVars, // Keep original level variables
+        _levelVariables: allVars, // All variables are at "current level" for AddPanel
       };
     };
 
@@ -975,12 +960,6 @@ export default defineComponent({
       const currentPanelId = route.query.panelId as string;
       const currentTabId = route.query.tab as string;
       const allVars = currentDashboardData.data.variables.list;
-
-      console.log('[AddPanel] filteredVariablesConfig - context:', {
-        currentPanelId,
-        currentTabId,
-        totalVars: allVars.length
-      });
 
       // Get global variables (always available)
       const globalVars = allVars.filter(
