@@ -45,6 +45,7 @@ use tokio::{
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
+        alerts::ConditionExt,
         ingestion::{apply_vrl_fn, compile_vrl_function},
         self_reporting::publish_error,
     },
@@ -652,9 +653,9 @@ async fn process_node(
                 }
                 // only send to children when passing all condition evaluations
                 if condition_params
-                    .conditions
-                    .iter()
-                    .all(|cond| cond.evaluate(record.as_object().unwrap()))
+                    .condition
+                    .evaluate(record.as_object().unwrap())
+                    .await
                 {
                     send_to_children(
                         &mut child_senders,

@@ -354,7 +354,7 @@ pub struct QueryCondition {
     pub multi_time_range: Option<Vec<CompareHistoricData>>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
 #[serde(untagged)]
 pub enum ConditionList {
     OrNode {
@@ -427,6 +427,18 @@ impl ConditionList {
             }
             ConditionList::NotNode { not } => not.depth() + 1,
             ConditionList::EndCondition(_) => 1,
+        }
+    }
+
+    /// Checks if the condition list is empty (has no actual conditions)
+    /// Used for validation to ensure condition nodes have meaningful conditions
+    pub fn has_conditions(&self) -> bool {
+        match self {
+            ConditionList::OrNode { or } => !or.is_empty(),
+            ConditionList::AndNode { and } => !and.is_empty(),
+            ConditionList::LegacyConditions(conditions) => !conditions.is_empty(),
+            ConditionList::NotNode { .. } => true,
+            ConditionList::EndCondition(_) => true,
         }
     }
 }

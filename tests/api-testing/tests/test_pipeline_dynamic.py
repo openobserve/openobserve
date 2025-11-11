@@ -205,14 +205,12 @@ def test_pipeline_dynamic_template_substitution(create_session, base_url, source
                 "type": "condition",
                 "data": {
                     "node_type": "condition",
-                    "conditions": [
-                        {
-                            "column": condition_field,
-                            "operator": "Contains",
-                            "value": condition_value,
-                            "ignore_case": False
-                        }
-                    ]
+                    "condition": {
+                        "column": condition_field,
+                        "operator": "Contains",
+                        "value": condition_value,
+                        "ignore_case": False
+                    }
                 },
                 "position": {"x": 300, "y": 100},
                 "io_type": "condition",
@@ -442,14 +440,12 @@ def test_pipeline_complex_templates(create_session, base_url, source_stream, des
                 "type": "condition",
                 "data": {
                     "node_type": "condition",
-                    "conditions": [
-                        {
-                            "column": condition_field,
-                            "operator": "Contains",
-                            "value": condition_value,
-                            "ignore_case": False
-                        }
-                    ]
+                    "condition": {
+                        "column": condition_field,
+                        "operator": "Contains",
+                        "value": condition_value,
+                        "ignore_case": False
+                    }
                 },
                 "position": {"x": 300, "y": 100},
                 "io_type": "condition",
