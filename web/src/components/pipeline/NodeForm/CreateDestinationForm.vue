@@ -181,7 +181,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rules="[(val: any) => !!val || 'Field is required!']"
               tabindex="0"
             />
-
             <!-- Output Format field - disabled for all except Custom -->
             <q-select
               data-test="add-destination-output-format-select"
@@ -811,12 +810,20 @@ watch(
   { immediate: true },
 );
 
-// Watch destination_type changes to ensure method is set to "post" for non-custom types
+// Watch destination_type changes to set method and output_format appropriately
 watch(
   () => formData.value.destination_type,
   (newType) => {
     if (newType !== "custom") {
+      // Set method to POST for all non-custom types
       formData.value.method = "post";
+
+      // Set output_format based on destination type
+      if (newType === "splunk") {
+        formData.value.output_format = "ndjson";
+      } else {
+        formData.value.output_format = "json";
+      }
     }
   },
 );
