@@ -557,7 +557,7 @@ def test_e2e_createalertfloat(create_session, base_url):
         resp_delete_template.status_code == 200
     ), f"Deleting this function, but got {resp_delete_template.status_code} {resp_delete_template.content}"
 
-@pytest.mark.skip(reason="WIP")
+
 def test_e2e_alert_history(create_session, base_url):
     """Running an E2E test for alert history API.
 
@@ -721,6 +721,34 @@ def test_e2e_alert_history(create_session, base_url):
     print("Waiting for alerts to potentially trigger and generate history...")
     time.sleep(3)
 
+    # Get alert list to retrieve alert IDs
+    print("\n=== Getting alert list to retrieve alert IDs ===")
+    resp_get_alerts = session.get(
+        f"{url}api/{org_id}/alerts",
+        headers=headers,
+    )
+    print(f"Get alerts list response: {resp_get_alerts.content}")
+    assert resp_get_alerts.status_code == 200, (
+        f"Expected 200 for get alerts list, but got {resp_get_alerts.status_code} {resp_get_alerts.content}"
+    )
+
+    alerts_data = resp_get_alerts.json()
+    alerts_list = alerts_data.get("list", [])
+
+    # Find alert IDs for our test alerts
+    alert_id_1 = None
+    alert_id_2 = None
+    for alert in alerts_list:
+        if alert["name"] == alert_name_1:
+            alert_id_1 = alert["alert_id"]
+            print(f"Found alert_id for {alert_name_1}: {alert_id_1}")
+        elif alert["name"] == alert_name_2:
+            alert_id_2 = alert["alert_id"]
+            print(f"Found alert_id for {alert_name_2}: {alert_id_2}")
+
+    assert alert_id_1 is not None, f"Could not find alert_id for {alert_name_1}"
+    assert alert_id_2 is not None, f"Could not find alert_id for {alert_name_2}"
+
     # Step 5: Test 1 - Get all alert history for the organization
     print("\n=== Test 1: Get all alert history ===")
     resp_get_history = session.get(
@@ -742,10 +770,10 @@ def test_e2e_alert_history(create_session, base_url):
     print(f"Total alert history entries: {history_data['total']}")
     print(f"Retrieved {len(history_data['hits'])} history entries")
 
-    # Step 6: Test 2 - Filter history by specific alert name
-    print(f"\n=== Test 2: Filter history by alert name: {alert_name_1} ===")
+    # Step 6: Test 2 - Filter history by specific alert_id
+    print(f"\n=== Test 2: Filter history by alert_id: {alert_id_1} ===")
     resp_filtered_history = session.get(
-        f"{url}api/{org_id}/alerts/history?alert_name={alert_name_1}",
+        f"{url}api/{org_id}/alerts/history?alert_id={alert_id_1}",
         headers=headers,
     )
     print(f"Filtered alert history response: {resp_filtered_history.content}")
@@ -811,10 +839,10 @@ def test_e2e_alert_history(create_session, base_url):
     )
     print("Invalid time range correctly rejected with 400")
 
-    # Step 10: Test 6 - Test with non-existent alert name
-    print("\n=== Test 6: Test with non-existent alert name (should return 404) ===")
+    # Step 10: Test 6 - Test with non-existent alert_id
+    print("\n=== Test 6: Test with non-existent alert_id (should return 404) ===")
     resp_nonexistent = session.get(
-        f"{url}api/{org_id}/alerts/history?alert_name=nonexistent_alert_xyz",
+        f"{url}api/{org_id}/alerts/history?alert_id=nonexistent_alert_id_xyz123",
         headers=headers,
     )
     assert resp_nonexistent.status_code == 404, (
