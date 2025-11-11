@@ -135,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:pagination="pagination"
           :rows-per-page-options="rowsPerPageOptions"
           @request="onRequest"
+          :loading="loading"
           binary-state-sort
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           style="width: 100%; height: calc(100vh - 105px)"
@@ -568,8 +569,8 @@ const pagination = ref({
   page: 1,
   rowsPerPage: 20,
   rowsNumber: 0,
-  sortBy: null,
-  descending: false,
+  sortBy: "timestamp",
+  descending: true,
 });
 
 const rowsPerPageOptions = [
@@ -612,14 +613,14 @@ const columns = ref([
     label: "Alert Name",
     field: "alert_name",
     align: "left",
-    sortable: false,
+    sortable: true,
   },
   {
     name: "is_realtime",
     label: "Type",
     field: "is_realtime",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 37px;",
   },
   {
@@ -627,7 +628,7 @@ const columns = ref([
     label: "Is Silenced",
     field: "is_silenced",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 37px;",
   },
   {
@@ -635,7 +636,7 @@ const columns = ref([
     label: "Timestamp",
     field: "timestamp",
     align: "left",
-    sortable: false,
+    sortable: true,
     style: "width: 160px;",
   },
   {
@@ -643,7 +644,7 @@ const columns = ref([
     label: "Start Time",
     field: "start_time",
     align: "left",
-    sortable: false,
+    sortable: true,
     style: "width: 160px;",
   },
   {
@@ -651,7 +652,7 @@ const columns = ref([
     label: "End Time",
     field: "end_time",
     align: "left",
-    sortable: false,
+    sortable: true,
     style: "width: 160px;",
   },
   {
@@ -659,7 +660,7 @@ const columns = ref([
     label: "Duration",
     field: (row: any) => row.end_time - row.start_time,
     align: "right",
-    sortable: false,
+    sortable: true,
     style: "width: 50px;",
   },
   {
@@ -667,7 +668,7 @@ const columns = ref([
     label: "Status",
     field: "status",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 150px;",
   },
   {
@@ -675,7 +676,7 @@ const columns = ref([
     label: "Retries",
     field: "retries",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 50px;",
   },
   // {
@@ -787,6 +788,14 @@ const fetchAlertHistory = async () => {
     if (searchQuery.value && searchQuery.value.trim()) {
       query.alert_id = searchQuery.value.trim();
     }
+
+    // Add sorting parameters
+    if (pagination.value.sortBy) {
+      query.sort_by = pagination.value.sortBy;
+      query.sort_order = pagination.value.descending ? "desc" : "asc";
+    }
+
+    console.log("Fetching alert history with query:", query);
 
     const response = await alertsService.getHistory(org, query);
     if (response.data) {
