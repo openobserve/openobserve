@@ -52,7 +52,7 @@ pub struct Dashboard {
 
 impl From<Dashboard> for super::Dashboard {
     fn from(value: Dashboard) -> Self {
-        let version: i32 = 7;
+        let version: i32 = 6;
 
         let mut hasher = std::hash::DefaultHasher::new();
         hasher.write_i32(version);
@@ -553,6 +553,12 @@ pub struct VariableList {
     pub custom_multi_select_value: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub escape_single_quotes: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tabs: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panels: Option<Vec<String>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
