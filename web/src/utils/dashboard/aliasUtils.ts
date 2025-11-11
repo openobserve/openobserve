@@ -13,6 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export const getDataValue = (obj: any, alias: string): any => {
-  return obj?.[alias] || obj?.[alias?.toString()?.toLowerCase()];
+export const getDataValue = (obj: any, alias: string | number): any => {
+  if (!obj) return undefined;
+
+  // Direct access
+  const value = obj[alias];
+  if (value !== undefined) return value;
+
+  // Lowercase fallback (only for strings)
+  return typeof alias === 'string' ? obj[alias.toLowerCase()] : undefined;
 };
