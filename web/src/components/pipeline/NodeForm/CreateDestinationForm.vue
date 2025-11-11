@@ -112,6 +112,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tabindex="0"
             >
             </q-input>
+
+            <!-- OpenObserve-specific fields -->
+            <div
+              v-if="formData.destination_type === 'openobserve'"
+              class="openobserve-fields"
+            >
+              <q-input
+                data-test="add-destination-org-identifier-input"
+                v-model="formData.org_identifier"
+                label="Organization Identifier *"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                tabindex="0"
+              ></q-input>
+              <q-input
+                data-test="add-destination-stream-name-input"
+                v-model="formData.stream_name"
+                label="Stream Name *"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                tabindex="0"
+              ></q-input>
+            </div>
+
             <q-input
               data-test="add-destination-url-input"
               v-model="formData.url"
@@ -364,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
@@ -421,7 +453,7 @@ const destinationTypes = [
     label: "Custom",
     value: "custom",
     icon: "settings",
-    image: getImageURL("images/pipeline/custom.png"),
+    image: null, // No image for custom, will use icon
   },
 ];
 
@@ -439,6 +471,8 @@ const formData: Ref<DestinationData> = ref({
   type: "http",
   output_format: "json",
   destination_type: "openobserve",
+  org_identifier: "default",
+  stream_name: "default",
 });
 
 // TODO OK: Use UUID package instead of this and move this method in utils
@@ -460,8 +494,11 @@ const isValidDestination = computed(
 
 const urlSuffix = computed(() => {
   switch (formData.value.destination_type) {
-    case "openobserve":
-      return "/api/default/_json";
+    case "openobserve": {
+      const org = formData.value.org_identifier || "default";
+      const stream = formData.value.stream_name || "default";
+      return `/api/${org}/${stream}/_json`;
+    }
     case "splunk":
       return "/services/collector/raw";
     case "elasticsearch":
@@ -693,6 +730,8 @@ const resetForm = () => {
     type: "http",
     output_format: "json",
     destination_type: "openobserve",
+    org_identifier: "default",
+    stream_name: "default",
   };
   apiHeaders.value = [{ key: "", value: "", uuid: getUUID() }];
   step.value = 1;
