@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-flex tw-items-center tw-gap-3">
           <q-icon name="history" size="24px" />
           <div>
-            <div class="tw-font-semibold tw-text-lg">{{ props.alertName }}</div>
+            <div class="tw-font-semibold tw-text-lg">{{ alertName }}</div>
             <div class="tw-text-sm tw-text-gray-500 dark:tw-text-gray-400">
               {{ t("alerts.alertHistory") }}
             </div>
@@ -193,7 +193,6 @@ interface AlertHistoryStats {
 
 interface Props {
   modelValue: boolean;
-  alertId: string;
   alertName: string;
 }
 
@@ -284,7 +283,7 @@ const formatDuration = (seconds: number) => {
 };
 
 const fetchHistory = async (append = false) => {
-  if (!props.alertId) return;
+  if (!props.alertName) return;
 
   loading.value = true;
   try {
@@ -293,7 +292,7 @@ const fetchHistory = async (append = false) => {
     const startTime = endTime - 30 * 24 * 60 * 60 * 1000000; // 30 days ago
 
     const response = await alertsService.getHistory(orgIdentifier, {
-      alert_id: props.alertId,
+      alert_name: props.alertName,
       start_time: startTime,
       end_time: endTime,
       from: currentPage.value * pageSize,
@@ -379,7 +378,7 @@ const close = () => {
 watch(
   () => props.modelValue,
   (newVal) => {
-    if (newVal && props.alertId) {
+    if (newVal && props.alertName) {
       currentPage.value = 0;
       historyItems.value = [];
       fetchHistory();
@@ -389,7 +388,7 @@ watch(
 
 // Watch for alert name changes
 watch(
-  () => props.alertId,
+  () => props.alertName,
   (newVal) => {
     if (newVal && props.modelValue) {
       currentPage.value = 0;

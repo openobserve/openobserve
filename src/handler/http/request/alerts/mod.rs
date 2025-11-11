@@ -171,7 +171,7 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::get_by_id(client, &org_id, alert_id).await {
-        Ok((_, alert)) => {
+        Ok(alert) => {
             let key = alert.get_unique_key();
             let scheduled_job = scheduler::get(&org_id, TriggerModule::Alert, &key)
                 .await
@@ -212,7 +212,7 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::get_by_id(client, &org_id, alert_id).await {
-        Ok((_, alert)) => {
+        Ok(alert) => {
             let key = alert.get_unique_key();
             let scheduled_job = scheduler::get(&org_id, TriggerModule::Alert, &key)
                 .await

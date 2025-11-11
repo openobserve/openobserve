@@ -620,16 +620,19 @@ pub async fn get_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
-) -> Result<(Folder, Alert), AlertError> {
-    match db::alerts::alert::get_by_id(conn, org_id, alert_id).await? {
-        Some(f_a) => Ok(f_a),
+) -> Result<Alert, AlertError> {
+    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
+        Some((_f, a)) => Ok(a),
         None => Err(AlertError::AlertNotFound),
     }
 }
 
 pub async fn get_by_id_db(org_id: &str, alert_id: Ksuid) -> Result<Alert, AlertError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    get_by_id(conn, org_id, alert_id).await.map(|f_a| f_a.1)
+    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
+        Some((_f, a)) => Ok(a),
+        None => Err(AlertError::AlertNotFound),
+    }
 }
 
 pub async fn get_folder_alert_by_id_db(

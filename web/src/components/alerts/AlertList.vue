@@ -748,7 +748,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Alert History Drawer -->
       <AlertHistoryDrawer
         v-model="showHistoryDrawer"
-        :alert-id="selectedHistoryAlertId"
         :alert-name="selectedHistoryAlertName"
       />
     </template>
@@ -853,7 +852,6 @@ export default defineComponent({
 
     const showImportAlertDialog = ref(false);
     const showHistoryDrawer = ref(false);
-    const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
 
     const { getStreams } = useStreams();
@@ -2455,7 +2453,6 @@ export default defineComponent({
       tabs,
       filterAlertsByTab,
       showHistoryDrawer,
-      selectedHistoryAlertId,
       selectedHistoryAlertName,
       refreshImportedAlerts,
       folderIdToBeCloned,
