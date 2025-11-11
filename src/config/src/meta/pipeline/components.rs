@@ -167,7 +167,7 @@ pub struct FunctionParams {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct ConditionParams {
-    pub condition: ConditionList,
+    pub conditions: ConditionList,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -272,7 +272,7 @@ mod tests {
         // Test new format with ConditionList
         let payload = json::json!({
             "node_type": "condition",
-            "condition": {
+            "conditions": {
                 "column": "body",
                 "operator": ">=",
                 "value": {
@@ -288,7 +288,7 @@ mod tests {
         // Test backward compatibility with legacy array format
         let legacy_payload = json::json!({
             "node_type": "condition",
-            "condition": [
+            "conditions": [
               {
                 "column": "body",
                 "operator": ">=",
@@ -306,7 +306,7 @@ mod tests {
         // Test OR logic
         let or_payload = json::json!({
             "node_type": "condition",
-            "condition": {
+            "conditions": {
                 "or": [
                     {
                         "column": "level",

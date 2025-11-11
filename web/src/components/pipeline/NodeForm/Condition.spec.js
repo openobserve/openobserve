@@ -266,7 +266,7 @@ describe("Condition Component", () => {
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
           node_type: "condition",
-          condition: {
+          conditions: {
             and: [
               {
                 column: "level",
@@ -324,7 +324,7 @@ describe("Condition Component", () => {
       mockPipelineObj.isEditNode = true;
       mockPipelineObj.currentSelectedNodeData = {
         data: {
-          condition: {
+          conditions: {
             and: [
               {
                 column: "level",
@@ -434,7 +434,7 @@ describe("Condition Component", () => {
       await wrapper.vm.saveCondition();
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          condition: expect.objectContaining({
+          conditions: expect.objectContaining({
             and: expect.arrayContaining([
               expect.objectContaining({ value: '""' })
             ])
@@ -461,7 +461,7 @@ describe("Condition Component", () => {
       await wrapper.vm.saveCondition();
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          condition: expect.objectContaining({
+          conditions: expect.objectContaining({
             and: expect.arrayContaining([
               expect.objectContaining({ value: "null" })
             ])
@@ -498,7 +498,7 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          condition: {
+          conditions: {
             and: expect.arrayContaining([
               expect.objectContaining({ column: "level", value: "error" }),
               expect.objectContaining({ column: "message", value: "failed" })
@@ -534,7 +534,7 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          condition: {
+          conditions: {
             or: expect.arrayContaining([
               expect.objectContaining({ column: "level", value: "error" }),
               expect.objectContaining({ column: "level", value: "critical" })
@@ -660,7 +660,7 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          condition: {
+          conditions: {
             or: [
               expect.objectContaining({ column: "level", value: "error" }),
               {
@@ -714,7 +714,7 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          condition: {
+          conditions: {
             and: [
               expect.objectContaining({ column: "app_name", value: "myapp" }),
               {
@@ -781,7 +781,7 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          condition: {
+          conditions: {
             and: [
               expect.objectContaining({ column: "env", value: "production" }),
               {
@@ -885,7 +885,7 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          condition: {
+          conditions: {
             or: [
               expect.objectContaining({
                 column: "message",
@@ -924,7 +924,7 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          condition: {
+          conditions: {
             or: [
               expect.objectContaining({ column: "level", value: "error" })
             ]
@@ -999,7 +999,7 @@ describe("Condition Component", () => {
       mockPipelineObj.isEditNode = true;
       mockPipelineObj.currentSelectedNodeData = {
         data: {
-          condition: {
+          conditions: {
             and: [
               {
                 column: "status",
@@ -1064,7 +1064,7 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith({
         node_type: "condition",
-        condition: {
+        conditions: {
           and: [
             {
               column: "level",
@@ -1085,7 +1085,7 @@ describe("Condition Component", () => {
       mockPipelineObj.isEditNode = true;
       mockPipelineObj.currentSelectedNodeData = {
         data: {
-          condition: {
+          conditions: {
             or: [
               {
                 column: "level",

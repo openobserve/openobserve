@@ -286,10 +286,10 @@ const getDefaultStreamRoute: any = () => {
 
 // Initialize condition group - convert from backend format if editing
 const getDefaultConditionGroup = (): ConditionGroup => {
-  if (pipelineObj.isEditNode && pipelineObj.currentSelectedNodeData?.data?.condition) {
+  if (pipelineObj.isEditNode && pipelineObj.currentSelectedNodeData?.data?.conditions) {
     try {
       // Convert backend ConditionList format to FilterGroup format
-      const converted = retransformBEToFE(pipelineObj.currentSelectedNodeData.data.condition);
+      const converted = retransformBEToFE(pipelineObj.currentSelectedNodeData.data.conditions);
       if (converted) {
         return converted;
       }
@@ -556,7 +556,7 @@ const saveCondition = async () => {
 
     let conditionData = {
       node_type: "condition",
-      condition: backendCondition,
+      conditions: backendCondition,
     };
 
     // Ensure currentSelectedNodeData has proper structure
