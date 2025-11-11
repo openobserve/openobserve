@@ -991,8 +991,6 @@ export default defineComponent({
     watch(
       () => searchObj.meta.quickMode,
       (isActive) => {
-        //reset pagintion whenever user toggles on / off quick mode 
-        resetPagination();
 
         if (isActive) {
           // check if its present in the array dont add it again
