@@ -165,10 +165,9 @@ pub async fn get_pipeline_history(
             "evaluation_took_in_secs" => "evaluation_took_in_secs",
             "source_node" => "source_node",
             "query_took" => "query_took",
-            "is_partial" => "is_partial",
             _ => {
                 return MetaHttpResponse::bad_request(format!(
-                    "Invalid sort_by field: '{}'. Valid fields are: timestamp, pipeline_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took, is_partial",
+                    "Invalid sort_by field: '{}'. Valid fields are: timestamp, pipeline_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took",
                     sort_by
                 ));
             }

@@ -699,7 +699,7 @@ const columns = ref([
     label: "Partial",
     field: "is_partial",
     align: "center",
-    sortable: true,
+    sortable: false,
     style: "width: 60px;",
   },
   {
@@ -988,6 +988,19 @@ const changePagination = (val: { label: string; value: any }) => {
 
     td {
       vertical-align: middle;
+    }
+
+    // Align all sorting chevrons to the right
+    th.sortable {
+      .q-table__sort-icon {
+        margin-left: auto;
+        margin-right: 0;
+      }
+    }
+
+    // Ensure header content and icon are in a flex container
+    .q-table th .q-table__sort-icon {
+      order: 2;
     }
   }
 }
