@@ -408,11 +408,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
 
+                #[cfg(feature = "enterprise")]
+                let usage_enabled = true;
+                #[cfg(not(feature = "enterprise"))]
+                let usage_enabled = cfg.common.usage_enabled;
+
                 // if create_org_through_ingestion is enabled, we need to create the org
                 // if it doesn't exist. Hence, we need to check if the org exists in the cache
-                if (cfg.common.create_org_through_ingestion
-                    || cfg.common.usage_enabled
-                    || audit_enabled)
+                if (cfg.common.create_org_through_ingestion || usage_enabled || audit_enabled)
                     && !ORGANIZATIONS.read().await.contains_key(org_id)
                     && let Err(e) = check_and_create_org(org_id).await
                 {
