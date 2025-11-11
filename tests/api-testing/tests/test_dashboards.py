@@ -163,11 +163,11 @@ def test_create_dashboard(create_session, base_url):
     assert resp.status_code in [200, 201], f"Create dashboard failed: {resp.status_code} {resp.text}"
 
     body = resp.json()
-    # Dashboard ID is nested in v7.dashboardId
-    assert "v7" in body and "dashboardId" in body["v7"], "Response should contain dashboard ID in v7.dashboardId"
+    # Dashboard ID is nested in v8.dashboardId
+    assert "v7" in body and "dashboardId" in body["v8"], "Response should contain dashboard ID in v8.dashboardId"
 
     # Clean up: delete the created dashboard
-    dashboard_id = body["v7"]["dashboardId"]
+    dashboard_id = body["v8"]["dashboardId"]
     if dashboard_id:
         delete_url = f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}"
         session.delete(delete_url)
@@ -189,7 +189,7 @@ def test_get_dashboard_by_id(create_session, base_url):
     assert create_resp.status_code in [200, 201], f"Setup failed: {create_resp.status_code}"
 
     create_body = create_resp.json()
-    dashboard_id = create_body["v7"]["dashboardId"]
+    dashboard_id = create_body["v8"]["dashboardId"]
     assert dashboard_id, "Dashboard ID should be returned after creation"
 
     # Now get the dashboard
@@ -198,7 +198,7 @@ def test_get_dashboard_by_id(create_session, base_url):
     assert resp.status_code == 200, f"Get dashboard failed: {resp.status_code} {resp.text}"
 
     body = resp.json()
-    assert body["v7"]["title"] == "Test Get Dashboard", "Dashboard title should match"
+    assert body["v8"]["title"] == "Test Get Dashboard", "Dashboard title should match"
 
     # Clean up
     session.delete(get_url)
@@ -218,7 +218,7 @@ def test_update_dashboard(create_session, base_url):
 
     create_resp = session.post(create_url, json=dashboard_data)
     create_body = create_resp.json()
-    dashboard_id = create_body["v7"]["dashboardId"]
+    dashboard_id = create_body["v8"]["dashboardId"]
 
     # Verify we can get the dashboard
     get_url = f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}"
@@ -226,8 +226,8 @@ def test_update_dashboard(create_session, base_url):
     assert get_resp.status_code == 200, f"Get dashboard failed: {get_resp.status_code}"
 
     body = get_resp.json()
-    assert body["v7"]["title"] == "Dashboard for Update Test", "Dashboard title should match"
-    assert body["v7"]["description"] == "Testing dashboard lifecycle", "Dashboard description should match"
+    assert body["v8"]["title"] == "Dashboard for Update Test", "Dashboard title should match"
+    assert body["v8"]["description"] == "Testing dashboard lifecycle", "Dashboard description should match"
 
     # Note: Update API currently has issues with hash validation
     # Skipping update test until API is fixed
@@ -249,7 +249,7 @@ def test_delete_dashboard(create_session, base_url):
     }
 
     create_resp = session.post(create_url, json=dashboard_data)
-    dashboard_id = create_resp.json()["v7"]["dashboardId"]
+    dashboard_id = create_resp.json()["v8"]["dashboardId"]
 
     # Delete the dashboard
     delete_url = f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}"
@@ -276,12 +276,12 @@ def test_create_dashboard_with_empty_panels(create_session, base_url):
     resp = session.post(url, json=dashboard_data)
     assert resp.status_code in [200, 201], f"Create dashboard failed: {resp.status_code} {resp.text}"
 
-    dashboard_id = resp.json()["v7"]["dashboardId"]
+    dashboard_id = resp.json()["v8"]["dashboardId"]
 
     # Verify dashboard was created
     get_resp = session.get(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
     assert get_resp.status_code == 200
-    assert get_resp.json()["v7"]["title"] == "Dashboard with Empty Panels"
+    assert get_resp.json()["v8"]["title"] == "Dashboard with Empty Panels"
 
     # Clean up
     if dashboard_id:
@@ -303,7 +303,7 @@ def test_dashboard_with_custom_folder(create_session, base_url):
     # API creates folder automatically if it doesn't exist
     assert resp.status_code in [200, 201], f"Create dashboard with custom folder failed: {resp.status_code} {resp.text}"
 
-    dashboard_id = resp.json()["v7"]["dashboardId"]
+    dashboard_id = resp.json()["v8"]["dashboardId"]
 
     # Clean up
     if dashboard_id:
@@ -355,7 +355,7 @@ def test_update_nonexistent_dashboard(create_session, base_url):
     # Clean up if dashboard was created
     if resp.status_code == 200:
         try:
-            dashboard_id = resp.json()["v7"]["dashboardId"]
+            dashboard_id = resp.json()["v8"]["dashboardId"]
             session.delete(url)
         except (KeyError, TypeError):
             pass
@@ -375,7 +375,7 @@ def test_dashboard_duplicate_title(create_session, base_url):
     # Create first dashboard
     resp1 = session.post(url, json=dashboard_data)
     assert resp1.status_code in [200, 201]
-    dashboard_id1 = resp1.json()["v7"]["dashboardId"]
+    dashboard_id1 = resp1.json()["v8"]["dashboardId"]
 
     # Create second dashboard with same title (API allows this)
     resp2 = session.post(url, json=dashboard_data)
@@ -385,7 +385,7 @@ def test_dashboard_duplicate_title(create_session, base_url):
         session.delete(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id1}")
 
     if resp2.status_code in [200, 201]:
-        dashboard_id2 = resp2.json()["v7"]["dashboardId"]
+        dashboard_id2 = resp2.json()["v8"]["dashboardId"]
         if dashboard_id2:
             session.delete(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id2}")
 
@@ -404,7 +404,7 @@ def test_list_dashboards_pagination(create_session, base_url):
         }
         resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
         if resp.status_code in [200, 201]:
-            dashboard_id = resp.json()["v7"]["dashboardId"]
+            dashboard_id = resp.json()["v8"]["dashboardId"]
             if dashboard_id:
                 created_ids.append(dashboard_id)
 
@@ -435,7 +435,7 @@ def test_export_dashboard(create_session, base_url):
 
     create_resp = session.post(create_url, json=dashboard_data)
     assert create_resp.status_code in [200, 201]
-    dashboard_id = create_resp.json()["v7"]["dashboardId"]
+    dashboard_id = create_resp.json()["v8"]["dashboardId"]
 
     # Export the dashboard
     export_url = f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}/export"
@@ -491,7 +491,7 @@ def test_move_multiple_dashboards_batch(create_session, base_url):
         }
         resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
         if resp.status_code in [200, 201]:
-            dashboard_id = resp.json()["v7"]["dashboardId"]
+            dashboard_id = resp.json()["v8"]["dashboardId"]
             created_ids.append(dashboard_id)
 
     # Only attempt batch move if we have a valid folder_id and created dashboards
@@ -557,14 +557,14 @@ def test_dashboard_with_variables(create_session, base_url):
     resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
     assert resp.status_code in [200, 201], f"Create dashboard with variables failed: {resp.status_code} {resp.text}"
 
-    dashboard_id = resp.json()["v7"]["dashboardId"]
+    dashboard_id = resp.json()["v8"]["dashboardId"]
 
     # Verify variables were saved
     get_resp = session.get(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
     assert get_resp.status_code == 200
     body = get_resp.json()
-    assert "variables" in body["v7"], "Dashboard should have variables"
-    assert len(body["v7"]["variables"]["list"]) == 2, "Should have 2 variables"
+    assert "variables" in body["v8"], "Dashboard should have variables"
+    assert len(body["v8"]["variables"]["list"]) == 2, "Should have 2 variables"
 
     # Clean up
     session.delete(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
@@ -600,16 +600,16 @@ def test_dashboard_with_multiple_tabs(create_session, base_url):
     resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
     assert resp.status_code in [200, 201], f"Create multi-tab dashboard failed: {resp.status_code} {resp.text}"
 
-    dashboard_id = resp.json()["v7"]["dashboardId"]
+    dashboard_id = resp.json()["v8"]["dashboardId"]
 
     # Verify tabs were saved
     get_resp = session.get(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
     assert get_resp.status_code == 200
     body = get_resp.json()
-    assert len(body["v7"]["tabs"]) == 3, "Dashboard should have 3 tabs"
-    assert body["v7"]["tabs"][0]["name"] == "Overview"
-    assert body["v7"]["tabs"][1]["name"] == "Details"
-    assert body["v7"]["tabs"][2]["name"] == "Analytics"
+    assert len(body["v8"]["tabs"]) == 3, "Dashboard should have 3 tabs"
+    assert body["v8"]["tabs"][0]["name"] == "Overview"
+    assert body["v8"]["tabs"][1]["name"] == "Details"
+    assert body["v8"]["tabs"][2]["name"] == "Analytics"
 
     # Clean up
     session.delete(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
@@ -631,7 +631,7 @@ def test_list_dashboards_by_title_pattern(create_session, base_url):
         }
         resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
         if resp.status_code in [200, 201]:
-            dashboard_id = resp.json()["v7"]["dashboardId"]
+            dashboard_id = resp.json()["v8"]["dashboardId"]
             created_ids.append(dashboard_id)
 
     # Filter by title pattern "Prod"
@@ -667,7 +667,7 @@ def test_list_dashboards_by_folder(create_session, base_url):
         }
         resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
         if resp.status_code in [200, 201]:
-            dashboard_id = resp.json()["v7"]["dashboardId"]
+            dashboard_id = resp.json()["v8"]["dashboardId"]
             created_ids.append(dashboard_id)
 
     # Filter by folder
@@ -719,7 +719,7 @@ def test_create_timed_annotation(create_session, base_url):
 
     create_resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
     assert create_resp.status_code in [200, 201], f"Create dashboard failed: {create_resp.status_code} {create_resp.text}"
-    dashboard_id = create_resp.json()["v7"]["dashboardId"]
+    dashboard_id = create_resp.json()["v8"]["dashboardId"]
 
     # Create timed annotation
     end_time = int(time.time() * 1000000)  # microseconds
@@ -775,7 +775,7 @@ def test_get_timed_annotations(create_session, base_url):
 
     create_resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
     assert create_resp.status_code in [200, 201], f"Create dashboard failed: {create_resp.status_code} {create_resp.text}"
-    dashboard_id = create_resp.json()["v7"]["dashboardId"]
+    dashboard_id = create_resp.json()["v8"]["dashboardId"]
 
     # Create annotation
     end_time = int(time.time() * 1000000)
@@ -823,7 +823,7 @@ def test_dashboard_hash_conflict_detection(create_session, base_url):
 
     create_resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
     assert create_resp.status_code in [200, 201]
-    dashboard_id = create_resp.json()["v7"]["dashboardId"]
+    dashboard_id = create_resp.json()["v8"]["dashboardId"]
 
     # Get dashboard with hash
     get_resp = session.get(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
@@ -837,7 +837,7 @@ def test_dashboard_hash_conflict_detection(create_session, base_url):
 
     # Update dashboard - this should generate a new hash
     update_url = f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}"
-    update_data = body["v7"]
+    update_data = body["v8"]
     update_data["description"] = "Updated description"
 
     update_resp = session.put(update_url, json=update_data)
@@ -919,12 +919,12 @@ def test_dashboard_with_panel_filters(create_session, base_url):
     resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
     assert resp.status_code in [200, 201], f"Create dashboard with filters failed: {resp.status_code} {resp.text}"
 
-    dashboard_id = resp.json()["v7"]["dashboardId"]
+    dashboard_id = resp.json()["v8"]["dashboardId"]
 
     # Verify filters were saved
     get_resp = session.get(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
     body = get_resp.json()
-    panel = body["v7"]["tabs"][0]["panels"][0]
+    panel = body["v8"]["tabs"][0]["panels"][0]
     assert "filter" in panel["queries"][0]["fields"], "Panel should have filter configuration"
 
     # Clean up

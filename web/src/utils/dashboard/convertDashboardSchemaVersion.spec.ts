@@ -29,8 +29,8 @@ describe("convertDashboardSchemaVersion", () => {
 
   // Test 1: Basic functionality - constants
   it("should have correct current schema version", () => {
-    expect(CURRENT_DASHBOARD_SCHEMA_VERSION).toBe(7);
-    expect(CURRENT_DASHBOARD_SCHEMA_VERSION).toBe(7);
+    expect(CURRENT_DASHBOARD_SCHEMA_VERSION).toBe(8);
+    expect(CURRENT_DASHBOARD_SCHEMA_VERSION).toBe(8);
   });
 
   // Test 2: Edge cases - null/undefined data
@@ -53,7 +53,7 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataWithoutVersion);
-    expect(result.version).toBe(7); // Should be upgraded to version 7 through the switch cases
+    expect(result.version).toBe(8); // Should be upgraded to version 8 through the switch cases
   });
 
   // Test 3: Version 1 conversion tests
@@ -100,7 +100,7 @@ describe("convertDashboardSchemaVersion", () => {
 
     const result = convertDashboardSchemaVersion(dataV1);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     expect(result).not.toHaveProperty('layouts'); // layouts should be removed
     expect(result).not.toHaveProperty('panels'); // panels should be moved to tabs
     expect(result.tabs).toBeDefined();
@@ -122,7 +122,7 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV1WithNullLayouts);
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
   });
 
   it("should handle panels with missing fields in convertPanelSchemaVersion", () => {
@@ -150,7 +150,7 @@ describe("convertDashboardSchemaVersion", () => {
     };
 
     const result = convertDashboardSchemaVersion(dataV1WithIncompletePanel);
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     expect(result.tabs[0].panels.length).toBe(1);
     expect(result.tabs[0].panels[0].queries[0].fields.z).toEqual([]); // Should add z field
     expect(result.tabs[0].panels[0].queries[0].fields.stream_type).toBe("logs"); // Should default to logs
@@ -184,7 +184,7 @@ describe("convertDashboardSchemaVersion", () => {
 
     const result = convertDashboardSchemaVersion(dataV2);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     expect(result).not.toHaveProperty('panels'); // panels should be moved to tabs
     expect(result.tabs).toBeDefined();
     expect(result.tabs[0].name).toBe("Default");
@@ -228,7 +228,7 @@ describe("convertDashboardSchemaVersion", () => {
 
     const result = convertDashboardSchemaVersion(dataV3);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual(["field1"]); // only first x field
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual(["field2", "field3"]); // rest moved to breakdown
   });
@@ -266,7 +266,7 @@ describe("convertDashboardSchemaVersion", () => {
 
     const result = convertDashboardSchemaVersion(dataV3WithTable);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual(["field1", "field2", "field3"]); // all x fields preserved for table
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual([]); // breakdown should be empty array
   });
@@ -305,7 +305,7 @@ describe("convertDashboardSchemaVersion", () => {
 
     const result = convertDashboardSchemaVersion(dataV3WithExistingBreakdown);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual(["field1"]); // only first x field
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual(["existing1", "existing2", "field2"]); // existing + moved field
   });
@@ -360,7 +360,7 @@ describe("convertDashboardSchemaVersion", () => {
 
     const result = convertDashboardSchemaVersion(dataV4);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     expect(result.tabs[0].panels[0].queries[0].fields.filter).toEqual({
       filterType: "group",
       logicalOperator: "AND",
@@ -421,7 +421,7 @@ describe("convertDashboardSchemaVersion", () => {
 
     const result = convertDashboardSchemaVersion(dataV4WithEmptyFilter);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     expect(result.tabs[0].panels[0].queries[0].fields.filter).toEqual({
       filterType: "group",
       logicalOperator: "AND",
@@ -463,7 +463,7 @@ describe("convertDashboardSchemaVersion", () => {
 
     const result = convertDashboardSchemaVersion(dataV4WithNoFilter);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     // Should not modify fields that don't have filter property
   });
 
@@ -506,7 +506,7 @@ describe("convertDashboardSchemaVersion", () => {
 
     const result = convertDashboardSchemaVersion(dataV5);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     // Layout dimensions should be updated
     expect(result.tabs[0].panels[0].layout.w).toBe(48); // 12 * 4
     expect(result.tabs[0].panels[0].layout.x).toBe(8); // 2 * 4
@@ -514,7 +514,7 @@ describe("convertDashboardSchemaVersion", () => {
     expect(result.tabs[0].panels[0].layout.y).toBe(2); // 1 * 2 (v6 migration)
   });
 
-  it("should upgrade version 6 dashboard to version 7 (y coordinate fix)", () => {
+  it("should upgrade version 6 dashboard to version 8 (y coordinate fix)", () => {
     const dataV6 = {
       version: 6,
       title: "Test Dashboard",
@@ -540,7 +540,7 @@ describe("convertDashboardSchemaVersion", () => {
 
     const result = convertDashboardSchemaVersion(dataV6);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     expect(result.tabs[0].panels[0].layout.y).toBe(10); // 5 * 2 = 10 (y coordinate doubled in v6->v7)
     expect(result.tabs[0].panels[0].layout.x).toBe(8); // x unchanged
     expect(result.tabs[0].panels[0].layout.h).toBe(8); // h unchanged
@@ -549,14 +549,14 @@ describe("convertDashboardSchemaVersion", () => {
 
   it("should handle version higher than current schema version", () => {
     const dataV7 = {
-      version: 7,
+      version: 8,
       title: "Test Dashboard",
       tabs: []
     };
 
     const result = convertDashboardSchemaVersion(dataV7);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     expect(result).toEqual(dataV7); // Should be unchanged
   });
 
@@ -594,7 +594,7 @@ describe("convertDashboardSchemaVersion", () => {
 
     const result = convertDashboardSchemaVersion(dataV3WithSingleX);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual(["field1"]); // unchanged
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual([]); // empty array added
   });
@@ -632,7 +632,7 @@ describe("convertDashboardSchemaVersion", () => {
 
     const result = convertDashboardSchemaVersion(dataV3WithNoX);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(8);
     expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual([]); // unchanged
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual([]); // empty array added
   });
