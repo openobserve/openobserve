@@ -29,6 +29,9 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     functions_aggregate::min_max::max,
+    physical_plan::{
+        Partitioning, execute_stream_partitioned, expressions::Column, repartition::RepartitionExec,
+    },
     prelude::{DataFrame, SessionContext, col, lit},
 };
 use futures::{TryStreamExt, future::try_join_all};
@@ -1331,10 +1334,20 @@ async fn load_samples_from_datafusion(
     df: DataFrame,
 ) -> Result<()> {
     let start_time = std::time::Instant::now();
-    let streams = df
+    let task_ctx = Arc::new(df.task_ctx());
+    let plan = df
         .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?
-        .execute_stream_partitioned()
+        .create_physical_plan()
         .await?;
+    let schema = plan.schema();
+    let plan = Arc::new(RepartitionExec::try_new(
+        plan,
+        Partitioning::Hash(
+            vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
+            config::get_config().limit.query_thread_num as usize,
+        ),
+    )?);
+    let streams = execute_stream_partitioned(plan, task_ctx)?;
 
     let mut tasks = Vec::new();
     for mut stream in streams {
@@ -1398,22 +1411,23 @@ async fn load_samples_from_datafusion(
                         }
                     }
                 }
+
+                series.retain(|_, v| !v.samples.is_empty());
+
                 Ok(series)
             });
         tasks.push(task);
     }
 
     // collect results
+    let mut res = HashMap::with_capacity(metrics.len());
     for task in tasks {
         let m = task
             .await
             .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        for (hash, value) in m {
-            if let Some(range_val) = metrics.get_mut(&hash) {
-                range_val.samples.extend(value.samples);
-            }
-        }
+        res.extend(m);
     }
+    *metrics = res;
 
     log::info!(
         "[trace_id: {trace_id}] load samples from datafusion took: {:?}",
