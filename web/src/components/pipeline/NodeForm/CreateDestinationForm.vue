@@ -165,7 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </template>
             </q-input>
+            <!-- Method field - only shown for Custom destination type -->
             <q-select
+              v-if="formData.destination_type === 'custom'"
               data-test="add-destination-method-select"
               v-model="formData.method"
               :label="t('alert_destinations.method') + ' *'"
@@ -396,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
@@ -453,7 +455,7 @@ const destinationTypes = [
     label: "Custom",
     value: "custom",
     icon: "settings",
-    image: null, // No image for custom, will use icon
+    image: getImageURL("images/pipeline/custom.png"),
   },
 ];
 
@@ -487,6 +489,16 @@ const apiHeaders: Ref<
     uuid: string;
   }[]
 > = ref([{ key: "", value: "", uuid: getUUID() }]);
+
+// Watch destination_type changes to ensure method is set to "post" for non-custom types
+watch(
+  () => formData.value.destination_type,
+  (newType) => {
+    if (newType !== "custom") {
+      formData.value.method = "post";
+    }
+  },
+);
 
 const isValidDestination = computed(
   () => formData.value.name && formData.value.url && formData.value.method,
