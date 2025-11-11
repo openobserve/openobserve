@@ -5264,7 +5264,7 @@ export default defineComponent({
   animation: aiBarSlideDown 0.28s ease-out;
   box-shadow: none;
   margin: 0 0 10px 0; /* add bottom margin for spacing */
-  padding: 0 12px 8px; /* horizontal spacing with a little bottom breathing room */
+  padding: 0 6px 8px; /* horizontal spacing with a little bottom breathing room */
   backdrop-filter: none;
 }
 
