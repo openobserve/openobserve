@@ -1544,6 +1544,10 @@
                     {
                         "label": "Number",
                         "value": "number"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -1557,6 +1561,10 @@
                     {
                         "label": "Number",
                         "value": "number"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -1576,6 +1584,10 @@
                     {
                         "label": "Number",
                         "value": "number"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -1595,6 +1607,10 @@
                     {
                         "label": "Number",
                         "value": "number"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -2152,6 +2168,10 @@
                     {
                         "label": "String",
                         "value": "string"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -2171,6 +2191,10 @@
                     {
                         "label": "String",
                         "value": "string"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -2215,6 +2239,10 @@
                     {
                         "label": "String",
                         "value": "string"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -2234,6 +2262,10 @@
                     {
                         "label": "String",
                         "value": "string"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -2253,6 +2285,10 @@
                     {
                         "label": "String",
                         "value": "string"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -2266,6 +2302,10 @@
                     {
                         "label": "Number",
                         "value": "number"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -2279,6 +2319,10 @@
                     {
                         "label": "Number",
                         "value": "number"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": false
@@ -2298,6 +2342,10 @@
                     {
                         "label": "String",
                         "value": "string"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -2317,6 +2365,10 @@
                     {
                         "label": "String",
                         "value": "string"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -3627,6 +3679,10 @@
                     {
                         "label": "String",
                         "value": "string"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -3640,6 +3696,10 @@
                     {
                         "label": "Number",
                         "value": "number"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -3659,6 +3719,10 @@
                     {
                         "label": "String",
                         "value": "string"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -3672,6 +3736,10 @@
                     {
                         "label": "Number",
                         "value": "number"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -3691,6 +3759,10 @@
                     {
                         "label": "String",
                         "value": "string"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -3704,6 +3776,10 @@
                     {
                         "label": "String",
                         "value": "string"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -3723,6 +3799,10 @@
                     {
                         "label": "Number",
                         "value": "number"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -3736,6 +3816,10 @@
                     {
                         "label": "String",
                         "value": "string"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": false
@@ -5174,6 +5258,10 @@
                     {
                         "label": "Field",
                         "value": "field"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -5189,6 +5277,10 @@
                     {
                         "label": "Field",
                         "value": "field"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -5204,6 +5296,10 @@
                     {
                         "label": "Field",
                         "value": "field"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -5221,6 +5317,10 @@
                     {
                         "label": "Number",
                         "value": "number"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -5236,6 +5336,10 @@
                     {
                         "label": "Field",
                         "value": "field"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
@@ -5253,6 +5357,10 @@
                     {
                         "label": "Number",
                         "value": "number"
+                    },
+                    {
+                        "label": "Function",
+                        "value": "function"
                     }
                 ],
                 "required": true
