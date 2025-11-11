@@ -103,7 +103,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="url"
                           :placeholder="t('dashboard.addURL')"
                           borderless
-                          label-slot
                           style="padding: 10px 0px;"
                         />
                       </div>
