@@ -36,7 +36,10 @@ module.exports = defineConfig({
   workers: process.env.CI ? 5 : 5,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI
-    ? [['blob']] // Use blob reporter in CI for merging across shards
+    ? [
+        ['blob'], // Use blob reporter in CI for merging across shards
+        ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for TestDino
+      ]
     : [
         ['html', { outputFolder: 'playwright-results/html-report', open: 'never' }], // HTML reporter
         ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for TestDino
