@@ -385,13 +385,10 @@ export default defineComponent({
       editorObj.addCommand(
         monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
         function () {
-          setTimeout(() => {
-            emit("run-query");
-          }, 300);
+          //this is because to not trigger the cmnd + enter and to avoid the blank space while cmd + enter
         },
         "ctrlenter",
       );
-
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
       });
