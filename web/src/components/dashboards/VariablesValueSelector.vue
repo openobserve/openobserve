@@ -14,79 +14,104 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div
-    v-if="variablesData.values?.length > 0"
-    :key="variablesData.isVariablesLoading"
-    class="flex q-mt-xs q-ml-xs"
-  >
-    <div
-      v-for="(item, index) in variablesData.values"
-      :key="item.name + index"
-      :data-test="`dashboard-variable-${item}-selector`"
-    >
-      <div v-if="item.type == 'query_values' && item._isCurrentLevel !== false">
-        <VariableQueryValueSelector
-          class="q-mr-lg q-mt-xs"
-          v-show="!item.hideOnDashboard"
-          v-model="item.value"
-          :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
-          :loadOptions="loadVariableOptions"
-          @search="onVariableSearch(index, $event)"
-        />
+  <div v-if="variablesData.values?.length > 0">
+    <div :key="variablesData.isVariablesLoading" class="flex q-mt-xs q-ml-xs">
+      <div
+        v-for="(item, index) in variablesData.values"
+        :key="item.name + index"
+        :data-test="`dashboard-variable-${item}-selector`"
+      >
+        <div
+          v-if="item.type == 'query_values' && item._isCurrentLevel !== false"
+        >
+          <VariableQueryValueSelector
+            class="q-mr-lg q-mt-xs"
+            v-show="!item.hideOnDashboard"
+            v-model="item.value"
+            :variableItem="item"
+            @update:model-value="onVariablesValueUpdated(index)"
+            :loadOptions="loadVariableOptions"
+            @search="onVariableSearch(index, $event)"
+          />
+        </div>
+        <div
+          v-else-if="item.type == 'constant' && item._isCurrentLevel !== false"
+        >
+          <q-input
+            v-show="!item.hideOnDashboard"
+            class="q-mr-lg q-mt-xs"
+            style="max-width: 150px !important"
+            v-model="item.value"
+            :label="item.label || item.name"
+            dense
+            readonly
+            data-test="dashboard-variable-constant-selector"
+            @update:model-value="onVariablesValueUpdated(index)"
+            borderless
+            hide-bottom-space
+          ></q-input>
+        </div>
+        <div
+          v-else-if="item.type == 'textbox' && item._isCurrentLevel !== false"
+        >
+          <q-input
+            v-show="!item.hideOnDashboard"
+            class="q-mr-lg q-mt-xs"
+            style="max-width: 150px !important"
+            debounce="1000"
+            v-model="item.value"
+            :label="item.label || item.name"
+            dense
+            data-test="dashboard-variable-textbox-selector"
+            @update:model-value="onVariablesValueUpdated(index)"
+            borderless
+            hide-bottom-space
+          ></q-input>
+        </div>
+        <div
+          v-else-if="item.type == 'custom' && item._isCurrentLevel !== false"
+        >
+          <VariableCustomValueSelector
+            v-show="!item.hideOnDashboard"
+            class="q-mr-lg q-mt-xs"
+            v-model="item.value"
+            :variableItem="item"
+            @update:model-value="onVariablesValueUpdated(index)"
+          />
+        </div>
+        <div
+          v-else-if="
+            item.type == 'dynamic_filters' && item._isCurrentLevel !== false
+          "
+        >
+          <VariableAdHocValueSelector
+            class="q-mr-lg q-mt-xs"
+            v-model="item.value"
+            :variableItem="item"
+          />
+        </div>
       </div>
-      <div v-else-if="item.type == 'constant' && item._isCurrentLevel !== false">
-        <q-input
-          v-show="!item.hideOnDashboard"
-          class="q-mr-lg q-mt-xs"
-          style="max-width: 150px !important"
-          v-model="item.value"
-          :label="item.label || item.name"
-          dense
-          readonly
-          data-test="dashboard-variable-constant-selector"
-          @update:model-value="onVariablesValueUpdated(index)"
-          borderless
-          hide-bottom-space
-        ></q-input>
-      </div>
-      <div v-else-if="item.type == 'textbox' && item._isCurrentLevel !== false">
-        <q-input
-          v-show="!item.hideOnDashboard"
-          class="q-mr-lg q-mt-xs"
-          style="max-width: 150px !important"
-          debounce="1000"
-          v-model="item.value"
-          :label="item.label || item.name"
-          dense
-          data-test="dashboard-variable-textbox-selector"
-          @update:model-value="onVariablesValueUpdated(index)"
-          borderless
-          hide-bottom-space
-        ></q-input>
-      </div>
-      <div v-else-if="item.type == 'custom' && item._isCurrentLevel !== false">
-        <VariableCustomValueSelector
-          v-show="!item.hideOnDashboard"
-          class="q-mr-lg q-mt-xs"
-          v-model="item.value"
-          :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
-        />
-      </div>
-      <div v-else-if="item.type == 'dynamic_filters' && item._isCurrentLevel !== false">
-        <VariableAdHocValueSelector
-          class="q-mr-lg q-mt-xs"
-          v-model="item.value"
-          :variableItem="item"
-        />
-      </div>
+    </div>
+
+    <!-- Add Variable Button -->
+    <div v-if="showAddVariableButton" class="q-ml-xs q-mt-sm">
+      <q-btn
+        outline
+        no-caps
+        icon="add"
+        label="Add Variable"
+        color="primary"
+        size="md"
+        class="el-border"
+        @click="openAddVariable"
+        data-test="dashboard-add-variable-btn"
+      />
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
@@ -112,8 +137,9 @@ export default defineComponent({
     "initialVariableValues",
     "showDynamicFilters",
     "lazyLoad", // If true, don't auto-load on mount, wait for explicit trigger
+    "showAddVariableButton", // If true, show the "Add Variable" button
   ],
-  emits: ["variablesData"],
+  emits: ["variablesData", "openAddVariable"],
   components: {
     VariableQueryValueSelector,
     VariableAdHocValueSelector,
@@ -812,7 +838,7 @@ export default defineComponent({
     watch(
       () => JSON.stringify(props.initialVariableValues?.value || {}),
       async (newVal, oldVal) => {
-        if (!oldVal || oldVal === '{}') {
+        if (!oldVal || oldVal === "{}") {
           return; // Skip initial load
         }
         if (newVal === oldVal) return; // No changes
@@ -827,8 +853,11 @@ export default defineComponent({
         const newValues = newVal ? JSON.parse(newVal) : {};
         const changedVars: string[] = [];
 
-        Object.keys(newValues).forEach(varName => {
-          if (JSON.stringify(oldValues[varName]) !== JSON.stringify(newValues[varName])) {
+        Object.keys(newValues).forEach((varName) => {
+          if (
+            JSON.stringify(oldValues[varName]) !==
+            JSON.stringify(newValues[varName])
+          ) {
             changedVars.push(varName);
           }
         });
@@ -843,7 +872,9 @@ export default defineComponent({
           .map((v: any) => v.name);
 
         // Filter out changes that came from our own variables (to prevent self-triggering)
-        const externalChangedVars = changedVars.filter(varName => !localVarNames.includes(varName));
+        const externalChangedVars = changedVars.filter(
+          (varName) => !localVarNames.includes(varName),
+        );
 
         if (externalChangedVars.length === 0) {
           return;
@@ -858,7 +889,7 @@ export default defineComponent({
         });
 
         // Also update oldVariablesData for change detection
-        Object.keys(newValues).forEach(varName => {
+        Object.keys(newValues).forEach((varName) => {
           oldVariablesData[varName] = newValues[varName];
         });
 
@@ -881,8 +912,10 @@ export default defineComponent({
         try {
           // Sort variables by dependency order (independent first)
           const sortedVariables = affectedVariables.sort((a: any, b: any) => {
-            const aDeps = variablesDependencyGraph[a.name]?.parentVariables || [];
-            const bDeps = variablesDependencyGraph[b.name]?.parentVariables || [];
+            const aDeps =
+              variablesDependencyGraph[a.name]?.parentVariables || [];
+            const bDeps =
+              variablesDependencyGraph[b.name]?.parentVariables || [];
             // Variables with fewer dependencies load first
             return aDeps.length - bDeps.length;
           });
@@ -902,7 +935,7 @@ export default defineComponent({
           // Always clear the flag when done
           isProcessingParentChange.value = false;
         }
-      }
+      },
     );
 
     const emitVariablesData = () => {
@@ -1734,7 +1767,10 @@ export default defineComponent({
       // Set loading state for current-level variables
       // Variables with _isCurrentLevel === true or undefined should be loaded
       variablesData.values.forEach((variable: any) => {
-        if (variable._isCurrentLevel === true || variable._isCurrentLevel === undefined) {
+        if (
+          variable._isCurrentLevel === true ||
+          variable._isCurrentLevel === undefined
+        ) {
           variable.isVariableLoadingPending = true;
         }
       });
@@ -1742,10 +1778,13 @@ export default defineComponent({
       // Find independent variables to load (current-level with no dependencies)
       const independentVariables = variablesData.values.filter(
         (variable: any) => {
-          const shouldLoad = variable._isCurrentLevel === true || variable._isCurrentLevel === undefined;
-          const hasNoDeps = !variablesDependencyGraph[variable.name]?.parentVariables?.length;
+          const shouldLoad =
+            variable._isCurrentLevel === true ||
+            variable._isCurrentLevel === undefined;
+          const hasNoDeps =
+            !variablesDependencyGraph[variable.name]?.parentVariables?.length;
           return shouldLoad && hasNoDeps;
-        }
+        },
       );
 
       // Find all dependent variables at CURRENT level (variables with dependencies)
@@ -1964,6 +2003,13 @@ export default defineComponent({
       await loadSingleVariableDataByName(variableItem, false, filterText);
     };
 
+    /**
+     * Opens the Add Variable panel by emitting an event to the parent
+     */
+    const openAddVariable = () => {
+      emit("openAddVariable");
+    };
+
     return {
       props,
       variablesData,
@@ -1973,6 +2019,7 @@ export default defineComponent({
       onVariableSearch,
       cancelAllVariableOperations,
       loadAllVariablesData, // Expose for manual triggering when lazy loading
+      openAddVariable,
     };
   },
 });
