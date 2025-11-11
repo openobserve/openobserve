@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="item.name + index"
       :data-test="`dashboard-variable-${item}-selector`"
     >
-      <div v-if="item.type == 'query_values' && (item._isCurrentLevel !== false)">
+      <div v-if="item.type == 'query_values' && item._isCurrentLevel !== false">
         <VariableQueryValueSelector
           class="q-mr-lg q-mt-xs"
           v-show="!item.hideOnDashboard"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @search="onVariableSearch(index, $event)"
         />
       </div>
-      <div v-else-if="item.type == 'constant' && (item._isCurrentLevel !== false)">
+      <div v-else-if="item.type == 'constant' && item._isCurrentLevel !== false">
         <q-input
           v-show="!item.hideOnDashboard"
           class="q-mr-lg q-mt-xs"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           hide-bottom-space
         ></q-input>
       </div>
-      <div v-else-if="item.type == 'textbox' && (item._isCurrentLevel !== false)">
+      <div v-else-if="item.type == 'textbox' && item._isCurrentLevel !== false">
         <q-input
           v-show="!item.hideOnDashboard"
           class="q-mr-lg q-mt-xs"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           hide-bottom-space
         ></q-input>
       </div>
-      <div v-else-if="item.type == 'custom' && (item._isCurrentLevel !== false)">
+      <div v-else-if="item.type == 'custom' && item._isCurrentLevel !== false">
         <VariableCustomValueSelector
           v-show="!item.hideOnDashboard"
           class="q-mr-lg q-mt-xs"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(index)"
         />
       </div>
-      <div v-else-if="item.type == 'dynamic_filters' && (item._isCurrentLevel !== false)">
+      <div v-else-if="item.type == 'dynamic_filters' && item._isCurrentLevel !== false">
         <VariableAdHocValueSelector
           class="q-mr-lg q-mt-xs"
           v-model="item.value"
@@ -837,7 +837,7 @@ export default defineComponent({
           return;
         }
 
-        // Get list of local variable names (only current level)
+        // Get list of local variable names (only current-level variables)
         const localVarNames = variablesData.values
           .filter((v: any) => v._isCurrentLevel === true)
           .map((v: any) => v.name);
@@ -862,9 +862,9 @@ export default defineComponent({
           oldVariablesData[varName] = newValues[varName];
         });
 
-        // Check which LOCAL (current level) variables depend on changed EXTERNAL parent variables
+        // Check which variables depend on changed EXTERNAL parent variables
         const affectedVariables = variablesData.values.filter((v: any) => {
-          // Only consider current level variables
+          // Only check current-level variables
           if (v._isCurrentLevel !== true) return false;
 
           const deps = variablesDependencyGraph[v.name]?.parentVariables || [];
@@ -1731,20 +1731,20 @@ export default defineComponent({
         return;
       }
 
-      // Set loading state for all variables at CURRENT level only
+      // Set loading state for current-level variables
+      // Variables with _isCurrentLevel === true or undefined should be loaded
       variablesData.values.forEach((variable: any) => {
         if (variable._isCurrentLevel === true || variable._isCurrentLevel === undefined) {
           variable.isVariableLoadingPending = true;
         }
       });
 
-      // Find all independent variables at CURRENT level (variables with no dependencies)
+      // Find independent variables to load (current-level with no dependencies)
       const independentVariables = variablesData.values.filter(
         (variable: any) => {
-          // Only load current level variables
-          const isCurrentLevel = variable._isCurrentLevel === true || variable._isCurrentLevel === undefined;
+          const shouldLoad = variable._isCurrentLevel === true || variable._isCurrentLevel === undefined;
           const hasNoDeps = !variablesDependencyGraph[variable.name]?.parentVariables?.length;
-          return isCurrentLevel && hasNoDeps;
+          return shouldLoad && hasNoDeps;
         }
       );
 
