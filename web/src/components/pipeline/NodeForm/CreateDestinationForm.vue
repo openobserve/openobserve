@@ -1034,7 +1034,7 @@ defineExpose({
   min-height: 35px !important;
 }
 
-.modern-stepper {
+.create-destination-form {
   .q-stepper {
     background: transparent !important;
   }
