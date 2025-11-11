@@ -724,6 +724,8 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/_values_stream")
                 // bulk enable of pipelines and alerts
                 || path.contains("/bulk/enable")
+                // for license the function itself with do a perm check
+                || (url_len == 1 && path.contains("license"))
                 {
                     return Ok(AuthExtractor {
                         auth: auth_str.to_owned(),

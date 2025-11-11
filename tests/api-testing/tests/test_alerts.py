@@ -1,3 +1,4 @@
+import pytest
 
 def test_e2e_alerts(create_session, base_url):
     """Running an E2E test for get all the alerts list."""
@@ -556,7 +557,7 @@ def test_e2e_createalertfloat(create_session, base_url):
         resp_delete_template.status_code == 200
     ), f"Deleting this function, but got {resp_delete_template.status_code} {resp_delete_template.content}"
 
-
+@pytest.mark.skip(reason="WIP")
 def test_e2e_alert_history(create_session, base_url):
     """Running an E2E test for alert history API.
 

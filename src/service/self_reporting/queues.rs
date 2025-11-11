@@ -40,9 +40,16 @@ pub(super) static ERROR_QUEUE: Lazy<Arc<ReportingQueue>> =
 
 fn initialize_usage_queue() -> ReportingQueue {
     let cfg = get_config();
+
+    // max usage reporting interval can be 10 mins, because we
+    // need relatively recent data for usage calculations
+    #[cfg(feature = "enterprise")]
+    let usage_publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
+    #[cfg(not(feature = "enterprise"))]
+    let usage_publish_interval = cfg.common.usage_publish_interval;
+
     let timeout = time::Duration::from_secs(
-        cfg.common
-            .usage_publish_interval
+        usage_publish_interval
             .try_into()
             .expect("Env ZO_USAGE_PUBLISH_INTERVAL invalid format. Should be set as integer"),
     );
@@ -68,9 +75,16 @@ fn initialize_usage_queue() -> ReportingQueue {
 
 fn initialize_error_queue() -> ReportingQueue {
     let cfg = get_config();
+
+    // max usage reporting interval can be 10 mins, because we
+    // need relatively recent data for usage calculations
+    #[cfg(feature = "enterprise")]
+    let usage_publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
+    #[cfg(not(feature = "enterprise"))]
+    let usage_publish_interval = cfg.common.usage_publish_interval;
+
     let timeout = time::Duration::from_secs(
-        cfg.common
-            .usage_publish_interval
+        usage_publish_interval
             .try_into()
             .expect("Env ZO_USAGE_PUBLISH_INTERVAL invalid format. Should be set as integer"),
     );
@@ -205,7 +219,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
             if super::ingestion::ingest_reporting_data(triggers.clone(), trigger_stream)
                 .await
                 .is_err()
-                && &cfg.common.usage_reporting_mode != "both"
+                && &cfg.common.usage_reporting_mode != "dual"
                 && !enqueued_on_failure
             {
                 // Only enqueue once on first failure , this brings risk that it may be duplicated
