@@ -136,7 +136,7 @@ async function verifySingleFieldInLatestLog(page, pm, streamName, fieldName, sho
   }
 }
 
-test.describe("Import POC - Multiple Patterns on One Field", () => {
+test.describe("Import POC - Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
   let cleanupPerformedInSetup = false;

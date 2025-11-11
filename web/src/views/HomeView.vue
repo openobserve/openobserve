@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          <div>
           <TrialPeriod></TrialPeriod>
          </div>
+          <LicensePeriod @update-license="goToLicensePage"></LicensePeriod>
         <div class="feature-card"
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
         role="region"
@@ -427,6 +428,8 @@ import useStreams from "@/composables/useStreams";
 import pipelines from "@/services/pipelines";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
+import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
+import { useRouter } from "vue-router";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import store from "@/test/unit/helpers/store";
 import { outlinedWindow } from "@quasar/extras/material-icons-outlined";
@@ -445,6 +448,7 @@ export default defineComponent({
     const alertsPanelDataKey = ref(0);
     const pipelinesPanelDataKey = ref(0);
     const isLoadingSummary = ref(false);
+    const router = useRouter();
 
     // Animated counters for numbers
     const animatedStreamsCount = ref(0);
@@ -799,6 +803,9 @@ export default defineComponent({
     return getImageURL('images/home/pipeline.svg');
   });
 
+  const goToLicensePage = () => {
+    router.push({ name: 'license' });
+  };
   const getForwardIcon = computed(() => {
     const icon = store.state.theme === 'dark' ? 'images/home/forward_dark.svg' : 'images/home/forward_light.svg';
     return getImageURL(icon);
@@ -868,8 +875,9 @@ export default defineComponent({
       isLoadingSummary,
       pipelinesIcon,
       alertsIcon,
-      getForwardIcon,
+      goToLicensePage,
       formatEventCount,
+      getForwardIcon,
       animatedStreamsCount,
       animatedEventsCount,
       formattedAnimatedEventsCount,
@@ -904,6 +912,7 @@ export default defineComponent({
   components: {
     CustomChartRenderer,
     TrialPeriod,
+    LicensePeriod,
     HomeViewSkeleton,
   },
 });

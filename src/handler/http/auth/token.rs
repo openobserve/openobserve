@@ -123,7 +123,13 @@ pub async fn token_validator(
                                 };
                             users::get_user(Some(org_id), user_id).await
                         }
-                        None => users::get_user(None, user_id).await,
+                        None => {
+                            if path_columns.len() == 1 && path_columns[0] == "license" {
+                                users::get_user(Some("_meta"), user_id).await
+                            } else {
+                                users::get_user(None, user_id).await
+                            }
+                        }
                     }
                 };
                 match user {
