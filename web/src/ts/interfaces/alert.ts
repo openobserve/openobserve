@@ -104,6 +104,8 @@ export interface Destination {
   action_id?: string;
   output_format?: "json" | "ndjson";
   destination_type?: string;
+  org_identifier?: string;
+  stream_name?: string;
 }
 
 export interface DestinationPayload {
