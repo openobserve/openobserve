@@ -161,7 +161,7 @@ pub async fn get_alert_history(
     }
 
     // If alert_id filter is provided, validate it exists
-    let folder_id = if let Some(ref alert_id) = query.alert_id {
+    let _folder_id = if let Some(ref alert_id) = query.alert_id {
         // Try to parse the alert_id as Ksuid
         match svix_ksuid::Ksuid::from_str(alert_id) {
             Ok(ksuid) => {
@@ -213,7 +213,7 @@ pub async fn get_alert_history(
 
             // If specific alert_name is requested, check access to it
             if let Some(ref alert_id) = query.alert_id {
-                let folder_id = folder_id.unwrap_or_default();
+                let folder_id = _folder_id.unwrap_or_default();
                 let alert_obj = format!("{}:{}", OFGA_MODELS.get("alerts").unwrap().key, alert_id);
 
                 let has_permission = o2_openfga::authorizer::authz::is_allowed(
