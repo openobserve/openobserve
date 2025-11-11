@@ -7,6 +7,7 @@
         v-model="displayValue"
         :options="filteredOptions"
         dense
+        label="Select Field"
         use-input
         input-debounce="0"
         behavior="menu"

@@ -17,7 +17,7 @@
       option-value="value"
       emit-value
       map-options
-      class="tw-w-72 tw-h-10 tw-border tw-border-solid tw-border-gray-200 tw-pl-2"
+      class="tw-w-72 o2-custom-select-dashboard"
     >
       <!-- <template v-slot:append>
           <q-icon
@@ -96,7 +96,7 @@
                   dense
                   filled
                   :display-value="''"
-                  class="tw-w-22 tw-min-w-22 tw-h-10 text-sm bg-primary text-white q-field--dark"
+                  class="o2-custom-select-dashboard arg-type-select tw-mr-0.5"
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
@@ -553,3 +553,19 @@ export default {
   },
 };
 </script>
+
+<style lang="scss" scoped>
+.arg-type-select {
+  :deep(.q-field__control) {
+    background-color: var(--o2-primary-btn-bg) !important;
+  }
+
+  :deep(.q-field__append .q-icon) {
+    color: white !important;
+  }
+
+  :deep(.q-field__prepend .q-icon) {
+    color: white !important;
+  }
+}
+</style>

@@ -29,7 +29,7 @@
           :options="[]"
           :disable="true"
           label="Joining Stream"
-          class="full-width"
+          class="o2-custom-select-dashboard"
           data-test="dashboard-config-panel-join-from"
         />
       </div>
@@ -86,7 +86,7 @@
           emit-value
           map-options
           label="On Stream"
-          class="full-width"
+          class="o2-custom-select-dashboard"
           data-test="dashboard-config-panel-join-to"
           use-input
           input-debounce="0"
@@ -107,9 +107,10 @@
         ]"
         v-if="showJoinSummary"
       >
-        Joining <span class="tw-font-semibold">{{ mainStream }}</span> with
-        <span class="tw-font-semibold">{{ modelValue.stream }}</span> with
-        <span class="text-primary">{{ joinTypeLabel }} Join</span>
+        Performing a
+        <span class="text-primary">{{ joinTypeLabel }} Join</span> between
+        <span class="tw-font-semibold">{{ mainStream }}</span> and
+        <span class="tw-font-semibold">{{ modelValue.stream }}</span>
       </div>
       <div class="tw-border-t tw-border-gray-200 tw-flex-1"></div>
     </div>
@@ -146,6 +147,7 @@
               :options="operationOptions"
               dense
               filled
+              class="o2-custom-select-dashboard"
               label="Select Operation"
               :data-test="`dashboard-join-condition-operation-${argIndex}`"
             />

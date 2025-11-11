@@ -98,6 +98,7 @@
           icon="add"
           label="Add"
           padding="sm sm"
+          class="el-border"
           no-caps
           @click="toggleHavingFilter"
           v-if="!isHavingFilterVisible()"
@@ -112,6 +113,7 @@
             filled
             v-model="getHavingCondition().operator"
             :options="havingOperators"
+            class="o2-custom-select-dashboard"
             style="width: 30%"
           />
 
