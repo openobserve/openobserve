@@ -880,7 +880,6 @@ export default defineComponent({
     let routeQueryParamsOnMount: any = {};
 
     // ======= [START] default variable values
-
     const initialVariableValues: any = { value: {} };
     Object.keys(route.query).forEach((key) => {
       if (key.startsWith("var-")) {
@@ -912,13 +911,6 @@ export default defineComponent({
       const variableObj: any = {};
 
       data.values.forEach((variable: any) => {
-        // Skip variables that are explicitly marked as parent dependencies
-        // _isCurrentLevel can be: true (current level), false (parent), or undefined (also current level)
-        if (variable._isCurrentLevel === false) {
-          console.log(`[AddPanel] Skipping parent variable: ${variable.name}`);
-          return;
-        }
-
         if (variable.type === "dynamic_filters") {
           const filters = (variable.value || []).filter(
             (item: any) => item.name && item.operator && item.value,
@@ -932,6 +924,7 @@ export default defineComponent({
             JSON.stringify(encodedFilters),
           );
         } else {
+          // Simple: just set var-name=value
           variableObj[`var-${variable.name}`] = variable.value;
         }
       });
@@ -959,37 +952,13 @@ export default defineComponent({
       data: {},
     });
 
-    // Helper to create config for AddPanel mode
-    // In AddPanel, ALL variables (global + tab + panel) should be visible and loaded
-    // But only urlSyncVars should update URL
-    const createConfigWithAllVariables = (
-      urlSyncVars: any[],  // Variables that update URL when changed
-      allVars: any[],      // All variables to show
-      showFilters = false,
-    ) => {
-      // Mark which variables should update URL
-      // But ALL variables are marked as renderable (no _isCurrentLevel: false filtering needed)
-      const configList = allVars.map((v: any) => ({
-        ...v,
-        // _isCurrentLevel: true means "show this variable"
-        // For AddPanel, ALL variables should be shown, so all get true
-        _isCurrentLevel: true,
-        // _shouldUpdateUrl: flag to indicate which vars update URL
-        _shouldUpdateUrl: urlSyncVars.some((lv: any) => lv.name === v.name),
-      }));
+    // Cache the filtered variables config to prevent unnecessary re-renders
+    const cachedFilteredConfig = ref<any>(null);
+    let previousFilterKey = "";
 
-      return {
-        ...currentDashboardData.data.variables,
-        list: configList,
-        showDynamicFilters: showFilters,
-        _levelVariables: allVars, // All variables are at "current level" for AddPanel
-      };
-    };
-
-    // Computed property to get variables for the current panel
-    // Includes: global variables + tab variables (for current tab) + panel variables (for current panel)
-    // ALL parent variables are included for dependency resolution
+    // Filter variables for UI display: show only global + current tab + current panel
     const filteredVariablesConfig = computed(() => {
+      console.log('[AddPanel] Computing filteredVariablesConfig', currentDashboardData.data);
       if (!currentDashboardData.data?.variables?.list) {
         return { list: [], showDynamicFilters: false };
       }
@@ -998,67 +967,56 @@ export default defineComponent({
       const currentTabId = route.query.tab as string;
       const allVars = currentDashboardData.data.variables.list;
 
-      // Get global variables (always available)
-      const globalVars = allVars.filter(
-        (v: any) => getScopeType(v) === "global",
-      );
+      // Create a key to detect actual changes
+      const filterKey = `${currentPanelId}-${currentTabId}-${allVars.map((v: any) => v.name).join(',')}`;
 
-      // Get tab variables for current tab (if applicable)
-      const tabVars = currentTabId
-        ? allVars.filter(
-            (v: any) =>
-              getScopeType(v) === "tabs" &&
-              v.tabs &&
-              v.tabs.includes(currentTabId),
-          )
-        : [];
+      // If nothing changed, return cached result
+      if (filterKey === previousFilterKey && cachedFilteredConfig.value) {
+        return cachedFilteredConfig.value;
+      }
 
-      // Get panel variables for current panel (if in edit mode or "current_panel")
-      // In ADD mode, also include variables with "current_panel" reference
-      const panelVars = currentPanelId
-        ? allVars.filter(
-            (v: any) =>
-              getScopeType(v) === "panels" &&
-              v.panels &&
-              v.panels.includes(currentPanelId),
-          )
-        : allVars.filter(
-            (v: any) =>
-              getScopeType(v) === "panels" &&
-              v.panels &&
-              v.panels.includes("current_panel"),
-          );
+      previousFilterKey = filterKey;
 
-      // Determine which are the "current level" variables to render
-      // In EDIT mode (has panelId): show only panel variables
-      // In ADD mode (no panelId): show global + tab variables + "current_panel" variables
-      const currentLevelVars = currentPanelId
-        ? panelVars  // Edit mode: only panel-scoped vars
-        : [...globalVars, ...tabVars, ...panelVars];  // Add mode: global + tab + current_panel vars
+      // Filter to show only: global + current tab + current panel variables
+      const filteredVars = allVars.filter((v: any) => {
+        const scopeType = getScopeType(v);
 
-      console.log('[AddPanel] filteredVariablesConfig - vars:', {
-        globalVars: globalVars.map((v: any) => v.name),
-        tabVars: tabVars.map((v: any) => v.name),
-        panelVars: panelVars.map((v: any) => v.name),
-        currentLevelVars: currentLevelVars.map((v: any) => v.name)
+        if (scopeType === "global") {
+          return true; // Always show global
+        }
+
+        if (scopeType === "tabs") {
+          // Show if variable is scoped to current tab
+          return v.tabs && v.tabs.includes(currentTabId);
+        }
+
+        if (scopeType === "panels") {
+          // In EDIT mode: show if variable is scoped to current panel
+          // In ADD mode: show if variable uses "current_panel"
+          if (currentPanelId) {
+            return v.panels && v.panels.includes(currentPanelId);
+          } else {
+            return v.panels && v.panels.includes("current_panel");
+          }
+        }
+
+        return false;
       });
 
-      // Include all parent variables for dependency resolution
-      const config = createConfigWithAllVariables(
-        currentLevelVars,
-        [...globalVars, ...tabVars, ...panelVars],
-        currentDashboardData.data.variables?.showDynamicFilters || false,
-      );
-
-      console.log('[AddPanel] filteredVariablesConfig - result:', {
-        totalConfigVars: config.list.length,
-        varsWithFlags: config.list.map((v: any) => ({
-          name: v.name,
-          _isCurrentLevel: v._isCurrentLevel
-        }))
+      console.log('[AddPanel] Filtered variables:', {
+        total: allVars.length,
+        filtered: filteredVars.length,
+        names: filteredVars.map((v: any) => v.name)
       });
 
-      return config;
+      const result = {
+        ...currentDashboardData.data.variables,
+        list: filteredVars,
+        showDynamicFilters: currentDashboardData.data.variables?.showDynamicFilters || false,
+      };
+
+      cachedFilteredConfig.value = result;
+      return result;
     });
 
     // this is used to activate the watcher only after on mounted
