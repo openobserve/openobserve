@@ -931,21 +931,35 @@ const apiHeaders: Ref<
 watch(
   () => formData.value.destination_type,
   (newType) => {
-    if (newType !== "custom") {
-      // Set method to POST for all non-custom types
-      formData.value.method = "post";
+    // Only auto-set values if not in edit mode
+    if (!isEditMode.value) {
+      if (newType !== "custom") {
+        // Set method to POST for all non-custom types
+        formData.value.method = "post";
 
-      // Set output_format based on destination type
-      if (newType === "splunk") {
-        formData.value.output_format = "ndjson";
-      } else {
-        formData.value.output_format = "json";
+        // Set output_format based on destination type
+        if (newType === "splunk") {
+          formData.value.output_format = "ndjson";
+        } else {
+          formData.value.output_format = "json";
+        }
       }
-    }
 
-    // Set default headers for the destination type
-    apiHeaders.value = getDefaultHeaders(newType);
+      // Set default headers for the destination type
+      apiHeaders.value = getDefaultHeaders(newType);
+    }
   },
+);
+
+// Watch for destination prop changes to populate form in edit mode
+watch(
+  () => props.destination,
+  (destination) => {
+    if (destination) {
+      populateFormForEdit(destination);
+    }
+  },
+  { immediate: true },
 );
 
 const isValidDestination = computed(
