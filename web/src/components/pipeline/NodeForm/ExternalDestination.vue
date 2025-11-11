@@ -334,18 +334,18 @@ defineExpose({
   min-height: 120px;
 
   &:hover {
-    border-color: #1976d2;
+    border-color: var(--o2-border-color);
     box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
     transform: translateY(-2px);
   }
 
   &.selected {
-    border-color: #1976d2;
+    border-color: var(--o2-border-color);
     background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
     box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
 
     .card-icon {
-      color: #1976d2;
+      color: var(--o2-border-color);
     }
   }
 
@@ -415,10 +415,11 @@ defineExpose({
     width: 32px;
     height: 32px;
     font-size: 14px;
+    background: var(--o2-primary-btn-bg)
   }
 
   :deep(.q-stepper__step-inner) {
-    padding: 24px 0;
+    padding: 10px 0;
   }
 }
 
@@ -469,5 +470,16 @@ defineExpose({
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: bottom;
+}
+
+.header-label {
+  color: var(--o2-input-label-text-color);
+}
+</style>
+
+<style lang="scss">
+.pipeline-add-remote-destination-form .modern-stepper .q-stepper__tab {
+  padding: 5px 5px 15px 5px !important;
+  min-height: 35px !important;
 }
 </style>
