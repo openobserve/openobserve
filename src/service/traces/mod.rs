@@ -935,25 +935,11 @@ async fn write_traces(
             .as_str()
             .unwrap()
             .to_string();
-        let span_id = record_val
-            .get("span_id")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
-        let operation_name = record_val
-            .get("operation_name")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
         trace_index_values.push(MetadataItem::TraceListIndexer(TraceListItem {
             _timestamp: timestamp,
             stream_name: stream_name.to_string(),
             service_name: service_name.to_string(),
             trace_id,
-            span_id,
-            operation_name,
         }));
 
         // Start check for alert trigger
