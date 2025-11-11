@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="col" data-test="pipeline-destination-editor-title">
           <div v-if="destination" class="text-h6">
-            {{ t("alert_destinations.updateTitle") }}
+            {{ t("alert_destinations.updateTitle") }} - {{ destination.name }}
           </div>
           <div v-else class="text-h6">
             {{ t("alert_destinations.addTitle") }}
@@ -47,7 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="card-container tw-py-2 q-px-md tw-h-[calc(100vh-120px)] tw-overflow-auto">
       <div class="tw-w-[50vw]">
         <CreateDestinationForm
+          :destination="destination"
           @created="handleDestinationCreated"
+          @updated="handleDestinationUpdated"
           @cancel="handleCancel"
         />
       </div>
@@ -68,11 +70,16 @@ const props = defineProps<{
 }>();
 
 // Emits
-const emit = defineEmits(["cancel", "created"]);
+const emit = defineEmits(["cancel", "created", "updated"]);
 
 // Handle destination creation
 const handleDestinationCreated = (destinationName: string) => {
   emit("created", destinationName);
+};
+
+// Handle destination update
+const handleDestinationUpdated = (destinationName: string) => {
+  emit("updated", destinationName);
 };
 
 // Handle cancel

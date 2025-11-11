@@ -409,10 +409,17 @@ import { useQuasar } from "quasar";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL } from "@/utils/zincutils";
 
-const emit = defineEmits(["created", "cancel"]);
+// Props
+const props = defineProps<{
+  destination?: DestinationData | null;
+}>();
+
+const emit = defineEmits(["created", "updated", "cancel"]);
 const q = useQuasar();
 const store = useStore();
 const { t } = useI18n();
+
+const isEditMode = computed(() => !!props.destination);
 
 const apiMethods = ["get", "post", "put"];
 const outputFormats = ["json", "ndjson"];
@@ -569,25 +576,67 @@ const apiHeaders: Ref<
   }[]
 > = ref(getDefaultHeaders("openobserve"));
 
+// Helper function to populate form for editing
+const populateFormForEdit = (destination: DestinationData) => {
+  // Populate basic fields
+  formData.value.name = destination.name;
+  formData.value.url = destination.url || "";
+  formData.value.method = destination.method || "post";
+  formData.value.skip_tls_verify = destination.skip_tls_verify || false;
+  formData.value.template = (destination.template as string) || "";
+  formData.value.output_format = destination.output_format || "json";
+  formData.value.destination_type = destination.destination_type || "openobserve";
+  formData.value.org_identifier = destination.org_identifier || "default";
+  formData.value.stream_name = destination.stream_name || "default";
+
+  // Populate headers
+  if (destination.headers && typeof destination.headers === "object") {
+    apiHeaders.value = Object.entries(destination.headers).map(
+      ([key, value]) => ({
+        key,
+        value: value as string,
+        uuid: getUUID(),
+      }),
+    );
+  }
+
+  // Move to step 2 since destination type is already selected
+  step.value = 2;
+};
+
 // Watch destination_type changes to set method, output_format, and headers appropriately
 watch(
   () => formData.value.destination_type,
   (newType) => {
-    if (newType !== "custom") {
-      // Set method to POST for all non-custom types
-      formData.value.method = "post";
+    // Only auto-set values if not in edit mode
+    if (!isEditMode.value) {
+      if (newType !== "custom") {
+        // Set method to POST for all non-custom types
+        formData.value.method = "post";
 
-      // Set output_format based on destination type
-      if (newType === "splunk") {
-        formData.value.output_format = "ndjson";
-      } else {
-        formData.value.output_format = "json";
+        // Set output_format based on destination type
+        if (newType === "splunk") {
+          formData.value.output_format = "ndjson";
+        } else {
+          formData.value.output_format = "json";
+        }
       }
-    }
 
-    // Set default headers for the destination type
-    apiHeaders.value = getDefaultHeaders(newType);
+      // Set default headers for the destination type
+      apiHeaders.value = getDefaultHeaders(newType);
+    }
   },
+);
+
+// Watch for destination prop changes to populate form in edit mode
+watch(
+  () => props.destination,
+  (destination) => {
+    if (destination) {
+      populateFormForEdit(destination);
+    }
+  },
+  { immediate: true },
 );
 
 const isValidDestination = computed(
@@ -780,30 +829,60 @@ const createDestination = () => {
     output_format: formData.value.output_format,
   };
 
-  destinationService
-    .create({
-      org_identifier: store.state.selectedOrganization.identifier,
-      destination_name: formData.value.name,
-      data: payload,
-    })
-    .then(() => {
-      dismiss();
-      q.notify({
-        type: "positive",
-        message: `Destination saved successfully.`,
+  // Check if we're in edit mode
+  if (isEditMode.value) {
+    // Update existing destination
+    destinationService
+      .update({
+        org_identifier: store.state.selectedOrganization.identifier,
+        destination_name: formData.value.name,
+        data: payload,
+      })
+      .then(() => {
+        dismiss();
+        q.notify({
+          type: "positive",
+          message: `Destination updated successfully.`,
+        });
+        emit("updated", formData.value.name);
+      })
+      .catch((err: any) => {
+        if (err.response?.status == 403) {
+          return;
+        }
+        dismiss();
+        q.notify({
+          type: "negative",
+          message: err.response?.data?.error || err.response?.data?.message,
+        });
       });
-      emit("created", formData.value.name);
-    })
-    .catch((err: any) => {
-      if (err.response?.status == 403) {
-        return;
-      }
-      dismiss();
-      q.notify({
-        type: "negative",
-        message: err.response?.data?.error || err.response?.data?.message,
+  } else {
+    // Create new destination
+    destinationService
+      .create({
+        org_identifier: store.state.selectedOrganization.identifier,
+        destination_name: formData.value.name,
+        data: payload,
+      })
+      .then(() => {
+        dismiss();
+        q.notify({
+          type: "positive",
+          message: `Destination saved successfully.`,
+        });
+        emit("created", formData.value.name);
+      })
+      .catch((err: any) => {
+        if (err.response?.status == 403) {
+          return;
+        }
+        dismiss();
+        q.notify({
+          type: "negative",
+          message: err.response?.data?.error || err.response?.data?.message,
+        });
       });
-    });
+  }
 };
 
 const addApiHeader = (key: string = "", value: string = "") => {
