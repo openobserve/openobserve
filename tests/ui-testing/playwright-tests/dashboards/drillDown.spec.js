@@ -46,7 +46,7 @@ test("should create dashboard with trellis chart and configure logs auto drill-d
 
 
   // Select area chart (works well with trellis)
-  await pm.chartTypeSelector.selectChartType("area");
+  await pm.chartTypeSelector.selectChartType("table");
 
   // Select a stream
   await pm.chartTypeSelector.selectStreamType("logs");
@@ -76,6 +76,7 @@ test("should create dashboard with trellis chart and configure logs auto drill-d
   await pm.dashboardPanelConfigs.configureDrillDown({
     type: 'logs',
     mode: 'auto',
+    drillDownName: 'Logs Drill Down',
     openInNewTab: true
   });
 
