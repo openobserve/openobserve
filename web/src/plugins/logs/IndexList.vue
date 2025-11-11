@@ -80,6 +80,7 @@ size="xs" /> No field found in
     </div>
     <div v-else class="index-table q-mt-xs">
       <q-table
+        ref="fieldListRef"
         data-test="log-search-index-list-fields-table"
         v-model="sortedStreamFields"
         :visible-columns="['name']"
@@ -998,8 +999,27 @@ export default defineComponent({
       searchObj.loadingStream = false;
     };
 
+    const fieldListRef = ref<HTMLElement | null>(null);
+
+    const scrollToTop = () => {
+      if (fieldListRef.value) {
+        // Find the scrollable container within the q-table
+        const scrollContainer = fieldListRef.value.querySelector(
+          ".q-table__middle.scroll",
+        );
+        if (scrollContainer) {
+          scrollContainer.scrollTop = 0;
+        }
+      }
+    };
+
     const resetPagination = () => {
       pagination.value.page = 1;
+
+      // Reset scroll position when changing tabs
+      nextTick(() => {
+        scrollToTop();
+      });
     };
 
     watch(
@@ -1976,6 +1996,7 @@ export default defineComponent({
       pagination,
       toggleSchema,
       toggleInterestingFields,
+      fieldListRef,
       streamFieldsRows: computed(() => {
         let expandKeys = Object.keys(
           searchObj.data.stream.expandGroupRows,
