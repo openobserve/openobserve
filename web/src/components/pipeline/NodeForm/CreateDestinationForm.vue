@@ -813,7 +813,83 @@ watch(
   { immediate: true },
 );
 
-// Watch destination_type changes to set method and output_format appropriately
+// Helper function to get default headers for each destination type
+const getDefaultHeaders = (destinationType: string) => {
+  const headers: Array<{ key: string; value: string; uuid: string }> = [];
+
+  switch (destinationType) {
+    case "openobserve":
+      headers.push({
+        key: "Authorization",
+        value: "Basic <token>",
+        uuid: getUUID(),
+      });
+      break;
+    case "splunk":
+      headers.push({
+        key: "Authorization",
+        value: "Splunk <splunk_token>",
+        uuid: getUUID(),
+      });
+      break;
+    case "elasticsearch":
+      headers.push({
+        key: "Authorization",
+        value: "ApiKey <token>",
+        uuid: getUUID(),
+      });
+      headers.push({
+        key: "Content-Type",
+        value: "application/json",
+        uuid: getUUID(),
+      });
+      break;
+    case "datadog":
+      headers.push({
+        key: "DD-API-KEY",
+        value: "<token>",
+        uuid: getUUID(),
+      });
+      headers.push({
+        key: "Content-Encoding",
+        value: "gzip",
+        uuid: getUUID(),
+      });
+      headers.push({
+        key: "Content-Type",
+        value: "application/json",
+        uuid: getUUID(),
+      });
+      break;
+    case "dynatrace":
+      headers.push({
+        key: "Authorization",
+        value: "Api-Token <token>",
+        uuid: getUUID(),
+      });
+      headers.push({
+        key: "Content-Type",
+        value: "application/json; charset=utf-8",
+        uuid: getUUID(),
+      });
+      break;
+    case "newrelic":
+      headers.push({
+        key: "Authorization",
+        value: "Api-Token <token>",
+        uuid: getUUID(),
+      });
+      break;
+    case "custom":
+    default:
+      headers.push({ key: "", value: "", uuid: getUUID() });
+      break;
+  }
+
+  return headers;
+};
+
+// Watch destination_type changes to set method, output_format, and headers appropriately
 watch(
   () => formData.value.destination_type,
   (newType) => {
@@ -828,6 +904,9 @@ watch(
         formData.value.output_format = "json";
       }
     }
+
+    // Set default headers for the destination type
+    apiHeaders.value = getDefaultHeaders(newType);
   },
 );
 
