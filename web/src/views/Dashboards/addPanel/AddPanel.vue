@@ -316,7 +316,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dateTimeForVariables || dashboardPanelData.meta.dateTime
                       "
                       @variablesData="variablesDataUpdated"
+                      @openAddVariable="handleOpenAddVariable"
                       :initialVariableValues="initialVariableValues"
+                      :showAddVariableButton="true"
                     />
 
                     <div v-if="isOutDated" class="tw-p-2">
@@ -483,6 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @variablesData="variablesDataUpdated"
               :initialVariableValues="initialVariableValues"
               class="tw-flex-shrink-0 q-mb-sm"
+              :showAddVariableButton="true"
             />
             <CustomHTMLEditor
               v-model="dashboardPanelData.data.htmlContent"
@@ -507,6 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @variablesData="variablesDataUpdated"
               :initialVariableValues="initialVariableValues"
               class="tw-flex-shrink-0 q-mb-sm"
+              :showAddVariableButton="true"
             />
             <CustomMarkdownEditor
               v-model="dashboardPanelData.data.markdownContent"
@@ -686,6 +690,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+
+    <!-- Add Variable -->
+    <div
+      v-if="isAddVariableOpen"
+      class="add-variable-drawer-overlay"
+      @click.self="handleCloseAddVariable"
+    >
+      <div class="add-variable-drawer-panel tw-px-4 tw-pt-4">
+        <AddSettingVariable
+          @save="handleSaveVariable"
+          @close="handleCloseAddVariable"
+          :dashboardVariablesList="
+            currentDashboardData.data?.variables?.list || []
+          "
+          :variableName="selectedVariableToEdit"
+          :isFromAddPanel="true"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -713,6 +736,7 @@ import {
   getDashboard,
   getPanel,
   updatePanel,
+  deleteVariable,
 } from "../../../utils/commons";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -721,6 +745,7 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard.vue";
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue";
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
+import AddSettingVariable from "../../../components/dashboards/settings/AddSettingVariable.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import { useLoading } from "@/composables/useLoading";
@@ -776,6 +801,7 @@ export default defineComponent({
     PanelSidebar,
     ConfigPanel,
     VariablesValueSelector,
+    AddSettingVariable,
     PanelSchemaRenderer,
     RelativeTime,
     DashboardQueryEditor: defineAsyncComponent(
@@ -838,6 +864,17 @@ export default defineComponent({
 
     // used to provide values to chart only when apply is clicked (same as chart data)
     let updatedVariablesData: any = reactive({});
+
+    // State for Add Variable functionality
+    const isAddVariableOpen = ref(false);
+    const selectedVariableToEdit = ref(null);
+
+    // Track variables created during this edit session (for cleanup on discard)
+    const variablesCreatedInSession = ref<string[]>([]);
+    const initialVariableNames = ref<string[]>([]);
+    
+    // Track variables that use "current_panel" - these need special handling
+    const variablesWithCurrentPanel = ref<string[]>([]);
 
     // this is used to again assign query params on discard or save
     let routeQueryParamsOnMount: any = {};
@@ -976,7 +1013,8 @@ export default defineComponent({
           )
         : [];
 
-      // Get panel variables for current panel (if in edit mode)
+      // Get panel variables for current panel (if in edit mode or "current_panel")
+      // In ADD mode, also include variables with "current_panel" reference
       const panelVars = currentPanelId
         ? allVars.filter(
             (v: any) =>
@@ -984,14 +1022,19 @@ export default defineComponent({
               v.panels &&
               v.panels.includes(currentPanelId),
           )
-        : [];
+        : allVars.filter(
+            (v: any) =>
+              getScopeType(v) === "panels" &&
+              v.panels &&
+              v.panels.includes("current_panel"),
+          );
 
       // Determine which are the "current level" variables to render
       // In EDIT mode (has panelId): show only panel variables
-      // In ADD mode (no panelId): show global + tab variables (variables user can interact with)
+      // In ADD mode (no panelId): show global + tab variables + "current_panel" variables
       const currentLevelVars = currentPanelId
         ? panelVars  // Edit mode: only panel-scoped vars
-        : [...globalVars, ...tabVars];  // Add mode: global + tab vars
+        : [...globalVars, ...tabVars, ...panelVars];  // Add mode: global + tab + current_panel vars
 
       console.log('[AddPanel] filteredVariablesConfig - vars:', {
         globalVars: globalVars.map((v: any) => v.name),
@@ -1180,6 +1223,12 @@ export default defineComponent({
       ) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
+      }
+
+      // Capture initial variable names on first load (only once during mount)
+      if (initialVariableNames.value.length === 0) {
+        initialVariableNames.value = 
+          currentDashboardData.data?.variables?.list?.map((v: any) => v.name) || [];
       }
 
       // check if route has time related query params
@@ -1399,7 +1448,25 @@ export default defineComponent({
       }
     };
 
-    const goBack = () => {
+    const goBack = async () => {
+      // Clean up variables created during this session (on discard)
+      if (variablesCreatedInSession.value.length > 0) {
+        const dashId = route.query.dashboard + "";
+        const folderId = route.query.folder ?? "default";
+        
+        // Delete all variables that were created during this edit session
+        for (const variableName of variablesCreatedInSession.value) {
+          try {
+            await deleteVariable(store, dashId, variableName, folderId);
+          } catch (error) {
+            console.error(`Failed to delete variable ${variableName}:`, error);
+          }
+        }
+        
+        // Clear the tracking array
+        variablesCreatedInSession.value = [];
+      }
+      
       return router.push({
         path: "/dashboards/view",
         query: {
@@ -1545,12 +1612,18 @@ export default defineComponent({
           dashboardPanelData.data.id = panelId;
           chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
 
+          // Prepare variables to update (if any were created during this session)
+          const variablesToUpdate = variablesCreatedInSession.value.length > 0
+            ? { variableNames: variablesCreatedInSession.value, newPanelId: panelId }
+            : undefined;
+
           const errorMessageOnSave = await addPanel(
             store,
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
             route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+            variablesToUpdate,
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
@@ -1564,6 +1637,10 @@ export default defineComponent({
 
         isPanelConfigWatcherActivated = false;
         isPanelConfigChanged.value = false;
+
+        // Clear variables created during session since panel is being saved
+        variablesCreatedInSession.value = [];
+        variablesWithCurrentPanel.value = [];
 
         await nextTick();
         return router.push({
@@ -2041,6 +2118,65 @@ export default defineComponent({
 
     // [END] O2 AI Context Handler
 
+    /**
+     * Opens the Add Variable panel
+     */
+    const handleOpenAddVariable = () => {
+      selectedVariableToEdit.value = null;
+      isAddVariableOpen.value = true;
+    };
+
+    /**
+     * Closes the Add Variable panel without saving changes
+     */
+    const handleCloseAddVariable = () => {
+      isAddVariableOpen.value = false;
+      selectedVariableToEdit.value = null;
+      // Don't reload dashboard - user is canceling/discarding the variable creation
+    };
+
+    /**
+     * Handles saving a variable - reloads dashboard to reflect the saved variable
+     */
+    const handleSaveVariable = async () => {
+      isAddVariableOpen.value = false;
+      
+      // Before reloading, check if this was a new variable (not an edit)
+      const wasNewVariable = !selectedVariableToEdit.value;
+      
+      selectedVariableToEdit.value = null;
+      
+      // Refresh the dashboard data to include the newly saved variable
+      await loadDashboard();
+      
+      // If it was a new variable, track it for potential cleanup on discard
+      if (wasNewVariable) {
+        // Find the newly added variable(s) by comparing with initial list
+        const currentVariableNames =
+          currentDashboardData.data?.variables?.list?.map((v: any) => v.name) ||
+          [];
+        const newVariables = currentVariableNames.filter(
+          (name: string) => !initialVariableNames.value.includes(name),
+        );
+        // Add any new variables to our tracking list (avoid duplicates)
+        newVariables.forEach((name: string) => {
+          if (!variablesCreatedInSession.value.includes(name)) {
+            variablesCreatedInSession.value.push(name);
+          }
+          
+          // Check if this variable uses "current_panel" reference
+          const variable = currentDashboardData.data?.variables?.list?.find(
+            (v: any) => v.name === name,
+          );
+          if (variable?.panels?.includes("current_panel")) {
+            if (!variablesWithCurrentPanel.value.includes(name)) {
+              variablesWithCurrentPanel.value.push(name);
+            }
+          }
+        });
+      }
+    };
+
     return {
       t,
       updateDateTime,
@@ -2100,6 +2236,11 @@ export default defineComponent({
       outlinedWarning,
       symOutlinedDataInfoAlert,
       outlinedRunningWithErrors,
+      isAddVariableOpen,
+      selectedVariableToEdit,
+      handleOpenAddVariable,
+      handleCloseAddVariable,
+      handleSaveVariable,
     };
   },
   methods: {
@@ -2168,5 +2309,46 @@ export default defineComponent({
 
 .warning {
   color: var(--q-warning);
+}
+
+.add-variable-drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 6000;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.add-variable-drawer-panel {
+  width: 900px;
+  height: 100vh;
+  background-color: white;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  border-radius: 0 !important;
+
+  :deep(.column.full-height) {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.scrollable-content) {
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+  }
+
+  :deep(.sticky-footer) {
+    padding: 6px 6px;
+    margin-top: auto;
+  }
+}
+
+.theme-dark .add-variable-drawer-panel {
+  background-color: #1a1a1a;
 }
 </style>
