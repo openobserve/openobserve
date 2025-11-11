@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="col-12 q-mt-md">
+          <div class="col-12 q-mt-md tw-inline-flex">
             <q-toggle
               data-test="add-destination-skip-tls-verify-toggle"
               class="o2-toggle-button-xs q-mt-sm tw-inline-flex"
@@ -654,11 +654,11 @@ const connectionNotes = computed(() => {
         title: "OpenObserve Connection Details",
         steps: [
           "Log in to your OpenObserve instance",
-          "Navigate to Settings → API Keys",
-          "Create a new API key or use an existing one",
-          "Use your OpenObserve instance URL (e.g., https://your-instance.openobserve.ai)",
-          "The endpoint suffix will be automatically added: /api/default/_json",
-          "Add headers: Authorization: Basic <base64(email:api_key)>",
+          "Navigate to 'Data sources' navigation menu",
+          "Navigate to 'Custom' tab on data sources page",
+          "Go to respective sub-tab and copy OpenObserve instance URL (e.g., https://your-instance.openobserve.ai)",
+          "The endpoint suffix will be automatically added: /api/default/default/_json",
+          "Add headers: Authorization: Basic <OpenObserve_Token>",
         ],
         example: "https://your-instance.openobserve.ai",
       };
