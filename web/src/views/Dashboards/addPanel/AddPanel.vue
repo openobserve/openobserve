@@ -736,6 +736,7 @@ import {
   getDashboard,
   getPanel,
   updatePanel,
+  updateDashboard,
   deleteVariable,
 } from "../../../utils/commons";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
@@ -1407,23 +1408,16 @@ export default defineComponent({
     };
 
     const goBack = async () => {
-      // Clean up variables created during this session (on discard)
+      // If there were variables created during this session, reload the dashboard
+      // to discard the in-memory changes (since they were never persisted to DB)
       if (variablesCreatedInSession.value.length > 0) {
-        const dashId = route.query.dashboard + "";
-        const folderId = route.query.folder ?? "default";
-        
-        // Delete all variables that were created during this edit session
-        for (const variableName of variablesCreatedInSession.value) {
-          try {
-            await deleteVariable(store, dashId, variableName, folderId);
-          } catch (error) {
-            console.error(`Failed to delete variable ${variableName}:`, error);
-          }
-        }
-        
-        // Clear the tracking array
-        variablesCreatedInSession.value = [];
+        // Reload dashboard to get clean state without the temporary variables
+        await loadDashboard();
       }
+      
+      // Clear tracking arrays
+      variablesCreatedInSession.value = [];
+      variablesWithCurrentPanel.value = [];
       
       return router.push({
         path: "/dashboards/view",
@@ -1549,19 +1543,86 @@ export default defineComponent({
       try {
         // console.time("savePanelChangesToDashboard");
         if (editMode.value) {
-          const errorMessageOnSave = await updatePanel(
-            store,
-            dashId,
-            dashboardPanelData.data,
-            route.query.folder ?? "default",
-            route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
-          );
-          if (errorMessageOnSave instanceof Error) {
-            errorData.errors.push(
-              "Error saving panel configuration : " +
-                errorMessageOnSave.message,
+          console.log('[AddPanel] Edit mode - variables created in session:', variablesCreatedInSession.value);
+          
+          // If variables were created during edit session, we need to save them too
+          if (variablesCreatedInSession.value.length > 0) {
+            console.log('[AddPanel] Saving variables along with panel update');
+            
+            // Update variables with "current_panel" to use the actual panel ID
+            const currentPanelId = route.query.panelId as string;
+            console.log('[AddPanel] Current panel ID:', currentPanelId);
+            
+            variablesWithCurrentPanel.value.forEach((variableName) => {
+              const variable = currentDashboardData.data?.variables?.list?.find(
+                (v: any) => v.name === variableName,
+              );
+              if (variable && variable.panels && currentPanelId) {
+                const index = variable.panels.indexOf("current_panel");
+                if (index !== -1) {
+                  console.log(`[AddPanel] Replacing current_panel with ${currentPanelId} for variable:`, variableName);
+                  variable.panels[index] = currentPanelId;
+                }
+              }
+            });
+            
+            // Update the panel data in currentDashboardData
+            const tab = currentDashboardData.data.tabs.find(
+              (t: any) => t.tabId === (route.query.tab ?? currentDashboardData.data.tabs[0].tabId)
             );
-            return;
+            if (tab) {
+              const panelIndex = tab.panels.findIndex(
+                (p: any) => p.id === dashboardPanelData.data.id
+              );
+              if (panelIndex !== -1) {
+                console.log('[AddPanel] Updating panel in tab at index:', panelIndex);
+                tab.panels[panelIndex] = dashboardPanelData.data;
+              }
+            }
+            
+            console.log('[AddPanel] Dashboard data before save:', {
+              variablesCount: currentDashboardData.data?.variables?.list?.length,
+              variables: currentDashboardData.data?.variables?.list?.map((v: any) => ({
+                name: v.name,
+                panels: v.panels
+              }))
+            });
+            
+            // Save the entire dashboard (including new variables and updated panel)
+            const errorMessageOnSave = await updateDashboard(
+              store,
+              store.state.selectedOrganization.identifier,
+              dashId,
+              currentDashboardData.data,
+              route.query.folder ?? "default",
+            );
+            
+            if (errorMessageOnSave instanceof Error) {
+              errorData.errors.push(
+                "Error saving panel configuration : " +
+                  errorMessageOnSave.message,
+              );
+              return;
+            }
+            
+            console.log('[AddPanel] Dashboard saved successfully with variables');
+          } else {
+            console.log('[AddPanel] No new variables, just updating panel');
+            // No new variables, just update the panel
+            const errorMessageOnSave = await updatePanel(
+              store,
+              dashId,
+              dashboardPanelData.data,
+              route.query.folder ?? "default",
+              route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+            );
+            if (errorMessageOnSave instanceof Error) {
+              errorData.errors.push(
+                "Error saving panel configuration : " +
+                  errorMessageOnSave.message,
+              );
+              return;
+            }
           }
         } else {
           const panelId =
@@ -1570,18 +1631,62 @@ export default defineComponent({
           dashboardPanelData.data.id = panelId;
           chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
 
-          // Prepare variables to update (if any were created during this session)
-          const variablesToUpdate = variablesCreatedInSession.value.length > 0
-            ? { variableNames: variablesCreatedInSession.value, newPanelId: panelId }
-            : undefined;
+          // Update variables with "current_panel" to use the actual panel ID
+          if (variablesWithCurrentPanel.value.length > 0) {
+            variablesWithCurrentPanel.value.forEach((variableName) => {
+              const variable = currentDashboardData.data?.variables?.list?.find(
+                (v: any) => v.name === variableName,
+              );
+              if (variable && variable.panels) {
+                const index = variable.panels.indexOf("current_panel");
+                if (index !== -1) {
+                  variable.panels[index] = panelId;
+                }
+              }
+            });
+          }
 
-          const errorMessageOnSave = await addPanel(
+          // Add panel to currentDashboardData
+          const tab = currentDashboardData.data.tabs.find(
+            (t: any) => t.tabId === (route.query.tab ?? currentDashboardData.data.tabs[0].tabId)
+          );
+          
+          if (!tab.panels) {
+            tab.panels = [];
+          }
+
+          const maxI = Math.max(0, ...tab.panels.map((p: any) => p.layout?.i || 0));
+          const maxY = Math.max(0, ...tab.panels.map((p: any) => p.layout?.y || 0));
+          const lastPanel = tab.panels.find((p: any) => p.layout?.y === maxY);
+
+          const newLayoutObj = {
+            x: 0,
+            y: tab.panels?.length > 0 ? maxY + 10 : 0,
+            w: 96,
+            h: 18,
+            i: maxI + 1,
+            panelId: panelId,
+            static: false,
+          };
+
+          // Check if last panel has enough space to add new panel
+          if (tab.panels.length > 0) {
+            if (lastPanel && lastPanel.layout.w <= 48) {
+              newLayoutObj.x = 48;
+              newLayoutObj.y = maxY;
+            }
+          }
+
+          dashboardPanelData.data.layout = newLayoutObj;
+          tab.panels.push(dashboardPanelData.data);
+
+          // Save the entire dashboard with variables and panel in a single API call
+          const errorMessageOnSave = await updateDashboard(
             store,
+            store.state.selectedOrganization.identifier,
             dashId,
-            dashboardPanelData.data,
+            currentDashboardData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
-            variablesToUpdate,
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
@@ -2094,45 +2199,64 @@ export default defineComponent({
     };
 
     /**
-     * Handles saving a variable - reloads dashboard to reflect the saved variable
+     * Handles saving a variable in memory only (not persisted to DB until panel save)
+     * This is called when user clicks "Save" in the Add Variable drawer
      */
-    const handleSaveVariable = async () => {
+    const handleSaveVariable = async (variablePayload: any) => {
+      const { variableData, isEdit, oldVariableName } = variablePayload;
+      
       isAddVariableOpen.value = false;
-      
-      // Before reloading, check if this was a new variable (not an edit)
-      const wasNewVariable = !selectedVariableToEdit.value;
-      
       selectedVariableToEdit.value = null;
       
-      // Refresh the dashboard data to include the newly saved variable
-      await loadDashboard();
-      
-      // If it was a new variable, track it for potential cleanup on discard
-      if (wasNewVariable) {
-        // Find the newly added variable(s) by comparing with initial list
-        const currentVariableNames =
-          currentDashboardData.data?.variables?.list?.map((v: any) => v.name) ||
-          [];
-        const newVariables = currentVariableNames.filter(
-          (name: string) => !initialVariableNames.value.includes(name),
-        );
-        // Add any new variables to our tracking list (avoid duplicates)
-        newVariables.forEach((name: string) => {
-          if (!variablesCreatedInSession.value.includes(name)) {
-            variablesCreatedInSession.value.push(name);
-          }
-          
-          // Check if this variable uses "current_panel" reference
-          const variable = currentDashboardData.data?.variables?.list?.find(
-            (v: any) => v.name === name,
-          );
-          if (variable?.panels?.includes("current_panel")) {
-            if (!variablesWithCurrentPanel.value.includes(name)) {
-              variablesWithCurrentPanel.value.push(name);
-            }
-          }
-        });
+      // Update the in-memory dashboard data (dummy JSON) - do NOT make API call
+      if (!currentDashboardData.data.variables) {
+        currentDashboardData.data.variables = { list: [] };
       }
+      
+      console.log('[AddPanel] Current variables before save:', 
+        currentDashboardData.data.variables.list.map((v: any) => v.name));
+      
+      if (isEdit && oldVariableName) {
+        // Update existing variable in memory
+        const variableIndex = currentDashboardData.data.variables.list.findIndex(
+          (v: any) => v.name === oldVariableName,
+        );
+        if (variableIndex !== -1) {
+          currentDashboardData.data.variables.list[variableIndex] = { ...variableData };
+          console.log('[AddPanel] Updated variable:', variableData.name);
+        }
+      } else {
+        // Add new variable to memory
+        currentDashboardData.data.variables.list.push({ ...variableData });
+        console.log('[AddPanel] Added new variable:', variableData.name);
+        
+        // Track it for potential cleanup on discard
+        if (!variablesCreatedInSession.value.includes(variableData.name)) {
+          variablesCreatedInSession.value.push(variableData.name);
+        }
+        
+        // Check if this variable uses "current_panel" reference
+        if (variableData.panels?.includes("current_panel")) {
+          if (!variablesWithCurrentPanel.value.includes(variableData.name)) {
+            variablesWithCurrentPanel.value.push(variableData.name);
+          }
+        }
+      }
+      
+      console.log('[AddPanel] Variables after save:', 
+        currentDashboardData.data.variables.list.map((v: any) => v.name));
+      
+      // Force reactivity by creating a new object reference
+      currentDashboardData.data = { 
+        ...currentDashboardData.data,
+        variables: {
+          ...currentDashboardData.data.variables,
+          list: [...currentDashboardData.data.variables.list]
+        }
+      };
+      
+      console.log('[AddPanel] Reactivity triggered, new variables list:', 
+        currentDashboardData.data.variables.list.map((v: any) => v.name));
     };
 
     return {
