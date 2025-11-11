@@ -202,6 +202,7 @@ impl FlightService for FlightServiceImpl {
             .with_options(write_options)
             .build(FlightSenderStream::new(
                 trace_id.to_string(),
+                is_super_cluster,
                 stream,
                 defer,
                 start,
@@ -280,15 +281,19 @@ impl FlightService for FlightServiceImpl {
 
 struct FlightSenderStream {
     trace_id: String,
+    is_super: bool,
     stream: SendableRecordBatchStream,
     defer: Option<AsyncDefer>,
     start: std::time::Instant,
     timeout: u64,
+    req_id: u64,
+    print_key_event: bool,
 }
 
 impl FlightSenderStream {
     fn new(
         trace_id: String,
+        is_super: bool,
         stream: SendableRecordBatchStream,
         defer: Option<AsyncDefer>,
         start: std::time::Instant,
@@ -296,10 +301,13 @@ impl FlightSenderStream {
     ) -> Self {
         Self {
             trace_id,
+            is_super,
             stream,
             defer,
             start,
             timeout,
+            req_id: 0,
+            print_key_event: config::get_config().common.print_key_event,
         }
     }
 }
@@ -315,8 +323,30 @@ impl Stream for FlightSenderStream {
             return Poll::Ready(None);
         }
         match self.stream.poll_next_unpin(ctx) {
-            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
-            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(Some(Ok(batch))) => {
+                self.req_id += 1;
+                if self.print_key_event && config::utils::util::is_power_of_two(self.req_id) {
+                    log::info!(
+                        "[trace_id {}] flight->search: stream Poll::Ready(#{}) RecordBatch, is_super: {}, took: {} ms",
+                        self.trace_id,
+                        self.req_id,
+                        self.is_super,
+                        self.start.elapsed().as_millis()
+                    );
+                }
+                Poll::Ready(Some(Ok(batch)))
+            }
+            Poll::Ready(None) => {
+                if self.print_key_event {
+                    log::info!(
+                        "[trace_id {}] flight->search: stream Poll::Ready(None) is_super: {}, took: {} ms",
+                        self.trace_id,
+                        self.is_super,
+                        self.start.elapsed().as_millis()
+                    );
+                }
+                Poll::Ready(None)
+            }
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(Err(e))) => {
                 log::error!(
@@ -337,8 +367,9 @@ impl Drop for FlightSenderStream {
     fn drop(&mut self) {
         let end = self.start.elapsed().as_millis();
         log::info!(
-            "[trace_id {}] flight->search: stream end, took: {} ms",
+            "[trace_id {}] flight->search: stream end, is_super: {}, took: {} ms",
             self.trace_id,
+            self.is_super,
             end
         );
 
@@ -355,8 +386,9 @@ impl Drop for FlightSenderStream {
             drop(defer);
         } else {
             log::info!(
-                "[trace_id {}] flight->search: drop FlightSenderStream",
-                self.trace_id
+                "[trace_id {}] flight->search: drop FlightSenderStream, is_super: {}",
+                self.trace_id,
+                self.is_super
             );
             // clear session data
             clear_session_data(&self.trace_id);

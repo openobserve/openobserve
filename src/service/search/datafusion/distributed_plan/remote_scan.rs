@@ -384,7 +384,7 @@ async fn get_remote_batch(
     .into_inner();
 
     log::info!(
-        "[trace_id {}] flight->search: prepare to response node: {} , name: {}, is_super: {}, is_querier: {}",
+        "[trace_id {}] flight->search: prepare to response node: {}, name: {}, is_super: {}, is_querier: {}",
         trace_id,
         &node.get_grpc_addr(),
         node.get_name(),
@@ -397,7 +397,7 @@ async fn get_remote_batch(
         Ok(Some(flight_data)) => flight_data,
         Ok(None) => {
             log::error!(
-                "[trace_id {}] flight->search: response node: {} , name: {}, is_super: {}, is_querier: {}, err: {}, took: {} ms",
+                "[trace_id {}] flight->search: response node: {}, name: {}, is_super: {}, is_querier: {}, err: {}, took: {} ms",
                 trace_id,
                 node.get_grpc_addr(),
                 node.get_name(),
@@ -525,9 +525,12 @@ struct FlightStream {
     files: i64,
     scan_size: i64,
     num_rows: usize,
+    num_bytes: usize,
     partial_err: Arc<Mutex<String>>,
     start: std::time::Instant,
     timeout: u64,
+    req_id: u64,
+    print_key_event: bool,
 }
 
 impl FlightStream {
@@ -557,9 +560,12 @@ impl FlightStream {
             files,
             scan_size,
             num_rows: 0,
+            num_bytes: 0,
             partial_err,
             start,
             timeout,
+            req_id: 0,
+            print_key_event: config::get_config().common.print_key_event,
         }
     }
 
@@ -597,7 +603,7 @@ impl FlightStream {
                 };
                 let event = search_inspector_fields(
                     format!(
-                        "[trace_id {}] flight->search: response node: {} , name: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
+                        "[trace_id {}] flight->search: response node: {}, name: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
                         self.trace_id,
                         self.node.get_grpc_addr(),
                         self.node.get_name(),
@@ -646,7 +652,7 @@ impl Stream for FlightStream {
         if self.start.elapsed().as_secs() > self.timeout {
             let e = tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout");
             log::error!(
-                "[trace_id {}] flight->search: response node: {} , name: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
+                "[trace_id {}] flight->search: response node: {}, name: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
                 self.trace_id,
                 self.node.get_grpc_addr(),
                 self.node.get_name(),
@@ -662,19 +668,47 @@ impl Stream for FlightStream {
         let dictionaries_by_field = HashMap::new();
         match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(flight_data))) => {
+                let num_bytes = flight_data.data_header.len()
+                    + flight_data.app_metadata.len()
+                    + flight_data.data_body.len();
                 let record_batch = flight_data_to_arrow_batch(
                     &flight_data,
                     self.schema.clone(),
                     &dictionaries_by_field,
                 )?;
                 self.num_rows += record_batch.num_rows();
+                self.num_bytes += num_bytes;
+                self.req_id += 1;
+                if self.print_key_event && config::utils::util::is_power_of_two(self.req_id) {
+                    log::info!(
+                        "[trace_id {}] flight->search: stream receive RecordBatch #{} from node: {}, name: {}, is_super: {}, bytes: {num_bytes}, took: {} ms",
+                        self.trace_id,
+                        self.req_id,
+                        self.node.get_grpc_addr(),
+                        self.node.get_name(),
+                        self.is_super,
+                        self.start.elapsed().as_millis()
+                    );
+                }
                 Poll::Ready(Some(Ok(record_batch)))
             }
-            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(None) => {
+                if self.print_key_event {
+                    log::info!(
+                        "[trace_id {}] flight->search: stream receive Poll::Ready(None) from node: {}, name: {}, is_super: {}, took: {} ms",
+                        self.trace_id,
+                        self.node.get_grpc_addr(),
+                        self.node.get_name(),
+                        self.is_super,
+                        self.start.elapsed().as_millis()
+                    );
+                }
+                Poll::Ready(None)
+            }
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(Err(e))) => {
                 log::error!(
-                    "[trace_id {}] flight->search: response node: {} , name: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
+                    "[trace_id {}] flight->search: response node: {}, name: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
                     self.trace_id,
                     self.node.get_grpc_addr(),
                     self.node.get_name(),
@@ -699,7 +733,7 @@ impl Drop for FlightStream {
             log::error!("error creating stream span: {e}");
         }
         log::info!(
-            "[trace_id {}] flight->search: response node: {} , name: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
+            "[trace_id {}] flight->search: response node: {}, name: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, num_bytes: {}, took: {} ms",
             self.trace_id,
             self.node.get_grpc_addr(),
             self.node.get_name(),
@@ -708,6 +742,7 @@ impl Drop for FlightStream {
             self.files,
             self.scan_size / 1024 / 1024,
             self.num_rows,
+            self.num_bytes,
             self.start.elapsed().as_millis()
         );
     }
