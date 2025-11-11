@@ -66,12 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               borderless
               use-input
-              hide-selected
-              fill-input
               input-debounce="0"
               :options="filteredAlertOptions"
+              option-label="label"
+              option-value="value"
               @filter="filterAlertOptions"
-              @input-value="setSearchQuery"
               @update:model-value="onAlertSelected"
               :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
               data-test="alert-history-search-select"
@@ -562,9 +561,9 @@ const $q = useQuasar();
 const loading = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
-const selectedAlert = ref<string | null>(null);
+const selectedAlert = ref<any>(null);
 const allAlerts = ref<any[]>([]);
-const filteredAlertOptions = ref<string[]>([]);
+const filteredAlertOptions = ref<any[]>([]);
 const pagination = ref({
   page: 1,
   rowsPerPage: 20,
@@ -720,8 +719,13 @@ const fetchAlertsList = async () => {
     );
 
     if (res.data && res.data.list) {
-      // Extract alert names and sort them
-      allAlerts.value = res.data.list.map((alert: any) => alert.name).sort();
+      // Store complete alert objects and sort by name
+      allAlerts.value = res.data.list
+        .map((alert: any) => ({
+          label: alert.name,
+          value: alert.alert_id,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
       filteredAlertOptions.value = [...allAlerts.value];
     }
   } catch (error: any) {
@@ -734,18 +738,19 @@ const filterAlertOptions = (val: string, update: any) => {
   update(() => {
     const needle = val.toLowerCase();
     filteredAlertOptions.value = allAlerts.value.filter((v) =>
-      v.toLowerCase().includes(needle),
+      v.label.toLowerCase().includes(needle),
     );
   });
 };
 
-const setSearchQuery = (val: string) => {
-  searchQuery.value = val;
-};
-
-const onAlertSelected = (val: string | null) => {
+const onAlertSelected = (val: any) => {
   if (val) {
-    searchQuery.value = val;
+    // Extract the alert_id from the selected object
+    if (typeof val === 'object' && val.value) {
+      searchQuery.value = val.value;
+    } else if (typeof val === 'string') {
+      searchQuery.value = val;
+    }
   }
 };
 
@@ -780,7 +785,7 @@ const fetchAlertHistory = async () => {
 
     // Add alert_name filter if search query is provided
     if (searchQuery.value && searchQuery.value.trim()) {
-      query.alert_name = searchQuery.value.trim();
+      query.alert_id = searchQuery.value.trim();
     }
 
     const response = await alertsService.getHistory(org, query);
