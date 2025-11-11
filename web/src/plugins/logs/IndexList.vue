@@ -1017,6 +1017,9 @@ export default defineComponent({
             if (pagination.value) resetPagination();
             searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
           }
+
+          if(showOnlyInterestingFields.value)if (pagination.value) resetPagination();
+          
           showOnlyInterestingFields.value = false;
         }
       },
