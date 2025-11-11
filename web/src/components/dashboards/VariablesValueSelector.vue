@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="item.name + index"
       :data-test="`dashboard-variable-${item}-selector`"
     >
-      <div v-if="item.type == 'query_values'">
+      <div v-if="item.type == 'query_values' && (item._isCurrentLevel !== false)">
         <VariableQueryValueSelector
           class="q-mr-lg q-mt-xs"
           v-show="!item.hideOnDashboard"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @search="onVariableSearch(index, $event)"
         />
       </div>
-      <div v-else-if="item.type == 'constant'">
+      <div v-else-if="item.type == 'constant' && (item._isCurrentLevel !== false)">
         <q-input
           v-show="!item.hideOnDashboard"
           class="q-mr-lg q-mt-xs"
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(index)"
          borderless hide-bottom-space></q-input>
       </div>
-      <div v-else-if="item.type == 'textbox'">
+      <div v-else-if="item.type == 'textbox' && (item._isCurrentLevel !== false)">
         <q-input
           v-show="!item.hideOnDashboard"
           class="q-mr-lg q-mt-xs"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(index)"
          borderless hide-bottom-space></q-input>
       </div>
-      <div v-else-if="item.type == 'custom'">
+      <div v-else-if="item.type == 'custom' && (item._isCurrentLevel !== false)">
         <VariableCustomValueSelector
           v-show="!item.hideOnDashboard"
           class="q-mr-lg q-mt-xs"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(index)"
         />
       </div>
-      <div v-else-if="item.type == 'dynamic_filters'">
+      <div v-else-if="item.type == 'dynamic_filters' && (item._isCurrentLevel !== false)">
         <VariableAdHocValueSelector
           class="q-mr-lg q-mt-xs"
           v-model="item.value"
