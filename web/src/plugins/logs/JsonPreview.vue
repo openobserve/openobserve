@@ -534,15 +534,8 @@ export default {
     };
 
     onBeforeMount(() => {
-      searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
-        if (
-          item.streams?.length == searchObj.data.stream.selectedStream.length
-        ) {
-          multiStreamFields.value.push(item.name);
-        }
-      });
       setViewTraceBtn();
-
+      updateMultiStreamFields();
       previewId.value = getUUID();
     });
 
@@ -662,12 +655,31 @@ export default {
       }
     };
 
+    const updateMultiStreamFields = () => {
+      searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
+        if (
+          item.streams?.length == searchObj.data.stream.selectedStream.length
+        ) {
+          multiStreamFields.value.push(item.name);
+        }
+      });
+    }
+
     watch(activeTab, async () => {
       if (activeTab.value === "unflattened") {
         unflattendData.value = "";
         await getOriginalData();
       }
     });
+
+    watch(()=>searchObj.data.stream.selectedStreamFields,
+    ()=>{
+       updateMultiStreamFields();
+    },
+    {
+      deep:true
+    }
+  );
 
     const filterStreamFn = (val: any = "") => {
       filteredTracesStreamOptions.value = tracesStreams.value.filter(
