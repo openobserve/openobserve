@@ -44,6 +44,7 @@ impl From<meta_dest::Destination> for Destination {
                 meta_dest::DestinationType::Http(endpoint) => Self {
                     name: value.name,
                     url: endpoint.url,
+                    url_suffix: endpoint.url_suffix.clone(),
                     method: endpoint.method,
                     skip_tls_verify: endpoint.skip_tls_verify,
                     headers: endpoint.headers,
@@ -59,6 +60,9 @@ impl From<meta_dest::Destination> for Destination {
                     #[cfg(feature = "enterprise")]
                     action_id: endpoint.action_id,
                     output_format: endpoint.output_format,
+                    destination_type_name: endpoint.destination_type,
+                    org_identifier: endpoint.org_identifier,
+                    stream_name: endpoint.stream_name,
                     ..Default::default()
                 },
                 meta_dest::DestinationType::Sns(aws_sns) => Self {
@@ -73,11 +77,15 @@ impl From<meta_dest::Destination> for Destination {
             meta_dest::Module::Pipeline { endpoint } => Self {
                 name: value.name,
                 url: endpoint.url,
+                url_suffix: endpoint.url_suffix.clone(),
                 method: endpoint.method,
                 skip_tls_verify: endpoint.skip_tls_verify,
                 headers: endpoint.headers,
                 destination_type: DestinationType::Http,
                 output_format: endpoint.output_format,
+                destination_type_name: endpoint.destination_type,
+                org_identifier: endpoint.org_identifier,
+                stream_name: endpoint.stream_name,
                 ..Default::default()
             },
         }
@@ -95,11 +103,15 @@ impl Destination {
                     DestinationType::Http => {
                         meta_dest::DestinationType::Http(meta_dest::Endpoint {
                             url: self.url,
+                            url_suffix: self.url_suffix.clone(),
                             method: self.method,
                             skip_tls_verify: self.skip_tls_verify,
                             headers: self.headers,
                             action_id: None,
                             output_format: self.output_format,
+                            destination_type: self.destination_type_name.clone(),
+                            org_identifier: self.org_identifier.clone(),
+                            stream_name: self.stream_name.clone(),
                         })
                     }
                     DestinationType::Sns => meta_dest::DestinationType::Sns(meta_dest::AwsSns {
@@ -113,6 +125,7 @@ impl Destination {
                                 .map_err(DestinationError::InvalidActionId)?;
                             meta_dest::DestinationType::Http(meta_dest::Endpoint {
                                 url: action_endpoint.url,
+                                url_suffix: self.url_suffix.clone(),
                                 method: if action_endpoint.method == reqwest::Method::POST {
                                     meta_dest::HTTPType::POST
                                 } else {
@@ -122,6 +135,9 @@ impl Destination {
                                 headers: None,
                                 action_id: Some(action_id),
                                 output_format: self.output_format,
+                                destination_type: self.destination_type_name.clone(),
+                                org_identifier: self.org_identifier.clone(),
+                                stream_name: self.stream_name.clone(),
                             })
                         } else {
                             return Err(DestinationError::InvalidActionId(anyhow::anyhow!(
@@ -143,11 +159,15 @@ impl Destination {
             _ => {
                 let endpoint = meta_dest::Endpoint {
                     url: self.url,
+                    url_suffix: self.url_suffix,
                     method: self.method,
                     skip_tls_verify: self.skip_tls_verify,
                     headers: self.headers,
                     action_id: None,
                     output_format: self.output_format,
+                    destination_type: self.destination_type_name,
+                    org_identifier: self.org_identifier,
+                    stream_name: self.stream_name,
                 };
                 Ok(meta_dest::Destination {
                     id: None,
@@ -205,6 +225,9 @@ pub struct Destination {
     /// Required for `Http` destination_type
     #[serde(default)]
     pub url: String,
+    /// Optional URL suffix (e.g., /api/org/stream/_json for OpenObserve)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url_suffix: Option<String>,
     /// Required for `Http` destination_type
     #[serde(default)]
     pub method: meta_dest::HTTPType,
@@ -231,6 +254,15 @@ pub struct Destination {
     pub action_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_format: Option<meta_dest::HTTPOutputFormat>,
+    /// Specific destination type identifier (e.g., "openobserve", "splunk", "elasticsearch")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_type_name: Option<String>,
+    /// OpenObserve-specific: organization identifier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub org_identifier: Option<String>,
+    /// OpenObserve-specific: stream name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_name: Option<String>,
 }
 
 #[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone, ToSchema)]

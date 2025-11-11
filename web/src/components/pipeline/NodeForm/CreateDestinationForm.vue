@@ -828,6 +828,9 @@ const createDestination = () => {
     name: formData.value.name,
     type: "http",
     output_format: formData.value.output_format,
+    destination_type_name: formData.value.destination_type,
+    org_identifier: formData.value.org_identifier,
+    stream_name: formData.value.stream_name,
   };
 
   // Check if we're in edit mode

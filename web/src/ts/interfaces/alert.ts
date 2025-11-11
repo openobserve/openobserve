@@ -95,6 +95,7 @@ export interface Headers {
 export interface Destination {
   name: string;
   url?: string;
+  url_suffix?: string;
   method?: string;
   skip_tls_verify?: boolean;
   headers?: Headers;
@@ -111,6 +112,7 @@ export interface Destination {
 export interface DestinationPayload {
   name: string;
   url?: string;
+  url_suffix?: string;
   method?: string;
   skip_tls_verify?: boolean;
   headers?: Headers;
@@ -119,6 +121,9 @@ export interface DestinationPayload {
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
   output_format?: "json" | "ndjson";
+  destination_type?: string;
+  org_identifier?: string;
+  stream_name?: string;
 }
 
 // Destination object which is modified in frontend to display in table and form

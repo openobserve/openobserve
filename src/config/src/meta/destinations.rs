@@ -90,6 +90,8 @@ pub struct Email {
 #[serde(default)]
 pub struct Endpoint {
     pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url_suffix: Option<String>,
     #[serde(default)]
     pub method: HTTPType,
     #[serde(default)]
@@ -100,6 +102,15 @@ pub struct Endpoint {
     pub action_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_format: Option<HTTPOutputFormat>,
+    /// Destination type (e.g., "openobserve", "splunk", "elasticsearch", "custom")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_type: Option<String>,
+    /// OpenObserve-specific: organization identifier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub org_identifier: Option<String>,
+    /// OpenObserve-specific: stream name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_name: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -244,19 +255,27 @@ mod tests {
 
         let endpoint = Endpoint {
             url: "https://api.example.com".to_string(),
+            url_suffix: Some("/api/v1/data".to_string()),
             method: HTTPType::POST,
             skip_tls_verify: false,
             headers: Some(headers.clone()),
             action_id: Some("action_123".to_string()),
             output_format: Some(HTTPOutputFormat::JSON),
+            destination_type: Some("openobserve".to_string()),
+            org_identifier: Some("default".to_string()),
+            stream_name: Some("default".to_string()),
         };
 
         assert_eq!(endpoint.url, "https://api.example.com");
+        assert_eq!(endpoint.url_suffix, Some("/api/v1/data".to_string()));
         assert_eq!(endpoint.method, HTTPType::POST);
         assert!(!endpoint.skip_tls_verify);
         assert_eq!(endpoint.headers, Some(headers));
         assert_eq!(endpoint.action_id, Some("action_123".to_string()));
         assert_eq!(endpoint.output_format, Some(HTTPOutputFormat::JSON));
+        assert_eq!(endpoint.destination_type, Some("openobserve".to_string()));
+        assert_eq!(endpoint.org_identifier, Some("default".to_string()));
+        assert_eq!(endpoint.stream_name, Some("default".to_string()));
     }
 
     #[test]
@@ -320,11 +339,15 @@ mod tests {
     fn test_destination_type_http() {
         let endpoint = Endpoint {
             url: "https://webhook.example.com".to_string(),
+            url_suffix: None,
             method: HTTPType::POST,
             skip_tls_verify: true,
             headers: None,
             action_id: None,
             output_format: None,
+            destination_type: None,
+            org_identifier: None,
+            stream_name: None,
         };
 
         let dest_type = DestinationType::Http(endpoint.clone());
@@ -378,11 +401,15 @@ mod tests {
     fn test_module_pipeline() {
         let endpoint = Endpoint {
             url: "https://pipeline.example.com".to_string(),
+            url_suffix: None,
             method: HTTPType::PUT,
             skip_tls_verify: false,
             headers: None,
             action_id: None,
             output_format: None,
+            destination_type: None,
+            org_identifier: None,
+            stream_name: None,
         };
 
         let module = Module::Pipeline {
