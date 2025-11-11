@@ -22,12 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pt-[0.325rem]">
       <div class="card-container tw-mb-[0.625rem]">
         <div
-          class="flex justify-between full-width tw-px-4 items-center tw-border-b-[1px]"
-          :class="
-            store.state.theme === 'dark'
-              ? 'tw-border-gray-500'
-              : 'tw-border-gray-200'
-          "
+          class="flex justify-between full-width tw-h-[68px] tw-px-2 tw-py-3"
         >
           <div class="flex items-center">
             <q-btn
@@ -125,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="tw-w-full tw-h-full tw-px-[0.625rem]">
-      <div class="alert-history-table card-container tw-h-[calc(100vh-105px)]">
+      <div class="alert-history-table card-container tw-h-[calc(100vh-130px)]">
         <q-table
           data-test="alert-history-table"
           ref="qTable"
@@ -138,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           binary-state-sort
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          style="width: 100%; height: calc(100vh - 105px)"
+          style="width: 100%; height: calc(100vh - 130px)"
         >
           <template #no-data>
             <div class="tw-h-[100vh] full-width">
@@ -259,13 +254,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="scope">
-            <QTablePagination
-              :scope="scope"
-              :position="'bottom'"
-              :resultTotal="pagination.rowsNumber"
-              :perPageOptions="rowsPerPageOptions"
-              @update:changeRecordPerPage="changePagination"
-            />
+            <div class="bottom-btn tw-h-[48px] tw-w-full tw-flex tw-items-center">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[120px] tw-mr-md">
+                  {{ pagination.rowsNumber }} {{ t('pipeline.header') }}
+                </div>
+              <QTablePagination
+                :scope="scope"
+                :position="'bottom'"
+                :resultTotal="pagination.rowsNumber"
+                :perPageOptions="rowsPerPageOptions"
+                @update:changeRecordPerPage="changePagination"
+              />
+              </div>
           </template>
           
         </q-table>
