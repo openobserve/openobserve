@@ -110,39 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t('common.nameRequired'),
               ]"
               tabindex="0"
-            >
-            </q-input>
-
-            <!-- OpenObserve-specific fields -->
-            <div
-              v-if="formData.destination_type === 'openobserve'"
-              class="openobserve-fields"
-            >
-              <q-input
-                data-test="add-destination-org-identifier-input"
-                v-model="formData.org_identifier"
-                label="Organization Identifier *"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                tabindex="0"
-              ></q-input>
-              <q-input
-                data-test="add-destination-stream-name-input"
-                v-model="formData.stream_name"
-                label="Stream Name *"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                tabindex="0"
-              ></q-input>
-            </div>
+            ></q-input>
 
             <q-input
               data-test="add-destination-url-input"
@@ -181,6 +149,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rules="[(val: any) => !!val || 'Field is required!']"
               tabindex="0"
             />
+
+            <!-- OpenObserve-specific fields -->
+            <div
+              v-if="formData.destination_type === 'openobserve'"
+              class="openobserve-fields"
+            >
+              <q-input
+                data-test="add-destination-org-identifier-input"
+                v-model="formData.org_identifier"
+                label="Organization Identifier *"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                tabindex="0"
+              ></q-input>
+              <q-input
+                data-test="add-destination-stream-name-input"
+                v-model="formData.stream_name"
+                label="Stream Name *"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                tabindex="0"
+              ></q-input>
+            </div>
+
             <!-- Output Format field - disabled for all except Custom -->
             <q-select
               data-test="add-destination-output-format-select"
@@ -484,14 +484,6 @@ const getUUID = () => {
   return (Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100).toString();
 };
 
-const apiHeaders: Ref<
-  {
-    key: string;
-    value: string;
-    uuid: string;
-  }[]
-> = ref([{ key: "", value: "", uuid: getUUID() }]);
-
 // Helper function to get default headers for each destination type
 const getDefaultHeaders = (destinationType: string) => {
   const headers: Array<{ key: string; value: string; uuid: string }> = [];
@@ -567,6 +559,15 @@ const getDefaultHeaders = (destinationType: string) => {
 
   return headers;
 };
+
+// Initialize apiHeaders with default headers for OpenObserve (the default destination type)
+const apiHeaders: Ref<
+  {
+    key: string;
+    value: string;
+    uuid: string;
+  }[]
+> = ref(getDefaultHeaders("openobserve"));
 
 // Watch destination_type changes to set method, output_format, and headers appropriately
 watch(
