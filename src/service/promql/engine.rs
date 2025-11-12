@@ -372,9 +372,9 @@ impl Engine {
 
         // For each metric, select appropriate samples at each evaluation timestamp
         // TODO: make it parallel
-        let mut result = Vec::new();
+        let mut result = Vec::with_capacity(metrics_cache.len());
         for metric in metrics_cache {
-            let mut selected_samples = Vec::new();
+            let mut selected_samples = Vec::with_capacity(eval_timestamps.len());
 
             for &eval_ts in &eval_timestamps {
                 // Calculate lookback window for this evaluation timestamp
@@ -617,7 +617,7 @@ impl Engine {
             )
             .await?;
 
-        let mut tasks = Vec::new();
+        let mut tasks = Vec::with_capacity(ctxs.len());
         for (ctx, schema, scan_stats) in ctxs {
             let selector = selector.clone();
             let col_filters = &self.col_filters;
