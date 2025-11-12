@@ -1087,7 +1087,7 @@ def test_pipeline_creation_and_action_flatten(create_session, base_url, pipeline
 
     assert resp_create_pipeline.status_code == 400, "Invalid pipeline: After Flatten must be checked if a previous FunctionNode already checked it in the same branch."
 
-@pytest.mark.skip(reason="WIP")
+
 def test_e2e_pipeline_history(create_session, base_url):
     """Running an E2E test for pipeline history API.
 
@@ -1297,7 +1297,7 @@ def test_e2e_pipeline_history(create_session, base_url):
 
     # Wait for pipelines to potentially trigger and generate history
     print("Waiting for pipelines to potentially trigger and generate history...")
-    time.sleep(3)
+    time.sleep(20)
 
     # Step 4: Test 1 - Get all pipeline history for the organization
     print("\n=== Test 1: Get all pipeline history ===")
@@ -1320,10 +1320,10 @@ def test_e2e_pipeline_history(create_session, base_url):
     print(f"Total pipeline history entries: {history_data['total']}")
     print(f"Retrieved {len(history_data['hits'])} history entries")
 
-    # Step 5: Test 2 - Filter history by specific pipeline name
-    print(f"\n=== Test 2: Filter history by pipeline name: {pipeline_name_1} ===")
+    # Step 5: Test 2 - Filter history by specific pipeline_id
+    print(f"\n=== Test 2: Filter history by pipeline_id: {pipeline_id_1} ===")
     resp_filtered_history = session.get(
-        f"{url}api/{org_id}/pipelines/history?pipeline_name={pipeline_name_1}",
+        f"{url}api/{org_id}/pipelines/history?pipeline_id={pipeline_id_1}",
         headers=headers,
     )
     print(f"Filtered pipeline history response: {resp_filtered_history.content}")
@@ -1389,10 +1389,10 @@ def test_e2e_pipeline_history(create_session, base_url):
     )
     print("Invalid time range correctly rejected with 400")
 
-    # Step 9: Test 6 - Test with non-existent pipeline name
-    print("\n=== Test 6: Test with non-existent pipeline name (should return 404) ===")
+    # Step 9: Test 6 - Test with non-existent pipeline_id
+    print("\n=== Test 6: Test with non-existent pipeline_id (should return 404) ===")
     resp_nonexistent = session.get(
-        f"{url}api/{org_id}/pipelines/history?pipeline_name=nonexistent_pipeline_xyz",
+        f"{url}api/{org_id}/pipelines/history?pipeline_id=35MtcBsSRwlYwuuuaybOibAZ4gF",
         headers=headers,
     )
     assert resp_nonexistent.status_code == 404, (
