@@ -577,7 +577,9 @@ const populateFormForEdit = (destination: DestinationData) => {
   formData.value.template = (destination.template as string) || "";
   formData.value.output_format = destination.output_format || "json";
   // Use destination_type_name from backend, fallback to destination_type or default
-  formData.value.destination_type = destination.destination_type_name || destination.destination_type || "openobserve";
+  // Handle null, undefined, and empty string cases
+  const destType = destination.destination_type_name || destination.destination_type;
+  formData.value.destination_type = destType && destType.trim() !== "" ? destType : "openobserve";
 
   // Split URL into hostname and endpoint for all destination types
   const fullUrl = destination.url || "";
