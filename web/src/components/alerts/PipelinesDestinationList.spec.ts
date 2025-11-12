@@ -120,12 +120,14 @@ describe('PipelinesDestinationList Component - Comprehensive Function Tests', ()
     });
 
     it('should initialize columns correctly', () => {
-      expect(wrapper.vm.columns).toHaveLength(5);
+      expect(wrapper.vm.columns).toHaveLength(7);
       expect(wrapper.vm.columns[0].name).toBe('#');
       expect(wrapper.vm.columns[1].name).toBe('name');
-      expect(wrapper.vm.columns[2].name).toBe('url');
-      expect(wrapper.vm.columns[3].name).toBe('method');
-      expect(wrapper.vm.columns[4].name).toBe('actions');
+      expect(wrapper.vm.columns[2].name).toBe('destination_type');
+      expect(wrapper.vm.columns[3].name).toBe('url');
+      expect(wrapper.vm.columns[4].name).toBe('method');
+      expect(wrapper.vm.columns[5].name).toBe('output_format');
+      expect(wrapper.vm.columns[6].name).toBe('actions');
     });
 
     it('should initialize per page options correctly', () => {
@@ -249,9 +251,9 @@ describe('PipelinesDestinationList Component - Comprehensive Function Tests', ()
 
     describe('filterData', () => {
       const mockRows = [
-        { name: 'webhook-destination', url: 'http://example.com' },
-        { name: 'email-destination', url: 'smtp://mail.com' },
-        { name: 'slack-webhook', url: 'http://slack.com' },
+        { name: 'webhook-destination', url: 'http://example.com', method: 'post', destination_type_name: 'openobserve', output_format: 'json' },
+        { name: 'email-destination', url: 'smtp://mail.com', method: 'post', destination_type_name: 'custom', output_format: 'json' },
+        { name: 'slack-webhook', url: 'http://slack.com', method: 'post', destination_type_name: 'custom', output_format: 'ndjson' },
       ];
 
       it('should filter data by name (case insensitive)', () => {
