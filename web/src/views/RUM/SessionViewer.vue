@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row qp-2 full-height tw-px-[0.625rem]">
+  <div class="row qp-2 full-height tw-px-[0.625rem] tw-pt-[0.25rem]">
     <div class="col-12 row items-end tw-pb-[0.625rem]">
       <div class="col-12 row card-container tw-px-[0.625rem] tw-py-[0.625rem]">
         <div
-          class="flex justify-center items-center q-mr-md cursor-pointer"
+          class="flex justify-center items-center q-mr-md cursor-pointer hover:tw-text-[var(--o2-primary-btn-bg)]"
           style="
             border: 1.5px solid;
             border-radius: 50%;
