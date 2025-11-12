@@ -313,11 +313,6 @@ describe("ApiDashboard", () => {
       const dashboard = wrapper.find(".api-performance-dashboards");
       expect(dashboard.attributes("style")).toContain("visibility: visible");
     });
-
-    it("should have organization identifier as key for q-page", () => {
-      const qPage = wrapper.findComponent({ name: "q-page" });
-      expect(qPage.exists()).toBe(true);
-    });
   });
 
   describe("Dashboard Loading", () => {

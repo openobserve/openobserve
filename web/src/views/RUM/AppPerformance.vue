@@ -36,10 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               trigger
+              class="app-performance-auto-refresh-interval !tw-ml-[0.5rem] !tw-pl-0 !tw-overflow-hidden"
               @trigger="refreshData"
             />
             <q-btn
-              class="q-ml-sm"
+              class="q-ml-sm !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)] tw-h-[2rem] !tw-px-[0.325rem] hover:!tw-bg-[var(--o2-hover-accent)]"
               outline
               padding="xs"
               no-caps
@@ -59,10 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <router-view v-slot="{ Component }">
       <keep-alive>
-        <div
-          class="tw-pb-[0.625rem] tw-px-[0.625rem] tw-h-full tw-h-[calc(100%-146px)]"
-        >
-          <div class="card-container tw-py-[0.625rem] tw-h-full">
+        <div class="tw-pb-[0.375rem] tw-px-[0.625rem] !tw-h-[calc(100%-101px)]">
+          <div
+            class="card-container tw-py-[0.625rem] tw-h-full tw-overflow-hidden"
+          >
             <component
               :is="Component"
               :date-time="currentTimeObj"
@@ -425,8 +426,26 @@ export default defineComponent({
   }
 }
 
-.rum-date-time-picker {
-  height: 30px;
+.performance-dashboard {
+  :deep(.card-container) {
+    box-shadow: none !important;
+    &:first-child {
+      padding: 0 !important;
+    }
+  }
+}
+
+:deep(.app-performance-auto-refresh-interval) {
+  .q-btn {
+    height: 1.9rem !important;
+    min-height: 1.9rem !important;
+    border-radius: 0.375rem !important;
+    padding: 2px 4px !important;
+
+    &:hover {
+      background-color: var(--o2-hover-accent);
+    }
+  }
 }
 </style>
 
@@ -435,5 +454,12 @@ export default defineComponent({
   min-height: auto !important;
   max-height: calc(100vh - 200px);
   overflow-y: auto;
+
+  .card-container {
+    box-shadow: none !important;
+    &:only-child {
+      padding: 0 !important;
+    }
+  }
 }
 </style>

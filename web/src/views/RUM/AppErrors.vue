@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="sessions_page">
     <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
       <div class="card-container">
-        <div class="text-right q-py-sm flex align-center justify-between">
+        <div class="text-right tw-p-[0.375rem] flex align-center justify-between">
           <syntax-guide class="q-mr-sm" />
-          <div class="flex align-center justify-end metrics-date-time q-mr-md">
+          <div class="flex align-center justify-end metrics-date-time">
             <date-time
               auto-apply
               :default-type="errorTrackingState.data.datetime?.valueType"
@@ -32,31 +32,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 errorTrackingState.data.datetime.relativeTimePeriod
               "
               data-test="logs-search-bar-date-time-dropdown"
-              class="q-mr-md"
+              class="q-mr-sm"
               @on:date-change="updateDateChange"
             />
             <q-btn
               data-test="metrics-explorer-run-query-button"
               data-cy="metrics-explorer-run-query-button"
               dense
-              flat
               title="Run query"
-              class="q-pa-none search-button"
+              class="q-pa-none !tw-mr-none o2-run-query-button o2-color-primary tw-h-[33px] element-box-shadow"
               @click="runQuery"
             >
               Run query
             </q-btn>
           </div>
         </div>
-        <div
-          style="
-            border-top: 1px solid rgb(219, 219, 219);
-            border-bottom: 1px solid rgb(219, 219, 219);
-          "
-        >
+        <div class="tw-pb-[0.375rem] tw-px-[0.375rem]">
           <query-editor
             editor-id="rum-errors-query-editor"
-            class="monaco-editor"
+            class="monaco-editor tw-border tw-solid tw-border-[var(--o2-border-color)] tw-p-[0.25rem] tw-rounded-[0.375rem] tw-overflow-hidden"
             v-model:query="errorTrackingState.data.editorValue"
             style="height: 40px !important"
             :debounce-time="300"
@@ -65,13 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-splitter
-      class="logs-horizontal-splitter full-height"
+      class="logs-horizontal-splitter !tw-pl-[0.625rem] tw-h-full"
       v-model="splitterModel"
       unit="px"
       vertical
     >
       <template #before>
-        <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
+        <div class="card-container tw-p-[0.325rem]">
           <FieldList
             :fields="streamFields"
             :time-stamp="{
@@ -79,7 +73,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               endTime: dateTime.endTime,
             }"
             :stream-name="errorTrackingState.data.stream.errorStream"
-            class="card-container"
             @event-emitted="handleSidebarEvent"
           />
         </div>
@@ -94,8 +87,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template #after>
-        <div class="tw-pb-[0.625rem] tw-pr-[0.625rem]">
-          <div class="card-container">
+        <div class="tw-pb-[0.325rem] tw-pr-[0.625rem] tw-h-[calc(100%-101px)]">
+          <div class="card-container tw-h-full">
             <template v-if="isLoading.length">
               <div
                 class="q-pb-lg flex items-center justify-center text-center"
@@ -116,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AppTable
               :columns="columns"
               :rows="errorTrackingState.data.errors"
-              class="app-table-container"
+              class="app-table-container tw-h-full"
               @event-emitted="handleTableEvent"
             >
               <template v-slot:error_details="slotProps">
@@ -491,10 +484,6 @@ function updateUrlQueryParams() {
   .monaco-editor {
     height: 80px !important;
   }
-}
-
-.app-table-container {
-  height: calc(100vh - 200px) !important;
 }
 </style>
 <style lang="scss">

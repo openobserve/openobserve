@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon
               name="replay_10"
               size="24px"
-              class="q-mr-sm cursor-pointer"
+              class="q-mr-sm cursor-pointer tw-text-[var(--o2-icon-color-dark)] hover:tw-text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('backward')"
             />
             <q-icon
@@ -106,13 +106,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'play_circle_filled'
               "
               size="32px"
-              class="cursor-pointer"
+              class="cursor-pointer tw-text-[var(--o2-icon-color-dark)] hover:tw-text-[var(--o2-primary-btn-bg)]"
               @click="togglePlay"
             />
             <q-icon
               name="forward_10"
               size="24px"
-              class="q-ml-sm cursor-pointer"
+              class="q-ml-sm cursor-pointer tw-text-[var(--o2-icon-color-dark)] hover:tw-text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('forward')"
             />
           </div>

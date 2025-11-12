@@ -357,6 +357,10 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --q-primary: var(--o2-theme-color);
 
+  --o2-icon-color: #808080;
+
+  --o2-icon-color-dark: #5e5e5e;
+
   // JSON Syntax Highlighting
   --o2-json-key: #{$json-key-light};
   --o2-json-string: #{$json-string-light};

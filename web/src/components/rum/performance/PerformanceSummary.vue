@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="relative-position">
     <div
-      class="q-mx-sm performance-dashboard"
+      class="performance-dashboard"
       :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
     >
       <RenderDashboardCharts
