@@ -60,7 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <router-view v-slot="{ Component }">
       <keep-alive>
         <div class="tw-pb-[0.375rem] tw-px-[0.625rem] !tw-h-[calc(100%-101px)]">
-          <div class="card-container tw-py-[0.625rem] tw-h-full">
+          <div
+            class="card-container tw-py-[0.625rem] tw-h-full tw-overflow-hidden"
+          >
             <component
               :is="Component"
               :date-time="currentTimeObj"
@@ -426,6 +428,15 @@ export default defineComponent({
 .rum-date-time-picker {
   height: 30px;
 }
+
+.performance-dashboard {
+  :deep(.card-container) {
+    box-shadow: none !important;
+    &:first-child {
+      padding: 0 !important;
+    }
+  }
+}
 </style>
 
 <style lang="scss">
@@ -433,5 +444,12 @@ export default defineComponent({
   min-height: auto !important;
   max-height: calc(100vh - 200px);
   overflow-y: auto;
+
+  .card-container {
+    box-shadow: none !important;
+    &:only-child {
+      padding: 0 !important;
+    }
+  }
 }
 </style>

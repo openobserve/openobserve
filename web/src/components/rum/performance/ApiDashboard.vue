@@ -17,15 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page
-    class="relative-position"
+  <div
+    class="relative-position tw-h-full"
     :key="store.state.selectedOrganization.identifier"
   >
     <div
-      class="api-performance-dashboards"
+      class="api-performance-dashboards tw-h-full"
       :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
     >
-      <div class="q-px-sm performance-dashboard">
+      <div class="performance-dashboard">
         <RenderDashboardCharts
           ref="apiDashboardChartsRef"
           :viewOnly="true"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-center full-width">Loading Dashboard</div>
       </div>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
