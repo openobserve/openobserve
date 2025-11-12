@@ -55,52 +55,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Manage Theme section -->
-          <div class="settings-grid-item tw-items-start">
+          <div v-if="isMetaOrg" class="settings-grid-item tw-items-start">
             <span class="individual-setting-title">
               Manage Theme
             </span>
-            <div class="tw-flex tw-gap-2" style="margin-left: -40px;">
+            <div class="tw-flex tw-gap-2 tw-items-center" style="margin-left: -60px;">
               <!-- Light Mode Theme -->
-              <div class="tw-flex tw-items-center tw-gap-2">
-                <div
-                  class="color-preview-box clickable"
-                  :style="{ backgroundColor: customLightColor }"
-                  @click="openColorPicker('light')"
-                >
-                  <q-icon name="colorize" size="20px" color="white" />
+              <div
+                class="theme-color-chip"
+                @click="openColorPicker('light')"
+              >
+                <div class="color-circle" :style="{ backgroundColor: customLightColor }">
+                  <q-icon name="palette" size="14px" color="white" class="palette-icon" />
                 </div>
-                <div class="tw-flex tw-flex-col">
-                  <span class="theme-mode-label">Light Mode</span>
-                  <span class="color-code">{{ customLightColor }}</span>
-                </div>
+                <span class="chip-label">Light</span>
+                <span class="chip-value">{{ customLightColor }}</span>
               </div>
 
               <!-- Dark Mode Theme -->
-              <div class="tw-flex tw-items-center tw-gap-2">
-                <div
-                  class="color-preview-box clickable"
-                  :style="{ backgroundColor: customDarkColor }"
-                  @click="openColorPicker('dark')"
-                >
-                  <q-icon name="colorize" size="20px" color="white" />
+              <div
+                class="theme-color-chip"
+                @click="openColorPicker('dark')"
+              >
+                <div class="color-circle" :style="{ backgroundColor: customDarkColor }">
+                  <q-icon name="palette" size="14px" color="white" class="palette-icon" />
                 </div>
-                <div class="tw-flex tw-flex-col">
-                  <span class="theme-mode-label">Dark Mode</span>
-                  <span class="color-code">{{ customDarkColor }}</span>
-                </div>
+                <span class="chip-label">Dark</span>
+                <span class="chip-value">{{ customDarkColor }}</span>
               </div>
 
               <!-- Reset Button -->
-              <q-btn
-                flat
-                dense
-                icon="refresh"
-                color="primary"
+              <div
+                class="theme-reset-chip"
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
+                <q-icon name="refresh" size="16px" />
                 <q-tooltip>Reset to default colors</q-tooltip>
-              </q-btn>
+              </div>
             </div>
             <span class="individual-setting-description tw-self-start">
               Customize your application's theme colors for both light and dark modes. Click on color box to change.
@@ -340,6 +332,7 @@ import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
+import useIsMetaOrg from "@/composables/useIsMetaOrg";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -372,6 +365,7 @@ export default defineComponent({
     const customText = ref("");
     const editingText = ref(false);
     const files = ref(null);
+    const { isMetaOrg } = useIsMetaOrg();
 
     customText.value = store.state.zoConfig.custom_logo_text;
 
@@ -818,6 +812,7 @@ export default defineComponent({
       updateCustomColor,
       resetThemeColors,
       currentPickerMode,
+      isMetaOrg,
     };
   },
 });
@@ -864,44 +859,112 @@ export default defineComponent({
   border: 1px solid #6F737A ;
 }
 
-// Theme management styles
-.theme-mode-label {
-  font-size: 12px;
-  font-weight: 500;
-  opacity: 0.7;
+// Theme management styles - Compact chip design
+.theme-color-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-.color-preview-box {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  border: 2px solid rgba(0, 0, 0, 0.1);
+.theme-color-chip:hover {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: var(--q-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+body.body--dark .theme-color-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+body.body--dark .theme-color-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.color-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
   flex-shrink: 0;
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
 }
 
-.color-preview-box.clickable {
-  cursor: pointer;
+.palette-icon {
+  opacity: 0;
+  transition: opacity 0.2s;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
 }
 
-.color-preview-box.clickable:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+.theme-color-chip:hover .palette-icon {
+  opacity: 0.9;
 }
 
-body.body--dark .color-preview-box {
-  border-color: rgba(255, 255, 255, 0.2);
+.chip-label {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.color-code {
-  font-family: monospace;
-  font-size: 14px;
+.chip-value {
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  font-size: 11px;
   font-weight: 500;
-  min-width: 80px;
+  opacity: 0.7;
+  letter-spacing: -0.2px;
+}
+
+.theme-reset-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  opacity: 0.6;
+}
+
+.theme-reset-chip:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.4);
+  border-style: solid;
+  opacity: 1;
+  transform: translateY(-1px) rotate(180deg);
+}
+
+.theme-reset-chip:hover .q-icon {
+  color: rgb(239, 68, 68);
+}
+
+body.body--dark .theme-reset-chip {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+body.body--dark .theme-reset-chip:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+body.body--dark .theme-reset-chip:hover .q-icon {
+  color: rgb(248, 113, 113);
 }
 
 </style>
