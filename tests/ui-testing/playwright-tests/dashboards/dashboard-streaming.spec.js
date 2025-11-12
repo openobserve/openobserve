@@ -74,7 +74,7 @@ test.describe("dashboard streaming testcases", () => {
     );
 
     // await page.waitForTimeout(3000);
-    await page.waitForLoadState("networkidle");
+    // await page.waitForLoadState("networkidle");
 
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
