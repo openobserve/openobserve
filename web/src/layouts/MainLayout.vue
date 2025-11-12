@@ -1710,6 +1710,11 @@ export default defineComponent({
           body.body--light & {
             color: #19191e !important;
           }
+          // Dark mode: make text blue for readability
+          body.body--dark & {
+            color: #ffffff !important;
+          }
+
         }
         color: var(--o2-menu-color);
 
@@ -1721,6 +1726,17 @@ export default defineComponent({
             color: #19191e !important;
           }
         }
+
+        // Dark mode: make item text blue
+        body.body--dark & {
+          color: var(--o2-menu-color) !important;
+
+          .q-icon {
+            color: #ffffff !important;
+          }
+        }
+
+        
       }
 
       &__label {
