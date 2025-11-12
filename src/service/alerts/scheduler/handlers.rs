@@ -695,31 +695,83 @@ async fn handle_alert_triggers(
             data
         };
 
-        // [ENTERPRISE] Collect alert events for batched incident creation
-        // #[cfg(feature = "enterprise")]
-        // if rca_enabled && !data.is_empty() {
-        //     // Collect each deduplicated result row as an alert event
-        //     // Use parent trace_id for cross-alert correlation (not scheduler_trace_id)
-        //     for row in &data {
-        //         if let Err(e) =
-        // o2_enterprise::enterprise::ai::rca::integration::collect_alert_event(
-        // trace_id, // Use parent trace_id for cross-alert batch             &alert,
-        //             row,
-        //             triggered_at,
-        //         ) {
-        //             log::error!(
-        //                 "[SCHEDULER trace_id {scheduler_trace_id}] Error collecting alert event
-        // for RCA: {}",                 e
-        //             );
-        //             // Don't fail alert evaluation if RCA collection fails
-        //         }
-        //     }
-        //     log::debug!(
-        //         "[SCHEDULER trace_id {scheduler_trace_id}] Collected {} alert events for RCA
-        // batch {}",         data.len(),
-        //         trace_id
-        //     );
-        // }
+        // Apply correlation if enabled (enterprise-only feature)
+        #[cfg(feature = "enterprise")]
+        if let Some(db) = ORM_CLIENT.get() {
+            // Get correlation config for this org
+            match crate::service::alerts::org_config::get_correlation_config(&new_trigger.org).await
+            {
+                Ok(Some(correlation_config)) if correlation_config.enabled => {
+                    // Get semantic groups from alert's deduplication config
+                    let semantic_groups = alert
+                        .deduplication
+                        .as_ref()
+                        .map(|d| d.semantic_field_groups.clone())
+                        .unwrap_or_default();
+
+                    // Correlate each result row into incidents
+                    for row in &data {
+                        match crate::service::alerts::correlation::correlate_alert(
+                            db,
+                            &new_trigger.org,
+                            &alert,
+                            row,
+                            &correlation_config,
+                            &semantic_groups,
+                        )
+                        .await
+                        {
+                            Ok(Some(incident_id)) => {
+                                log::debug!(
+                                    "[SCHEDULER trace_id {scheduler_trace_id}] Alert correlated to incident {} for org: {}, alert: {}",
+                                    incident_id,
+                                    &new_trigger.org,
+                                    &alert.name
+                                );
+                            }
+                            Ok(None) => {
+                                log::debug!(
+                                    "[SCHEDULER trace_id {scheduler_trace_id}] Alert not correlated (below min threshold) for org: {}, alert: {}",
+                                    &new_trigger.org,
+                                    &alert.name
+                                );
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "[SCHEDULER trace_id {scheduler_trace_id}] Error correlating alert for org: {}, alert: {}: {}",
+                                    &new_trigger.org,
+                                    &alert.name,
+                                    e
+                                );
+                                // Don't fail alert evaluation if correlation fails
+                            }
+                        }
+                    }
+                }
+                Ok(Some(_)) => {
+                    // Correlation config exists but is disabled
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Correlation disabled for org: {}",
+                        &new_trigger.org
+                    );
+                }
+                Ok(None) => {
+                    // No correlation config for this org
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] No correlation config found for org: {}",
+                        &new_trigger.org
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error getting correlation config for org: {}: {}",
+                        &new_trigger.org,
+                        e
+                    );
+                    // Don't fail alert evaluation if config retrieval fails
+                }
+            }
+        }
 
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only

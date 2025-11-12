@@ -45,9 +45,13 @@ use crate::service::{
 
 pub mod alert;
 #[cfg(feature = "enterprise")]
+pub mod correlation;
+#[cfg(feature = "enterprise")]
 pub mod deduplication;
 pub mod derived_streams;
 pub mod destinations;
+#[cfg(feature = "enterprise")]
+pub mod org_config;
 pub mod scheduler;
 pub mod templates;
 

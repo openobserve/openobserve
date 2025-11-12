@@ -314,5 +314,69 @@ describe("JSON Utilities", () => {
       expect(keys).toContain("nested.length");
       expect(keys).toContain("nested.value");
     });
+
+    it("should handle objects with numeric keys", () => {
+      const numeric = {
+        0: "zero",
+        1: "one",
+        name: "test"
+      };
+      const keys = deepKeys(numeric);
+      expect(keys).toContain("0");
+      expect(keys).toContain("1");
+      expect(keys).toContain("name");
+    });
+
+    it("should handle objects with special characters in keys", () => {
+      const special = {
+        "key-with-dash": "value1",
+        "key.with.dot": "value2",
+        "key_with_underscore": "value3"
+      };
+      const keys = deepKeys(special);
+      expect(keys).toContain("key-with-dash");
+      expect(keys).toContain("key.with.dot");
+      expect(keys).toContain("key_with_underscore");
+    });
+
+    it("should handle very deeply nested objects", () => {
+      const deep = {
+        a: {
+          b: {
+            c: {
+              d: {
+                e: "deep value"
+              }
+            }
+          }
+        }
+      };
+      const keys = deepKeys(deep);
+      expect(keys).toContain("a.b.c.d.e");
+    });
+
+    it("should handle objects with undefined values", () => {
+      const withUndefined = {
+        defined: "value",
+        undefined: undefined,
+        nested: {
+          alsoUndefined: undefined
+        }
+      };
+      const keys = deepKeys(withUndefined);
+      expect(keys).toContain("defined");
+      expect(keys).toContain("undefined");
+      expect(keys).toContain("nested.alsoUndefined");
+    });
+
+    it("should handle empty nested objects", () => {
+      const emptyNested = {
+        outer: {},
+        data: "value"
+      };
+      const keys = deepKeys(emptyNested);
+      expect(keys).toContain("data");
+      expect(Array.isArray(keys)).toBe(true);
+    });
   });
 });
