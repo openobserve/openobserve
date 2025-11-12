@@ -89,10 +89,10 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
 
   const defaultProps = {
     destinations: [
-      { name: 'existing-dest', destination_type: 'http' },
+      { name: 'existing-dest', type: 'http' },
     ],
     templates: [
-      { name: 'template1', destination_type: 'http' },
+      { name: 'template1', type: 'http' },
       { name: 'email-template', type: 'email' },
     ],
     alerts: [],
@@ -219,7 +219,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
 
     it('should update destination type correctly', () => {
       wrapper.vm.updateDestinationType('email', 0);
-      expect(wrapper.vm.jsonArrayOfObj[0].destination_type).toBe('email');
+      expect(wrapper.vm.jsonArrayOfObj[0].type).toBe('email');
     });
 
     it('should update destination method correctly', () => {
@@ -324,7 +324,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should validate http destination with valid inputs', async () => {
         const validInput = {
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
@@ -338,7 +338,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should validate email destination with valid inputs', async () => {
         const validInput = {
           name: 'test-email-destination',
-          destination_type: 'email',
+          type: 'email',
           template: 'email-template',
           emails: ['test@example.com', 'user@test.com'],
         };
@@ -349,7 +349,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
 
       it('should return false for missing required fields', async () => {
         const invalidInput = {
-          destination_type: 'http',
+          type: 'http',
         };
 
         const result = await wrapper.vm.validateDestinationInputs(invalidInput, 1);
@@ -360,10 +360,11 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should validate action type destination', async () => {
         const actionInput = {
           name: 'test-action-destination',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
+          skip_tls_verify: false,
           action_id: 'action1',
         };
 
@@ -374,7 +375,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should accept action destination type', async () => {
         const actionInput = {
           name: 'test-action-destination',
-          destination_type: 'action',
+          type: 'action',
           action_id: 'action1',
         };
 
@@ -385,7 +386,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should reject action destination with non-existent action_id', async () => {
         const actionInput = {
           name: 'test-action-destination',
-          destination_type: 'action',
+          type: 'action',
           action_id: 'non-existent-action',
         };
 
@@ -396,7 +397,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should reject invalid destination type', async () => {
         const invalidInput = {
           name: 'test-destination',
-          destination_type: 'invalid-type',
+          type: 'invalid-type',
           template: 'template1',
         };
 
@@ -407,7 +408,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should reject existing destination name', async () => {
         const duplicateInput = {
           name: 'existing-dest',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
@@ -421,7 +422,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should validate headers for http type', async () => {
         const inputWithHeaders = {
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
@@ -436,7 +437,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should reject invalid headers for http type', async () => {
         const inputWithInvalidHeaders = {
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
@@ -445,7 +446,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
         };
 
         const result = await wrapper.vm.validateDestinationInputs(inputWithInvalidHeaders, 1);
-        expect(result).toBe(true); // Headers validation not enforced in current implementation
+        expect(result).toBe(false); // Should reject invalid headers
       });
 
       it('should reject headers for email type', async () => {
@@ -513,27 +514,27 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should validate missing skip_tls_verify for http type', async () => {
         const httpWithoutTls = {
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
         };
 
-        const result = await wrapper.vm.validateDestinationInputs(httpWithoutTls, 0, 1);
-        expect(result).toBe(true); // skip_tls_verify is optional
+        const result = await wrapper.vm.validateDestinationInputs(httpWithoutTls, 1);
+        expect(result).toBe(false); // skip_tls_verify is REQUIRED per validation logic
       });
 
       it('should validate invalid skip_tls_verify type for http', async () => {
         const httpWithInvalidTls = {
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
           skip_tls_verify: 'invalid',
         };
 
-        const result = await wrapper.vm.validateDestinationInputs(httpWithInvalidTls, 0, 1);
+        const result = await wrapper.vm.validateDestinationInputs(httpWithInvalidTls, 1);
         expect(result).toBe(false);
       });
     });
@@ -596,7 +597,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should process valid JSON array', async () => {
         const validJson = [{
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
@@ -609,6 +610,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
 
         // Mock successful creation
         const destinationService = await import('@/services/alert_destination');
+        vi.mocked(destinationService.default.create).mockClear();
         vi.mocked(destinationService.default.create).mockResolvedValueOnce(true);
 
         await wrapper.vm.importJson(payload);
@@ -619,7 +621,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should convert single object to array', async () => {
         const singleObject = {
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
@@ -632,6 +634,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
 
         // Mock successful creation
         const destinationService = await import('@/services/alert_destination');
+        vi.mocked(destinationService.default.create).mockClear();
         vi.mocked(destinationService.default.create).mockResolvedValueOnce(true);
 
         await wrapper.vm.importJson(payload);
@@ -640,9 +643,11 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       });
 
       it('should show success message and redirect on successful import', async () => {
+        vi.useFakeTimers();
+
         const validJson = [{
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
@@ -655,6 +660,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
 
         // Mock successful creation
         const destinationService = await import('@/services/alert_destination');
+        vi.mocked(destinationService.default.create).mockClear();
         vi.mocked(destinationService.default.create).mockResolvedValueOnce(true);
 
         await wrapper.vm.importJson(payload);
@@ -666,8 +672,8 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
           timeout: 2000,
         });
 
-        // Wait for the setTimeout (400ms) to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Execute setTimeout
+        vi.runAllTimers();
 
         expect(mockRouterPush).toHaveBeenCalledWith({
           name: 'alertDestinations',
@@ -675,6 +681,8 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
             org_identifier: 'test-org',
           },
         });
+
+        vi.useRealTimers();
       });
     });
 
@@ -682,7 +690,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should process valid destination object', async () => {
         const validObject = {
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
@@ -691,6 +699,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
 
         // Mock successful creation
         const destinationService = await import('@/services/alert_destination');
+        vi.mocked(destinationService.default.create).mockClear();
         vi.mocked(destinationService.default.create).mockResolvedValueOnce(true);
 
         const result = await wrapper.vm.processJsonObject(validObject, 1);
@@ -700,7 +709,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should return false for invalid destination object', async () => {
         const invalidObject = {
           name: '',
-          destination_type: 'invalid',
+          type: 'invalid',
         };
 
         const result = await wrapper.vm.processJsonObject(invalidObject, 1);
@@ -710,7 +719,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should handle processing when validation passes but destination errors exist', async () => {
         const validObject = {
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
@@ -730,7 +739,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should create destination successfully', async () => {
         const destinationInput = {
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
           url: 'https://example.com',
           method: 'post',
           template: 'template1',
@@ -739,6 +748,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
 
         // Mock successful creation
         const destinationService = await import('@/services/alert_destination');
+        vi.mocked(destinationService.default.create).mockClear();
         vi.mocked(destinationService.default.create).mockResolvedValueOnce(true);
 
         const result = await wrapper.vm.createDestination(destinationInput, 1);
@@ -756,7 +766,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should handle destination creation failure', async () => {
         const destinationInput = {
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
         };
 
         const error = {
@@ -769,6 +779,7 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
 
         // Mock failed creation
         const destinationService = await import('@/services/alert_destination');
+        vi.mocked(destinationService.default.create).mockClear();
         vi.mocked(destinationService.default.create).mockRejectedValueOnce(error);
 
         const result = await wrapper.vm.createDestination(destinationInput, 1);
@@ -781,11 +792,12 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
       it('should handle unknown creation error', async () => {
         const destinationInput = {
           name: 'test-destination',
-          destination_type: 'http',
+          type: 'http',
         };
 
         // Mock failed creation without response
         const destinationService = await import('@/services/alert_destination');
+        vi.mocked(destinationService.default.create).mockClear();
         vi.mocked(destinationService.default.create).mockRejectedValueOnce(new Error('Unknown error'));
 
         const result = await wrapper.vm.createDestination(destinationInput, 1);
