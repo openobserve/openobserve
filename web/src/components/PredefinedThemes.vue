@@ -66,6 +66,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
+
+            <!-- Custom Color Picker -->
+            <div class="theme-card-compact q-mb-sm">
+              <div class="row items-center no-wrap">
+                <div class="color-preview-small clickable" :style="{ backgroundColor: customLightColor }" @click="openColorPicker('light')">
+                  <q-icon name="colorize" size="16px" color="white" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);" />
+                </div>
+                <div class="text-subtitle2 q-ml-sm">Custom Color</div>
+                <q-space />
+                <q-badge v-if="isCustomThemeApplied('light')" color="positive" label="Applied" class="text-caption q-mr-xs" />
+                <q-btn
+                  label="Apply"
+                  color="primary"
+                  size="sm"
+                  unelevated
+                  @click="applyCustomTheme('light')"
+                />
+              </div>
+            </div>
           </q-tab-panel>
 
           <!-- Dark Mode Themes -->
@@ -85,30 +104,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
+
+            <!-- Custom Color Picker -->
+            <div class="theme-card-compact q-mb-sm">
+              <div class="row items-center no-wrap">
+                <div class="color-preview-small clickable" :style="{ backgroundColor: customDarkColor }" @click="openColorPicker('dark')">
+                  <q-icon name="colorize" size="16px" color="white" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);" />
+                </div>
+                <div class="text-subtitle2 q-ml-sm">Custom Color</div>
+                <q-space />
+                <q-badge v-if="isCustomThemeApplied('dark')" color="positive" label="Applied" class="text-caption q-mr-xs" />
+                <q-btn
+                  label="Apply"
+                  color="primary"
+                  size="sm"
+                  unelevated
+                  @click="applyCustomTheme('dark')"
+                />
+              </div>
+            </div>
           </q-tab-panel>
         </q-tab-panels>
       </q-card-section>
     </q-card>
+
+    <!-- Color Picker Dialog -->
+    <q-dialog v-model="showColorPicker">
+      <q-card style="min-width: 300px">
+        <q-card-section>
+          <div class="text-h6">Pick Custom Color</div>
+        </q-card-section>
+        <q-card-section>
+          <q-color
+            v-model="tempColor"
+            @update:model-value="updateCustomColor"
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Close" color="primary" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, onMounted, onUnmounted } from "vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
-import { useThemeCustomizer } from "@/composables/useThemeCustomizer";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 
 const $q = useQuasar();
 const store = useStore();
 const { isOpen } = usePredefinedThemes();
-const { applyTheme: applyThemeToCustomizer } = useThemeCustomizer();
 const dialogOpen = ref(false);
 const activeTab = ref("light");
 
 // Track applied themes for each mode
 const appliedLightTheme = ref<number | null>(null);
 const appliedDarkTheme = ref<number | null>(null);
+
+// Custom color picker state
+const customLightColor = ref("#3F7994");
+const customDarkColor = ref("#5B9FBE");
+const showColorPicker = ref(false);
+const currentPickerMode = ref<"light" | "dark">("light");
+const tempColor = ref("#3F7994");
 
 // Watch isOpen from composable
 watch(isOpen, (val) => {
@@ -145,6 +206,147 @@ watch(
     }
   }
 );
+
+// Helper function to convert hex to rgba
+const hexToRgba = (hex: string, opacity: number): string => {
+  hex = hex.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  const alpha = opacity / 10; // Convert 1-10 scale to 0.1-1.0
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+// Function to apply theme colors directly to CSS variables
+const applyThemeColors = (themeColor: string, mode: "light" | "dark", isDefault: boolean = false) => {
+  const isDarkMode = mode === "dark";
+
+  if (isDarkMode) {
+    // Apply dark mode theme color
+    const rgbaColor = hexToRgba(themeColor, 10);
+    document.body.style.setProperty('--o2-dark-theme-color', rgbaColor);
+
+    // Apply menu gradient colors
+    if (isDefault) {
+      // Use default menu gradient colors
+      document.body.style.setProperty('--o2-menu-gradient-start', 'rgba(89, 155, 174, 0.3)');
+      document.body.style.setProperty('--o2-menu-gradient-end', 'rgba(48, 193, 233, 0.3)');
+    } else {
+      // Calculate menu gradient from theme color
+      const menuGradientStart = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
+      const menuGradientEnd = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
+      document.body.style.setProperty('--o2-menu-gradient-start', menuGradientStart);
+      document.body.style.setProperty('--o2-menu-gradient-end', menuGradientEnd);
+    }
+
+    // Clear light mode variables
+    document.documentElement.style.removeProperty('--o2-theme-color');
+    document.documentElement.style.removeProperty('--o2-body-primary-bg');
+    document.documentElement.style.removeProperty('--o2-body-secondary-bg');
+    document.body.style.removeProperty('background');
+  } else {
+    // Apply light mode theme color
+    const rgbaColor = hexToRgba(themeColor, 10);
+    document.documentElement.style.setProperty('--o2-theme-color', rgbaColor);
+
+    // Auto-calculate and apply background colors based on theme color
+    const primaryBg = hexToRgba(themeColor, 0.1); // 0.01 alpha (1%)
+    const secondaryBg = hexToRgba(themeColor, 4); // 0.4 alpha (40%)
+
+    document.documentElement.style.setProperty('--o2-body-primary-bg', primaryBg);
+    document.documentElement.style.setProperty('--o2-body-secondary-bg', secondaryBg);
+
+    // Update body gradient with auto-calculated colors
+    const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
+    document.body.style.setProperty('background', gradient, 'important');
+
+    // Apply menu gradient colors
+    if (isDefault) {
+      // Use default menu gradient colors
+      document.documentElement.style.setProperty('--o2-menu-gradient-start', 'rgba(89, 175, 199, 0.3)');
+      document.documentElement.style.setProperty('--o2-menu-gradient-end', 'rgba(48, 193, 233, 0.3)');
+    } else {
+      // Calculate menu gradient from theme color
+      const menuGradientStart = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
+      const menuGradientEnd = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
+      document.documentElement.style.setProperty('--o2-menu-gradient-start', menuGradientStart);
+      document.documentElement.style.setProperty('--o2-menu-gradient-end', menuGradientEnd);
+    }
+
+    // Clear dark mode variables
+    document.body.style.removeProperty('--o2-dark-theme-color');
+  }
+};
+
+// Watch for theme mode changes and reapply colors
+let observer: MutationObserver | null = null;
+
+onMounted(() => {
+  // Apply default theme on initial load if no theme has been applied
+  const currentMode = store.state.theme === "dark" ? "dark" : "light";
+  const appliedTheme = currentMode === "light" ? appliedLightTheme.value : appliedDarkTheme.value;
+
+  if (appliedTheme === null) {
+    // No theme applied yet, apply the default blue theme silently
+    const defaultTheme = predefinedThemes.find(t => t.id === 1);
+    if (defaultTheme) {
+      const modeColors = currentMode === "light" ? defaultTheme.light : defaultTheme.dark;
+      applyThemeColors(modeColors.themeColor, currentMode, true);
+
+      // Track the applied theme
+      if (currentMode === "light") {
+        appliedLightTheme.value = defaultTheme.id;
+      } else {
+        appliedDarkTheme.value = defaultTheme.id;
+      }
+    }
+  }
+
+  // Start observing body class changes for theme mode switches
+  observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        // Reapply the current theme when mode changes
+        const isDarkMode = document.body.classList.contains('body--dark');
+        const currentMode = isDarkMode ? 'dark' : 'light';
+
+        // Get the currently applied theme
+        if (currentMode === 'light' && appliedLightTheme.value !== null) {
+          if (appliedLightTheme.value === -1) {
+            applyThemeColors(customLightColor.value, 'light', false);
+          } else {
+            const theme = predefinedThemes.find(t => t.id === appliedLightTheme.value);
+            if (theme) {
+              const isDefault = theme.id === 1; // Default Blue theme has id 1
+              applyThemeColors(theme.light.themeColor, 'light', isDefault);
+            }
+          }
+        } else if (currentMode === 'dark' && appliedDarkTheme.value !== null) {
+          if (appliedDarkTheme.value === -1) {
+            applyThemeColors(customDarkColor.value, 'dark', false);
+          } else {
+            const theme = predefinedThemes.find(t => t.id === appliedDarkTheme.value);
+            if (theme) {
+              const isDefault = theme.id === 1; // Default Blue theme has id 1
+              applyThemeColors(theme.dark.themeColor, 'dark', isDefault);
+            }
+          }
+        }
+      }
+    });
+  });
+
+  observer.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['class']
+  });
+});
+
+onUnmounted(() => {
+  if (observer) {
+    observer.disconnect();
+  }
+});
 
 // Predefined themes with both light and dark mode colors
 // Each theme has:
@@ -222,17 +424,11 @@ const predefinedThemes = [
 const applyTheme = (theme: any, mode: "light" | "dark") => {
   const modeColors = mode === "light" ? theme.light : theme.dark;
 
-  // Create theme config object to pass to ThemeCustomizer
-  // Only pass theme color with full opacity (10 = 1.0)
-  // Backgrounds will use defaults from SCSS
-  const themeConfig: any = {
-    mode: mode,
-    themeColor: modeColors.themeColor,
-    themeColorOpacity: 10, // Always use full opacity (1.0)
-  };
+  // Check if this is the default theme (id: 1)
+  const isDefault = theme.id === 1;
 
-  // Apply theme through the ThemeCustomizer composable
-  applyThemeToCustomizer(themeConfig);
+  // Apply theme colors directly
+  applyThemeColors(modeColors.themeColor, mode, isDefault);
 
   // Track which theme was applied for this mode
   if (mode === "light") {
@@ -257,6 +453,51 @@ const isThemeApplied = (theme: any, mode: "light" | "dark"): boolean => {
     return appliedDarkTheme.value === theme.id;
   }
 };
+
+// Custom theme functions
+const openColorPicker = (mode: "light" | "dark") => {
+  currentPickerMode.value = mode;
+  tempColor.value = mode === "light" ? customLightColor.value : customDarkColor.value;
+  showColorPicker.value = true;
+};
+
+const applyCustomTheme = (mode: "light" | "dark") => {
+  const color = mode === "light" ? customLightColor.value : customDarkColor.value;
+
+  // Apply theme colors directly (custom theme is never default)
+  applyThemeColors(color, mode, false);
+
+  // Clear predefined theme tracking and mark custom as applied
+  if (mode === "light") {
+    appliedLightTheme.value = -1; // -1 indicates custom theme
+  } else {
+    appliedDarkTheme.value = -1;
+  }
+
+  // Show success notification
+  $q.notify({
+    type: 'positive',
+    message: `Custom color applied to ${mode} mode successfully!`,
+    position: 'top',
+    timeout: 2000,
+  });
+};
+
+const isCustomThemeApplied = (mode: "light" | "dark"): boolean => {
+  if (mode === "light") {
+    return appliedLightTheme.value === -1;
+  } else {
+    return appliedDarkTheme.value === -1;
+  }
+};
+
+const updateCustomColor = () => {
+  if (currentPickerMode.value === "light") {
+    customLightColor.value = tempColor.value;
+  } else {
+    customDarkColor.value = tempColor.value;
+  }
+};
 </script>
 
 <style scoped>
@@ -278,6 +519,16 @@ const isThemeApplied = (theme: any, mode: "light" | "dark"): boolean => {
   border-radius: 4px;
   border: 1px solid var(--o2-border-color);
   flex-shrink: 0;
+  position: relative;
+}
+
+.color-preview-small.clickable {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.color-preview-small.clickable:hover {
+  transform: scale(1.1);
 }
 .predefined-theme-card{
   width: 450px;
