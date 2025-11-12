@@ -47,9 +47,12 @@ mod queues;
 pub mod search;
 
 pub async fn run() {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
-        return;
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let cfg = get_config();
+        if !cfg.common.usage_enabled {
+            return;
+        }
     }
 
     // Force initialization usage queue
@@ -98,6 +101,7 @@ pub async fn report_request_usage_stats(
             .inc_by((stats.size * SIZE_IN_MB) as u64);
     }
 
+    #[cfg(not(feature = "enterprise"))]
     if !get_config().common.usage_enabled {
         return;
     }
@@ -197,9 +201,12 @@ pub async fn report_request_usage_stats(
 }
 
 async fn publish_usage(usages: Vec<UsageData>) {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
-        return;
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let cfg = get_config();
+        if !cfg.common.usage_enabled {
+            return;
+        }
     }
 
     for usage in usages {
@@ -215,10 +222,15 @@ async fn publish_usage(usages: Vec<UsageData>) {
 }
 
 pub fn publish_triggers_usage(trigger: TriggerData) {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
-        log::debug!("[SELF-REPORTING] Skipping trigger usage publish - usage reporting disabled");
-        return;
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let cfg = get_config();
+        if !cfg.common.usage_enabled {
+            log::debug!(
+                "[SELF-REPORTING] Skipping trigger usage publish - usage reporting disabled"
+            );
+            return;
+        }
     }
 
     log::debug!(
@@ -274,10 +286,13 @@ pub fn publish_triggers_usage(trigger: TriggerData) {
 }
 
 pub async fn publish_error(error_data: ErrorData) {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
-        log::debug!("[SELF-REPORTING] Skipping error publish - usage reporting disabled");
-        return;
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let cfg = get_config();
+        if !cfg.common.usage_enabled {
+            log::debug!("[SELF-REPORTING] Skipping error publish - usage reporting disabled");
+            return;
+        }
     }
 
     // Important data - use shorter timeout than usage to prevent indefinite blocking
@@ -342,13 +357,19 @@ pub async fn flush() {
     flush_audit().await;
 
     let cfg = get_config();
+
+    #[cfg(feature = "enterprise")]
+    let usage_enabled = true;
+    #[cfg(not(feature = "enterprise"))]
+    let usage_enabled = cfg.common.usage_enabled;
+
     // only ingester and querier nodes report usage
-    if !cfg.common.usage_enabled || (!LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier()) {
+    if !usage_enabled || (!LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier()) {
         return;
     }
 
     // shutdown usage_queuer
-    for _ in 0..get_config().limit.usage_reporting_thread_num {
+    for _ in 0..cfg.limit.usage_reporting_thread_num {
         let (res_sender, res_receiver) = oneshot::channel();
         if let Err(e) = queues::USAGE_QUEUE.shutdown(res_sender).await {
             log::error!("[SELF-REPORTING] Error shutting down USAGE_QUEUER: {e}");

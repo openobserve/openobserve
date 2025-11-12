@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { Quasar } from 'quasar';
-import { nextTick } from 'vue';
 import ImportPipeline from '@/components/pipeline/ImportPipeline.vue';
 import store from '@/test/unit/helpers/store';
 
@@ -81,12 +80,12 @@ const i18n = createI18n({
 describe('ImportPipeline.vue', () => {
   let wrapper: VueWrapper<any>;
   let mockQuasar: any;
-  
+
   const createWrapper = (props = {}) => {
     mockQuasar = {
       notify: vi.fn()
     };
-    
+
     return mount(ImportPipeline, {
       props: {
         destinations: [],
@@ -100,6 +99,12 @@ describe('ImportPipeline.vue', () => {
           $q: mockQuasar
         },
         stubs: {
+          BaseImport: {
+            template: '<div data-test="base-import"><slot name="output-content" /></div>',
+            methods: {
+              updateJsonArray: vi.fn(),
+            }
+          },
           AppTabs: {
             template: '<div data-test="app-tabs"><slot /></div>'
           },
@@ -160,22 +165,6 @@ describe('ImportPipeline.vue', () => {
       wrapper = createWrapper();
     });
 
-    it('should initialize jsonStr as empty string', () => {
-      expect(wrapper.vm.jsonStr).toBe('');
-    });
-
-    it('should initialize jsonArrayOfObj with empty object', () => {
-      expect(wrapper.vm.jsonArrayOfObj).toEqual([{}]);
-    });
-
-    it('should initialize activeTab as import_json_file', () => {
-      expect(wrapper.vm.activeTab).toBe('import_json_file');
-    });
-
-    it('should initialize splitterModel as 60', () => {
-      expect(wrapper.vm.splitterModel).toBe(60);
-    });
-
     it('should initialize streamTypes array correctly', () => {
       expect(wrapper.vm.streamTypes).toEqual(['logs', 'metrics', 'traces']);
     });
@@ -184,17 +173,11 @@ describe('ImportPipeline.vue', () => {
       expect(wrapper.vm.destinationStreamTypes).toEqual(['logs', 'metrics', 'traces', 'enrichment_tables']);
     });
 
-    it('should initialize userSelectedDestinations as empty array', () => {
-      expect(wrapper.vm.userSelectedDestinations).toEqual([]);
-    });
-
     it('should initialize userSelectedPipelineName as empty array', () => {
       expect(wrapper.vm.userSelectedPipelineName).toEqual([]);
     });
 
-    it('should initialize error arrays as empty', () => {
-      expect(wrapper.vm.templateErrorsToDisplay).toEqual([]);
-      expect(wrapper.vm.destinationErrorsToDisplay).toEqual([]);
+    it('should initialize pipelineErrorsToDisplay as empty', () => {
       expect(wrapper.vm.pipelineErrorsToDisplay).toEqual([]);
     });
   });
@@ -209,391 +192,292 @@ describe('ImportPipeline.vue', () => {
         { identifier: 'org1', label: 'Org 1' },
         { identifier: 'test-org', label: 'Test Org' }
       ];
-      
+
       const orgData = wrapper.vm.organizationData;
       expect(orgData).toHaveLength(2);
       expect(orgData[0].disable).toBe(true);
       expect(orgData[1].disable).toBe(false);
     });
-
-    it('should compute getFormattedDestinations correctly', () => {
-      wrapper = createWrapper({
-        destinations: [
-          { name: 'dest1' },
-          { name: 'dest2' }
-        ]
-      });
-      
-      expect(wrapper.vm.getFormattedDestinations).toEqual(['dest1', 'dest2']);
-    });
   });
 
-  describe('updateUserSelectedDestinations Function', () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-      wrapper.vm.jsonArrayOfObj = [{}, {}];
-    });
-
-    it('should update destinations for specific index', () => {
-      const destinations = ['dest1', 'dest2'];
-      wrapper.vm.updateUserSelectedDestinations(destinations, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].destinations).toEqual(destinations);
-    });
-
-    it('should update jsonStr after updating destinations', () => {
-      const destinations = ['dest1'];
-      wrapper.vm.updateUserSelectedDestinations(destinations, 0);
-      
-      expect(wrapper.vm.jsonStr).toContain('dest1');
-    });
-  });
 
   describe('updateSqlQuery Function', () => {
     beforeEach(() => {
       wrapper = createWrapper();
-      wrapper.vm.jsonArrayOfObj = [{
-        source: { query_condition: {} },
-        nodes: [
-          { 
-            io_type: 'input',
-            data: { query_condition: { type: 'sql' } }
-          }
-        ]
-      }];
+      // Mock baseImportRef with jsonArrayOfObj
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: [{
+          source: { query_condition: {} },
+          nodes: [
+            {
+              io_type: 'input',
+              data: { query_condition: { type: 'sql' } }
+            }
+          ]
+        }],
+        updateJsonArray: vi.fn(),
+        isImporting: false
+      };
     });
 
     it('should update sql_query at root level', () => {
       const sqlQuery = 'SELECT * FROM table';
       wrapper.vm.updateSqlQuery(sqlQuery, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].sql_query).toBe(sqlQuery);
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].sql_query).toBe(sqlQuery);
     });
 
     it('should update source query_condition sql', () => {
       const sqlQuery = 'SELECT * FROM table';
       wrapper.vm.updateSqlQuery(sqlQuery, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].source.query_condition.sql).toBe(sqlQuery);
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.query_condition.sql).toBe(sqlQuery);
     });
 
     it('should update nodes with matching criteria', () => {
       const sqlQuery = 'SELECT * FROM table';
       wrapper.vm.updateSqlQuery(sqlQuery, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].nodes[0].data.query_condition.sql).toBe(sqlQuery);
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.query_condition.sql).toBe(sqlQuery);
     });
   });
 
   describe('updateStreamFields Function', () => {
     beforeEach(() => {
       wrapper = createWrapper();
-      wrapper.vm.jsonArrayOfObj = [{
-        source: {},
-        nodes: [{ io_type: 'input', data: {} }],
-        edges: [{ sourceNode: { data: {} } }]
-      }];
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: [{
+          source: {},
+          nodes: [{ io_type: 'input', data: {} }],
+          edges: [{ sourceNode: { data: {} } }]
+        }],
+        updateJsonArray: vi.fn(),
+        isImporting: false
+      };
     });
 
     it('should update stream_name in source', () => {
       const streamName = { value: 'test-stream' };
       wrapper.vm.updateStreamFields(streamName, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].source.stream_name).toBe('test-stream');
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name).toBe('test-stream');
     });
 
     it('should update stream_name in nodes', () => {
       const streamName = { value: 'test-stream' };
       wrapper.vm.updateStreamFields(streamName, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].nodes[0].data.stream_name).toBe('test-stream');
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.stream_name).toBe('test-stream');
     });
 
     it('should update stream_name at root level', () => {
       const streamName = { value: 'test-stream' };
       wrapper.vm.updateStreamFields(streamName, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].stream_name).toBe('test-stream');
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].stream_name).toBe('test-stream');
     });
   });
 
   describe('updatePipelineName Function', () => {
     beforeEach(() => {
       wrapper = createWrapper();
-      wrapper.vm.jsonArrayOfObj = [{}];
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: [{}],
+        updateJsonArray: vi.fn(),
+        isImporting: false
+      };
     });
 
     it('should update pipeline name', () => {
       const pipelineName = 'test-pipeline';
       wrapper.vm.updatePipelineName(pipelineName, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].name).toBe(pipelineName);
-    });
 
-    it('should update jsonStr after updating name', () => {
-      const pipelineName = 'test-pipeline';
-      wrapper.vm.updatePipelineName(pipelineName, 0);
-      
-      expect(wrapper.vm.jsonStr).toContain(pipelineName);
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].name).toBe(pipelineName);
     });
   });
 
   describe('updateFunctionName Function', () => {
     beforeEach(() => {
       wrapper = createWrapper();
-      wrapper.vm.jsonArrayOfObj = [{
-        nodes: [
-          {
-            io_type: 'default',
-            data: { node_type: 'function' }
-          }
-        ]
-      }];
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: [{
+          nodes: [
+            {
+              io_type: 'default',
+              data: { node_type: 'function' }
+            }
+          ]
+        }],
+        updateJsonArray: vi.fn(),
+        isImporting: false
+      };
     });
 
     it('should update function name in correct node', () => {
       const functionName = 'test-function';
       wrapper.vm.updateFunctionName(functionName, 0, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].nodes[0].data.name).toBe(functionName);
-    });
 
-    it('should update jsonStr after updating function name', () => {
-      const functionName = 'test-function';
-      wrapper.vm.updateFunctionName(functionName, 0, 0);
-      
-      expect(wrapper.vm.jsonStr).toContain(functionName);
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.name).toBe(functionName);
     });
 
     it('should not update non-function nodes', () => {
-      wrapper.vm.jsonArrayOfObj[0].nodes[0].data.node_type = 'stream';
+      wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.node_type = 'stream';
       const functionName = 'test-function';
       wrapper.vm.updateFunctionName(functionName, 0, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].nodes[0].data.name).toBeUndefined();
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.name).toBeUndefined();
     });
   });
 
   describe('updateRemoteDestination Function', () => {
     beforeEach(() => {
       wrapper = createWrapper();
-      wrapper.vm.jsonArrayOfObj = [{
-        nodes: [
-          {
-            data: { node_type: 'remote_stream' }
-          }
-        ]
-      }];
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: [{
+          nodes: [
+            {
+              data: { node_type: 'remote_stream' }
+            }
+          ]
+        }],
+        updateJsonArray: vi.fn(),
+        isImporting: false
+      };
     });
 
     it('should update remote destination name', () => {
       const remoteDestination = 'remote-dest';
       wrapper.vm.updateRemoteDestination(remoteDestination, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].nodes[0].data.destination_name).toBe(remoteDestination);
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.destination_name).toBe(remoteDestination);
     });
   });
 
   describe('updateDestinationStreamFields Function', () => {
     beforeEach(() => {
       wrapper = createWrapper();
-      wrapper.vm.jsonArrayOfObj = [{
-        nodes: [
-          { io_type: 'output', data: {} }
-        ]
-      }];
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: [{
+          nodes: [
+            { io_type: 'output', data: {} }
+          ]
+        }],
+        updateJsonArray: vi.fn(),
+        isImporting: false
+      };
     });
 
     it('should update destination stream name in output nodes', () => {
       const streamName = 'dest-stream';
       wrapper.vm.updateDestinationStreamFields(streamName, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].nodes[0].data.stream_name).toBe(streamName);
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.stream_name).toBe(streamName);
     });
   });
 
   describe('updateTimezone Function', () => {
     beforeEach(() => {
       wrapper = createWrapper();
-      wrapper.vm.jsonArrayOfObj = [{
-        source: { trigger_condition: {} },
-        nodes: [
-          { data: { node_type: 'query', trigger_condition: {} } }
-        ]
-      }];
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: [{
+          source: { trigger_condition: {} },
+          nodes: [
+            { data: { node_type: 'query', trigger_condition: {} } }
+          ]
+        }],
+        updateJsonArray: vi.fn(),
+        isImporting: false
+      };
     });
 
     it('should update timezone in source trigger_condition', () => {
       const timezone = 'UTC';
       wrapper.vm.updateTimezone(timezone, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].source.trigger_condition.timezone).toBe(timezone);
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.trigger_condition.timezone).toBe(timezone);
     });
 
     it('should update timezone in query nodes', () => {
       const timezone = 'UTC';
       wrapper.vm.updateTimezone(timezone, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].nodes[0].data.trigger_condition.timezone).toBe(timezone);
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.trigger_condition.timezone).toBe(timezone);
     });
   });
 
   describe('updateOrgId Function', () => {
     beforeEach(() => {
       wrapper = createWrapper();
-      wrapper.vm.jsonArrayOfObj = [{
-        source: {},
-        nodes: [
-          { data: { node_type: 'stream' } },
-          { data: { node_type: 'query' } }
-        ]
-      }];
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: [{
+          source: {},
+          nodes: [
+            { data: { node_type: 'stream' } },
+            { data: { node_type: 'query' } }
+          ]
+        }],
+        updateJsonArray: vi.fn(),
+        isImporting: false
+      };
     });
 
     it('should update organization id at root level', () => {
       const orgId = 'new-org';
       wrapper.vm.updateOrgId(orgId, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].org).toBe(orgId);
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].org).toBe(orgId);
     });
 
     it('should update organization id in source', () => {
       const orgId = 'new-org';
       wrapper.vm.updateOrgId(orgId, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].source.org_id).toBe(orgId);
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.org_id).toBe(orgId);
     });
 
     it('should update organization id in eligible nodes', () => {
       const orgId = 'new-org';
       wrapper.vm.updateOrgId(orgId, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].nodes[0].data.org_id).toBe(orgId);
-      expect(wrapper.vm.jsonArrayOfObj[0].nodes[1].data.org_id).toBe(orgId);
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.org_id).toBe(orgId);
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.org_id).toBe(orgId);
     });
   });
 
   describe('handleDynamicStreamName Function', () => {
     beforeEach(() => {
       wrapper = createWrapper();
-      wrapper.vm.jsonArrayOfObj = [{
-        source: {},
-        nodes: [{ io_type: 'input', data: {} }]
-      }];
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: [{
+          source: {},
+          nodes: [{ io_type: 'input', data: {} }]
+        }],
+        updateJsonArray: vi.fn(),
+        isImporting: false
+      };
     });
 
     it('should update stream name when provided', () => {
       const streamName = 'dynamic-stream';
       wrapper.vm.handleDynamicStreamName(streamName, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].source.stream_name).toBe(streamName);
-      expect(wrapper.vm.jsonArrayOfObj[0].stream_name).toBe(streamName);
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name).toBe(streamName);
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].stream_name).toBe(streamName);
     });
 
     it('should not update when stream name is empty', () => {
       wrapper.vm.handleDynamicStreamName('', 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].source.stream_name).toBeUndefined();
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name).toBeUndefined();
     });
 
     it('should not update when stream name is whitespace', () => {
       wrapper.vm.handleDynamicStreamName('   ', 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].source.stream_name).toBeUndefined();
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name).toBeUndefined();
     });
   });
 
-  describe('toggleDestination Function', () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-      wrapper.vm.userSelectedDestinations = [];
-      wrapper.vm.jsonArrayOfObj = [{ destinations: [] }];
-    });
-
-    it('should add destination when not present', () => {
-      wrapper.vm.toggleDestination('dest1', 0);
-      
-      expect(wrapper.vm.userSelectedDestinations[0]).toContain('dest1');
-    });
-
-    it('should remove destination when present', () => {
-      wrapper.vm.userSelectedDestinations[0] = ['dest1'];
-      wrapper.vm.toggleDestination('dest1', 0);
-      
-      expect(wrapper.vm.userSelectedDestinations[0]).not.toContain('dest1');
-    });
-
-    it('should initialize array if not exists', () => {
-      wrapper.vm.toggleDestination('dest1', 0);
-      
-      expect(Array.isArray(wrapper.vm.userSelectedDestinations[0])).toBe(true);
-    });
-  });
-
-  describe('filterDestinations Function', () => {
-    beforeEach(() => {
-      wrapper = createWrapper({
-        destinations: [
-          { name: 'elasticsearch' },
-          { name: 'kafka' },
-          { name: 'elasticsearch-prod' }
-        ]
-      });
-    });
-
-    it('should show all destinations when filter is empty', () => {
-      const update = vi.fn();
-      wrapper.vm.filterDestinations('', update);
-      
-      expect(update).toHaveBeenCalledWith(expect.any(Function));
-    });
-
-    it('should filter destinations by substring', () => {
-      const update = vi.fn();
-      wrapper.vm.filterDestinations('elastic', update);
-      
-      expect(update).toHaveBeenCalledWith(expect.any(Function));
-    });
-  });
-
-  describe('timezoneFilterFn Function', () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it('should show all timezones when filter is empty', () => {
-      const update = vi.fn();
-      wrapper.vm.timezoneFilterFn('', update);
-      
-      expect(update).toHaveBeenCalledWith(expect.any(Function));
-    });
-
-    it('should filter timezones by substring', () => {
-      const update = vi.fn();
-      wrapper.vm.timezoneFilterFn('UTC', update);
-      
-      expect(update).toHaveBeenCalledWith(expect.any(Function));
-    });
-  });
-
-  describe('updateActiveTab Function', () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-      wrapper.vm.jsonStr = 'test';
-      wrapper.vm.jsonFiles = ['file1'];
-      wrapper.vm.url = 'http://test.com';
-      wrapper.vm.jsonArrayOfObj = [{ test: 'data' }];
-    });
-
-    it('should reset all form data', () => {
-      wrapper.vm.updateActiveTab();
-      
-      expect(wrapper.vm.jsonStr).toBe('');
-      expect(wrapper.vm.jsonFiles).toBeNull();
-      expect(wrapper.vm.url).toBe('');
-      expect(wrapper.vm.jsonArrayOfObj).toEqual([{}]);
-    });
-  });
 
   describe('validateNodesForOrg Function', () => {
     beforeEach(() => {
@@ -741,20 +625,6 @@ describe('ImportPipeline.vue', () => {
     });
   });
 
-  describe('onSubmit Function', () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it('should prevent default event behavior', () => {
-      const mockEvent = {
-        preventDefault: vi.fn()
-      };
-      
-      wrapper.vm.onSubmit(mockEvent);
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-    });
-  });
 
   describe('Component Emits', () => {
     beforeEach(() => {
@@ -767,50 +637,6 @@ describe('ImportPipeline.vue', () => {
     });
   });
 
-  describe('JSON File Watcher', () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-      // Mock FileReader
-      global.FileReader = vi.fn(() => ({
-        readAsText: vi.fn(function() {
-          this.onload({ target: { result: JSON.stringify({ test: 'data' }) } });
-        }),
-        onload: null
-      }));
-    });
-
-    it('should process JSON files when jsonFiles changes', async () => {
-      const mockFile = new File([JSON.stringify({ test: 'data' })], 'test.json');
-      wrapper.vm.jsonFiles = [mockFile];
-      
-      await nextTick();
-      // Allow the file reading promise to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
-      expect(wrapper.vm.jsonArrayOfObj).toBeDefined();
-    });
-  });
-
-  describe('URL Watcher', () => {
-    let axiosMock: any;
-    
-    beforeEach(async () => {
-      const axios = await import('axios');
-      axiosMock = vi.mocked(axios.default);
-      axiosMock.get.mockResolvedValue({
-        data: { test: 'data' },
-        headers: { 'content-type': 'application/json' }
-      });
-      wrapper = createWrapper();
-    });
-
-    it('should fetch data when URL changes', async () => {
-      wrapper.vm.url = 'http://example.com/data.json';
-      
-      await nextTick();
-      expect(axiosMock.get).toHaveBeenCalledWith('http://example.com/data.json');
-    });
-  });
 
   describe('Exposed Internal Functions', () => {
     beforeEach(() => {
@@ -871,16 +697,8 @@ describe('ImportPipeline.vue', () => {
       wrapper = createWrapper();
     });
 
-    it('should initialize destinationCreators as empty array', () => {
-      expect(wrapper.vm.destinationCreators).toEqual([]);
-    });
-
     it('should initialize pipelineCreators as empty array', () => {
       expect(wrapper.vm.pipelineCreators).toEqual([]);
-    });
-
-    it('should initialize queryEditorPlaceholderFlag as true', () => {
-      expect(wrapper.vm.queryEditorPlaceholderFlag).toBe(true);
     });
 
     it('should initialize streamList as empty array', () => {
@@ -905,22 +723,6 @@ describe('ImportPipeline.vue', () => {
 
     it('should initialize scheduledPipelines as empty array', () => {
       expect(wrapper.vm.scheduledPipelines).toEqual([]);
-    });
-
-    it('should initialize jsonFiles as null', () => {
-      expect(wrapper.vm.jsonFiles).toBeNull();
-    });
-
-    it('should initialize url as empty string', () => {
-      expect(wrapper.vm.url).toBe('');
-    });
-
-    it('should initialize filteredDestinations as empty array', () => {
-      expect(wrapper.vm.filteredDestinations).toEqual([]);
-    });
-
-    it('should initialize filteredTimezone correctly', () => {
-      expect(Array.isArray(wrapper.vm.filteredTimezone)).toBe(true);
     });
 
     it('should initialize userSelectedTimezone as empty array', () => {
@@ -957,20 +759,6 @@ describe('ImportPipeline.vue', () => {
 
     it('should initialize userSelectedDestinationStreamType as empty array', () => {
       expect(wrapper.vm.userSelectedDestinationStreamType).toEqual([]);
-    });
-  });
-
-  describe('Tabs Configuration', () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it('should have correct tabs structure', () => {
-      expect(wrapper.vm.tabs).toHaveLength(2);
-      expect(wrapper.vm.tabs[0].label).toBe('File Upload / JSON');
-      expect(wrapper.vm.tabs[0].value).toBe('import_json_file');
-      expect(wrapper.vm.tabs[1].label).toBe('URL Import');
-      expect(wrapper.vm.tabs[1].value).toBe('import_json_url');
     });
   });
 
@@ -1039,10 +827,14 @@ describe('ImportPipeline.vue', () => {
         edges: []
       };
 
-      wrapper.vm.jsonArrayOfObj = [pipelineData];
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: [pipelineData],
+        updateJsonArray: vi.fn(),
+        isImporting: false
+      };
       wrapper.vm.updatePipelineName('updated-pipeline', 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].name).toBe('updated-pipeline');
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].name).toBe('updated-pipeline');
     });
 
     it('should handle multiple pipeline objects', () => {
@@ -1051,12 +843,16 @@ describe('ImportPipeline.vue', () => {
         { name: 'pipeline2', source: {}, nodes: [] }
       ];
 
-      wrapper.vm.jsonArrayOfObj = pipelines;
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: pipelines,
+        updateJsonArray: vi.fn(),
+        isImporting: false
+      };
       wrapper.vm.updatePipelineName('updated-pipeline1', 0);
       wrapper.vm.updatePipelineName('updated-pipeline2', 1);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].name).toBe('updated-pipeline1');
-      expect(wrapper.vm.jsonArrayOfObj[1].name).toBe('updated-pipeline2');
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].name).toBe('updated-pipeline1');
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[1].name).toBe('updated-pipeline2');
     });
 
     it('should maintain data consistency across updates', () => {
@@ -1068,12 +864,16 @@ describe('ImportPipeline.vue', () => {
         edges: [{ sourceNode: { data: { stream_name: 'old-stream' } } }]
       };
 
-      wrapper.vm.jsonArrayOfObj = [pipelineData];
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: [pipelineData],
+        updateJsonArray: vi.fn(),
+        isImporting: false
+      };
       wrapper.vm.updateStreamFields({ value: 'new-stream' }, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].source.stream_name).toBe('new-stream');
-      expect(wrapper.vm.jsonArrayOfObj[0].stream_name).toBe('new-stream');
-      expect(wrapper.vm.jsonArrayOfObj[0].nodes[0].data.stream_name).toBe('new-stream');
+
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name).toBe('new-stream');
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].stream_name).toBe('new-stream');
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.stream_name).toBe('new-stream');
     });
   });
 });

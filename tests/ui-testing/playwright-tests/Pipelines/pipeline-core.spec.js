@@ -313,17 +313,25 @@ test.describe("Core Pipeline Tests", () => {
     await page.waitForTimeout(500);
     await page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
     await page.locator('[data-test="confirm-button"]').click();
-    // Drag and drop condition instead of hover-click  
+    // Drag and drop condition instead of hover-click
     await pageManager.pipelinesPage.selectAndDragCondition();
-    await page.getByPlaceholder("Column").click();
-    await page.getByPlaceholder("Column").fill("container_name");
+    await page.waitForTimeout(1000);
+
+    // FilterGroup UI: Fill column select
+    await page.locator('[data-test="alert-conditions-select-column"]').locator('input').click();
+    await page.locator('[data-test="alert-conditions-select-column"]').locator('input').fill("container_name");
+    await page.waitForTimeout(500);
     await page.getByRole("option", { name: "kubernetes_container_name" }).click();
-    await page.locator(
-      "div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native"
-    ).click();
+
+    // Select operator
+    await page.locator('[data-test="alert-conditions-operator-select"]').click();
+    await page.waitForTimeout(300);
     await page.getByText("Contains", { exact: true }).click();
-    await page.getByPlaceholder("Value").click();
-    await page.getByPlaceholder("Value").fill("prometheus");
+
+    // Fill value input
+    await page.locator('[data-test="alert-conditions-value-input"]').locator('input').click();
+    await page.locator('[data-test="alert-conditions-value-input"]').locator('input').fill("prometheus");
+
     await pageManager.pipelinesPage.saveCondition();
     await page.waitForTimeout(2000);
     // Drag and drop output stream instead of hover-click

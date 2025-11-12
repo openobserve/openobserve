@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, onMounted } from "vue";
+import { defineComponent, ref, onActivated, onBeforeMount, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -744,7 +744,12 @@ export default defineComponent({
       if (!filterQuery.value) return serviceAccountsState.service_accounts_users || []
       return filterData(serviceAccountsState.service_accounts_users || [], filterQuery.value)
     });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+    // Watch visibleRows to sync resultTotal with search filter
+    watch(visibleRows, (newVisibleRows) => {
+      resultTotal.value = newVisibleRows.length;
+    }, { immediate: true });
 
     return {
       $q,

@@ -1706,6 +1706,7 @@ import {
   queryIndexSplit,
   timestampToTimezoneDate,
   b64EncodeUnicode,
+  buildDateTimeObject,
 } from "@/utils/zincutils";
 
 import savedviewsService from "@/services/saved_views";
@@ -1926,7 +1927,7 @@ export default defineComponent({
       getHistogramTitle,
     } = useLogs();
 
-    const { isStreamExists, isStreamFetched, getStreams } = useStreams();
+    const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams();
     const queryEditorRef = ref(null);
 
     const formData: any = ref(defaultValue());
@@ -2963,6 +2964,7 @@ export default defineComponent({
               extractedObj.data.savedViews = searchObj.data.savedViews;
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
+              //here we are merging deep to the searchObj with the extractedObj
               mergeDeep(searchObj, extractedObj);
               searchObj.shouldIgnoreWatcher = true;
 
@@ -2997,6 +2999,98 @@ export default defineComponent({
                 );
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
+              }
+
+
+              //here we are getting data so we need to check here
+              //before we set the time to the dateTimeRef.value we need to check if the startTime and endTime difference is greater than maxQueryRange in hours
+              //solution will be we will do endTime - startTime and convert that difference into hours and check with both global and stream level maxQueryRange and if it is less than or equal to that we will keep that as it is
+              //if that exceeds the maxQueryRange we will convert that to relative type (because we cannot assume the start and end date) or we can do that by converting present time - maxQueryRange
+
+              // Validate and adjust time range based on maxQueryRange
+              //before we check all this we need to get the current selected stream max query range and also global max query range
+              //we need to compare so if max query range of stream is there we will use that otherwise we will use the global max query if both are not present
+              //we will skip this below process
+
+              // Get max query range for all selected streams and take the minimum
+              // Preference: stream max query range > global max query range
+              const globalMaxQueryRange = store.state.zoConfig.max_query_range || 0;
+              let effectiveMaxQueryRange = -1;
+
+              if (selectedStreams && selectedStreams.length > 0) {
+                // Fetch all stream data in parallel
+                const streamDataPromises = selectedStreams.map((streamName) =>
+                  getStream(streamName, searchObj.data.stream.streamType, false)
+                );
+
+                try {
+                  const streamDataList = await Promise.all(streamDataPromises);
+
+                  // Extract max_query_range from each stream's settings
+                  const streamMaxQueryRanges = streamDataList
+                    .map((streamData) => streamData?.settings?.max_query_range || 0)
+                    .filter((range) => range > 0); // Only consider positive values
+
+                  // If we have stream-specific max query ranges, find the minimum (stream takes preference)
+                  if (streamMaxQueryRanges.length > 0) {
+                    effectiveMaxQueryRange = Math.min(...streamMaxQueryRanges);
+                  } else if (globalMaxQueryRange > 0) {
+                    // No stream-specific ranges, fall back to global max query range
+                    effectiveMaxQueryRange = globalMaxQueryRange;
+                  }
+                } catch (error) {
+                  // On error, fall back to global max query range
+                  effectiveMaxQueryRange = globalMaxQueryRange > 0 ? globalMaxQueryRange : -1;
+                }
+              } else if (globalMaxQueryRange > 0) {
+                // No selected streams, use global max query range
+                effectiveMaxQueryRange = globalMaxQueryRange;
+              }
+
+              // Validate and adjust time range if effective max query range exists
+              if (
+                effectiveMaxQueryRange > 0 &&
+                searchObj.data.datetime?.startTime &&
+                searchObj.data.datetime?.endTime
+              ) {
+                // Calculate time difference in hours
+                const startTimeMicros = parseInt(searchObj.data.datetime.startTime);
+                const endTimeMicros = parseInt(searchObj.data.datetime.endTime);
+                const timeDiffInHours = (endTimeMicros - startTimeMicros) / (60 * 60 * 1000000);
+
+                // Check if time difference exceeds effective max query range
+                if (timeDiffInHours > effectiveMaxQueryRange) {
+                  // Adjust to current time - maxQueryRange
+                  const currentTimeMicros = Date.now() * 1000; // Convert milliseconds to microseconds
+                  const maxQueryRangeMicros = effectiveMaxQueryRange * 60 * 60 * 1000000;
+
+                  const adjustedStartTime = currentTimeMicros - maxQueryRangeMicros;
+                  const adjustedEndTime = currentTimeMicros;
+
+                  // Get the current datetime type
+                  const currentType = searchObj.data.datetime.type || "relative";
+
+                  // Build the complete datetime object with all required fields
+                  const updatedDateTime = buildDateTimeObject(
+                    adjustedStartTime,
+                    adjustedEndTime,
+                    currentType
+                  );
+
+                  // Update searchObj.data.datetime with all fields
+                  searchObj.data.datetime.startTime = adjustedStartTime;
+                  searchObj.data.datetime.endTime = adjustedEndTime;
+
+                  if (currentType === "relative") {
+                    // For relative type, update relativeTimePeriod
+                    searchObj.data.datetime.relativeTimePeriod = updatedDateTime.relativeTimePeriod;
+                  } else if (currentType === "absolute") {
+                    // For absolute type, update selectedDate and selectedTime
+                    searchObj.data.datetime.selectedDate = updatedDateTime.selectedDate;
+                    searchObj.data.datetime.selectedTime = updatedDateTime.selectedTime;
+                    searchObj.data.datetime.relativeTimePeriod = null;
+                  }
+                }
               }
 
               dateTimeRef.value.setSavedDate(searchObj.data.datetime);

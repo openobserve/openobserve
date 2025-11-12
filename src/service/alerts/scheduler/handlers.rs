@@ -742,7 +742,7 @@ async fn handle_alert_triggers(
                 &data,
                 trigger_results.end_time,
                 Some(start_time),
-                final_end_time,
+                triggered_at,
             )
             .await
         {

@@ -975,7 +975,7 @@ pub struct Common {
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
         help = "possible values - 'local', 'remote', 'both'"
-    )] // local, remote , both
+    )] // local, remote, both
     pub usage_reporting_mode: String,
     #[env_config(
         name = "ZO_USAGE_REPORTING_URL",
@@ -2558,6 +2558,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.common.default_hec_stream.is_empty() {
         cfg.common.default_hec_stream = "_hec".to_string();
+    }
+
+    if cfg.common.usage_publish_interval < 1 {
+        cfg.common.usage_publish_interval = 60;
     }
 
     cfg.common.log_page_default_field_list = cfg.common.log_page_default_field_list.to_lowercase();

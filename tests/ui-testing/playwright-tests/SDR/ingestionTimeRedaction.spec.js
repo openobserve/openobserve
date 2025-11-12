@@ -154,7 +154,7 @@ async function verifyMultipleFieldsRedaction(page, pm, streamName, fieldsToVerif
 }
 
 
-test.describe("Ingestion Time Redaction - Combined Test", () => {
+test.describe("Ingestion Time Redaction - Combined Test", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
 

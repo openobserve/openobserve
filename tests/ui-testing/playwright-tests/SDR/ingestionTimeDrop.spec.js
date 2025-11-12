@@ -210,7 +210,7 @@ async function verifyFieldsAreDropped(page, pm, streamName, fieldNames) {
 }
 
 
-test.describe("Ingestion Time Drop - Combined Test", () => {
+test.describe("Ingestion Time Drop - Combined Test", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
 
