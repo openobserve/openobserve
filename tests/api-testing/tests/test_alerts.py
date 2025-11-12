@@ -734,10 +734,12 @@ def test_e2e_alert_history(create_session, base_url):
 
     alerts_data = resp_get_alerts.json()
     alerts_list = alerts_data.get("list", [])
+    print(f"Alerts list: {alerts_list}")
 
     # Find alert IDs for our test alerts
     alert_id_1 = None
     alert_id_2 = None
+
     for alert in alerts_list:
         if alert["name"] == alert_name_1:
             alert_id_1 = alert["alert_id"]
