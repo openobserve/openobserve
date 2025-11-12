@@ -15,12 +15,14 @@ vi.mock("@/services/alert_destination", () => ({
 }));
 
 // Mock the zincutils
+let uuidCounter = 0;
 vi.mock("@/utils/zincutils", () => ({
   isValidResourceName: vi.fn((val: string) => {
     const invalidChars = /[:\/?#\s]/;
     return !invalidChars.test(val);
   }),
   getImageURL: vi.fn((path: string) => `/mock/${path}`),
+  getUUID: vi.fn(() => `test-uuid-${++uuidCounter}`),
 }));
 
 installQuasar({
