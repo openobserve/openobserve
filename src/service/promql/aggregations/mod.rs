@@ -50,14 +50,80 @@ pub(crate) use stdvar::stdvar;
 pub(crate) use sum::sum;
 pub(crate) use topk::topk;
 
+/// Trait for PromQL aggregation functions.
+///
+/// This trait defines the interface for aggregation functions (e.g., sum, avg, max, min, topk)
+/// used in PromQL query evaluation. Each aggregation function implements this trait to provide
+/// its name and create accumulator instances for processing time series data.
+///
+/// # Examples
+///
+/// ```ignore
+/// struct SumAgg;
+///
+/// impl AggFunc for SumAgg {
+///     fn name(&self) -> &'static str {
+///         "sum"
+///     }
+///
+///     fn build(&self) -> Box<dyn Accumulate> {
+///         Box::new(SumAccumulator::new())
+///     }
+/// }
+/// ```
 pub trait AggFunc: Sync {
+    /// Returns the name of the aggregation function (e.g., "sum", "avg", "max").
     fn name(&self) -> &'static str;
+
+    /// Creates a new accumulator instance for this aggregation function.
+    ///
+    /// Each call to `build()` should return a fresh accumulator that can independently
+    /// collect and aggregate samples. This allows for parallel processing of multiple
+    /// label groups.
     fn build(&self) -> Box<dyn Accumulate>;
 }
 
+/// Trait for accumulating and aggregating time series samples.
+///
+/// This trait defines the interface for accumulators that collect samples from one or more
+/// time series and compute aggregated results. Accumulators are created by [`AggFunc::build()`]
+/// and are used to process samples in a stateful manner.
+///
+/// The typical lifecycle is:
+/// 1. Create accumulator via `AggFunc::build()`
+/// 2. Call `accumulate()` for each sample to include in the aggregation
+/// 3. Call `evaluate()` to compute and return the final aggregated samples
+///
+/// # Examples
+///
+/// ```ignore
+/// let mut acc = sum_agg.build();
+/// for sample in samples {
+///     acc.accumulate(&sample);
+/// }
+/// let results = acc.evaluate();
+/// ```
 pub trait Accumulate: Sync {
+    /// Adds a sample to this accumulator.
+    ///
+    /// This method is called for each sample that should be included in the aggregation.
+    /// The accumulator maintains internal state to track the accumulated values across
+    /// all samples.
+    ///
+    /// # Parameters
+    ///
+    /// * `sample` - The sample to accumulate, containing a timestamp and value
     fn accumulate(&mut self, sample: &Sample);
 
+    /// Computes and returns the final aggregated results.
+    ///
+    /// This method consumes the accumulator (takes ownership via `Box<Self>`) and produces
+    /// the final aggregated samples. The returned vector typically contains one sample per
+    /// unique timestamp that was accumulated.
+    ///
+    /// # Returns
+    ///
+    /// A vector of samples representing the aggregated results
     fn evaluate(self: Box<Self>) -> Vec<Sample>;
 }
 
@@ -135,7 +201,7 @@ where
 
     // Use the eval timestamps from the context to ensure consistent alignment
     let eval_timestamps = eval_ctx.timestamps();
-    let eval_timestamps: ahash::HashSet<i64> = eval_timestamps.iter().cloned().collect();
+    let eval_timestamps: hashbrown::HashSet<i64> = eval_timestamps.iter().cloned().collect();
 
     if eval_timestamps.is_empty() {
         return Ok(Value::None);

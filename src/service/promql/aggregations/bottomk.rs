@@ -15,6 +15,7 @@
 
 use config::utils::sort::sort_float;
 use datafusion::error::{DataFusionError, Result};
+use hashbrown::HashSet;
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
@@ -44,16 +45,15 @@ pub fn bottomk(
     }
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] bottomk_range(k={}) started with {} series and {} timestamps",
+        "[trace_id: {}] [PromQL Timing] bottomk(k={k}) started with {} series and {} timestamps",
         eval_ctx.trace_id,
-        k,
         matrix.len(),
         eval_ctx.timestamps().len()
     );
 
     // For bottomk, we select the bottom k series at each timestamp
     // We need to preserve the original series structure
-    let eval_timestamps: ahash::HashSet<i64> = eval_ctx.timestamps().iter().cloned().collect();
+    let eval_timestamps: HashSet<i64> = eval_ctx.timestamps().iter().cloned().collect();
 
     // Group series by label modifier
     let grouped_series = super::group_series_by_labels(&matrix, modifier);
@@ -68,9 +68,8 @@ pub fn bottomk(
         .collect();
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] bottomk_range(k={}) completed in {:?}, produced {} series",
+        "[trace_id: {}] [PromQL Timing] bottomk(k={k}) completed in {:?}, produced {} series",
         eval_ctx.trace_id,
-        k,
         start.elapsed(),
         result.len()
     );
@@ -87,7 +86,7 @@ fn select_bottomk_series(
     matrix: &[RangeValue],
     series_indices: &[usize],
     k: usize,
-    eval_timestamps: &ahash::HashSet<i64>,
+    eval_timestamps: &HashSet<i64>,
 ) -> Vec<RangeValue> {
     // For bottomk, we keep the original series but only include timestamps
     // where they are in the bottom k

@@ -55,9 +55,8 @@ pub fn count_values(
     }
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] count_values_range(label_name={}) started with {} series and {} timestamps",
+        "[trace_id: {}] [PromQL Timing] count_values(label_name={label_name}) started with {} series and {} timestamps",
         eval_ctx.trace_id,
-        label_name,
         matrix.len(),
         eval_ctx.timestamps().len()
     );
@@ -131,9 +130,8 @@ pub fn count_values(
         .collect();
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] count_values_range(label_name={}) completed in {:?}, produced {} series",
+        "[trace_id: {}] [PromQL Timing] count_values(label_name={label_name}) completed in {:?}, produced {} series",
         eval_ctx.trace_id,
-        label_name,
         start.elapsed(),
         result.len()
     );
