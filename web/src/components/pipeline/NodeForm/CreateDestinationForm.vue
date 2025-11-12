@@ -123,14 +123,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               stack-label
               :rules="[
                 (val: any) => !!val.trim() || 'Field is required!',
+                (val: any) => !val.trim().endsWith('/') || 'URL should not end with a trailing slash',
               ]"
               tabindex="0"
-              :suffix="urlSuffix"
             >
               <template #hint>
                 <span class="text-caption"
-                  >Example: https://your-domain.com</span
+                  >Base URL without trailing slash (e.g., https://your-domain.com)</span
                 >
+              </template>
+            </q-input>
+
+            <!-- Endpoint Path field - shown for all destination types -->
+            <q-input
+              data-test="add-destination-url-endpoint-input"
+              v-model="formData.url_endpoint"
+              :label="formData.destination_type === 'custom' ? 'Endpoint Path' : 'Endpoint Path *'"
+              class="no-border showLabelOnTop"
+              borderless
+              dense
+              flat
+              stack-label
+              bottom-slots
+              :rules="[
+                ...(formData.destination_type === 'custom' ? [] : [(val: any) => !!val.trim() || 'Field is required!']),
+                (val: any) => !val.trim() || val.trim().startsWith('/') || 'Endpoint path must start with /',
+              ]"
+              tabindex="0"
+            >
+              <template #hint>
+                <span class="text-caption">
+                  Path will be appended to base URL (must start with /)
+                </span>
               </template>
             </q-input>
             <!-- Method field - only shown for Custom destination type -->
@@ -140,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.method"
               :label="t('alert_destinations.method') + ' *'"
               :options="apiMethods"
-              class="no-border showLabelOnTop q-mt-lg"
+              class="no-border showLabelOnTop"
               borderless
               dense
               flat
@@ -149,37 +173,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rules="[(val: any) => !!val || 'Field is required!']"
               tabindex="0"
             />
-
-            <!-- OpenObserve-specific fields -->
-            <div
-              v-if="formData.destination_type === 'openobserve'"
-              class="openobserve-fields"
-            >
-              <q-input
-                data-test="add-destination-org-identifier-input"
-                v-model="formData.org_identifier"
-                label="Organization Identifier *"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                tabindex="0"
-              ></q-input>
-              <q-input
-                data-test="add-destination-stream-name-input"
-                v-model="formData.stream_name"
-                label="Stream Name *"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                tabindex="0"
-              ></q-input>
-            </div>
 
             <!-- Output Format field - disabled for all except Custom -->
             <q-select
@@ -474,6 +467,7 @@ const step = ref(1);
 const formData: Ref<DestinationData> = ref({
   name: "",
   url: "",
+  url_endpoint: "",
   method: "post",
   skip_tls_verify: false,
   template: "",
@@ -482,8 +476,6 @@ const formData: Ref<DestinationData> = ref({
   type: "http",
   output_format: "json",
   destination_type: "openobserve",
-  org_identifier: "default",
-  stream_name: "default",
 });
 
 // TODO OK: Use UUID package instead of this and move this method in utils
@@ -580,14 +572,31 @@ const apiHeaders: Ref<
 const populateFormForEdit = (destination: DestinationData) => {
   // Populate basic fields
   formData.value.name = destination.name;
-  formData.value.url = destination.url || "";
   formData.value.method = destination.method || "post";
   formData.value.skip_tls_verify = destination.skip_tls_verify || false;
   formData.value.template = (destination.template as string) || "";
   formData.value.output_format = destination.output_format || "json";
-  formData.value.destination_type = destination.destination_type || "openobserve";
-  formData.value.org_identifier = destination.org_identifier || "default";
-  formData.value.stream_name = destination.stream_name || "default";
+  // Use destination_type_name from backend, fallback to destination_type or default
+  formData.value.destination_type = destination.destination_type_name || destination.destination_type || "openobserve";
+
+  // Split URL into hostname and endpoint for all destination types
+  const fullUrl = destination.url || "";
+  if (fullUrl) {
+    try {
+      const url = new URL(fullUrl);
+      // Base URL is protocol + hostname + port (if any)
+      formData.value.url = url.origin;
+      // URL endpoint is the path + search + hash
+      formData.value.url_endpoint = url.pathname + url.search + url.hash;
+    } catch {
+      // If URL parsing fails, keep the full URL in the url field
+      formData.value.url = fullUrl;
+      formData.value.url_endpoint = "";
+    }
+  } else {
+    formData.value.url = fullUrl;
+    formData.value.url_endpoint = "";
+  }
 
   // Populate headers
   if (destination.headers && typeof destination.headers === "object") {
@@ -604,7 +613,7 @@ const populateFormForEdit = (destination: DestinationData) => {
   step.value = 2;
 };
 
-// Watch destination_type changes to set method, output_format, and headers appropriately
+// Watch destination_type changes to set method, output_format, headers, and url_endpoint
 watch(
   () => formData.value.destination_type,
   (newType) => {
@@ -621,6 +630,9 @@ watch(
           formData.value.output_format = "json";
         }
       }
+
+      // Prefill URL endpoint based on destination type
+      formData.value.url_endpoint = defaultUrlEndpoint.value;
 
       // Set default headers for the destination type
       apiHeaders.value = getDefaultHeaders(newType);
@@ -643,13 +655,11 @@ const isValidDestination = computed(
   () => formData.value.name && formData.value.url && formData.value.method,
 );
 
-const urlSuffix = computed(() => {
+// Default URL endpoints for different destination types (shown as hint)
+const defaultUrlEndpoint = computed(() => {
   switch (formData.value.destination_type) {
-    case "openobserve": {
-      const org = formData.value.org_identifier || "default";
-      const stream = formData.value.stream_name || "default";
-      return `/api/${org}/${stream}/_json`;
-    }
+    case "openobserve":
+      return "/api/{org}/{stream}/_json";
     case "splunk":
       return "/services/collector";
     case "elasticsearch":
@@ -703,13 +713,14 @@ const connectionNotes = computed(() => {
         title: "OpenObserve Connection Details",
         steps: [
           "Log in to your OpenObserve instance",
-          "Navigate to 'Data sources' navigation menu",
-          "Navigate to 'Custom' tab on data sources page",
-          "Go to respective sub-tab and copy OpenObserve instance URL (e.g., https://your-instance.openobserve.ai)",
-          "The endpoint suffix will be automatically added: /api/default/default/_json",
-          "Add headers: Authorization: Basic <OpenObserve_Token>",
+          "Copy your base URL (e.g., https://your-instance.openobserve.ai)",
+          "The endpoint path is prefilled as: /api/{org}/{stream}/_json",
+          "Replace {org} with your organization identifier",
+          "Replace {stream} with your stream name",
+          "Add authentication header: Authorization: Basic <OpenObserve_Token>",
         ],
-        example: "https://your-instance.openobserve.ai",
+        example:
+          "Base URL: https://your-instance.openobserve.ai | Endpoint: /api/default/default/_json",
       };
     case "splunk":
       return {
@@ -818,9 +829,11 @@ const createDestination = () => {
     if (header["key"] && header["value"]) headers[header.key] = header.value;
   });
 
+  // Merge URL + URL endpoint for all destination types
+  const fullUrl = formData.value.url + (formData.value.url_endpoint || '');
+
   const payload: any = {
-    url: formData.value.url,
-    url_suffix: urlSuffix.value,
+    url: fullUrl,
     method: formData.value.method,
     skip_tls_verify: formData.value.skip_tls_verify,
     template: formData.value.template,
@@ -828,6 +841,7 @@ const createDestination = () => {
     name: formData.value.name,
     type: "http",
     output_format: formData.value.output_format,
+    destination_type_name: formData.value.destination_type,
   };
 
   // Check if we're in edit mode
@@ -905,6 +919,7 @@ const resetForm = () => {
   formData.value = {
     name: "",
     url: "",
+    url_endpoint: "",
     method: "post",
     skip_tls_verify: false,
     template: "",
@@ -913,8 +928,6 @@ const resetForm = () => {
     type: "http",
     output_format: "json",
     destination_type: defaultDestinationType,
-    org_identifier: "default",
-    stream_name: "default",
   };
   // Set default headers for OpenObserve
   apiHeaders.value = getDefaultHeaders(defaultDestinationType);
@@ -1117,6 +1130,14 @@ defineExpose({
 .create-destination-form {
   .q-stepper {
     background: transparent !important;
+  }
+
+  .q-field--labeled.showLabelOnTop .q-field__bottom {
+    padding: 0.275rem 0 0 !important;
+  }
+
+  .q-field--labeled.showLabelOnTop {
+    padding-top: 24px;
   }
 }
 </style>

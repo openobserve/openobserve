@@ -95,6 +95,7 @@ export interface Headers {
 export interface Destination {
   name: string;
   url?: string;
+  url_endpoint?: string; // Frontend only - used for display/editing
   method?: string;
   skip_tls_verify?: boolean;
   headers?: Headers;
@@ -103,14 +104,13 @@ export interface Destination {
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
   output_format?: "json" | "ndjson";
-  destination_type?: string;
-  org_identifier?: string;
-  stream_name?: string;
+  destination_type?: string; // Frontend internal use
+  destination_type_name?: string; // From backend
 }
 
 export interface DestinationPayload {
   name: string;
-  url?: string;
+  url?: string; // Full URL (merged with endpoint before sending)
   method?: string;
   skip_tls_verify?: boolean;
   headers?: Headers;
@@ -119,6 +119,7 @@ export interface DestinationPayload {
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
   output_format?: "json" | "ndjson";
+  destination_type?: string; // New field added
 }
 
 // Destination object which is modified in frontend to display in table and form
