@@ -653,7 +653,7 @@ async fn process_node(
                 }
                 // only send to children when passing all condition evaluations
                 if condition_params
-                    .condition
+                    .conditions
                     .evaluate(record.as_object().unwrap())
                     .await
                 {
