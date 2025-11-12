@@ -30,6 +30,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">Predefined Themes</div>
         <q-space />
+        <q-btn
+          label="Reset"
+          icon="refresh"
+          flat
+          dense
+          color="negative"
+          @click="resetToDefaultTheme"
+          class="q-mr-sm"
+        />
         <q-btn icon="close" flat round dense v-close-popup />
       </q-card-section>
 
@@ -174,6 +183,7 @@ import { ref, watch, onMounted, onUnmounted } from "vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
+import { hexToRgba, applyThemeColors } from "@/utils/theme";
 
 const $q = useQuasar();
 const store = useStore();
@@ -181,7 +191,13 @@ const { isOpen } = usePredefinedThemes();
 const dialogOpen = ref(false);
 const activeTab = ref("light");
 
-// Track applied themes for each mode - Load from localStorage
+// Default colors
+// Get default colors from Vuex store (centralized - can be updated in one place)
+const DEFAULT_LIGHT_COLOR = store.state.defaultThemeColors.light;
+const DEFAULT_DARK_COLOR = store.state.defaultThemeColors.dark;
+
+// Track applied themes for each mode
+// Read from localStorage if available, otherwise set to null (no theme applied yet)
 const appliedLightTheme = ref<number | null>(
   localStorage.getItem('appliedLightTheme')
     ? parseInt(localStorage.getItem('appliedLightTheme')!)
@@ -193,12 +209,29 @@ const appliedDarkTheme = ref<number | null>(
     : null
 );
 
-// Custom color picker state - Load from localStorage
-const customLightColor = ref(localStorage.getItem('customLightColor') || "#3F7994");
-const customDarkColor = ref(localStorage.getItem('customDarkColor') || "#5B9FBE");
-const showColorPicker = ref(false);
-const currentPickerMode = ref<"light" | "dark">("light");
-const tempColor = ref("#3F7994");
+// Custom color state for the color picker in PredefinedThemes dialog
+// Priority order (highest to lowest):
+// 1. Vuex store tempThemeColors (live preview from General Settings - highest priority)
+// 2. localStorage customColor (permanently saved custom color)
+// 3. Organization settings (backend default for the organization)
+// 4. Application defaults (#3F7994 for light, #5B9FBE for dark)
+const customLightColor = ref(
+  store.state.tempThemeColors?.light ||
+  localStorage.getItem('customLightColor') ||
+  store.state?.organizationData?.organizationSettings?.light_mode_theme_color ||
+  DEFAULT_LIGHT_COLOR
+);
+const customDarkColor = ref(
+  store.state.tempThemeColors?.dark ||
+  localStorage.getItem('customDarkColor') ||
+  store.state?.organizationData?.organizationSettings?.dark_mode_theme_color ||
+  DEFAULT_DARK_COLOR
+);
+
+// Color picker dialog state
+const showColorPicker = ref(false);                          // Controls dialog visibility
+const currentPickerMode = ref<"light" | "dark">("light");    // Which mode is being edited
+const tempColor = ref(customLightColor.value);               // Bound to q-color component
 
 // Watch isOpen from composable
 watch(isOpen, (val) => {
@@ -236,137 +269,131 @@ watch(
   }
 );
 
-// Helper function to convert hex to rgba
-const hexToRgba = (hex: string, opacity: number): string => {
-  hex = hex.replace('#', '');
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  const alpha = opacity / 10; // Convert 1-10 scale to 0.1-1.0
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
+// Watch for organization settings changes and update custom colors
+// This watcher handles the case where organizationSettings load AFTER component initialization
+// or when admin updates organization settings while PredefinedThemes dialog is open
+watch(
+  () => store.state?.organizationData?.organizationSettings,
+  (newSettings, oldSettings) => {
+    if (newSettings && newSettings !== oldSettings) {
+      // IMPORTANT: Don't override if user is actively previewing a color from General Settings
+      // If temp colors exist in Vuex store, skip update to preserve the preview
+      const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+      if (hasTempColors) {
+        return;
+      }
 
-// Function to apply theme colors directly to CSS variables
-const applyThemeColors = (themeColor: string, mode: "light" | "dark", isDefault: boolean = false) => {
-  const isDarkMode = mode === "dark";
+      const currentMode = store.state.theme === "dark" ? "dark" : "light";
+      let shouldApply = false;
 
-  if (isDarkMode) {
-    // Apply dark mode theme color
-    const rgbaColor = hexToRgba(themeColor, 10);
-    document.body.style.setProperty('--o2-dark-theme-color', rgbaColor);
+      // Only update if localStorage doesn't have custom colors
+      if (!localStorage.getItem('customLightColor') && newSettings.light_mode_theme_color) {
+        customLightColor.value = newSettings.light_mode_theme_color;
+        if (currentMode === 'light' && appliedLightTheme.value === -1) {
+          shouldApply = true;
+        }
+      }
+      if (!localStorage.getItem('customDarkColor') && newSettings.dark_mode_theme_color) {
+        customDarkColor.value = newSettings.dark_mode_theme_color;
+        if (currentMode === 'dark' && appliedDarkTheme.value === -1) {
+          shouldApply = true;
+        }
+      }
 
-    // Apply menu gradient colors
-    if (isDefault) {
-      // Use default menu gradient colors
-      document.body.style.setProperty('--o2-menu-gradient-start', 'rgba(89, 155, 174, 0.3)');
-      document.body.style.setProperty('--o2-menu-gradient-end', 'rgba(48, 193, 233, 0.3)');
-      // Use default menu color for dark mode
-      document.body.style.setProperty('--o2-menu-color', '#FFFFFF');
-    } else {
-      // Calculate menu gradient from theme color
-      const menuGradientStart = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
-      const menuGradientEnd = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
-      document.body.style.setProperty('--o2-menu-gradient-start', menuGradientStart);
-      document.body.style.setProperty('--o2-menu-gradient-end', menuGradientEnd);
-      // Use theme color as menu color for dark mode
-      document.body.style.setProperty('--o2-menu-color', themeColor);
+      // Apply theme if custom theme is active and we updated the color
+      if (shouldApply) {
+        const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
+        applyThemeColors(color, currentMode, false);
+      }
     }
+  },
+  { deep: true }
+);
 
-    // Clear light mode variables
-    document.documentElement.style.removeProperty('--o2-theme-color');
-    document.documentElement.style.removeProperty('--o2-body-primary-bg');
-    document.documentElement.style.removeProperty('--o2-body-secondary-bg');
-    document.documentElement.style.removeProperty('--o2-menu-gradient-start');
-    document.documentElement.style.removeProperty('--o2-menu-gradient-end');
-    document.documentElement.style.removeProperty('--o2-menu-color');
-    document.body.style.removeProperty('background');
-  } else {
-    // Apply light mode theme color
-    const rgbaColor = hexToRgba(themeColor, 10);
-    document.documentElement.style.setProperty('--o2-theme-color', rgbaColor);
-
-    // Auto-calculate and apply background colors based on theme color
-    const primaryBg = hexToRgba(themeColor, 0.1); // 0.01 alpha (1%)
-    const secondaryBg = hexToRgba(themeColor, 4); // 0.4 alpha (40%)
-
-    document.documentElement.style.setProperty('--o2-body-primary-bg', primaryBg);
-    document.documentElement.style.setProperty('--o2-body-secondary-bg', secondaryBg);
-
-    // Update body gradient with auto-calculated colors
-    const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
-    document.body.style.setProperty('background', gradient, 'important');
-
-    // Apply menu gradient colors
-    if (isDefault) {
-      // Use default menu gradient colors
-      document.documentElement.style.setProperty('--o2-menu-gradient-start', 'rgba(89, 175, 199, 0.3)');
-      document.documentElement.style.setProperty('--o2-menu-gradient-end', 'rgba(48, 193, 233, 0.3)');
-      // Use default menu color for light mode
-      document.documentElement.style.setProperty('--o2-menu-color', '#3F7994');
-    } else {
-      // Calculate menu gradient from theme color
-      const menuGradientStart = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
-      const menuGradientEnd = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
-      document.documentElement.style.setProperty('--o2-menu-gradient-start', menuGradientStart);
-      document.documentElement.style.setProperty('--o2-menu-gradient-end', menuGradientEnd);
-      // Use theme color as menu color for light mode
-      document.documentElement.style.setProperty('--o2-menu-color', themeColor);
-    }
-
-    // Clear dark mode variables
-    document.body.style.removeProperty('--o2-dark-theme-color');
-    document.body.style.removeProperty('--o2-menu-gradient-start');
-    document.body.style.removeProperty('--o2-menu-gradient-end');
-    document.body.style.removeProperty('--o2-menu-color');
-  }
-};
-
-// Watch for theme mode changes and reapply colors
+// MutationObserver for watching body class changes (theme mode switches)
+// This will be initialized in onMounted and cleaned up in onUnmounted
 let observer: MutationObserver | null = null;
 
+/**
+ * Component mounted lifecycle hook
+ * Initializes theme colors and sets up MutationObserver for theme mode changes
+ */
 onMounted(() => {
-  // Apply default theme on initial load if no theme has been applied
   const currentMode = store.state.theme === "dark" ? "dark" : "light";
-  const appliedTheme = currentMode === "light" ? appliedLightTheme.value : appliedDarkTheme.value;
 
-  if (appliedTheme === null) {
-    // No theme applied yet, apply the default blue theme silently
-    const defaultTheme = predefinedThemes.find(t => t.id === 1);
-    if (defaultTheme) {
-      const modeColors = currentMode === "light" ? defaultTheme.light : defaultTheme.dark;
-      applyThemeColors(modeColors.themeColor, currentMode, true);
+  // PRIORITY 1: Check if there's a temporary preview color in Vuex store (from General Settings)
+  // If user is previewing a color in General Settings, apply it here too
+  const hasTempPreview = currentMode === "light"
+    ? !!store.state.tempThemeColors?.light
+    : !!store.state.tempThemeColors?.dark;
 
-      // Track the applied theme and save to localStorage
-      if (currentMode === "light") {
-        appliedLightTheme.value = defaultTheme.id;
-        localStorage.setItem('appliedLightTheme', defaultTheme.id.toString());
-      } else {
-        appliedDarkTheme.value = defaultTheme.id;
-        localStorage.setItem('appliedDarkTheme', defaultTheme.id.toString());
-      }
-    }
+  if (hasTempPreview) {
+    // Apply temporary preview color from Vuex store (highest priority)
+    // RE-READ from store instead of using customLightColor.value to ensure we get the latest
+    const color = currentMode === "light"
+      ? store.state.tempThemeColors!.light!
+      : store.state.tempThemeColors!.dark!;
+
+    applyThemeColors(color, currentMode, false);
   } else {
-    // Theme was loaded from localStorage, reapply it
-    if (appliedTheme === -1) {
-      // Custom theme
+    // No temporary preview - check if user has saved a theme
+    const appliedTheme = currentMode === "light" ? appliedLightTheme.value : appliedDarkTheme.value;
+
+    if (appliedTheme === null) {
+      // PRIORITY 2: No theme explicitly selected by user yet
+      // Apply color from customLightColor/customDarkColor which has its own priority:
+      // localStorage > org settings > defaults
+      // DON'T save to localStorage automatically - let user explicitly choose
       const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
-      applyThemeColors(color, currentMode, false);
+
+      // Determine if this is a default color or from organization settings
+      const isFromOrgSettings = currentMode === "light"
+        ? store.state?.organizationData?.organizationSettings?.light_mode_theme_color
+        : store.state?.organizationData?.organizationSettings?.dark_mode_theme_color;
+
+      // Mark as default only if NOT from org settings and NOT in localStorage
+      const isDefault = !isFromOrgSettings &&
+        !sessionStorage.getItem(`tempCustom${currentMode === 'light' ? 'Light' : 'Dark'}Color`) &&
+        !localStorage.getItem(`custom${currentMode === 'light' ? 'Light' : 'Dark'}Color`);
+
+      applyThemeColors(color, currentMode, isDefault);
     } else {
-      // Predefined theme
-      const theme = predefinedThemes.find(t => t.id === appliedTheme);
-      if (theme) {
-        const isDefault = theme.id === 1;
-        const modeColors = currentMode === "light" ? theme.light : theme.dark;
-        applyThemeColors(modeColors.themeColor, currentMode, isDefault);
+      // PRIORITY 3: User has explicitly applied a theme - reapply it
+      if (appliedTheme === -1) {
+        // appliedTheme === -1 means Custom theme (from color picker)
+        const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
+        applyThemeColors(color, currentMode, false);
+      } else {
+        // appliedTheme is a predefined theme ID
+        const theme = predefinedThemes.find(t => t.id === appliedTheme);
+        if (theme) {
+          const modeColors = currentMode === "light" ? theme.light : theme.dark;
+          applyThemeColors(modeColors.themeColor, currentMode, false);
+        }
       }
     }
   }
 
-  // Start observing body class changes for theme mode switches
+  /**
+   * MutationObserver to watch for body class changes (theme mode switches)
+   * This handles the case when user toggles between light/dark mode
+   *
+   * CRITICAL FIX: This observer was the root cause of the color picker bug
+   * It was checking sessionStorage (old implementation) instead of Vuex store (new implementation)
+   * Now it properly checks store.state.tempThemeColors to prevent overriding preview colors
+   */
   observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-        // Reapply the current theme when mode changes
+        // CRITICAL: Check if user is actively previewing a color from General Settings
+        // If temp colors exist in Vuex store, skip applying to preserve the preview
+        // This prevents the backend color from overriding the user's preview selection
+        const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+        if (hasTempColors) {
+          return;
+        }
+
+        // Reapply the current theme when mode changes (light <-> dark toggle)
         const isDarkMode = document.body.classList.contains('body--dark');
         const currentMode = isDarkMode ? 'dark' : 'light';
 
@@ -383,27 +410,22 @@ onMounted(() => {
             // Predefined theme
             const theme = predefinedThemes.find(t => t.id === appliedTheme);
             if (theme) {
-              const isDefault = theme.id === 1; // Default Blue theme has id 1
               const modeColors = currentMode === 'light' ? theme.light : theme.dark;
-              applyThemeColors(modeColors.themeColor, currentMode, isDefault);
+              applyThemeColors(modeColors.themeColor, currentMode, false);
             }
           }
         } else {
-          // No theme applied for this mode, apply default theme
-          const defaultTheme = predefinedThemes.find(t => t.id === 1);
-          if (defaultTheme) {
-            const modeColors = currentMode === 'light' ? defaultTheme.light : defaultTheme.dark;
-            applyThemeColors(modeColors.themeColor, currentMode, true);
+          // No theme explicitly selected, just apply available color
+          // DON'T save to localStorage - let user explicitly choose
+          const color = currentMode === 'light' ? customLightColor.value : customDarkColor.value;
 
-            // Track and save the applied theme
-            if (currentMode === 'light') {
-              appliedLightTheme.value = defaultTheme.id;
-              localStorage.setItem('appliedLightTheme', defaultTheme.id.toString());
-            } else {
-              appliedDarkTheme.value = defaultTheme.id;
-              localStorage.setItem('appliedDarkTheme', defaultTheme.id.toString());
-            }
-          }
+          const isFromOrgSettings = currentMode === "light"
+            ? store.state?.organizationData?.organizationSettings?.light_mode_theme_color
+            : store.state?.organizationData?.organizationSettings?.dark_mode_theme_color;
+
+          const isDefault = !isFromOrgSettings && !sessionStorage.getItem(`tempCustom${currentMode === 'light' ? 'Light' : 'Dark'}Color`) && !localStorage.getItem(`custom${currentMode === 'light' ? 'Light' : 'Dark'}Color`);
+
+          applyThemeColors(color, currentMode, isDefault);
         }
       }
     });
@@ -432,18 +454,6 @@ onUnmounted(() => {
 // - themeColor: hex color for buttons/toggles/borders
 // - themeColorOpacity: opacity value (always 10 = fully opaque)
 const predefinedThemes = [
-  {
-    id: 1,
-    name: "Default Blue",
-    light: {
-      themeColor: "#3F7994",
-      themeColorOpacity: 10,
-    },
-    dark: {
-      themeColor: "#5B9FBE",
-      themeColorOpacity: 10,
-    },
-  },
   {
     id: 2,
     name: "Ocean Breeze",
@@ -497,19 +507,18 @@ const predefinedThemes = [
 const applyTheme = (theme: any, mode: "light" | "dark") => {
   const modeColors = mode === "light" ? theme.light : theme.dark;
 
-  // Check if this is the default theme (id: 1)
-  const isDefault = theme.id === 1;
+  // Apply theme colors directly (predefined themes are never "default")
+  applyThemeColors(modeColors.themeColor, mode, false);
 
-  // Apply theme colors directly
-  applyThemeColors(modeColors.themeColor, mode, isDefault);
-
-  // Track which theme was applied for this mode and save to localStorage
+  // Store the hex color value in localStorage (not the theme ID)
   if (mode === "light") {
     appliedLightTheme.value = theme.id;
     localStorage.setItem('appliedLightTheme', theme.id.toString());
+    localStorage.setItem('customLightColor', modeColors.themeColor);
   } else {
     appliedDarkTheme.value = theme.id;
     localStorage.setItem('appliedDarkTheme', theme.id.toString());
+    localStorage.setItem('customDarkColor', modeColors.themeColor);
   }
 
   // Show success notification
@@ -536,15 +545,46 @@ const openColorPicker = (mode: "light" | "dark") => {
   showColorPicker.value = true;
 };
 
+/**
+ * Check if custom theme is currently applied for the given mode
+ * Returns false if user is actively previewing a color (to hide "Applied" badge during preview)
+ * @param mode - 'light' or 'dark' theme mode
+ * @returns true if custom theme is applied and not being previewed
+ */
+const isCustomThemeApplied = (mode: "light" | "dark"): boolean => {
+  // If there are temp colors being previewed from General Settings, don't show "Applied" badge
+  // This prevents confusion - the temp color is being previewed, not permanently applied
+  const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+  if (hasTempColors) {
+    return false;
+  }
+
+  // Check if custom theme (appliedTheme === -1) is applied for this mode
+  if (mode === "light") {
+    return appliedLightTheme.value === -1;
+  } else {
+    return appliedDarkTheme.value === -1;
+  }
+};
+
+const updateCustomColor = () => {
+  // Just update the preview color as user picks
+  if (currentPickerMode.value === "light") {
+    customLightColor.value = tempColor.value;
+  } else {
+    customDarkColor.value = tempColor.value;
+  }
+};
+
 const applyCustomTheme = (mode: "light" | "dark") => {
   const color = mode === "light" ? customLightColor.value : customDarkColor.value;
 
   // Apply theme colors directly (custom theme is never default)
   applyThemeColors(color, mode, false);
 
-  // Clear predefined theme tracking and mark custom as applied, save to localStorage
+  // Mark as custom theme and save to localStorage
   if (mode === "light") {
-    appliedLightTheme.value = -1; // -1 indicates custom theme
+    appliedLightTheme.value = -1;
     localStorage.setItem('appliedLightTheme', '-1');
     localStorage.setItem('customLightColor', color);
   } else {
@@ -562,22 +602,42 @@ const applyCustomTheme = (mode: "light" | "dark") => {
   });
 };
 
-const isCustomThemeApplied = (mode: "light" | "dark"): boolean => {
-  if (mode === "light") {
-    return appliedLightTheme.value === -1;
-  } else {
-    return appliedDarkTheme.value === -1;
-  }
-};
+// Reset both light and dark themes to settings or defaults
+const resetToDefaultTheme = () => {
+  // Check if we have colors in organizationSettings
+  const orgLightColor = store.state?.organizationData?.organizationSettings?.light_mode_theme_color;
+  const orgDarkColor = store.state?.organizationData?.organizationSettings?.dark_mode_theme_color;
 
-const updateCustomColor = () => {
-  if (currentPickerMode.value === "light") {
-    customLightColor.value = tempColor.value;
-    localStorage.setItem('customLightColor', tempColor.value);
-  } else {
-    customDarkColor.value = tempColor.value;
-    localStorage.setItem('customDarkColor', tempColor.value);
-  }
+  // Reset light mode
+  const lightResetColor = orgLightColor || DEFAULT_LIGHT_COLOR;
+  customLightColor.value = lightResetColor;
+  localStorage.removeItem('customLightColor');
+  localStorage.removeItem('appliedLightTheme');
+  appliedLightTheme.value = -1;
+  localStorage.setItem('appliedLightTheme', '-1');
+
+  // Reset dark mode
+  const darkResetColor = orgDarkColor || DEFAULT_DARK_COLOR;
+  customDarkColor.value = darkResetColor;
+  localStorage.removeItem('customDarkColor');
+  localStorage.removeItem('appliedDarkTheme');
+  appliedDarkTheme.value = -1;
+  localStorage.setItem('appliedDarkTheme', '-1');
+
+  // Apply theme for current mode
+  const currentMode = store.state.theme === "dark" ? "dark" : "light";
+  const currentColor = currentMode === "light" ? lightResetColor : darkResetColor;
+  const isDefault = currentMode === "light" ? !orgLightColor : !orgDarkColor;
+  applyThemeColors(currentColor, currentMode, isDefault);
+
+  $q.notify({
+    type: 'positive',
+    message: orgLightColor || orgDarkColor
+      ? 'Theme reset to organization settings!'
+      : 'Theme reset to default colors!',
+    position: 'top',
+    timeout: 2000,
+  });
 };
 </script>
 
