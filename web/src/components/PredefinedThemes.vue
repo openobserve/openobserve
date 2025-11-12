@@ -126,6 +126,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tab-panel>
         </q-tab-panels>
       </q-card-section>
+
+      <!-- Note at the bottom -->
+      <q-card-section class="q-pt-none q-pb-sm">
+        <q-separator class="q-mb-sm" />
+        <div class="text-caption text-grey-7 tw-flex tw-items-start q-gutter-xs">
+          <q-icon name="info_outline" size="14px" class="q-mt-xs" />
+          <span>Theme preferences are stored locally on this device and will not sync across different browsers or devices.</span>
+        </div>
+      </q-card-section>
     </q-card>
 
     <!-- Color Picker Dialog -->
@@ -255,6 +264,9 @@ const applyThemeColors = (themeColor: string, mode: "light" | "dark", isDefault:
     document.documentElement.style.removeProperty('--o2-theme-color');
     document.documentElement.style.removeProperty('--o2-body-primary-bg');
     document.documentElement.style.removeProperty('--o2-body-secondary-bg');
+    document.documentElement.style.removeProperty('--o2-menu-gradient-start');
+    document.documentElement.style.removeProperty('--o2-menu-gradient-end');
+    document.documentElement.style.removeProperty('--o2-menu-color');
     document.body.style.removeProperty('background');
   } else {
     // Apply light mode theme color
@@ -291,6 +303,9 @@ const applyThemeColors = (themeColor: string, mode: "light" | "dark", isDefault:
 
     // Clear dark mode variables
     document.body.style.removeProperty('--o2-dark-theme-color');
+    document.body.style.removeProperty('--o2-menu-gradient-start');
+    document.body.style.removeProperty('--o2-menu-gradient-end');
+    document.body.style.removeProperty('--o2-menu-color');
   }
 };
 
