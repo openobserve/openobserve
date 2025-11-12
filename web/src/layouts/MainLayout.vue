@@ -1698,6 +1698,10 @@ export default defineComponent({
         width: 1.3rem;
       }
 
+      .q-item__label{
+        padding-bottom: 4px;
+      }
+
       &.q-router-link--active {
         .q-icon img {
           filter: brightness(100);
