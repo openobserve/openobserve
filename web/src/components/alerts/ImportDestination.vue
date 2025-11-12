@@ -750,6 +750,13 @@ export default defineComponent({
         });
       }
 
+      // Check if action type is supported when actions are not enabled
+      if (input.type === "action" && !isActionsEnabled.value) {
+        destinationErrors.push(
+          `Destination - ${index}: 'action' type is not supported.`,
+        );
+      }
+
       // Validate action_id exists when type is action
       const availableActions = getServiceActions().map(
         (action: any) => action.id,
@@ -792,23 +799,55 @@ export default defineComponent({
           });
         }
 
-        // Validate skip_tls_verify if present
+        // Validate skip_tls_verify is required and must be boolean
         if (
-          input.skip_tls_verify !== undefined &&
+          input.skip_tls_verify === undefined ||
           typeof input.skip_tls_verify !== "boolean"
         ) {
           destinationErrors.push({
-            message: `Destination - ${index}: The "skip_tls_verify" field must be a boolean.`,
+            message: `Destination - ${index}: The "skip_tls_verify" field is required and should be a boolean value`,
             field: "skip_tls_verify",
           });
+        }
+
+        // Validate headers should be an object if present
+        if (input.headers !== undefined) {
+          if (typeof input.headers !== "object" || Array.isArray(input.headers)) {
+            destinationErrors.push(
+              `Destination - ${index}: 'headers' should be an object for http type`,
+            );
+          }
         }
       }
 
       // Validate email type
       if (input.type === "email") {
+        // Validate URL should not be present for email type
+        if (input.url) {
+          destinationErrors.push(
+            `Destination - ${index}: 'url' should not be provided for email type`,
+          );
+        }
+
+        // Validate headers should not be present for email type
+        if (
+          input.hasOwnProperty("headers") &&
+          Object.keys(input.headers).length !== 0
+        ) {
+          destinationErrors.push(
+            `Destination - ${index}: 'headers' should not be provided for email type`,
+          );
+        }
+
+        // Validate emails array with stricter validation
         if (!input.emails || !Array.isArray(input.emails) || input.emails.length === 0) {
           destinationErrors.push({
             message: `Destination - ${index}: The "emails" field is required and should be an array for email type destinations.`,
+            field: "email_input",
+          });
+        } else if (input.emails.some((email: any) => typeof email !== "string")) {
+          destinationErrors.push({
+            message: `Destination - ${index}: 'emails' should be an array of strings for email type`,
             field: "email_input",
           });
         }
@@ -816,6 +855,24 @@ export default defineComponent({
         if (!input.template || typeof input.template !== "string") {
           destinationErrors.push({
             message: `Destination - ${index}: The "template" field is required for email type destinations.`,
+            field: "template_name",
+          });
+        }
+      }
+
+      // Validate template exists in available templates
+      if (input.template) {
+        const availableTemplates = props.templates
+          .filter((template: any) => {
+            if (input.type === "email" && template.type === "email") return true;
+            else if (input.type !== "email") return true;
+            return false;
+          })
+          .map((template: any) => template.name);
+
+        if (!availableTemplates.includes(input.template)) {
+          destinationErrors.push({
+            message: `Destination - ${index}: template "${input.template}" does not exist for type "${input.type}"`,
             field: "template_name",
           });
         }
