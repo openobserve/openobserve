@@ -400,7 +400,7 @@ import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import type { DestinationData, Headers } from "@/ts/interfaces";
-import { isValidResourceName, getImageURL } from "@/utils/zincutils";
+import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 
 // Props
 const props = defineProps<{
@@ -477,11 +477,6 @@ const formData: Ref<DestinationData> = ref({
   output_format: "json",
   destination_type: "openobserve",
 });
-
-// TODO OK: Use UUID package instead of this and move this method in utils
-const getUUID = () => {
-  return (Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100).toString();
-};
 
 // Helper function to get default headers for each destination type
 const getDefaultHeaders = (destinationType: string) => {
