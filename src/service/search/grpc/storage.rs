@@ -784,7 +784,7 @@ pub async fn tantivy_search(
                 .search_role("follower".to_string())
                 .duration(search_start.elapsed().as_millis() as usize)
                 .desc(format!(
-                    "found {} , is_add_filter_back: {}, file_num: {}",
+                    "found {}, is_add_filter_back: {}, file_num: {}",
                     tantivy_result,
                     is_add_filter_back,
                     file_list_map.len(),
