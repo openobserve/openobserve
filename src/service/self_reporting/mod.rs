@@ -286,9 +286,9 @@ pub fn publish_triggers_usage(trigger: TriggerData) {
 }
 
 pub async fn publish_error(error_data: ErrorData) {
+    let cfg = get_config();
     #[cfg(not(feature = "enterprise"))]
     {
-        let cfg = get_config();
         if !cfg.common.usage_enabled {
             log::debug!("[SELF-REPORTING] Skipping error publish - usage reporting disabled");
             return;
