@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
                       <div style="width: 100%" class="q-pr-sm">
                         <q-file
-                          :data-test="`${testPrefix}-import-json-file-input`"
+                          :data-test="`${testPrefix}-import-file-input`"
                           v-model="jsonFiles"
                           filled
                           bottom-slots
