@@ -35,7 +35,7 @@ export class AlertDestinationsPage {
         this.confirmButton = '[data-test="confirm-button"]';
         this.deleteDestinationButton = '[data-test="alert-destination-list-{destinationName}-delete-destination"]';
         this.importJsonFileTab = '[data-test="tab-import_json_file"]';
-        this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
+        this.destinationImportFileInput = '[data-test="destination-import-json-file-input"]';
         this.destinationCountText = 'Alert Destinations';
         this.destinationInUseMessage = 'Destination is currently used by alert:';
     }
