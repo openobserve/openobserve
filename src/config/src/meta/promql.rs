@@ -282,24 +282,6 @@ impl DownsamplingRule {
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub enum HashLabelValue {
-    String(String),
-    Number(u64),
-}
-
-impl From<&str> for HashLabelValue {
-    fn from(value: &str) -> Self {
-        Self::String(value.to_string())
-    }
-}
-
-impl From<u64> for HashLabelValue {
-    fn from(value: u64) -> Self {
-        Self::Number(value)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
