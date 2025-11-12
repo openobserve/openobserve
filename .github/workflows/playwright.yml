@@ -488,7 +488,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: blob-report-${{ matrix.testfolder }}
+          name: blob-report-${{ matrix.testfolder }}-attempt-${{ github.run_attempt }}
           path: tests/ui-testing/blob-report
           retention-days: 1
 
@@ -519,7 +519,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: tests/ui-testing/all-blob-reports
-          pattern: blob-report-*
+          pattern: blob-report-*-attempt-${{ github.run_attempt }}
           merge-multiple: true
 
       - name: Merge Reports
