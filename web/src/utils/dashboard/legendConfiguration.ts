@@ -443,8 +443,6 @@ export const calculatePieChartRadius = (
   originalWidth?: number,
   originalHeight?: number,
 ): number => {
-  // When layout is not available (add panel), calculate based on available dimensions
-  if (!panelSchema.layout) {
     // Calculate the optimal radius in pixels based on available space
     const maxAvailableRadius = Math.min(availableWidth, availableHeight) / 2;
     const optimalRadiusPixels = maxAvailableRadius * 0.75; // 75% of available space for padding
@@ -460,37 +458,6 @@ export const calculatePieChartRadius = (
 
     // Fallback: use a conservative percentage
     return 60;
-  }
-
-  const minRadius = Math.min(
-    panelSchema.layout.w * 30,
-    panelSchema.layout.h * 30,
-  );
-
-  if (minRadius === 0) {
-    return 0;
-  }
-
-  // Calculate radius based on available space
-  const maxRadius = Math.min(availableWidth, availableHeight) / 2;
-  const baseRadius = minRadius / 2;
-
-  // Determine space usage efficiency
-  const isFullSpace =
-    availableWidth === panelSchema.layout.w * 30 &&
-    availableHeight === panelSchema.layout.h * 30;
-  const spaceUsage = isFullSpace ? 0.98 : 0.95;
-
-  const effectiveRadius = Math.min(baseRadius, maxRadius * spaceUsage);
-
-  // Calculate multiplier based on effective radius
-  let multiplier = 100;
-  if (effectiveRadius > 90) multiplier = 120;
-  if (effectiveRadius > 150) multiplier = 140;
-
-  // Calculate final percentage with appropriate limits
-  const maxLimit = isFullSpace ? 98 : 95;
-  return Math.min((effectiveRadius / minRadius) * multiplier, maxLimit);
 };
 
 /**
