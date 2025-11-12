@@ -1279,6 +1279,7 @@ async fn load_samples_from_datafusion(
 ) -> Result<()> {
     let start_time = std::time::Instant::now();
     let ctx = Arc::new(df.task_ctx());
+    let target_partitions = ctx.session_config().target_partitions();
     let plan = df
         .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?
         .create_physical_plan()
@@ -1288,7 +1289,7 @@ async fn load_samples_from_datafusion(
         plan,
         Partitioning::Hash(
             vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
-            ctx.session_config().target_partitions(),
+            target_partitions,
         ),
     )?);
     let streams = execute_stream_partitioned(plan, ctx)?;
@@ -1296,7 +1297,7 @@ async fn load_samples_from_datafusion(
     let mut tasks = Vec::new();
     for mut stream in streams {
         let mut series: HashMap<u64, Vec<Sample>> =
-            metrics.keys().map(|k| (*k, Vec::new())).collect();
+            HashMap::with_capacity(metrics.len() * 2 / target_partitions);
         let task: tokio::task::JoinHandle<Result<HashMap<u64, Vec<Sample>>>> =
             tokio::task::spawn(async move {
                 loop {
@@ -1322,12 +1323,9 @@ async fn load_samples_from_datafusion(
                                 .unwrap();
                             for i in 0..batch.num_rows() {
                                 let hash: u64 = hash_values.value(i);
-                                if let Some(range_val) = series.get_mut(&hash) {
-                                    range_val.push(Sample::new(
-                                        time_values.value(i),
-                                        value_values.value(i),
-                                    ));
-                                }
+                                let entry = series.entry(hash).or_default();
+                                entry
+                                    .push(Sample::new(time_values.value(i), value_values.value(i)));
                             }
                         }
                         Ok(None) => break,
@@ -1337,8 +1335,6 @@ async fn load_samples_from_datafusion(
                         }
                     }
                 }
-                // remove empty series
-                series.retain(|_, v| !v.is_empty());
                 Ok(series)
             });
         tasks.push(task);
@@ -1371,6 +1367,7 @@ async fn load_exemplars_from_datafusion(
 ) -> Result<()> {
     let start_time = std::time::Instant::now();
     let ctx = Arc::new(df.task_ctx());
+    let target_partitions = ctx.session_config().target_partitions();
     let plan = df
         .filter(col(EXEMPLARS_LABEL).is_not_null())?
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
@@ -1381,7 +1378,7 @@ async fn load_exemplars_from_datafusion(
         plan,
         Partitioning::Hash(
             vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
-            ctx.session_config().target_partitions(),
+            target_partitions,
         ),
     )?);
     let streams = execute_stream_partitioned(plan, ctx)?;
@@ -1389,7 +1386,7 @@ async fn load_exemplars_from_datafusion(
     let mut tasks = Vec::new();
     for mut stream in streams {
         let mut series: HashMap<u64, Vec<Arc<Exemplar>>> =
-            metrics.keys().map(|k| (*k, Vec::new())).collect();
+            HashMap::with_capacity(metrics.len() * 2 / target_partitions);
         let task: tokio::task::JoinHandle<Result<HashMap<u64, Vec<Arc<Exemplar>>>>> =
             tokio::task::spawn(async move {
                 loop {
@@ -1410,13 +1407,12 @@ async fn load_exemplars_from_datafusion(
                             for i in 0..batch.num_rows() {
                                 let hash: u64 = hash_values.value(i);
                                 let exemplar = exemplars_values.value(i);
-                                if let Some(range_val) = series.get_mut(&hash)
-                                    && let Ok(exemplars) =
-                                        json::from_str::<Vec<json::Value>>(exemplar)
+                                if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar)
                                 {
+                                    let entry = series.entry(hash).or_default();
                                     for exemplar in exemplars {
                                         if let Some(exemplar) = exemplar.as_object() {
-                                            range_val.push(Arc::new(Exemplar::from(exemplar)));
+                                            entry.push(Arc::new(Exemplar::from(exemplar)));
                                         }
                                     }
                                 }
@@ -1429,8 +1425,6 @@ async fn load_exemplars_from_datafusion(
                         }
                     }
                 }
-                // remove empty series
-                series.retain(|_, v| !v.is_empty());
                 Ok(series)
             });
         tasks.push(task);
