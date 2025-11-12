@@ -135,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.cancel')"
               no-caps
               flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="$emit('cancel:hideform')"
               data-test="add-template-cancel-btn"
             />
@@ -143,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.save')"
               no-caps
               flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               @click="saveTemplate"
               data-test="add-template-submit-btn"
             />
@@ -226,6 +228,10 @@ import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import {
+  validateTemplateBody,
+  getTemplateValidationErrorMessage,
+} from "@/utils/templates/validation";
 
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
@@ -307,17 +313,17 @@ const setupTemplateData = () => {
 };
 
 const isTemplateBodyValid = () => {
-  try {
-    JSON.parse(formData.value.body);
-    return true;
-  } catch (e) {
+  const result = validateTemplateBody(formData.value.body);
+
+  if (!result.valid) {
     q.notify({
       type: "negative",
-      message: "Please enter valid JSON in template body",
+      message: getTemplateValidationErrorMessage(),
       timeout: 1500,
     });
-    return false;
   }
+
+  return result.valid;
 };
 
 const router = useRouter();
