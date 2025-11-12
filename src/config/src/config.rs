@@ -1417,8 +1417,6 @@ pub struct Limit {
         help = "Integer value representing the delay in percentage of the alert frequency that will be included in alert evaluation timerange. Default is 20. This can be changed in runtime."
     )]
     pub alert_considerable_delay: i32,
-    #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
-    pub scheduler_clean_interval: i64,
     #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
     pub scheduler_watch_interval: i64,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
