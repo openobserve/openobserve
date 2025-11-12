@@ -453,7 +453,7 @@ class="padding-none" />
                     <q-icon size="xs" name="color_lens" class="padding-none" />
                   </q-item-section>
                   <q-item-section>
-                    <q-item-label>Theme Preferences</q-item-label>
+                    <q-item-label>Manage Theme</q-item-label>
                   </q-item-section>
                 </q-item>
                 <q-separator />
