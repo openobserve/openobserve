@@ -280,7 +280,7 @@ async function verifyFieldsAreHashed(page, pm, streamName, fieldNames) {
 }
 
 
-test.describe("Ingestion Time Hash - Combined Test", () => {
+test.describe("Ingestion Time Hash - Combined Test", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
 

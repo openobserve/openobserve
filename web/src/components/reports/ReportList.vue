@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeMount, reactive, computed } from "vue";
+import { ref, onBeforeMount, reactive, computed, watch } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -532,7 +532,12 @@ const visibleRows = computed(() => {
   if (!filterQuery.value) return reportsTableRows.value || [];
   return filterData(reportsTableRows.value || [], filterQuery.value);
 });
-const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+// Watch visibleRows to sync resultTotal with search filter
+watch(visibleRows, (newVisibleRows) => {
+  resultTotal.value = newVisibleRows.length;
+}, { immediate: true });
 
 </script>
 

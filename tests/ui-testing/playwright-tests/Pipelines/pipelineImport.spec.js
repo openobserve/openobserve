@@ -6,7 +6,7 @@ import { PipelineDestinations } from '../../pages/pipelinesPages/pipelineDestina
 
 test.describe.configure({ mode: 'parallel' });
 
-test.describe("Pipeline Import", () => {
+test.describe("Pipeline Import", { tag: '@enterprise' }, () => {
     let loginPage, pipelinesEP, ingestionPage, pipelineDestinations;
 
     test.beforeEach(async ({ page }) => {

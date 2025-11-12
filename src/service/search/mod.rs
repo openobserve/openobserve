@@ -57,6 +57,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::sql::visitor::group_by::get_group_by_fields,
+    config::META_ORG_ID,
+    config::meta::self_reporting::usage::USAGE_STREAM,
     config::utils::sql::is_simple_aggregate_query,
     infra::client::grpc::make_grpc_search_client,
     o2_enterprise::enterprise::{
@@ -696,7 +698,7 @@ pub async fn search_partition(
         skip_get_file_list = true;
     }
 
-    let mut files = Vec::new();
+    let mut files = Vec::with_capacity(sql.schemas.len() * 10);
 
     let mut step_factor = 1;
 
@@ -1201,8 +1203,8 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
 
     // make cluster request
     let trace_id = config::ider::generate_trace_id();
-    let mut tasks = Vec::new();
-    for node in nodes.iter().cloned() {
+    let mut tasks = Vec::with_capacity(nodes.len());
+    for node in nodes {
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
             "service:search:cluster:grpc_query_status",
@@ -1235,7 +1237,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         tasks.push(task);
     }
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(tasks.len());
     for task in tasks {
         match task.await {
             Ok(res) => match res {
@@ -1373,7 +1375,7 @@ pub async fn cancel_query(
         tasks.push(task);
     }
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(tasks.len());
     for task in tasks {
         match task.await {
             Ok(res) => match res {
@@ -1572,4 +1574,26 @@ pub fn generate_search_schema_diff(
     }
 
     diff_fields
+}
+
+#[inline]
+pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        // for meta org usage and audit stream, we should always allow search
+        if _org_id == META_ORG_ID && _stream == Some(USAGE_STREAM) || _stream == Some("audit") {
+            return Ok(());
+        }
+        // this is installation level limit for all orgs combined
+        if !o2_enterprise::enterprise::license::search_allowed() {
+            Err(Error::Message(
+                "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.".to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    Ok(())
 }

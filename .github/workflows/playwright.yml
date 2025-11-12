@@ -362,32 +362,6 @@ jobs:
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
           fi 
 
-      - name: Cache test failures to TestDino
-        if: always()
-        env:
-          TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
-        run: |
-          cd tests/ui-testing
-          echo "::group::Caching test failure metadata to TestDino"
-          if [ -f "playwright-results/report.json" ]; then
-            echo "::notice::JSON report found at playwright-results/report.json"
-            ls -lh playwright-results/report.json
-            # tdpw cache expects to be run from the directory containing report.json
-            # Change to playwright-results directory where report.json lives
-            cd playwright-results
-            if npx tdpw cache; then
-              echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
-              echo "::notice::This data will be used for optimized reruns if tests fail"
-            else
-              echo "::warning::⚠️ Failed to cache test metadata to TestDino"
-              echo "::warning::Rerun optimization may not work properly"
-            fi
-          else
-            echo "::error::JSON report not found at playwright-results/report.json"
-            echo "::warning::Cannot cache test failures - skipping"
-          fi
-          echo "::endgroup::"
-
       - name: Sanitize Test Folder Name
         shell: bash
         run: |
@@ -458,6 +432,32 @@ jobs:
           ls -la playwright-results/html-report/
           echo "Checking report.json:"
           ls -lh playwright-results/report.json
+
+      - name: Cache test failures to TestDino
+        if: always()
+        env:
+          TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
+        run: |
+          cd tests/ui-testing
+          echo "::group::Caching test failure metadata to TestDino"
+          if [ -f "playwright-results/report.json" ]; then
+            echo "::notice::JSON report found at playwright-results/report.json"
+            ls -lh playwright-results/report.json
+            # tdpw cache expects to be run from the directory containing report.json
+            # Change to playwright-results directory where report.json lives
+            cd playwright-results
+            if npx tdpw cache; then
+              echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
+              echo "::notice::This data will be used for optimized reruns if tests fail"
+            else
+              echo "::warning::⚠️ Failed to cache test metadata to TestDino"
+              echo "::warning::Rerun optimization may not work properly"
+            fi
+          else
+            echo "::error::JSON report not found at playwright-results/report.json"
+            echo "::warning::Cannot cache test failures - skipping"
+          fi
+          echo "::endgroup::"
 
       - name: Upload to TestDino
         if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}

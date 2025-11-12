@@ -27,7 +27,7 @@ use crate::{
     meta::self_reporting::usage::Stats,
     utils::{
         hash::{Sum64, gxhash},
-        json::{self, Map, Value},
+        json::{self, Value},
     },
 };
 
@@ -1172,127 +1172,6 @@ impl Display for StreamPartitionType {
 pub struct PartitioningDetails {
     pub partition_keys: Vec<StreamPartition>,
     pub partition_time_level: Option<PartitionTimeLevel>,
-}
-
-// Code Duplicated from alerts
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct RoutingCondition {
-    pub column: String,
-    pub operator: Operator,
-    #[schema(value_type = Object)]
-    pub value: Value,
-    #[serde(default)]
-    pub ignore_case: bool,
-}
-// Code Duplicated from alerts
-impl RoutingCondition {
-    pub fn evaluate(&self, row: &Map<String, Value>) -> bool {
-        let val = match row.get(&self.column) {
-            Some(val) => val,
-            None => {
-                // field not found -> dropped
-                return false;
-            }
-        };
-        match val {
-            Value::String(v) => {
-                let val = v.as_str();
-                let con_val = self.value.as_str().unwrap_or_default().trim_matches('"'); // "" is interpreted as empty string
-                match self.operator {
-                    Operator::EqualTo => val == con_val,
-                    Operator::NotEqualTo => val != con_val,
-                    Operator::GreaterThan => val > con_val,
-                    Operator::GreaterThanEquals => val >= con_val,
-                    Operator::LessThan => val < con_val,
-                    Operator::LessThanEquals => val <= con_val,
-                    Operator::Contains => val.contains(con_val),
-                    Operator::NotContains => !val.contains(con_val),
-                }
-            }
-            Value::Number(_) => {
-                let val = val.as_f64().unwrap_or_default();
-                let con_val = if self.value.is_number() {
-                    self.value.as_f64().unwrap_or_default()
-                } else {
-                    self.value
-                        .as_str()
-                        .unwrap_or_default()
-                        .parse()
-                        .unwrap_or_default()
-                };
-                match self.operator {
-                    Operator::EqualTo => val == con_val,
-                    Operator::NotEqualTo => val != con_val,
-                    Operator::GreaterThan => val > con_val,
-                    Operator::GreaterThanEquals => val >= con_val,
-                    Operator::LessThan => val < con_val,
-                    Operator::LessThanEquals => val <= con_val,
-                    _ => false,
-                }
-            }
-            Value::Bool(v) => {
-                let val = v.to_owned();
-                let con_val = if self.value.is_boolean() {
-                    self.value.as_bool().unwrap_or_default()
-                } else {
-                    self.value
-                        .as_str()
-                        .unwrap_or_default()
-                        .parse()
-                        .unwrap_or_default()
-                };
-                match self.operator {
-                    Operator::EqualTo => val == con_val,
-                    Operator::NotEqualTo => val != con_val,
-                    _ => false,
-                }
-            }
-            Value::Null => {
-                matches!(self.operator, Operator::EqualTo)
-                    && matches!(&self.value, Value::String(v) if v == "null")
-            }
-            _ => false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub enum Operator {
-    #[serde(rename = "=")]
-    EqualTo,
-    #[serde(rename = "!=")]
-    NotEqualTo,
-    #[serde(rename = ">")]
-    GreaterThan,
-    #[serde(rename = ">=")]
-    GreaterThanEquals,
-    #[serde(rename = "<")]
-    LessThan,
-    #[serde(rename = "<=")]
-    LessThanEquals,
-    Contains,
-    NotContains,
-}
-
-impl Default for Operator {
-    fn default() -> Self {
-        Self::EqualTo
-    }
-}
-
-impl std::fmt::Display for Operator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Operator::EqualTo => write!(f, "="),
-            Operator::NotEqualTo => write!(f, "!="),
-            Operator::GreaterThan => write!(f, ">"),
-            Operator::GreaterThanEquals => write!(f, ">="),
-            Operator::LessThan => write!(f, "<"),
-            Operator::LessThanEquals => write!(f, "<="),
-            Operator::Contains => write!(f, "contains"),
-            Operator::NotContains => write!(f, "not contains"),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
