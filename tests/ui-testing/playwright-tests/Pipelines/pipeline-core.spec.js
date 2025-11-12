@@ -382,36 +382,4 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.confirmDeletePipeline();
     await pageManager.pipelinesPage.verifyPipelineDeleted();
   });
-
-  test("TEMP: flaky test for TestDino optimization testing", {
-    tag: ['@tempTest', '@pipelines']
-  }, async ({ page }) => {
-    testLogger.info('This test is flaky - always fails on first run, randomly passes on reruns');
-
-    // Check if this is attempt 1 or a rerun (attempt 2+)
-    // In GitHub Actions, github.run_attempt tells us which attempt this is
-    // But we need to use a different approach since we can't access GitHub context here
-
-    // Use timestamp-based logic: if file doesn't exist, it's first run
-    const fs = require('fs');
-    const path = require('path');
-    const markerFile = path.join(__dirname, '../../../.test-marker-' + Date.now());
-    const markerPattern = path.join(__dirname, '../../../.test-marker-*');
-
-    // Check if any marker file exists from a previous run
-    const glob = require('glob');
-    const existingMarkers = glob.sync(markerPattern);
-
-    if (existingMarkers.length === 0) {
-      // First run - always fail
-      fs.writeFileSync(markerFile, 'first-run');
-      testLogger.info('First run detected - intentionally failing');
-      expect(1 + 1).toBe(3);
-    } else {
-      // Rerun - randomly pass or fail (70% chance to pass)
-      const shouldPass = Math.random() > 0.3;
-      testLogger.info(`Rerun detected - randomly ${shouldPass ? 'passing' : 'failing'}`);
-      expect(shouldPass).toBe(true);
-    }
-  });
 });
