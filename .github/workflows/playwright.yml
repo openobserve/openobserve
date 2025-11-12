@@ -336,20 +336,52 @@ jobs:
 
             # Determine what to run based on rerun mode
             if [ "$RERUN_MODE" = "optimized" ]; then
-              # TestDino returns: "Pipelines/pipeline-core.spec.js -g test name here"
-              # We need to: "./playwright-tests/Pipelines/pipeline-core.spec.js" "-g" "test name here"
-              # Extract file path (before -g) and test name (after -g)
-              FILE_PATH=$(echo "$EXTRA_PW_FLAGS" | sed 's/ -g.*//')
-              TEST_NAME=$(echo "$EXTRA_PW_FLAGS" | sed 's/.*-g //')
+              # TestDino returns ALL failed tests from the previous run
+              # Format examples:
+              # Single: "SDR/test.spec.js -g test name"
+              # Multiple: "Logs/test1.spec.js -g name1 Pipelines/test2.spec.js -g name2"
 
-              FIXED_FILE_PATH="./playwright-tests/$FILE_PATH"
+              echo "DEBUG: Full TestDino output (all failed tests): $EXTRA_PW_FLAGS"
+              echo "DEBUG: Current shard folder: $ACTUAL_FOLDER"
 
-              echo "::notice::🎯 OPTIMIZED RERUN: Running only failed tests"
-              echo "DEBUG: Original TestDino flags: $EXTRA_PW_FLAGS"
-              echo "DEBUG: File path: $FIXED_FILE_PATH"
-              echo "DEBUG: Test name: $TEST_NAME"
-              echo "DEBUG: Final command: npx playwright test \"$FIXED_FILE_PATH\" -g \"$TEST_NAME\""
-              npx playwright test "$FIXED_FILE_PATH" -g "$TEST_NAME"
+              # Strategy: Extract only tests that start with "$ACTUAL_FOLDER/"
+              # Use grep to find lines matching our shard folder
+              SHARD_TESTS=""
+
+              # Check if the TestDino output contains tests for this shard
+              # Look for pattern: $ACTUAL_FOLDER/something.spec.js
+              if echo "$EXTRA_PW_FLAGS" | grep -q "$ACTUAL_FOLDER/.*\.spec\.js"; then
+                echo "DEBUG: Found test(s) for this shard in TestDino output"
+
+                # Extract only the test(s) that belong to this shard
+                # Handle both single and multiple test scenarios:
+                # Single: "SDR/test.spec.js -g test name"
+                # Multiple: "Logs/test1.spec.js -g name1 Pipelines/test2.spec.js -g name2"
+
+                # Use grep to extract lines matching this shard's folder pattern
+                # Match pattern: $ACTUAL_FOLDER/filename.spec.js followed by optional -g "test name"
+                # The test name ends when we hit the next folder pattern or end of string
+
+                SHARD_SPECIFIC_TESTS=$(echo "$EXTRA_PW_FLAGS" | grep -oE "$ACTUAL_FOLDER/[^ ]+\.spec\.js( -g [^/]+)?")
+
+                if [ -n "$SHARD_SPECIFIC_TESTS" ]; then
+                  echo "DEBUG: Extracted shard-specific tests: $SHARD_SPECIFIC_TESTS"
+
+                  # Add ./playwright-tests/ prefix
+                  FIXED_SHARD_TESTS=$(echo "$SHARD_SPECIFIC_TESTS" | sed "s|^|./playwright-tests/|")
+
+                  echo "::notice::🎯 OPTIMIZED RERUN: Running failed test(s) from this shard"
+                  echo "DEBUG: Final command: npx playwright test $FIXED_SHARD_TESTS"
+                  npx playwright test $FIXED_SHARD_TESTS
+                else
+                  echo "::warning::Failed to extract shard-specific tests. Falling back to skip."
+                  exit 0
+                fi
+              else
+                echo "::notice::⏭️ OPTIMIZED RERUN: No failed tests found for '$ACTUAL_FOLDER' shard in TestDino output"
+                echo "::notice::This shard has no failed tests to rerun. Exiting successfully."
+                exit 0
+              fi
             else
               # Normal run or fallback
               if [ "$RERUN_MODE" = "fallback" ]; then

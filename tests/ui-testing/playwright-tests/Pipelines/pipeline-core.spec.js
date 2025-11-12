@@ -382,4 +382,11 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.confirmDeletePipeline();
     await pageManager.pipelinesPage.verifyPipelineDeleted();
   });
-}); 
+
+  test("TEMP: intentional failure for TestDino optimization testing", {
+    tag: ['@tempTest', '@pipelines']
+  }, async ({ page }) => {
+    testLogger.info('This test will intentionally fail to test TestDino rerun optimization');
+    expect(1 + 1).toBe(3); // Intentional failure
+  });
+});
