@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <div class="tw-pb-[0.625rem] tw-px-[0.625rem] q-pt-xs">
+      <div v-if="showTabs" class="tw-pb-[0.625rem] tw-px-[0.625rem] q-pt-xs">
         <AppTabs
           :show="showTabs"
           :tabs="tabs"
@@ -45,7 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
-          <keep-alive class="tw-h-full">
+          <keep-alive
+            :class="showTabs ? 'tw-h-[calc(100%-53px)]' : 'tw-h-full'"
+          >
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -54,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </keep-alive>
         </template>
         <template v-else>
-          <div class="tw-h-full">
+          <div :class="showTabs ? 'tw-h-[calc(100%-53px)]' : 'tw-h-full'">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -65,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </router-view>
     </template>
     <template v-else>
-      <div class="q-pt-xs">
+      <div class="">
         <div class="q-pa-lg tw-mx-[0.625rem] enable-rum card-container">
           <div class="q-pb-lg">
             <div class="text-left text-h6 text-bold q-pb-md">

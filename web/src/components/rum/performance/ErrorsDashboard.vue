@@ -19,10 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="relative-position">
     <div
-      class="q-mx-sm performance-error-dashboard"
+      class="performance-error-dashboard"
       :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
     >
-      <div class="q-px-sm performance-dashboard">
+      <div class="performance-dashboard">
         <RenderDashboardCharts
           ref="errorRenderDashboardChartsRef"
           :viewOnly="true"

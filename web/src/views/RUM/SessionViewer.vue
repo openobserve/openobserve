@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row qp-2 full-height">
-    <div class="col-12 q-px-sm q-pt-md row items-end">
-      <div class="col-9 row">
+  <div class="row qp-2 full-height tw-px-[0.625rem] tw-pt-[0.25rem]">
+    <div class="col-12 row items-end tw-pb-[0.625rem]">
+      <div class="col-12 row card-container tw-px-[0.625rem] tw-py-[0.625rem]">
         <div
-          class="flex justify-center items-center q-mr-md cursor-pointer"
+          class="flex justify-center items-center q-mr-md cursor-pointer hover:tw-text-[var(--o2-primary-btn-bg)]"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -52,9 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
       </div>
-      <q-separator class="full-width q-mt-sm" />
     </div>
-    <div class="col-12 row" style="height: calc(100vh - 104px)">
+    <div
+      class="col-12 row card-container tw-overflow-hidden tw-mb-[0.325rem] !tw-h-[calc(100%-58px)]"
+    >
       <div class="col-9 full-height">
         <VideoPlayer
           ref="videoPlayerRef"
