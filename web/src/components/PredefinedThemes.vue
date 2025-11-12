@@ -160,13 +160,21 @@ const { isOpen } = usePredefinedThemes();
 const dialogOpen = ref(false);
 const activeTab = ref("light");
 
-// Track applied themes for each mode
-const appliedLightTheme = ref<number | null>(null);
-const appliedDarkTheme = ref<number | null>(null);
+// Track applied themes for each mode - Load from localStorage
+const appliedLightTheme = ref<number | null>(
+  localStorage.getItem('appliedLightTheme')
+    ? parseInt(localStorage.getItem('appliedLightTheme')!)
+    : null
+);
+const appliedDarkTheme = ref<number | null>(
+  localStorage.getItem('appliedDarkTheme')
+    ? parseInt(localStorage.getItem('appliedDarkTheme')!)
+    : null
+);
 
-// Custom color picker state
-const customLightColor = ref("#3F7994");
-const customDarkColor = ref("#5B9FBE");
+// Custom color picker state - Load from localStorage
+const customLightColor = ref(localStorage.getItem('customLightColor') || "#3F7994");
+const customDarkColor = ref(localStorage.getItem('customDarkColor') || "#5B9FBE");
 const showColorPicker = ref(false);
 const currentPickerMode = ref<"light" | "dark">("light");
 const tempColor = ref("#3F7994");
@@ -231,12 +239,16 @@ const applyThemeColors = (themeColor: string, mode: "light" | "dark", isDefault:
       // Use default menu gradient colors
       document.body.style.setProperty('--o2-menu-gradient-start', 'rgba(89, 155, 174, 0.3)');
       document.body.style.setProperty('--o2-menu-gradient-end', 'rgba(48, 193, 233, 0.3)');
+      // Use default menu color for dark mode
+      document.body.style.setProperty('--o2-menu-color', '#FFFFFF');
     } else {
       // Calculate menu gradient from theme color
       const menuGradientStart = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
       const menuGradientEnd = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
       document.body.style.setProperty('--o2-menu-gradient-start', menuGradientStart);
       document.body.style.setProperty('--o2-menu-gradient-end', menuGradientEnd);
+      // Use theme color as menu color for dark mode
+      document.body.style.setProperty('--o2-menu-color', themeColor);
     }
 
     // Clear light mode variables
@@ -265,12 +277,16 @@ const applyThemeColors = (themeColor: string, mode: "light" | "dark", isDefault:
       // Use default menu gradient colors
       document.documentElement.style.setProperty('--o2-menu-gradient-start', 'rgba(89, 175, 199, 0.3)');
       document.documentElement.style.setProperty('--o2-menu-gradient-end', 'rgba(48, 193, 233, 0.3)');
+      // Use default menu color for light mode
+      document.documentElement.style.setProperty('--o2-menu-color', '#3F7994');
     } else {
       // Calculate menu gradient from theme color
       const menuGradientStart = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
       const menuGradientEnd = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
       document.documentElement.style.setProperty('--o2-menu-gradient-start', menuGradientStart);
       document.documentElement.style.setProperty('--o2-menu-gradient-end', menuGradientEnd);
+      // Use theme color as menu color for light mode
+      document.documentElement.style.setProperty('--o2-menu-color', themeColor);
     }
 
     // Clear dark mode variables
@@ -293,11 +309,28 @@ onMounted(() => {
       const modeColors = currentMode === "light" ? defaultTheme.light : defaultTheme.dark;
       applyThemeColors(modeColors.themeColor, currentMode, true);
 
-      // Track the applied theme
+      // Track the applied theme and save to localStorage
       if (currentMode === "light") {
         appliedLightTheme.value = defaultTheme.id;
+        localStorage.setItem('appliedLightTheme', defaultTheme.id.toString());
       } else {
         appliedDarkTheme.value = defaultTheme.id;
+        localStorage.setItem('appliedDarkTheme', defaultTheme.id.toString());
+      }
+    }
+  } else {
+    // Theme was loaded from localStorage, reapply it
+    if (appliedTheme === -1) {
+      // Custom theme
+      const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
+      applyThemeColors(color, currentMode, false);
+    } else {
+      // Predefined theme
+      const theme = predefinedThemes.find(t => t.id === appliedTheme);
+      if (theme) {
+        const isDefault = theme.id === 1;
+        const modeColors = currentMode === "light" ? theme.light : theme.dark;
+        applyThemeColors(modeColors.themeColor, currentMode, isDefault);
       }
     }
   }
@@ -310,25 +343,38 @@ onMounted(() => {
         const isDarkMode = document.body.classList.contains('body--dark');
         const currentMode = isDarkMode ? 'dark' : 'light';
 
-        // Get the currently applied theme
-        if (currentMode === 'light' && appliedLightTheme.value !== null) {
-          if (appliedLightTheme.value === -1) {
-            applyThemeColors(customLightColor.value, 'light', false);
+        // Get the applied theme for the current mode
+        const appliedTheme = currentMode === 'light' ? appliedLightTheme.value : appliedDarkTheme.value;
+
+        if (appliedTheme !== null) {
+          // Theme exists for this mode, apply it
+          if (appliedTheme === -1) {
+            // Custom theme
+            const color = currentMode === 'light' ? customLightColor.value : customDarkColor.value;
+            applyThemeColors(color, currentMode, false);
           } else {
-            const theme = predefinedThemes.find(t => t.id === appliedLightTheme.value);
+            // Predefined theme
+            const theme = predefinedThemes.find(t => t.id === appliedTheme);
             if (theme) {
               const isDefault = theme.id === 1; // Default Blue theme has id 1
-              applyThemeColors(theme.light.themeColor, 'light', isDefault);
+              const modeColors = currentMode === 'light' ? theme.light : theme.dark;
+              applyThemeColors(modeColors.themeColor, currentMode, isDefault);
             }
           }
-        } else if (currentMode === 'dark' && appliedDarkTheme.value !== null) {
-          if (appliedDarkTheme.value === -1) {
-            applyThemeColors(customDarkColor.value, 'dark', false);
-          } else {
-            const theme = predefinedThemes.find(t => t.id === appliedDarkTheme.value);
-            if (theme) {
-              const isDefault = theme.id === 1; // Default Blue theme has id 1
-              applyThemeColors(theme.dark.themeColor, 'dark', isDefault);
+        } else {
+          // No theme applied for this mode, apply default theme
+          const defaultTheme = predefinedThemes.find(t => t.id === 1);
+          if (defaultTheme) {
+            const modeColors = currentMode === 'light' ? defaultTheme.light : defaultTheme.dark;
+            applyThemeColors(modeColors.themeColor, currentMode, true);
+
+            // Track and save the applied theme
+            if (currentMode === 'light') {
+              appliedLightTheme.value = defaultTheme.id;
+              localStorage.setItem('appliedLightTheme', defaultTheme.id.toString());
+            } else {
+              appliedDarkTheme.value = defaultTheme.id;
+              localStorage.setItem('appliedDarkTheme', defaultTheme.id.toString());
             }
           }
         }
@@ -430,11 +476,13 @@ const applyTheme = (theme: any, mode: "light" | "dark") => {
   // Apply theme colors directly
   applyThemeColors(modeColors.themeColor, mode, isDefault);
 
-  // Track which theme was applied for this mode
+  // Track which theme was applied for this mode and save to localStorage
   if (mode === "light") {
     appliedLightTheme.value = theme.id;
+    localStorage.setItem('appliedLightTheme', theme.id.toString());
   } else {
     appliedDarkTheme.value = theme.id;
+    localStorage.setItem('appliedDarkTheme', theme.id.toString());
   }
 
   // Show success notification
@@ -467,11 +515,15 @@ const applyCustomTheme = (mode: "light" | "dark") => {
   // Apply theme colors directly (custom theme is never default)
   applyThemeColors(color, mode, false);
 
-  // Clear predefined theme tracking and mark custom as applied
+  // Clear predefined theme tracking and mark custom as applied, save to localStorage
   if (mode === "light") {
     appliedLightTheme.value = -1; // -1 indicates custom theme
+    localStorage.setItem('appliedLightTheme', '-1');
+    localStorage.setItem('customLightColor', color);
   } else {
     appliedDarkTheme.value = -1;
+    localStorage.setItem('appliedDarkTheme', '-1');
+    localStorage.setItem('customDarkColor', color);
   }
 
   // Show success notification
@@ -494,8 +546,10 @@ const isCustomThemeApplied = (mode: "light" | "dark"): boolean => {
 const updateCustomColor = () => {
   if (currentPickerMode.value === "light") {
     customLightColor.value = tempColor.value;
+    localStorage.setItem('customLightColor', tempColor.value);
   } else {
     customDarkColor.value = tempColor.value;
+    localStorage.setItem('customDarkColor', tempColor.value);
   }
 };
 </script>
