@@ -477,7 +477,7 @@ jobs:
       - name: Upload Coverage Data
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-coverage-${{ env.SANITIZED_FOLDERNAME }}
+          name: playwright-coverage-${{ env.SANITIZED_FOLDERNAME }}-attempt-${{ github.run_attempt }}
           path: tests/ui-testing/.nyc_output
           include-hidden-files: true
 
@@ -588,7 +588,7 @@ jobs:
       - name: Download Playwright Coverage Data
         uses: actions/download-artifact@v5
         with:
-          pattern: playwright-coverage-* # Match all artifacts with this prefix
+          pattern: playwright-coverage-*-attempt-${{ github.run_attempt }}
           path: merged-coverage
           merge-multiple: true
 

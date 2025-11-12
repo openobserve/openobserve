@@ -573,11 +573,4 @@ test.describe("Logs Page testcases", () => {
     
     testLogger.info('Pagination SQL group/order/limit query test completed');
   });
-
-  test("TEMP: intentional failure for TestDino optimization testing", {
-    tag: ['@tempTest', '@logs']
-  }, async ({ page }) => {
-    testLogger.info('This test will intentionally fail to test TestDino rerun optimization');
-    expect(true).toBe(false); // Intentional failure
-  });
 });
