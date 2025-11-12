@@ -82,7 +82,7 @@ pub(crate) fn group_series_by_labels(
     matrix: &[RangeValue],
     modifier: &Option<LabelModifier>,
 ) -> HashMap<u64, Vec<usize>> {
-    let mut groups: HashMap<u64, Vec<usize>> = HashMap::new();
+    let mut groups: HashMap<u64, Vec<usize>> = HashMap::with_capacity(matrix.len());
 
     for (idx, series) in matrix.iter().enumerate() {
         let grouped_labels = match modifier {
@@ -242,7 +242,8 @@ where
     let start4 = std::time::Instant::now();
 
     // Step 4: Convert results to final format
-    let mut result_by_labels: HashMap<u64, (Labels, Vec<Sample>)> = HashMap::new();
+    let mut result_by_labels: HashMap<u64, (Labels, Vec<Sample>)> =
+        HashMap::with_capacity(results.len());
     for (hash, labels, samples) in results {
         if !samples.is_empty() {
             result_by_labels.insert(hash, (labels, samples));
