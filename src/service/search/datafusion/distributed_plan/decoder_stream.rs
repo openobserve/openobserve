@@ -140,6 +140,22 @@ impl Stream for FlightDecoderStream {
                         break;
                     }
                     FlightMessage::CustomMessage(message) => {
+                        self.query_context.req_id += 1;
+                        let took = self.query_context.req_last_time.elapsed().as_millis();
+                        self.query_context.req_last_time = std::time::Instant::now();
+                        if self.query_context.print_key_event
+                            && (took > 100
+                                || config::utils::util::is_power_of_two(self.query_context.req_id))
+                        {
+                            log::info!(
+                                "[trace_id {}] flight->search: stream receive CustomMessage #{} from node: {}, name: {}, is_super: {}, took: {took} ms",
+                                self.query_context.trace_id,
+                                self.query_context.req_id,
+                                self.query_context.node.get_grpc_addr(),
+                                self.query_context.node.get_name(),
+                                self.query_context.is_super,
+                            );
+                        }
                         self.process_custom_message(message);
                     }
                     FlightMessage::Schema(_) => {

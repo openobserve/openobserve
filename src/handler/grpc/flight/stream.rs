@@ -189,7 +189,7 @@ impl Stream for FlightEncoderStream {
                     && (took > 100 || config::utils::util::is_power_of_two(self.req_id))
                 {
                     log::info!(
-                        "[trace_id {}] flight->search: stream Poll::Ready(#{}) RecordBatch, is_super: {}, took: {took} ms",
+                        "[trace_id {}] flight->search: stream Poll::Ready(#{}) message, is_super: {}, took: {took} ms",
                         self.trace_id,
                         self.req_id,
                         self.is_super,
