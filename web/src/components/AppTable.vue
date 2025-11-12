@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:header="props">
         <q-tr
           :props="props"
-          class="thead-sticky !tw-bg-[var(--o2-hover-accent)]"
+          class="!tw-bg-[var(--o2-hover-accent)]"
         >
           <q-th
             v-for="col in props.cols"
