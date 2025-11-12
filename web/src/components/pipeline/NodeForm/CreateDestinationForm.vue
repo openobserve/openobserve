@@ -174,37 +174,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tabindex="0"
             />
 
-            <!-- OpenObserve-specific fields -->
-            <div
-              v-if="formData.destination_type === 'openobserve'"
-              class="openobserve-fields"
-            >
-              <q-input
-                data-test="add-destination-org-identifier-input"
-                v-model="formData.org_identifier"
-                label="Organization Identifier *"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                tabindex="0"
-              ></q-input>
-              <q-input
-                data-test="add-destination-stream-name-input"
-                v-model="formData.stream_name"
-                label="Stream Name *"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                tabindex="0"
-              ></q-input>
-            </div>
-
             <!-- Output Format field - disabled for all except Custom -->
             <q-select
               data-test="add-destination-output-format-select"
@@ -507,8 +476,6 @@ const formData: Ref<DestinationData> = ref({
   type: "http",
   output_format: "json",
   destination_type: "openobserve",
-  org_identifier: "default",
-  stream_name: "default",
 });
 
 // TODO OK: Use UUID package instead of this and move this method in utils
@@ -788,6 +755,9 @@ watch(
           formData.value.output_format = "json";
         }
       }
+
+      // Prefill URL endpoint based on destination type
+      formData.value.url_endpoint = defaultUrlEndpoint.value;
 
       // Set default headers for the destination type
       apiHeaders.value = getDefaultHeaders(newType);
