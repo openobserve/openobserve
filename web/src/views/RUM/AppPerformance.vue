@@ -59,9 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <router-view v-slot="{ Component }">
       <keep-alive>
-        <div
-          class="tw-pb-[0.625rem] tw-px-[0.625rem] tw-h-full tw-h-[calc(100%-146px)]"
-        >
+        <div class="tw-pb-[0.375rem] tw-px-[0.625rem] !tw-h-[calc(100%-101px)]">
           <div class="card-container tw-py-[0.625rem] tw-h-full">
             <component
               :is="Component"

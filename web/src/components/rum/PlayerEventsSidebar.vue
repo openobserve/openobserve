@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="events-container relative-position">
     <AppTabs :tabs="tabs" v-model:active-tab="activeTab" />
     <template v-if="activeTab === 'tags'">
-      <div class="row q-pa-sm event-metadata">
+      <div class="row q-pa-sm event-metadata tw-px-[0.375rem]">
         <div class="col-12 row">
           <div class="col-12 q-pb-sm text-caption">
             <q-icon name="mail" size="16px" class="q-pr-xs" />
@@ -44,7 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
-      <div class="flex items-center justify-between col-12 q-pt-sm">
+      <div
+        class="flex items-center justify-between col-12 q-pt-sm tw-px-[0.375rem]"
+      >
         <div class="q-pr-xs" style="width: 60%">
           <q-input
             v-model="searchEvent"
@@ -182,8 +184,6 @@ const handleEventClick = (event: any) => {
   width: calc(100% - 1px);
   height: calc(100vh - 57px);
   overflow: hidden;
-  padding-right: 8px;
-  padding-left: 8px;
 }
 
 .events-list {
