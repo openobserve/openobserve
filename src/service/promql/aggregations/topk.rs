@@ -92,11 +92,11 @@ fn select_topk_series(
 ) -> Vec<RangeValue> {
     // For topk/bottomk, we keep the original series but only include timestamps
     // where they are in the top/bottom k
-    let mut result = Vec::new();
+    let mut result = Vec::with_capacity(series_indices.len());
 
     for &series_idx in series_indices {
         let series = &matrix[series_idx];
-        let mut filtered_samples = Vec::new();
+        let mut filtered_samples = Vec::with_capacity(eval_timestamps.len());
 
         // Group samples by timestamp and compare
         for sample in &series.samples {

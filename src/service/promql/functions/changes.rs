@@ -101,7 +101,7 @@ mod tests {
         match result {
             Value::Matrix(m) => {
                 assert_eq!(m.len(), 1);
-                assert!(m[0].samples.len() > 0);
+                assert!(!m[0].samples.is_empty());
             }
             _ => panic!("Expected Matrix result"),
         }
