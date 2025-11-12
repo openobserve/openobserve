@@ -100,6 +100,9 @@ pub struct Endpoint {
     pub action_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_format: Option<HTTPOutputFormat>,
+    /// Destination type (e.g., "openobserve", "splunk", "elasticsearch", "custom")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_type: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

@@ -59,6 +59,7 @@ impl From<meta_dest::Destination> for Destination {
                     #[cfg(feature = "enterprise")]
                     action_id: endpoint.action_id,
                     output_format: endpoint.output_format,
+                    destination_type_name: endpoint.destination_type,
                     ..Default::default()
                 },
                 meta_dest::DestinationType::Sns(aws_sns) => Self {
@@ -78,6 +79,7 @@ impl From<meta_dest::Destination> for Destination {
                 headers: endpoint.headers,
                 destination_type: DestinationType::Http,
                 output_format: endpoint.output_format,
+                destination_type_name: endpoint.destination_type,
                 ..Default::default()
             },
         }
@@ -100,6 +102,7 @@ impl Destination {
                             headers: self.headers,
                             action_id: None,
                             output_format: self.output_format,
+                            destination_type: self.destination_type_name,
                         })
                     }
                     DestinationType::Sns => meta_dest::DestinationType::Sns(meta_dest::AwsSns {
@@ -122,6 +125,7 @@ impl Destination {
                                 headers: None,
                                 action_id: Some(action_id),
                                 output_format: self.output_format,
+                                destination_type: self.destination_type_name,
                             })
                         } else {
                             return Err(DestinationError::InvalidActionId(anyhow::anyhow!(
@@ -148,6 +152,7 @@ impl Destination {
                     headers: self.headers,
                     action_id: None,
                     output_format: self.output_format,
+                    destination_type: self.destination_type_name,
                 };
                 Ok(meta_dest::Destination {
                     id: None,
@@ -231,6 +236,9 @@ pub struct Destination {
     pub action_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_format: Option<meta_dest::HTTPOutputFormat>,
+    /// Specific destination type identifier (e.g., "openobserve", "splunk", "elasticsearch")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_type_name: Option<String>,
 }
 
 #[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone, ToSchema)]
