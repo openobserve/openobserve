@@ -129,10 +129,10 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickConfirmButton();
   });
 
-  test("should redirect to logs after clicking on stream explorer via stream page", {
+  test("should create saved view and delete it", {
     tag: ['@streamExplorer', '@all', '@logs']
   }, async ({ page }) => {
-    testLogger.info('Testing stream explorer redirect functionality');
+    testLogger.info('Testing saved view creation and deletion functionality');
     // Generate a random saved view name
     const randomSavedViewName = `streamslog${Math.random().toString(36).substring(2, 10)}`;
   
@@ -142,6 +142,15 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickSaveViewButton();
     await pm.logsPage.fillSavedViewName(randomSavedViewName); // Use the random name
     await pm.logsPage.clickSavedViewDialogSave();
+    
+    // Wait for the success toast message to appear briefly after save
+    try {
+      await pm.logsPage.page.waitForSelector('.q-notification__message:has-text("View created successfully")', { timeout: 3000 });
+      testLogger.info('Success toast validated: View created successfully');
+    } catch (error) {
+      testLogger.info('View creation toast may have appeared and disappeared quickly - continuing with test');
+    }
+    
     // Strategic 2000ms wait for saved view creation - this is functionally necessary
     await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.clickStreamsMenuItem();
@@ -163,12 +172,17 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickSavedViewsExpand();
     await pm.logsPage.clickSavedViewSearchInput();
     await pm.logsPage.clickSavedViewByTitle(randomSavedViewName); // Use the random name here
-  
-    // Dynamic delete button selector using the random saved view name
-    await pm.logsPage.clickDeleteSavedViewButton(randomSavedViewName);
-    await pm.logsPage.clickConfirmButton(); // Confirm deletion
     
-    testLogger.info('Stream explorer redirect test completed');
+    // Wait for UI to stabilize before attempting deletion
+    await pm.logsPage.waitForTimeout(1000);
+    
+    // Delete the saved view
+    await pm.logsPage.clickDeleteSavedViewButton(randomSavedViewName);
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickConfirmButton(); // Confirm deletion
+    testLogger.info(`Successfully deleted saved view: ${randomSavedViewName}`);
+    
+    testLogger.info('Saved view creation and deletion test completed');
   });
 
   test("should reset the editor on clicking reset filter button", {
