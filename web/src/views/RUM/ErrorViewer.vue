@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="error-viewer-container">
+  <div class="error-viewer-container tw-mx-[0.625rem] tw-my-[0.375rem] card-container">
     <template v-if="isLoading.length">
       <div
         class="q-pb-lg flex items-center justify-center text-center"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-    <template v-else>
+    <div class=" " v-else>
       <div class="q-px-lg q-py-md">
         <ErrorHeader :error="errorDetails" />
       </div>
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ErrorSessionReplay :error="errorDetails" />
         <ErrorEvents :error="errorDetails" />
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -172,7 +172,7 @@ const getError = () => {
 
 <style scoped>
 .error-viewer-container {
-  height: calc(100vh - 57px);
+  height: calc(100vh - 52px);
   overflow-y: auto;
 }
 </style>

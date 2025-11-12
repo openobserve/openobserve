@@ -19,11 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="relative-position">
     <div
-      class="q-mx-sm performance-dashboard"
+      class="performance-dashboard"
       :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
     >
       <div
-        class="text-bold q-ml-sm q-px-sm rounded q-mt-md q-py-xs learn-web-vitals-link flex items-center"
+        class="text-bold q-ml-md q-px-sm rounded q-mt-sm q-py-xs learn-web-vitals-link flex items-center"
         :class="store.state.theme === 'dark' ? 'bg-indigo-7' : 'bg-indigo-2'"
       >
         <q-icon
