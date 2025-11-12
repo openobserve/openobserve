@@ -120,7 +120,7 @@ impl Stream for FlightDecoderStream {
                     FlightMessage::RecordBatch(batch) => {
                         self.query_context.num_rows += batch.num_rows();
                         self.query_context.req_id += 1;
-                        let took = self.query_context.start.elapsed().as_millis();
+                        let took = self.query_context.req_last_time.elapsed().as_millis();
                         self.query_context.req_last_time = std::time::Instant::now();
                         if self.query_context.print_key_event
                             && (took > 100
