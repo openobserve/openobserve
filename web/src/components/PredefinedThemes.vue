@@ -54,7 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card-compact q-mb-sm">
               <div class="row items-center no-wrap">
                 <div class="color-preview-small" :style="{ backgroundColor: theme.light.themeColor }"></div>
-                <div class="text-subtitle2 q-ml-sm">{{ theme.name }}</div>
+                <div class="q-ml-sm" style="flex: 1; min-width: 0;">
+                  <div class="text-subtitle2">{{ theme.name }}</div>
+                  <div class="text-caption text-grey-7">{{ theme.light.themeColor }}</div>
+                </div>
                 <q-space />
                 <q-badge v-if="isThemeApplied(theme, 'light')" color="positive" label="Applied" class="text-caption q-mr-xs" />
                 <q-btn
@@ -73,7 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="color-preview-small clickable" :style="{ backgroundColor: customLightColor }" @click="openColorPicker('light')">
                   <q-icon name="colorize" size="16px" color="white" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);" />
                 </div>
-                <div class="text-subtitle2 q-ml-sm">Custom Color</div>
+                <div class="q-ml-sm" style="flex: 1; min-width: 0;">
+                  <div class="text-subtitle2">Custom Color</div>
+                  <div class="text-caption text-grey-7">{{ customLightColor }}</div>
+                </div>
                 <q-space />
                 <q-badge v-if="isCustomThemeApplied('light')" color="positive" label="Applied" class="text-caption q-mr-xs" />
                 <q-btn
@@ -92,7 +98,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card-compact q-mb-sm">
               <div class="row items-center no-wrap">
                 <div class="color-preview-small" :style="{ backgroundColor: theme.dark.themeColor }"></div>
-                <div class="text-subtitle2 q-ml-sm">{{ theme.name }}</div>
+                <div class="q-ml-sm" style="flex: 1; min-width: 0;">
+                  <div class="text-subtitle2">{{ theme.name }}</div>
+                  <div class="text-caption text-grey-7">{{ theme.dark.themeColor }}</div>
+                </div>
                 <q-space />
                 <q-badge v-if="isThemeApplied(theme, 'dark')" color="positive" label="Applied" class="text-caption q-mr-xs" />
                 <q-btn
@@ -111,7 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="color-preview-small clickable" :style="{ backgroundColor: customDarkColor }" @click="openColorPicker('dark')">
                   <q-icon name="colorize" size="16px" color="white" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);" />
                 </div>
-                <div class="text-subtitle2 q-ml-sm">Custom Color</div>
+                <div class="q-ml-sm" style="flex: 1; min-width: 0;">
+                  <div class="text-subtitle2">Custom Color</div>
+                  <div class="text-caption text-grey-7">{{ customDarkColor }}</div>
+                </div>
                 <q-space />
                 <q-badge v-if="isCustomThemeApplied('dark')" color="positive" label="Applied" class="text-caption q-mr-xs" />
                 <q-btn
