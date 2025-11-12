@@ -15,571 +15,413 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-   <div class="card-container tw-mb-[0.625rem] tw-mr-2">
-    <div class="flex tw-py-3 tw-px-4 items-center no-wrap tw-h-[68px]">
-      <div class="col">
-        <div class="flex">
-          <q-btn
-            no-caps
-            padding="xs"
-            outline
-            @click="router.back()"
-            icon="arrow_back_ios_new"
-            data-test="pipeline-import-back-btn"
-          />
-          <div class="tw-font-[600] tw-text-[20px] q-ml-md">Import Pipeline</div>
+  <base-import
+    ref="baseImportRef"
+    title="Import Pipeline"
+    test-prefix="pipeline"
+    :is-importing="isPipelineImporting"
+    :editor-heights="{
+      urlEditor: 'calc(100vh - 290px)',
+      fileEditor: 'calc(100vh - 310px)',
+      outputContainer: 'calc(100vh - 132px)',
+      errorReport: 'calc(100vh - 132px)',
+    }"
+    @back="router.back()"
+    @cancel="router.back()"
+    @import="importJson"
+  >
+    <!-- Output Section with Pipeline-specific Error Display -->
+    <template #output-content>
+      <div class="tw-w-full" style="min-width: 400px;">
+        <div
+          v-if="pipelineErrorsToDisplay.length > 0"
+          class="text-center text-h6 tw-py-2"
+        >
+          Error Validations
+        </div>
+        <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
+        <q-separator class="q-mx-md q-mt-md" />
+        <div class="error-report-container" style="height: calc(100vh - 128px) !important; overflow: auto; resize: none;">
+          <!-- Pipeline Errors Section -->
+          <div
+            class="error-section"
+            v-if="pipelineErrorsToDisplay.length > 0"
+          >
+            <div class="error-list">
+              <!-- Iterate through the outer array -->
+              <div
+                v-for="(errorGroup, index) in pipelineErrorsToDisplay"
+                :key="index"
+                :data-test="`pipeline-import-error-${index}`"
+              >
+                <!-- Iterate through each inner array (the individual error message) -->
+                <div
+                  v-for="(errorMessage, errorIndex) in errorGroup"
+                  :key="errorIndex"
+                  class="error-item"
+                  :data-test="`pipeline-import-error-${index}-${errorIndex}`"
+                >
+                  <!-- pipeline name should not be empty -->
+                  <span
+                    class="text-red"
+                    v-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'pipeline_name'
+                    "
+                  >
+                    {{ errorMessage.message }}
+
+                    <div style="width: 300px">
+                      <q-input
+                        data-test="pipeline-import-name-input"
+                        :model-value="userSelectedPipelineName[index] || ''"
+                        :label="t('alerts.name') + ' *'"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="showLabelOnTop"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        tabindex="0"
+                        @update:model-value="(val: string) => {
+                          userSelectedPipelineName[index] = val;
+                          updatePipelineName(val as string, index);
+                        }"
+                      />
+                    </div>
+                  </span>
+                  <!-- source stream name should not be empty -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'source_stream_name'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div style="width: 300px">
+                      <q-select
+                        data-test="pipeline-import-source-stream-name-input"
+                        :model-value="userSelectedStreamName[index] || ''"
+                        :options="streamList"
+                        :label="t('alerts.stream_name') + ' *'"
+                        :popup-content-style="{
+                          textTransform: 'lowercase',
+                        }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        filled
+                        stack-label
+                        dense
+                        use-input
+                        hide-selected
+                        fill-input
+                        :input-debounce="400"
+                        @update:model-value="(val) => {
+                          userSelectedStreamName[index] = val;
+                          updateStreamFields(val, index);
+                        }"
+                        behavior="menu"
+                        @input-value="handleDynamicStreamName($event, index)"
+                      >
+                        <template v-slot:option="scope">
+                          <q-item v-bind="scope.itemProps">
+                            <q-item-section>
+                              <q-item-label
+                                :class="{
+                                  'text-grey-6': scope.opt.disable,
+                                }"
+                              >
+                                {{ scope.opt.label }}
+                              </q-item-label>
+                            </q-item-section>
+                          </q-item>
+                        </template>
+                      </q-select>
+                    </div>
+                  </span>
+                  <!-- source stream type should be one of the valid stream types -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'source_stream_type'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div>
+                      <q-select
+                        data-test="pipeline-import-source-stream-type-input"
+                        :model-value="userSelectedStreamType[index] || ''"
+                        :options="streamTypes"
+                        :label="t('alerts.streamType') + ' *'"
+                        :popup-content-style="{
+                          textTransform: 'lowercase',
+                        }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        @update:model-value="(val) => {
+                          userSelectedStreamType[index] = val;
+                          getSourceStreamsList(val, index);
+                        }"
+                        :rules="[
+                          (val: any) => !!val || 'Field is required!',
+                        ]"
+                        style="width: 300px"
+                      />
+                    </div>
+                  </span>
+                  <!-- sql query should be same across all nodes as well try to match the query in the nodes -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'sql_query_missing'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div>
+                      <query-editor
+                        style="width: 100%; height: 200px"
+                        data-test="pipeline-import-sql-query-input"
+                        :model-value="userSelectedSqlQuery[index] || ''"
+                        :label="'SQL Query'"
+                        :debounceTime="300"
+                        language="sql"
+                        @update:query="(val) => {
+                          userSelectedSqlQuery[index] = val;
+                          updateSqlQuery(val, index);
+                        }"
+                      />
+                    </div>
+                  </span>
+                  <!-- destination stream type should be one of the valid stream types -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'destination_stream_type'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div>
+                      <q-select
+                        data-test="pipeline-import-destination-stream-type-input"
+                        :model-value="userSelectedDestinationStreamType[index] || ''"
+                        :options="destinationStreamTypes"
+                        :label="t('alerts.streamType') + ' *'"
+                        :popup-content-style="{
+                          textTransform: 'lowercase',
+                        }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        @update:model-value="(val) => {
+                          userSelectedDestinationStreamType[index] = val;
+                          getDestinationStreamsList(val, index);
+                        }"
+                        :rules="[
+                          (val: any) => !!val || 'Field is required!',
+                        ]"
+                        style="width: 300px"
+                      />
+                    </div>
+                  </span>
+                  <!-- destination stream name should not be empty -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'org_id'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div style="width: 300px">
+                      <q-select
+                        data-test="pipeline-import-org-id-input"
+                        :model-value="userSelectedOrgId[index] || null"
+                        :options="organizationData"
+                        :label="'Organization Id'"
+                        :popup-content-style="{
+                          textTransform: 'lowercase',
+                        }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        filled
+                        stack-label
+                        dense
+                        use-input
+                        hide-selected
+                        fill-input
+                        :input-debounce="400"
+                        @update:model-value="(val) => {
+                          userSelectedOrgId[index] = val;
+                          updateOrgId(val?.value || val, index);
+                        }"
+                        behavior="menu"
+                      >
+                      </q-select>
+                    </div>
+                  </span>
+                  <!-- source stream type should be one of the valid stream types -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field.startsWith('function_name')
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div>
+                      <q-select
+                        data-test="pipeline-import-destination-function-name-input"
+                        :model-value="userSelectedFunctionName[errorMessage.nodeIndex] || ''"
+                        :options="existingFunctions"
+                        :label="'Function Name'"
+                        :popup-content-style="{
+                          textTransform: 'lowercase',
+                        }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        @update:model-value="(val) => {
+                          userSelectedFunctionName[errorMessage.nodeIndex] = val;
+                          updateFunctionName(val, index, errorMessage.nodeIndex);
+                        }"
+                        :rules="[
+                          (val: any) => !!val || 'Field is required!',
+                        ]"
+                        style="width: 300px"
+                      />
+                    </div>
+                  </span>
+
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'remote_destination'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div>
+                      <q-select
+                        data-test="pipeline-import-destination-stream-type-input"
+                        :model-value="userSelectedRemoteDestination[index] || ''"
+                        :options="pipelineDestinations"
+                        :label="'Remote Destination'"
+                        :popup-content-style="{
+                          textTransform: 'lowercase',
+                        }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        @update:model-value="(val) => {
+                          userSelectedRemoteDestination[index] = val;
+                          updateRemoteDestination(val, index);
+                        }"
+                        :rules="[
+                          (val: any) => !!val || 'Field is required!',
+                        ]"
+                        style="width: 300px"
+                      />
+                    </div>
+                  </span>
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'source_timezone'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div>
+                      <q-select
+                        data-test="pipeline-import-destination-stream-type-input"
+                        :model-value="userSelectedTimezone[index] || ''"
+                        :options="timezoneOptions"
+                        :label="'Timezone'"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        @update:model-value="(val) => {
+                          userSelectedTimezone[index] = val;
+                          updateTimezone(val, index);
+                        }"
+                        :rules="[
+                          (val: any) => !!val || 'Field is required!',
+                        ]"
+                        style="width: 300px"
+                      />
+                    </div>
+                  </span>
+                  <span v-else>{{ errorMessage }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="error-section" v-if="pipelineCreators.length > 0">
+            <div
+              class="section-title text-primary"
+              data-test="pipeline-import-creation-title"
+            >
+              Pipeline Creation
+            </div>
+            <div
+              class="error-list"
+              v-for="(val, index) in pipelineCreators"
+              :key="index"
+              :data-test="`pipeline-import-creation-${index}`"
+            >
+              <div
+                :class="{
+                  'error-item text-bold': true,
+                  'text-green': val.success,
+                  'text-red': !val.success,
+                }"
+                style="
+                  white-space: pre-wrap;
+                  word-wrap: break-word;
+                  overflow-wrap: break-word;
+                "
+                :data-test="`pipeline-import-creation-${index}-message`"
+              >
+                <pre
+                  style="white-space: pre-wrap; word-break: break-word"
+                  >{{ val.message }}</pre
+                >
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="flex justify-center">
-        <q-btn
-          v-close-popup
-          class="q-mr-md o2-secondary-button tw-h-[36px]"
-          :label="t('function.cancel')"
-          no-caps
-          flat
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          @click="router.back()"
-          data-test="pipeline-import-cancel-btn"
-        />
-        <q-btn
-          class="o2-primary-button no-border tw-h-[36px]"
-          :label="t('dashboard.import')"
-          type="submit"
-          no-caps
-          flat
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-primary-button-dark'
-              : 'o2-primary-button-light'
-          "
-          @click="importJson"
-          data-test="pipeline-import-json-btn"
-        />
-      </div>
-    </div>
-  </div>
-  <div class="flex tw-pr-[0.5rem]">
-    <div class="flex" style="width: 100%">
-      <q-splitter
-        class="logs-search-splitter"
-        no-scroll
-        v-model="splitterModel"
-        style="width: calc(100vw - 100px); height: 100%"
-      >
-        <template #before>
-        <div class="tw-w-full tw-h-full ">
-          <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
-                   <div class="app-tabs-container tw-h-[36px] tw-w-fit">
-          <app-tabs
-            data-test="pipeline-import-tabs"
-            class="tabs-selection-container"
-            :tabs="tabs"
-            v-model:active-tab="activeTab"
-            @update:active-tab="updateActiveTab"
-          />
-          </div>
-          </div>
-          <div
-            v-if="activeTab == 'import_json_url'"
-            class="editor-container-url card-container tw-py-1 "
-          >
-            <q-form class="q-mt-md tw-pb-2" @submit="onSubmit">
-              <div style="width: 100%" class="q-mb-md tw-px-2">
-                <q-input
-                  data-test="pipeline-import-url-input"
-                  v-model="url"
-                  :placeholder="t('dashboard.addURL')"
-                  stack-label
-                  borderless
-                />
-              </div>
-              <query-editor
-                data-test="pipeline-import-sql-editor"
-                ref="queryEditorRef"
-                editor-id="pipeline-import-query-editor"
-                class="monaco-editor tw-mx-2"
-                :debounceTime="300"
-                v-model:query="jsonStr"
-                language="json"
-                :class="
-                  jsonStr == '' && queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="queryEditorPlaceholderFlag = true"
-              />
-
-              <div></div>
-            </q-form>
-          </div>
-          <div
-            v-if="activeTab == 'import_json_file'"
-            class="editor-container-json card-container tw-py-1"
-          >
-            <q-form class=" q-mt-md tw-pb-2" @submit="onSubmit">
-              <div style="width: 100%" class="q-mb-md tw-px-2">
-                <q-file
-                  data-test="pipeline-import-json-file-input"
-                  v-model="jsonFiles"
-                  filled
-                  bottom-slots
-                  :label="t('dashboard.dropFileMsg')"
-                  accept=".json"
-                  multiple
-                >
-                  <template v-slot:prepend>
-                    <q-icon name="cloud_upload" @click.stop.prevent />
-                  </template>
-                  <template v-slot:append>
-                    <q-icon
-                      name="close"
-                      @click.stop.prevent="jsonFiles = null"
-                      class="cursor-pointer"
-                    />
-                  </template>
-                  <template v-slot:hint> .json files only </template>
-                </q-file>
-              </div>
-              <query-editor
-                data-test="pipeline-import-sql-editor"
-                ref="queryEditorRef"
-                editor-id="pipeline-import-query-editor"
-                class="monaco-editor tw-mx-2"
-                :debounceTime="300"
-                v-model:query="jsonStr"
-                language="json"
-                :class="
-                  jsonStr == '' && queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="queryEditorPlaceholderFlag = true"
-              />
-
-              <div></div>
-            </q-form>
-          </div>
-          </div>
-        </template>
-        <template #after>
-          <div
-            data-test="pipeline-import-output-editor"
-            style="width: 100%; height: 100%"
-            class="card-container tw-h-full"
-          >
-            <div
-              v-if="pipelineErrorsToDisplay.length > 0"
-              class="text-center text-h6"
-            >
-              Error Validations
-            </div>
-            <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
-            <q-separator class="q-mx-md q-mt-md" />
-            <div class="error-report-container">
-              <!-- Pipeline Errors Section -->
-              <div
-                class="error-section"
-                v-if="pipelineErrorsToDisplay.length > 0"
-              >
-                <div class="error-list">
-                  <!-- Iterate through the outer array -->
-                  <div
-                    v-for="(errorGroup, index) in pipelineErrorsToDisplay"
-                    :key="index"
-                    :data-test="`pipeline-import-error-${index}`"
-                  >
-                    <!-- Iterate through each inner array (the individual error message) -->
-                    <div
-                      v-for="(errorMessage, errorIndex) in errorGroup"
-                      :key="errorIndex"
-                      class="error-item"
-                      :data-test="`pipeline-import-error-${index}-${errorIndex}`"
-                    >
-                      <!-- pipeline name should not be empty -->
-                      <span
-                        class="text-red"
-                        v-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'pipeline_name'
-                        "
-                      >
-                        {{ errorMessage.message }}
-
-                        <div style="width: 300px">
-                          <q-input
-                            data-test="pipeline-import-name-input"
-                            v-model="userSelectedPipelineName[index]"
-                            :label="t('alerts.name') + ' *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updatePipelineName(
-                                userSelectedPipelineName[index],
-                                index,
-                              )
-                            "
-                          />
-                        </div>
-                      </span>
-                      <!-- source stream name should not be empty -->
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'source_stream_name'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-select
-                            data-test="pipeline-import-source-stream-name-input"
-                            v-model="userSelectedStreamName[index]"
-                            :options="streamList"
-                            :label="t('alerts.stream_name') + ' *'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
-                            :input-debounce="400"
-                            @update:model-value="
-                              updateStreamFields(
-                                userSelectedStreamName[index],
-                                index,
-                              )
-                            "
-                            behavior="menu"
-                            @input-value="
-                              handleDynamicStreamName($event, index)
-                            "
-                          >
-                            <template v-slot:option="scope">
-                              <q-item v-bind="scope.itemProps">
-                                <q-item-section>
-                                  <q-item-label
-                                    :class="{
-                                      'text-grey-6': scope.opt.disable,
-                                    }"
-                                  >
-                                    {{ scope.opt.label }}
-                                  </q-item-label>
-                                </q-item-section>
-                              </q-item>
-                            </template>
-                          </q-select>
-                        </div>
-                      </span>
-                      <!-- source stream type should be one of the valid stream types -->
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'source_stream_type'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <q-select
-                            data-test="pipeline-import-source-stream-type-input"
-                            v-model="userSelectedStreamType[index]"
-                            :options="streamTypes"
-                            :label="t('alerts.streamType') + ' *'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            @update:model-value="
-                              getSourceStreamsList(
-                                userSelectedStreamType[index],
-                                index,
-                              )
-                            "
-                            :rules="[
-                              (val: any) => !!val || 'Field is required!',
-                            ]"
-                            style="width: 300px"
-                          />
-                        </div>
-                      </span>
-                      <!-- sql query should be same across all nodes as well try to match the query in the nodes -->
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'sql_query_missing'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <query-editor
-                            style="width: 100%; height: 200px"
-                            data-test="pipeline-import-sql-query-input"
-                            v-model:query="userSelectedSqlQuery[index]"
-                            :label="'SQL Query'"
-                            :debounceTime="300"
-                            language="sql"
-                            @update:query="
-                              updateSqlQuery(userSelectedSqlQuery[index], index)
-                            "
-                          />
-                        </div>
-                      </span>
-                      <!-- destination stream type should be one of the valid stream types -->
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'destination_stream_type'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <q-select
-                            data-test="pipeline-import-destination-stream-type-input"
-                            v-model="userSelectedDestinationStreamType[index]"
-                            :options="destinationStreamTypes"
-                            :label="t('alerts.streamType') + ' *'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            @update:model-value="
-                              getDestinationStreamsList(
-                                userSelectedDestinationStreamType[index],
-                                index,
-                              )
-                            "
-                            :rules="[
-                              (val: any) => !!val || 'Field is required!',
-                            ]"
-                            style="width: 300px"
-                          />
-                        </div>
-                      </span>
-                      <!-- destination stream name should not be empty -->
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'org_id'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-select
-                            data-test="pipeline-import-org-id-input"
-                            v-model="userSelectedOrgId[index]"
-                            :options="organizationData"
-                            :label="'Organization Id'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
-                            :input-debounce="400"
-                            @update:model-value="
-                              updateOrgId(userSelectedOrgId[index].value, index)
-                            "
-                            behavior="menu"
-                          >
-                          </q-select>
-                        </div>
-                      </span>
-                      <!-- source stream type should be one of the valid stream types -->
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field.startsWith('function_name')
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <q-select
-                            data-test="pipeline-import-destination-function-name-input"
-                            v-model="
-                              userSelectedFunctionName[errorMessage.nodeIndex]
-                            "
-                            :options="existingFunctions"
-                            :label="'Function Name'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            @update:model-value="
-                              updateFunctionName(
-                                userSelectedFunctionName[
-                                  errorMessage.nodeIndex
-                                ],
-                                index,
-                                errorMessage.nodeIndex,
-                              )
-                            "
-                            :rules="[
-                              (val: any) => !!val || 'Field is required!',
-                            ]"
-                            style="width: 300px"
-                          />
-                        </div>
-                      </span>
-
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'remote_destination'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <q-select
-                            data-test="pipeline-import-destination-stream-type-input"
-                            v-model="userSelectedRemoteDestination[index]"
-                            :options="pipelineDestinations"
-                            :label="'Remote Destination'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            @update:model-value="
-                              updateRemoteDestination(
-                                userSelectedRemoteDestination[index],
-                                index,
-                              )
-                            "
-                            :rules="[
-                              (val: any) => !!val || 'Field is required!',
-                            ]"
-                            style="width: 300px"
-                          />
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'source_timezone'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <q-select
-                            data-test="pipeline-import-destination-stream-type-input"
-                            v-model="userSelectedTimezone[index]"
-                            :options="timezoneOptions"
-                            :label="'Timezone'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            @update:model-value="
-                              updateTimezone(userSelectedTimezone[index], index)
-                            "
-                            :rules="[
-                              (val: any) => !!val || 'Field is required!',
-                            ]"
-                            style="width: 300px"
-                          />
-                        </div>
-                      </span>
-                      <span v-else>{{ errorMessage }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="error-section" v-if="pipelineCreators.length > 0">
-                <div
-                  class="section-title text-primary"
-                  data-test="pipeline-import-creation-title"
-                >
-                  Pipeline Creation
-                </div>
-                <div
-                  class="error-list"
-                  v-for="(val, index) in pipelineCreators"
-                  :key="index"
-                  :data-test="`pipeline-import-creation-${index}`"
-                >
-                  <div
-                    :class="{
-                      'error-item text-bold': true,
-                      'text-green': val.success,
-                      'text-red': !val.success,
-                    }"
-                    style="
-                      white-space: pre-wrap;
-                      word-wrap: break-word;
-                      overflow-wrap: break-word;
-                    "
-                    :data-test="`pipeline-import-creation-${index}-message`"
-                  >
-                    <pre
-                      style="white-space: pre-wrap; word-break: break-word"
-                      >{{ val.message }}</pre
-                    >
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-      </q-splitter>
-    </div>
-  </div>
+    </template>
+  </base-import>
 </template>
 
 <script lang="ts">
@@ -587,26 +429,28 @@ import {
   defineComponent,
   ref,
   onMounted,
-  reactive,
   computed,
-  watch,
   defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useRouter, useRoute } from "vue-router";
-import axios from "axios";
-import router from "@/router";
+import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import pipelinesService from "../../services/pipelines";
 import useStreams from "@/composables/useStreams";
 import destinationService from "@/services/alert_destination";
-import AppTabs from "../common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
 import usePipelines from "@/composables/usePipelines";
+import BaseImport from "../common/BaseImport.vue";
 
 export default defineComponent({
   name: "ImportPipeline",
+  components: {
+    BaseImport,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/CodeQueryEditor.vue"),
+    ),
+  },
   props: {
     destinations: {
       type: Array,
@@ -629,73 +473,43 @@ export default defineComponent({
       nodeIndex?: any;
       currentValue?: string;
     };
-    type alertCreator = {
+    type pipelineCreator = {
       message: string;
       success: boolean;
     }[];
 
-    type AlertErrors = (ErrorMessage | string)[][];
+    type PipelineErrors = (ErrorMessage | string)[][];
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const route = useRoute();
 
-    const jsonStr: any = ref("");
     const q = useQuasar();
     const { getStreams } = useStreams();
     const { getPipelineDestinations } = usePipelines();
 
-    const templateErrorsToDisplay = ref([]);
-
-    const destinationErrorsToDisplay = ref([]);
-
-    const pipelineErrorsToDisplay = ref<AlertErrors>([]);
-    const userSelectedDestinations = ref<string[][]>([]);
+    const baseImportRef = ref<any>(null);
+    const pipelineErrorsToDisplay = ref<PipelineErrors>([]);
     const userSelectedPipelineName = ref<string[]>([]);
 
-    const templateCreators = ref([]);
-    const destinationCreators = ref([]);
-    const pipelineCreators = ref<alertCreator>([]);
-    const queryEditorPlaceholderFlag = ref(true);
+    const pipelineCreators = ref<pipelineCreator>([]);
     const streamList = ref<any>([]);
     const streamData = ref<any>([]);
-
-    // Migration function to convert old conditions format to new condition format
-    const migratePipelineConditions = (pipelines: any[]) => {
-      return pipelines.map((pipeline: any) => {
-        if (pipeline.nodes && Array.isArray(pipeline.nodes)) {
-          pipeline.nodes = pipeline.nodes.map((node: any) => {
-            // Check if this is a condition node with old format
-            if (node.data?.node_type === "condition" && node.data.conditions) {
-              // Old format detected - migrate to new format
-              if (Array.isArray(node.data.conditions) && node.data.conditions.length > 0) {
-                // Convert array of conditions to new nested format (implicit AND)
-                node.data.condition = {
-                  and: node.data.conditions
-                };
-                // Remove old format
-                delete node.data.conditions;
-              }
-            }
-            return node;
-          });
-        }
-        return pipeline;
-      });
-    };
     const userSelectedStreamName = ref<string[]>([]);
     const userSelectedDestinationStreamName = ref<string[]>([]);
     const userSelectedStreamType = ref<string[]>([]);
     const userSelectedDestinationStreamType = ref<string[]>([]);
     const userSelectedRemoteDestination = ref<string[]>([]);
-    const jsonFiles = ref(null);
 
-    const url = ref("");
-    const jsonArrayOfObj: any = ref([{}]);
-    const streams = ref<any>({});
-    const activeTab = ref("import_json_file");
-    const splitterModel = ref(60);
-    const filteredDestinations = ref<string[]>([]);
+    // Use computed to directly reference BaseImport's jsonArrayOfObj
+    const jsonArrayOfObj = computed({
+      get: () => baseImportRef.value?.jsonArrayOfObj || [],
+      set: (val) => {
+        if (baseImportRef.value) {
+          baseImportRef.value.jsonArrayOfObj = val;
+        }
+      }
+    });
+
     const streamTypes = ["logs", "metrics", "traces"];
     const destinationStreamTypes = [
       "logs",
@@ -710,6 +524,8 @@ export default defineComponent({
     const userSelectedFunctionName = ref<any[]>([]);
     const scheduledPipelines = ref<any>([]);
     const userSelectedOrgId = ref<any[]>([]);
+    const isPipelineImporting = ref(false);
+
     const organizationData = computed(() => {
       return store.state.organizations.map((org: any) => {
         return {
@@ -722,20 +538,12 @@ export default defineComponent({
       });
     });
 
-    const getFormattedDestinations: any = computed(() => {
-      return props.destinations.map((destination: any) => {
-        return destination.name;
-      });
-    });
-
     const userSelectedTimezone = ref<string[]>([]);
 
     // @ts-ignore
     let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
       return tz;
     });
-    const filteredTimezone = ref<any>([]);
-    filteredTimezone.value = [...timezoneOptions];
 
     const browserTime =
       "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
@@ -744,194 +552,121 @@ export default defineComponent({
     timezoneOptions.unshift("UTC");
     timezoneOptions.unshift(browserTime);
 
-    const updateUserSelectedDestinations = (
-      destinations: string[],
-      index: number,
-    ) => {
-      jsonArrayOfObj.value[index].destinations = destinations;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    };
     const updateSqlQuery = (sqlQuery: string, index: number) => {
-      jsonArrayOfObj.value[index].sql_query = sqlQuery;
-      jsonArrayOfObj.value[index].source.query_condition.sql = sqlQuery;
-      jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
-        if (
-          node.io_type == "input" &&
-          node.data.query_condition.type == "sql"
-        ) {
-          node.data.query_condition.sql = sqlQuery;
-        }
-      });
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].sql_query = sqlQuery;
+        baseImportRef.value.jsonArrayOfObj[index].source.query_condition.sql = sqlQuery;
+        baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
+          if (
+            node.io_type == "input" &&
+            node.data.query_condition.type == "sql"
+          ) {
+            node.data.query_condition.sql = sqlQuery;
+          }
+        });
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const updateStreamFields = (streamName: any, index: number) => {
-      const stream_name = streamName.value;
-      jsonArrayOfObj.value[index].source.stream_name = stream_name;
-      jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
-        if (node.io_type == "input") {
-          node.data.stream_name = stream_name;
-        }
-      });
-      jsonArrayOfObj.value[index].edges.forEach((edge: any) => {
-        if (edge.hasOwnProperty("sourceNode")) {
-          edge.sourceNode.data.stream_name = stream_name;
-        }
-      });
-      jsonArrayOfObj.value[index].stream_name = stream_name;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        const stream_name = streamName.value || streamName;
+        baseImportRef.value.jsonArrayOfObj[index].source.stream_name = stream_name;
+        baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
+          if (node.io_type == "input") {
+            node.data.stream_name = stream_name;
+          }
+        });
+        baseImportRef.value.jsonArrayOfObj[index].edges.forEach((edge: any) => {
+          if (edge.hasOwnProperty("sourceNode")) {
+            edge.sourceNode.data.stream_name = stream_name;
+          }
+        });
+        baseImportRef.value.jsonArrayOfObj[index].stream_name = stream_name;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const updateRemoteDestination = (
       remoteDestination: string,
       index: number,
     ) => {
-      jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
-        if (node.data.node_type == "remote_stream") {
-          node.data.destination_name = remoteDestination;
-        }
-      });
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
+          if (node.data.node_type == "remote_stream") {
+            node.data.destination_name = remoteDestination;
+          }
+        });
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const updateDestinationStreamFields = (streamName: any, index: number) => {
-      jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
-        if (node.io_type == "output") {
-          node.data.stream_name = streamName;
-        }
-      });
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
+          if (node.io_type == "output") {
+            node.data.stream_name = streamName;
+          }
+        });
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const updatePipelineName = (pipelineName: string, index: number) => {
-      jsonArrayOfObj.value[index].name = pipelineName;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].name = pipelineName;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
-    //this function helps in updating the function name in the pipeline
-    //we use the pipelineIndex to get the correct pipeline and the nodeIndex to get the correct node
-    //we use the nodeIndex to push the error to the correct node
 
     const updateFunctionName = (
       functionName: any,
       pipelineIndex: any,
       nodeIndex: any,
     ) => {
-      const node = jsonArrayOfObj.value[pipelineIndex].nodes[nodeIndex];
+      if (baseImportRef.value?.jsonArrayOfObj[pipelineIndex]) {
+        const node = baseImportRef.value.jsonArrayOfObj[pipelineIndex].nodes[nodeIndex];
 
-      if (
-        node &&
-        node.io_type === "default" &&
-        node.data.node_type === "function"
-      ) {
-        node.data.name = functionName;
-      }
-
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    };
-
-    watch(jsonFiles, async (newVal: any, oldVal: any) => {
-      if (newVal && newVal.length > 0) {
-        let combinedJson: any[] = [];
-
-        for (const file of newVal) {
-          try {
-            const result: any = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onload = (e: any) => {
-                try {
-                  const parsedJson = JSON.parse(e.target.result);
-                  // Convert to array if it's a single object
-                  let jsonArray = Array.isArray(parsedJson)
-                    ? parsedJson
-                    : [parsedJson];
-                  // Migrate old conditions format to new condition format
-                  jsonArray = migratePipelineConditions(jsonArray);
-                  resolve(jsonArray);
-                } catch (error) {
-                  q.notify({
-                    message: `Error parsing JSON from file ${file.name}`,
-                    color: "negative",
-                    position: "bottom",
-                    timeout: 2000,
-                  });
-                  resolve([]);
-                }
-              };
-              reader.readAsText(file);
-            });
-
-            combinedJson = [...combinedJson, ...result];
-          } catch (error) {
-            console.error("Error reading file:", error);
-          }
+        if (
+          node &&
+          node.io_type === "default" &&
+          node.data.node_type === "function"
+        ) {
+          node.data.name = functionName;
         }
 
-        // Update the refs with combined JSON data
-        jsonArrayOfObj.value = combinedJson;
-        jsonStr.value = JSON.stringify(combinedJson, null, 2);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
-    });
-    watch(url, async (newVal, oldVal) => {
-      try {
-        if (newVal) {
-          const response = await axios.get(newVal);
-
-          // Check if the response body is valid JSON
-          try {
-            if (
-              response.headers["content-type"].includes("application/json") ||
-              response.headers["content-type"].includes("text/plain")
-            ) {
-              // Migrate old format if needed
-              const migratedData = Array.isArray(response.data)
-                ? migratePipelineConditions(response.data)
-                : migratePipelineConditions([response.data]);
-              jsonStr.value = JSON.stringify(migratedData, null, 2);
-              jsonArrayOfObj.value = migratedData;
-            } else {
-              q.notify({
-                message: "Invalid JSON format in the URL",
-                color: "negative",
-                position: "bottom",
-                timeout: 2000,
-              });
-            }
-          } catch (parseError) {
-            // If parsing fails, display an error message
-            q.notify({
-              message: "Invalid JSON format",
-              color: "negative",
-              position: "bottom",
-              timeout: 2000,
-            });
-          }
-        }
-      } catch (error) {
-        q.notify({
-          message: "Error fetching data",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
-      }
-    });
-
-    const tabs = reactive([
-      {
-        label: "File Upload / JSON",
-        value: "import_json_file",
-      },
-      {
-        label: "URL Import",
-        value: "import_json_url",
-      },
-    ]);
-
-    const updateActiveTab = () => {
-      jsonStr.value = "";
-      jsonFiles.value = null;
-      url.value = "";
-      jsonArrayOfObj.value = [{}];
     };
 
     onMounted(async () => {
@@ -954,6 +689,7 @@ export default defineComponent({
         return fun.name;
       });
     };
+
     const getAlertDestinations = async () => {
       const destinations = await destinationService.list({
         page_num: 1,
@@ -968,23 +704,21 @@ export default defineComponent({
       });
     };
 
-    const importJson = async () => {
+    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
       pipelineErrorsToDisplay.value = [];
       pipelineCreators.value = [];
 
       try {
-        // Check if jsonStr.value is empty or null
-        if ((!jsonStr.value || jsonStr.value.trim() === "") && !url.value) {
+        // Check if jsonStr is empty or null
+        if (!jsonString || jsonString.trim() === "") {
           throw new Error("JSON string is empty");
-        } else {
-          const parsedJson = JSON.parse(jsonStr.value);
-          // Convert single object to array if needed
-          let jsonArray = Array.isArray(parsedJson)
-            ? parsedJson
-            : [parsedJson];
-          // Migrate old conditions format to new condition format
-          jsonArrayOfObj.value = migratePipelineConditions(jsonArray);
         }
+
+        const parsedJson = JSON.parse(jsonString);
+        // Convert single object to array if needed
+        jsonArrayOfObj.value = Array.isArray(parsedJson)
+          ? parsedJson
+          : [parsedJson];
       } catch (e: any) {
         q.notify({
           message: e.message || "Invalid JSON format",
@@ -996,7 +730,9 @@ export default defineComponent({
       }
 
       let allPipelinesCreated = true;
-      // Now we can always process as an array
+      isPipelineImporting.value = true;
+
+      // Process each object in the array
       for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
         const success = await processJsonObject(jsonObj, index + 1);
         if (!success) {
@@ -1005,21 +741,30 @@ export default defineComponent({
       }
 
       if (allPipelinesCreated) {
+        q.notify({
+          message: "Pipeline(s) imported successfully",
+          color: "positive",
+          position: "bottom",
+          timeout: 2000,
+        });
+
+        // Delay navigation to allow Monaco editor to complete all debounced operations
         setTimeout(() => {
           emit("update:pipelines");
-          q.notify({
-            message: "Pipelines(s) imported successfully",
-            color: "positive",
-            position: "bottom",
-            timeout: 2000,
-          });
           router.push({
             name: "pipelines",
             query: {
               org_identifier: store.state.selectedOrganization.identifier,
             },
           });
-        }, 3000);
+        }, 400);
+      }
+
+      isPipelineImporting.value = false;
+
+      // Reset BaseImport's importing flag
+      if (baseImportRef.value) {
+        baseImportRef.value.isImporting = false;
       }
     };
 
@@ -1030,7 +775,7 @@ export default defineComponent({
           return false;
         }
 
-        if (pipelineErrorsToDisplay.value.length === 0) {
+        if (pipelineErrorsToDisplay.value.length === 0 && isValidPipeline) {
           return await createPipeline(jsonObj, index);
         }
       } catch (e: any) {
@@ -1128,6 +873,7 @@ export default defineComponent({
         return true;
       }
     };
+
     const validateNodesForOrg = (input: any) => {
       return input.nodes.some((node: any) => {
         const isFunction = node.data.node_type === "function";
@@ -1223,8 +969,8 @@ export default defineComponent({
           input.sql_query != input.source.query_condition.sql) ||
         !isValidQuery
       ) {
-        pipelineErrors.push(`Pipeline - ${index}: SQL query should be same across all nodes as well try to match the query in the nodes \n 
-          input.sql_query: ${input.sql_query} \n 
+        pipelineErrors.push(`Pipeline - ${index}: SQL query should be same across all nodes as well try to match the query in the nodes \n
+          input.sql_query: ${input.sql_query} \n
           input.source.query_condition.sql: ${input.source.query_condition.sql} \n`);
       }
 
@@ -1339,14 +1085,6 @@ export default defineComponent({
         input.source.source_type == "realtime"
       ) {
         const validationPromises = input.nodes.map(async (node: any) => {
-          //   if (node.io_type == "output" && node.data.node_type == "stream") {
-          //     const isValidDestinationStream = await validateDestinationStream(node.data.stream_type, node.data.stream_name);
-          //     await getDestinationStreamsList(node.data.stream_type, -1);
-          //     if(!isValidDestinationStream){
-
-          //     pipelineErrors.push({ message: `Pipeline - ${index}: Destination stream name is required`, field: "destination_stream_name" });
-          //   }
-          // }
           const validDestinationStreamTypes = [
             "logs",
             "metrics",
@@ -1359,9 +1097,6 @@ export default defineComponent({
       }
 
       //validate function node in pipeline
-      //this function helps in validating the function node and pushing the errors to the pipelineErrors array
-      //we track the function counter to get the correct node index because all nodes are not function nodes
-      //we use the nodeIndex to push the error to the correct node
       const validateFunctionNode = (input: any, pipelineIndex: number) => {
         let functionCounter = 0;
 
@@ -1391,7 +1126,7 @@ export default defineComponent({
           return (
             node.io_type == "default" &&
             node.data.node_type == "condition" &&
-            !node.data.condition
+            !node.data.conditions
           );
         });
         return isValid;
@@ -1457,24 +1192,26 @@ export default defineComponent({
       }
     };
 
-    const onSubmit = (e: any) => {
-      e.preventDefault();
-    };
     const getSourceStreamsList = async (
       streamType: string,
       index: number,
       isInput: boolean = false,
     ) => {
       //update the stream type if user selects a different stream type
-      if (index != -1) {
-        jsonArrayOfObj.value[index].source.stream_type = streamType;
-        jsonArrayOfObj.value[index].stream_type = streamType;
-        jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
+      if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].source.stream_type = streamType;
+        baseImportRef.value.jsonArrayOfObj[index].stream_type = streamType;
+        baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
           if (node.io_type == "input") {
             node.data.stream_type = streamType;
           }
         });
-        jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
       try {
         const streamResponse: any = await getStreams(streamType, false);
@@ -1500,19 +1237,25 @@ export default defineComponent({
         console.error("Error fetching streams:", error);
       }
     };
+
     const getDestinationStreamsList = async (
       streamType: string,
       index: number,
       isInput: boolean = false,
     ) => {
       //update the stream type if user selects a different stream type
-      if (index != -1) {
-        jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
+      if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
           if (node.io_type == "output") {
             node.data.stream_type = streamType;
           }
         });
-        jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
       try {
         const streamResponse: any = await getStreams(streamType, false);
@@ -1524,20 +1267,26 @@ export default defineComponent({
         console.error("Error fetching streams:", error);
       }
     };
+
     const getOutputStreamsList = async (
       streamType: string,
       index: number,
       isInput: boolean = false,
     ) => {
       //update the stream type if user selects a different stream type
-      if (index != -1) {
-        jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
+      if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
           if (node.io_type == "output") {
             node.data.stream_type = streamType;
           }
         });
 
-        jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
       try {
         const streamResponse: any = await getStreams(streamType, false);
@@ -1548,74 +1297,39 @@ export default defineComponent({
         console.error("Error fetching streams:", error);
       }
     };
-    const filterDestinations = (val: string, update: Function) => {
-      if (val === "") {
-        update(() => {
-          filteredDestinations.value = getFormattedDestinations.value;
-        });
-        return;
-      }
-
-      update(() => {
-        filteredDestinations.value = getFormattedDestinations.value.filter(
-          (destination: string) =>
-            destination.toLowerCase().includes(val.toLowerCase()),
-        );
-      });
-    };
-
-    const toggleDestination = (destination: string, index: number) => {
-      if (!userSelectedDestinations.value[index]) {
-        userSelectedDestinations.value[index] = [];
-      }
-
-      const destinations = userSelectedDestinations.value[index];
-      const destinationIndex = destinations.indexOf(destination);
-
-      if (destinationIndex === -1) {
-        destinations.push(destination);
-      } else {
-        destinations.splice(destinationIndex, 1);
-      }
-
-      updateUserSelectedDestinations(destinations, index);
-    };
 
     const updateTimezone = (timezone: string, index: number) => {
-      jsonArrayOfObj.value[index].source.trigger_condition.timezone = timezone;
-      jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
-        if (node.data.node_type == "query") {
-          node.data.trigger_condition.timezone = timezone;
-        }
-      });
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    };
-
-    const timezoneFilterFn = (val: string, update: Function) => {
-      if (val === "") {
-        update(() => {
-          filteredTimezone.value = timezoneOptions;
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].source.trigger_condition.timezone = timezone;
+        baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
+          if (node.data.node_type == "query") {
+            node.data.trigger_condition.timezone = timezone;
+          }
         });
-        return;
-      }
-
-      update(() => {
-        const needle = val.toLowerCase();
-        filteredTimezone.value = timezoneOptions.filter((timezone: string) =>
-          timezone.toLowerCase().includes(needle),
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
         );
-      });
+      }
     };
+
     const handleDynamicStreamName = (streamName: string, index: number) => {
-      if (streamName?.trim() != "") {
-        jsonArrayOfObj.value[index].source.stream_name = streamName;
-        jsonArrayOfObj.value[index].stream_name = streamName;
-        jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
+      if (streamName?.trim() != "" && baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].source.stream_name = streamName;
+        baseImportRef.value.jsonArrayOfObj[index].stream_name = streamName;
+        baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
           if (node.io_type == "input") {
             node.data.stream_name = streamName;
           }
         });
-        jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
     };
 
@@ -1628,45 +1342,39 @@ export default defineComponent({
         .filter((pipeline: any) => pipeline.source.source_type == "scheduled")
         .map((pipeline: any) => pipeline.name);
     };
+
     const updateOrgId = (orgId: string, index: number) => {
-      jsonArrayOfObj.value[index].org = orgId;
-      jsonArrayOfObj.value[index].source.org_id = orgId;
-      jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
-        if (node.data.node_type == "stream" || node.data.node_type == "query") {
-          node.data.org_id = orgId;
-        }
-      });
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].org = orgId;
+        baseImportRef.value.jsonArrayOfObj[index].source.org_id = orgId;
+        baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
+          if (node.data.node_type == "stream" || node.data.node_type == "query") {
+            node.data.org_id = orgId;
+          }
+        });
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     return {
       t,
-      jsonStr,
       importJson,
-      onSubmit,
       router,
       q,
-      templateErrorsToDisplay,
-      destinationErrorsToDisplay,
+      baseImportRef,
       pipelineErrorsToDisplay,
-      templateCreators,
-      destinationCreators,
       pipelineCreators,
-      queryEditorPlaceholderFlag,
-      splitterModel,
-      tabs,
-      activeTab,
-      userSelectedDestinations,
-      getFormattedDestinations,
       jsonArrayOfObj,
       streamList,
       userSelectedStreamName,
       userSelectedDestinationStreamName,
       updateStreamFields,
       updatePipelineName,
-      jsonFiles,
-      updateActiveTab,
-      url,
       userSelectedPipelineName,
       streamTypes,
       userSelectedStreamType,
@@ -1674,15 +1382,7 @@ export default defineComponent({
       getSourceStreamsList,
       getDestinationStreamsList,
       getOutputStreamsList,
-      streams,
-      filterDestinations,
-      filteredDestinations,
-      updateUserSelectedDestinations,
-      toggleDestination,
-      userSelectedTimezone,
-      filteredTimezone,
       updateTimezone,
-      timezoneFilterFn,
       userSelectedSqlQuery,
       updateSqlQuery,
       alertDestinations,
@@ -1701,6 +1401,9 @@ export default defineComponent({
       userSelectedOrgId,
       organizationData,
       updateOrgId,
+      userSelectedTimezone,
+      store,
+      isPipelineImporting,
       // Exposed internal functions for testing
       processJsonObject,
       validatePipelineInputs,
@@ -1713,58 +1416,16 @@ export default defineComponent({
       getFunctions,
       getAlertDestinations,
       getScheduledPipelines,
-      store,
     };
-  },
-  components: {
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
-    AppTabs,
   },
 });
 </script>
 
 <style scoped lang="scss">
-.editor-container {
-  height: calc(78vh - 20px) !important;
-}
-.editor-container-url {
-  .monaco-editor {
-    height: calc(100vh - 275px) !important; /* Total editor height */
-    overflow: auto; /* Allows scrolling if content overflows */
-    resize: none; /* Remove resize behavior */
-    padding-top: 12px;
-  }
-}
-.editor-container-json {
-  .monaco-editor {
-    height: calc(100vh - 314px) !important; /* Total editor height */
-    overflow: auto; /* Allows scrolling if content overflows */
-    resize: none; /* Remove resize behavior */
-  }
-}
-.monaco-editor {
-  height: calc(100vh - 16px) !important; /* Total editor height */
-  overflow: auto; /* Allows scrolling if content overflows */
-  resize: none; /* Remove resize behavior */
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  padding-top: 0.3rem;
-
-}
 .error-report-container {
-  height: calc(100vh - 192px) !important; /* Total editor height */
-  overflow: auto; /* Allows scrolling if content overflows */
+  height: calc(100vh - 128px) !important;
+  overflow: auto;
   resize: none;
-}
-.error-container {
-  display: flex;
-  overflow-y: auto;
-
-  flex-direction: column;
-  border: 1px solid #ccc;
-  height: calc(100% - 100px) !important; /* Total container height */
 }
 
 .error-section {
@@ -1778,54 +1439,8 @@ export default defineComponent({
   text-transform: uppercase;
 }
 
-.error-list {
-}
-
 .error-item {
   padding: 5px 0px;
   font-size: 14px;
-}
-.report-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #464646;
-  }
-
-  :deep(.rum-tab) {
-    &:hover {
-      background: #464646;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-.report-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
 }
 </style>
