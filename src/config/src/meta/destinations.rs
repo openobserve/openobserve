@@ -252,6 +252,7 @@ mod tests {
             headers: Some(headers.clone()),
             action_id: Some("action_123".to_string()),
             output_format: Some(HTTPOutputFormat::JSON),
+            destination_type: Some("custom".to_string()),
         };
 
         assert_eq!(endpoint.url, "https://api.example.com");
@@ -260,6 +261,7 @@ mod tests {
         assert_eq!(endpoint.headers, Some(headers));
         assert_eq!(endpoint.action_id, Some("action_123".to_string()));
         assert_eq!(endpoint.output_format, Some(HTTPOutputFormat::JSON));
+        assert_eq!(endpoint.destination_type, Some("custom".to_string()));
     }
 
     #[test]
@@ -328,6 +330,7 @@ mod tests {
             headers: None,
             action_id: None,
             output_format: None,
+            destination_type: Some("openobserve".to_string()),
         };
 
         let dest_type = DestinationType::Http(endpoint.clone());
@@ -386,6 +389,7 @@ mod tests {
             headers: None,
             action_id: None,
             output_format: None,
+            destination_type: Some("splunk".to_string()),
         };
 
         let module = Module::Pipeline {
@@ -398,6 +402,7 @@ mod tests {
             } => {
                 assert_eq!(pipeline_endpoint.url, "https://pipeline.example.com");
                 assert_eq!(pipeline_endpoint.method, HTTPType::PUT);
+                assert_eq!(pipeline_endpoint.destination_type, Some("splunk".to_string()));
             }
             _ => panic!("Should be Pipeline module"),
         }
