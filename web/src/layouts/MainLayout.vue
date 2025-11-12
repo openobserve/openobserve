@@ -1313,6 +1313,8 @@ export default defineComponent({
           streaming_aggregation_enabled:
             orgSettings?.data?.data?.streaming_aggregation_enabled ?? false,
           free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? "",
+          light_mode_theme_color: orgSettings?.data?.data?.light_mode_theme_color,
+          dark_mode_theme_color: orgSettings?.data?.data?.dark_mode_theme_color,
         });
 
         if (

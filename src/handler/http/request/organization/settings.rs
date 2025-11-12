@@ -118,6 +118,16 @@ async fn create(
         data.enable_streaming_search = enable_streaming_search;
     }
 
+    if let Some(light_mode_theme_color) = settings.light_mode_theme_color {
+        field_found = true;
+        data.light_mode_theme_color = Some(light_mode_theme_color);
+    }
+
+    if let Some(dark_mode_theme_color) = settings.dark_mode_theme_color {
+        field_found = true;
+        data.dark_mode_theme_color = Some(dark_mode_theme_color);
+    }
+
     if !field_found {
         return Ok(MetaHttpResponse::bad_request("No valid field found"));
     }

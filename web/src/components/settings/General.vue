@@ -53,6 +53,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               The scrape interval is the frequency, in seconds, at which the monitoring system collects metrics.
             </span>
           </div>
+
+          <!-- Manage Theme section -->
+          <div class="settings-grid-item tw-items-start">
+            <span class="individual-setting-title">
+              Manage Theme
+            </span>
+            <div class="tw-flex tw-gap-2" style="margin-left: -40px;">
+              <!-- Light Mode Theme -->
+              <div class="tw-flex tw-items-center tw-gap-2">
+                <div
+                  class="color-preview-box clickable"
+                  :style="{ backgroundColor: customLightColor }"
+                  @click="openColorPicker('light')"
+                >
+                  <q-icon name="colorize" size="20px" color="white" />
+                </div>
+                <div class="tw-flex tw-flex-col">
+                  <span class="theme-mode-label">Light Mode</span>
+                  <span class="color-code">{{ customLightColor }}</span>
+                </div>
+              </div>
+
+              <!-- Dark Mode Theme -->
+              <div class="tw-flex tw-items-center tw-gap-2">
+                <div
+                  class="color-preview-box clickable"
+                  :style="{ backgroundColor: customDarkColor }"
+                  @click="openColorPicker('dark')"
+                >
+                  <q-icon name="colorize" size="20px" color="white" />
+                </div>
+                <div class="tw-flex tw-flex-col">
+                  <span class="theme-mode-label">Dark Mode</span>
+                  <span class="color-code">{{ customDarkColor }}</span>
+                </div>
+              </div>
+
+              <!-- Reset Button -->
+              <q-btn
+                flat
+                dense
+                icon="refresh"
+                color="primary"
+                @click="resetThemeColors"
+                data-test="reset-theme-colors-btn"
+              >
+                <q-tooltip>Reset to default colors</q-tooltip>
+              </q-btn>
+            </div>
+            <span class="individual-setting-description tw-self-start">
+              Customize your application's theme colors for both light and dark modes. Click on color box to change.
+            </span>
+          </div>
           <span>&nbsp;</span>
 
           <div class="flex justify-start">
@@ -251,11 +304,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-actions>
     </q-card>
   </q-dialog>
+
+  <!-- Color Picker Dialog -->
+  <q-dialog v-model="showColorPicker" @hide="onColorPickerClose">
+    <q-card style="min-width: 300px">
+      <q-card-section>
+        <div class="text-h6">Pick Custom Color</div>
+      </q-card-section>
+      <q-card-section>
+        <q-color
+          v-model="tempColor"
+          @update:model-value="updateCustomColor"
+        />
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat label="Close" color="primary" v-close-popup />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, onActivated, ref, watch } from "vue";
+import { defineComponent, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -268,6 +339,7 @@ import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
+import { applyThemeColors } from "@/utils/theme";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -303,22 +375,95 @@ export default defineComponent({
 
     customText.value = store.state.zoConfig.custom_logo_text;
 
+    // Theme management state
+    // Get default colors from Vuex store (centralized - can be updated in one place)
+    const DEFAULT_LIGHT_COLOR = store.state.defaultThemeColors.light;
+    const DEFAULT_DARK_COLOR = store.state.defaultThemeColors.dark;
+
+    // Custom theme colors for light and dark modes
+    // Priority: Vuex store tempThemeColors > organizationSettings (backend) > defaults
+    // These refs display the current color in the UI and in the color picker
+    const customLightColor = ref(
+      store.state.tempThemeColors?.light ||
+      store.state?.organizationData?.organizationSettings?.light_mode_theme_color ||
+      DEFAULT_LIGHT_COLOR
+    );
+    const customDarkColor = ref(
+      store.state.tempThemeColors?.dark ||
+      store.state?.organizationData?.organizationSettings?.dark_mode_theme_color ||
+      DEFAULT_DARK_COLOR
+    );
+
+    // Color picker dialog state
+    const showColorPicker = ref(false);                          // Controls dialog visibility
+    const currentPickerMode = ref<"light" | "dark">("light");    // Which mode is being edited
+    const tempColor = ref(DEFAULT_LIGHT_COLOR);                  // Bound to q-color component
+
+    /**
+     * Update theme colors from Vuex store
+     * Called on component mount and when organization settings change
+     * Priority: Vuex store tempThemeColors > organizationSettings > defaults
+     */
     const updateFromStore = () => {
+      // Update scrape interval setting
       scrapeIntereval.value =
         store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15;
+
+      // Get theme colors from store with priority order
+      // 1. Check Vuex store for temporary preview colors (highest priority)
+      // 2. Check organization settings for backend defaults
+      // 3. Use application defaults
+      const tempLightFromStore = store.state.tempThemeColors?.light;
+      const tempDarkFromStore = store.state.tempThemeColors?.dark;
+
+      const newLightColor =
+        tempLightFromStore ||
+        store.state?.organizationData?.organizationSettings?.light_mode_theme_color ||
+        DEFAULT_LIGHT_COLOR;
+      const newDarkColor =
+        tempDarkFromStore ||
+        store.state?.organizationData?.organizationSettings?.dark_mode_theme_color ||
+        DEFAULT_DARK_COLOR;
+
+      // Check if colors changed and need to be applied
+      let shouldApply = false;
+
+      if (customLightColor.value !== newLightColor) {
+        customLightColor.value = newLightColor;
+        shouldApply = true;
+      }
+      if (customDarkColor.value !== newDarkColor) {
+        customDarkColor.value = newDarkColor;
+        shouldApply = true;
+      }
+
+      // Apply the theme colors if they changed
+      if (shouldApply) {
+        const currentMode = store.state.theme === "dark" ? "dark" : "light";
+        const color = currentMode === "light" ? newLightColor : newDarkColor;
+        const isDefault = color === DEFAULT_LIGHT_COLOR || color === DEFAULT_DARK_COLOR;
+        applyThemeColors(color, currentMode, isDefault);
+      }
     };
 
-    onActivated(() => {
+    onMounted(() => {
+      // Initialize from store on mount
       updateFromStore();
     });
 
+    // Watch for changes in organization settings (backend config)
+    // This handles when admin updates org settings while General Settings page is open
     watch(
       () => store.state.organizationData?.organizationSettings,
       () => {
-        updateFromStore();
+        // Only update from org settings if user is NOT actively previewing a color
+        // If temp colors exist in store, skip update to preserve the preview
+        if (!store.state.tempThemeColors?.light && !store.state.tempThemeColors?.dark) {
+          updateFromStore();
+        }
       },
-      { deep: true, immediate: true }
+      { deep: true }  // Deep watch to catch nested property changes
     );
 
     watch(
@@ -337,6 +482,8 @@ export default defineComponent({
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
           scrape_interval: scrapeIntereval.value,
+          light_mode_theme_color: customLightColor.value,
+          dark_mode_theme_color: customDarkColor.value,
         });
 
         //update settings in backend
@@ -344,6 +491,14 @@ export default defineComponent({
           store.state?.selectedOrganization?.identifier,
           store.state?.organizationData?.organizationSettings,
         );
+
+        // Apply the current mode's theme
+        const currentMode = store.state.theme === "dark" ? "dark" : "light";
+        const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
+        applyThemeColors(color, currentMode, false);
+
+        // Clear temporary theme colors from store since we're saving permanently
+        store.commit('clearTempThemeColors');
 
         q.notify({
           type: "positive",
@@ -483,6 +638,81 @@ export default defineComponent({
       return DOMPurify.sanitize(text);
     };
 
+    // ========== Theme Management Functions ==========
+
+    /**
+     * Open color picker dialog for light or dark mode
+     * @param mode - 'light' or 'dark' theme mode to edit
+     */
+    const openColorPicker = (mode: "light" | "dark") => {
+      currentPickerMode.value = mode;
+      // Initialize tempColor with current color for this mode
+      tempColor.value = mode === "light" ? customLightColor.value : customDarkColor.value;
+      showColorPicker.value = true;
+    };
+
+    /**
+     * Handle color picker dialog close
+     * Temp colors remain in Vuex store for preview until user clicks "Save"
+     */
+    const onColorPickerClose = () => {
+      // No action needed - temp colors stay in store for continued preview
+    };
+
+    /**
+     * Update custom color as user drags the color picker (live preview)
+     * This function is called on every color change via @update:model-value
+     *
+     * Flow:
+     * 1. Update local ref (customLightColor or customDarkColor)
+     * 2. Save to Vuex store (tempThemeColors) so it persists across navigation
+     * 3. Apply theme immediately to UI for live preview
+     *
+     * Note: Color is NOT saved permanently until user clicks "Save" button
+     */
+    const updateCustomColor = () => {
+      // Update the local ref for the current mode
+      if (currentPickerMode.value === "light") {
+        customLightColor.value = tempColor.value;
+      } else {
+        customDarkColor.value = tempColor.value;
+      }
+
+      // Store temporarily in Vuex store
+      // This makes the color available to App.vue and PredefinedThemes.vue
+      // and prevents other watchers/observers from overriding it
+      store.commit('setTempThemeColor', {
+        mode: currentPickerMode.value,
+        color: tempColor.value
+      });
+
+      // Apply the theme immediately to the UI for live preview
+      // isDefault=false because user is customizing the color
+      applyThemeColors(tempColor.value, currentPickerMode.value, false);
+    };
+
+    const resetThemeColors = () => {
+      // Reset to default colors
+      customLightColor.value = DEFAULT_LIGHT_COLOR;
+      customDarkColor.value = DEFAULT_DARK_COLOR;
+
+      // Store temporarily in Vuex store
+      store.commit('setTempThemeColor', { mode: 'light', color: DEFAULT_LIGHT_COLOR });
+      store.commit('setTempThemeColor', { mode: 'dark', color: DEFAULT_DARK_COLOR });
+
+      // Apply the theme immediately for current mode
+      const currentMode = store.state.theme === "dark" ? "dark" : "light";
+      const color = currentMode === "light" ? DEFAULT_LIGHT_COLOR : DEFAULT_DARK_COLOR;
+      applyThemeColors(color, currentMode, true);
+
+      // Show notification
+      q.notify({
+        type: "positive",
+        message: "Theme colors reset to defaults and applied.",
+        timeout: 2000,
+      });
+    };
+
     const updateCustomText = () => {
       loadingState.value = true;
       let orgIdentifier = "default";
@@ -578,6 +808,16 @@ export default defineComponent({
       updateCustomText,
       confirmDeleteImage: ref(false),
       sanitizeInput,
+      // Theme management
+      customLightColor,
+      customDarkColor,
+      showColorPicker,
+      tempColor,
+      openColorPicker,
+      onColorPickerClose,
+      updateCustomColor,
+      resetThemeColors,
+      currentPickerMode,
     };
   },
 });
@@ -622,6 +862,46 @@ export default defineComponent({
 }
 .text-btn-border-dark{
   border: 1px solid #6F737A ;
+}
+
+// Theme management styles
+.theme-mode-label {
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.color-preview-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.color-preview-box.clickable {
+  cursor: pointer;
+}
+
+.color-preview-box.clickable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+body.body--dark .color-preview-box {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.color-code {
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 80px;
 }
 
 </style>
