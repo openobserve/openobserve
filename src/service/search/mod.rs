@@ -696,7 +696,7 @@ pub async fn search_partition(
         skip_get_file_list = true;
     }
 
-    let mut files = Vec::new();
+    let mut files = Vec::with_capacity(sql.schemas.len() * 10);
 
     let mut step_factor = 1;
 
@@ -1109,8 +1109,8 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
 
     // make cluster request
     let trace_id = config::ider::generate_trace_id();
-    let mut tasks = Vec::new();
-    for node in nodes.iter().cloned() {
+    let mut tasks = Vec::with_capacity(nodes.len());
+    for node in nodes {
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
             "service:search:cluster:grpc_query_status",
@@ -1143,7 +1143,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         tasks.push(task);
     }
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(tasks.len());
     for task in tasks {
         match task.await {
             Ok(res) => match res {
@@ -1281,7 +1281,7 @@ pub async fn cancel_query(
         tasks.push(task);
     }
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(tasks.len());
     for task in tasks {
         match task.await {
             Ok(res) => match res {
