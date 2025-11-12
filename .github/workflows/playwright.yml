@@ -398,32 +398,55 @@ jobs:
                 fi
               else
                 echo "::notice::⏭️ OPTIMIZED RERUN: No failed tests found for '$ACTUAL_FOLDER' shard in TestDino output"
-                echo "::notice::Checking if this shard was cancelled/skipped in previous run..."
+                echo "::notice::Checking if this shard was cancelled/abruptly ended in previous attempt..."
 
                 # Check the status of this matrix job in the previous attempt
-                # If it was cancelled/skipped, we should run the full test suite
-                PREV_ATTEMPT=$(({{ github.run_attempt }} - 1))
+                # Rule: If shard was cancelled/abruptly ended → treat as failed → run full test suite
+                PREV_ATTEMPT=$((${{ github.run_attempt }} - 1))
 
                 if [ "$PREV_ATTEMPT" -ge 1 ]; then
-                  # Get the job status from the previous attempt
                   # Job name format: "e2e / {matrix.testfolder}"
                   JOB_NAME="e2e / ${{ matrix.testfolder }}"
 
                   echo "DEBUG: Checking previous attempt #$PREV_ATTEMPT for job: $JOB_NAME"
 
-                  # Use gh CLI to get job status
-                  PREV_JOB_STATUS=$(gh run view ${{ github.run_id }} --json jobs --jq ".jobs[] | select(.name == \"$JOB_NAME\") | .conclusion" 2>/dev/null || echo "unknown")
+                  # Use GitHub REST API to get job status from specific attempt
+                  # This is guaranteed to work and provides attempt-specific data
+                  API_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+                    -H "Accept: application/vnd.github.v3+json" \
+                    "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/$PREV_ATTEMPT/jobs" 2>/dev/null)
 
-                  echo "DEBUG: Previous job status: $PREV_JOB_STATUS"
+                  if [ $? -eq 0 ] && [ -n "$API_RESPONSE" ]; then
+                    # Successfully got API response, parse it
+                    PREV_JOB_STATUS=$(echo "$API_RESPONSE" | jq -r ".jobs[] | select(.name == \"$JOB_NAME\") | .conclusion" 2>/dev/null)
 
-                  if [ "$PREV_JOB_STATUS" = "cancelled" ] || [ "$PREV_JOB_STATUS" = "skipped" ] || [ "$PREV_JOB_STATUS" = "unknown" ]; then
-                    echo "::warning::⚠️ Previous run was $PREV_JOB_STATUS - running FULL test suite for safety"
+                    echo "DEBUG: Previous job status: $PREV_JOB_STATUS"
+
+                    if [ "$PREV_JOB_STATUS" = "cancelled" ] || [ "$PREV_JOB_STATUS" = "null" ] || [ -z "$PREV_JOB_STATUS" ]; then
+                      echo "::warning::⚠️ Previous shard was cancelled/abruptly ended (status: ${PREV_JOB_STATUS:-not found})"
+                      echo "::warning::Treating as FAILED - running FULL test suite for this shard"
+                      echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
+                      npx playwright test $FILE_PATHS
+                    elif [ "$PREV_JOB_STATUS" = "success" ]; then
+                      echo "::notice::✅ Previous shard completed successfully - all tests passed"
+                      echo "::notice::No failed tests to rerun. Exiting successfully."
+                      exit 0
+                    elif [ "$PREV_JOB_STATUS" = "failure" ]; then
+                      echo "::warning::⚠️ Previous shard failed but TestDino has no failures recorded"
+                      echo "::warning::This shouldn't happen - running FULL test suite for safety"
+                      echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
+                      npx playwright test $FILE_PATHS
+                    else
+                      echo "::warning::⚠️ Unknown job status: $PREV_JOB_STATUS"
+                      echo "::warning::Running FULL test suite for safety"
+                      echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
+                      npx playwright test $FILE_PATHS
+                    fi
+                  else
+                    echo "::error::Failed to fetch job status from GitHub API"
+                    echo "::warning::Falling back to running FULL test suite for safety"
                     echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                     npx playwright test $FILE_PATHS
-                  else
-                    echo "::notice::✅ Previous run completed successfully (status: $PREV_JOB_STATUS)"
-                    echo "::notice::No failed tests to rerun. Exiting successfully."
-                    exit 0
                   fi
                 else
                   echo "::notice::✅ This is the first run, no previous attempt to check"
@@ -436,7 +459,7 @@ jobs:
               if [ "$RERUN_MODE" = "fallback" ]; then
                 echo "::warning::⚠️ FALLBACK RERUN: Running all tests in matrix (TestDino optimization failed)"
               fi
-              echo "DEBUG: Final command: npx playwright test$FILE_PATHS"
+              echo "DEBUG: Final command: npx playwright test $FILE_PATHS"
               npx playwright test $FILE_PATHS
             fi
           else
