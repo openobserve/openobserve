@@ -30,23 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">Predefined Themes</div>
         <q-space />
-        <q-btn
-          icon="content_copy"
-          flat
-          round
-          dense
-          @click="copyAppliedTheme"
-        >
-          <q-tooltip>Copy Applied Theme Configuration</q-tooltip>
-        </q-btn>
         <q-btn icon="close" flat round dense v-close-popup />
-      </q-card-section>
-
-      <q-card-section class="q-pt-xs q-pb-sm tw-flex">
-        <div class="text-caption text-grey-7 tw-flex  q-gutter-xs">
-          <q-icon name="info" size="16px" />
-          <span>Panel auto-hides when you click away. Hover over the edge to bring it back.</span>
-        </div>
       </q-card-section>
 
       <q-card-section class="q-pt-none">
@@ -67,79 +51,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-tab-panels v-model="activeTab" animated>
           <!-- Light Mode Themes -->
           <q-tab-panel name="light" class="q-pa-none">
-            <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card q-mb-sm">
-              <div class="row items-center q-mb-xs">
-                <div class="text-subtitle2">{{ theme.name }}</div>
+            <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card-compact q-mb-sm">
+              <div class="row items-center no-wrap">
+                <div class="color-preview-small" :style="{ backgroundColor: theme.light.themeColor }"></div>
+                <div class="text-subtitle2 q-ml-sm">{{ theme.name }}</div>
                 <q-space />
-                <q-badge v-if="isThemeApplied(theme, 'light')" color="positive" label="Applied" class="text-caption" />
+                <q-badge v-if="isThemeApplied(theme, 'light')" color="positive" label="Applied" class="text-caption q-mr-xs" />
+                <q-btn
+                  label="Apply"
+                  color="primary"
+                  size="sm"
+                  unelevated
+                  @click="applyTheme(theme, 'light')"
+                />
               </div>
-
-              <div class="row q-mb-sm q-col-gutter-sm">
-                <div class="col-5">
-                  <div class="text-caption text-grey-7 q-mb-xs">Theme Color</div>
-                  <div class="color-preview-compact" :style="{ backgroundColor: hexToRgba(theme.light.themeColor, getOpacity(theme.id, 'light', 'themeColor', theme.light.themeColorOpacity)) }"></div>
-                  <div class="text-caption">{{ theme.light.themeColor }}</div>
-                </div>
-                <div class="col-7">
-                  <div class="text-caption text-grey-7 q-mb-xs">Opacity</div>
-                  <q-select
-                    :model-value="getOpacity(theme.id, 'light', 'themeColor', theme.light.themeColorOpacity)"
-                    @update:model-value="(val) => setOpacity(theme.id, 'light', 'themeColor', val)"
-                    :options="opacityOptions"
-                    dense
-                    emit-value
-                    map-options
-                    class="o2-custom-select-dashboard"
-                  />
-                </div>
-              </div>
-
-              <q-btn
-                label="Apply"
-                color="primary"
-                size="sm"
-                class="full-width"
-                @click="applyTheme(theme, 'light')"
-              />
             </div>
           </q-tab-panel>
 
           <!-- Dark Mode Themes -->
           <q-tab-panel name="dark" class="q-pa-none">
-            <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card q-mb-sm">
-              <div class="row items-center q-mb-xs">
-                <div class="text-subtitle2">{{ theme.name }}</div>
+            <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card-compact q-mb-sm">
+              <div class="row items-center no-wrap">
+                <div class="color-preview-small" :style="{ backgroundColor: theme.dark.themeColor }"></div>
+                <div class="text-subtitle2 q-ml-sm">{{ theme.name }}</div>
                 <q-space />
-                <q-badge v-if="isThemeApplied(theme, 'dark')" color="positive" label="Applied" class="text-caption" />
+                <q-badge v-if="isThemeApplied(theme, 'dark')" color="positive" label="Applied" class="text-caption q-mr-xs" />
+                <q-btn
+                  label="Apply"
+                  color="primary"
+                  size="sm"
+                  unelevated
+                  @click="applyTheme(theme, 'dark')"
+                />
               </div>
-
-              <div class="row q-mb-sm q-col-gutter-sm">
-                <div class="col-5">
-                  <div class="text-caption text-grey-7 q-mb-xs">Theme Color</div>
-                  <div class="color-preview-compact" :style="{ backgroundColor: hexToRgba(theme.dark.themeColor, getOpacity(theme.id, 'dark', 'themeColor', theme.dark.themeColorOpacity)) }"></div>
-                  <div class="text-caption">{{ theme.dark.themeColor }}</div>
-                </div>
-                <div class="col-7">
-                  <div class="text-caption text-grey-7 q-mb-xs">Opacity</div>
-                  <q-select
-                    :model-value="getOpacity(theme.id, 'dark', 'themeColor', theme.dark.themeColorOpacity)"
-                    @update:model-value="(val) => setOpacity(theme.id, 'dark', 'themeColor', val)"
-                    :options="opacityOptions"
-                    dense
-                    emit-value
-                    map-options
-                    class="o2-custom-select-dashboard"
-                  />
-                </div>
-              </div>
-
-              <q-btn
-                label="Apply"
-                color="primary"
-                size="sm"
-                class="full-width"
-                @click="applyTheme(theme, 'dark')"
-              />
             </div>
           </q-tab-panel>
         </q-tab-panels>
@@ -165,39 +109,6 @@ const activeTab = ref("light");
 // Track applied themes for each mode
 const appliedLightTheme = ref<number | null>(null);
 const appliedDarkTheme = ref<number | null>(null);
-
-// Track user-selected opacity values for each theme and mode
-const selectedOpacities = ref<Record<string, any>>({});
-
-// Opacity options for dropdowns (0-10 scale)
-const opacityOptions = [
-  { label: '0 (Transparent)', value: 0 },
-  { label: '0.1', value: 1 },
-  { label: '0.2', value: 2 },
-  { label: '0.3', value: 3 },
-  { label: '0.4', value: 4 },
-  { label: '0.5', value: 5 },
-  { label: '0.6', value: 6 },
-  { label: '0.7', value: 7 },
-  { label: '0.8', value: 8 },
-  { label: '0.9', value: 9 },
-  { label: '1.0 (Opaque)', value: 10 },
-];
-
-// Get opacity for a specific theme, mode, and color type
-const getOpacity = (themeId: number, mode: string, colorType: string, defaultValue: number) => {
-  const key = `${themeId}-${mode}-${colorType}`;
-  if (selectedOpacities.value[key] === undefined) {
-    selectedOpacities.value[key] = defaultValue;
-  }
-  return selectedOpacities.value[key];
-};
-
-// Set opacity for a specific theme, mode, and color type
-const setOpacity = (themeId: number, mode: string, colorType: string, value: number) => {
-  const key = `${themeId}-${mode}-${colorType}`;
-  selectedOpacities.value[key] = value;
-};
 
 // Watch isOpen from composable
 watch(isOpen, (val) => {
@@ -235,30 +146,16 @@ watch(
   }
 );
 
-// Helper function to convert hex to rgba
-const hexToRgba = (hex: string, opacity: number): string => {
-  hex = hex.replace('#', '');
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  const alpha = opacity / 10; // Convert 1-10 scale to 0.1-1.0
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
 // Predefined themes with both light and dark mode colors
 // Each theme has:
 // - id: unique identifier
 // - name: display name for the theme
-// - light: colors and opacities for light mode
-// - dark: colors and opacities for dark mode
+// - light: colors for light mode
+// - dark: colors for dark mode
 //
 // For each mode:
 // - themeColor: hex color for buttons/toggles/borders
-// - themeColorOpacity: opacity value (0-10 scale, 10 = fully opaque)
-// - primaryBg: hex color for primary background gradient
-// - primaryBgOpacity: opacity value (0-10 scale)
-// - secondaryBg: hex color for secondary background gradient
-// - secondaryBgOpacity: opacity value (0-10 scale)
+// - themeColorOpacity: opacity value (always 10 = fully opaque)
 const predefinedThemes = [
   {
     id: 1,
@@ -281,18 +178,6 @@ const predefinedThemes = [
     },
     dark: {
       themeColor: "#8B8DF0",
-      themeColorOpacity: 10,
-    },
-  },
-  {
-    id: 3,
-    name: "Sunset Orange",
-    light: {
-      themeColor: "#f28846",
-      themeColorOpacity: 10,
-    },
-    dark: {
-      themeColor: "#FF9D5C",
       themeColorOpacity: 10,
     },
   },
@@ -321,30 +206,6 @@ const predefinedThemes = [
     },
   },
   {
-    id: 6,
-    name: "Deep Sea",
-    light: {
-      themeColor: "#006064",
-      themeColorOpacity: 10,
-    },
-    dark: {
-      themeColor: "#00838F",
-      themeColorOpacity: 10,
-    },
-  },
-  {
-    id: 7,
-    name: "Rose Wine",
-    light: {
-      themeColor: "#C2185B",
-      themeColorOpacity: 10,
-    },
-    dark: {
-      themeColor: "#EC407A",
-      themeColorOpacity: 10,
-    },
-  },
-  {
     id: 8,
     name: "Sky Blue",
     light: {
@@ -361,16 +222,13 @@ const predefinedThemes = [
 const applyTheme = (theme: any, mode: "light" | "dark") => {
   const modeColors = mode === "light" ? theme.light : theme.dark;
 
-  // Get user-selected theme color opacity (or use default)
-  const themeColorOpacity = getOpacity(theme.id, mode, 'themeColor', modeColors.themeColorOpacity);
-
   // Create theme config object to pass to ThemeCustomizer
-  // Only pass theme color for both light and dark modes
+  // Only pass theme color with full opacity (10 = 1.0)
   // Backgrounds will use defaults from SCSS
   const themeConfig: any = {
     mode: mode,
     themeColor: modeColors.themeColor,
-    themeColorOpacity: themeColorOpacity,
+    themeColorOpacity: 10, // Always use full opacity (1.0)
   };
 
   // Apply theme through the ThemeCustomizer composable
@@ -399,73 +257,6 @@ const isThemeApplied = (theme: any, mode: "light" | "dark"): boolean => {
     return appliedDarkTheme.value === theme.id;
   }
 };
-
-const copyAppliedTheme = () => {
-  // Get the currently applied themes
-  const lightTheme = predefinedThemes.find(t => t.id === appliedLightTheme.value);
-  const darkTheme = predefinedThemes.find(t => t.id === appliedDarkTheme.value);
-
-  if (!lightTheme && !darkTheme) {
-    $q.notify({
-      type: 'warning',
-      message: 'No theme has been applied yet. Please apply a theme first.',
-      position: 'top',
-      timeout: 2000,
-    });
-    return;
-  }
-
-  // Build the theme configuration object
-  const themeConfig: any = {
-    id: lightTheme?.id || darkTheme?.id || 1,
-    name: lightTheme?.name || darkTheme?.name || "Custom Theme",
-    light: {
-      themeColor: "#3F7994",
-      themeColorOpacity: 10,
-    },
-    dark: {
-      themeColor: "#3F7994",
-      themeColorOpacity: 10,
-    },
-  };
-
-  // If light theme is applied, get its values with user-selected opacity
-  if (lightTheme) {
-    themeConfig.light = {
-      themeColor: lightTheme.light.themeColor,
-      themeColorOpacity: getOpacity(lightTheme.id, 'light', 'themeColor', lightTheme.light.themeColorOpacity),
-    };
-  }
-
-  // If dark theme is applied, get its values with user-selected opacity
-  if (darkTheme) {
-    themeConfig.dark = {
-      themeColor: darkTheme.dark.themeColor,
-      themeColorOpacity: getOpacity(darkTheme.id, 'dark', 'themeColor', darkTheme.dark.themeColorOpacity),
-    };
-  }
-
-  // Format as JSON string with proper indentation
-  const jsonString = JSON.stringify(themeConfig, null, 2);
-
-  // Copy to clipboard
-  navigator.clipboard.writeText(jsonString).then(() => {
-    $q.notify({
-      type: 'positive',
-      message: 'Theme configuration copied to clipboard!',
-      position: 'top',
-      timeout: 2000,
-    });
-  }).catch((err) => {
-    console.error('Failed to copy:', err);
-    $q.notify({
-      type: 'negative',
-      message: 'Failed to copy theme configuration',
-      position: 'top',
-      timeout: 2000,
-    });
-  });
-};
 </script>
 
 <style scoped>
@@ -474,27 +265,19 @@ const copyAppliedTheme = () => {
   overflow-y: auto;
 }
 
-.theme-card {
-  padding: 10px 12px;
+.theme-card-compact {
+  padding: 8px 12px;
   border: 1px solid var(--o2-border-color);
   border-radius: 6px;
   background: var(--o2-card-bg);
 }
 
-.color-preview {
-  width: 80px;
-  height: 60px;
+.color-preview-small {
+  width: 32px;
+  height: 32px;
   border-radius: 4px;
   border: 1px solid var(--o2-border-color);
-  margin: 8px 0;
-}
-
-.color-preview-compact {
-  width: 100%;
-  height: 50px;
-  border-radius: 4px;
-  border: 1px solid var(--o2-border-color);
-  margin: 4px 0 2px 0;
+  flex-shrink: 0;
 }
 .predefined-theme-card{
   width: 450px;
@@ -504,14 +287,10 @@ const copyAppliedTheme = () => {
   flex-direction: column;
   background-color: #ffffff;
   color: rgba(0, 0, 0, 0.87);
-  opacity: 0;
 
   body.body--dark & {
     background: #1d1d1d;
     color: rgba(255, 255, 255, 0.87);
-  }
-  &:hover{
-    opacity: 1;
   }
 }
 </style>
