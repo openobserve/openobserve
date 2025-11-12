@@ -546,14 +546,10 @@ const copyColorConfig = async () => {
   flex-direction: column;
   background-color: #ffffff;
   color: rgba(0, 0, 0, 0.87);
-  opacity: 0;
 
   body.body--dark & {
     background: #1d1d1d;
     color: rgba(255, 255, 255, 0.87);
-  }
-  &:hover{
-    opacity: 1;
   }
 }
 .sticky-header {
