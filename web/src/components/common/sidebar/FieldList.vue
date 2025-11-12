@@ -411,7 +411,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-field-table {
-  height: calc(100vh - 200px) !important;
+  height: calc(100vh - 212px) !important;
 }
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);

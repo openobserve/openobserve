@@ -166,6 +166,25 @@ body {
   height: 2.25rem !important;
 }
 
+.o2-run-query-button{
+  font-size: 11px;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  padding: 0px 12px !important;
+  width: 92px !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  /* subtle default glow */
+  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
+}
+.o2-color-primary{
+    background-color: var(--o2-primary-btn-bg);
+    color: var(--o2-primary-btn-text);
+    &:hover {
+    opacity: 0.9;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
+  }
+}
+
 
 .o2-secondary-button {
   background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
