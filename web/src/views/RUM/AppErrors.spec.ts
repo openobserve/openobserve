@@ -346,7 +346,7 @@ describe('AppErrors.vue', () => {
       
       const appTable = wrapper.findComponent(MockAppTable);
       expect(appTable.exists()).toBe(true);
-      expect(appTable.props('class')).toBe('app-table-container');
+      expect(appTable.props('class')).toBe('app-table-container tw-h-full');
       expect(appTable.props('columns')).toEqual((wrapper.vm as any).columns);
     });
 
