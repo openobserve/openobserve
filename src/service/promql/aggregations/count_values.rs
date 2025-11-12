@@ -208,7 +208,7 @@ mod tests {
                     } else if value_str == "20" {
                         assert_eq!(series.samples[0].value, 1.0); // Count of 20.0 is 1
                     } else {
-                        panic!("Unexpected value label: {}", value_str);
+                        panic!("Unexpected value label: {value_str}");
                     }
 
                     assert_eq!(series.samples[0].timestamp, timestamp);
