@@ -1412,14 +1412,21 @@ export class LogsPage {
     async clickDeleteSavedViewButton(savedViewName) {
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
         
-        // Ensure saved views panel is expanded
+        // Wait for the saved views area to be stable after navigation
+        await this.waitForTimeout(2000);
+        
+        // Ensure saved views panel is expanded and wait for stability
         await this.clickSavedViewsExpand();
+        await this.waitForTimeout(1000);
+        
+        // Wait for the search input to be stable and ready
+        await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'attached', timeout: 5000 });
         await this.waitForTimeout(500);
         
-        // Search for the specific saved view to make it visible
-        await this.clickSavedViewSearchInput();
-        await this.fillSavedViewSearchInput(savedViewName);
-        await this.waitForTimeout(1000);
+        // Click and fill the search input with better error handling
+        await this.page.locator(this.savedViewSearchInput).click({ force: true });
+        await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
+        await this.waitForTimeout(1500);
         
         // Wait for and click the delete button
         await this.page.locator(deleteButtonSelector).waitFor({ state: 'visible', timeout: 10000 });
