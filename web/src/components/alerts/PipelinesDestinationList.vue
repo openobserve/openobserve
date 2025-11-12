@@ -193,6 +193,15 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "destination_type",
+        field: "destination_type_name",
+        label: "Destination Type",
+        align: "left",
+        sortable: true,
+        style: "width: 150px",
+        format: (val: string) => val || "N/A",
+      },
+      {
         name: "url",
         field: "url",
         label: t("alert_destinations.url"),
@@ -205,7 +214,16 @@ export default defineComponent({
         label: t("alert_destinations.method"),
         align: "left",
         sortable: true,
-        style: "width: 150px",
+        style: "width: 120px",
+      },
+      {
+        name: "output_format",
+        field: "output_format",
+        label: "Output Format",
+        align: "left",
+        sortable: true,
+        style: "width: 140px",
+        format: (val: string) => val ? val.toUpperCase() : "N/A",
       },
       {
         name: "actions",
