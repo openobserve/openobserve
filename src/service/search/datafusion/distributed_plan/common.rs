@@ -36,6 +36,9 @@ pub struct QueryContext {
     pub cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
     pub start: std::time::Instant,
     pub num_rows: usize,
+    pub req_id: u64,
+    pub req_last_time: std::time::Instant,
+    pub print_key_event: bool,
 }
 
 impl QueryContext {
@@ -50,6 +53,9 @@ impl QueryContext {
             trace_id: String::new(),
             start: std::time::Instant::now(),
             num_rows: 0,
+            req_id: 0,
+            req_last_time: std::time::Instant::now(),
+            print_key_event: config::get_config().common.print_key_event,
         }
     }
 
