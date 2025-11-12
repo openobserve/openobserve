@@ -402,7 +402,10 @@ mod tests {
             } => {
                 assert_eq!(pipeline_endpoint.url, "https://pipeline.example.com");
                 assert_eq!(pipeline_endpoint.method, HTTPType::PUT);
-                assert_eq!(pipeline_endpoint.destination_type, Some("splunk".to_string()));
+                assert_eq!(
+                    pipeline_endpoint.destination_type,
+                    Some("splunk".to_string())
+                );
             }
             _ => panic!("Should be Pipeline module"),
         }
