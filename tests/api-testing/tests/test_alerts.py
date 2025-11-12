@@ -724,7 +724,7 @@ def test_e2e_alert_history(create_session, base_url):
     # Get alert list to retrieve alert IDs
     print("\n=== Getting alert list to retrieve alert IDs ===")
     resp_get_alerts = session.get(
-        f"{url}api/{org_id}/alerts",
+        f"{url}api/v2/{org_id}/alerts",
         headers=headers,
     )
     print(f"Get alerts list response: {resp_get_alerts.content}")
@@ -734,7 +734,6 @@ def test_e2e_alert_history(create_session, base_url):
 
     alerts_data = resp_get_alerts.json()
     alerts_list = alerts_data.get("list", [])
-    print(f"Alerts list: {alerts_list}")
 
     # Find alert IDs for our test alerts
     alert_id_1 = None
