@@ -382,4 +382,4 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.confirmDeletePipeline();
     await pageManager.pipelinesPage.verifyPipelineDeleted();
   });
-}); 
+});
