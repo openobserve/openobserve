@@ -843,7 +843,7 @@ def test_e2e_alert_history(create_session, base_url):
     # Step 10: Test 6 - Test with non-existent alert_id
     print("\n=== Test 6: Test with non-existent alert_id (should return 404) ===")
     resp_nonexistent = session.get(
-        f"{url}api/{org_id}/alerts/history?alert_id=nonexistent_alert_id_xyz123",
+        f"{url}api/{org_id}/alerts/history?alert_id=35MtcBsSRwlYwuuuaybOibAZ4gF",
         headers=headers,
     )
     assert resp_nonexistent.status_code == 404, (

@@ -1392,7 +1392,7 @@ def test_e2e_pipeline_history(create_session, base_url):
     # Step 9: Test 6 - Test with non-existent pipeline_id
     print("\n=== Test 6: Test with non-existent pipeline_id (should return 404) ===")
     resp_nonexistent = session.get(
-        f"{url}api/{org_id}/pipelines/history?pipeline_id=nonexistent_pipeline_id_xyz123",
+        f"{url}api/{org_id}/pipelines/history?pipeline_id=35MtcBsSRwlYwuuuaybOibAZ4gF",
         headers=headers,
     )
     assert resp_nonexistent.status_code == 404, (
