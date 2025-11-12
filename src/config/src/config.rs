@@ -2763,8 +2763,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.result_cache_enabled = false;
         cfg.common.metrics_cache_enabled = false;
         cfg.common.feature_query_streaming_aggs = false;
-        cfg.cache_latest_files.enabled = false;
-        cfg.cache_latest_files.delete_merge_files = false;
     }
 
     let disks = sysinfo::disk::get_disk_usage();

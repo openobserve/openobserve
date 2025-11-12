@@ -214,6 +214,7 @@ impl FlightService for FlightServiceImpl {
 
         let mut stream = FlightEncoderStreamBuilder::new(write_options, 33554432)
             .with_trace_id(trace_id.to_string())
+            .with_is_super(is_super_cluster)
             .with_defer(defer)
             .with_start(start)
             .with_custom_message(PreCustomMessage::ScanStats(scan_stats))

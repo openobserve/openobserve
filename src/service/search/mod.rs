@@ -768,7 +768,7 @@ pub async fn search_partition(
             let records = (stats.doc_num as i64 / data_retention) * query_duration;
             let original_size = (stats.storage_size as i64 / data_retention) * query_duration;
             log::info!(
-                "[trace_id {trace_id}] using approximation: stream: {stream_name}, records: {records}, original_size: {original_size} , data_retention in seconds: {data_retention}",
+                "[trace_id {trace_id}] using approximation: stream: {stream_name}, records: {records}, original_size: {original_size}, data_retention in seconds: {data_retention}",
             );
             files.push(infra::file_list::FileId {
                 id: Utc::now().timestamp_micros(),
