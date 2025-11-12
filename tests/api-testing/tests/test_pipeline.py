@@ -1297,7 +1297,7 @@ def test_e2e_pipeline_history(create_session, base_url):
 
     # Wait for pipelines to potentially trigger and generate history
     print("Waiting for pipelines to potentially trigger and generate history...")
-    time.sleep(3)
+    time.sleep(20)
 
     # Step 4: Test 1 - Get all pipeline history for the organization
     print("\n=== Test 1: Get all pipeline history ===")

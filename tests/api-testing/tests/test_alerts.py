@@ -719,7 +719,7 @@ def test_e2e_alert_history(create_session, base_url):
 
     # Wait a bit for alerts to be processed (if they auto-trigger)
     print("Waiting for alerts to potentially trigger and generate history...")
-    time.sleep(3)
+    time.sleep(20)
 
     # Get alert list to retrieve alert IDs
     print("\n=== Getting alert list to retrieve alert IDs ===")
