@@ -435,7 +435,13 @@ export default defineComponent({
       var filtered = [];
       terms = terms.toLowerCase();
       for (var i = 0; i < rows.length; i++) {
-        if (rows[i]["name"].toLowerCase().includes(terms)) {
+        if (
+          rows[i]["name"].toLowerCase().includes(terms) ||
+          rows[i]["destination_type_name"].toLowerCase().includes(terms) ||
+          rows[i]["url"].toLowerCase().includes(terms) ||
+          rows[i]["method"].toLowerCase().includes(terms) ||
+          (rows[i]["output_format"] && rows[i]["output_format"].toLowerCase().includes(terms))
+        ) {
           filtered.push(rows[i]);
         }
       }
