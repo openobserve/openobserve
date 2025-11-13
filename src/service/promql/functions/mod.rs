@@ -146,9 +146,68 @@ pub(crate) enum Func {
 pub static KEEP_METRIC_NAME_FUNC: Lazy<HashSet<&str>> =
     Lazy::new(|| HashSet::from_iter(["last_over_time"]));
 
+/// Trait for PromQL range vector functions.
+///
+/// This trait defines the interface for range functions that operate on time series data
+/// within a specified time window. Range functions (e.g., `rate()`, `increase()`,
+/// `avg_over_time()`) compute values based on samples within a sliding time window `[eval_ts -
+/// range, eval_ts]`.
+///
+/// Range functions are typically used with range vector selectors like `http_requests_total[5m]`,
+/// where `5m` specifies the lookback range from the evaluation timestamp.
+///
+/// # Evaluation Model
+///
+/// For each evaluation timestamp:
+/// 1. A time window is determined: `[eval_ts - range, eval_ts]`
+/// 2. Samples within this window are extracted from the time series
+/// 3. The `exec()` method processes these samples to compute a single value
+/// 4. The result becomes a sample at the evaluation timestamp
+///
+/// # Examples
+///
+/// ```ignore
+/// struct RateFunc;
+///
+/// impl RangeFunc for RateFunc {
+///     fn name(&self) -> &'static str {
+///         "rate"
+///     }
+///
+///     fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64> {
+///         if samples.len() < 2 {
+///             return None;
+///         }
+///         let first = samples.first().unwrap();
+///         let last = samples.last().unwrap();
+///         let time_delta = (last.timestamp - first.timestamp) as f64 / 1_000_000.0;
+///         Some((last.value - first.value) / time_delta)
+///     }
+/// }
+/// ```
 pub trait RangeFunc: Sync {
+    /// Returns the name of the range function (e.g., "rate", "avg_over_time", "increase").
     fn name(&self) -> &'static str;
 
+    /// Executes the range function on samples within a time window.
+    ///
+    /// This method processes samples from a single time series that fall within the window
+    /// `[eval_ts - range, eval_ts]` and computes a single aggregated value.
+    ///
+    /// # Parameters
+    ///
+    /// * `samples` - Samples within the time window, sorted by timestamp in ascending order. May be
+    ///   empty if no samples exist in the window.
+    /// * `eval_ts` - The evaluation timestamp (in microseconds) for which to compute the result.
+    ///   This is the right endpoint of the time window.
+    /// * `range` - The duration of the lookback window. The window spans from `eval_ts - range` to
+    ///   `eval_ts`.
+    ///
+    /// # Returns
+    ///
+    /// * `Some(f64)` - The computed value for this time window
+    /// * `None` - If the function cannot produce a value (e.g., insufficient samples, invalid data,
+    ///   or the result should be omitted)
     fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64>;
 }
 
