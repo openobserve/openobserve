@@ -2517,6 +2517,14 @@ export class LogsPage {
         const quickModeToggle = this.page.locator(this.quickModeToggle);
         const ariaPressed = await quickModeToggle.getAttribute('aria-pressed');
         const classNames = await quickModeToggle.getAttribute('class');
-        return { ariaPressed, classNames, locator: quickModeToggle };
+        return { ariaPressed, classNames };
+    }
+
+    async expectQuickModeToggleVisible() {
+        await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+    }
+
+    async waitForUI(timeout = 500) {
+        await this.page.waitForTimeout(timeout);
     }
 } 

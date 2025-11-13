@@ -332,7 +332,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     
     // Add field in normal mode (already in normal mode from beforeEach)
     await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
-    await page.waitForTimeout(500);
+    await pageManager.logsPage.waitForUI(500);
     
     await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
     await pageManager.logsPage.clickAddFieldToTableButton(fieldName);
@@ -342,10 +342,10 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     
     // Toggle to quick mode and verify the toggle works
     await pageManager.logsPage.clickQuickModeToggle();
-    await page.waitForTimeout(1000);
+    await pageManager.logsPage.waitForUI(1000);
     
     // Check if quick mode is active - use a more flexible approach
-    await page.waitForTimeout(500);
+    await pageManager.logsPage.waitForUI(500);
     
     // Check various ways to detect if quick mode is on
     const toggleInfo = await pageManager.logsPage.getQuickModeToggleAttributes();
@@ -353,21 +353,20 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info(`Quick mode toggle state - aria-pressed: ${toggleInfo.ariaPressed}, classes: ${toggleInfo.classNames}`);
     
     // Quick mode should be enabled - verify the toggle worked
-    // If aria-pressed doesn't work, just verify the toggle is still visible and clickable
-    await expect(toggleInfo.locator).toBeVisible();
+    await pageManager.logsPage.expectQuickModeToggleVisible();
     testLogger.info('Quick mode toggle is functional');
     
     // Toggle back to normal mode
     await pageManager.logsPage.clickQuickModeToggle();
-    await page.waitForTimeout(1000);
+    await pageManager.logsPage.waitForUI(1000);
     
     // Verify toggle is still functional after second click
-    await expect(quickModeToggle).toBeVisible();
+    await pageManager.logsPage.expectQuickModeToggleVisible();
     testLogger.info('Quick mode toggle functionality verified');
     
     // Clean up - remove the field we added
     await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
-    await page.waitForTimeout(500);
+    await pageManager.logsPage.waitForUI(500);
     await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
     await pageManager.logsPage.clickRemoveFieldFromTableButton(fieldName);
     
