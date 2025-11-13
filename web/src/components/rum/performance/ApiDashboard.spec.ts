@@ -303,7 +303,7 @@ describe("ApiDashboard", () => {
       await wrapper.vm.$nextTick();
 
       const dashboard = wrapper.find(".api-performance-dashboards");
-      expect(dashboard.attributes("style")).toContain("visibility: hidden");
+      expect(dashboard.classes()).toContain("tw-invisible");
     });
 
     it("should show dashboard when not loading", async () => {
@@ -311,7 +311,7 @@ describe("ApiDashboard", () => {
       await wrapper.vm.$nextTick();
 
       const dashboard = wrapper.find(".api-performance-dashboards");
-      expect(dashboard.attributes("style")).toContain("visibility: visible");
+      expect(dashboard.classes()).toContain("tw-visible");
     });
   });
 
