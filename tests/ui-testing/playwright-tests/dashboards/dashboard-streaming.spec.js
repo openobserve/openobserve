@@ -74,7 +74,7 @@ test.describe("dashboard streaming testcases", () => {
     );
 
     // await page.waitForTimeout(3000);
-    await page.waitForLoadState("networkidle");
+    // await page.waitForLoadState("networkidle");
 
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -261,7 +261,8 @@ test.describe("dashboard streaming testcases", () => {
       );
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+    await waitForDateTimeButtonToBeEnabled(page);
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
 

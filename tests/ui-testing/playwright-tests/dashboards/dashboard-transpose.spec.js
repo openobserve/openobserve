@@ -97,6 +97,28 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.chartTypeSelector.waitForTableDataLoad();
 
+    // Wait for network to be idle after transpose
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+      // Continue even if networkidle times out - data might already be loaded
+      testLogger.info('Network idle timeout - continuing anyway');
+    });
+
+    // Wait for the transposed table to be stable and have data
+    await page.waitForFunction(
+      () => {
+        const table = document.querySelector('[data-test="dashboard-panel-table"]');
+        if (!table) return false;
+
+        const rows = table.querySelectorAll('tbody tr');
+        if (rows.length === 0) return false;
+
+        const firstRowCells = rows[0].querySelectorAll('td');
+        // Just check that we have at least one cell - don't be too strict
+        return firstRowCells.length >= 1;
+      },
+      { timeout: 10000, polling: 200 }
+    );
+
     // Store transposed data after rendering is complete
     const transposedTableData = await captureTableData(page);
 
@@ -125,11 +147,27 @@ test.describe("dashboard UI testcases", () => {
             .filter((row) => row.length > 0 && row.some((cell) => cell !== ""))
       );
 
+      // Log captured data for debugging
+      testLogger.info(`Captured ${data.length} rows with ${headers.length} headers`);
+      if (data.length > 0) {
+        testLogger.info(`First row has ${data[0].length} cells`);
+      }
+
       return { headers, data };
     }
 
     // Helper function to verify transpose is working correctly
     function verifyTransposeWorking(initialData, transposedData) {
+      // Log data for debugging
+      testLogger.info(`Initial data: ${initialData.data.length} rows, ${initialData.headers.length} headers`);
+      testLogger.info(`Initial headers: ${JSON.stringify(initialData.headers)}`);
+      testLogger.info(`Transposed data: ${transposedData.data.length} rows`);
+      testLogger.info(`Transposed headers: ${JSON.stringify(transposedData.headers)}`);
+
+      if (transposedData.data.length > 0) {
+        testLogger.info(`Transposed first row has ${transposedData.data[0].length} cells: ${JSON.stringify(transposedData.data[0])}`);
+      }
+
       // Verify that transposed data exists
       expect(transposedData.data.length).toBeGreaterThan(0);
 
@@ -145,11 +183,25 @@ test.describe("dashboard UI testcases", () => {
       const expectedFieldName = initialData.headers.slice(1)[0]; // Get first data header (excluding first column)
       const transposedFieldNames = transposedData.data.map((row) => row[0]);
 
+      testLogger.info(`Expected field name: ${expectedFieldName}`);
+      testLogger.info(`Transposed field names: ${JSON.stringify(transposedFieldNames)}`);
+
       expect(transposedFieldNames).toContain(expectedFieldName);
 
       // Verify that transpose actually changed the structure
       // Initial should have more columns, transposed should have 2 main columns
       expect(initialData.headers.length).toBeGreaterThanOrEqual(2);
+
+      // Verify first row has at least 2 cells
+      if (!transposedData.data[0] || transposedData.data[0].length < 2) {
+        testLogger.error(`Transposed table first row issue:`);
+        testLogger.error(`  - First row exists: ${!!transposedData.data[0]}`);
+        testLogger.error(`  - First row length: ${transposedData.data[0]?.length || 0}`);
+        testLogger.error(`  - First row content: ${JSON.stringify(transposedData.data[0] || [])}`);
+        testLogger.error(`  - All transposed data: ${JSON.stringify(transposedData.data)}`);
+      }
+
+      expect(transposedData.data[0]).toBeDefined();
       expect(transposedData.data[0].length).toBeGreaterThanOrEqual(2);
     }
 

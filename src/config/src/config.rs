@@ -1423,8 +1423,6 @@ pub struct Limit {
         help = "Integer value representing the delay in percentage of the alert frequency that will be included in alert evaluation timerange. Default is 20. This can be changed in runtime."
     )]
     pub alert_considerable_delay: i32,
-    #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
-    pub scheduler_clean_interval: i64,
     #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
     pub scheduler_watch_interval: i64,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
@@ -2771,8 +2769,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.result_cache_enabled = false;
         cfg.common.metrics_cache_enabled = false;
         cfg.common.feature_query_streaming_aggs = false;
-        cfg.cache_latest_files.enabled = false;
-        cfg.cache_latest_files.delete_merge_files = false;
     }
 
     let disks = sysinfo::disk::get_disk_usage();
