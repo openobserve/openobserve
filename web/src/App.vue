@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { onMounted } from "vue";
+import { onMounted, watch } from "vue";
 import config from "@/aws-exports";
 import { applyThemeColors } from "@/utils/theme";
 
@@ -37,48 +37,24 @@ export default {
     }
 
     // Initialize theme colors on app mount
+    // This runs once when the app loads and applies the correct theme colors
+    // based on priority: tempThemeColors > localStorage > org settings > defaults
     onMounted(() => {
       initializeThemeColors();
-
-      // Watch for theme mode changes (light/dark toggle)
-      // MutationObserver watches body class changes to detect dark/light mode switches
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-            // Check if user is actively previewing a color in General Settings
-            // If temp colors exist, don't re-initialize to avoid overriding the preview
-            const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
-            if (!hasTempColors) {
-              initializeThemeColors();
-            }
-          }
-        });
-      });
-
-      observer.observe(document.body, {
-        attributes: true,
-        attributeFilter: ['class']
-      });
     });
 
-    // Watch for organization settings to load (for backend colors)
-    // This handles the case where settings load after App mounts
-    // The watcher has { deep: true } to catch any nested property changes
-    const unwatchSettings = store.watch(
-      (state) => state?.organizationData?.organizationSettings,
-      (newSettings, oldSettings) => {
-        if (newSettings && newSettings !== oldSettings) {
-          // Check if user is actively previewing a color in General Settings
-          // If temp colors exist in store, skip re-initialization to preserve the preview
-          // This prevents backend colors from overriding the user's preview selection
-          const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
-          if (!hasTempColors) {
-            // Settings just loaded, re-initialize theme colors from backend
-            initializeThemeColors();
-          }
+    // Watch for theme mode changes (light ↔ dark toggle)
+    // When user toggles between light and dark mode, reapply the correct colors
+    watch(
+      () => store.state.theme,
+      () => {
+        // Check if user is actively previewing colors in General Settings
+        // Skip reinitialization if temp colors exist to preserve the preview
+        const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+        if (!hasTempColors) {
+          initializeThemeColors();
         }
-      },
-      { deep: true }
+      }
     );
 
     /**
