@@ -1043,7 +1043,6 @@ pub async fn search_partition(
                 &stream_type.to_string(),
                 &stream_name,
                 hashed_query,
-                cache_interval_mins,
             );
 
             // Discover existing cache files for this query
@@ -1099,6 +1098,7 @@ pub async fn search_partition(
                 query.start_time,
                 query.end_time,
                 &cache_file_path,
+                cache_interval_mins,
             );
 
             // Store partition strategy for use in do_partitioned_search
