@@ -576,8 +576,8 @@ jobs:
         run: |
           cd tests/ui-testing
           npx --yes tdpw upload playwright-results \
-            --json-report report.json \
-            --html-report html-report \
+            --json-report playwright-results/report.json \
+            --html-report playwright-results/html-report \
             --upload-html \
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
