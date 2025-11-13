@@ -810,7 +810,6 @@ export default defineComponent({
       updateCustomColor,
       resetThemeColors,
       currentPickerMode,
-      isMetaOrg,
     };
   },
 });
