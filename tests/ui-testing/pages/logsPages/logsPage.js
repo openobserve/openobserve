@@ -35,6 +35,10 @@ export class LogsPage {
         this.exploreButton = '[data-test="logs-search-explore-btn"]';
         this.timestampColumnMenu = '[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]';
         this.resultText = '[data-test="logs-search-search-result"]';
+        this.logsSearchResultLogsTable = '[data-test="logs-search-result-logs-table"]';
+        this.kubernetesFieldsSelector = '[data-test*="log-search-expand-kubernetes"]';
+        this.allFieldsSelector = '[data-test*="log-search-expand-"]';
+        this.matchingFieldsSelector = '[data-test*="log-search-expand-"]';
         this.logTableColumnSource = '[data-test="log-table-column-0-source"]';
         this.logsSearchBarQueryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.searchBarRefreshButton = '[data-cy="search-bar-refresh-button"] > .q-btn__content';
@@ -2286,5 +2290,241 @@ export class LogsPage {
     async expectFieldNotInTableHeader(fieldName) {
         // When field is removed, the source column should be visible again
         return await expect(this.page.locator('[data-test="log-search-result-table-th-source"]').getByText('source')).toBeVisible();
+    }
+
+    // New POM methods for PR tests
+
+    async executeBlankQueryWithKeyboardShortcut() {
+        // Clear any existing query and ensure editor is focused
+        await this.page.locator(this.queryEditor).click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
+        await this.page.waitForTimeout(500);
+        
+        // Try to run the blank query with cmd+enter
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        
+        // Wait for any response
+        await this.page.waitForTimeout(3000);
+    }
+
+    async expectBlankQueryError() {
+        // Verify proper error handling for blank SQL query (the actual behavior from PR #9023)
+        const errorMessage = this.page.getByText("Error occurred while retrieving search events");
+        await expect(errorMessage).toBeVisible();
+        
+        // Verify there's a clickable error details button
+        const errorDetailsBtn = this.page.locator('[data-test="logs-page-result-error-details-btn"]');
+        if (await errorDetailsBtn.isVisible()) {
+            await errorDetailsBtn.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('✓ Error details button clicked successfully');
+        }
+    }
+
+    async openFirstLogDetails() {
+        // Click on the first log entry to open details (expand the _timestamp column)
+        await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async addIncludeSearchTermFromLogDetails() {
+        // Click on include/exclude button for a field in the opened log details
+        const includeExcludeButtons = this.page.locator('[data-test="log-details-include-exclude-field-btn"]');
+        await expect(includeExcludeButtons.first()).toBeVisible();
+        await includeExcludeButtons.first().click();
+        await this.page.waitForTimeout(500);
+        
+        // Click 'Include Search Term'
+        await this.page.getByText('Include Search Term').click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async expectIncludeExcludeButtonsVisibleInLogDetails() {
+        // CRITICAL ASSERTION: After running query, the include/exclude buttons should still be visible
+        const postQueryButtons = this.page.locator('[data-test="log-details-include-exclude-field-btn"]');
+        
+        // Assert that include/exclude buttons are still visible after query run
+        await expect(postQueryButtons.first()).toBeVisible();
+        await expect(postQueryButtons.nth(1)).toBeVisible();
+        
+        // Assert that we still have multiple buttons available
+        const buttonCount = await postQueryButtons.count();
+        expect(buttonCount).toBeGreaterThanOrEqual(2);
+        
+        testLogger.info(`✓ ${buttonCount} include/exclude buttons remain visible in open log details AFTER query run`);
+        return buttonCount;
+    }
+
+    async setupAPICallTracking() {
+        const allRequests = [];
+        
+        const requestHandler = (request) => {
+            if (request.url().includes('/_search') && request.method() === 'POST') {
+                let postData = null;
+                try {
+                    postData = request.postData();
+                } catch (e) {
+                    postData = 'Unable to read post data';
+                }
+                
+                allRequests.push({
+                    url: request.url(),
+                    postData: postData,
+                    timestamp: Date.now()
+                });
+            }
+        };
+        
+        this.page.on('request', requestHandler);
+        
+        return { allRequests, requestHandler };
+    }
+
+    async executeQueryWithKeyboardShortcutAndTrackAPICalls(query) {
+        // Clear any existing query and add a test query
+        await this.page.locator(this.queryEditor).click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
+        await this.page.keyboard.type(query);
+        await this.page.waitForTimeout(500);
+        
+        // Use cmd+enter to run the query
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        
+        // Wait for the API calls to complete
+        await this.page.waitForTimeout(4000);
+    }
+
+    async verifyAPICallCounts(allRequests, requestHandler) {
+        // Filter recent requests made after cmd+enter
+        const recentRequests = allRequests.filter(req => Date.now() - req.timestamp < 5000);
+        
+        // Histogram calls have size: 0, regular search calls have size > 0 (typically 51)
+        const searchCalls = recentRequests.filter(req => 
+            req.postData && (req.postData.includes('"size":51') || req.postData.includes('"size": 51'))
+        );
+        const histogramCalls = recentRequests.filter(req => 
+            req.postData && (req.postData.includes('"size":0') || req.postData.includes('"size": 0'))
+        );
+        
+        // Verify exactly 1 search call and 1 histogram call are made
+        expect(searchCalls.length).toBe(1);
+        expect(histogramCalls.length).toBe(1);
+        expect(recentRequests.length).toBe(2);
+        
+        // Clean up event listener
+        this.page.off('request', requestHandler);
+        
+        return { searchCalls: searchCalls.length, histogramCalls: histogramCalls.length, total: recentRequests.length };
+    }
+
+    async getEditorContentBefore() {
+        // Get the actual Monaco editor content using a more specific selector
+        const monacoEditor = this.page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines');
+        const initialQuery = await monacoEditor.textContent();
+        return initialQuery?.trim().replace(/\s+/g, ' ') || '';
+    }
+
+    async getEditorContentAfter() {
+        // Check editor content after cmd+enter
+        const monacoEditor = this.page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines');
+        const finalEditorContent = await monacoEditor.textContent();
+        return finalEditorContent?.trim().replace(/\s+/g, ' ') || '';
+    }
+
+    async setupEditorForCursorTest(query) {
+        // Click in the query editor and add a simple query
+        const queryEditor = this.page.locator(this.queryEditor);
+        await queryEditor.click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
+        await this.page.keyboard.type(query);
+        
+        // Position cursor at the end of the query
+        await this.page.keyboard.press("End");
+        await this.page.waitForTimeout(500);
+    }
+
+    async executeQueryWithKeyboardShortcutForEditor() {
+        // Press cmd+enter to run the query
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        await this.page.waitForTimeout(2000);
+    }
+
+    async verifyEditorContentIntegrity(initialQuery, finalQuery) {
+        // The query content should remain exactly the same 
+        expect(finalQuery).toBe(initialQuery);
+        expect(finalQuery).toBe('select * from "e2e_automate"');
+        
+        // Additional integrity checks
+        expect(finalQuery).not.toMatch(/\n/); // No newlines
+        expect(finalQuery).not.toMatch(/\r/); // No carriage returns  
+        expect(finalQuery).not.toMatch(/^\d/); // No leading numbers
+        expect(finalQuery).not.toContain('monaco'); // No Monaco artifacts
+    }
+
+    // Additional POM methods to eliminate all locators from spec file
+
+    async expectLogsSearchResultLogsTableVisible() {
+        await expect(this.page.locator(this.logsSearchResultLogsTable)).toBeVisible();
+    }
+
+    async getKubernetesFields() {
+        return this.page.locator(this.kubernetesFieldsSelector);
+    }
+
+    async getSpecificFieldLocator(fieldName) {
+        return this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+    }
+
+    async getAllFields() {
+        return this.page.locator(this.allFieldsSelector);
+    }
+
+    async getMatchingFields() {
+        return this.page.locator(this.matchingFieldsSelector);
+    }
+
+    async countMatchingFields() {
+        const matchingFields = this.page.locator(this.matchingFieldsSelector);
+        return await matchingFields.count();
+    }
+
+    async ensureQuickModeState(desiredState) {
+        const quickModeToggle = this.page.locator(this.quickModeToggle);
+        const isEnabled = await quickModeToggle.getAttribute('aria-pressed');
+        
+        if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
+            await quickModeToggle.click();
+            await this.page.waitForTimeout(500);
+        }
+    }
+
+    async ensureHistogramToggleState(desiredState) {
+        const histogramToggle = this.page.locator(this.histogramToggle);
+        const isEnabled = await histogramToggle.getAttribute('aria-pressed');
+        
+        if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
+            await histogramToggle.click();
+            await this.page.waitForTimeout(500);
+            return true; // State was changed
+        }
+        return false; // State was already correct
+    }
+
+    async getQuickModeToggleAttributes() {
+        const quickModeToggle = this.page.locator(this.quickModeToggle);
+        const ariaPressed = await quickModeToggle.getAttribute('aria-pressed');
+        const classNames = await quickModeToggle.getAttribute('class');
+        return { ariaPressed, classNames };
+    }
+
+    async expectQuickModeToggleVisible() {
+        await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+    }
+
+    async waitForUI(timeout = 500) {
+        await this.page.waitForTimeout(timeout);
     }
 } 
