@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :table-colspan="9"
         row-key="index"
         :virtual-scroll="virtualScroll"
-        :virtual-scroll-item-size="3"
         :rows-per-page-options="[0]"
         @virtual-scroll="onScroll"
         class="full-height"
