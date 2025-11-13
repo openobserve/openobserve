@@ -183,6 +183,9 @@ test.describe("Core Pipeline Tests", () => {
       logsdata: logsdata
     });
 
+    // Wait for stream to be indexed and available
+    await page.waitForTimeout(3000);
+
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -352,6 +355,9 @@ test.describe("Core Pipeline Tests", () => {
       streamName: sourceStreamName,
       logsdata: logsdata
     });
+
+    // Wait for stream to be indexed and available
+    await page.waitForTimeout(3000);
 
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
