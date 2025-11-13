@@ -154,6 +154,9 @@ test.describe("Core Pipeline Tests", () => {
   });
 
   test("should add source & destination node and then delete the pipeline", async ({ page }) => {
+    // Generate unique stream name to avoid conflicts with parallel tests
+    const destinationStreamName = `destination_node_${Math.random().toString(36).substring(7)}`;
+
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -175,15 +178,15 @@ test.describe("Core Pipeline Tests", () => {
     // Drag and drop output stream instead of hover-click
     await pageManager.pipelinesPage.selectAndDragSecondStream();
     await page.getByLabel("Stream Name *").click();
-    await page.getByLabel("Stream Name *").fill("destination-node");
+    await page.getByLabel("Stream Name *").fill(destinationStreamName.replace(/_/g, "-"));
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
-    
+
     // Wait for dialog to close and ensure canvas is ready for interaction
     await page.waitForTimeout(2000);
     await page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' });
     await page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
-    
+
     // Ensure no dialogs are blocking the interaction
     await page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
       // Ignore if no backdrop exists
@@ -201,7 +204,7 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.savePipeline();
     await ingestion(page);
 
-    await exploreStreamAndNavigateToPipeline(page, 'destination_node');
+    await exploreStreamAndNavigateToPipeline(page, destinationStreamName);
     await pageManager.pipelinesPage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
     const deletePipelineButton = page.locator(
@@ -295,6 +298,9 @@ test.describe("Core Pipeline Tests", () => {
   });
 
   test("should add source, condition & destination node and then delete the pipeline", async ({ page }) => {
+    // Generate unique stream name to avoid conflicts with parallel tests
+    const destinationStreamName = `destination_node_${Math.random().toString(36).substring(7)}`;
+
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -337,40 +343,40 @@ test.describe("Core Pipeline Tests", () => {
     // Drag and drop output stream instead of hover-click
     await pageManager.pipelinesPage.selectAndDragSecondStream();
     await page.getByLabel("Stream Name *").click();
-    await page.getByLabel("Stream Name *").fill("destination-node");
+    await page.getByLabel("Stream Name *").fill(destinationStreamName.replace(/_/g, "-"));
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
-    
+
     // Wait for dialog to close and ensure canvas is ready for interaction
     await page.waitForTimeout(2000);
     await page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' });
     await page.waitForSelector('[data-test="pipeline-node-default-input-handle"]', { state: 'visible' });
     await page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
-    
+
     // Ensure no dialogs are blocking the interaction
     await page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
       // Ignore if no backdrop exists
     });
-    
+
     // Connect the input node to condition to output node by creating edges
     await page.locator('[data-test="pipeline-node-input-output-handle"]').hover({ force: true });
     await page.mouse.down();
     await page.locator('[data-test="pipeline-node-default-input-handle"]').hover({ force: true });
     await page.mouse.up();
     await page.waitForTimeout(500);
-    
+
     await page.locator('[data-test="pipeline-node-default-output-handle"]').hover({ force: true });
     await page.mouse.down();
     await page.locator('[data-test="pipeline-node-output-input-handle"]').hover({ force: true });
     await page.mouse.up();
     await page.waitForTimeout(1000);
-    
+
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);
     await pageManager.pipelinesPage.savePipeline();
     await ingestion(page);
 
-    await exploreStreamAndNavigateToPipeline(page, 'destination_node');
+    await exploreStreamAndNavigateToPipeline(page, destinationStreamName);
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
