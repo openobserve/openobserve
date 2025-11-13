@@ -540,8 +540,13 @@ const getDefaultHeaders = (destinationType: string) => {
       break;
     case "newrelic":
       headers.push({
-        key: "Authorization",
-        value: "Api-Token <token>",
+        key: "Api-Key",
+        value: "<token>",
+        uuid: getUUID(),
+      });
+      headers.push({
+        key: "Content-Type",
+        value: "application/json",
         uuid: getUUID(),
       });
       break;
