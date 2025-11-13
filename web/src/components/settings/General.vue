@@ -841,11 +841,11 @@ export default defineComponent({
   gap: 1rem;
   align-items: center;
   padding: 1rem 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid var(--o2-border-color);
 }
 
 .dark-settings-theme .settings-grid-item {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid var(--o2-border-color) !important;
 }
 .text-btn-border-light{
   border: 1px solid #D3D5DB ;
