@@ -958,6 +958,7 @@ export default defineComponent({
     let previousFilterKey = "";
 
     // Filter variables for UI display: show only global + current tab + current panel
+    // BUT also include parent variables that child variables depend on (even if they're at different levels)
     const filteredVariablesConfig = computed(() => {
       console.log('[AddPanel] Computing filteredVariablesConfig', currentDashboardData.data);
       if (!currentDashboardData.data?.variables?.list) {
@@ -978,8 +979,8 @@ export default defineComponent({
 
       previousFilterKey = filterKey;
 
-      // Filter to show only: global + current tab + current panel variables
-      const filteredVars = allVars.filter((v: any) => {
+      // First pass: Filter to show: global + current tab + current panel variables
+      const visibleVars = allVars.filter((v: any) => {
         const scopeType = getScopeType(v);
 
         if (scopeType === "global") {
@@ -1004,10 +1005,70 @@ export default defineComponent({
         return false;
       });
 
+      // Second pass: Include parent variables that visible variables depend on
+      // This ensures child variables at current level can load properly
+      const parentVarNames = new Set<string>();
+
+      visibleVars.forEach((v: any) => {
+        // Extract parent variable names from query_data.filter or query string
+        if (v.query_data?.filter) {
+          v.query_data.filter.forEach((condition: any) => {
+            // Check if condition value contains variable references like $variableName
+            const matches = condition.value?.match(/\$(\w+)/g);
+            if (matches) {
+              matches.forEach((match: string) => {
+                const varName = match.substring(1); // Remove $
+                parentVarNames.add(varName);
+              });
+            }
+          });
+        }
+
+        // Also check the query field if it exists
+        if (v.queryValue) {
+          const matches = v.queryValue.match(/\$(\w+)/g);
+          if (matches) {
+            matches.forEach((match: string) => {
+              const varName = match.substring(1);
+              parentVarNames.add(varName);
+            });
+          }
+        }
+      });
+
+      // Add parent variables to the filtered list (but mark them as not current level for UI)
+      // Only include parent variables from: global scope OR current tab
+      const parentVars = allVars.filter((v: any) => {
+        if (!parentVarNames.has(v.name)) return false;
+        if (visibleVars.find((vv: any) => vv.name === v.name)) return false;
+
+        // Check if parent variable is at global scope or current tab
+        const scopeType = getScopeType(v);
+        if (scopeType === "global") return true;
+        if (scopeType === "tabs" && v.tabs && v.tabs.includes(currentTabId)) return true;
+
+        // Don't include parent variables from other tabs or other panels
+        return false;
+      }).map((v: any) => ({
+        ...v,
+        _isCurrentLevel: false, // Mark as parent-only variable (not for UI display)
+      }));
+
+      // Mark visible vars as current level
+      const markedVisibleVars = visibleVars.map((v: any) => ({
+        ...v,
+        _isCurrentLevel: true,
+      }));
+
+      const filteredVars = [...markedVisibleVars, ...parentVars];
+
       console.log('[AddPanel] Filtered variables:', {
         total: allVars.length,
+        visible: markedVisibleVars.length,
+        parents: parentVars.length,
         filtered: filteredVars.length,
-        names: filteredVars.map((v: any) => v.name)
+        visibleNames: markedVisibleVars.map((v: any) => v.name),
+        parentNames: parentVars.map((v: any) => v.name)
       });
 
       const result = {
