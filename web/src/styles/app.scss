@@ -419,6 +419,7 @@ body {
   // tab content bg color
   padding: 0px 10px;
   border-radius: 0.5rem;
+  position: relative; // Make this the positioning context for absolute children
   &__head {
     justify-content: end;
     display: flex;
@@ -438,7 +439,7 @@ body {
         line-height: 0px;
         float: inline-end;
         position: absolute;
-        right: 30px;
+        right: 10px; // Adjusted from 30px to 10px for better spacing
       }
     }
   }
