@@ -41,6 +41,8 @@
 import { defineComponent, ref, computed, inject } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
+import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import Group from "./Group.vue";
 import AddCondition from "./AddCondition.vue";
 
@@ -53,6 +55,7 @@ export default defineComponent({
   props: ["dashboardData"],
 
   setup(props) {
+    const route = useRoute();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
@@ -194,8 +197,38 @@ export default defineComponent({
       });
     };
 
-    const dashboardVariablesFilterItems = (index: number) =>
-      (props.dashboardData?.variables?.list ?? []).map((it: any) => {
+    const dashboardVariablesFilterItems = (index: number) => {
+      const currentPanelId = route.query.panelId as string;
+      const currentTabId = route.query.tab as string;
+      const allVars = props.dashboardData?.variables?.list ?? [];
+
+      // Filter to show only: global + current tab + current panel variables
+      const filteredVars = allVars.filter((v: any) => {
+        const scopeType = getScopeType(v);
+
+        if (scopeType === "global") {
+          return true; // Always show global
+        }
+
+        if (scopeType === "tabs") {
+          // Show if variable is scoped to current tab
+          return v.tabs && v.tabs.includes(currentTabId);
+        }
+
+        if (scopeType === "panels") {
+          // In EDIT mode: show if variable is scoped to current panel
+          // In ADD mode: show if variable uses "current_panel"
+          if (currentPanelId) {
+            return v.panels && v.panels.includes(currentPanelId);
+          } else {
+            return v.panels && v.panels.includes("current_panel");
+          }
+        }
+
+        return false;
+      });
+
+      return filteredVars.map((it: any) => {
         let value;
         const operator =
           dashboardPanelData.data.queries[
@@ -217,6 +250,7 @@ export default defineComponent({
           value: value,
         };
       });
+    };
 
     const schemaOptions = computed(() =>
       selectedStreamFieldsBasedOnUserDefinedSchema?.value?.map(
