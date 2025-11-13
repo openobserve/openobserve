@@ -1051,7 +1051,9 @@ pub async fn search_partition(
                 &cache_file_path,
                 query.start_time,
                 query.end_time,
-            ) {
+            )
+            .await
+            {
                 Ok(result) => result,
                 Err(e) => {
                     log::warn!(
