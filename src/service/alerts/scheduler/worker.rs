@@ -253,7 +253,12 @@ impl SchedulerJobPuller {
                 let ttl = self.config.keep_alive_interval_secs;
                 let alert_timeout = self.config.alert_schedule_timeout;
                 let report_timeout = self.config.report_schedule_timeout;
+                // Maximum lifetime for keep-alive: use the larger timeout * 3
+                let max_lifetime_secs = std::cmp::max(alert_timeout, report_timeout) * 3;
                 tokio::task::spawn(async move {
+                    let start_time = tokio::time::Instant::now();
+                    let max_lifetime = tokio::time::Duration::from_secs(max_lifetime_secs as u64);
+
                     loop {
                         tokio::select! {
                             _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
@@ -264,6 +269,15 @@ impl SchedulerJobPuller {
                                 return;
                             }
                         }
+
+                        // Check if we've exceeded the maximum lifetime
+                        if start_time.elapsed() >= max_lifetime {
+                            log::warn!(
+                                "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive for job[{job_id}] trigger[{job_key}] exceeded maximum lifetime of {max_lifetime_secs}s, stopping"
+                            );
+                            return;
+                        }
+
                         if let Err(e) =
                             infra::scheduler::keep_alive(&[job_id], alert_timeout, report_timeout)
                                 .await
