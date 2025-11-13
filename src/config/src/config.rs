@@ -1191,7 +1191,7 @@ pub struct Common {
     pub additional_reporting_orgs: String,
     #[env_config(
         name = "ZO_USAGE_REPORT_TO_OWN_ORG",
-        default = true,
+        default = false,
         help = "Report alert/report triggers to the originating organization in addition to _meta org"
     )]
     pub usage_report_to_own_org: bool,
