@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <span class="individual-setting-description tw-self-start">
-              Customize your application's theme colors for both light and dark modes. Click on color box to change.
+              Manage your organization's theme colors for both light and dark modes. These colors will be applied at the organization level.
             </span>
           </div>
           <span>&nbsp;</span>
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, onMounted, ref, watch } from "vue";
+import { defineComponent, onActivated, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -439,7 +439,7 @@ export default defineComponent({
       }
     };
 
-    onMounted(() => {
+    onActivated(() => {
       // Initialize from store on mount
       updateFromStore();
     });
@@ -451,11 +451,9 @@ export default defineComponent({
       () => {
         // Only update from org settings if user is NOT actively previewing a color
         // If temp colors exist in store, skip update to preserve the preview
-        if (!store.state.tempThemeColors?.light && !store.state.tempThemeColors?.dark) {
           updateFromStore();
-        }
       },
-      { deep: true }  // Deep watch to catch nested property changes
+      { deep: true, immediate: true }  // Deep watch to catch nested property changes
     );
 
     watch(
