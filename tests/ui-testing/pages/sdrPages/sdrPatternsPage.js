@@ -192,7 +192,7 @@ export class SDRPatternsPage {
     await this.page.locator('[data-test="tab-import_json_file"]').click();
 
     // Upload file
-    const fileInput = this.page.locator('[data-test="regex-pattern-import-file-input"]');
+    const fileInput = this.page.locator('[data-test="regex-pattern-import-json-file-input"]');
     await expect(fileInput).toBeVisible();
     await fileInput.setInputFiles(filePath);
     testLogger.info('File selected for import');

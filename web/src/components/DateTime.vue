@@ -141,11 +141,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="row q-gutter-sm">
                   <div class="col">
                     <q-input
-                      v-model="relativeValue"
+                      v-model.number="relativeValue"
                       type="number"
                       dense
                       filled
                       min="1"
+                      :step="1"
                       :max="
                         relativePeriodsMaxValue[relativePeriod] > 0
                           ? relativePeriodsMaxValue[relativePeriod]
@@ -621,6 +622,9 @@ export default defineComponent({
             ? relativePeriodsMaxValue.value[relativePeriod.value]
             : 15;
       }
+
+      relativeValue.value = parseInt(relativeValue.value);
+
       if (props.autoApply) saveDate("relative-custom");
     };
 

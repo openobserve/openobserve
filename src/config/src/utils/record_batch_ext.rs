@@ -25,7 +25,7 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use arrow_schema::{ArrowError, DataType, Schema};
-use datafusion::error::DataFusionError;
+use datafusion::{error::DataFusionError, physical_plan::spill::get_record_batch_memory_size};
 use hashbrown::{HashMap, HashSet};
 
 use super::schema_ext::SchemaExt;
@@ -40,7 +40,8 @@ pub trait RecordBatchExt {
 
 impl RecordBatchExt for RecordBatch {
     fn size(&self) -> usize {
-        self.schema().size() + self.get_array_memory_size() + USIZE_SIZE
+        // per RecordBatch size = schema size + data size + usize size for num_rows
+        self.schema().size() + get_record_batch_memory_size(self) + USIZE_SIZE
     }
 }
 
