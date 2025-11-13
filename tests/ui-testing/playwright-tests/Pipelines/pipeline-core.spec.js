@@ -168,7 +168,7 @@ test.describe("Core Pipeline Tests", () => {
       "Authorization": `Basic ${basicAuthCredentials}`,
       "Content-Type": "application/json",
     };
-    await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+    const ingestionResult = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
       const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
         method: 'POST',
         headers: headers,
@@ -182,9 +182,39 @@ test.describe("Core Pipeline Tests", () => {
       streamName: sourceStreamName,
       logsdata: logsdata
     });
+    testLogger.debug('Stream ingestion completed', { streamName: sourceStreamName, result: ingestionResult });
 
-    // Wait for stream to be indexed and available
-    await page.waitForTimeout(3000);
+    // Wait for stream to be indexed and available in the system
+    // Polling to check if stream exists via API
+    let streamExists = false;
+    for (let i = 0; i < 10; i++) {
+      await page.waitForTimeout(1000);
+      const streams = await page.evaluate(async ({ url, headers, orgId }) => {
+        const response = await fetch(`${url}/api/${orgId}/streams?type=logs`, {
+          method: 'GET',
+          headers: headers
+        });
+        const data = await response.json();
+        return data.list || [];
+      }, {
+        url: process.env.INGESTION_URL,
+        headers: headers,
+        orgId: orgId
+      });
+
+      if (streams.some(s => s.name === sourceStreamName)) {
+        streamExists = true;
+        testLogger.debug('Stream found in streams list', { streamName: sourceStreamName, attempt: i + 1 });
+        break;
+      }
+    }
+
+    if (!streamExists) {
+      testLogger.warn('Stream not found in streams list after polling', { streamName: sourceStreamName });
+    }
+
+    // Additional wait for UI to refresh
+    await page.waitForTimeout(2000);
 
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -343,7 +373,7 @@ test.describe("Core Pipeline Tests", () => {
       "Authorization": `Basic ${basicAuthCredentials}`,
       "Content-Type": "application/json",
     };
-    await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+    const ingestionResult = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
       const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
         method: 'POST',
         headers: headers,
@@ -357,9 +387,39 @@ test.describe("Core Pipeline Tests", () => {
       streamName: sourceStreamName,
       logsdata: logsdata
     });
+    testLogger.debug('Stream ingestion completed', { streamName: sourceStreamName, result: ingestionResult });
 
-    // Wait for stream to be indexed and available
-    await page.waitForTimeout(3000);
+    // Wait for stream to be indexed and available in the system
+    // Polling to check if stream exists via API
+    let streamExists = false;
+    for (let i = 0; i < 10; i++) {
+      await page.waitForTimeout(1000);
+      const streams = await page.evaluate(async ({ url, headers, orgId }) => {
+        const response = await fetch(`${url}/api/${orgId}/streams?type=logs`, {
+          method: 'GET',
+          headers: headers
+        });
+        const data = await response.json();
+        return data.list || [];
+      }, {
+        url: process.env.INGESTION_URL,
+        headers: headers,
+        orgId: orgId
+      });
+
+      if (streams.some(s => s.name === sourceStreamName)) {
+        streamExists = true;
+        testLogger.debug('Stream found in streams list', { streamName: sourceStreamName, attempt: i + 1 });
+        break;
+      }
+    }
+
+    if (!streamExists) {
+      testLogger.warn('Stream not found in streams list after polling', { streamName: sourceStreamName });
+    }
+
+    // Additional wait for UI to refresh
+    await page.waitForTimeout(2000);
 
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
