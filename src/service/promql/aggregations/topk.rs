@@ -15,6 +15,7 @@
 
 use config::utils::sort::sort_float;
 use datafusion::error::{DataFusionError, Result};
+use hashbrown::{HashMap, HashSet};
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
@@ -44,16 +45,15 @@ pub fn topk(
     }
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] topk_range(k={}) started with {} series and {} timestamps",
+        "[trace_id: {}] [PromQL Timing] topk(k={k}) started with {} series and {} timestamps",
         eval_ctx.trace_id,
-        k,
         matrix.len(),
         eval_ctx.timestamps().len()
     );
 
     // For topk, we select the top k series at each timestamp
     // We need to preserve the original series structure
-    let eval_timestamps: ahash::HashSet<i64> = eval_ctx.timestamps().iter().cloned().collect();
+    let eval_timestamps: HashSet<i64> = eval_ctx.timestamps().iter().cloned().collect();
 
     // Group series by label modifier
     let grouped_series = super::group_series_by_labels(&matrix, modifier);
@@ -68,9 +68,8 @@ pub fn topk(
         .collect();
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] topk_range(k={}) completed in {:?}, produced {} series",
+        "[trace_id: {}] [PromQL Timing] topk(k={k}) completed in {:?}, produced {} series",
         eval_ctx.trace_id,
-        k,
         start.elapsed(),
         result.len()
     );
@@ -82,42 +81,50 @@ pub fn topk(
     }
 }
 
-// Helper function to select top/bottom k series at each timestamp
-fn select_topk_series(
+// For topk/bottomk, we keep the original series but only include timestamps
+// where they are in the top/bottom k
+pub(super) fn select_topk_series(
     matrix: &[RangeValue],
     series_indices: &[usize],
     k: usize,
-    eval_timestamps: &ahash::HashSet<i64>,
+    eval_timestamps: &HashSet<i64>,
     is_bottom: bool,
 ) -> Vec<RangeValue> {
-    // For topk/bottomk, we keep the original series but only include timestamps
-    // where they are in the top/bottom k
-    let mut result = Vec::with_capacity(series_indices.len());
+    if series_indices.is_empty() || k == 0 {
+        return Vec::new();
+    }
 
-    for &series_idx in series_indices {
-        let series = &matrix[series_idx];
-        let mut filtered_samples = Vec::with_capacity(eval_timestamps.len());
+    // Pre-build timestamp index: timestamp -> Vec<(series_idx, value)>
+    let mut timestamp_index: HashMap<i64, Vec<(usize, f64)>> =
+        HashMap::with_capacity(eval_timestamps.len());
 
-        // Group samples by timestamp and compare
-        for sample in &series.samples {
-            if !eval_timestamps.contains(&sample.timestamp) {
-                continue;
+    for &idx in series_indices {
+        for sample in &matrix[idx].samples {
+            if eval_timestamps.contains(&sample.timestamp) {
+                timestamp_index
+                    .entry(sample.timestamp)
+                    .or_default()
+                    .push((idx, sample.value));
             }
+        }
+    }
 
-            // Check if this sample is in top k at this timestamp
-            let mut values_at_timestamp: Vec<(usize, f64)> = series_indices
-                .iter()
-                .filter_map(|&idx| {
-                    matrix[idx]
-                        .samples
-                        .iter()
-                        .find(|s| s.timestamp == sample.timestamp)
-                        .map(|s| (idx, s.value))
-                })
-                .collect();
+    // Use partial sorting (select_nth_unstable) to find top-k efficiently
+    // This is O(N) average case instead of O(N log N) for full sort
+    let mut topk_per_timestamp: HashMap<i64, HashSet<usize>> =
+        HashMap::with_capacity(timestamp_index.len());
 
-            // Sort by value
-            values_at_timestamp.sort_by(|(_, a), (_, b)| {
+    for (timestamp, mut values) in timestamp_index {
+        let len = values.len();
+
+        if len <= k {
+            // All values are in top-k
+            topk_per_timestamp.insert(timestamp, values.iter().map(|(idx, _)| *idx).collect());
+        } else {
+            // Use partial sorting to find top k elements
+            // select_nth_unstable is O(n) average, partitions around the k-th element
+            let k_index = k.saturating_sub(1);
+            values.select_nth_unstable_by(k_index, |(_, a), (_, b)| {
                 if is_bottom {
                     sort_float(a, b)
                 } else {
@@ -125,13 +132,29 @@ fn select_topk_series(
                 }
             });
 
-            // Check if current series is in top k
-            let is_in_topk = values_at_timestamp
-                .iter()
-                .take(k)
-                .any(|(idx, _)| *idx == series_idx);
+            // Take the first k elements (now partitioned)
+            let topk_indices: HashSet<usize> = values[..k].iter().map(|(idx, _)| *idx).collect();
+            topk_per_timestamp.insert(timestamp, topk_indices);
+        }
+    }
 
-            if is_in_topk {
+    // Build result efficiently by iterating through series once
+    // and checking which of their samples are in top-k
+    let mut result = Vec::with_capacity(series_indices.len().min(k * eval_timestamps.len()));
+
+    for &series_idx in series_indices {
+        let series = &matrix[series_idx];
+
+        // Use with_capacity since we know samples won't exceed series.samples.len()
+        let mut filtered_samples =
+            Vec::with_capacity(series.samples.len().min(eval_timestamps.len()));
+
+        for sample in &series.samples {
+            // O(1) lookup to check if this timestamp has top-k data
+            // and if this series is in the top k for that timestamp
+            if let Some(topk_indices) = topk_per_timestamp.get(&sample.timestamp)
+                && topk_indices.contains(&series_idx)
+            {
                 filtered_samples.push(*sample);
             }
         }
