@@ -466,7 +466,11 @@ impl Writer {
             );
 
         // Move entries into ProcessedBatch
-        // Safety: entries are no longer needed after this point
+        // Clear the heavy data field after conversion to avoid memory duplication
+        // The JSON data is already in bytes_entries and Arrow format in batch_entries
+        for entry in entries.iter_mut() {
+            entry.data.clear();
+        }
         let entries_vec = entries.to_vec();
         let _start_preprocess_batch_duration = _start_preprocess_batch.elapsed();
         if _start_preprocess_batch_duration.as_millis() > 100 {
