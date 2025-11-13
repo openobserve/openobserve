@@ -494,8 +494,9 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await page.waitForTimeout(1000);
     
     // Click on include/exclude button for a field in the opened log details
-    const includeExcludeButton = page.locator('[data-test="log-details-include-exclude-field-btn"]').nth(2);
-    await includeExcludeButton.click();
+    const includeExcludeButtons = page.locator('[data-test="log-details-include-exclude-field-btn"]');
+    await expect(includeExcludeButtons.first()).toBeVisible();
+    await includeExcludeButtons.first().click();
     await page.waitForTimeout(500);
     
     // Click 'Include Search Term'
@@ -510,14 +511,14 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     
     // CRITICAL ASSERTION: After running query, the include/exclude buttons should still be visible
     // If the bug exists, these buttons would have disappeared from the open log details
-    const includeExcludeButtons = page.locator('[data-test="log-details-include-exclude-field-btn"]');
+    const postQueryButtons = page.locator('[data-test="log-details-include-exclude-field-btn"]');
     
     // Assert that include/exclude buttons are still visible after query run
-    await expect(includeExcludeButtons.first()).toBeVisible();
-    await expect(includeExcludeButtons.nth(1)).toBeVisible();
+    await expect(postQueryButtons.first()).toBeVisible();
+    await expect(postQueryButtons.nth(1)).toBeVisible();
     
     // Assert that we still have multiple buttons available
-    const buttonCount = await includeExcludeButtons.count();
+    const buttonCount = await postQueryButtons.count();
     expect(buttonCount).toBeGreaterThanOrEqual(2);
     
     testLogger.info(`✓ ${buttonCount} include/exclude buttons remain visible in open log details AFTER query run`);
@@ -546,7 +547,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     // Track API requests to verify expected calls
     const allRequests = [];
     
-    page.on('request', request => {
+    const requestHandler = (request) => {
       if (request.url().includes('/_search') && request.method() === 'POST') {
         let postData = null;
         try {
@@ -561,7 +562,9 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
           timestamp: Date.now()
         });
       }
-    });
+    };
+    
+    page.on('request', requestHandler);
     
     // Clear any existing query and add a test query
     await page.locator('[data-test="logs-search-bar-query-editor"]').click();
@@ -591,6 +594,9 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     expect(searchCalls.length).toBe(1);
     expect(histogramCalls.length).toBe(1);
     expect(recentRequests.length).toBe(2);
+    
+    // Clean up event listener
+    page.off('request', requestHandler);
     
     testLogger.info('✓ CMD+Enter API calls verified: 1 search + 1 histogram = 2 total');
   });
@@ -631,19 +637,14 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info(`Query after cmd+enter: "${cleanedFinalQuery}"`);
     
     // The query content should remain exactly the same 
-    // Currently failing due to editor bug where extra characters are added
-    if (cleanedFinalQuery !== cleanedInitialQuery) {
-      testLogger.warn(`🐛 Editor bug detected: Query changed from "${cleanedInitialQuery}" to "${cleanedFinalQuery}"`);
-      testLogger.warn('This test documents the editor cursor bug - cmd+enter should not modify the query text');
-      
-      // For now, let's just log the difference but not fail the test until the bug is confirmed
-      testLogger.warn('Test will be updated to assert strict equality once bug behavior is understood');
-    } else {
-      testLogger.info('✓ CMD+Enter editor behavior verified: query text unchanged');
-    }
+    expect(cleanedFinalQuery).toBe(cleanedInitialQuery);
+    expect(cleanedFinalQuery).toBe('select * from "e2e_automate"');
     
-    // Basic checks - ensure the query is still fundamentally correct
-    expect(cleanedFinalQuery).toContain('select * from "e2e_automate"');
+    // Additional integrity checks
+    expect(cleanedFinalQuery).not.toMatch(/\n/); // No newlines
+    expect(cleanedFinalQuery).not.toMatch(/\r/); // No carriage returns  
+    expect(cleanedFinalQuery).not.toMatch(/^\d/); // No leading numbers
+    expect(cleanedFinalQuery).not.toContain('monaco'); // No Monaco artifacts
     
     testLogger.info('✓ CMD+Enter editor bug test completed');
   });
