@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row !tw-m-0 tw-p-[0.375rem]">
       <div class="float-right col flex items-center">
         <!-- Tab Toggle Buttons -->
-        <div v-if="1==0" class="button-group logs-visualize-toggle element-box-shadow tw-mr-[0.375rem]">
+        <!-- <div class="button-group logs-visualize-toggle element-box-shadow tw-mr-[0.375rem]">
           <div class="row">
             <div>
               <q-btn
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-btn>
             </div>
           </div>
-        </div>
+        </div> -->
 
         <!-- Show search controls only when on Search tab -->
         <template v-if="activeTab === 'search'">
