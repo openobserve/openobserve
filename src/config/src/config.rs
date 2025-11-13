@@ -975,7 +975,7 @@ pub struct Common {
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
         help = "possible values - 'local', 'remote', 'both'"
-    )] // local, remote , both
+    )] // local, remote, both
     pub usage_reporting_mode: String,
     #[env_config(
         name = "ZO_USAGE_REPORTING_URL",
@@ -2554,6 +2554,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.default_hec_stream = "_hec".to_string();
     }
 
+    if cfg.common.usage_publish_interval < 1 {
+        cfg.common.usage_publish_interval = 60;
+    }
+
     cfg.common.log_page_default_field_list = cfg.common.log_page_default_field_list.to_lowercase();
     if !matches!(
         cfg.common.log_page_default_field_list.as_str(),
@@ -2761,8 +2765,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.result_cache_enabled = false;
         cfg.common.metrics_cache_enabled = false;
         cfg.common.feature_query_streaming_aggs = false;
-        cfg.cache_latest_files.enabled = false;
-        cfg.cache_latest_files.delete_merge_files = false;
     }
 
     let disks = sysinfo::disk::get_disk_usage();

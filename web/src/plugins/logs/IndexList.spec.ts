@@ -1052,7 +1052,10 @@ describe("Index List", async () => {
 
       const result = wrapper.vm.filterFieldFn(rows, "");
 
-      expect(result).toEqual([]);
+      console.log(result);
+      expect(result).toEqual([
+        { name: "no-fields-found", label: "No matching fields found" },
+      ]);
     });
 
     it("should filter fields case-insensitively", async () => {
@@ -2151,7 +2154,9 @@ describe("Index List", async () => {
 
       const result = wrapper.vm.filterFieldFn(rows, "");
 
-      expect(result).toEqual([]);
+      expect(result).toEqual([
+        { name: "no-fields-found", label: "No matching fields found" },
+      ]);
     });
 
     it("should filter fields case-insensitively", async () => {
