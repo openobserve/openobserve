@@ -15,17 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div :style="{ height: 'calc(100vh - 2.5625rem)', overflow: 'hidden' }">
+  <div class="tw-h-[calc(100vh-2.5625rem)] tw-overflow-hidden">
     <template v-if="isLoading.length">
       <div
-        class="q-pb-lg flex items-center justify-center text-center q-pt-xs"
-        style="height: calc(100vh - 11.875rem)"
+        class="q-pb-lg flex items-center justify-center text-center q-pt-xs tw-h-[calc(100vh-11.875rem)]"
       >
         <div>
           <q-spinner-hourglass
             color="primary"
             size="2.5rem"
-            style="margin: 0 auto; display: block"
+            class="tw-mx-auto tw-block"
           />
           <div class="text-center full-width">
             Hold on tight, we're loading RUM data.
@@ -68,7 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div class="">
-        <div class="q-pa-lg tw-mx-[0.625rem] enable-rum card-container">
+        <div
+          class="card-container q-pa-lg tw-mx-[0.625rem] tw-max-w-full tw-max-h-full tw-h-[calc(100vh - 3.125rem)]"
+        >
           <div class="q-pb-lg">
             <div class="text-left text-h6 text-bold q-pb-md">
               {{ t("rum.aboutRUMTitle") }}
@@ -351,22 +352,3 @@ const getRumDataFields = () => {
   });
 };
 </script>
-
-<style scoped lang="scss">
-.rum-tabs {
-  border-bottom: 1px solid #e0e0e0;
-  .rum-tab {
-    border-bottom: 2px solid transparent;
-    width: 8.75rem;
-  }
-  .active {
-    border-bottom: 2px solid $primary;
-  }
-}
-
-.enable-rum {
-  max-width: 100%;
-  max-height: 100%;
-  height: calc(100vh - 3.125rem);
-}
-</style>

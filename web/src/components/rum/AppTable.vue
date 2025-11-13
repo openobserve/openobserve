@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <q-table
         flat
-        bordered
         ref="tableRef"
         :title="title"
         :rows="rows"

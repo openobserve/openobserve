@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="flex items-center justify-between col-12 q-pt-sm tw-px-[0.375rem]"
       >
-        <div class="q-pr-xs" style="width: 60%">
+        <div class="q-pr-xs tw-w-[60%]">
           <q-input
             v-model="searchEvent"
             size="xs"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="searchEvents"
           />
         </div>
-        <div class="q-pl-xs event-type-selector" style="width: 40%">
+        <div class="q-pl-xs event-type-selector tw-w-[40%]">
           <q-select
             v-model="selectedEventTypes"
             :options="eventOptions"
@@ -88,8 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="ellipsis">
               <div class="q-mr-md inline">{{ filteredEvent.displayTime }}</div>
               <div
-                class="q-mr-md inline event-type q-px-xs"
-                style="border-radius: 0.25rem"
+                class="q-mr-md inline event-type q-px-xs tw-rounded-[0.25rem]"
                 :class="filteredEvent.type === 'error' ? 'bg-red-3' : ''"
               >
                 {{ filteredEvent.type }}

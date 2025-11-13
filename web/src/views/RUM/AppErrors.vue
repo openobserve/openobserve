@@ -50,22 +50,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-pb-[0.375rem] tw-px-[0.375rem]">
           <query-editor
             editor-id="rum-errors-query-editor"
-            class="monaco-editor tw-border tw-solid tw-border-[var(--o2-border-color)] tw-p-[0.25rem] tw-rounded-[0.375rem] tw-overflow-hidden"
+            class="monaco-editor tw-border tw-solid tw-border-[var(--o2-border-color)] tw-p-[0.25rem] tw-rounded-[0.375rem] tw-overflow-hidden !tw-h-[4rem]"
             v-model:query="errorTrackingState.data.editorValue"
-            style="height: 2.5rem !important"
             :debounce-time="300"
           />
         </div>
       </div>
     </div>
     <q-splitter
-      class="logs-horizontal-splitter !tw-pl-[0.625rem] tw-h-full"
+      class="logs-horizontal-splitter !tw-pl-[0.625rem] !tw-h-[calc(100%-131px)]"
       v-model="splitterModel"
       unit="px"
       vertical
     >
       <template #before>
-        <div class="card-container tw-p-[0.325rem]">
+        <div class="card-container tw-p-[0.325rem] tw-h-full">
           <FieldList
             :fields="streamFields"
             :time-stamp="{
@@ -81,24 +80,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-avatar
           color="primary"
           text-color="white"
-          size="1.25rem"
           icon="drag_indicator"
-          style="top: 0.625rem"
+          class="!tw-top-[2rem] tw-w-[0.75rem] !tw-h-[2rem] !tw-text-[2rem] !tw-rounded-[0.325rem]"
         />
       </template>
       <template #after>
-        <div class="tw-pb-[0.325rem] tw-pr-[0.625rem] tw-h-[calc(100%-101px)]">
+        <div class="tw-pr-[0.625rem] tw-h-full">
           <div class="card-container tw-h-full">
             <template v-if="isLoading.length">
               <div
-                class="q-pb-lg flex items-center justify-center text-center"
-                style="height: calc(100vh - 18.75rem)"
+                class="q-pb-lg flex items-center justify-center text-center tw-h-[calc(100vh-18.75rem)]"
               >
                 <div>
                   <q-spinner-hourglass
                     color="primary"
                     size="2.5rem"
-                    style="margin: 0 auto; display: block"
+                    class="tw-mx-auto tw-block"
                   />
                   <div class="text-center full-width">
                     Hold on tight, we're fetching your application errors.
@@ -480,11 +477,6 @@ function updateUrlQueryParams() {
 </script>
 
 <style scoped lang="scss">
-.sessions_page {
-  .monaco-editor {
-    height: 5rem !important;
-  }
-}
 </style>
 <style lang="scss">
 .sessions_page {

@@ -52,22 +52,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw-pb-[0.375rem] tw-px-[0.375rem]">
             <query-editor
               editor-id="session-replay-query-editor"
-              class="monaco-editor tw-border tw-solid tw-border-[var(--o2-border-color)] tw-p-[0.25rem] tw-rounded-[0.375rem] tw-overflow-hidden"
+              class="monaco-editor tw-border tw-solid tw-border-[var(--o2-border-color)] tw-p-[0.25rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-[4rem]"
               v-model:query="sessionState.data.editorValue"
               :debounce-time="300"
-              style="height: 2.5rem !important"
             />
           </div>
         </div>
       </div>
       <q-splitter
-        class="logs-horizontal-splitter !tw-pl-[0.625rem] tw-h-full"
+        class="!tw-pl-[0.625rem] tw-h-[calc(100%-131px)]"
         v-model="splitterModel"
         unit="px"
         vertical
       >
         <template #before>
-          <div class="card-container tw-p-[0.325rem]">
+          <div class="card-container tw-p-[0.325rem] tw-h-full">
             <FieldList
               :fields="streamFields"
               :time-stamp="{
@@ -83,15 +82,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-avatar
             color="primary"
             text-color="white"
-            size="1.25rem"
             icon="drag_indicator"
-            style="top: 0.625rem"
+            class="!tw-top-[2rem] tw-w-[0.75rem] !tw-h-[2rem] !tw-text-[2rem] !tw-rounded-[0.325rem]"
           />
         </template>
         <template #after>
-          <div
-            class="tw-pb-[0.325rem] tw-pr-[0.625rem] tw-h-[calc(100%-101px)]"
-          >
+          <div class="tw-pr-[0.625rem] tw-h-full">
             <div class="card-container tw-h-full">
               <template v-if="isLoading.length">
                 <div
@@ -101,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-spinner-hourglass
                       color="primary"
                       size="2.5rem"
-                      style="margin: 0 auto; display: block"
+                      class="tw-mx-auto tw-block"
                     />
                     <div class="text-center full-width">
                       Hold on tight, we're fetching your sessions.
@@ -130,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
         <div class="card-container">
-          <div class="q-pa-lg enable-rum" style="max-width: 1024px">
+          <div class="q-pa-lg enable-rum tw-max-w-[64rem]">
             <div class="q-pb-lg">
               <div class="text-left text-h6 text-bold q-pb-md">
                 Discover Session Replay to Understand User Interactions in
@@ -667,9 +663,7 @@ const getStarted = () => {
 </script>
 <style scoped lang="scss">
 .sessions_page {
-  .monaco-editor {
-    height: 5rem !important;
-  }
+
 }
 </style>
 <style lang="scss">

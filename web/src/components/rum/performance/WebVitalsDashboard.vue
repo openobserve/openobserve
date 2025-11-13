@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="relative-position">
     <div
       class="performance-dashboard"
-      :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
+      :class="isLoading.length ? 'tw-invisible' : 'tw-visible'"
     >
       <div
         class="text-bold q-ml-md q-px-sm rounded q-mt-sm q-py-xs learn-web-vitals-link flex items-center"
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-icon
           name="info"
-          size="16px"
+          size="1rem"
           class="material-symbols-outlined q-mr-xs"
         />
         {{ t("rum.learnWebVitalsLabel") }}
@@ -52,14 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-show="isLoading.length"
-      class="q-pb-lg flex items-center justify-center text-center absolute full-width"
-      style="height: calc(100vh - 250px); top: 0"
+      class="q-pb-lg flex items-center justify-center text-center absolute full-width tw-h-[calc(100vh-15.625rem)] tw-top-0"
     >
       <div>
         <q-spinner-hourglass
           color="primary"
-          size="40px"
-          style="margin: 0 auto; display: block"
+          size="2.5rem"
+          class="tw-mx-auto tw-block"
         />
         <div class="text-center full-width">Loading Dashboard</div>
       </div>

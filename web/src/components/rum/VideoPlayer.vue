@@ -18,14 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="player-container full-height q-pa-sm">
     <div
       v-if="isLoading"
-      class="q-pb-lg flex items-center justify-center text-center full-width"
-      style="height: calc(100vh - 12.5rem)"
+      class="q-pb-lg flex items-center justify-center text-center full-width tw-h-[calc(100vh-12.5rem)]"
     >
       <div>
         <q-spinner-hourglass
           color="primary"
           size="2.5rem"
-          style="margin: 0 auto; display: block"
+          class="tw-mx-auto tw-block"
         />
         <div class="text-center full-width">
           Hold on tight, we're fetching session.
@@ -34,8 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       ref="playerContainerRef"
-      class="flex items-center justify-center"
-      style="height: calc(100vh - 12.375rem)"
+      class="flex items-center justify-center tw-h-[calc(100vh-12.375rem)]"
     >
       <div
         ref="playerRef"
