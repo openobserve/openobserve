@@ -925,6 +925,12 @@ pub struct Common {
         help = "Reject write when write queue is full"
     )]
     pub wal_write_queue_full_reject: bool,
+    #[env_config(
+        name = "ZO_WAL_DEDICATED_RUNTIME_ENABLED",
+        default = false,
+        help = "Enable dedicated runtime with CPU binding for WAL writer threads"
+    )]
+    pub wal_dedicated_runtime_enabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
@@ -1243,6 +1249,18 @@ pub struct Common {
         help = "Which fields to show by default in logs search page. Valid values - all,uds,interesting"
     )]
     pub log_page_default_field_list: String,
+    #[env_config(
+        name = "ZO_TRACES_LIST_INDEX_ENABLED",
+        default = true,
+        help = "enable trace list index for traces"
+    )]
+    pub traces_list_index_enabled: bool,
+    #[env_config(
+        name = "ZO_INGESTION_LOG_ENABLE_CHECK",
+        default = true,
+        help = "ingestion log enabled check"
+    )]
+    pub ingestion_log_enabled_check: bool,
 }
 
 #[derive(EnvConfig, Default)]
