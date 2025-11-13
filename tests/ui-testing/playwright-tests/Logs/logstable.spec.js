@@ -62,16 +62,8 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await pageManager.logsPage.clickRelative15MinButton();
     
     // Switch off quick mode before starting the test
-    const quickModeToggle = page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
-    const isQuickModeOn = await quickModeToggle.getAttribute('aria-pressed');
-    
-    if (isQuickModeOn === 'true') {
-      await pageManager.logsPage.clickQuickModeToggle();
-      await page.waitForTimeout(500);
-      testLogger.info('Quick mode turned off');
-    } else {
-      testLogger.info('Quick mode already off');
-    }
+    await pageManager.logsPage.ensureQuickModeState(false);
+    testLogger.info('Quick mode state ensured');
     
     await pageManager.logsPage.clickSearchBarRefreshButton();
     await page.waitForTimeout(2000);
@@ -239,7 +231,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await page.waitForTimeout(500);
     
     // Verify specific field is found
-    const specificFieldLocator = page.locator(`[data-test="log-search-expand-${specificField}-field-btn"]`);
+    const specificFieldLocator = await pageManager.logsPage.getSpecificFieldLocator(specificField);
     await expect(specificFieldLocator).toBeVisible();
     
     // Clear search and verify all fields are visible again
@@ -247,8 +239,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await page.waitForTimeout(500);
     
     // Verify more fields are now visible (not just kubernetes ones)
-    const allFields = page.locator('[data-test*="log-search-expand-"]');
-    const totalFieldCount = await allFields.count();
+    const totalFieldCount = await pageManager.logsPage.countMatchingFields();
     expect(totalFieldCount).toBeGreaterThan(20); // Adjusted expectation based on actual field count
     
     testLogger.info('Field search functionality test completed successfully');
@@ -309,7 +300,6 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
   }, async ({ page }) => {
     testLogger.info('Testing field search case insensitivity');
     
-    const fieldName = "kubernetes_container_name";
     const searchVariations = ["KUBERNETES", "Kubernetes", "kubernetes", "CONTAINER", "container"];
     
     for (const searchTerm of searchVariations) {
@@ -317,8 +307,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
       await page.waitForTimeout(500);
       
       // Verify that fields matching the search are visible regardless of case
-      const matchingFields = page.locator('[data-test*="log-search-expand-"]');
-      const fieldCount = await matchingFields.count();
+      const fieldCount = await pageManager.logsPage.countMatchingFields();
       
       // Should find at least some fields for kubernetes/container searches
       if (searchTerm.toLowerCase().includes('kubernetes') || searchTerm.toLowerCase().includes('container')) {
@@ -356,20 +345,16 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await page.waitForTimeout(1000);
     
     // Check if quick mode is active - use a more flexible approach
-    const quickModeToggle = page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
-    
-    // Wait a bit more for the toggle to fully update
     await page.waitForTimeout(500);
     
     // Check various ways to detect if quick mode is on
-    const ariaPressed = await quickModeToggle.getAttribute('aria-pressed');
-    const classNames = await quickModeToggle.getAttribute('class');
+    const toggleInfo = await pageManager.logsPage.getQuickModeToggleAttributes();
     
-    testLogger.info(`Quick mode toggle state - aria-pressed: ${ariaPressed}, classes: ${classNames}`);
+    testLogger.info(`Quick mode toggle state - aria-pressed: ${toggleInfo.ariaPressed}, classes: ${toggleInfo.classNames}`);
     
     // Quick mode should be enabled - verify the toggle worked
     // If aria-pressed doesn't work, just verify the toggle is still visible and clickable
-    await expect(quickModeToggle).toBeVisible();
+    await expect(toggleInfo.locator).toBeVisible();
     testLogger.info('Quick mode toggle is functional');
     
     // Toggle back to normal mode
@@ -450,29 +435,11 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await pageManager.logsPage.clickSQLModeToggle();
     await page.waitForTimeout(1000);
     
-    // Clear any existing query and ensure editor is focused
-    await page.locator('[data-test="logs-search-bar-query-editor"]').click();
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-    await page.keyboard.press("Backspace");
-    await page.waitForTimeout(500);
+    // Execute blank query with keyboard shortcut
+    await pageManager.logsPage.executeBlankQueryWithKeyboardShortcut();
     
-    // Try to run the blank query with cmd+enter
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
-    
-    // Wait for any response
-    await page.waitForTimeout(3000);
-    
-    // Verify proper error handling for blank SQL query (the actual behavior from PR #9023)
-    const errorMessage = page.getByText("Error occurred while retrieving search events");
-    await expect(errorMessage).toBeVisible();
-    
-    // Verify there's a clickable error details button
-    const errorDetailsBtn = page.locator('[data-test="logs-page-result-error-details-btn"]');
-    if (await errorDetailsBtn.isVisible()) {
-      await errorDetailsBtn.click();
-      await page.waitForTimeout(1000);
-      testLogger.info('✓ Error details button clicked successfully');
-    }
+    // Verify proper error handling
+    await pageManager.logsPage.expectBlankQueryError();
     
     testLogger.info('✓ Proper error handling verified - shows error message instead of breaking UI');
   });
@@ -487,41 +454,21 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await page.waitForTimeout(2000);
     
     // Verify logs table is visible
-    await expect(page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
+    await pageManager.logsPage.expectLogsSearchResultLogsTableVisible();
     
-    // Click on the first log entry to open details (expand the _timestamp column)
-    await page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
-    await page.waitForTimeout(1000);
+    // Open first log details
+    await pageManager.logsPage.openFirstLogDetails();
     
-    // Click on include/exclude button for a field in the opened log details
-    const includeExcludeButtons = page.locator('[data-test="log-details-include-exclude-field-btn"]');
-    await expect(includeExcludeButtons.first()).toBeVisible();
-    await includeExcludeButtons.first().click();
-    await page.waitForTimeout(500);
-    
-    // Click 'Include Search Term'
-    await page.getByText('Include Search Term').click();
-    await page.waitForTimeout(1000);
-    
+    // Add include search term from log details
+    await pageManager.logsPage.addIncludeSearchTermFromLogDetails();
     testLogger.info('✓ First include search term added');
     
     // Run the query (this is where the bug occurred - include terms would disappear from open details)
     await pageManager.logsPage.clickSearchBarRefreshButton();
     await page.waitForTimeout(2000);
     
-    // CRITICAL ASSERTION: After running query, the include/exclude buttons should still be visible
-    // If the bug exists, these buttons would have disappeared from the open log details
-    const postQueryButtons = page.locator('[data-test="log-details-include-exclude-field-btn"]');
-    
-    // Assert that include/exclude buttons are still visible after query run
-    await expect(postQueryButtons.first()).toBeVisible();
-    await expect(postQueryButtons.nth(1)).toBeVisible();
-    
-    // Assert that we still have multiple buttons available
-    const buttonCount = await postQueryButtons.count();
-    expect(buttonCount).toBeGreaterThanOrEqual(2);
-    
-    testLogger.info(`✓ ${buttonCount} include/exclude buttons remain visible in open log details AFTER query run`);
+    // Verify include/exclude buttons are still visible after query run
+    await pageManager.logsPage.expectIncludeExcludeButtonsVisibleInLogDetails();
     
     testLogger.info('✓ Include/exclude search terms preserved in open log details after query run - bug is fixed!');
   });
@@ -536,67 +483,19 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await page.waitForTimeout(1000);
     
     // Ensure histogram is enabled (it should be by default, but let's verify)
-    const histogramToggle = page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
-    const isHistogramEnabled = await histogramToggle.getAttribute('aria-pressed');
-    if (isHistogramEnabled !== 'true') {
-      await histogramToggle.click();
-      await page.waitForTimeout(500);
+    const wasChanged = await pageManager.logsPage.ensureHistogramToggleState(true);
+    if (wasChanged) {
       testLogger.info('✓ Histogram enabled');
     }
     
-    // Track API requests to verify expected calls
-    const allRequests = [];
+    // Setup API call tracking
+    const trackingData = await pageManager.logsPage.setupAPICallTracking();
     
-    const requestHandler = (request) => {
-      if (request.url().includes('/_search') && request.method() === 'POST') {
-        let postData = null;
-        try {
-          postData = request.postData();
-        } catch (e) {
-          postData = 'Unable to read post data';
-        }
-        
-        allRequests.push({
-          url: request.url(),
-          postData: postData,
-          timestamp: Date.now()
-        });
-      }
-    };
+    // Execute query with keyboard shortcut and track API calls
+    await pageManager.logsPage.executeQueryWithKeyboardShortcutAndTrackAPICalls('select * from "e2e_automate"');
     
-    page.on('request', requestHandler);
-    
-    // Clear any existing query and add a test query
-    await page.locator('[data-test="logs-search-bar-query-editor"]').click();
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-    await page.keyboard.press("Backspace");
-    await page.keyboard.type('select * from "e2e_automate"');
-    await page.waitForTimeout(500);
-    
-    // Use cmd+enter to run the query
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
-    
-    // Wait for the API calls to complete
-    await page.waitForTimeout(4000);
-    
-    // Filter recent requests made after cmd+enter
-    const recentRequests = allRequests.filter(req => Date.now() - req.timestamp < 5000);
-    
-    // Histogram calls have size: 0, regular search calls have size > 0 (typically 51)
-    const searchCalls = recentRequests.filter(req => 
-      req.postData && (req.postData.includes('"size":51') || req.postData.includes('"size": 51'))
-    );
-    const histogramCalls = recentRequests.filter(req => 
-      req.postData && (req.postData.includes('"size":0') || req.postData.includes('"size": 0'))
-    );
-    
-    // Verify exactly 1 search call and 1 histogram call are made
-    expect(searchCalls.length).toBe(1);
-    expect(histogramCalls.length).toBe(1);
-    expect(recentRequests.length).toBe(2);
-    
-    // Clean up event listener
-    page.off('request', requestHandler);
+    // Verify API call counts
+    await pageManager.logsPage.verifyAPICallCounts(trackingData.allRequests, trackingData.requestHandler);
     
     testLogger.info('✓ CMD+Enter API calls verified: 1 search + 1 histogram = 2 total');
   });
@@ -610,41 +509,22 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await pageManager.logsPage.clickSQLModeToggle();
     await page.waitForTimeout(1000);
     
-    // Click in the query editor and add a simple query
-    const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
-    await queryEditor.click();
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-    await page.keyboard.press("Backspace");
-    await page.keyboard.type('select * from "e2e_automate"');
+    // Setup editor for cursor test
+    await pageManager.logsPage.setupEditorForCursorTest('select * from "e2e_automate"');
     
-    // Position cursor at the end of the query
-    await page.keyboard.press("End");
-    await page.waitForTimeout(500);
+    // Get editor content before cmd+enter
+    const initialQuery = await pageManager.logsPage.getEditorContentBefore();
+    testLogger.info(`Query before cmd+enter: "${initialQuery}"`);
     
-    // Get the actual Monaco editor content using a more specific selector
-    const monacoEditor = page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines');
-    const initialQuery = await monacoEditor.textContent();
-    const cleanedInitialQuery = initialQuery?.trim().replace(/\s+/g, ' ') || '';
-    testLogger.info(`Query before cmd+enter: "${cleanedInitialQuery}"`);
+    // Execute query with keyboard shortcut
+    await pageManager.logsPage.executeQueryWithKeyboardShortcutForEditor();
     
-    // Press cmd+enter to run the query
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
-    await page.waitForTimeout(2000);
+    // Get editor content after cmd+enter
+    const finalQuery = await pageManager.logsPage.getEditorContentAfter();
+    testLogger.info(`Query after cmd+enter: "${finalQuery}"`);
     
-    // Check editor content after cmd+enter
-    const finalEditorContent = await monacoEditor.textContent();
-    const cleanedFinalQuery = finalEditorContent?.trim().replace(/\s+/g, ' ') || '';
-    testLogger.info(`Query after cmd+enter: "${cleanedFinalQuery}"`);
-    
-    // The query content should remain exactly the same 
-    expect(cleanedFinalQuery).toBe(cleanedInitialQuery);
-    expect(cleanedFinalQuery).toBe('select * from "e2e_automate"');
-    
-    // Additional integrity checks
-    expect(cleanedFinalQuery).not.toMatch(/\n/); // No newlines
-    expect(cleanedFinalQuery).not.toMatch(/\r/); // No carriage returns  
-    expect(cleanedFinalQuery).not.toMatch(/^\d/); // No leading numbers
-    expect(cleanedFinalQuery).not.toContain('monaco'); // No Monaco artifacts
+    // Verify editor content integrity
+    await pageManager.logsPage.verifyEditorContentIntegrity(initialQuery, finalQuery);
     
     testLogger.info('✓ CMD+Enter editor bug test completed');
   });
