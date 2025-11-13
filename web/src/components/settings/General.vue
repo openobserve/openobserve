@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Manage Theme section -->
-          <div v-if="isMetaOrg" class="settings-grid-item tw-items-start">
+          <div class="settings-grid-item tw-items-start">
             <span class="individual-setting-title">
               Manage Theme
             </span>
@@ -332,7 +332,6 @@ import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
-import useIsMetaOrg from "@/composables/useIsMetaOrg";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -365,7 +364,6 @@ export default defineComponent({
     const customText = ref("");
     const editingText = ref(false);
     const files = ref(null);
-    const { isMetaOrg } = useIsMetaOrg();
 
     customText.value = store.state.zoConfig.custom_logo_text;
 
