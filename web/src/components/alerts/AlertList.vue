@@ -84,8 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-history-btn"
             icon="history"
           />
-          <q-btn
-            v-if="1==0"
+          <!-- <q-btn
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
@@ -93,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="goToAlertInsights"
             data-test="alert-insights-btn"
             icon="insights"
-          />
+          /> -->
           <q-btn
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
