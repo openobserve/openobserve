@@ -276,9 +276,13 @@ jobs:
 
           if [ "$IS_RERUN" = "true" ]; then
             echo "::group::Fetching last failed tests from TestDino"
+            # Use custom cache ID that includes run_id to distinguish separate workflow runs
+            # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
+            CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
+            echo "::notice::Using cache ID: $CACHE_ID"
             # Try to get last failed tests from TestDino
             # Redirect stderr to /dev/null to avoid capturing npm warnings
-            if LAST_FAILED_FLAGS="$(npx tdpw last-failed 2>/dev/null)"; then
+            if LAST_FAILED_FLAGS="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
               # Trim whitespace
               LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
 
@@ -550,7 +554,11 @@ jobs:
             # tdpw cache expects to be run from the directory containing report.json
             # Change to playwright-results directory where report.json lives
             cd playwright-results
-            if npx tdpw cache; then
+            # Use custom cache ID that includes run_id to distinguish separate workflow runs
+            # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
+            CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
+            echo "::notice::Using cache ID: $CACHE_ID"
+            if npx tdpw cache --cache-id "$CACHE_ID"; then
               echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
               echo "::notice::This data will be used for optimized reruns if tests fail"
             else
