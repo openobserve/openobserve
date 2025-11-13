@@ -1010,7 +1010,10 @@ export default defineComponent({
     };
 
 
-    const toggleSchema = async () => {
+    const toggleSchema = async (newValue: string) => {
+      // Update the schema type with the new value from the toggle
+      searchObj.meta.useUserDefinedSchemas = newValue;
+
       // Reset pagination to page 1 before resetting fields
       resetPagination();
 
@@ -1027,7 +1030,10 @@ export default defineComponent({
       
     };
 
-    const toggleInterestingFields = () => {
+    const toggleInterestingFields = (newValue: boolean) => {
+      // Update the interesting fields toggle with the new value
+      showOnlyInterestingFields.value = newValue;
+
       // Reset pagination to page 1 before resetting fields
       resetPagination();
       resetFields();

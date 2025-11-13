@@ -55,14 +55,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="cursor-pointer text-bold"
       >
         <q-td
-          class="field_list field-group-header"
+          class="field_list field-group-header !tw-flex tw-justify-between tw-items-center tw-rounded-[0.25rem]"
           :class="theme === 'dark' ? 'text-grey-5' : 'bg-grey-3'"
         >
-          {{ props.row.name }} ({{
-            showOnlyInterestingFields
-              ? interestingExpandedGroupRowsFieldCount[props.row.group]
+          <div class="tw-w-[calc(100%-1.25rem)] ellipsis">
+            {{ props.row.name }} ({{
+              showOnlyInterestingFields
+                ? interestingExpandedGroupRowsFieldCount[props.row.group]
               : expandGroupRowsFieldCount[props.row.group]
-          }})
+            }})
+          </div>
           <q-icon
             v-if="expandGroupRowsFieldCount[props.row.group] > 0"
             :name="
@@ -140,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           clearable
           debounce="1"
           :placeholder="t('search.searchField')"
-          class="indexlist-search-input"
+          class="indexlist-search-input tw-mb-[0.25rem]"
         >
           <template #prepend>
             <q-icon name="search" size="20px" class="o2-search-input-icon" />
@@ -292,8 +294,8 @@ defineExpose({
 
   &.field-group-header {
     font-weight: 600;
-    font-size: 13px;
-    padding: 8px 12px;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.325rem;
   }
 }
 </style>
