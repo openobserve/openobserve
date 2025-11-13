@@ -196,6 +196,8 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.enterStreamName(sourceStreamName.substring(0, 5));
     await pageManager.pipelinesPage.enterStreamName(sourceStreamName);
     await page.waitForTimeout(2000);
+    // Wait for the stream option to appear in the dropdown
+    await page.getByRole("option", { name: sourceStreamName, exact: true }).waitFor({ state: 'visible', timeout: 10000 });
     await page.getByRole("option", { name: sourceStreamName, exact: true }).click();
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(3000);
@@ -369,6 +371,8 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.enterStreamName(sourceStreamName.substring(0, 5));
     await pageManager.pipelinesPage.enterStreamName(sourceStreamName);
     await page.waitForTimeout(2000);
+    // Wait for the stream option to appear in the dropdown
+    await page.getByRole("option", { name: sourceStreamName, exact: true }).waitFor({ state: 'visible', timeout: 10000 });
     await page.getByRole("option", { name: sourceStreamName, exact: true }).click();
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
