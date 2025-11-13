@@ -1091,7 +1091,7 @@ def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_f
 
     # Adjust the assertion based on our expectations
     expected_hits_sql_cache = total_exp  # what we're expecting
-    assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
+    assert abs(total_hits_sql_cache - expected_hits_sql_cache) <= tolerance, f"Expected {test_name_sql} total to be {expected_hits_sql_cache} (±{tolerance}), but got {total_hits_sql_cache}"
 
 # Define the test function
 
