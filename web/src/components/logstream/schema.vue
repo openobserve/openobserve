@@ -842,7 +842,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :pagination="pagination"
                     selection="multiple"
                     v-model:selected="selectedDateFields"
-                    class="q-table o2-schema-table"
+                    class="q-table o2-quasar-table o2-row-md o2-schema-table"
                     id="schemaFieldList"
                     :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark' : 'o2-last-row-border-light o2-schema-table-header-sticky-light'"
                     style="height: calc(100vh - 363px);"
@@ -920,7 +920,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </q-btn>
                   <q-btn
-                    v-if="activeMainTab == 'schemaSettings'"
                     v-bind:disable="
                       !selectedFields.length && !selectedDateFields.length
                     "
