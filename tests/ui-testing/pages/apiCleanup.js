@@ -569,7 +569,7 @@ class APICleanup {
 
     /**
      * Clean up all pipelines for specific streams
-     * Deletes pipelines where source.stream_name matches any of the target streams or patterns
+     * Deletes pipelines where source.stream_name matches any of the target streams
      * @param {Array<string>} streamNames - Array of stream names to match (default: ['e2e_automate', 'e2e_automate1', 'e2e_automate2', 'e2e_automate3'])
      */
     async cleanupPipelines(streamNames = ['e2e_automate', 'e2e_automate1', 'e2e_automate2', 'e2e_automate3']) {
@@ -580,13 +580,10 @@ class APICleanup {
             const pipelines = await this.fetchPipelines();
             testLogger.info('Fetched pipelines', { total: pipelines.length });
 
-            // Filter pipelines by source stream name (exact match or pattern match)
-            const matchingPipelines = pipelines.filter(p => {
-                if (!p.source) return false;
-                const streamName = p.source.stream_name;
-                // Check exact match or pattern match for e2e_src_*
-                return streamNames.includes(streamName) || streamName.startsWith('e2e_src_');
-            });
+            // Filter pipelines by source stream name
+            const matchingPipelines = pipelines.filter(p =>
+                p.source && streamNames.includes(p.source.stream_name)
+            );
             testLogger.info('Found pipelines matching target streams', { count: matchingPipelines.length });
 
             if (matchingPipelines.length === 0) {
@@ -805,9 +802,7 @@ class APICleanup {
      * 1. Starts with "sanitylogstream_"
      * 2. Matches test patterns: test1, test2, test3, etc.
      * 3. stress_test followed by numbers
-     * 4. e2e_src_* (pipeline source streams)
-     * 5. destination_node_* (pipeline destination streams)
-     * 6. Random 8-9 character lowercase strings (from pipeline dynamic tests)
+     * 4. Random 8-9 character lowercase strings (from pipeline dynamic tests)
      *    - BUT excludes known production/important streams
      */
     shouldCleanupStream(streamName) {
@@ -823,16 +818,6 @@ class APICleanup {
 
         // Pattern 3: stress_test*
         if (streamName.startsWith('stress_test')) {
-            return true;
-        }
-
-        // Pattern 4: e2e_src_* (pipeline test source streams)
-        if (streamName.startsWith('e2e_src_')) {
-            return true;
-        }
-
-        // Pattern 5: destination_node_* (pipeline test destination streams)
-        if (streamName.startsWith('destination_node_')) {
             return true;
         }
 

@@ -154,68 +154,6 @@ test.describe("Core Pipeline Tests", () => {
   });
 
   test("should add source & destination node and then delete the pipeline", async ({ page }) => {
-    // Generate unique stream names to avoid conflicts with parallel tests
-    const uniqueSuffix = Math.random().toString(36).substring(7);
-    const sourceStreamName = `e2e_src_${uniqueSuffix}`;
-    const destinationStreamName = `destination_node_${uniqueSuffix}`;
-
-    // Ingest data to the unique source stream
-    const orgId = process.env["ORGNAME"];
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-    const ingestionResult = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(logsdata)
-      });
-      return await fetchResponse.json();
-    }, {
-      url: process.env.INGESTION_URL,
-      headers: headers,
-      orgId: orgId,
-      streamName: sourceStreamName,
-      logsdata: logsdata
-    });
-    testLogger.debug('Stream ingestion completed', { streamName: sourceStreamName, result: ingestionResult });
-
-    // Wait for stream to be indexed and available in the system
-    // Polling to check if stream exists via API
-    let streamExists = false;
-    for (let i = 0; i < 10; i++) {
-      await page.waitForTimeout(1000);
-      const streams = await page.evaluate(async ({ url, headers, orgId }) => {
-        const response = await fetch(`${url}/api/${orgId}/streams?type=logs`, {
-          method: 'GET',
-          headers: headers
-        });
-        const data = await response.json();
-        return data.list || [];
-      }, {
-        url: process.env.INGESTION_URL,
-        headers: headers,
-        orgId: orgId
-      });
-
-      if (streams.some(s => s.name === sourceStreamName)) {
-        streamExists = true;
-        testLogger.debug('Stream found in streams list', { streamName: sourceStreamName, attempt: i + 1 });
-        break;
-      }
-    }
-
-    if (!streamExists) {
-      testLogger.warn('Stream not found in streams list after polling', { streamName: sourceStreamName });
-    }
-
-    // Additional wait for UI to refresh
-    await page.waitForTimeout(2000);
-
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -223,12 +161,10 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectLogs();
 
-    await pageManager.pipelinesPage.enterStreamName(sourceStreamName.substring(0, 5));
-    await pageManager.pipelinesPage.enterStreamName(sourceStreamName);
+    await pageManager.pipelinesPage.enterStreamName("e2e");
+    await pageManager.pipelinesPage.enterStreamName("e2e_automate3");
     await page.waitForTimeout(2000);
-    // Wait for the stream option to appear in the dropdown
-    await page.getByRole("option", { name: sourceStreamName, exact: true }).waitFor({ state: 'visible', timeout: 10000 });
-    await page.getByRole("option", { name: sourceStreamName, exact: true }).click();
+    await page.getByRole("option", { name: "e2e_automate3", exact: true }).click();
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(3000);
     // Hover over the output stream node to show delete button, then click it
@@ -239,15 +175,15 @@ test.describe("Core Pipeline Tests", () => {
     // Drag and drop output stream instead of hover-click
     await pageManager.pipelinesPage.selectAndDragSecondStream();
     await page.getByLabel("Stream Name *").click();
-    await page.getByLabel("Stream Name *").fill(destinationStreamName.replace(/_/g, "-"));
+    await page.getByLabel("Stream Name *").fill("destination-node");
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
-
+    
     // Wait for dialog to close and ensure canvas is ready for interaction
     await page.waitForTimeout(2000);
     await page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' });
     await page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
-
+    
     // Ensure no dialogs are blocking the interaction
     await page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
       // Ignore if no backdrop exists
@@ -265,7 +201,7 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.savePipeline();
     await ingestion(page);
 
-    await exploreStreamAndNavigateToPipeline(page, destinationStreamName);
+    await exploreStreamAndNavigateToPipeline(page, 'destination_node');
     await pageManager.pipelinesPage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
     const deletePipelineButton = page.locator(
@@ -359,68 +295,6 @@ test.describe("Core Pipeline Tests", () => {
   });
 
   test("should add source, condition & destination node and then delete the pipeline", async ({ page }) => {
-    // Generate unique stream names to avoid conflicts with parallel tests
-    const uniqueSuffix = Math.random().toString(36).substring(7);
-    const sourceStreamName = `e2e_src_${uniqueSuffix}`;
-    const destinationStreamName = `destination_node_${uniqueSuffix}`;
-
-    // Ingest data to the unique source stream
-    const orgId = process.env["ORGNAME"];
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-    const ingestionResult = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(logsdata)
-      });
-      return await fetchResponse.json();
-    }, {
-      url: process.env.INGESTION_URL,
-      headers: headers,
-      orgId: orgId,
-      streamName: sourceStreamName,
-      logsdata: logsdata
-    });
-    testLogger.debug('Stream ingestion completed', { streamName: sourceStreamName, result: ingestionResult });
-
-    // Wait for stream to be indexed and available in the system
-    // Polling to check if stream exists via API
-    let streamExists = false;
-    for (let i = 0; i < 10; i++) {
-      await page.waitForTimeout(1000);
-      const streams = await page.evaluate(async ({ url, headers, orgId }) => {
-        const response = await fetch(`${url}/api/${orgId}/streams?type=logs`, {
-          method: 'GET',
-          headers: headers
-        });
-        const data = await response.json();
-        return data.list || [];
-      }, {
-        url: process.env.INGESTION_URL,
-        headers: headers,
-        orgId: orgId
-      });
-
-      if (streams.some(s => s.name === sourceStreamName)) {
-        streamExists = true;
-        testLogger.debug('Stream found in streams list', { streamName: sourceStreamName, attempt: i + 1 });
-        break;
-      }
-    }
-
-    if (!streamExists) {
-      testLogger.warn('Stream not found in streams list after polling', { streamName: sourceStreamName });
-    }
-
-    // Additional wait for UI to refresh
-    await page.waitForTimeout(2000);
-
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -428,12 +302,10 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectLogs();
 
-    await pageManager.pipelinesPage.enterStreamName(sourceStreamName.substring(0, 5));
-    await pageManager.pipelinesPage.enterStreamName(sourceStreamName);
+    await pageManager.pipelinesPage.enterStreamName("e2e");
+    await pageManager.pipelinesPage.enterStreamName("e2e_automate2");
     await page.waitForTimeout(2000);
-    // Wait for the stream option to appear in the dropdown
-    await page.getByRole("option", { name: sourceStreamName, exact: true }).waitFor({ state: 'visible', timeout: 10000 });
-    await page.getByRole("option", { name: sourceStreamName, exact: true }).click();
+    await page.getByRole("option", { name: "e2e_automate2", exact: true }).click();
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
     // Hover over the output stream node to show delete button, then click it
@@ -465,40 +337,40 @@ test.describe("Core Pipeline Tests", () => {
     // Drag and drop output stream instead of hover-click
     await pageManager.pipelinesPage.selectAndDragSecondStream();
     await page.getByLabel("Stream Name *").click();
-    await page.getByLabel("Stream Name *").fill(destinationStreamName.replace(/_/g, "-"));
+    await page.getByLabel("Stream Name *").fill("destination-node");
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
-
+    
     // Wait for dialog to close and ensure canvas is ready for interaction
     await page.waitForTimeout(2000);
     await page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' });
     await page.waitForSelector('[data-test="pipeline-node-default-input-handle"]', { state: 'visible' });
     await page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
-
+    
     // Ensure no dialogs are blocking the interaction
     await page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
       // Ignore if no backdrop exists
     });
-
+    
     // Connect the input node to condition to output node by creating edges
     await page.locator('[data-test="pipeline-node-input-output-handle"]').hover({ force: true });
     await page.mouse.down();
     await page.locator('[data-test="pipeline-node-default-input-handle"]').hover({ force: true });
     await page.mouse.up();
     await page.waitForTimeout(500);
-
+    
     await page.locator('[data-test="pipeline-node-default-output-handle"]').hover({ force: true });
     await page.mouse.down();
     await page.locator('[data-test="pipeline-node-output-input-handle"]').hover({ force: true });
     await page.mouse.up();
     await page.waitForTimeout(1000);
-
+    
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);
     await pageManager.pipelinesPage.savePipeline();
     await ingestion(page);
 
-    await exploreStreamAndNavigateToPipeline(page, destinationStreamName);
+    await exploreStreamAndNavigateToPipeline(page, 'destination_node');
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
