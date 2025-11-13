@@ -3419,7 +3419,6 @@ export default defineComponent({
         savedSearchObj.loadingCounter = false;
         savedSearchObj.loadingStream = false;
         savedSearchObj.loadingSavedView = false;
-        savedSearchObj.stream.loading = false;
         
         savedSearchObj.data.timezone = store.state.timezone;
 
