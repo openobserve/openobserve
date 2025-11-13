@@ -574,10 +574,10 @@ jobs:
       - name: Upload to TestDino
         if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
-          cd tests/ui-testing
-          npx --yes tdpw upload playwright-results \
-            --json-report playwright-results/report.json \
-            --html-report playwright-results/html-report \
+          cd tests/ui-testing/playwright-results
+          npx --yes tdpw upload . \
+            --json-report report.json \
+            --html-report html-report \
             --upload-html \
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
