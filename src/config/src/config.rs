@@ -751,7 +751,7 @@ pub struct Common {
     pub is_local_storage: bool,
     #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "nats")]
     pub cluster_coordinator: String,
-    #[env_config(name = "ZO_QUEUE_STORE", default = "")]
+    #[env_config(name = "ZO_QUEUE_STORE", default = "nats")]
     pub queue_store: String,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
