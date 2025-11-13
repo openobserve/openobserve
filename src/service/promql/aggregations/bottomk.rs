@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::sort::sort_float;
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashSet;
 use promql_parser::parser::LabelModifier;
@@ -58,12 +57,12 @@ pub fn bottomk(
     // Group series by label modifier
     let grouped_series = super::group_series_by_labels(&matrix, modifier);
 
-    // Process each group
+    // Process each group - reuse the efficient topk implementation with is_bottom=true
     let result: Vec<RangeValue> = grouped_series
         .par_iter()
         .flat_map(|(_, series_indices)| {
             // For each timestamp, select bottom k series from this group
-            select_bottomk_series(&matrix, series_indices, k, &eval_timestamps)
+            super::topk::select_topk_series(&matrix, series_indices, k, &eval_timestamps, true)
         })
         .collect();
 
@@ -79,66 +78,6 @@ pub fn bottomk(
     } else {
         Ok(Value::Matrix(result))
     }
-}
-
-// Helper function to select bottom k series at each timestamp
-fn select_bottomk_series(
-    matrix: &[RangeValue],
-    series_indices: &[usize],
-    k: usize,
-    eval_timestamps: &HashSet<i64>,
-) -> Vec<RangeValue> {
-    // For bottomk, we keep the original series but only include timestamps
-    // where they are in the bottom k
-    let mut result = Vec::new();
-
-    for &series_idx in series_indices {
-        let series = &matrix[series_idx];
-        let mut filtered_samples = Vec::new();
-
-        // Group samples by timestamp and compare
-        for sample in &series.samples {
-            if !eval_timestamps.contains(&sample.timestamp) {
-                continue;
-            }
-
-            // Check if this sample is in bottom k at this timestamp
-            let mut values_at_timestamp: Vec<(usize, f64)> = series_indices
-                .iter()
-                .filter_map(|&idx| {
-                    matrix[idx]
-                        .samples
-                        .iter()
-                        .find(|s| s.timestamp == sample.timestamp)
-                        .map(|s| (idx, s.value))
-                })
-                .collect();
-
-            // Sort by value (ascending for bottom k)
-            values_at_timestamp.sort_by(|(_, a), (_, b)| sort_float(a, b));
-
-            // Check if current series is in bottom k
-            let is_in_bottomk = values_at_timestamp
-                .iter()
-                .take(k)
-                .any(|(idx, _)| *idx == series_idx);
-
-            if is_in_bottomk {
-                filtered_samples.push(*sample);
-            }
-        }
-
-        if !filtered_samples.is_empty() {
-            result.push(RangeValue {
-                labels: series.labels.clone(),
-                samples: filtered_samples,
-                exemplars: series.exemplars.clone(),
-                time_window: series.time_window.clone(),
-            });
-        }
-    }
-
-    result
 }
 
 #[cfg(test)]
