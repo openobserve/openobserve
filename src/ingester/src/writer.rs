@@ -471,13 +471,13 @@ impl Writer {
         for entry in entries.iter_mut() {
             entry.data.clear();
         }
-        let entries_vec = entries.to_vec();
+
         let _start_preprocess_batch_duration = _start_preprocess_batch.elapsed();
         if _start_preprocess_batch_duration.as_millis() > 100 {
             log::warn!("_start_preprocess_batch: {_start_preprocess_batch_duration:?}");
         }
         Ok(crate::ProcessedBatch {
-            entries: entries_vec,
+            entries,
             bytes_entries,
             batch_entries,
             entries_json_size,
