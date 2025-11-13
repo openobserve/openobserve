@@ -779,7 +779,7 @@ export default defineComponent({
       };
     });
 
-    // Emit aggregated variables when they change
+    // Emit aggregated variables when they change (for URL syncing and current state)
     watch(
       aggregatedVariablesForUrl,
       (newValue) => {
@@ -788,13 +788,13 @@ export default defineComponent({
       { deep: true, immediate: true },
     );
 
-    watch(
-      () => variablesData.value,
-      () => {
-        emit("refreshedVariablesDataUpdated", variablesData.value);
-      },
-      { deep: true },
-    );
+    // Emit initial refreshed state only once on mount
+    // The parent (ViewDashboard) will handle syncing this when refresh is clicked
+    onMounted(() => {
+      if (aggregatedVariablesForUrl.value) {
+        emit("refreshedVariablesDataUpdated", aggregatedVariablesForUrl.value);
+      }
+    });
 
     const currentQueryTraceIds = computed(() => {
       const traceIds = Object.values(
