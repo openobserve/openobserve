@@ -164,7 +164,6 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import FieldList from "./components/FieldList.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -183,7 +182,13 @@ interface Filter {
 }
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
-  components: { EqualIcon, NotEqualIcon, FieldList },
+  components: { 
+    EqualIcon, 
+    NotEqualIcon,      
+    FieldList: defineAsyncComponent(
+      () => import("@/plugins/logs/components/FieldList.vue"),
+    ), 
+  },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {
