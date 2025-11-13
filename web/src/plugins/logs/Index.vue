@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #before>
                 <div class="relative-position tw-h-full tw-pl-[0.625rem]">
                   <index-list
-                    v-show="searchObj.meta.showFields"
+                    v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     class="card-container"
                     @setInterestingFieldInSQLQuery="
@@ -1389,6 +1389,11 @@ export default defineComponent({
       field: any,
       isFieldExistInSQL: boolean,
     ) => {
+      // Only modify query if SQL mode is enabled
+      if (!searchObj.meta.sqlMode) {
+        return;
+      }
+
       //implement setQuery function using node-sql-parser
       //isFieldExistInSQL is used to check if the field is already present in the query or not.
       let parsedSQL = fnParsedSQL();
