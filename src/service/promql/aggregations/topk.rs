@@ -152,10 +152,10 @@ pub(super) fn select_topk_series(
         for sample in &series.samples {
             // O(1) lookup to check if this timestamp has top-k data
             // and if this series is in the top k for that timestamp
-            if let Some(topk_indices) = topk_per_timestamp.get(&sample.timestamp) {
-                if topk_indices.contains(&series_idx) {
-                    filtered_samples.push(*sample);
-                }
+            if let Some(topk_indices) = topk_per_timestamp.get(&sample.timestamp)
+                && topk_indices.contains(&series_idx)
+            {
+                filtered_samples.push(*sample);
             }
         }
 
