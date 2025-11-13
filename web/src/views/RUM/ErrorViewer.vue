@@ -19,12 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isLoading.length">
       <div
         class="q-pb-lg flex items-center justify-center text-center"
-        style="height: calc(100vh - 200px)"
+        style="height: calc(100vh - 12.5rem)"
       >
         <div>
           <q-spinner-hourglass
             color="primary"
-            size="40px"
+            size="2.5rem"
             style="margin: 0 auto; display: block"
           />
           <div class="text-center full-width">
@@ -172,7 +172,7 @@ const getError = () => {
 
 <style scoped>
 .error-viewer-container {
-  height: calc(100vh - 52px);
+  height: calc(100vh - 3.25rem);
   overflow-y: auto;
 }
 </style>

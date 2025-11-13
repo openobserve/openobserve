@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             editor-id="rum-errors-query-editor"
             class="monaco-editor tw-border tw-solid tw-border-[var(--o2-border-color)] tw-p-[0.25rem] tw-rounded-[0.375rem] tw-overflow-hidden"
             v-model:query="errorTrackingState.data.editorValue"
-            style="height: 40px !important"
+            style="height: 2.5rem !important"
             :debounce-time="300"
           />
         </div>
@@ -81,9 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-avatar
           color="primary"
           text-color="white"
-          size="20px"
+          size="1.25rem"
           icon="drag_indicator"
-          style="top: 10px"
+          style="top: 0.625rem"
         />
       </template>
       <template #after>
@@ -92,12 +92,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="isLoading.length">
               <div
                 class="q-pb-lg flex items-center justify-center text-center"
-                style="height: calc(100vh - 300px)"
+                style="height: calc(100vh - 18.75rem)"
               >
                 <div>
                   <q-spinner-hourglass
                     color="primary"
-                    size="40px"
+                    size="2.5rem"
                     style="margin: 0 auto; display: block"
                   />
                   <div class="text-center full-width">
@@ -482,7 +482,7 @@ function updateUrlQueryParams() {
 <style scoped lang="scss">
 .sessions_page {
   .monaco-editor {
-    height: 80px !important;
+    height: 5rem !important;
   }
 }
 </style>
@@ -492,7 +492,7 @@ function updateUrlQueryParams() {
   .q-field__native,
   .q-field__input,
   .q-table tbody td {
-    font-size: 12px !important;
+    font-size: 0.75rem !important;
   }
 
   .q-splitter__after {
@@ -505,24 +505,24 @@ function updateUrlQueryParams() {
 
   .index-table :hover::-webkit-scrollbar,
   #tracesSearchGridComponent:hover::-webkit-scrollbar {
-    height: 13px;
-    width: 13px;
+    height: 0.8125rem;
+    width: 0.8125rem;
   }
 
   .index-table ::-webkit-scrollbar-track,
   #tracesSearchGridComponent::-webkit-scrollbar-track {
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 10px;
+    border-radius: 0.625rem;
   }
 
   .index-table ::-webkit-scrollbar-thumb,
   #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 10px;
+    border-radius: 0.625rem;
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
   }
 
   .q-table__top {
-    padding: 0px !important;
+    padding: 0 !important;
   }
 
   .q-table__control {
@@ -530,23 +530,23 @@ function updateUrlQueryParams() {
   }
 
   .q-field__control-container {
-    padding-top: 0px !important;
+    padding-top: 0 !important;
   }
 
   .search-button {
-    width: 96px;
-    line-height: 29px;
+    width: 6rem;
+    line-height: 1.8125rem;
     font-weight: bold;
     text-transform: initial;
-    font-size: 11px;
+    font-size: 0.6875rem;
     color: white;
 
     .q-btn__content {
       background: $secondary;
-      border-radius: 3px 3px 3px 3px;
+      border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
 
       .q-icon {
-        font-size: 15px;
+        font-size: 0.9375rem;
         color: #ffffff;
       }
     }

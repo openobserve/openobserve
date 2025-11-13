@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row qp-2 full-height tw-px-[0.625rem] tw-pt-[0.25rem]">
+  <div class="row qp-2 tw-h-full tw-px-[0.625rem] tw-pt-[0.25rem]">
     <div class="col-12 row items-end tw-pb-[0.625rem]">
       <div class="col-12 row card-container tw-px-[0.625rem] tw-py-[0.625rem]">
         <div
@@ -23,32 +23,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="
             border: 1.5px solid;
             border-radius: 50%;
-            width: 22px;
-            height: 22px;
+            width: 1.375rem;
+            height: 1.375rem;
           "
           title="Go Back"
           @click="router.back()"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <q-icon name="arrow_back_ios_new" size="0.875rem" />
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="language" size="14px" class="q-pr-xs" />
+          <q-icon name="language" size="0.875rem" class="q-pr-xs" />
           {{ sessionDetails.ip }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="calendar_month" size="14px" class="q-pr-xs" />
+          <q-icon name="calendar_month" size="0.875rem" class="q-pr-xs" />
           {{ sessionDetails.date }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="person" size="14px" class="q-pr-xs" />
+          <q-icon name="person" size="0.875rem" class="q-pr-xs" />
           {{ sessionDetails.user_email || "Unknown User" }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="location_on" size="14px" class="q-pr-xs" />
+          <q-icon name="location_on" size="0.875rem" class="q-pr-xs" />
           {{ sessionDetails.city }}, {{ sessionDetails.country }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="settings" size="14x" class="q-pr-xs" />
+          <q-icon name="settings" size="0.875rem" class="q-pr-xs" />
           {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
       </div>

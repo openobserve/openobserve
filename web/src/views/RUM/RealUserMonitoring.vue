@@ -15,16 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div :style="{ height: 'calc(100vh - 41px)', overflow: 'hidden' }">
+  <div :style="{ height: 'calc(100vh - 2.5625rem)', overflow: 'hidden' }">
     <template v-if="isLoading.length">
       <div
         class="q-pb-lg flex items-center justify-center text-center q-pt-xs"
-        style="height: calc(100vh - 190px)"
+        style="height: calc(100vh - 11.875rem)"
       >
         <div>
           <q-spinner-hourglass
             color="primary"
-            size="40px"
+            size="2.5rem"
             style="margin: 0 auto; display: block"
           />
           <div class="text-center full-width">
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="getStarted"
           >
             {{ t("rum.getStartedLabel") }}
-            <q-icon name="arrow_forward" size="20px"
+            <q-icon name="arrow_forward" size="1.25rem"
   class="q-ml-xs" />
           </q-btn>
         </div>
@@ -357,7 +357,7 @@ const getRumDataFields = () => {
   border-bottom: 1px solid #e0e0e0;
   .rum-tab {
     border-bottom: 2px solid transparent;
-    width: 140px;
+    width: 8.75rem;
   }
   .active {
     border-bottom: 2px solid $primary;
@@ -367,6 +367,6 @@ const getRumDataFields = () => {
 .enable-rum {
   max-width: 100%;
   max-height: 100%;
-  height: calc(100vh - 50px);
+  height: calc(100vh - 3.125rem);
 }
 </style>

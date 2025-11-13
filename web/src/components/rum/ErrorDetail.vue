@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ column.error_handling }}
       </div>
-      <q-icon name="schedule" size="14px" class="text-grey-8" />
+      <q-icon name="schedule" size="0.875rem" class="text-grey-8" />
       <span class="q-pl-xs text-grey-8">{{
         getFormattedDate(column.zo_sql_timestamp / 1000)
       }}</span>
@@ -71,25 +71,25 @@ const handleErrorTypeClick = () => {
 
 <style lang="scss" scoped>
 .error_type {
-  font-size: 16px;
+  font-size: 1rem;
   color: $info;
   text-transform: capitalize;
 }
 
 .error_description {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .error_message {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .error_time {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .unhandled_error {
   border: 1px solid rgb(246, 68, 68);
-  border-radius: 4px;
+  border-radius: 0.25rem;
 }
 </style>

@@ -121,8 +121,8 @@ export default defineComponent({
         value: "overview",
         style: {
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         },
       },
       {
@@ -130,8 +130,8 @@ export default defineComponent({
         value: "web_vitals",
         style: {
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         },
       },
       {
@@ -139,8 +139,8 @@ export default defineComponent({
         value: "errors",
         style: {
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         },
       },
       {
@@ -148,8 +148,8 @@ export default defineComponent({
         value: "api",
         style: {
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         },
       },
     ];
@@ -417,7 +417,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .performance_title {
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 .q-table {
   &__top {
@@ -440,7 +440,7 @@ export default defineComponent({
     height: 1.9rem !important;
     min-height: 1.9rem !important;
     border-radius: 0.375rem !important;
-    padding: 2px 4px !important;
+    padding: 0.125rem 0.25rem !important;
 
     &:hover {
       background-color: var(--o2-hover-accent);
@@ -452,7 +452,7 @@ export default defineComponent({
 <style lang="scss">
 .performance-dashboard {
   min-height: auto !important;
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 12.5rem);
   overflow-y: auto;
 
   .card-container {
