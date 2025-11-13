@@ -1408,12 +1408,6 @@ export default defineComponent({
     };
 
     const goBack = async () => {
-      // If there were variables created during this session, reload the dashboard
-      // to discard the in-memory changes (since they were never persisted to DB)
-      if (variablesCreatedInSession.value.length > 0) {
-        // Reload dashboard to get clean state without the temporary variables
-        await loadDashboard();
-      }
       
       // Clear tracking arrays
       variablesCreatedInSession.value = [];
