@@ -255,6 +255,7 @@ jobs:
       - name: Install dependencies and run ui-tests
         env:
           TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           touch .env
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
@@ -275,9 +276,13 @@ jobs:
 
           if [ "$IS_RERUN" = "true" ]; then
             echo "::group::Fetching last failed tests from TestDino"
+            # Use custom cache ID that includes run_id to distinguish separate workflow runs
+            # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
+            CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
+            echo "::notice::Using cache ID: $CACHE_ID"
             # Try to get last failed tests from TestDino
             # Redirect stderr to /dev/null to avoid capturing npm warnings
-            if LAST_FAILED_FLAGS="$(npx tdpw last-failed 2>/dev/null)"; then
+            if LAST_FAILED_FLAGS="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
               # Trim whitespace
               LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
 
@@ -336,26 +341,129 @@ jobs:
 
             # Determine what to run based on rerun mode
             if [ "$RERUN_MODE" = "optimized" ]; then
-              # TestDino returns: "Pipelines/pipeline-core.spec.js -g test name here"
-              # We need to: "./playwright-tests/Pipelines/pipeline-core.spec.js" "-g" "test name here"
-              # Extract file path (before -g) and test name (after -g)
-              FILE_PATH=$(echo "$EXTRA_PW_FLAGS" | sed 's/ -g.*//')
-              TEST_NAME=$(echo "$EXTRA_PW_FLAGS" | sed 's/.*-g //')
+              # TestDino returns ALL failed tests from the previous run
+              # Format examples:
+              # Single: "SDR/test.spec.js -g test name"
+              # Multiple: "Logs/test1.spec.js -g name1 Pipelines/test2.spec.js -g name2"
 
-              FIXED_FILE_PATH="./playwright-tests/$FILE_PATH"
+              echo "DEBUG: Full TestDino output (all failed tests): $EXTRA_PW_FLAGS"
+              echo "DEBUG: Current shard folder: $ACTUAL_FOLDER"
 
-              echo "::notice::🎯 OPTIMIZED RERUN: Running only failed tests"
-              echo "DEBUG: Original TestDino flags: $EXTRA_PW_FLAGS"
-              echo "DEBUG: File path: $FIXED_FILE_PATH"
-              echo "DEBUG: Test name: $TEST_NAME"
-              echo "DEBUG: Final command: npx playwright test \"$FIXED_FILE_PATH\" -g \"$TEST_NAME\""
-              npx playwright test "$FIXED_FILE_PATH" -g "$TEST_NAME"
+              # Strategy: Extract only tests that start with "$ACTUAL_FOLDER/"
+              # Use grep to find lines matching our shard folder
+              SHARD_TESTS=""
+
+              # Check if the TestDino output contains tests for this shard
+              # Look for pattern: $ACTUAL_FOLDER/something.spec.js
+              if echo "$EXTRA_PW_FLAGS" | grep -q "$ACTUAL_FOLDER/.*\.spec\.js"; then
+                echo "DEBUG: Found test(s) for this shard in TestDino output"
+
+                # IMPORTANT: Based on observation, TestDino returns ONE test at a time
+                # Format: "Folder/file.spec.js -g test name"
+                # Simply check if it starts with our folder and pass it through
+
+                # Extract file path (everything before -g or end of string)
+                TEST_FILE=$(echo "$EXTRA_PW_FLAGS" | grep -oE "$ACTUAL_FOLDER/[^ ]+\.spec\.js" | head -1)
+
+                if [ -n "$TEST_FILE" ]; then
+                  # Check if file actually starts with our folder (double-check)
+                  if [[ "$TEST_FILE" == "$ACTUAL_FOLDER/"* ]]; then
+                    # Parse out the file path and test name separately for proper quoting
+                    # Extract file path (before -g)
+                    TEST_FILE_PATH=$(echo "$EXTRA_PW_FLAGS" | sed "s/ -g.*//" | sed "s|^|./playwright-tests/|")
+
+                    # Check if there's a -g flag
+                    if echo "$EXTRA_PW_FLAGS" | grep -q " -g "; then
+                      # Extract test name (after -g)
+                      TEST_NAME=$(echo "$EXTRA_PW_FLAGS" | sed 's/.*-g //')
+
+                      echo "DEBUG: File path: $TEST_FILE_PATH"
+                      echo "DEBUG: Test name: $TEST_NAME"
+                      echo "::notice::🎯 OPTIMIZED RERUN: Running failed test from this shard"
+                      echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\" -g \"$TEST_NAME\""
+
+                      # Properly quote the test name to handle spaces and special chars
+                      npx playwright test "$TEST_FILE_PATH" -g "$TEST_NAME"
+                    else
+                      # No -g flag, just run the file
+                      echo "DEBUG: File path: $TEST_FILE_PATH (no -g flag)"
+                      echo "::notice::🎯 OPTIMIZED RERUN: Running failed test file from this shard"
+                      echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\""
+
+                      npx playwright test "$TEST_FILE_PATH"
+                    fi
+                  else
+                    echo "::notice::⏭️ Test file doesn't match shard folder exactly. Skipping."
+                    exit 0
+                  fi
+                else
+                  echo "::warning::Failed to extract test file path. Falling back to skip."
+                  exit 0
+                fi
+              else
+                echo "::notice::⏭️ OPTIMIZED RERUN: No failed tests found for '$ACTUAL_FOLDER' shard in TestDino output"
+                echo "::notice::Checking if this shard was cancelled/abruptly ended in previous attempt..."
+
+                # Check the status of this matrix job in the previous attempt
+                # Rule: If shard was cancelled/abruptly ended → treat as failed → run full test suite
+                PREV_ATTEMPT=$((${{ github.run_attempt }} - 1))
+
+                if [ "$PREV_ATTEMPT" -ge 1 ]; then
+                  # Job name format: "e2e / {matrix.testfolder}"
+                  JOB_NAME="e2e / ${{ matrix.testfolder }}"
+
+                  echo "DEBUG: Checking previous attempt #$PREV_ATTEMPT for job: $JOB_NAME"
+
+                  # Use GitHub REST API to get job status from specific attempt
+                  # This is guaranteed to work and provides attempt-specific data
+                  API_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+                    -H "Accept: application/vnd.github.v3+json" \
+                    "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/$PREV_ATTEMPT/jobs" 2>/dev/null)
+
+                  if [ $? -eq 0 ] && [ -n "$API_RESPONSE" ]; then
+                    # Successfully got API response, parse it
+                    PREV_JOB_STATUS=$(echo "$API_RESPONSE" | jq -r ".jobs[] | select(.name == \"$JOB_NAME\") | .conclusion" 2>/dev/null)
+
+                    echo "DEBUG: Previous job status: $PREV_JOB_STATUS"
+
+                    if [ "$PREV_JOB_STATUS" = "cancelled" ] || [ "$PREV_JOB_STATUS" = "null" ] || [ -z "$PREV_JOB_STATUS" ]; then
+                      echo "::warning::⚠️ Previous shard was cancelled/abruptly ended (status: ${PREV_JOB_STATUS:-not found})"
+                      echo "::warning::Treating as FAILED - running FULL test suite for this shard"
+                      echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
+                      npx playwright test $FILE_PATHS
+                    elif [ "$PREV_JOB_STATUS" = "success" ]; then
+                      echo "::notice::✅ Previous shard completed successfully - all tests passed"
+                      echo "::notice::No failed tests to rerun. Exiting successfully."
+                      exit 0
+                    elif [ "$PREV_JOB_STATUS" = "failure" ]; then
+                      echo "::warning::⚠️ Previous shard failed but TestDino has no failures recorded"
+                      echo "::warning::This shouldn't happen - running FULL test suite for safety"
+                      echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
+                      npx playwright test $FILE_PATHS
+                    else
+                      echo "::warning::⚠️ Unknown job status: $PREV_JOB_STATUS"
+                      echo "::warning::Running FULL test suite for safety"
+                      echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
+                      npx playwright test $FILE_PATHS
+                    fi
+                  else
+                    echo "::error::Failed to fetch job status from GitHub API"
+                    echo "::warning::Falling back to running FULL test suite for safety"
+                    echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
+                    npx playwright test $FILE_PATHS
+                  fi
+                else
+                  echo "::notice::✅ This is the first run, no previous attempt to check"
+                  echo "::notice::No failed tests to rerun. Exiting successfully."
+                  exit 0
+                fi
+              fi
             else
               # Normal run or fallback
               if [ "$RERUN_MODE" = "fallback" ]; then
                 echo "::warning::⚠️ FALLBACK RERUN: Running all tests in matrix (TestDino optimization failed)"
               fi
-              echo "DEBUG: Final command: npx playwright test$FILE_PATHS"
+              echo "DEBUG: Final command: npx playwright test $FILE_PATHS"
               npx playwright test $FILE_PATHS
             fi
           else
@@ -373,7 +481,7 @@ jobs:
       - name: Upload Coverage Data
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-coverage-${{ env.SANITIZED_FOLDERNAME }}
+          name: playwright-coverage-${{ env.SANITIZED_FOLDERNAME }}-attempt-${{ github.run_attempt }}
           path: tests/ui-testing/.nyc_output
           include-hidden-files: true
 
@@ -384,7 +492,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: blob-report-${{ matrix.testfolder }}
+          name: blob-report-${{ matrix.testfolder }}-attempt-${{ github.run_attempt }}
           path: tests/ui-testing/blob-report
           retention-days: 1
 
@@ -415,7 +523,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: tests/ui-testing/all-blob-reports
-          pattern: blob-report-*
+          pattern: blob-report-*-attempt-${{ github.run_attempt }}
           merge-multiple: true
 
       - name: Merge Reports
@@ -446,7 +554,11 @@ jobs:
             # tdpw cache expects to be run from the directory containing report.json
             # Change to playwright-results directory where report.json lives
             cd playwright-results
-            if npx tdpw cache; then
+            # Use custom cache ID that includes run_id to distinguish separate workflow runs
+            # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
+            CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
+            echo "::notice::Using cache ID: $CACHE_ID"
+            if npx tdpw cache --cache-id "$CACHE_ID"; then
               echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
               echo "::notice::This data will be used for optimized reruns if tests fail"
             else
@@ -484,7 +596,7 @@ jobs:
       - name: Download Playwright Coverage Data
         uses: actions/download-artifact@v5
         with:
-          pattern: playwright-coverage-* # Match all artifacts with this prefix
+          pattern: playwright-coverage-*-attempt-${{ github.run_attempt }}
           path: merged-coverage
           merge-multiple: true
 

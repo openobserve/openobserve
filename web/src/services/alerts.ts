@@ -191,6 +191,8 @@ const alerts = {
     if (query.end_time) params.append("end_time", query.end_time);
     params.append("from", query.from || "0");
     params.append("size", query.size || "100");
+    if (query.sort_by) params.append("sort_by", query.sort_by);
+    if (query.sort_order) params.append("sort_order", query.sort_order);
     return http().get(`/api/${org_identifier}/alerts/history?${params}`);
   },
 };
