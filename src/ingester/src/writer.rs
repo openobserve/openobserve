@@ -399,7 +399,7 @@ impl Writer {
         self.write_batch(vec![entry], fsync).await
     }
 
-    pub async fn write_batch(&self, mut entries: Vec<Entry>, fsync: bool) -> Result<()> {
+    pub async fn write_batch(&self, entries: Vec<Entry>, fsync: bool) -> Result<()> {
         if entries.is_empty() {
             return Ok(());
         }
@@ -407,7 +407,7 @@ impl Writer {
         // Pre-process data BEFORE sending to queue
         // This moves CPU-intensive work (JSON to Arrow conversion) out of the consume loop,
         // allowing consume to focus purely on IO operations
-        let processed_batch = self.preprocess_batch(&mut entries)?;
+        let processed_batch = self.preprocess_batch(entries)?;
 
         let cfg = get_config();
         if !cfg.common.wal_write_queue_enabled {
@@ -438,7 +438,7 @@ impl Writer {
         Ok(())
     }
 
-    fn preprocess_batch(&self, entries: &mut [Entry]) -> Result<crate::ProcessedBatch> {
+    fn preprocess_batch(&self, mut entries: Vec<Entry>) -> Result<crate::ProcessedBatch> {
         let _start_preprocess_batch = Instant::now();
         // Serialize entries to bytes for WAL writing
         let bytes_entries = entries
