@@ -38,7 +38,8 @@ module.exports = defineConfig({
   reporter: process.env.CI
     ? [
         ['blob'], // Use blob reporter in CI for merging across shards
-        ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for TestDino
+        ['json', { outputFile: 'playwright-results/report.json' }], // JSON reporter for TestDino
+        ['blob', { outputDir: 'blob-report' }], // Use blob reporter in CI - JSON created during merge
       ]
     : [
         ['html', { outputFolder: 'playwright-results/html-report', open: 'never' }], // HTML reporter
