@@ -619,27 +619,64 @@ export default defineComponent({
         if (normalized.values) {
           normalized.values = normalized.values
             .map((variable) => {
+              // Create a normalized value for comparison
+              let normalizedValue = variable.value;
+
+              // For scoped variables (tabs/panels), the value is an array of objects
+              // Sort them by their ID for consistent comparison
               if (Array.isArray(variable.value)) {
-                variable.value.sort((a, b) =>
-                  JSON.stringify(a).localeCompare(JSON.stringify(b)),
+                // Check if this is a scoped variable array (has tabId or panelId)
+                const isScopedArray = variable.value.some((item: any) =>
+                  item && typeof item === 'object' && (item.tabId || item.panelId)
                 );
+
+                if (isScopedArray) {
+                  // Sort by tabId or panelId, then by stringified value
+                  normalizedValue = [...variable.value].sort((a, b) => {
+                    const aId = a.tabId || a.panelId || '';
+                    const bId = b.tabId || b.panelId || '';
+                    const idCompare = aId.localeCompare(bId);
+                    if (idCompare !== 0) return idCompare;
+                    return JSON.stringify(a.value).localeCompare(JSON.stringify(b.value));
+                  });
+                } else {
+                  // Regular array (multi-select values), just sort
+                  normalizedValue = [...variable.value].sort((a, b) =>
+                    JSON.stringify(a).localeCompare(JSON.stringify(b))
+                  );
+                }
               }
-              return variable;
+
+              return {
+                name: variable.name,
+                scope: variable.scope || 'global',
+                value: normalizedValue,
+                _isCurrentLevel: variable._isCurrentLevel,
+              };
             })
-            .sort((a, b) => a.name.localeCompare(b.name));
+            .sort((a, b) => {
+              // Sort by name first, then by scope
+              const nameCompare = a.name.localeCompare(b.name);
+              if (nameCompare !== 0) return nameCompare;
+              return (a.scope || 'global').localeCompare(b.scope || 'global');
+            });
         }
         return normalized;
       };
 
       const normalizedCurrent = normalizeVariables(variablesData);
       const normalizedRefreshed = normalizeVariables(refreshedVariablesData);
-      console.log("[VariablesValueSelector] Comparing variables:", {
+
+      const isChanged = !isEqual(normalizedCurrent, normalizedRefreshed);
+
+      console.log("[ViewDashboard] Comparing variables:", {
         "current": normalizedCurrent,
         "refreshed": normalizedRefreshed,
-        "isEqual": !isEqual(normalizedCurrent, normalizedRefreshed),
-        "variablesData": variablesData,
-      })
-      return !isEqual(normalizedCurrent, normalizedRefreshed);
+        "isEqual": !isChanged,
+        "isChanged": isChanged,
+      });
+
+      return isChanged;
     });
     // ======= [START] default variable values
 
@@ -926,6 +963,10 @@ export default defineComponent({
             }
           });
         });
+
+        // Sync refreshedVariablesData with current variablesData when refresh is triggered
+        // This marks the current state as "applied" for comparison
+        Object.assign(refreshedVariablesData, JSON.parse(JSON.stringify(variablesData)));
 
         // Refresh the dashboard
         dateTimePicker.value.refresh();
