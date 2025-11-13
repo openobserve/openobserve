@@ -752,6 +752,10 @@ pub fn merge_response(
         cache_response.function_error.extend(fn_error);
         cache_response.is_partial = true;
     }
+    cache_response.is_histogram_eligible = search_response
+        .first()
+        .map(|res| res.is_histogram_eligible)
+        .unwrap_or_default();
     cache_response
 }
 
