@@ -154,8 +154,34 @@ test.describe("Core Pipeline Tests", () => {
   });
 
   test("should add source & destination node and then delete the pipeline", async ({ page }) => {
-    // Generate unique stream name to avoid conflicts with parallel tests
-    const destinationStreamName = `destination_node_${Math.random().toString(36).substring(7)}`;
+    // Generate unique stream names to avoid conflicts with parallel tests
+    const uniqueSuffix = Math.random().toString(36).substring(7);
+    const sourceStreamName = `e2e_src_${uniqueSuffix}`;
+    const destinationStreamName = `destination_node_${uniqueSuffix}`;
+
+    // Ingest data to the unique source stream
+    const orgId = process.env["ORGNAME"];
+    const basicAuthCredentials = Buffer.from(
+      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+    ).toString('base64');
+    const headers = {
+      "Authorization": `Basic ${basicAuthCredentials}`,
+      "Content-Type": "application/json",
+    };
+    await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(logsdata)
+      });
+      return await fetchResponse.json();
+    }, {
+      url: process.env.INGESTION_URL,
+      headers: headers,
+      orgId: orgId,
+      streamName: sourceStreamName,
+      logsdata: logsdata
+    });
 
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -164,10 +190,10 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectLogs();
 
-    await pageManager.pipelinesPage.enterStreamName("e2e");
-    await pageManager.pipelinesPage.enterStreamName("e2e_automate3");
+    await pageManager.pipelinesPage.enterStreamName(sourceStreamName.substring(0, 5));
+    await pageManager.pipelinesPage.enterStreamName(sourceStreamName);
     await page.waitForTimeout(2000);
-    await page.getByRole("option", { name: "e2e_automate3", exact: true }).click();
+    await page.getByRole("option", { name: sourceStreamName, exact: true }).click();
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(3000);
     // Hover over the output stream node to show delete button, then click it
@@ -298,8 +324,34 @@ test.describe("Core Pipeline Tests", () => {
   });
 
   test("should add source, condition & destination node and then delete the pipeline", async ({ page }) => {
-    // Generate unique stream name to avoid conflicts with parallel tests
-    const destinationStreamName = `destination_node_${Math.random().toString(36).substring(7)}`;
+    // Generate unique stream names to avoid conflicts with parallel tests
+    const uniqueSuffix = Math.random().toString(36).substring(7);
+    const sourceStreamName = `e2e_src_${uniqueSuffix}`;
+    const destinationStreamName = `destination_node_${uniqueSuffix}`;
+
+    // Ingest data to the unique source stream
+    const orgId = process.env["ORGNAME"];
+    const basicAuthCredentials = Buffer.from(
+      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+    ).toString('base64');
+    const headers = {
+      "Authorization": `Basic ${basicAuthCredentials}`,
+      "Content-Type": "application/json",
+    };
+    await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(logsdata)
+      });
+      return await fetchResponse.json();
+    }, {
+      url: process.env.INGESTION_URL,
+      headers: headers,
+      orgId: orgId,
+      streamName: sourceStreamName,
+      logsdata: logsdata
+    });
 
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -308,10 +360,10 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectLogs();
 
-    await pageManager.pipelinesPage.enterStreamName("e2e");
-    await pageManager.pipelinesPage.enterStreamName("e2e_automate2");
+    await pageManager.pipelinesPage.enterStreamName(sourceStreamName.substring(0, 5));
+    await pageManager.pipelinesPage.enterStreamName(sourceStreamName);
     await page.waitForTimeout(2000);
-    await page.getByRole("option", { name: "e2e_automate2", exact: true }).click();
+    await page.getByRole("option", { name: sourceStreamName, exact: true }).click();
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
     // Hover over the output stream node to show delete button, then click it
