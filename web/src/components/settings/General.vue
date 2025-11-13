@@ -911,7 +911,6 @@ body.body--dark .theme-color-chip:hover {
   font-size: 11px;
   font-weight: 600;
   opacity: 0.5;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
