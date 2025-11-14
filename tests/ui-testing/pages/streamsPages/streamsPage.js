@@ -279,7 +279,8 @@ export class StreamsPage {
     }
 
     async expectValidationErrorVisible() {
-        await expect(this.page.getByText("Field(s) 'body' cannot have")).toBeVisible();
+        // Field-agnostic validation error - matches any field name
+        await expect(this.page.locator("text=/Field\\(s\\) '.*' cannot have/")).toBeVisible();
     }
 
     async verifyIndexTypeOptions() {

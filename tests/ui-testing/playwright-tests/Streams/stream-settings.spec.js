@@ -21,6 +21,7 @@ test.describe("Stream Index Type Configuration Tests", () => {
         await pageManager.streamsPage.expectStreamExistsExact("e2e_automate");
         
         await pageManager.streamsPage.openStreamDetail("e2e_automate");
+        await pageManager.streamsPage.searchForField("message"); // Use different field
         
         const availableOptions = await pageManager.streamsPage.verifyIndexTypeOptions();
         expect(availableOptions.length).toBeGreaterThan(0);
@@ -33,7 +34,7 @@ test.describe("Stream Index Type Configuration Tests", () => {
         await pageManager.streamsPage.expectStreamExistsExact("e2e_automate");
         
         await pageManager.streamsPage.openStreamDetail("e2e_automate");
-        await pageManager.streamsPage.searchForField("body");
+        await pageManager.streamsPage.searchForField("log"); // Use different field
         
         // Select both index types (this should cause validation error)
         await pageManager.streamsPage.selectFullTextSearch();
@@ -51,7 +52,7 @@ test.describe("Stream Index Type Configuration Tests", () => {
         await pageManager.streamsPage.expectStreamExistsExact("e2e_automate");
         
         await pageManager.streamsPage.openStreamDetail("e2e_automate");
-        await pageManager.streamsPage.searchForField("body");
+        await pageManager.streamsPage.searchForField("job"); // Use different field
         
         // First select both (will cause error)
         await pageManager.streamsPage.selectFullTextSearch();
@@ -68,6 +69,12 @@ test.describe("Stream Index Type Configuration Tests", () => {
         // 1. Selected both index types ✅
         // 2. Got validation error ✅  
         // 3. Successfully cleared one selection ✅
+    });
+
+    test.afterAll(async ({ page }) => {
+        // Refresh page after all tests complete
+        await page.reload();
+        console.log('✅ Page refreshed after all tests completed');
     });
 
 
