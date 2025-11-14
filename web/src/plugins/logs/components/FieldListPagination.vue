@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="schema-field-toggle q-mr-xs tw-p-0"
         toggle-color="primary"
         bordered
-        size="8px"
+        size="0.5rem"
         text-color="primary"
         bg-color="primary"
         :options="userDefinedSchemaBtnGroupOption"
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-page-fields-list-user-defined-fields-warning-tooltip"
               anchor="center right"
               self="center left"
-              max-width="300px"
+              max-width="18.75rem"
               class="text-body2"
             >
               <span class="text-bold" color="white">{{
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-page-fields-list-all-fields-warning-tooltip"
               anchor="center right"
               self="center left"
-              max-width="300px"
+              max-width="18.75rem"
               class="text-body2"
             >
               <span class="text-bold" color="white">{{
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tooltip
               anchor="center right"
               self="center left"
-              max-width="300px"
+              max-width="18.75rem"
               class="text-body2"
             >
               <span class="text-bold" color="white">{{
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="schema-field-toggle q-mr-xs"
         toggle-color="primary"
         bordered
-        size="8px"
+        size="0.5rem"
         text-color="primary"
         :options="selectedFieldsBtnGroupOption"
       >
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-page-fields-list-all-fields-warning-tooltip"
               anchor="center right"
               self="center left"
-              max-width="300px"
+              max-width="18.75rem"
               class="text-body2"
             >
               <span class="text-bold" color="white">{{
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tooltip
               anchor="center right"
               self="center left"
-              max-width="300px"
+              max-width="18.75rem"
               class="text-body2"
             >
               <span class="text-bold" color="white">{{
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-page-fields-list-pagination-tooltip"
           anchor="center left"
           self="center right"
-          max-width="300px"
+          max-width="18.75rem"
           class="text-body2"
         >
           Total Fields: {{ totalFieldsCount }}
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-page-fields-list-reset-tooltip"
           anchor="center left"
           self="center right"
-          max-width="300px"
+          max-width="18.75rem"
           class="text-body2"
         >
           <span class="text-bold" color="white">{{
@@ -280,18 +280,18 @@ const visiblePages = computed(() => {
 .field-list-pagination {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0.25rem;
 }
 
 .pagination-nav-btn {
-  min-width: 32px;
-  height: 32px;
+  min-width: 2rem;
+  height: 2rem;
 }
 
 .pagination-page-btn {
-  min-width: 32px;
-  height: 32px;
-  font-size: 13px;
+  min-width: 2rem;
+  height: 2rem;
+  font-size: 0.8125rem;
 }
 
 .pagination-page-active {
@@ -305,7 +305,7 @@ const visiblePages = computed(() => {
 }
 
 .reset-icon {
-  font-size: 20px;
+  font-size: 1.25rem;
   cursor: pointer;
   opacity: 0.7;
   transition: opacity 0.2s;
@@ -317,7 +317,7 @@ const visiblePages = computed(() => {
 
 .schema-field-toggle {
   :deep(.q-btn) {
-    padding: 4px 8px;
+    padding: 0.25rem 0.5rem;
   }
 }
 </style>

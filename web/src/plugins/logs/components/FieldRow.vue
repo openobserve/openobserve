@@ -138,7 +138,7 @@ const isFieldSelected = computed(() =>
     bottom: 0;
     display: none;
     align-items: center;
-    padding: 0 4px;
+    padding: 0 0.25rem;
     background: var(--q-dark);
   }
 
@@ -148,6 +148,6 @@ const isFieldSelected = computed(() =>
 }
 
 .field_label {
-  padding: 4px 0;
+  padding: 0.25rem 0;
 }
 </style>
