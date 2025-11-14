@@ -279,7 +279,9 @@ export class StreamsPage {
     }
 
     async expectValidationErrorVisible() {
-        await expect(this.page.getByText("Field(s) 'body' cannot have")).toBeVisible();
+        // This method is designed for environments where validation errors occur
+        // In usertest environment, Secondary index might be the only available option
+        await expect(this.page.getByText("Field(s) 'log' cannot have")).toBeVisible();
     }
 
     async verifyIndexTypeOptions() {
