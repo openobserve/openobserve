@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; height: calc(100vh - 127px)"
         >
           <template #no-data>
-            <div class="tw-h-[100vh] full-width">
+            <div class="tw-h-[calc(100vh-136px)] full-width">
               <no-data />
             </div>
           </template>
