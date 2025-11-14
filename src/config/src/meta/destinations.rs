@@ -17,6 +17,7 @@ use std::fmt;
 
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -100,6 +101,9 @@ pub struct Endpoint {
     pub action_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_format: Option<HTTPOutputFormat>,
+    /// Destination type (e.g., "openobserve", "splunk", "elasticsearch", "custom")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_type: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -124,6 +128,48 @@ pub enum HTTPOutputFormat {
     #[default]
     JSON,
     NDJSON,
+    NestedEvent,
+    ESBulk {
+        index: String,
+    },
+}
+
+impl HTTPOutputFormat {
+    pub fn get_content_type(&self) -> &'static str {
+        match self {
+            Self::JSON => "application/json",
+            Self::NDJSON => "application/x+ndjson",
+            Self::NestedEvent => "application/x+ndjson",
+            Self::ESBulk { .. } => "application/x-ndjson",
+        }
+    }
+
+    pub fn get_body_from_data<T: AsRef<Value> + Serialize>(&self, data: &[T]) -> Vec<u8> {
+        match self {
+            Self::JSON => serde_json::to_vec(data).unwrap(),
+            Self::NDJSON => data
+                .into_iter()
+                .map(|x| x.as_ref().to_string())
+                .collect::<Vec<_>>()
+                .join("\n")
+                .into_bytes(),
+            Self::NestedEvent => data
+                .into_iter()
+                .map(|v| serde_json::json!({"event":v.as_ref()}).to_string())
+                .collect::<Vec<_>>()
+                .join("\n")
+                .into_bytes(),
+            Self::ESBulk { index } => {
+                let expected_count = data.into_iter().count();
+                let mut ret = Vec::with_capacity(expected_count * 2);
+                data.into_iter().for_each(|v| {
+                    ret.push(serde_json::json!({ "index": { "_index": index } }).to_string());
+                    ret.push(v.as_ref().to_string());
+                });
+                ret.join("\n").into_bytes()
+            }
+        }
+    }
 }
 
 impl fmt::Display for HTTPType {
@@ -249,6 +295,7 @@ mod tests {
             headers: Some(headers.clone()),
             action_id: Some("action_123".to_string()),
             output_format: Some(HTTPOutputFormat::JSON),
+            destination_type: Some("custom".to_string()),
         };
 
         assert_eq!(endpoint.url, "https://api.example.com");
@@ -257,6 +304,7 @@ mod tests {
         assert_eq!(endpoint.headers, Some(headers));
         assert_eq!(endpoint.action_id, Some("action_123".to_string()));
         assert_eq!(endpoint.output_format, Some(HTTPOutputFormat::JSON));
+        assert_eq!(endpoint.destination_type, Some("custom".to_string()));
     }
 
     #[test]
@@ -325,6 +373,7 @@ mod tests {
             headers: None,
             action_id: None,
             output_format: None,
+            destination_type: Some("openobserve".to_string()),
         };
 
         let dest_type = DestinationType::Http(endpoint.clone());
@@ -383,6 +432,7 @@ mod tests {
             headers: None,
             action_id: None,
             output_format: None,
+            destination_type: Some("splunk".to_string()),
         };
 
         let module = Module::Pipeline {
@@ -395,6 +445,10 @@ mod tests {
             } => {
                 assert_eq!(pipeline_endpoint.url, "https://pipeline.example.com");
                 assert_eq!(pipeline_endpoint.method, HTTPType::PUT);
+                assert_eq!(
+                    pipeline_endpoint.destination_type,
+                    Some("splunk".to_string())
+                );
             }
             _ => panic!("Should be Pipeline module"),
         }
