@@ -83,6 +83,14 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
             log::error!(
                 "[METRICS:OTLP] Error while handling grpc metrics request: org_id: {org_id}, error: {e}"
             );
+            // Check if this is a schema validation error (columns limit)
+            let error_msg = e.to_string();
+            if error_msg.contains("columns accept") || error_msg.contains("columns for stream") {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST,
+                    error_msg,
+                )));
+            }
             Err(Error::other(e))
         }
     }
@@ -103,6 +111,14 @@ pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, s
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!("[METRICS:OTLP] Error while handling http trace request: {e}");
+            // Check if this is a schema validation error (columns limit)
+            let error_msg = e.to_string();
+            if error_msg.contains("columns accept") || error_msg.contains("columns for stream") {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST,
+                    error_msg,
+                )));
+            }
             Err(Error::other(e))
         }
     }
@@ -493,8 +509,8 @@ pub async fn handle_otlp_request(
                 }
             }
             drop(schema_fields);
-            if need_schema_check
-                && check_for_schema(
+            if need_schema_check {
+                let (schema_evolution, _infer_schema) = check_for_schema(
                     org_id,
                     &local_metric_name,
                     StreamType::Metrics,
@@ -503,10 +519,10 @@ pub async fn handle_otlp_request(
                     timestamp,
                     false, // is_derived is false for metrics
                 )
-                .await
-                .is_ok()
-            {
-                schema_evolved.insert(local_metric_name.to_owned(), true);
+                .await?;
+                if schema_evolution.is_schema_changed {
+                    schema_evolved.insert(local_metric_name.to_owned(), true);
+                }
             }
 
             let buf = metric_data_map
