@@ -925,6 +925,12 @@ pub struct Common {
         help = "Reject write when write queue is full"
     )]
     pub wal_write_queue_full_reject: bool,
+    #[env_config(
+        name = "ZO_WAL_DEDICATED_RUNTIME_ENABLED",
+        default = false,
+        help = "Enable dedicated runtime with CPU binding for WAL writer threads"
+    )]
+    pub wal_dedicated_runtime_enabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
@@ -975,7 +981,7 @@ pub struct Common {
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
         help = "possible values - 'local', 'remote', 'both'"
-    )] // local, remote , both
+    )] // local, remote, both
     pub usage_reporting_mode: String,
     #[env_config(
         name = "ZO_USAGE_REPORTING_URL",
@@ -1237,6 +1243,18 @@ pub struct Common {
         help = "Which fields to show by default in logs search page. Valid values - all,uds,interesting"
     )]
     pub log_page_default_field_list: String,
+    #[env_config(
+        name = "ZO_TRACES_LIST_INDEX_ENABLED",
+        default = true,
+        help = "enable trace list index for traces"
+    )]
+    pub traces_list_index_enabled: bool,
+    #[env_config(
+        name = "ZO_INGESTION_LOG_ENABLED",
+        default = true,
+        help = "Enable ingestion error log"
+    )]
+    pub ingestion_log_enabled: bool,
 }
 
 #[derive(EnvConfig, Default)]
@@ -2554,6 +2572,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.default_hec_stream = "_hec".to_string();
     }
 
+    if cfg.common.usage_publish_interval < 1 {
+        cfg.common.usage_publish_interval = 60;
+    }
+
     cfg.common.log_page_default_field_list = cfg.common.log_page_default_field_list.to_lowercase();
     if !matches!(
         cfg.common.log_page_default_field_list.as_str(),
@@ -2761,8 +2783,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.result_cache_enabled = false;
         cfg.common.metrics_cache_enabled = false;
         cfg.common.feature_query_streaming_aggs = false;
-        cfg.cache_latest_files.enabled = false;
-        cfg.cache_latest_files.delete_merge_files = false;
     }
 
     let disks = sysinfo::disk::get_disk_usage();
