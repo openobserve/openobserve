@@ -810,39 +810,69 @@ test.describe("dashboard UI testcases", () => {
   test("should update the line chart correctly when used camel case in custom sql query", async ({
     page,
   }) => {
+    console.log("=== TEST START: camelCase SQL query test ===");
+
     const pm = new PageManager(page);
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("line-panel-test");
 
+    console.log(`Generated panel name: ${panelName}`);
+    console.log(`Dashboard name: ${randomDashboardName}`);
+
     // Navigate to dashboards and create new dashboard
+    console.log("Step 1: Navigating to dashboards menu...");
     await pm.dashboardList.menuItem("dashboards-item");
+
+    console.log("Step 2: Waiting for dashboard page to load...");
     await waitForDashboardPage(page);
+
+    console.log("Step 3: Creating new dashboard...");
     await pm.dashboardCreate.createDashboard(randomDashboardName);
+
+    console.log("Step 4: Adding panel to dashboard...");
     await pm.dashboardCreate.addPanel();
+
+    console.log(`Step 5: Setting panel name to: ${panelName}`);
     await pm.dashboardPanelActions.addPanelName(panelName);
 
     // Configure line chart with custom SQL using camelCase aliases
+    console.log("Step 6: Removing default _timestamp field from x-axis...");
     await pm.chartTypeSelector.removeField("_timestamp", "x");
+
+    console.log("Step 7: Selecting line chart type...");
     await pm.chartTypeSelector.selectChartType("line");
 
+    console.log("Step 8: Clicking custom SQL button...");
     await page.locator('[data-test="dashboard-customSql"]').click();
+
+    console.log("Step 9: Clicking on SQL editor view...");
     await page.locator(".view-line").first().click();
+
+    const sqlQuery = 'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1';
+    console.log("Step 10: Filling custom SQL query with camelCase aliases:");
+    console.log(`SQL Query: ${sqlQuery}`);
     await page
       .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
-      .fill(
-        'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
-      );
+      .fill(sqlQuery);
 
+    console.log("Step 11: Adding xAxis1 field to x-axis...");
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
+
+    console.log("Step 12: Adding yAxis1 field to y-axis...");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
+
+    console.log("Step 13: Applying dashboard configuration...");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Verify line chart data is rendered correctly
+    console.log("Step 14: Waiting for chart renderer to be visible...");
     await page.waitForSelector('[data-test="chart-renderer"]', {
       state: "visible",
       timeout: 10000,
     });
+    console.log("Chart renderer is visible");
 
+    console.log("Step 15: Waiting for ECharts instance to initialize...");
     await page.waitForFunction(
       () => {
         const chartElement = document.querySelector(
@@ -852,26 +882,38 @@ test.describe("dashboard UI testcases", () => {
       },
       { timeout: 15000 }
     );
+    console.log("ECharts instance initialized successfully");
 
     // Wait for canvas elements to be rendered
+    console.log("Step 16: Waiting for canvas elements to be rendered...");
     await page.waitForSelector('[data-test="chart-renderer"] canvas', {
       state: "attached",
       timeout: 15000,
     });
+    console.log("Canvas elements are attached");
 
     // Validate chart is properly rendered
+    console.log("Step 17: Validating chart rendering...");
     const chartContainer = page.locator('[data-test="chart-renderer"]');
     const boundingBox = await chartContainer.boundingBox();
     const canvasCount = await page
       .locator('[data-test="chart-renderer"] canvas')
       .count();
 
-    expect(canvasCount).toBeGreaterThan(0);
-    expect(boundingBox.width).toBeGreaterThan(0);
-    expect(boundingBox.height).toBeGreaterThan(0);
+    console.log(`Canvas count: ${canvasCount}`);
+    console.log(`Bounding box - Width: ${boundingBox.width}, Height: ${boundingBox.height}`);
+
+    // Enhanced validation: Check for meaningful data rendering
+    // With data: canvasCount >= 2, height > 100px
+    // Without data: canvasCount = 1, height = 38px
+    expect(canvasCount).toBeGreaterThanOrEqual(2); // Should have at least 2 canvas layers with data
+    expect(boundingBox.width).toBeGreaterThan(100); // Reasonable width
+    expect(boundingBox.height).toBeGreaterThan(50); // Reasonable height (not the tiny 38px no-data case)
     await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
+    console.log("Chart validation passed - chart has proper dimensions and multiple canvas layers");
 
     // Verify canvas has visual content
+    console.log("Step 18: Verifying canvas has visual content...");
     const canvasHasContent = await page.evaluate(() => {
       const canvas = document.querySelector(
         '[data-test="chart-renderer"] canvas'
@@ -887,11 +929,176 @@ test.describe("dashboard UI testcases", () => {
       return false;
     });
 
+    console.log(`Canvas has content: ${canvasHasContent}`);
     expect(canvasHasContent).toBe(true);
+    console.log("Canvas content validation passed");
 
     // Save panel and cleanup
+    console.log("Step 19: Saving panel...");
     await pm.dashboardPanelActions.savePanel();
+
+    console.log("Step 20: Navigating back to dashboard list...");
     await pm.dashboardCreate.backToDashboardList();
+
+    console.log(`Step 21: Deleting dashboard: ${randomDashboardName}`);
     await deleteDashboard(page, randomDashboardName);
+
+    console.log("=== TEST COMPLETE: All steps executed successfully ===");
   });
+
+  test("should update the line chart correctly with complex CASE WHEN statements in custom sql query", async ({
+    page,
+  }) => {
+    console.log("=== TEST START: Complex CASE WHEN SQL query test ===");
+
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("complex-case-panel-test");
+
+    console.log(`Generated panel name: ${panelName}`);
+    console.log(`Dashboard name: ${randomDashboardName}`);
+
+    // Navigate to dashboards and create new dashboard
+    console.log("Step 1: Navigating to dashboards menu...");
+    await pm.dashboardList.menuItem("dashboards-item");
+
+    console.log("Step 2: Waiting for dashboard page to load...");
+    await waitForDashboardPage(page);
+
+    console.log("Step 3: Creating new dashboard...");
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+
+    console.log("Step 4: Adding panel to dashboard...");
+    await pm.dashboardCreate.addPanel();
+
+    console.log(`Step 5: Setting panel name to: ${panelName}`);
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    // Configure line chart with custom SQL using complex CASE WHEN statements
+    console.log("Step 6: Removing default _timestamp field from x-axis...");
+    await pm.chartTypeSelector.removeField("_timestamp", "x");
+
+    console.log("Step 7: Selecting line chart type...");
+    await pm.chartTypeSelector.selectChartType("line");
+
+    console.log("Step 8: Clicking custom SQL button...");
+    await page.locator('[data-test="dashboard-customSql"]').click();
+
+    console.log("Step 9: Clicking on SQL editor view...");
+    await page.locator(".view-line").first().click();
+
+    const sqlQuery = `SELECT histogram(_timestamp, '5 minute') AS "_time",
+       COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE '4%' THEN 1 END) AS "4xxErrorCount",
+       COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE 'tes%' THEN 1 END) AS "5xxErrorCount",
+       COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_pod_id IS NULL THEN 1 END) AS "NullErrorCount",
+       COUNT(CASE WHEN kubernetes_container_name = 'prometheus' THEN 1 END) AS "pageViewCount"
+FROM e2e_automate
+GROUP BY _time
+ORDER BY _time ASC`;
+    console.log("Step 10: Filling custom SQL query with complex CASE WHEN statements:");
+    console.log(`SQL Query: ${sqlQuery}`);
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
+      .fill(sqlQuery);
+
+    console.log("Step 11: Adding _time field to x-axis...");
+    await pm.chartTypeSelector.searchAndAddField("_time", "x");
+
+    console.log("Step 12: Adding 4xxErrorCount field to y-axis...");
+    await pm.chartTypeSelector.searchAndAddField("4xxErrorCount", "y");
+
+    console.log("Step 13: Adding 5xxErrorCount field to y-axis...");
+    await pm.chartTypeSelector.searchAndAddField("5xxErrorCount", "y");
+
+    console.log("Step 14: Adding NullErrorCount field to y-axis...");
+    await pm.chartTypeSelector.searchAndAddField("NullErrorCount", "y");
+
+    console.log("Step 15: Adding pageViewCount field to y-axis...");
+    await pm.chartTypeSelector.searchAndAddField("pageViewCount", "y");
+
+    console.log("Step 16: Applying dashboard configuration...");
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
+    // Verify line chart data is rendered correctly
+    console.log("Step 17: Waiting for chart renderer to be visible...");
+    await page.waitForSelector('[data-test="chart-renderer"]', {
+      state: "visible",
+      timeout: 10000,
+    });
+    console.log("Chart renderer is visible");
+
+    console.log("Step 18: Waiting for ECharts instance to initialize...");
+    await page.waitForFunction(
+      () => {
+        const chartElement = document.querySelector(
+          '[data-test="chart-renderer"]'
+        );
+        return chartElement && chartElement.hasAttribute("_echarts_instance_");
+      },
+      { timeout: 15000 }
+    );
+    console.log("ECharts instance initialized successfully");
+
+    // Wait for canvas elements to be rendered
+    console.log("Step 19: Waiting for canvas elements to be rendered...");
+    await page.waitForSelector('[data-test="chart-renderer"] canvas', {
+      state: "attached",
+      timeout: 15000,
+    });
+    console.log("Canvas elements are attached");
+
+    // Validate chart is properly rendered
+    console.log("Step 20: Validating chart rendering...");
+    const chartContainer = page.locator('[data-test="chart-renderer"]');
+    const boundingBox = await chartContainer.boundingBox();
+    const canvasCount = await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .count();
+
+    console.log(`Canvas count: ${canvasCount}`);
+    console.log(`Bounding box - Width: ${boundingBox.width}, Height: ${boundingBox.height}`);
+
+    // Enhanced validation: Check for meaningful data rendering
+    // With data: canvasCount >= 2, height > 100px
+    // Without data: canvasCount = 1, height = 38px
+    expect(canvasCount).toBeGreaterThanOrEqual(2); // Should have at least 2 canvas layers with data
+    expect(boundingBox.width).toBeGreaterThan(100); // Reasonable width
+    expect(boundingBox.height).toBeGreaterThan(50); // Reasonable height (not the tiny 38px no-data case)
+    await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
+    console.log("Chart validation passed - chart has proper dimensions and multiple canvas layers");
+
+    // Verify canvas has visual content
+    console.log("Step 21: Verifying canvas has visual content...");
+    const canvasHasContent = await page.evaluate(() => {
+      const canvas = document.querySelector(
+        '[data-test="chart-renderer"] canvas'
+      );
+      if (!canvas) return false;
+
+      const ctx = canvas.getContext("2d");
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      for (let i = 3; i < imageData.data.length; i += 4) {
+        if (imageData.data[i] > 0) return true;
+      }
+      return false;
+    });
+
+    console.log(`Canvas has content: ${canvasHasContent}`);
+    expect(canvasHasContent).toBe(true);
+    console.log("Canvas content validation passed");
+
+    // Save panel and cleanup
+    console.log("Step 22: Saving panel...");
+    await pm.dashboardPanelActions.savePanel();
+
+    console.log("Step 23: Navigating back to dashboard list...");
+    await pm.dashboardCreate.backToDashboardList();
+
+    console.log(`Step 24: Deleting dashboard: ${randomDashboardName}`);
+    await deleteDashboard(page, randomDashboardName);
+
+    console.log("=== TEST COMPLETE: All steps executed successfully ===");
+  });
+
 });
