@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-tooltip>
             </div>
           </div>
-          <q-btn
+          <!-- <q-btn
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="goToAlertHistory"
             data-test="alert-history-btn"
             icon="history"
-          />
+          /> -->
           <!-- <q-btn
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
