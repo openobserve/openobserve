@@ -479,8 +479,8 @@ pub async fn remote_write(
                 }
             }
             drop(schema_fields);
-            if need_schema_check
-                && check_for_schema(
+            if need_schema_check {
+                let (schema_evolution, _infer_schema) = check_for_schema(
                     org_id,
                     &stream_name,
                     StreamType::Metrics,
@@ -489,10 +489,10 @@ pub async fn remote_write(
                     timestamp,
                     false, // is_derived is false for metrics
                 )
-                .await
-                .is_ok()
-            {
-                schema_evolved.insert(stream_name.clone(), true);
+                .await?;
+                if schema_evolution.is_schema_changed {
+                    schema_evolved.insert(stream_name.clone(), true);
+                }
             }
 
             let schema = metric_schema_map
