@@ -282,11 +282,33 @@ jobs:
             echo "::notice::Using cache ID: $CACHE_ID"
             # Try to get last failed tests from TestDino
             # Redirect stderr to /dev/null to avoid capturing npm warnings
-            if LAST_FAILED_FLAGS="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
+            # Filter out TestDino debug output (lines starting with ===, DEBUG:, or spaces)
+            if RAW_OUTPUT="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
+              # Filter debug lines and get the actual test path
+              # Remove debug output, empty lines, and metadata lines
+              LAST_FAILED_FLAGS="$(echo "$RAW_OUTPUT" | \
+                grep -v '^===' | \
+                grep -v '^DEBUG:' | \
+                grep -v '^   ' | \
+                grep -v '^$' | \
+                grep -v '🔍' | \
+                grep -v '📁' | \
+                grep -v '📋' | \
+                grep -v '⚠️' | \
+                grep -v '🏗️' | \
+                grep -v '📤' | \
+                grep -v '✅' | \
+                grep -v '✓' | \
+                tail -1)"
               # Trim whitespace
               LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
 
-              if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
+              echo "DEBUG: Raw TestDino output length: ${#RAW_OUTPUT} chars"
+              echo "DEBUG: Filtered output: '$LAST_FAILED_FLAGS'"
+              echo "DEBUG: Filtered output length: ${#LAST_FAILED_FLAGS} chars"
+
+              # Check if we got a valid test path (should contain .spec.js)
+              if [ -n "$LAST_FAILED_FLAGS" ] && echo "$LAST_FAILED_FLAGS" | grep -q '\.spec\.js'; then
                 echo "::notice::✅ Found failed tests from previous run."
                 echo "::notice::TestDino flags: $LAST_FAILED_FLAGS"
                 RERUN_MODE="optimized"
