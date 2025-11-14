@@ -146,11 +146,15 @@ describe("DomainManagement Component", () => {
     it("should display correct title and description", async () => {
       wrapper = createWrapper();
       
-      const title = wrapper.find(".text-h6");
-      const description = wrapper.find(".text-body2");
-      
-      expect(title.text()).toContain("SSO Domain Restrictions");
-      expect(description.text()).toContain("Control which domains");
+      const titles = wrapper.findAll(".text-h6");
+      const descriptions = wrapper.findAll(".text-body2");
+
+      // Check first section - Claim Parser Function
+      expect(titles[0].text()).toContain("Claim Parser Function");
+
+      // Check second section - Domain Restrictions
+      expect(titles[1].text()).toContain("Domain Restrictions");
+      expect(descriptions[1].text()).toContain("Control which domains");
     });
 
     it("should load domain settings on mount", async () => {

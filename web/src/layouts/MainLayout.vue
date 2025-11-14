@@ -1315,6 +1315,7 @@ export default defineComponent({
           free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? "",
           light_mode_theme_color: orgSettings?.data?.data?.light_mode_theme_color,
           dark_mode_theme_color: orgSettings?.data?.data?.dark_mode_theme_color,
+          claim_parser_function: orgSettings?.data?.data?.claim_parser_function ?? "",
         });
 
         if (
