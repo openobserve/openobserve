@@ -15,25 +15,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit">
-    <div v-if="!showDestinationEditor" >
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
+  <q-page
+    class="q-pa-none"
+    style="height: calc(100vh - 88px); min-height: inherit"
+  >
+    <div v-if="!showDestinationEditor">
+      <div
+        class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
       >
-        <div class="q-table__title tw-font-[600]" data-test="alert-destinations-list-title">
-            {{ t("pipeline_destinations.header") }}
-          </div>
-          <div class="tw-flex tw-justify-end">
-            <q-input
-              v-model="filterQuery"
-              borderless
-              dense
-              class="q-ml-auto no-border o2-search-input"
-              :placeholder="t('pipeline_destinations.search')"
-            >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
-              </template>
-            </q-input>
+        <div
+          class="q-table__title tw-font-[600]"
+          data-test="alert-destinations-list-title"
+        >
+          {{ t("pipeline_destinations.header") }}
+        </div>
+        <div class="tw-flex tw-justify-end">
+          <q-input
+            v-model="filterQuery"
+            borderless
+            dense
+            class="q-ml-auto no-border o2-search-input"
+            :placeholder="t('pipeline_destinations.search')"
+          >
+            <template #prepend>
+              <q-icon class="o2-search-input-icon" name="search" />
+            </template>
+          </q-input>
           <q-btn
             data-test="pipeline-destination-list-add-btn"
             class="o2-primary-button q-ml-sm tw-h-[36px]"
@@ -42,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t(`alert_destinations.add`)"
             @click="editDestination(null)"
           />
-          </div>
+        </div>
       </div>
       <q-table
         data-test="alert-destinations-list-table"
@@ -52,9 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="id"
         :pagination="pagination"
         class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky o2-last-row-border"
-        :style="hasVisibleRows
+        :style="
+          hasVisibleRows
             ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
-            : 'width: 100%'"
+            : 'width: 100%'
+        "
       >
         <template #no-data>
           <template>
@@ -65,60 +74,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-td :props="props">
             <div class="tw-flex tw-justify-center tw-items-center">
               <q-btn
-              :data-test="`alert-destination-list-${props.row.name}-update-destination`"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              icon="edit"
-              :title="t('alert_destinations.edit')"
-              @click="editDestination(props.row)"
-            >
-            </q-btn>
-            <q-btn
-              :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :icon="outlinedDelete"
-              :title="t('alert_destinations.delete')"
-              @click="conformDeleteDestination(props.row)"
-            >
-            </q-btn>
+                :data-test="`alert-destination-list-${props.row.name}-update-destination`"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                icon="edit"
+                :title="t('alert_destinations.edit')"
+                @click="editDestination(props.row)"
+              >
+              </q-btn>
+              <q-btn
+                :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :icon="outlinedDelete"
+                :title="t('alert_destinations.delete')"
+                @click="conformDeleteDestination(props.row)"
+              >
+              </q-btn>
             </div>
           </q-td>
         </template>
         <template #bottom="scope">
-          <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
-                  {{ resultTotal }} {{ t('pipeline_destinations.header') }}
-                </div>
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
+          <div
+            class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]"
+          >
+            <div
+              class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md"
+            >
+              {{ resultTotal }} {{ t("pipeline_destinations.header") }}
+            </div>
+            <QTablePagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
           </div>
         </template>
         <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
+          <q-tr :props="props">
+            <!-- render the table headers -->
+            <q-th
+              v-for="col in props.cols"
+              :key="col.name"
+              :props="props"
+              :class="col.classes"
+              :style="col.style"
+            >
+              {{ col.label }}
+            </q-th>
+          </q-tr>
+        </template>
       </q-table>
     </div>
     <div v-else>
@@ -139,7 +152,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts">
-import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue"; 
+import {
+  ref,
+  onBeforeMount,
+  onActivated,
+  watch,
+  defineComponent,
+  onMounted,
+  computed,
+} from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar, type QTableProps } from "quasar";
@@ -223,7 +244,12 @@ export default defineComponent({
         align: "left",
         sortable: true,
         style: "width: 140px",
-        format: (val: string) => val ? val.toUpperCase() : "N/A",
+        format: (val: any) => {
+          if (!val) return "N/A";
+          if (typeof val === "string") return val.toUpperCase();
+          if (typeof val === "object" && val.esbulk) return "ESBULK";
+          return "N/A";
+        },
       },
       {
         name: "actions",
@@ -231,7 +257,7 @@ export default defineComponent({
         label: t("alert_destinations.actions"),
         align: "center",
         sortable: false,
-        classes:'actions-column'
+        classes: "actions-column",
       },
     ]);
     const destinations: Ref<DestinationPayload[]> = ref([]);
@@ -271,12 +297,12 @@ export default defineComponent({
       () => router.currentRoute.value.query.action,
       (action) => {
         if (!action) showDestinationEditor.value = false;
-      }
+      },
     );
 
-    onMounted(()=>{
+    onMounted(() => {
       updateRoute();
-    })
+    });
 
     const getDestinations = () => {
       const dismiss = q.notify({
@@ -304,7 +330,7 @@ export default defineComponent({
           updateRoute();
         })
         .catch((err) => {
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             q.notify({
               type: "negative",
               message: "Error while pulling destinations.",
@@ -327,19 +353,19 @@ export default defineComponent({
         editDestination(null);
       if (router.currentRoute.value.query.action === "update")
         editDestination(
-          getDestinationByName(router.currentRoute.value.query.name as string)
+          getDestinationByName(router.currentRoute.value.query.name as string),
         );
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find(
-        (destination) => destination.name === name
+        (destination) => destination.name === name,
       );
     };
     const editDestination = (destination: any) => {
       if (!destination) {
         track("Button Click", {
           button: "Add Pipeline Destination",
-          page: "Pipeline Destinations"
+          page: "Pipeline Destinations",
         });
       }
       toggleDestinationEditor();
@@ -435,12 +461,25 @@ export default defineComponent({
       var filtered = [];
       terms = terms.toLowerCase();
       for (var i = 0; i < rows.length; i++) {
+        // Convert output_format to string for filtering
+        let outputFormatStr = "";
+        if (rows[i]["output_format"]) {
+          if (typeof rows[i]["output_format"] === "string") {
+            outputFormatStr = rows[i]["output_format"].toLowerCase();
+          } else if (
+            typeof rows[i]["output_format"] === "object" &&
+            rows[i]["output_format"].esbulk
+          ) {
+            outputFormatStr = "esbulk";
+          }
+        }
+
         if (
           rows[i]["name"].toLowerCase().includes(terms) ||
           rows[i]["destination_type_name"].toLowerCase().includes(terms) ||
           rows[i]["url"].toLowerCase().includes(terms) ||
           rows[i]["method"].toLowerCase().includes(terms) ||
-          (rows[i]["output_format"] && rows[i]["output_format"].toLowerCase().includes(terms))
+          outputFormatStr.includes(terms)
         ) {
           filtered.push(rows[i]);
         }
@@ -465,9 +504,13 @@ export default defineComponent({
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
     return {
       t,

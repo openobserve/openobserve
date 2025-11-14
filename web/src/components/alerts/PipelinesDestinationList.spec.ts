@@ -130,6 +130,22 @@ describe('PipelinesDestinationList Component - Comprehensive Function Tests', ()
       expect(wrapper.vm.columns[6].name).toBe('actions');
     });
 
+    it('should format output_format column correctly for string values', () => {
+      const outputFormatColumn = wrapper.vm.columns.find((col: any) => col.name === 'output_format');
+      expect(outputFormatColumn).toBeDefined();
+      expect(outputFormatColumn?.format?.('json')).toBe('JSON');
+      expect(outputFormatColumn?.format?.('ndjson')).toBe('NDJSON');
+      expect(outputFormatColumn?.format?.('nestedevent')).toBe('NESTEDEVENT');
+      expect(outputFormatColumn?.format?.(null)).toBe('N/A');
+      expect(outputFormatColumn?.format?.(undefined)).toBe('N/A');
+    });
+
+    it('should format output_format column correctly for esbulk object', () => {
+      const outputFormatColumn = wrapper.vm.columns.find((col: any) => col.name === 'output_format');
+      expect(outputFormatColumn).toBeDefined();
+      expect(outputFormatColumn?.format?.({ esbulk: { index: 'test' } })).toBe('ESBULK');
+    });
+
     it('should initialize per page options correctly', () => {
       expect(wrapper.vm.perPageOptions).toHaveLength(6);
       expect(wrapper.vm.perPageOptions[0]).toEqual({ label: "5", value: 5 });
