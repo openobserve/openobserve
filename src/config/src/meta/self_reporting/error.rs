@@ -149,12 +149,19 @@ impl NodeErrors {
 }
 
 /// SSO Claim Parser Error
+///
+/// Captures errors from VRL-based custom claim parsing for SSO authentication.
+/// This error type is reported to _meta/errors stream for monitoring and debugging.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SsoClaimParserError {
+    /// Name of the VRL function that failed
     pub function_name: String,
-    pub error_type: String, // compile_error, exec_error, timeout, parse_error, validation_error
+    /// Error category: compile_error, exec_error, timeout, parse_error, validation_error
+    pub error_type: String,
+    /// Detailed error message from VRL execution
     pub error: String,
-    pub claims_json: Option<String>, // JSON string of input claims for debugging
+    /// JSON string of input claims for debugging (truncated to 1KB in serialization)
+    pub claims_json: Option<String>,
 }
 
 impl SsoClaimParserError {
