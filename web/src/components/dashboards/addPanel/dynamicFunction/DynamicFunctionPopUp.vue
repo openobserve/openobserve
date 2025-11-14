@@ -86,26 +86,25 @@
         </q-tab-panel>
       </q-tab-panels>
 
-      <div
-        class="tw-flex tw-justify-between tw-items-center tw-pt-2 tw-pr-3"
-        v-if="allowAggregation"
-      >
-        <span class="tw-block tw-mb-1 tw-font-bold">Having</span>
+      <div class="tw-pt-2 tw-pr-3" v-if="allowAggregation">
+        <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
+          <span class="tw-font-bold">Having</span>
 
-        <q-btn
-          dense
-          outline
-          icon="add"
-          label="Add"
-          padding="sm sm"
-          class="el-border"
-          no-caps
-          @click="toggleHavingFilter"
-          v-if="!isHavingFilterVisible()"
-        />
+          <q-btn
+            dense
+            outline
+            icon="add"
+            label="Add"
+            padding="xs sm"
+            class="el-border"
+            no-caps
+            @click="toggleHavingFilter"
+            v-if="!isHavingFilterVisible()"
+          />
+        </div>
 
         <div
-          class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
+          class="tw-flex tw-space-x-2 tw-items-center"
           v-if="isHavingFilterVisible()"
         >
           <q-select
@@ -113,8 +112,9 @@
             filled
             v-model="getHavingCondition().operator"
             :options="havingOperators"
+            borderless
             class="o2-custom-select-dashboard"
-            style="width: 30%"
+            style="width: 60px;"
           />
 
           <q-input
