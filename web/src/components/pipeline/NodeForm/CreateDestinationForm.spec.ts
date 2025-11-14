@@ -292,16 +292,27 @@ describe("CreateDestinationForm", () => {
       expect(outputField.exists()).toBe(true);
     });
 
-    it("should set output_format to ndjson for Splunk", async () => {
+    it("should set output_format to nestedevent for Splunk", async () => {
       wrapper.vm.formData.destination_type = "splunk";
       await wrapper.vm.$nextTick();
+      await flushPromises();
 
-      expect(wrapper.vm.formData.output_format).toBe("ndjson");
+      expect(wrapper.vm.formData.output_format).toBe("nestedevent");
+    });
+
+    it("should set output_format to esbulk for Elasticsearch", async () => {
+      wrapper.vm.formData.destination_type = "elasticsearch";
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      expect(wrapper.vm.formData.output_format).toBe("esbulk");
+      expect(wrapper.vm.formData.esbulk_index).toBe("default");
     });
 
     it("should set output_format to json for Datadog", async () => {
       wrapper.vm.formData.destination_type = "datadog";
       await wrapper.vm.$nextTick();
+      await flushPromises();
 
       expect(wrapper.vm.formData.output_format).toBe("json");
     });
