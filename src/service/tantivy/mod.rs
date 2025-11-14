@@ -125,6 +125,12 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         .collect::<HashSet<_>>();
     let index_fields = index_fields
         .iter()
+        .filter(|f| {
+            schema_fields
+                .get(f)
+                .map(|v| v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8)
+                .is_some()
+        })
         .map(|f| f.to_string())
         .collect::<HashSet<_>>();
     let tantivy_fields = fts_fields
@@ -146,19 +152,20 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         );
         tantivy_schema_builder.add_text_field(INDEX_FIELD_NAME_FOR_ALL, fts_opts);
     }
+
+    let index_opts = tantivy::schema::TextOptions::default()
+        .set_indexing_options(
+            tantivy::schema::TextFieldIndexing::default()
+                .set_index_option(tantivy::schema::IndexRecordOption::Basic)
+                .set_tokenizer("raw")
+                .set_fieldnorms(false),
+        )
+        .set_fast(None);
     for field in index_fields.iter() {
         if field == TIMESTAMP_COL_NAME {
             continue;
         }
-        let index_opts = tantivy::schema::TextOptions::default()
-            .set_indexing_options(
-                tantivy::schema::TextFieldIndexing::default()
-                    .set_index_option(tantivy::schema::IndexRecordOption::Basic)
-                    .set_tokenizer("raw")
-                    .set_fieldnorms(false),
-            )
-            .set_fast(None);
-        tantivy_schema_builder.add_text_field(field, index_opts);
+        tantivy_schema_builder.add_text_field(field, index_opts.clone());
     }
     // add _timestamp field to tantivy schema
     tantivy_schema_builder.add_i64_field(TIMESTAMP_COL_NAME, tantivy::schema::FAST);
