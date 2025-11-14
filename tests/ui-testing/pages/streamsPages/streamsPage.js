@@ -267,10 +267,16 @@ export class StreamsPage {
     }
 
     async selectFullTextSearch() {
+        // Open dropdown first
+        await this.page.locator('[data-test="schema-stream-index-select"] div').filter({ hasText: 'arrow_drop_down' }).nth(1).click();
+        await this.waitForUI(500);
+        
+        // Then select Full text search option
         await this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1).click();
     }
 
     async selectSecondaryIndex() {
+        // Dropdown stays open after first selection, so just select the option
         await this.page.getByText('Secondary index').click();
     }
 
@@ -287,24 +293,45 @@ export class StreamsPage {
         // Wait a bit for the page to load completely
         await this.waitForUI(2000);
         
-        // Check if Full text search and Secondary index options are visible
-        const fullTextOption = this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1);
-        const secondaryIndexOption = this.page.getByText('Secondary index');
-        
-        const options = [];
         try {
-            if (await fullTextOption.isVisible({ timeout: 3000 })) options.push('Full text search');
-        } catch (e) {
-            // Element not found
+            // Click the dropdown arrow to open the options
+            const dropdownArrow = this.page.locator('[data-test="schema-stream-index-select"] div').filter({ hasText: 'arrow_drop_down' }).nth(1);
+            await dropdownArrow.click({ timeout: 5000 });
+            console.log('✅ Clicked dropdown arrow');
+            
+            // Wait for dropdown to open
+            await this.waitForUI(1000);
+            
+            // Check if Full text search and Secondary index options are visible in the dropdown
+            const fullTextOption = this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1);
+            const secondaryIndexOption = this.page.getByText('Secondary index');
+            
+            const options = [];
+            try {
+                if (await fullTextOption.isVisible({ timeout: 3000 })) {
+                    options.push('Full text search');
+                    console.log('✅ Found Full text search option');
+                }
+            } catch (e) {
+                console.log('⚠️  Full text search option not found');
+            }
+            
+            try {
+                if (await secondaryIndexOption.isVisible({ timeout: 3000 })) {
+                    options.push('Secondary index');
+                    console.log('✅ Found Secondary index option');
+                }
+            } catch (e) {
+                console.log('⚠️  Secondary index option not found');
+            }
+            
+            console.log(`Found ${options.length} options:`, options);
+            return options;
+            
+        } catch (error) {
+            console.log('⚠️  Error in verifyIndexTypeOptions:', error.message);
+            return [];
         }
-        
-        try {
-            if (await secondaryIndexOption.isVisible({ timeout: 3000 })) options.push('Secondary index');
-        } catch (e) {
-            // Element not found
-        }
-        
-        return options;
     }
 
     async clearIndexTypeSelection(indexType) {
