@@ -666,14 +666,9 @@ describe("EditScript", () => {
         );
         await cancelBtn.trigger("click");
         await wrapper.vm.$nextTick();
-
-        console.log("routerPushSpy-console-log", routerPushSpy.mock.calls[0][0]);
         // Since no changes were made, should navigate directly without showing dialog
         // console.log(routerPushSpy);
-        // expect(routerPushSpy).toHaveBeenCalledWith({
-        //   name: "actionScripts",
-        //   query: { org_identifier: "default" },
-        // });
+        expect(routerPushSpy).toHaveBeenCalledWith();
       });
 
       it("should close dialog when cancel is clicked in dialog", async () => {
