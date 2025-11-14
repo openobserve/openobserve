@@ -257,12 +257,12 @@ pub async fn search(
             match stat.work_group.as_ref() {
                 Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
                 Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
+                Some(WorkGroup::Background) => _work_group = Some("background".to_string()),
                 None => _work_group = None,
             }
         };
     }
 
-    // do this because of clippy warning
     match res {
         Ok(mut res) => {
             if in_req.query.streaming_output && meta.order_by.is_empty() {
@@ -278,7 +278,6 @@ pub async fn search(
                             | search::SearchEventType::Dashboards
                             | search::SearchEventType::Values
                             | search::SearchEventType::Other
-                            // Alerts search now uses grpc cache::search which does report usage
                             | search::SearchEventType::Alerts
                             | search::SearchEventType::DerivedStream
                     ) {
