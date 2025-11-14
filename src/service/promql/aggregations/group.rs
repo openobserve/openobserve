@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::{HashSet, HashSetExt};
 use datafusion::error::Result;
+use hashbrown::HashSet;
 use promql_parser::parser::LabelModifier;
 
 use crate::service::promql::{

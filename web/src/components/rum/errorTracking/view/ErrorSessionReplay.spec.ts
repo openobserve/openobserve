@@ -144,27 +144,23 @@ describe("ErrorSessionReplay Component", () => {
 
   describe("Play Button", () => {
     it("should render play button", () => {
-      const playButton = wrapper.find(".play-button");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
       expect(playButton.exists()).toBe(true);
     });
 
     it("should have correct button styling", () => {
-      const playButton = wrapper.find(".play-button");
-      expect(playButton.classes()).toContain("play-button");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
       expect(playButton.classes()).toContain("bg-primary");
-      expect(playButton.classes()).toContain("cursor-pointer");
-      expect(playButton.classes()).toContain("q-mt-md");
+      expect(playButton.classes()).toContain("rounded");
+      expect(playButton.classes()).toContain("tw-mt-[0.625rem]");
       expect(playButton.classes()).toContain("text-white");
-      expect(playButton.classes()).toContain("row");
-      expect(playButton.classes()).toContain("items-center");
     });
 
     it("should have correct button inline styles", () => {
-      const playButton = wrapper.find(".play-button");
-      const style = playButton.attributes("style");
-      expect(style).toContain("width: fit-content");
-      expect(style).toContain("border-radius: 3px");
-      expect(style).toContain("padding: 6px 8px");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
+      expect(playButton.classes()).toContain("bg-primary");
+      expect(playButton.classes()).toContain("rounded");
+      expect(playButton.classes()).toContain("tw-mt-[0.625rem]");
     });
 
     it("should display play icon", () => {
@@ -173,7 +169,7 @@ describe("ErrorSessionReplay Component", () => {
     });
 
     it("should display 'Play Session Replay' text", () => {
-      const playButton = wrapper.find(".play-button");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
       expect(playButton.text()).toContain("Play Session Replay");
     });
 
@@ -216,7 +212,7 @@ describe("ErrorSessionReplay Component", () => {
     });
 
     it("should navigate to SessionViewer when play button is clicked", async () => {
-      const playButton = wrapper.find(".play-button");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
       await playButton.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
@@ -240,7 +236,7 @@ describe("ErrorSessionReplay Component", () => {
         },
       });
 
-      const playButton = wrapper.find(".play-button");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
       await playButton.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
@@ -276,7 +272,7 @@ describe("ErrorSessionReplay Component", () => {
       expect(sessionTags.session_id).toBe("custom-session-789");
       expect(sessionTags.view_id).toBe("custom-view-101");
 
-      const playButton = wrapper.find(".play-button");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
       await playButton.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
@@ -295,7 +291,7 @@ describe("ErrorSessionReplay Component", () => {
       const container = wrapper.find(".q-mt-lg");
       const title = container.find(".tags-title");
       const tagsRow = container.find(".row");
-      const playButton = container.find(".play-button");
+      const playButton = container.findComponent({ name: "QBtn" });
 
       expect(container.exists()).toBe(true);
       expect(title.exists()).toBe(true);
@@ -309,7 +305,7 @@ describe("ErrorSessionReplay Component", () => {
 
       expect(children[0].classList.contains("tags-title")).toBe(true);
       expect(children[1].classList.contains("row")).toBe(true);
-      expect(children[2].classList.contains("play-button")).toBe(true);
+      expect(children[2].tagName.toLowerCase()).toBe("button");
     });
   });
 
@@ -377,7 +373,7 @@ describe("ErrorSessionReplay Component", () => {
         },
       });
 
-      const playButton = wrapper.find(".play-button");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
       await playButton.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
@@ -403,7 +399,7 @@ describe("ErrorSessionReplay Component", () => {
       expect(sessionTags.session_id).toBeNull();
       expect(sessionTags.view_id).toBeNull();
 
-      const playButton = wrapper.find(".play-button");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
       await playButton.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
@@ -424,21 +420,21 @@ describe("ErrorSessionReplay Component", () => {
     });
 
     it("should apply correct button styling", () => {
-      const playButton = wrapper.find(".play-button");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
       expect(playButton.classes()).toContain("bg-primary");
-      expect(playButton.classes()).toContain("cursor-pointer");
+      expect(playButton.classes()).toContain("rounded");
       expect(playButton.classes()).toContain("text-white");
     });
   });
 
   describe("Accessibility", () => {
     it("should have clickable play button", () => {
-      const playButton = wrapper.find(".play-button");
-      expect(playButton.classes()).toContain("cursor-pointer");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
+      expect(playButton.exists()).toBe(true);
     });
 
     it("should provide clear button text", () => {
-      const playButton = wrapper.find(".play-button");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
       expect(playButton.text()).toContain("Play Session Replay");
     });
 
@@ -450,7 +446,7 @@ describe("ErrorSessionReplay Component", () => {
 
   describe("Component Lifecycle", () => {
     it("should handle multiple navigation calls", async () => {
-      const playButton = wrapper.find(".play-button");
+      const playButton = wrapper.findComponent({ name: "QBtn" });
 
       await playButton.trigger("click");
       await playButton.trigger("click");

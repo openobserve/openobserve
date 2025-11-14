@@ -390,14 +390,14 @@ impl TimeWindow {
 /// Context for evaluating PromQL expressions across multiple timestamps
 #[derive(Debug, Clone)]
 pub struct EvalContext {
+    /// Trace ID for logging and debugging
+    pub trace_id: String,
     /// Start time in microseconds
     pub start: i64,
     /// End time in microseconds
     pub end: i64,
     /// Step interval in microseconds
     pub step: i64,
-    /// Trace ID for logging and debugging
-    pub trace_id: String,
 }
 
 impl EvalContext {

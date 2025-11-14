@@ -15,17 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div :style="{ height: 'calc(100vh - 41px)', overflow: 'hidden' }">
+  <div class="tw-h-[calc(100vh-2.5625rem)] tw-overflow-hidden">
     <template v-if="isLoading.length">
       <div
-        class="q-pb-lg flex items-center justify-center text-center q-pt-xs"
-        style="height: calc(100vh - 190px)"
+        class="q-pb-lg flex items-center justify-center text-center q-pt-xs tw-h-[calc(100vh-11.875rem)]"
       >
         <div>
           <q-spinner-hourglass
             color="primary"
-            size="40px"
-            style="margin: 0 auto; display: block"
+            size="2.5rem"
+            class="tw-mx-auto tw-block"
           />
           <div class="text-center full-width">
             Hold on tight, we're loading RUM data.
@@ -34,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <div class="tw-pb-[0.625rem] tw-px-[0.625rem] q-pt-xs">
+      <div v-if="showTabs" class="tw-pb-[0.625rem] tw-px-[0.625rem] q-pt-xs">
         <AppTabs
           :show="showTabs"
           :tabs="tabs"
@@ -45,7 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
-          <keep-alive class="tw-h-full">
+          <keep-alive
+            :class="showTabs ? 'tw-h-[calc(100%-53px)]' : 'tw-h-full'"
+          >
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -54,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </keep-alive>
         </template>
         <template v-else>
-          <div class="tw-h-full">
+          <div :class="showTabs ? 'tw-h-[calc(100%-53px)]' : 'tw-h-full'">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -65,8 +66,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </router-view>
     </template>
     <template v-else>
-      <div class="q-pt-xs">
-        <div class="q-pa-lg tw-mx-[0.625rem] enable-rum card-container">
+      <div class="">
+        <div
+          class="card-container q-pa-lg tw-mx-[0.625rem] tw-max-w-full tw-max-h-full tw-h-[calc(100vh - 3.125rem)]"
+        >
           <div class="q-pb-lg">
             <div class="text-left text-h6 text-bold q-pb-md">
               {{ t("rum.aboutRUMTitle") }}
@@ -86,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="getStarted"
           >
             {{ t("rum.getStartedLabel") }}
-            <q-icon name="arrow_forward" size="20px"
+            <q-icon name="arrow_forward" size="1.25rem"
   class="q-ml-xs" />
           </q-btn>
         </div>
@@ -349,22 +352,3 @@ const getRumDataFields = () => {
   });
 };
 </script>
-
-<style scoped lang="scss">
-.rum-tabs {
-  border-bottom: 1px solid #e0e0e0;
-  .rum-tab {
-    border-bottom: 2px solid transparent;
-    width: 140px;
-  }
-  .active {
-    border-bottom: 2px solid $primary;
-  }
-}
-
-.enable-rum {
-  max-width: 100%;
-  max-height: 100%;
-  height: calc(100vh - 50px);
-}
-</style>

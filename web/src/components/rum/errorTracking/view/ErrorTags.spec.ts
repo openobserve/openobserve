@@ -130,7 +130,7 @@ describe("ErrorTags Component", () => {
 
   describe("IP Address Display", () => {
     it("should display IP address with icon", () => {
-      const ipSection = wrapper.find(".q-mr-lg.row.items-center");
+      const ipSection = wrapper.find(".q-mr-lg.items-center");
       expect(ipSection.exists()).toBe(true);
       expect(ipSection.text()).toContain("192.168.1.1");
     });
@@ -139,8 +139,8 @@ describe("ErrorTags Component", () => {
       const ipIcon = wrapper.find("img[src='/mock/ip.png']");
       expect(ipIcon.exists()).toBe(true);
       expect(ipIcon.attributes("alt")).toBe("IP");
-      expect(ipIcon.attributes("style")).toContain("height: 30px");
-      expect(ipIcon.attributes("style")).toContain("width: 30px");
+      expect(ipIcon.classes()).toContain("!tw-w-[1.875rem]");
+      expect(ipIcon.classes()).toContain("!tw-h-auto");
     });
   });
 
