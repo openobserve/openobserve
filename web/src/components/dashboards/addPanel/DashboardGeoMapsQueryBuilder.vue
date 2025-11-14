@@ -84,11 +84,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   style="padding: 3px 16px 16px 16px"
                   :style="{
-                    width: dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery
-                      ? 'auto'
-                      : '771px',
+                    width:
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.latitude.isDerived
+                        ? 'auto'
+                        : '771px',
                   }"
                 >
                   <DynamicFunctionPopUp
@@ -199,11 +203,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   style="padding: 3px 16px 16px 16px"
                   :style="{
-                    width: dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery
-                      ? 'auto'
-                      : '771px',
+                    width:
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.longitude.isDerived
+                        ? 'auto'
+                        : '771px',
                   }"
                 >
                   <DynamicFunctionPopUp
@@ -314,11 +322,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   style="padding: 3px 16px 16px 16px"
                   :style="{
-                    width: dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery
-                      ? 'auto'
-                      : '771px',
+                    width:
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.weight.isDerived
+                        ? 'auto'
+                        : '771px',
                   }"
                 >
                   <DynamicFunctionPopUp

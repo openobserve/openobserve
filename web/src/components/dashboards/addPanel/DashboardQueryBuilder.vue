@@ -27,9 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       style="display: flex; flex-direction: row; width: 100%"
       class="q-pl-md"
-      v-if="
-        dashboardPanelData.data.type != 'metric'
-      "
+      v-if="dashboardPanelData.data.type != 'metric'"
     >
       <div style="flex: 1">
         <div style="display: flex; flex-direction: row">
@@ -121,11 +119,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         style="padding: 3px 16px 16px 16px"
                         :style="{
-                          width: dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery
-                            ? 'auto'
-                            : '771px',
+                          width:
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].customQuery ||
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.x[index].isDerived
+                              ? 'auto'
+                              : '771px',
                         }"
                       >
                         <div>
@@ -292,11 +294,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         style="padding: 3px 16px 16px 16px"
                         :style="{
-                          width: dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery
-                            ? 'auto'
-                            : '771px',
+                          width:
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].customQuery ||
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.breakdown[index].isDerived
+                              ? 'auto'
+                              : '771px',
                         }"
                       >
                         <div>
@@ -441,11 +447,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     style="padding: 3px 16px 16px 16px"
                     :style="{
-                      width: dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery
-                        ? 'auto'
-                        : '771px',
+                      width:
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.y[index].isDerived
+                          ? 'auto'
+                          : '771px',
                     }"
                   >
                     <div>
@@ -589,11 +599,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       style="padding: 3px 16px 16px 16px"
                       :style="{
-                        width: dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery
-                          ? 'auto'
-                          : '771px',
+                        width:
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].customQuery ||
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.z[index].isDerived
+                            ? 'auto'
+                            : '771px',
                       }"
                     >
                       <div>

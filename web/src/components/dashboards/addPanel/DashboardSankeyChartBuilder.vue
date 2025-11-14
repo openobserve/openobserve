@@ -84,11 +84,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   style="padding: 3px 16px 16px 16px"
                   :style="{
-                    width: dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery
-                      ? 'auto'
-                      : '771px',
+                    width:
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.source.isDerived
+                        ? 'auto'
+                        : '771px',
                   }"
                 >
                   <div>
@@ -203,11 +207,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   style="padding: 3px 16px 16px 16px"
                   :style="{
-                    width: dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery
-                      ? 'auto'
-                      : '771px',
+                    width:
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.target.isDerived
+                        ? 'auto'
+                        : '771px',
                   }"
                 >
                   <div>
@@ -322,11 +330,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   style="padding: 3px 16px 16px 16px"
                   :style="{
-                    width: dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery
-                      ? 'auto'
-                      : '771px',
+                    width:
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.value.isDerived
+                        ? 'auto'
+                        : '771px',
                   }"
                 >
                   <div>
