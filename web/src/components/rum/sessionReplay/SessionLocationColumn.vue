@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <div class="row items-center no-wrap">
         <span :class="`fi fi-${column.country_iso_code} q-mr-sm`" />
-        <div style="font-size: 12px">{{ column.country }}</div>
+        <div class="tw-text-[0.75rem]">{{ column.country }}</div>
       </div>
       <div class="row q-mt-xs items-center">
         <div class="text-grey-8">
@@ -55,19 +55,19 @@ defineProps({
 </script>
 <style lang="scss">
 .error_type {
-  font-size: 16px;
+  font-size: 1rem;
   color: $info;
 }
 
 .error_description {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .error_message {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .error_time {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 </style>
