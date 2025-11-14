@@ -1212,7 +1212,6 @@ export default defineComponent({
       }
 
       try {
-        debugger;
         if (sqlMode) {
           let selectFields = "";
           let whereClause = "";
