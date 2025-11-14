@@ -1766,6 +1766,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery == true
     ) {
+      // clear joins when switching to custom query mode
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].joins = [];
+
       // first, remove all derived fields from x,y,z,latitude,longitude,weight,source,target,value
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
