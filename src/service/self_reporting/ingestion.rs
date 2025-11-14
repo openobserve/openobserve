@@ -22,7 +22,10 @@ use config::{
         search::SearchEventType,
         self_reporting::{
             ReportingData,
-            usage::{AggregatedData, GroupKey, USAGE_STREAM, UsageData, UsageEvent},
+            usage::{
+                AggregatedData, DATA_RETENTION_USAGE_STREAM, DataRetentionUsageData, GroupKey,
+                USAGE_STREAM, UsageData, UsageEvent,
+            },
         },
         stream::{StreamParams, StreamType},
     },
@@ -273,6 +276,28 @@ pub(super) async fn ingest_reporting_data(
                 Err(anyhow!("{err}"))
             }
         }
+    }
+}
+
+#[cfg(feature = "cloud")]
+pub async fn ingest_data_retention_usages(
+    data_retention_usages: Vec<DataRetentionUsageData>,
+) {
+    if data_retention_usages.is_empty() {
+        log::info!("[SELF-REPORTING] Returning as no data retention usages reported");
+        return;
+    }
+
+    let report_data = data_retention_usages
+        .iter()
+        .map(|usage| json::to_value(usage).unwrap())
+        .collect::<Vec<_>>();
+
+    let data_retention_stream =
+        StreamParams::new(META_ORG_ID, DATA_RETENTION_USAGE_STREAM, StreamType::Logs);
+
+    if let Err(e) = ingest_reporting_data(report_data, data_retention_stream).await {
+        log::error!("[SELF-REPORTING] Error in ingesting data retention usage: {e}");
     }
 }
 

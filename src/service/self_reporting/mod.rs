@@ -44,6 +44,9 @@ mod ingestion;
 mod queues;
 pub mod search;
 
+#[cfg(feature = "cloud")]
+pub use ingestion::ingest_data_retention_usages;
+
 pub async fn run() {
     #[cfg(not(feature = "enterprise"))]
     {
