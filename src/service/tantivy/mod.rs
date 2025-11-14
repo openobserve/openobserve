@@ -121,17 +121,12 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                 .map(|v| v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8)
                 .is_some()
         })
-        .map(|f| f.to_string())
+        .map(String::from)
         .collect::<HashSet<_>>();
     let index_fields = index_fields
         .iter()
-        .filter(|f| {
-            schema_fields
-                .get(f)
-                .map(|v| v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8)
-                .is_some()
-        })
-        .map(|f| f.to_string())
+        .filter(|f| schema_fields.contains_key(f))
+        .map(String::from)
         .collect::<HashSet<_>>();
     let tantivy_fields = fts_fields
         .union(&index_fields)
