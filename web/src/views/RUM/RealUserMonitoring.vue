@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-h-[calc(100vh-2.5625rem)] tw-overflow-hidden">
+  <div class="tw-h-[calc(100vh-2.5625rem)] tw-overflow-hidden tw-mt-[0.325rem]">
     <template v-if="isLoading.length">
       <div
         class="q-pb-lg flex items-center justify-center text-center q-pt-xs tw-h-[calc(100vh-11.875rem)]"
