@@ -591,6 +591,9 @@ async fn write_logs(
 }
 
 async fn ingestion_log_enabled() -> bool {
+    if !get_config().common.ingestion_log_enabled {
+        return false;
+    }
     // the logging will be enabled through meta only, so hardcoded
     match get_org_setting("_meta").await {
         Ok(org_settings) => org_settings.toggle_ingestion_logs,
