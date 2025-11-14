@@ -378,9 +378,11 @@ describe("CreateDestinationForm", () => {
       wrapper.vm.formData.destination_type = "newrelic";
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.apiHeaders).toHaveLength(1);
-      expect(wrapper.vm.apiHeaders[0].key).toBe("Authorization");
-      expect(wrapper.vm.apiHeaders[0].value).toBe("Api-Token <token>");
+      expect(wrapper.vm.apiHeaders).toHaveLength(2);
+      expect(wrapper.vm.apiHeaders[0].key).toBe("Api-Key");
+      expect(wrapper.vm.apiHeaders[0].value).toBe("<token>");
+      expect(wrapper.vm.apiHeaders[1].key).toBe("Content-Type");
+      expect(wrapper.vm.apiHeaders[1].value).toBe("application/json");
     });
 
     it("should set empty header for Custom", async () => {
