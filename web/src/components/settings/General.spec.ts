@@ -93,6 +93,14 @@ const mockDOMPurify = DOMPurify as any;
 const mockStore = {
   state: {
     theme: "light",
+    defaultThemeColors: {
+      light: "#3F7994",
+      dark: "#5B9FBE",
+    },
+    tempThemeColors: {
+      light: null,
+      dark: null,
+    },
     selectedOrganization: {
       identifier: "test-org",
     },
@@ -112,6 +120,7 @@ const mockStore = {
     ],
   },
   dispatch: vi.fn(),
+  commit: vi.fn(),
 };
 
 // Create real router instance
