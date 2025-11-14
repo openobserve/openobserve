@@ -228,41 +228,87 @@ pub async fn process_token(
                         assignments.len()
                     );
 
-                    // Convert parsed assignments into source_orgs
+                    // Convert parsed assignments into custom roles
                     // Note: Validation is already done inside parse_claims
-                    for assignment in assignments {
-                        let role = UserRole::from_str(&assignment.role)
-                            .unwrap_or(UserRole::from_str(&dex_cfg.default_role).unwrap());
-                        source_orgs.push(UserOrg {
-                            role,
-                            name: assignment.org.clone(),
-                            token: Default::default(),
-                            rum_token: Default::default(),
-                        });
-                        log::info!(
-                            "Added user to org '{}' with role '{}'",
-                            assignment.org,
-                            assignment.role
-                        );
+                    // For custom claim parser flow, we ALWAYS use map_group_to_custom_role
+                    // when map_group_to_role is enabled (same as JWT SSO flow)
+                    if openfga_cfg.map_group_to_role {
+                        // All roles go through custom role flow
+                        for assignment in assignments {
+                            custom_roles.push(format_role_name(&assignment.org, &assignment.role));
+                            log::info!(
+                                "Added custom role '{}/{}' for user",
+                                assignment.org,
+                                assignment.role
+                            );
+                        }
+                    } else {
+                        // Fallback: treat as standard roles
+                        for assignment in assignments {
+                            // Check if it's a standard role using UserRole::is_valid_role
+                            if UserRole::is_valid_role(&assignment.role) {
+                                let role = UserRole::from_str(&assignment.role).unwrap();
+                                source_orgs.push(UserOrg {
+                                    role,
+                                    name: assignment.org.clone(),
+                                    token: Default::default(),
+                                    rum_token: Default::default(),
+                                });
+                                log::info!(
+                                    "Added user to org '{}' with standard role '{}'",
+                                    assignment.org,
+                                    assignment.role
+                                );
+                            } else {
+                                // Non-standard role but map_group_to_role is disabled
+                                log::warn!(
+                                    "Role '{}' is not a standard role and O2_OPENFGA_MAP_GROUP_TO_ROLE is disabled. Falling back to default role '{}'",
+                                    assignment.role,
+                                    dex_cfg.default_role
+                                );
+                                let role = UserRole::from_str(&dex_cfg.default_role).unwrap();
+                                source_orgs.push(UserOrg {
+                                    role,
+                                    name: assignment.org.clone(),
+                                    token: Default::default(),
+                                    rum_token: Default::default(),
+                                });
+                            }
+                        }
                     }
 
                     // If we have valid assignments, mark that we used custom parsing
-                    if !source_orgs.is_empty() {
+                    if !source_orgs.is_empty() || !custom_roles.is_empty() {
                         use_custom_parsing = true;
                         log::info!(
-                            "Using custom claim parsing results ({} orgs)",
-                            source_orgs.len()
+                            "Using custom claim parsing results ({} orgs, {} custom roles)",
+                            source_orgs.len(),
+                            custom_roles.len()
                         );
+
+                        // If we have custom roles and map_group_to_role is enabled,
+                        // handle them using the custom role flow (same as legacy SSO)
+                        if !custom_roles.is_empty() && openfga_cfg.map_group_to_role {
+                            log::info!(
+                                "Custom claim parsing: Handling {} custom roles via map_group_to_custom_role",
+                                custom_roles.len()
+                            );
+                            map_group_to_custom_role(
+                                &user_email,
+                                &name,
+                                custom_roles,
+                                res.0.user_role,
+                            )
+                            .await;
+                            return Ok(None);
+                        }
                     } else {
                         log::warn!(
-                            "Custom claim parsing returned no valid assignments, falling back to O2_DEX_DEFAULT_ORG"
+                            "Custom claim parsing returned no valid assignments, falling back to O2_DEX_DEFAULT_ORG with O2_DEX_DEFAULT_ROLE"
                         );
-                        // Fall back to default org
-                        let role = if let Some(role) = &res.0.user_role {
-                            role.clone()
-                        } else {
-                            UserRole::from_str(&dex_cfg.default_role).unwrap()
-                        };
+                        // Fall back to default org with default role (don't preserve existing user
+                        // role)
+                        let role = UserRole::from_str(&dex_cfg.default_role).unwrap();
                         source_orgs.push(UserOrg {
                             role,
                             name: dex_cfg.default_org.clone(),
