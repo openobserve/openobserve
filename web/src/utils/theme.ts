@@ -41,6 +41,24 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     // Apply dark mode theme color
     const rgbaColor = hexToRgba(themeColor, 10);
     document.body.style.setProperty('--o2-dark-theme-color', rgbaColor);
+    document.body.style.setProperty('--o2-theme-color', rgbaColor);
+
+    // Apply table header background color (80% theme color mixed with white)
+    const tableHeaderBg = hexToRgba(themeColor, 1); // 0.8 alpha (80%)
+    document.body.style.setProperty('--o2-table-header-bg', tableHeaderBg);
+
+    // Apply tab background colors for dark mode
+    // --o2-tab-bg: 20% white + 80% theme color (inverted from light mode)
+    const tabBg = hexToRgba(themeColor,3); // 0.8 alpha (80% theme color)
+    document.body.style.setProperty('--o2-tab-bg', tabBg);
+
+    // --o2-inactive-tab-bg: 10% theme color mixed with dark background
+    const inactiveTabBg = hexToRgba(themeColor, 1); // 0.1 alpha (10% theme color)
+    document.body.style.setProperty('--o2-inactive-tab-bg', inactiveTabBg);
+
+    // // Apply header menu background color for dark mode (30% theme color)
+    // const headerMenuBg = hexToRgba(themeColor, 2); // 0.3 alpha (30% theme color)
+    // document.body.style.setProperty('--o2-header-menu-bg', headerMenuBg);
 
     // Apply menu gradient colors
     if (isDefault) {
@@ -63,6 +81,10 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     document.documentElement.style.removeProperty('--o2-theme-color');
     document.documentElement.style.removeProperty('--o2-body-primary-bg');
     document.documentElement.style.removeProperty('--o2-body-secondary-bg');
+    document.documentElement.style.removeProperty('--o2-table-header-bg');
+    document.documentElement.style.removeProperty('--o2-tab-bg');
+    document.documentElement.style.removeProperty('--o2-inactive-tab-bg');
+    document.documentElement.style.removeProperty('--o2-header-menu-bg');
     document.documentElement.style.removeProperty('--o2-menu-gradient-start');
     document.documentElement.style.removeProperty('--o2-menu-gradient-end');
     document.documentElement.style.removeProperty('--o2-menu-color');
@@ -83,6 +105,20 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
     document.body.style.setProperty('background', gradient, 'important');
 
+    // Apply table header background color (20% theme color mixed with white)
+    const tableHeaderBg = hexToRgba(themeColor, 1); // 0.2 alpha (20%)
+    document.documentElement.style.setProperty('--o2-table-header-bg', tableHeaderBg);
+
+    // Apply tab background colors for light mode
+    // --o2-tab-bg: 20% theme color + 80% white
+    const tabBg = hexToRgba(themeColor, 2); // 0.2 alpha (20% theme color)
+    document.documentElement.style.setProperty('--o2-tab-bg', tabBg);
+
+    // --o2-inactive-tab-bg: 10% theme color + 90% white
+    const inactiveTabBg = hexToRgba(themeColor, 1); // 0.1 alpha (10% theme color)
+    document.documentElement.style.setProperty('--o2-inactive-tab-bg', inactiveTabBg);
+
+
     // Apply menu gradient colors
     if (isDefault) {
       // Use default menu gradient colors
@@ -102,6 +138,10 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
 
     // Clear dark mode variables
     document.body.style.removeProperty('--o2-dark-theme-color');
+    document.body.style.removeProperty('--o2-table-header-bg');
+    document.body.style.removeProperty('--o2-tab-bg');
+    document.body.style.removeProperty('--o2-inactive-tab-bg');
+    document.body.style.removeProperty('--o2-header-menu-bg');
     document.body.style.removeProperty('--o2-menu-gradient-start');
     document.body.style.removeProperty('--o2-menu-gradient-end');
     document.body.style.removeProperty('--o2-menu-color');
