@@ -52,13 +52,16 @@ pub async fn read_from_immutable(
     time_range: Option<(i64, i64)>,
     partition_filters: &[(String, Vec<String>)],
 ) -> Result<Vec<ReadRecordBatchEntry>> {
+    let shared_memtable = config::get_config().common.feature_shared_memtable_enabled;
     let r = IMMUTABLES.read().await;
     let mut batches = Vec::with_capacity(r.len());
     for (_, i) in r.iter() {
-        if org_id == i.key.org_id.as_ref() && stream_type == i.key.stream_type.as_ref() {
+        if stream_type == i.key.stream_type.as_ref()
+            && (shared_memtable || org_id == i.key.org_id.as_ref())
+        {
             batches.extend(
                 i.memtable
-                    .read(stream_name, time_range, partition_filters)?,
+                    .read(org_id, stream_name, time_range, partition_filters)?,
             );
         }
     }
@@ -181,12 +184,14 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
 
     // update metrics
     metrics::INGEST_MEMTABLE_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .sub(stat.json_size);
     metrics::INGEST_MEMTABLE_ARROW_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .sub(stat.arrow_size as i64);
-    metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
+    metrics::INGEST_MEMTABLE_FILES
+        .with_label_values::<&str>(&[])
+        .dec();
 
     Ok(())
 }

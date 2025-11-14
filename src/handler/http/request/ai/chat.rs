@@ -18,14 +18,16 @@ use actix_web::{
     HttpRequest, HttpResponse, Responder, post,
     web::{self, Json},
 };
-use o2_enterprise::enterprise::{ai, common::config::get_config as get_o2_config};
+use o2_enterprise::enterprise::{ai::agent, common::config::get_config as get_o2_config};
 use serde::Deserialize;
+use tracing::Span;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{
+        extractors::Headers,
         models::ai::{PromptRequest, PromptResponse},
-        request::{ai::util::Headers, search::search_stream::report_to_audit},
+        request::search::search_stream::report_to_audit,
     },
 };
 
@@ -43,7 +45,7 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name")
     ),
     request_body(
-        content = PromptRequest,
+        content = inline(PromptRequest),
         description = "Prompt details",
         example = json!({
             "messages": [
@@ -55,7 +57,7 @@ use crate::{
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Chat response", body = PromptResponse),
+        (status = StatusCode::OK, description = "Chat response", body = inline(PromptResponse)),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
@@ -64,17 +66,55 @@ use crate::{
     )
 )]
 #[post("/{org_id}/ai/chat")]
-pub async fn chat(Json(body): Json<PromptRequest>) -> impl Responder {
+pub async fn chat(
+    Headers(auth_data): Headers<TraceInfo>,
+    org_id: web::Path<String>,
+    Json(body): Json<PromptRequest>,
+) -> impl Responder {
+    let trace_id = auth_data.get_trace_id();
+    let user_id = &auth_data.user_id;
+    let org_id_str = org_id.as_str();
     let config = get_o2_config();
 
+    // Create root span for AI tracing if enabled
+    let _span = if config.ai.traces_enabled {
+        tracing::info_span!(
+            "http.request",
+            http.method = "POST",
+            http.route = "/api/{org_id}/ai/chat",
+            http.target = format!("/api/{}/ai/chat", org_id_str),
+            otel.kind = "server",
+        )
+        .entered()
+    } else {
+        Span::none().entered()
+    };
+
     if config.ai.enabled {
-        let response =
-            ai::service::chat(ai::meta::AiServerRequest::new(body.messages, body.model)).await;
+        let response = agent::service::chat(
+            agent::meta::AiServerRequest::new(body.messages, body.model, body.context),
+            trace_id.clone(),
+        )
+        .await;
         match response {
             Ok(response) => HttpResponse::Ok().json(PromptResponse::from(response)),
             Err(e) => {
-                log::error!("Error in chat: {e}");
-                MetaHttpResponse::internal_error(e)
+                let error_msg = e.to_string();
+                log::error!(
+                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] Error in AI chat: {error_msg}"
+                );
+
+                // Check if this is a rate limit error (429) - pass through to client
+                if error_msg.contains("status 429") || error_msg.contains("rate_limit_exceeded") {
+                    return HttpResponse::TooManyRequests().json(serde_json::json!({
+                        "error": error_msg,
+                        "code": 429
+                    }));
+                }
+
+                // All other errors (4XX except 429, and 5XX) are internal server errors
+                // as they indicate misconfiguration or provider issues
+                MetaHttpResponse::internal_error(error_msg)
             }
         }
     } else {
@@ -86,7 +126,29 @@ pub async fn chat(Json(body): Json<PromptRequest>) -> impl Responder {
 struct TraceInfo {
     user_id: String,
     #[serde(default)]
-    trace_id: String,
+    traceparent: String,
+}
+
+impl TraceInfo {
+    /// Extract trace_id from traceparent header if present, otherwise generate UUID v7
+    fn get_trace_id(&self) -> String {
+        if !self.traceparent.is_empty() {
+            // Parse traceparent format: 00-{trace_id}-{span_id}-{flags}
+            let parts: Vec<&str> = self.traceparent.split('-').collect();
+            if parts.len() >= 3 {
+                let trace_id = parts[1].to_string();
+                // Validate trace_id (32 hex chars, not all zeros)
+                if trace_id.len() == 32
+                    && trace_id.chars().all(|c| c.is_ascii_hexdigit())
+                    && trace_id.chars().any(|c| c != '0')
+                {
+                    return trace_id;
+                }
+            }
+        }
+        // Generate new UUID v7 trace_id if traceparent is invalid or missing
+        config::ider::generate_trace_id()
+    }
 }
 
 /// CreateChatStream
@@ -103,7 +165,7 @@ struct TraceInfo {
         ("org_id" = String, Path, description = "Organization name")
     ),
     request_body(
-        content = PromptRequest,
+        content = inline(PromptRequest),
         description = "Prompt details",
         example = json!({
             "messages": [
@@ -130,20 +192,37 @@ pub async fn chat_stream(
     body: web::Json<PromptRequest>,
     in_req: HttpRequest,
 ) -> impl Responder {
-    let TraceInfo { user_id, trace_id } = auth_data;
+    let trace_id = auth_data.get_trace_id();
+    let user_id = auth_data.user_id;
     let org_id = org_id.into_inner();
+
+    let config = get_o2_config();
+
+    // Create root span for AI tracing if enabled
+    let _span = if config.ai.traces_enabled {
+        tracing::info_span!(
+            "http.request",
+            http.method = "POST",
+            http.route = "/api/{org_id}/ai/chat_stream",
+            http.target = format!("/api/{}/ai/chat_stream", org_id),
+            otel.kind = "server",
+        )
+        .entered()
+    } else {
+        Span::none().entered()
+    };
 
     let mut code = StatusCode::OK.as_u16();
     let req_body = body.into_inner();
     let body_bytes = serde_json::to_string(&req_body).unwrap();
 
-    if !get_o2_config().ai.enabled {
+    if !config.ai.enabled {
         let error_message = Some("AI is not enabled".to_string());
         code = StatusCode::BAD_REQUEST.as_u16();
         report_to_audit(
             user_id,
             org_id,
-            trace_id,
+            trace_id.clone(),
             code,
             error_message,
             &in_req,
@@ -153,19 +232,45 @@ pub async fn chat_stream(
 
         return MetaHttpResponse::bad_request("AI is not enabled");
     }
-    let auth_str = crate::common::utils::auth::extract_auth_str(&in_req);
+    let auth_str = crate::common::utils::auth::extract_auth_str(&in_req).await;
 
-    let stream = match ai::service::chat_stream(
-        ai::meta::AiServerRequest::new(req_body.messages, req_body.model),
-        org_id.clone(),
+    let stream = match agent::service::chat_stream(
+        agent::meta::AiServerRequest::new(req_body.messages, req_body.model, req_body.context),
         auth_str,
+        trace_id.clone(),
     )
     .await
     {
         Ok(stream) => stream,
         Err(e) => {
-            let error_message = Some(e.to_string());
-            // TODO: Handle the error rather than hard coding
+            let error_msg = e.to_string();
+            log::error!(
+                "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id}] Error in AI chat_stream: {error_msg}"
+            );
+
+            // Check if this is a rate limit error (429) - pass through to client
+            if error_msg.contains("status 429") || error_msg.contains("rate_limit_exceeded") {
+                code = StatusCode::TOO_MANY_REQUESTS.as_u16();
+                let error_message = Some(error_msg.clone());
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    code,
+                    error_message,
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+
+                return HttpResponse::TooManyRequests().json(serde_json::json!({
+                    "error": error_msg,
+                    "code": 429
+                }));
+            }
+
+            // All other errors (4XX except 429, and 5XX) are internal server errors
+            let error_message = Some(error_msg.clone());
             code = StatusCode::INTERNAL_SERVER_ERROR.as_u16();
             report_to_audit(
                 user_id,
@@ -178,8 +283,7 @@ pub async fn chat_stream(
             )
             .await;
 
-            log::error!("Error in chat_stream: {e}");
-            return MetaHttpResponse::bad_request(e.to_string());
+            return MetaHttpResponse::internal_error(error_msg);
         }
     };
 

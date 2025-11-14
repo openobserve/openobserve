@@ -33,14 +33,16 @@ use crate::{
 };
 
 pub(crate) struct MemTable {
-    streams: HashMap<Arc<str>, Stream>, // key: schema name, val: stream
+    streams: HashMap<Arc<str>, Stream>, // key: orgId/schemaName, val: stream
     json_bytes_written: AtomicU64,
     arrow_bytes_written: AtomicU64,
 }
 
 impl MemTable {
     pub(crate) fn new() -> Self {
-        metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).inc();
+        metrics::INGEST_MEMTABLE_FILES
+            .with_label_values::<&str>(&[])
+            .inc();
         Self {
             streams: HashMap::default(),
             json_bytes_written: AtomicU64::new(0),
@@ -54,12 +56,10 @@ impl MemTable {
         entry: Entry,
         batch: Arc<RecordBatchEntry>,
     ) -> Result<()> {
-        let partitions = match self.streams.get_mut(&entry.stream) {
+        let key = Arc::from(format!("{}/{}", entry.org_id, entry.stream));
+        let partitions = match self.streams.get_mut(&key) {
             Some(v) => v,
-            None => self
-                .streams
-                .entry(entry.stream.clone())
-                .or_insert_with(Stream::new),
+            None => self.streams.entry(key.clone()).or_insert_with(Stream::new),
         };
         let json_size = entry.data_size;
         let arrow_size = partitions.write(schema, entry, batch)?;
@@ -72,11 +72,13 @@ impl MemTable {
 
     pub(crate) fn read(
         &self,
+        org_id: &str,
         stream_name: &str,
         time_range: Option<(i64, i64)>,
         partition_filters: &[(String, Vec<String>)],
     ) -> Result<Vec<ReadRecordBatchEntry>> {
-        let Some(stream) = self.streams.get(stream_name) else {
+        let key = Arc::from(format!("{org_id}/{stream_name}"));
+        let Some(stream) = self.streams.get(&key) else {
             return Ok(vec![]);
         };
         stream.read(time_range, partition_filters)
@@ -91,6 +93,12 @@ impl MemTable {
         let mut schema_size = 0;
         let mut paths = Vec::with_capacity(self.streams.len());
         for (stream_name, stream) in self.streams.iter() {
+            let key_parts: Vec<&str> = stream_name.splitn(2, '/').collect();
+            let (org_id, stream_name) = if key_parts.len() == 2 {
+                (key_parts[0], key_parts[1])
+            } else {
+                (org_id, stream_name.as_ref())
+            };
             let (part_schema_size, partitions) = stream
                 .persist(idx, org_id, stream_type, stream_name)
                 .await?;

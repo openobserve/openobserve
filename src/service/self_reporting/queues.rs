@@ -20,7 +20,7 @@ use config::{
     meta::{
         self_reporting::{
             ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
-            usage::{ERROR_STREAM, TRIGGERS_USAGE_STREAM, TriggerData},
+            usage::{ERROR_STREAM, TRIGGERS_STREAM, TriggerData},
         },
         stream::{StreamParams, StreamType},
     },
@@ -40,9 +40,16 @@ pub(super) static ERROR_QUEUE: Lazy<Arc<ReportingQueue>> =
 
 fn initialize_usage_queue() -> ReportingQueue {
     let cfg = get_config();
+
+    // max usage reporting interval can be 10 mins, because we
+    // need relatively recent data for usage calculations
+    #[cfg(feature = "enterprise")]
+    let usage_publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
+    #[cfg(not(feature = "enterprise"))]
+    let usage_publish_interval = cfg.common.usage_publish_interval;
+
     let timeout = time::Duration::from_secs(
-        cfg.common
-            .usage_publish_interval
+        usage_publish_interval
             .try_into()
             .expect("Env ZO_USAGE_PUBLISH_INTERVAL invalid format. Should be set as integer"),
     );
@@ -68,9 +75,16 @@ fn initialize_usage_queue() -> ReportingQueue {
 
 fn initialize_error_queue() -> ReportingQueue {
     let cfg = get_config();
+
+    // max usage reporting interval can be 10 mins, because we
+    // need relatively recent data for usage calculations
+    #[cfg(feature = "enterprise")]
+    let usage_publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
+    #[cfg(not(feature = "enterprise"))]
+    let usage_publish_interval = cfg.common.usage_publish_interval;
+
     let timeout = time::Duration::from_secs(
-        cfg.common
-            .usage_publish_interval
+        usage_publish_interval
             .try_into()
             .expect("Env ZO_USAGE_PUBLISH_INTERVAL invalid format. Should be set as integer"),
     );
@@ -149,15 +163,20 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         buffered.len()
     );
 
-    let (usages, triggers, errors) = buffered.into_iter().fold(
-        (Vec::new(), Vec::new(), Vec::new()),
-        |(mut usages, mut triggers, mut errors), item| {
+    let (usages, triggers, errors, raw_errors) = buffered.into_iter().fold(
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+        |(mut usages, mut triggers, mut errors, mut raw_errors), item| {
             match item {
                 ReportingData::Usage(usage) => usages.push(*usage),
                 ReportingData::Trigger(trigger) => triggers.push(json::to_value(*trigger).unwrap()),
-                ReportingData::Error(error) => errors.push(json::to_value(*error).unwrap()),
+                ReportingData::Error(error) => {
+                    let error_data = *error;
+                    // Keep raw error data for DB batching
+                    errors.push(json::to_value(&error_data).unwrap());
+                    raw_errors.push(error_data);
+                }
             }
-            (usages, triggers, errors)
+            (usages, triggers, errors, raw_errors)
         },
     );
 
@@ -168,23 +187,39 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     }
 
     if !triggers.is_empty() {
-        let mut additional_reporting_orgs = if !cfg.common.additional_reporting_orgs.is_empty() {
-            cfg.common.additional_reporting_orgs.split(",").collect()
-        } else {
-            Vec::new()
-        };
-        additional_reporting_orgs.push(META_ORG_ID);
+        let mut additional_reporting_orgs: Vec<String> =
+            if !cfg.common.additional_reporting_orgs.is_empty() {
+                cfg.common
+                    .additional_reporting_orgs
+                    .split(",")
+                    .map(|s| s.to_string())
+                    .collect()
+            } else {
+                Vec::new()
+            };
+        additional_reporting_orgs.push(META_ORG_ID.to_string());
+
+        // If configured, automatically add each trigger's own org
+        if cfg.common.usage_report_to_own_org {
+            for trigger_json in &triggers {
+                if let Ok(trigger) = json::from_value::<TriggerData>(trigger_json.clone()) {
+                    additional_reporting_orgs.push(trigger.org.clone());
+                }
+            }
+        }
+
+        additional_reporting_orgs.sort();
         additional_reporting_orgs.dedup();
 
         let mut enqueued_on_failure = false;
 
-        for org in additional_reporting_orgs {
-            let trigger_stream = StreamParams::new(org, TRIGGERS_USAGE_STREAM, StreamType::Logs);
+        for org in &additional_reporting_orgs {
+            let trigger_stream = StreamParams::new(org, TRIGGERS_STREAM, StreamType::Logs);
 
             if super::ingestion::ingest_reporting_data(triggers.clone(), trigger_stream)
                 .await
                 .is_err()
-                && &cfg.common.usage_reporting_mode != "both"
+                && &cfg.common.usage_reporting_mode != "dual"
                 && !enqueued_on_failure
             {
                 // Only enqueue once on first failure , this brings risk that it may be duplicated
@@ -209,6 +244,42 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         let error_stream = StreamParams::new(META_ORG_ID, ERROR_STREAM, StreamType::Logs);
         if let Err(e) = super::ingestion::ingest_reporting_data(errors, error_stream).await {
             log::error!("[SELF-REPORTING] Error in ingesting ErrorData: {e}");
+        }
+    }
+
+    // Batch upsert pipeline errors to DB
+    if !raw_errors.is_empty() {
+        let pipeline_errors: Vec<_> = raw_errors
+            .into_iter()
+            .filter_map(|error_data| {
+                // Only process pipeline errors
+                if let config::meta::self_reporting::error::ErrorSource::Pipeline(pipeline_error) =
+                    error_data.error_source
+                {
+                    Some((
+                        pipeline_error.pipeline_id.clone(),
+                        pipeline_error.pipeline_name.clone(),
+                        error_data.stream_params.org_id.to_string(),
+                        error_data._timestamp,
+                        pipeline_error,
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if !pipeline_errors.is_empty() {
+            log::debug!(
+                "[SELF-REPORTING] thread_{thread_id} batch upserting {} pipeline errors to DB",
+                pipeline_errors.len()
+            );
+            if let Err(e) = crate::service::db::pipeline_errors::batch_upsert(pipeline_errors).await
+            {
+                log::error!(
+                    "[SELF-REPORTING] thread_{thread_id} failed to batch upsert pipeline errors to DB: {e}"
+                );
+            }
         }
     }
 }

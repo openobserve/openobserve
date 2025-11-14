@@ -1,12 +1,12 @@
 <template>
   <div>
-    <div class="q-pa-md">
-      <div class="text-subtitle1 text-bold q-mt-md q-pl-xs">OTLP HTTP</div>
+    <div class="q-pa-sm">
+      <div class="text-subtitle1 text-bold">OTLP HTTP</div>
       <ContentCopy class="q-mt-sm" :content="getOtelHttpConfig" />
     </div>
     <div class="q-pa-md">
-      <div class="text-subtitle1 text-bold q-mt-md q-pl-xs">OTLP gRPC</div>
-      <ContentCopy class="q-mt-sm" :content="getOtelGrpcConfig" />
+      <div class="text-subtitle1 text-bold">OTLP gRPC</div>
+      <ContentCopy :content="getOtelGrpcConfig" />
     </div>
   </div>
 </template>

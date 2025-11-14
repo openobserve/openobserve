@@ -33,6 +33,7 @@ use crate::{
         },
         utils::auth::UserEmail,
     },
+    handler::http::extractors::Headers,
     service::users,
 };
 
@@ -60,9 +61,13 @@ use crate::{
     )
 )]
 #[get("/{org_id}/service_accounts")]
-pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn list(
+    org_id: web::Path<String>,
+    _req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let user_id = req.headers().get("user_id").unwrap().to_str().unwrap();
+    let user_id = &user_email.user_id;
     let mut _user_list_from_rbac = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
@@ -113,7 +118,7 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = ServiceAccountRequest, description = "ServiceAccount data", content_type = "application/json"),
+    request_body(content = inline(ServiceAccountRequest), description = "ServiceAccount data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
@@ -125,7 +130,7 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
 pub async fn save(
     org_id: web::Path<String>,
     service_account: web::Json<ServiceAccountRequest>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let initiator_id = user_email.user_id;
@@ -163,7 +168,7 @@ pub async fn save(
         ("org_id" = String, Path, description = "Organization name"),
         ("email_id" = String, Path, description = "Service Account email id"),
     ),
-    request_body(content = UpdateServiceAccountRequest, description = "Service Account data", content_type = "application/json"),
+    request_body(content = inline(UpdateServiceAccountRequest), description = "Service Account data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
@@ -175,7 +180,7 @@ pub async fn save(
 pub async fn update(
     params: web::Path<(String, String)>,
     service_account: web::Json<UpdateServiceAccountRequest>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
@@ -262,7 +267,7 @@ pub async fn update(
 #[delete("/{org_id}/service_accounts/{email_id}")]
 pub async fn delete(
     path: web::Path<(String, String)>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = path.into_inner();
     let initiator_id = user_email.user_id;
@@ -285,7 +290,7 @@ pub async fn delete(
         ("email_id" = String, Path, description = "Service Account email id"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = APIToken),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(APIToken)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(

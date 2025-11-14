@@ -50,6 +50,7 @@ use crate::{
         },
         utils::auth::{UserEmail, generate_presigned_url, is_valid_email},
     },
+    handler::http::extractors::Headers,
     service::users,
 };
 
@@ -81,7 +82,7 @@ pub mod service_accounts;
 #[get("/{org_id}/users")]
 pub async fn list(
     org_id: web::Path<String>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
@@ -135,7 +136,7 @@ pub async fn list(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = PostUserRequest, description = "User data", content_type = "application/json"),
+    request_body(content = inline(PostUserRequest), description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
@@ -147,7 +148,7 @@ pub async fn list(
 pub async fn save(
     org_id: web::Path<String>,
     user: web::Json<PostUserRequest>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let initiator_id = user_email.user_id;
@@ -196,7 +197,7 @@ pub async fn save(
         ("org_id" = String, Path, description = "Organization name"),
         ("email_id" = String, Path, description = "User's email id"),
     ),
-    request_body(content = UpdateUser, description = "User data", content_type = "application/json"),
+    request_body(content = inline(UpdateUser), description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
@@ -208,7 +209,7 @@ pub async fn save(
 pub async fn update(
     params: web::Path<(String, String)>,
     user: web::Json<UpdateUser>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let email_id = email_id.trim().to_lowercase();
@@ -269,7 +270,7 @@ pub async fn update(
         ("org_id" = String, Path, description = "Organization name"),
         ("email_id" = String, Path, description = "User's email id"),
     ),
-    request_body(content = UserRoleRequest, description = "User role", content_type = "application/json"),
+    request_body(content = inline(UserRoleRequest), description = "User role", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
@@ -281,7 +282,7 @@ pub async fn update(
 pub async fn add_user_to_org(
     params: web::Path<(String, String)>,
     role: web::Json<UserRoleRequest>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let initiator_id = user_email.user_id;
@@ -336,7 +337,7 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
 #[delete("/{org_id}/users/{email_id}")]
 pub async fn delete(
     path: web::Path<(String, String)>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = path.into_inner();
     let initiator_id = user_email.user_id;
@@ -353,9 +354,9 @@ context_path = "/auth",
                    Supports both JSON request body authentication and Authorization header-based authentication. \
                    Successful authentication establishes a session that allows access to protected resources and APIs \
                    throughout the platform.",
-    request_body(content = SignInUser, description = "User login", content_type = "application/json"),
+    request_body(content = inline(SignInUser), description = "User login", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SignInResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(SignInResponse)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"}))
@@ -831,7 +832,9 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
     )
 )]
 #[get("/invites")]
-pub async fn list_invitations(user_email: UserEmail) -> Result<HttpResponse, Error> {
+pub async fn list_invitations(
+    Headers(user_email): Headers<UserEmail>,
+) -> Result<HttpResponse, Error> {
     let user_id = user_email.user_id.as_str();
     users::list_user_invites(user_id, true).await
 }
@@ -848,12 +851,12 @@ pub async fn list_invitations(user_email: UserEmail) -> Result<HttpResponse, Err
         ("token" = String, Path, description = "invitation token"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(UserList)),
     )
 )]
 #[delete("/invites/{token}")]
 pub async fn decline_invitation(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     use crate::service::organization;
@@ -874,7 +877,7 @@ pub async fn decline_invitation(
 #[cfg(not(feature = "cloud"))]
 #[delete("/invites/{token}")]
 pub async fn decline_invitation(
-    _user_email: UserEmail,
+    Headers(_): Headers<UserEmail>,
     _path: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
@@ -882,7 +885,7 @@ pub async fn decline_invitation(
 
 #[cfg(not(feature = "cloud"))]
 #[get("/invites")]
-pub async fn list_invitations(_user_email: UserEmail) -> Result<HttpResponse, Error> {
+pub async fn list_invitations(Headers(_): Headers<UserEmail>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 

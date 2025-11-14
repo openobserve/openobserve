@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error, sync::Arc, time::Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Error,
+    sync::Arc,
+    time::Instant,
+};
 
 use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
@@ -29,7 +34,6 @@ use config::{
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt, time::now_micros},
 };
-use hashbrown::HashSet;
 use infra::schema::{SchemaCache, unwrap_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -40,6 +44,8 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 use serde_json::Map;
+
+pub mod service_graph;
 
 #[cfg(feature = "cloud")]
 use crate::service::stream::get_stream;
@@ -206,6 +212,24 @@ pub async fn handle_otlp_request(
     let mut stream_pipeline_inputs = Vec::new();
     // End pipeline params construction
 
+    // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
+    let streams = vec![StreamParams {
+        org_id: org_id.to_owned().into(),
+        stream_type: StreamType::Traces,
+        stream_name: traces_stream_name.to_owned().into(),
+    }];
+    crate::service::ingestion::get_uds_and_original_data_streams(
+        &streams,
+        &mut user_defined_schema_map,
+        &mut streams_need_original_map,
+        &mut streams_need_all_values_map,
+    )
+    .await;
+    // End get user defined schema
+
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
     let mut json_data_by_stream = HashMap::new();
@@ -343,21 +367,65 @@ pub async fn handle_otlp_request(
                 }
                 let local_val = Span {
                     trace_id: trace_id.clone(),
-                    span_id,
+                    span_id: span_id.clone(),
                     span_kind: span.kind.to_string(),
-                    span_status: get_span_status(span.status),
+                    span_status: get_span_status(span.status.clone()),
                     operation_name: span.name.clone(),
                     start_time,
                     end_time,
                     duration: (end_time - start_time) / 1000, // microseconds
-                    reference: span_ref,
+                    reference: span_ref.clone(),
                     service_name: service_name.clone(),
-                    attributes: span_att_map,
+                    attributes: span_att_map.clone(),
                     service: service_att_map.clone(),
                     flags: 1, // TODO add appropriate value
                     events: json::to_string(&events).unwrap(),
                     links: json::to_string(&links).unwrap(),
                 };
+
+                // Process span for service graph if enabled
+                #[cfg(feature = "enterprise")]
+                if cfg.service_graph.enabled {
+                    // Wrap in catch_unwind to prevent panics from crashing trace ingestion
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        log::trace!(
+                            "[ServiceGraph] Processing span: trace_id={}, span_id={}",
+                            trace_id,
+                            span_id
+                        );
+                        let parent_span_id_opt =
+                            span_ref.get(PARENT_SPAN_ID).map(|s| Arc::from(s.as_str()));
+                        // Convert HashMap to json::Map
+                        let mut attrs_map = json::Map::new();
+                        for (k, v) in &span_att_map {
+                            attrs_map.insert(k.clone(), v.clone());
+                        }
+                        let graph_span = service_graph::span_to_graph_span(
+                            Arc::from(trace_id.as_str()),
+                            Arc::from(span_id.as_str()),
+                            parent_span_id_opt,
+                            Arc::from(service_name.as_str()),
+                            Arc::from(traces_stream_name.as_str()),
+                            &local_val.span_kind,
+                            start_time,
+                            end_time,
+                            &local_val.span_status,
+                            &attrs_map,
+                        );
+                        service_graph::process_span(org_id, graph_span);
+                    }));
+
+                    if let Err(e) = result {
+                        log::error!(
+                            "[ServiceGraph] Panic caught during span processing: {:?}",
+                            e
+                        );
+                        // Increment error metric
+                        service_graph::SERVICE_GRAPH_DROPPED_SPANS
+                            .with_label_values(&[org_id])
+                            .inc();
+                    }
+                }
 
                 let mut value: json::Value = json::to_value(local_val).unwrap();
                 // add timestamp
@@ -375,7 +443,7 @@ pub async fn handle_otlp_request(
                     })?;
 
                     // get json object
-                    let record_val = match value.take() {
+                    let mut record_val = match value.take() {
                         json::Value::Object(v) => v,
                         _ => {
                             log::error!(
@@ -391,6 +459,10 @@ pub async fn handle_otlp_request(
                             ));
                         }
                     };
+
+                    if let Some(Some(fields)) = user_defined_schema_map.get(&traces_stream_name) {
+                        record_val = crate::service::ingestion::refactor_map(record_val, fields);
+                    }
 
                     let (ts_data, _) = json_data_by_stream
                         .entry(traces_stream_name.to_string())
@@ -432,7 +504,7 @@ pub async fn handle_otlp_request(
 
                     for (_idx, mut res) in stream_pl_results {
                         // get json object
-                        let record_val = match res.take() {
+                        let mut record_val = match res.take() {
                             json::Value::Object(v) => v,
                             _ => {
                                 log::error!(
@@ -449,6 +521,13 @@ pub async fn handle_otlp_request(
                                     )));
                             }
                         };
+
+                        if let Some(Some(fields)) =
+                            user_defined_schema_map.get(&stream_params.stream_name.to_string())
+                        {
+                            record_val =
+                                crate::service::ingestion::refactor_map(record_val, fields);
+                        }
 
                         log::debug!(
                             "[TRACES:OTLP] pipeline result for stream: {} got {} records",
@@ -511,6 +590,7 @@ pub async fn handle_otlp_request(
 /// This ingestion handler is designated to ScheduledPipeline's gPRC ingestion service.
 /// Only accepts data that has already been validated against the otlp protocol.
 /// Please use other ingestion handlers when ingesting raw trace data.
+/// For internal service only, so don't need to check UDS
 pub async fn ingest_json(
     org_id: &str,
     body: web::Bytes,
@@ -918,6 +998,7 @@ async fn write_traces(
     let writer = ingester::get_writer(0, org_id, StreamType::Traces.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
+        org_id,
         stream_name,
         data_buf,
         !cfg.common.wal_fsync_disabled,
@@ -938,7 +1019,8 @@ async fn write_traces(
     }
 
     // send trace metadata
-    if !trace_index_values.is_empty()
+    if get_config().common.traces_list_index_enabled
+        && !trace_index_values.is_empty()
         && let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await
     {
         log::error!("Error while writing trace_index values: {e}");

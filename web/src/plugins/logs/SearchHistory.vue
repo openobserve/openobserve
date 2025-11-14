@@ -1,12 +1,9 @@
 <template>
   <div
-    :class="
-      store.state.theme === 'dark'
-        ? 'dark-theme-history-page'
-        : 'light-theme-history-page'
-    "
+  class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs"
   >
-    <div class="flex tw-justify-between tw-items-center tw-h-[71px]">
+   <div class="">
+    <div class="flex tw-justify-between tw-items-center tw-h-[68px] card-container tw-mb-[0.625rem]">
       <div class="flex items-center q-py-sm q-pl-md">
         <div
           data-test="search-history-alert-back-btn"
@@ -26,9 +23,19 @@
       </div>
       <div class="tw-flex tw-items-center q-pr-md">
         <div>
-          <q-toggle size="sm" v-model="wrapText" label="Wrap Text" class="q-mr-md" />
+          <q-toggle 
+            v-model="wrapText" 
+            label="Wrap Text" 
+            class="o2-toggle-button-xs q-mr-md"
+            size="xs"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            " />
         </div>
-        <div class="warning-text flex items-center q-px-sm q-mr-md tw-h-[36px]">
+        <div class="warning-text flex items-center q-px-sm q-mr-md tw-h-[36px] tw-rounded-md">
           <q-icon name="info" class="q-mr-xs" size="16px" />
           <div>
             Search History might be delayed by <b> {{ delayMessage }}</b>
@@ -59,8 +66,8 @@
         </div>
       </div>
     </div>
-
-    <div class="">
+   <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+      <div class=" tw-h-[calc(100vh-128px)] card-container">
         <q-table
           ref="qTable"
           dense
@@ -69,11 +76,10 @@
           :pagination.sync="pagination"
           row-key="trace_id"
           :rows-per-page-options="[]"
-          class="custom-table o2-quasar-table-header-sticky"
-          :class="store.state.theme == 'dark' ? ' o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-header-sticky-light'"
+          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           :sort-method="sortMethod"
           :wrap-cells="wrapText"
-          :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh - 118px); overflow-y: auto;' : ''"
+          :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh - 128px); overflow-y: auto;' : 'height: 0px'"
         >
           <template v-slot:body="props">
             <q-tr
@@ -237,6 +243,8 @@
         >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
+    </div>
+    </div>
     </div>
   </div>
 
@@ -731,102 +739,5 @@ export default defineComponent({
 });
 </script>
 <style lang="scss" scoped>
-.expanded-content {
-  padding: 0 0.5rem 0rem 1rem;
-  width: calc(95vw - 40px);
-  max-height: 100vh; /* Set a fixed height for the container */
-  overflow: hidden; /* Hide overflow by default */
-}
-
-.scrollable-content {
-  width: 100%; /* Use the full width of the parent */
-  overflow-y: auto; /* Enable vertical scrolling for long content */
-  padding: 10px; /* Optional: padding for aesthetics */
-  border: 1px solid #ddd; /* Optional: border for visibility */
-  height: 100%;
-  max-height: 200px;
-  /* Use the full height of the parent */
-  text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
-}
-
-.q-td {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.custom-table .q-tr > .q-td:nth-child(2) {
-  text-align: left;
-}
-
-.copy-btn-sql {
-  border: #7a54a2 1px solid;
-  color: #7a54a2;
-}
-
-.copy-btn-function {
-  border: #0a7ebc 1px solid;
-  color: #0a7ebc;
-}
-
-.warning-text {
-  color: #f5a623;
-  border: 1px solid #f5a623;
-  border-radius: 2px;
-}
-.expanded-sql {
-  border-left: #7a54a2 3px solid;
-}
-.expanded-function {
-  border-left: #0a7ebc 3px solid;
-}
-
-.report-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #464646;
-  }
-
-  :deep(.rum-tab) {
-    &:hover {
-      background: #464646;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-
-.report-list-tabs {
-  padding: 0 1rem;
-  height: fit-content;
-  width: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
+@import '@/styles/logs/search-history.scss';
 </style>

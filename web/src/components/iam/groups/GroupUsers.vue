@@ -18,12 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="col">
     <div
       data-test="iam-users-selection-filters"
-      class="flex justify-start bordered q-px-md q-py-sm"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      class="flex justify-start q-px-md q-py-sm card-container"
       style="position: sticky; top: 0px; z-index: 2"
     >
       <div data-test="iam-users-selection-show-toggle" class="q-mr-md">
-        <div class="flex items-center q-pt-xs">
+        <div class="flex items-center">
           <span
             data-test="iam-users-selection-show-text"
             style="font-size: 14px"
@@ -35,7 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="
               border: 1px solid #d7d7d7;
               width: fit-content;
-              border-radius: 2px;
+              border-radius: 0.3rem;
+              padding: 2px;
             "
           >
             <template v-for="visual in usersDisplayOptions" :key="visual.value">
@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="11px"
                 class="q-px-md visual-selection-btn"
                 @click="updateUserTable(visual.value)"
+                style="height: 30px;"
               >
                 {{ visual.label }}</q-btn
               >
@@ -57,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         data-test="iam-users-selection-search-input"
-        class="o2-input q-mr-md"
+        class="q-mr-md"
         style="width: 400px"
       >
         <q-input
@@ -65,12 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="userSearchKey"
           borderless
           dense
-          class=" no-border o2-search-input tw-h-[36px] tw-w-[200px]"
-          :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+          class="no-border o2-search-input tw-h-[36px] tw-w-[200px]"
           placeholder="Search User"
         >
           <template #prepend>
-            <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+            <q-icon name="search" class="cursor-pointer o2-search-input-icon"/>
           </template>
         </q-input>
       </div>
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
     </div>
-    <div data-test="iam-users-selection-table">
+    <div data-test="iam-users-selection-table" style="height: calc(100vh - 250px);" class="card-container">
       <template v-if="rows.length">
         <app-table
           :rows="visibleRows"
@@ -113,8 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             method: filterUsers,
           }"
           :title="t('iam.users')"
-          class="o2-quasar-table o2-quasar-table-header-sticky"
-          :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
+          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
           :hideTopPagination="true"
           :showBottomPaginationWithTitle="true"
@@ -128,12 +127,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="toggleUserSelection(slotProps.column.row)"
             />
           </template>
+          <template v-slot:email="slotProps: any">
+            <div class="flex items-center">
+              <span>{{ slotProps.column.row.email }}</span>
+              <q-icon
+                v-if="shouldShowWarning(slotProps.column.row)"
+                name="info"
+                color="warning"
+                size="16px"
+                class="q-ml-xs cursor-pointer"
+                :data-test="`iam-external-user-warning-icon-${slotProps.column.row.email}`"
+              >
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  :offset="[10, 0]"
+                  max-width="300px"
+                >
+                  <div style="font-size: 12px; line-height: 1.5;">
+                    <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
+                    <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
+                  </div>
+                </q-tooltip>
+              </q-icon>
+            </div>
+          </template>
         </app-table>
       </template>
       <div
         data-test="iam-users-selection-table-no-users-text"
         v-if="!rows.length"
-        class="q-mt-md text-bold q-pl-md"
+        class="text-bold q-pl-md q-py-md"
       >
         No users added
       </div>
@@ -168,6 +192,10 @@ const props = defineProps({
   removedUsers: {
     type: Set,
     default: () => new Set(),
+  },
+  context: {
+    type: String,
+    default: "group", // "group" or "role"
   },
 });
 
@@ -230,6 +258,8 @@ const columns = computed(() => {
       label: t("iam.userName"),
       align: "left",
       sortable: true,
+      slot: true,
+      slotName: "email",
     },
   ];
 
@@ -330,13 +360,14 @@ const getchOrgUsers = async () => {
     );
 
     usersState.users = cloneDeep(
-      data.map((user: any, index: number) => {  
+      data.map((user: any, index: number) => {
         return {
           email: user.email,
           "#": index + 1,
           isInGroup: groupUsersMap.value.has(user.email),
           org: user.orgs?.length > 0 ? user.orgs.map((org:{ org_name: string }) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
-          role:user.role
+          role: user.role,
+          is_external: user.is_external || false
         };
       })
     );
@@ -348,7 +379,8 @@ const getchOrgUsers = async () => {
           email: user.email,
           isInGroup: groupUsersMap.value.has(user.email),
           org: user.org,
-          role:user.role
+          role: user.role,
+          is_external: user.is_external || false
         };
       }
     );
@@ -370,6 +402,24 @@ const toggleUserSelection = (user: any) => {
   if (!user.isInGroup && props.addedUsers.has(user.email)) {
     props.removedUsers.delete(user.email);
   }
+};
+
+const shouldShowWarning = (user: any) => {
+  // Show warning icon for external users being newly added to roles
+  // Warning conditions:
+  // 1. context === "role" - Only show for roles, not for groups
+  // 2. user.is_external - User is marked as external (e.g., from AD/LDAP)
+  // 3. user.isInGroup - User is currently selected/checked in the UI
+  // 4. !groupUsersMap.has(email) - User was NOT already in the role (newly added)
+  //
+  // Note: We don't warn for users already in the role as they might have
+  // been added through AD groups and we don't want to show false warnings
+  return (
+    props.context === "role" &&
+    user.is_external &&
+    user.isInGroup &&
+    !groupUsersMap.value.has(user.email)
+  );
 };
 
 const filterUsers = (rows: any[], term: string) => {

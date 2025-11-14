@@ -41,13 +41,13 @@ use crate::service::{
     db::enrichment_table,
     search::{
         SEARCH_SERVER,
-        cluster::flight::{check_work_group, get_online_querier_nodes, partition_filt_list},
+        cluster::flight::{check_work_group, get_online_querier_nodes, partition_file_list},
         datafusion::{
             distributed_plan::{
                 NewEmptyExecVisitor,
                 codec::get_physical_extension_codec,
                 node::{RemoteScanNode, SearchInfos},
-                remote_scan::RemoteScanExec,
+                remote_scan_exec::RemoteScanExec,
             },
             exec::{DataFusionContextBuilder, register_udf},
         },
@@ -234,7 +234,7 @@ pub async fn search(
     });
 
     // partition file list
-    let partition_file_lists = partition_filt_list(file_id_list, &nodes, role_group).await?;
+    let partition_file_lists = partition_file_list(file_id_list, &nodes, role_group).await?;
     log::info!(
         "[trace_id {trace_id}] flight->follower_leader: get partition_file_lists num: {}",
         partition_file_lists.len()

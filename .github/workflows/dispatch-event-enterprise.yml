@@ -4,6 +4,11 @@ on:
   pull_request:
     branches:
       - "*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
@@ -27,12 +32,13 @@ jobs:
         run: |
           unset SHORT_COMMIT_ID
           echo "SHORT_COMMIT_ID=${GITHUB_HEAD_SHA:0:7}" >> $GITHUB_ENV
+          echo "COMMIT_ID=${GITHUB_HEAD_SHA}" >> $GITHUB_ENV
 
       - name: Confirm git commit SHA output
         run: echo ${{ env.SHORT_COMMIT_ID }}
 
       - name: Repository Dispatch
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@v4
         env:
           TOKEN: ${{ steps.generate_token.outputs.token }}
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
@@ -40,4 +46,4 @@ jobs:
           token: ${{ env.TOKEN }} # GitHub App installation access token
           repository: openobserve/o2-enterprise
           event-type: initiate-enterprise-build
-          client-payload: '{"o2_enterprise_repo": "${{ env.BRANCH_NAME }}", "o2_opensource_repo": "${{ env.BRANCH_NAME }}" ,"o2_commit_id": "${{ env.SHORT_COMMIT_ID }}"}'
+          client-payload: '{"o2_enterprise_repo": "${{ env.BRANCH_NAME }}", "o2_opensource_repo": "${{ env.BRANCH_NAME }}" ,"o2_commit_id": "${{ env.SHORT_COMMIT_ID }}", "o2_full_commit":"${{env.COMMIT_ID}}"}'

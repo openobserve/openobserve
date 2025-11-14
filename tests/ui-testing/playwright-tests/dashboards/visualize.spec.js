@@ -7,8 +7,10 @@ import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
+import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+const testLogger = require("../utils/test-logger.js");
 
 //Dashboard name
 const randomDashboardName =
@@ -49,6 +51,8 @@ const largeDatasetSqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_i
   GROUP BY x_axis_1, breakdown_1`;
 
 const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1"  FROM "${STREAM_NAME}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC `;
+
+const histogramQueryWithHaving = `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "${STREAM_NAME}"  GROUP BY x_axis_1 HAVING y_axis_1 >= 1000 ORDER BY x_axis_1 ASC`;
 
 // Query without aliases for testing error message
 const queryWithoutAliases = `SELECT count(kubernetes_container_hash), count(kubernetes_container_name), count(kubernetes_host) FROM "${STREAM_NAME}" WHERE kubernetes_namespace_name IS NOT NULL GROUP BY kubernetes_annotations_kubectl_kubernetes_io_default_container`;
@@ -639,4 +643,125 @@ test.describe("logs testcases", () => {
     );
     await expect(quickModeToggle).toHaveAttribute("aria-checked", "false");
   });
+ test("should apply override config after running histogram query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    // Open logs and prepare histogram query
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.openQueryEditor();
+    await pm.logsVisualise.fillLogsQueryEditor(histogramQuery);
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Go to visualize and wait for chart to render
+    await pm.logsVisualise.openVisualiseTab();
+
+    await pm.chartTypeSelector.selectChartType("table");
+
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Open panel configs and configure override
+    const panelConfigs = new DashboardPanelConfigs(page);
+    await panelConfigs.openConfigPanel();
+    await page.waitForTimeout(2000);
+    await panelConfigs.scrollDownSidebarUntilOverrideVisible();
+
+    await panelConfigs.configureOverride({
+      columnName: "x_axis_1",
+      typeName: "Unique Value Color",
+      enableTypeCheckbox: true,
+    });
+    
+    // Re-run the query to apply override effect and wait for rendering
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Assert that at least one table cell has a background color applied
+    const coloredCells = page.locator(
+      '[data-test="dashboard-panel-table"] tbody .q-td[style*="background-color"]'
+    );
+    await expect(coloredCells.first()).toBeVisible();
+    const coloredCount = await coloredCells.count();
+    testLogger.error(`[TEST] Colored cells detected: ${coloredCount}`);
+    expect(coloredCount).toBeGreaterThan(0);
+
+    // Capture and log the inline style(s) applied to colored cells
+    const coloredStyles = await coloredCells.evaluateAll((nodes) =>
+      nodes.map((n) => n.getAttribute("style") || "")
+    );
+    testLogger.error("[TEST] Colored cell inline styles:", coloredStyles);
+
+     await pm.logsVisualise.addPanelToNewDashboard(
+      randomDashboardName,
+      panelName
+    );
+
+    // Wait for and assert the success message
+    const successMessage = page.getByText("Panel added to dashboard");
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
+
+      // Assert that at least one table cell has a background color applied
+    const coloredCellsonPanel = page.locator(
+      '[data-test="dashboard-panel-table"] tbody .q-td[style*="background-color"]'
+    );
+    await expect(coloredCellsonPanel.first()).toBeVisible();
+    const coloredCountOnPanel = await coloredCellsonPanel.count();
+    testLogger.error(`[TEST] Colored cells detected: ${coloredCountOnPanel}`);
+    expect(coloredCountOnPanel).toBeGreaterThan(0);
+
+    // Capture and log the inline style(s) applied to colored cells
+    const coloredStylesOnPanel = await coloredCellsonPanel.evaluateAll((nodes) =>
+      nodes.map((n) => n.getAttribute("style") || "")
+    );
+    testLogger.error("[TEST] Colored cell inline styles:", coloredStylesOnPanel    );
+
+    // delete the dashboard
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should show connect null values toggle as true by default when visualizing histogram query with HAVING clause", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    // Step 1: Open logs and enable SQL mode
+    await pm.logsVisualise.openLogs();
+
+    // Step 2: Fill the query editor with histogram query that has HAVING clause
+    await pm.logsVisualise.fillLogsQueryEditor(histogramQueryWithHaving);
+
+    // Step 3: Set relative time
+    await pm.logsVisualise.setRelative("6", "w");
+
+    // Step 4: Apply the query
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Step 5: Open the visualize tab
+    await pm.logsVisualise.openVisualiseTab();
+
+    // Step 6: Wait for chart to render
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Step 7: Open the config panel to access the connect null values toggle
+    const panelConfigs = new DashboardPanelConfigs(page);
+    await panelConfigs.openConfigPanel();
+
+    // Wait for the config panel to be visible
+    await page.waitForTimeout(1000);
+
+    // Step 8: Verify connect null values toggle is true by default
+    const connectNullState = await panelConfigs.verifyConnectNullValuesToggle(true);
+    expect(connectNullState).toBe(true);
+
+    // Step 9: Additional assertion using Playwright's expect for the toggle state
+    const connectNullToggle = page.locator(
+      '[data-test="dashboard-config-connect-null-values"]'
+    );
+    await expect(connectNullToggle).toHaveAttribute("aria-checked", "true");
+  });
+
 });

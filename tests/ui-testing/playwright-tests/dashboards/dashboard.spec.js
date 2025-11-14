@@ -853,7 +853,11 @@ test.describe("dashboard UI testcases", () => {
       { timeout: 15000 }
     );
 
-    // await page.waitForTimeout(2000);
+    // Wait for canvas elements to be rendered
+    await page.waitForSelector('[data-test="chart-renderer"] canvas', {
+      state: "attached",
+      timeout: 15000,
+    });
 
     // Validate chart is properly rendered
     const chartContainer = page.locator('[data-test="chart-renderer"]');
@@ -862,9 +866,12 @@ test.describe("dashboard UI testcases", () => {
       .locator('[data-test="chart-renderer"] canvas')
       .count();
 
-    expect(canvasCount).toBeGreaterThan(0);
-    expect(boundingBox.width).toBeGreaterThan(0);
-    expect(boundingBox.height).toBeGreaterThan(0);
+    // Enhanced validation: Check for meaningful data rendering
+    // With data: canvasCount >= 2, height > 100px
+    // Without data: canvasCount = 1, height = 38px
+    expect(canvasCount).toBeGreaterThanOrEqual(2); // Should have at least 2 canvas layers with data
+    expect(boundingBox.width).toBeGreaterThan(100); // Reasonable width
+    expect(boundingBox.height).toBeGreaterThan(50); // Reasonable height (not the tiny 38px no-data case)
     await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
 
     // Verify canvas has visual content
@@ -890,4 +897,109 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
+
+  test("Should update the line chart correctly when using camelCase fields that contain zero values", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("complex-case-panel-test");
+
+    // Navigate to dashboards and create new dashboard
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    // Configure line chart with custom SQL using complex CASE WHEN statements
+    await pm.chartTypeSelector.removeField("_timestamp", "x");
+    await pm.chartTypeSelector.selectChartType("line");
+
+    await page.locator('[data-test="dashboard-customSql"]').click();
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
+      .fill(
+        `SELECT histogram(_timestamp, '5 minute') AS "_time",
+       COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE '4%' THEN 1 END) AS "4xxErrorCount",
+       COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE 'tes%' THEN 1 END) AS "5xxErrorCount",
+       COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_pod_id IS NULL THEN 1 END) AS "NullErrorCount",
+       COUNT(CASE WHEN kubernetes_container_name = 'prometheus' THEN 1 END) AS "pageViewCount"
+FROM e2e_automate
+GROUP BY _time
+ORDER BY _time ASC`
+      );
+
+    await pm.chartTypeSelector.searchAndAddField("_time", "x");
+    await pm.chartTypeSelector.searchAndAddField("4xxErrorCount", "y");
+    await pm.chartTypeSelector.searchAndAddField("5xxErrorCount", "y");
+    await pm.chartTypeSelector.searchAndAddField("NullErrorCount", "y");
+    await pm.chartTypeSelector.searchAndAddField("pageViewCount", "y");
+
+    await waitForDateTimeButtonToBeEnabled(page);
+    await pm.dashboardTimeRefresh.setRelative("5", "w");
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
+    // Verify line chart data is rendered correctly
+    await page.waitForSelector('[data-test="chart-renderer"]', {
+      state: "visible",
+      timeout: 10000,
+    });
+
+    await page.waitForFunction(
+      () => {
+        const chartElement = document.querySelector(
+          '[data-test="chart-renderer"]'
+        );
+        return chartElement && chartElement.hasAttribute("_echarts_instance_");
+      },
+      { timeout: 15000 }
+    );
+
+    // Wait for canvas elements to be rendered
+    await page.waitForSelector('[data-test="chart-renderer"] canvas', {
+      state: "attached",
+      timeout: 15000,
+    });
+
+    // Validate chart is properly rendered
+    const chartContainer = page.locator('[data-test="chart-renderer"]');
+    const boundingBox = await chartContainer.boundingBox();
+    const canvasCount = await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .count();
+
+    // Enhanced validation: Check for meaningful data rendering
+    // With data: canvasCount >= 2, height > 100px
+    // Without data: canvasCount = 1, height = 38px
+    expect(canvasCount).toBeGreaterThanOrEqual(2); // Should have at least 2 canvas layers with data
+    expect(boundingBox.width).toBeGreaterThan(100); // Reasonable width
+    expect(boundingBox.height).toBeGreaterThan(50); // Reasonable height (not the tiny 38px no-data case)
+    await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
+
+    // Verify canvas has visual content
+    const canvasHasContent = await page.evaluate(() => {
+      const canvas = document.querySelector(
+        '[data-test="chart-renderer"] canvas'
+      );
+      if (!canvas) return false;
+
+      const ctx = canvas.getContext("2d");
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      for (let i = 3; i < imageData.data.length; i += 4) {
+        if (imageData.data[i] > 0) return true;
+      }
+      return false;
+    });
+
+    expect(canvasHasContent).toBe(true);
+
+    // Save panel and cleanup
+    await pm.dashboardPanelActions.savePanel();
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
+  });
+
 });

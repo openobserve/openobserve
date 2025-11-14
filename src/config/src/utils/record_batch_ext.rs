@@ -25,13 +25,10 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use arrow_schema::{ArrowError, DataType, Schema};
-use datafusion::error::DataFusionError;
+use datafusion::{error::DataFusionError, physical_plan::spill::get_record_batch_memory_size};
 use hashbrown::{HashMap, HashSet};
 
-use super::{
-    json::{get_bool_value, get_float_value, get_int_value, get_string_value, get_uint_value},
-    schema_ext::SchemaExt,
-};
+use super::schema_ext::SchemaExt;
 use crate::{FxIndexMap, TIMESTAMP_COL_NAME};
 
 const USIZE_SIZE: usize = std::mem::size_of::<usize>();
@@ -43,37 +40,39 @@ pub trait RecordBatchExt {
 
 impl RecordBatchExt for RecordBatch {
     fn size(&self) -> usize {
-        self.schema().size() + self.get_array_memory_size() + USIZE_SIZE
+        // per RecordBatch size = schema size + data size + usize size for num_rows
+        self.schema().size() + get_record_batch_memory_size(self) + USIZE_SIZE
     }
 }
 
-// convert json value to record batch
-pub fn convert_json_to_record_batch(
+// convert vrl values directly to record batch
+pub fn convert_vrl_to_record_batch(
     schema: &Arc<Schema>,
-    data: &[Arc<serde_json::Value>],
+    data: &[vrl::value::Value],
 ) -> Result<RecordBatch, ArrowError> {
-    // collect all keys from the json data
+    // collect all keys from the vrl data
     let mut keys = HashSet::with_capacity(schema.fields().len());
     let mut max_keys = 0;
     for record in data.iter() {
-        let record = record.as_object().unwrap();
-        if record.len() > max_keys {
-            max_keys = record.len();
-        }
-        for (k, _) in record {
-            keys.insert(k);
+        if let vrl::value::Value::Object(obj) = record {
+            if obj.len() > max_keys {
+                max_keys = obj.len();
+            }
+            for k in obj.keys() {
+                keys.insert(k.as_str());
+            }
         }
     }
 
     // create builders for each key
     let records_len = data.len();
-    let mut builders: FxIndexMap<&String, (&DataType, Box<dyn ArrayBuilder>)> = schema
+    let mut builders: FxIndexMap<&str, (&DataType, Box<dyn ArrayBuilder>)> = schema
         .fields()
         .iter()
-        .filter(|f| keys.contains(f.name()))
+        .filter(|f| keys.contains(f.name().as_str()))
         .map(|f| {
             (
-                f.name(),
+                f.name().as_str(),
                 (f.data_type(), make_builder(f.data_type(), records_len)),
             )
         })
@@ -83,117 +82,188 @@ pub fn convert_json_to_record_batch(
     let mut record_keys = HashSet::with_capacity(max_keys);
     for record in data.iter() {
         record_keys.clear();
-        for (k, v) in record.as_object().unwrap() {
-            record_keys.insert(k);
-            let Some((data_type, builder)) = builders.get_mut(k) else {
-                continue;
-            };
-            match data_type {
-                DataType::Utf8 => {
-                    let b = builder
-                        .as_any_mut()
-                        .downcast_mut::<StringBuilder>()
-                        .unwrap();
-                    if v.is_null() {
-                        b.append_null();
-                    } else {
-                        b.append_value(get_string_value(v));
+        if let vrl::value::Value::Object(obj) = record {
+            for (k, v) in obj {
+                let key_str = k.as_str();
+                record_keys.insert(key_str);
+                let Some((data_type, builder)) = builders.get_mut(key_str) else {
+                    continue;
+                };
+                match data_type {
+                    DataType::Utf8 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<StringBuilder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Bytes(bytes) => {
+                                b.append_value(String::from_utf8_lossy(bytes));
+                            }
+                            vrl::value::Value::Integer(i) => b.append_value(i.to_string()),
+                            vrl::value::Value::Float(f) => b.append_value(f.to_string()),
+                            vrl::value::Value::Boolean(b_val) => b.append_value(b_val.to_string()),
+                            vrl::value::Value::Timestamp(ts) => {
+                                b.append_value(ts.timestamp_nanos_opt().unwrap_or(0).to_string())
+                            }
+                            _ => b.append_value(v.to_string()),
+                        }
                     }
-                }
-                DataType::Utf8View => {
-                    let b = builder
-                        .as_any_mut()
-                        .downcast_mut::<StringViewBuilder>()
-                        .unwrap();
-                    if v.is_null() {
-                        b.append_null();
-                    } else {
-                        b.append_value(get_string_value(v));
+                    DataType::Utf8View => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<StringViewBuilder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Bytes(bytes) => {
+                                b.append_value(String::from_utf8_lossy(bytes));
+                            }
+                            vrl::value::Value::Integer(i) => b.append_value(i.to_string()),
+                            vrl::value::Value::Float(f) => b.append_value(f.to_string()),
+                            vrl::value::Value::Boolean(b_val) => b.append_value(b_val.to_string()),
+                            vrl::value::Value::Timestamp(ts) => {
+                                b.append_value(ts.timestamp_nanos_opt().unwrap_or(0).to_string())
+                            }
+                            _ => b.append_value(v.to_string()),
+                        }
                     }
-                }
-                DataType::LargeUtf8 => {
-                    let b = builder
-                        .as_any_mut()
-                        .downcast_mut::<LargeStringBuilder>()
-                        .unwrap();
-                    if v.is_null() {
-                        b.append_null();
-                    } else {
-                        b.append_value(get_string_value(v));
+                    DataType::LargeUtf8 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<LargeStringBuilder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Bytes(bytes) => {
+                                b.append_value(String::from_utf8_lossy(bytes));
+                            }
+                            vrl::value::Value::Integer(i) => b.append_value(i.to_string()),
+                            vrl::value::Value::Float(f) => b.append_value(f.to_string()),
+                            vrl::value::Value::Boolean(b_val) => b.append_value(b_val.to_string()),
+                            vrl::value::Value::Timestamp(ts) => {
+                                b.append_value(ts.timestamp_nanos_opt().unwrap_or(0).to_string())
+                            }
+                            _ => b.append_value(v.to_string()),
+                        }
                     }
-                }
-                DataType::Int64 => {
-                    let b = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
-                    if v.is_null() {
-                        b.append_null();
-                    } else {
-                        b.append_value(get_int_value(v));
+                    DataType::Int64 => {
+                        let b = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Integer(i) => b.append_value(*i),
+                            vrl::value::Value::Float(f) => b.append_value(f.into_inner() as i64),
+                            vrl::value::Value::Boolean(b_val) => b.append_value(*b_val as i64),
+                            vrl::value::Value::Bytes(bytes) => {
+                                let s = String::from_utf8_lossy(bytes);
+                                b.append_value(s.parse::<i64>().unwrap_or(0));
+                            }
+                            vrl::value::Value::Timestamp(ts) => {
+                                b.append_value(ts.timestamp_nanos_opt().unwrap_or(0) / 1000);
+                            }
+                            _ => b.append_value(0),
+                        }
                     }
-                }
-                DataType::UInt64 => {
-                    let b = builder
-                        .as_any_mut()
-                        .downcast_mut::<UInt64Builder>()
-                        .unwrap();
-                    if v.is_null() {
-                        b.append_null();
-                    } else {
-                        b.append_value(get_uint_value(v));
+                    DataType::UInt64 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<UInt64Builder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Integer(i) => b.append_value(*i as u64),
+                            vrl::value::Value::Float(f) => b.append_value(f.into_inner() as u64),
+                            vrl::value::Value::Boolean(b_val) => b.append_value(*b_val as u64),
+                            vrl::value::Value::Bytes(bytes) => {
+                                let s = String::from_utf8_lossy(bytes);
+                                b.append_value(s.parse::<u64>().unwrap_or(0));
+                            }
+                            vrl::value::Value::Timestamp(ts) => {
+                                b.append_value(ts.timestamp_nanos_opt().unwrap_or(0) as u64 / 1000);
+                            }
+                            _ => b.append_value(0),
+                        }
                     }
-                }
-                DataType::Float64 => {
-                    let b = builder
-                        .as_any_mut()
-                        .downcast_mut::<Float64Builder>()
-                        .unwrap();
-                    if v.is_null() {
-                        b.append_null();
-                    } else {
-                        b.append_value(get_float_value(v));
+                    DataType::Float64 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<Float64Builder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Integer(i) => b.append_value(*i as f64),
+                            vrl::value::Value::Float(f) => b.append_value(f.into_inner()),
+                            vrl::value::Value::Boolean(b_val) => {
+                                b.append_value(*b_val as i64 as f64)
+                            }
+                            vrl::value::Value::Bytes(bytes) => {
+                                let s = String::from_utf8_lossy(bytes);
+                                b.append_value(s.parse::<f64>().unwrap_or(0.0));
+                            }
+                            vrl::value::Value::Timestamp(ts) => {
+                                b.append_value(
+                                    ts.timestamp_nanos_opt().unwrap_or(0) as f64 / 1000.0,
+                                );
+                            }
+                            _ => b.append_value(0.0),
+                        }
                     }
-                }
-                DataType::Boolean => {
-                    let b = builder
-                        .as_any_mut()
-                        .downcast_mut::<BooleanBuilder>()
-                        .unwrap();
-                    if v.is_null() {
-                        b.append_null();
-                    } else {
-                        b.append_value(get_bool_value(v));
+                    DataType::Boolean => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<BooleanBuilder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Boolean(b_val) => b.append_value(*b_val),
+                            vrl::value::Value::Integer(i) => b.append_value(*i > 0),
+                            vrl::value::Value::Float(f) => b.append_value(f.into_inner() > 0.0),
+                            vrl::value::Value::Bytes(bytes) => {
+                                let s = String::from_utf8_lossy(bytes);
+                                b.append_value(s.parse::<bool>().unwrap_or(false));
+                            }
+                            _ => b.append_value(false),
+                        }
                     }
-                }
-                DataType::Binary => {
-                    let b = builder
-                        .as_any_mut()
-                        .downcast_mut::<BinaryBuilder>()
-                        .unwrap();
-                    if v.is_null() {
-                        b.append_null();
-                    } else {
-                        let v = v.as_str().ok_or_else(|| {
-                            ArrowError::SchemaError(
-                                "Cannot convert to [DataType::Binary] from non-string value"
-                                    .to_string(),
-                            )
-                        })?;
-                        let bin_data = hex::decode(v).map_err(|_| {
-                            ArrowError::SchemaError(
-                                "Cannot convert to [DataType::Binary] from non-hex string value"
-                                    .to_string(),
-                            )
-                        })?;
-                        b.append_value(bin_data);
+                    DataType::Binary => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<BinaryBuilder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Bytes(bytes) => {
+                                let hex_string = String::from_utf8_lossy(bytes);
+                                let bin_data = hex::decode(hex_string.as_ref()).map_err(|_| {
+                                    ArrowError::SchemaError(
+                                        "Cannot convert VRL bytes to [DataType::Binary] from non-hex string value"
+                                            .to_string(),
+                                    )
+                                })?;
+                                b.append_value(bin_data);
+                            }
+                            _ => {
+                                let hex_string = v.to_string();
+                                let bin_data = hex::decode(hex_string).map_err(|_| {
+                                    ArrowError::SchemaError(
+                                        "Cannot convert VRL value to [DataType::Binary] from non-hex string value"
+                                            .to_string(),
+                                    )
+                                })?;
+                                b.append_value(bin_data);
+                            }
+                        }
                     }
-                }
-                DataType::Null => {
-                    let b = builder.as_any_mut().downcast_mut::<NullBuilder>().unwrap();
-                    b.append_null();
-                }
-                _ => {
-                    return Err(ArrowError::SchemaError(
-                        "Cannot convert json to RecordBatch from non-basic type value".to_string(),
-                    ));
+                    DataType::Null => {
+                        let b = builder.as_any_mut().downcast_mut::<NullBuilder>().unwrap();
+                        b.append_null();
+                    }
+                    _ => {
+                        return Err(ArrowError::SchemaError(
+                            "Cannot convert VRL to RecordBatch from non-basic type value"
+                                .to_string(),
+                        ));
+                    }
                 }
             }
         }
@@ -264,7 +334,7 @@ pub fn convert_json_to_record_batch(
 
     let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema.fields().len());
     for field in schema.fields() {
-        if let Some((_, builder)) = builders.get_mut(field.name()) {
+        if let Some((_, builder)) = builders.get_mut(field.name().as_str()) {
             cols.push(builder.finish());
         } else {
             cols.push(new_null_array(field.data_type(), records_len))
@@ -833,6 +903,357 @@ pub fn sort_record_batch_by_column(
     RecordBatch::try_new(batch.schema(), sorted_columns?).map_err(|e| e.into())
 }
 
+pub fn convert_json_to_record_batch(
+    schema: &Arc<Schema>,
+    data: &[Arc<serde_json::Value>],
+) -> Result<RecordBatch, ArrowError> {
+    if data.is_empty() {
+        return RecordBatch::try_new(schema.clone(), vec![]);
+    }
+
+    let records_len = data.len();
+    let num_fields = schema.fields().len();
+
+    // Pre-allocate builders for all fields in schema
+    let mut builders: Vec<Box<dyn ArrayBuilder>> = schema
+        .fields()
+        .iter()
+        .map(|f| make_builder(f.data_type(), records_len))
+        .collect();
+
+    // Create field name to index mapping (amortize lookup cost)
+    let field_indices: HashMap<&str, usize> = schema
+        .fields()
+        .iter()
+        .enumerate()
+        .map(|(idx, f)| (f.name().as_str(), idx))
+        .collect();
+
+    // Cache data types for faster access
+    let data_types: Vec<&DataType> = schema.fields().iter().map(|f| f.data_type()).collect();
+
+    // Single-pass traversal with bitmap for present fields
+    for record in data.iter() {
+        let obj = match record.as_object() {
+            Some(obj) => obj,
+            None => {
+                return Err(ArrowError::SchemaError("Expected JSON object".to_string()));
+            }
+        };
+
+        // Use bitmap to track present fields (more efficient than HashSet)
+        let mut field_present = vec![false; num_fields];
+
+        // Process all fields present in this record
+        for (key, value) in obj.iter() {
+            if let Some(&idx) = field_indices.get(key.as_str()) {
+                field_present[idx] = true;
+                append_value_optimized(&mut builders[idx], data_types[idx], value)?;
+            }
+        }
+
+        // Append null for missing fields (using bitmap check)
+        for (idx, &is_present) in field_present.iter().enumerate() {
+            if !is_present {
+                append_null_optimized(&mut builders[idx], data_types[idx]);
+            }
+        }
+    }
+
+    // Build final RecordBatch
+    let cols: Vec<ArrayRef> = builders
+        .into_iter()
+        .map(|mut builder| builder.finish())
+        .collect();
+
+    RecordBatch::try_new(schema.clone(), cols)
+}
+
+/// Fast append value with zero-copy optimization and inline type conversion
+#[inline(always)]
+fn append_value_optimized(
+    builder: &mut Box<dyn ArrayBuilder>,
+    data_type: &DataType,
+    value: &serde_json::Value,
+) -> Result<(), ArrowError> {
+    use serde_json::Value;
+
+    if value.is_null() {
+        append_null_optimized(builder, data_type);
+        return Ok(());
+    }
+
+    match data_type {
+        DataType::Utf8 => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<StringBuilder>()
+                .unwrap();
+            // Zero-copy for strings, fast path for numbers
+            match value {
+                Value::String(s) => b.append_value(s.as_str()), // Zero-copy!
+                Value::Number(n) => {
+                    // Fast integer/float formatting using specialized libraries
+                    if let Some(i) = n.as_i64() {
+                        let mut buf = itoa::Buffer::new();
+                        b.append_value(buf.format(i));
+                    } else if let Some(u) = n.as_u64() {
+                        let mut buf = itoa::Buffer::new();
+                        b.append_value(buf.format(u));
+                    } else if let Some(f) = n.as_f64() {
+                        let mut buf = ryu::Buffer::new();
+                        b.append_value(buf.format(f));
+                    } else {
+                        b.append_value("");
+                    }
+                }
+                Value::Bool(bo) => b.append_value(if *bo { "true" } else { "false" }),
+                _ => b.append_value(""),
+            }
+            Ok(())
+        }
+        DataType::Utf8View => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<StringViewBuilder>()
+                .unwrap();
+            match value {
+                Value::String(s) => b.append_value(s.as_str()),
+                Value::Number(n) => {
+                    if let Some(i) = n.as_i64() {
+                        let mut buf = itoa::Buffer::new();
+                        b.append_value(buf.format(i));
+                    } else if let Some(u) = n.as_u64() {
+                        let mut buf = itoa::Buffer::new();
+                        b.append_value(buf.format(u));
+                    } else if let Some(f) = n.as_f64() {
+                        let mut buf = ryu::Buffer::new();
+                        b.append_value(buf.format(f));
+                    } else {
+                        b.append_value("");
+                    }
+                }
+                Value::Bool(bo) => b.append_value(if *bo { "true" } else { "false" }),
+                _ => b.append_value(""),
+            }
+            Ok(())
+        }
+        DataType::LargeUtf8 => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<LargeStringBuilder>()
+                .unwrap();
+            match value {
+                Value::String(s) => b.append_value(s.as_str()),
+                Value::Number(n) => {
+                    if let Some(i) = n.as_i64() {
+                        let mut buf = itoa::Buffer::new();
+                        b.append_value(buf.format(i));
+                    } else if let Some(u) = n.as_u64() {
+                        let mut buf = itoa::Buffer::new();
+                        b.append_value(buf.format(u));
+                    } else if let Some(f) = n.as_f64() {
+                        let mut buf = ryu::Buffer::new();
+                        b.append_value(buf.format(f));
+                    } else {
+                        b.append_value("");
+                    }
+                }
+                Value::Bool(bo) => b.append_value(if *bo { "true" } else { "false" }),
+                _ => b.append_value(""),
+            }
+            Ok(())
+        }
+        DataType::Int64 => {
+            let b = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+            // Inline fast path for common cases
+            let val = match value {
+                Value::Number(n) => {
+                    if let Some(i) = n.as_i64() {
+                        i
+                    } else if let Some(u) = n.as_u64() {
+                        u as i64
+                    } else {
+                        n.as_f64().unwrap_or(0.0) as i64
+                    }
+                }
+                Value::String(s) => s.parse::<i64>().unwrap_or(0),
+                Value::Bool(bo) => {
+                    if *bo {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                _ => 0,
+            };
+            b.append_value(val);
+            Ok(())
+        }
+        DataType::UInt64 => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<UInt64Builder>()
+                .unwrap();
+            let val = match value {
+                Value::Number(n) => {
+                    if let Some(u) = n.as_u64() {
+                        u
+                    } else if let Some(i) = n.as_i64() {
+                        i as u64
+                    } else {
+                        n.as_f64().unwrap_or(0.0) as u64
+                    }
+                }
+                Value::String(s) => s.parse::<u64>().unwrap_or(0),
+                Value::Bool(bo) => {
+                    if *bo {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                _ => 0,
+            };
+            b.append_value(val);
+            Ok(())
+        }
+        DataType::Float64 => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<Float64Builder>()
+                .unwrap();
+            let val = match value {
+                Value::Number(n) => n.as_f64().unwrap_or(0.0),
+                Value::String(s) => s.parse::<f64>().unwrap_or(0.0),
+                Value::Bool(bo) => {
+                    if *bo {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                }
+                _ => 0.0,
+            };
+            b.append_value(val);
+            Ok(())
+        }
+        DataType::Boolean => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<BooleanBuilder>()
+                .unwrap();
+            let val = match value {
+                Value::Bool(bo) => *bo,
+                Value::Number(n) => n.as_f64().unwrap_or(0.0) > 0.0,
+                Value::String(s) => s.parse::<bool>().unwrap_or(false),
+                _ => false,
+            };
+            b.append_value(val);
+            Ok(())
+        }
+        DataType::Binary => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<BinaryBuilder>()
+                .unwrap();
+            if let Value::String(s) = value {
+                let bin_data = hex::decode(s).map_err(|_| {
+                    ArrowError::SchemaError(
+                        "Cannot convert to [DataType::Binary] from non-hex string value"
+                            .to_string(),
+                    )
+                })?;
+                b.append_value(bin_data);
+            } else {
+                return Err(ArrowError::SchemaError(
+                    "Cannot convert to [DataType::Binary] from non-string value".to_string(),
+                ));
+            }
+            Ok(())
+        }
+        DataType::Null => {
+            let b = builder.as_any_mut().downcast_mut::<NullBuilder>().unwrap();
+            b.append_null();
+            Ok(())
+        }
+        _ => Err(ArrowError::SchemaError(
+            "Cannot convert json to RecordBatch from non-basic type value".to_string(),
+        )),
+    }
+}
+
+/// Fast null append
+#[inline(always)]
+fn append_null_optimized(builder: &mut Box<dyn ArrayBuilder>, data_type: &DataType) {
+    match data_type {
+        DataType::Utf8 => {
+            builder
+                .as_any_mut()
+                .downcast_mut::<StringBuilder>()
+                .unwrap()
+                .append_null();
+        }
+        DataType::Utf8View => {
+            builder
+                .as_any_mut()
+                .downcast_mut::<StringViewBuilder>()
+                .unwrap()
+                .append_null();
+        }
+        DataType::LargeUtf8 => {
+            builder
+                .as_any_mut()
+                .downcast_mut::<LargeStringBuilder>()
+                .unwrap()
+                .append_null();
+        }
+        DataType::Int64 => {
+            builder
+                .as_any_mut()
+                .downcast_mut::<Int64Builder>()
+                .unwrap()
+                .append_null();
+        }
+        DataType::UInt64 => {
+            builder
+                .as_any_mut()
+                .downcast_mut::<UInt64Builder>()
+                .unwrap()
+                .append_null();
+        }
+        DataType::Float64 => {
+            builder
+                .as_any_mut()
+                .downcast_mut::<Float64Builder>()
+                .unwrap()
+                .append_null();
+        }
+        DataType::Boolean => {
+            builder
+                .as_any_mut()
+                .downcast_mut::<BooleanBuilder>()
+                .unwrap()
+                .append_null();
+        }
+        DataType::Binary => {
+            builder
+                .as_any_mut()
+                .downcast_mut::<BinaryBuilder>()
+                .unwrap()
+                .append_null();
+        }
+        DataType::Null => {
+            builder
+                .as_any_mut()
+                .downcast_mut::<NullBuilder>()
+                .unwrap()
+                .append_null();
+        }
+        _ => {}
+    }
+}
+
 #[cfg(test)]
 mod test {
     use arrow::{
@@ -1306,6 +1727,103 @@ mod test {
 | Bob   | 30  |
 +-------+-----+"
         );
+    }
+
+    // Test case for convert_vrl_to_record_batch
+    #[tokio::test]
+    async fn test_convert_vrl_to_record_batch() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Int64, false),
+            Field::new("score", DataType::Float64, true),
+            Field::new("active", DataType::Boolean, false),
+        ]));
+
+        let data = vec![
+            vrl::value::Value::Object(
+                [
+                    ("name".into(), vrl::value::Value::from("Alice")),
+                    ("age".into(), vrl::value::Value::Integer(25)),
+                    (
+                        "score".into(),
+                        vrl::value::Value::Float(vrl::prelude::NotNan::new(85.5).unwrap()),
+                    ),
+                    ("active".into(), vrl::value::Value::Boolean(true)),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+            vrl::value::Value::Object(
+                [
+                    ("name".into(), vrl::value::Value::from("Bob")),
+                    ("age".into(), vrl::value::Value::Integer(30)),
+                    ("score".into(), vrl::value::Value::Null), // missing score
+                    ("active".into(), vrl::value::Value::Boolean(false)),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+            vrl::value::Value::Object(
+                [
+                    ("name".into(), vrl::value::Value::from("Charlie")),
+                    ("age".into(), vrl::value::Value::Integer(35)),
+                    (
+                        "score".into(),
+                        vrl::value::Value::Float(vrl::prelude::NotNan::new(92.1).unwrap()),
+                    ),
+                    ("active".into(), vrl::value::Value::Boolean(true)),
+                    // extra field that's not in schema should be ignored
+                    ("extra".into(), vrl::value::Value::from("ignored")),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+        ];
+
+        let record_batch = convert_vrl_to_record_batch(&schema, &data).unwrap();
+
+        assert_eq!(record_batch.num_rows(), 3);
+        assert_eq!(record_batch.schema(), schema);
+
+        // Test string column
+        let name_array = record_batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(name_array.value(0), "Alice");
+        assert_eq!(name_array.value(1), "Bob");
+        assert_eq!(name_array.value(2), "Charlie");
+
+        // Test int64 column
+        let age_array = record_batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(age_array.value(0), 25);
+        assert_eq!(age_array.value(1), 30);
+        assert_eq!(age_array.value(2), 35);
+
+        // Test float64 column with null values
+        let score_array = record_batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        assert_eq!(score_array.value(0), 85.5);
+        assert!(score_array.is_null(1)); // Bob's score should be null
+        assert_eq!(score_array.value(2), 92.1);
+
+        // Test boolean column
+        let active_array = record_batch
+            .column(3)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        assert_eq!(active_array.value(0), true);
+        assert_eq!(active_array.value(1), false);
+        assert_eq!(active_array.value(2), true);
     }
 
     // Test case for convert_json_to_record_batch that contains utf8view

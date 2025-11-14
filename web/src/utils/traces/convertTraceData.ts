@@ -1,4 +1,5 @@
 import { toZonedTime, format } from "date-fns-tz";
+import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
     backgroundColor: "transparent",
@@ -187,6 +188,535 @@ export const convertTraceServiceMapData = (
     ],
   };
   return { options };
+};
+
+/**
+ * Convert service graph data (nodes/edges) to ECharts tree format
+ * @param graphData - Object containing nodes and edges arrays
+ * @param layoutType - Layout orientation: 'horizontal' | 'vertical' | 'radial'
+ * @returns ECharts tree options
+ */
+export const convertServiceGraphToTree = (
+  graphData: { nodes: any[]; edges: any[] },
+  layoutType: string = 'horizontal'
+) => {
+  // Build adjacency map for edges
+  const edgesMap = new Map<string, any[]>();
+  graphData.edges.forEach((edge: any) => {
+    if (!edgesMap.has(edge.from)) {
+      edgesMap.set(edge.from, []);
+    }
+    edgesMap.get(edge.from)!.push(edge);
+  });
+
+  // Find root nodes (nodes with no incoming edges)
+  const nodesWithIncoming = new Set(graphData.edges.map((e: any) => e.to));
+  const rootNodes = graphData.nodes.filter((n: any) => !nodesWithIncoming.has(n.id));
+
+  // Helper to build tree recursively
+  const buildTree = (nodeId: string, visited = new Set<string>()): any => {
+    if (visited.has(nodeId)) return null; // Prevent cycles
+    visited.add(nodeId);
+
+    const node = graphData.nodes.find((n: any) => n.id === nodeId);
+    if (!node) return null;
+
+    const outgoingEdges = edgesMap.get(nodeId) || [];
+    const children = outgoingEdges
+      .map((edge: any) => buildTree(edge.to, new Set(visited)))
+      .filter((child: any) => child !== null);
+
+    // Calculate node metrics
+    const totalRequests = outgoingEdges.reduce((sum: number, e: any) => sum + (e.total_requests || 0), 0);
+    const failedRequests = outgoingEdges.reduce((sum: number, e: any) => sum + (e.failed_requests || 0), 0);
+    const errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
+
+    // Determine node color based on error rate
+    let nodeColor = "#4CAF50"; // Green for healthy
+    if (errorRate > 10) nodeColor = "#F44336"; // Red
+    else if (errorRate > 5) nodeColor = "#FF9800"; // Orange
+    else if (errorRate > 1) nodeColor = "#FFC107"; // Yellow
+
+    return {
+      name: node.label || node.id,
+      value: totalRequests,
+      symbolSize: Math.max(20, Math.min(60, Math.log10(totalRequests + 1) * 15)),
+      itemStyle: {
+        color: nodeColor,
+        borderColor: nodeColor,
+        borderWidth: 2,
+      },
+      label: {
+        show: true,
+        position: layoutType === 'vertical' ? 'bottom' : 'right',
+        formatter: (params: any) => {
+          return `${params.name}\n${formatNumber(totalRequests)} req`;
+        },
+      },
+      tooltip: {
+        formatter: (params: any) => {
+          return `
+            <strong>${params.name}</strong><br/>
+            Requests: ${formatNumber(totalRequests)}<br/>
+            Errors: ${failedRequests}<br/>
+            Error Rate: ${errorRate.toFixed(2)}%
+          `;
+        },
+      },
+      children: children.length > 0 ? children : undefined,
+    };
+  };
+
+  // If no clear root nodes, use all nodes with outgoing edges as roots
+  const roots = rootNodes.length > 0
+    ? rootNodes
+    : graphData.nodes.filter((n: any) => edgesMap.has(n.id));
+
+  const treeData = roots.map((node: any) => buildTree(node.id)).filter((n: any) => n !== null);
+
+  // If still no tree data, create a flat structure
+  if (treeData.length === 0 && graphData.nodes.length > 0) {
+    return {
+      tooltip: { show: true, trigger: 'item' },
+      series: [{
+        type: 'tree',
+        data: graphData.nodes.map((node: any) => ({
+          name: node.label || node.id,
+          value: 0,
+          symbolSize: 20,
+          itemStyle: { color: '#9E9E9E' },
+        })),
+        layout: 'orthogonal',
+        orient: layoutType === 'vertical' ? 'TB' : 'LR',
+        initialTreeDepth: -1,
+        symbolSize: 20,
+        label: {
+          position: layoutType === 'vertical' ? 'bottom' : 'right',
+          verticalAlign: layoutType === 'vertical' ? 'top' : 'middle',
+          distance: 15,
+          fontSize: 12,
+        },
+      }],
+    };
+  }
+
+  const options = {
+    tooltip: {
+      show: true,
+      trigger: 'item',
+      triggerOn: 'mousemove',
+    },
+    series: [
+      {
+        type: 'tree',
+        data: treeData,
+        layout: layoutType === 'radial' ? 'radial' : 'orthogonal',
+        orient: layoutType === 'vertical' ? 'TB' : 'LR',
+        initialTreeDepth: -1,
+        symbol: 'circle',
+        symbolSize: 20,
+        label: {
+          position: layoutType === 'vertical' ? 'bottom' : 'right',
+          verticalAlign: layoutType === 'vertical' ? 'top' : 'middle',
+          distance: 15,
+          fontSize: 12,
+          rotate: 0, // Keep text horizontal, no rotation
+        },
+        leaves: {
+          label: {
+            position: layoutType === 'vertical' ? 'bottom' : 'right',
+            verticalAlign: layoutType === 'vertical' ? 'top' : 'middle',
+            distance: 15,
+            rotate: 0, // Keep text horizontal, no rotation
+          },
+        },
+        expandAndCollapse: true,
+        animationDuration: 550,
+        animationDurationUpdate: 750,
+      },
+    ],
+  };
+
+  return { options };
+};
+
+// D3-Force simulation physics parameters
+const FORCE_PHYSICS_PARAMS = {
+  // Many-Body Force (Repulsion)
+  chargeStrength: -3000,       // Lower repulsion to tighten clusters
+  chargeDistanceMax: 1200,     // Limit long-range repulsion
+
+  // Link Force
+  linkDistance: 250,           // Shorter links for tighter grouping
+  linkStrength: 0.6,           // Stronger link pull to hold structure
+  linkIterations: 3,           // Fewer passes, less "rubberiness"
+
+  // Center Force
+  centerStrength: 0.05,        // Stronger centering keeps it compact
+
+  // Position Forces
+  forceXStrength: 0.08,        // Gentle horizontal correction
+  forceYStrength: 0.08,        // Gentle vertical correction
+
+  // Collision Force
+  collisionPadding: 80,        // Reasonable padding without huge gaps
+  collisionStrength: 1.0,      // Full collision enforcement
+  collisionIterations: 2,      // Enough to resolve overlaps
+
+  // Simulation
+  velocityDecay: 0.35,         // Slightly more friction for faster settle
+  totalTicks: 5000,            // Iterations for stabilization
+};
+
+/**
+ * Compute force-directed layout using D3-force simulation
+ * @param nodes - Array of nodes
+ * @param edges - Array of edges
+ * @param width - Container width
+ * @param height - Container height
+ * @returns Nodes with computed x, y positions
+ */
+const computeForceLayout = (
+  nodes: any[],
+  edges: any[],
+  width: number = 800,
+  height: number = 600
+) => {
+  // Create a copy of nodes to avoid mutation
+  const nodesCopy = nodes.map(n => ({ ...n }));
+
+  // Prepare edges with proper source/target references
+  const edgesCopy = edges.map(e => ({
+    source: e.from,
+    target: e.to,
+    ...e,
+  }));
+
+  // Create simulation and compute layout using physics params
+  const simulation = forceSimulation(nodesCopy)
+    .force('charge', forceManyBody()
+      .strength(FORCE_PHYSICS_PARAMS.chargeStrength)
+      .distanceMax(FORCE_PHYSICS_PARAMS.chargeDistanceMax)
+    )
+    .force('link', forceLink(edgesCopy)
+      .id((d: any) => d.id)
+      .distance(FORCE_PHYSICS_PARAMS.linkDistance)
+      .strength(FORCE_PHYSICS_PARAMS.linkStrength)
+      .iterations(FORCE_PHYSICS_PARAMS.linkIterations)
+    )
+    .force('center', forceCenter(width / 2, height / 2)
+      .strength(FORCE_PHYSICS_PARAMS.centerStrength)
+    )
+    .force('x', forceX(width / 2).strength(FORCE_PHYSICS_PARAMS.forceXStrength))
+    .force('y', forceY(height / 2).strength(FORCE_PHYSICS_PARAMS.forceYStrength))
+    .force('collision', forceCollide()
+      .radius((d: any) => (d.symbolSize || 60) / 2 + FORCE_PHYSICS_PARAMS.collisionPadding)
+      .strength(FORCE_PHYSICS_PARAMS.collisionStrength)
+      .iterations(FORCE_PHYSICS_PARAMS.collisionIterations)
+    )
+    .velocityDecay(FORCE_PHYSICS_PARAMS.velocityDecay)
+    .stop();
+
+  // Run simulation for specified iterations to stabilize layout
+  for (let i = 0; i < FORCE_PHYSICS_PARAMS.totalTicks; i++) {
+    simulation.tick();
+  }
+
+  // Return nodes with computed positions
+  return simulation.nodes().map(n => ({ ...n }));
+};
+
+/**
+ * Convert service graph data to ECharts Graph format (force-directed/circular network)
+ */
+export const convertServiceGraphToNetwork = (
+  graphData: { nodes: any[]; edges: any[] },
+  layoutType: string = "force",
+  cachedPositions?: Map<string, { x: number; y: number }>
+) => {
+  // Build node metrics map (requests, errors, connections)
+  const nodeMetrics = new Map<string, { requests: number; errors: number; connections: number }>();
+
+  // Count connections for each node
+  const connectionCount = new Map<string, number>();
+  graphData.nodes.forEach((node: any) => {
+    connectionCount.set(node.id, 0);
+  });
+
+  graphData.edges.forEach((edge: any) => {
+    connectionCount.set(edge.from, (connectionCount.get(edge.from) || 0) + 1);
+    connectionCount.set(edge.to, (connectionCount.get(edge.to) || 0) + 1);
+
+    // Update metrics for both source and target nodes
+    [edge.from, edge.to].forEach((nodeId: string) => {
+      if (!nodeMetrics.has(nodeId)) {
+        nodeMetrics.set(nodeId, { requests: 0, errors: 0, connections: 0 });
+      }
+      const metrics = nodeMetrics.get(nodeId)!;
+      metrics.requests += edge.total_requests || 0;
+      metrics.errors += edge.failed_requests || 0;
+    });
+  });
+
+  // Update connection counts in metrics
+  connectionCount.forEach((count, nodeId) => {
+    if (nodeMetrics.has(nodeId)) {
+      nodeMetrics.get(nodeId)!.connections = count;
+    } else {
+      nodeMetrics.set(nodeId, { requests: 0, errors: 0, connections: count });
+    }
+  });
+
+  const nodes = graphData.nodes.map((node: any) => {
+    const metrics = nodeMetrics.get(node.id) || { requests: 0, errors: 0 };
+    const errorRate = metrics.requests > 0 ? (metrics.errors / metrics.requests) * 100 : 0;
+
+    // Border color based on error rate
+    let borderColor = "#52c41a"; // Green (healthy)
+    if (errorRate > 10) borderColor = "#f5222d"; // Red (critical)
+    else if (errorRate > 5) borderColor = "#fa8c16"; // Orange (high)
+    else if (errorRate > 1) borderColor = "#faad14"; // Yellow (warning)
+
+    // Size based on request volume - much smaller nodes
+    const symbolSize = Math.max(40, Math.min(80, Math.log10(metrics.requests + 1) * 20));
+
+    // Use cached position if available
+    const cachedPos = cachedPositions?.get(node.id);
+    const nodeData: any = {
+      id: node.id,
+      name: node.label || node.id,
+      value: metrics.requests,
+      errors: metrics.errors,
+      symbolSize: symbolSize,
+      itemStyle: {
+        color: '#ffffff', // White background
+        borderColor: borderColor,
+        borderWidth: 4,
+        shadowBlur: 10,
+        shadowColor: 'rgba(0, 0, 0, 0.3)',
+      },
+      label: {
+        show: true,
+      },
+      emphasis: {
+        label: {
+          show: true,
+          fontSize: 12,
+          fontWeight: 'bold',
+        },
+      },
+      tooltip: {
+        formatter: `
+          <strong>${node.label || node.id}</strong><br/>
+          Requests: ${formatNumber(metrics.requests)}<br/>
+          Errors: ${formatNumber(metrics.errors)}<br/>
+          Error Rate: ${errorRate.toFixed(2)}%<br/>
+          Connections: ${connectionCount.get(node.id) || 0}
+        `,
+      },
+    };
+
+    // If we have cached positions, use them and set fixed: true
+    if (cachedPos) {
+      nodeData.x = cachedPos.x;
+      nodeData.y = cachedPos.y;
+      nodeData.fixed = true;
+    } else {
+      nodeData.fixed = false;
+    }
+
+    return nodeData;
+  });
+
+  // Prepare edges with arrows showing flow direction
+  // For circular layout, use curved lines; for force layout, use straight lines
+  const edges = graphData.edges.map((edge: any, edgeIndex: number) => {
+    const errorRate = edge.total_requests > 0 ? (edge.failed_requests / edge.total_requests) * 100 : 0;
+
+    // For circular layout, calculate curveness to route through center
+    // Use positive curveness values to curve inward toward center
+    let curveness = 0;
+    if (layoutType === 'circular') {
+      // Vary curveness based on edge index to create visual separation
+      // Range from 0.3 to 0.6 (positive values should curve inward)
+      curveness = 0.3 + (edgeIndex % 4) * 0.1;
+    }
+
+    return {
+      source: edge.from,
+      target: edge.to,
+      value: edge.total_requests || 0,
+      symbol: ['none', 'arrow'], // Arrow at target end
+      symbolSize: [0, 12], // Smaller arrows for cleaner look
+      lineStyle: {
+        width: Math.max(1, Math.min(4, 1 + (edge.total_requests || 0) / 150)),
+        color: errorRate > 5 ? "#f5222d" : errorRate > 1 ? "#faad14" : "#52c41a",
+        curveness: curveness,
+        opacity: 0.5, // More transparent for less visual clutter
+      },
+      label: {
+        show: false,
+      },
+      emphasis: {
+        lineStyle: {
+          width: 5,
+          opacity: 0.9,
+        },
+      },
+    };
+  });
+
+  // Determine if we should use force layout, circular layout, or fixed positions
+  const hasPositions = cachedPositions && cachedPositions.size > 0;
+
+  // For force layout without cached positions, compute layout with D3-force
+  if (layoutType === 'force' && !hasPositions) {
+    console.log('[convertServiceGraphToNetwork] Computing force layout with D3-force');
+    const positionedNodes = computeForceLayout(nodes, graphData.edges, 800, 600);
+
+    // Apply computed positions to nodes and mark them as fixed
+    positionedNodes.forEach((positioned: any) => {
+      const node = nodes.find((n: any) => n.id === positioned.id);
+      if (node) {
+        node.x = positioned.x;
+        node.y = positioned.y;
+        node.fixed = true; // Lock positions so ECharts doesn't re-layout
+      }
+    });
+
+    console.log('[convertServiceGraphToNetwork] Applied D3-force positions to', positionedNodes.length, 'nodes');
+  }
+
+  // For circular layout, calculate positions manually on the periphery
+  if (layoutType === 'circular' && !hasPositions) {
+    const nodeCount = nodes.length;
+    const nodeSize = 15; // Node diameter
+    const radius = 280; // Radius where node centers are positioned
+    const centerX = 0;
+    const centerY = 0;
+
+    nodes.forEach((node: any, index: number) => {
+      const angle = (2 * Math.PI * index) / nodeCount - Math.PI / 2; // Start from top
+      node.x = centerX + radius * Math.cos(angle);
+      node.y = centerY + radius * Math.sin(angle);
+      node.fixed = true;
+
+      // For circular layout, use small uniform nodes (chord diagram style)
+      node.symbolSize = nodeSize;
+
+      // Simplify styling for chord diagram - use solid colors without gradients
+      node.itemStyle = {
+        color: node.itemStyle.borderColor, // Use the border color as fill
+        borderColor: '#ffffff',
+        borderWidth: 2,
+        shadowBlur: 5,
+        shadowColor: 'rgba(0, 0, 0, 0.2)',
+      };
+    });
+
+    console.log('[convertServiceGraphToNetwork] Using circular layout with', nodeCount, 'nodes on periphery');
+  } else if (hasPositions) {
+    console.log('[convertServiceGraphToNetwork] Using cached positions for', cachedPositions.size, 'nodes');
+  } else if (layoutType !== 'force') {
+    console.log('[convertServiceGraphToNetwork] Using', layoutType, 'layout');
+  }
+
+  // Use "none" layout when we have fixed positions (D3-force computed, circular, or cached)
+  const layoutMode = (hasPositions || layoutType === 'circular' || layoutType === 'force') ? "none" : layoutType;
+
+  const options = {
+    tooltip: {
+      trigger: "item",
+      triggerOn: "mousemove",
+      backgroundColor: 'rgba(50, 50, 50, 0.95)',
+      borderColor: '#777',
+      borderWidth: 1,
+      textStyle: {
+        color: '#fff',
+      },
+    },
+    animation: hasPositions ? false : true, // Disable animation when using cached positions
+    series: [
+      {
+        type: "graph",
+        layout: layoutMode,
+        data: nodes,
+        links: edges,
+        roam: true,
+        draggable: true, // Enable dragging to allow manual position adjustments
+        focusNodeAdjacency: true,
+        scaleLimit: {
+          min: 0.4,
+          max: 3,
+        },
+        label: layoutType === 'circular' ? {
+          show: true,
+          position: 'top',
+          formatter: (params: any) => params.data.name,
+          fontSize: 11,
+          color: '#333',
+        } : {
+          show: true,
+          formatter: (params: any) => {
+            const requests = params.data.value || 0;
+            const errors = params.data.errors || 0;
+            const errorRate = requests > 0 ? (errors / requests) : 0;
+            const reqPerSec = (requests / 60).toFixed(2);
+            const errorDisplay = (errorRate * 100).toFixed(2);
+            const serviceName = params.data.name;
+
+            // Display metrics inside, name below using rich text
+            return `{metrics|${errorDisplay} ms/r}\n{metrics|${reqPerSec} r/sec}\n{spacer|}\n{name|${serviceName}}`;
+          },
+          rich: {
+            metrics: {
+              fontSize: 10,
+              color: '#333',
+              lineHeight: 14,
+              align: 'center',
+            },
+            spacer: {
+              height: 40,
+              lineHeight: 40,
+            },
+            name: {
+              fontSize: 11,
+              fontWeight: 'normal',
+              color: '#333',
+              align: 'center',
+              lineHeight: 16,
+            },
+          },
+        },
+        emphasis: {
+          focus: "adjacency",
+          label: {
+            show: true,
+            fontSize: 13,
+            fontWeight: 'bold',
+          },
+          itemStyle: {
+            shadowBlur: 15,
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        },
+        lineStyle: {
+          opacity: layoutType === 'circular' ? 0.5 : 0.7,
+          curveness: 'auto', // Let individual edges control curveness
+        },
+        edgeSymbol: ['none', 'arrow'],
+        edgeSymbolSize: [0, layoutType === 'circular' ? 10 : 15],
+      },
+    ],
+  };
+
+  return { options };
+};
+
+const formatNumber = (num: number) => {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+  if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+  return num.toString();
 };
 
 const formatDate = (date: any) => {

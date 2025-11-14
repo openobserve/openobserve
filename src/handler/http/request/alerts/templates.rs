@@ -22,6 +22,8 @@ use crate::{
     handler::http::models::destinations::Template,
     service::{alerts::templates, db::alerts::templates::TemplateError},
 };
+#[cfg(feature = "enterprise")]
+use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 impl From<TemplateError> for HttpResponse {
     fn from(value: TemplateError) -> Self {
@@ -54,7 +56,7 @@ impl From<TemplateError> for HttpResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
       ),
-    request_body(content = Template, description = "Template data", content_type = "application/json"),    
+    request_body(content = inline(Template), description = "Template data", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -97,7 +99,7 @@ pub async fn save_template(
         ("org_id" = String, Path, description = "Organization name"),
         ("template_name" = String, Path, description = "Template name"),
       ),
-    request_body(content = Template, description = "Template data", content_type = "application/json"),    
+    request_body(content = inline(Template), description = "Template data", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -137,7 +139,7 @@ pub async fn update_template(
         ("template_name" = String, Path, description = "Template name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Template),
+        (status = 200, description = "Success",  content_type = "application/json", body = inline(Template)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -170,7 +172,7 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Template>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Template>)),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
@@ -178,19 +180,20 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
     )
 )]
 #[get("/{org_id}/alerts/templates")]
-async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn list_templates(
+    path: web::Path<String>,
+    _req: HttpRequest,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
     let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = _req.headers().get("user_id").unwrap();
+        let user_id = &user_email.user_id;
         match crate::handler::http::auth::validator::list_objects_for_user(
-            &org_id,
-            user_id.to_str().unwrap(),
-            "GET",
-            "template",
+            &org_id, user_id, "GET", "template",
         )
         .await
         {

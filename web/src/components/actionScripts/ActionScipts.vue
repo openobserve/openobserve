@@ -17,148 +17,139 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
-    data-test="action-scripts-list-page"
-    class="q-pa-none tw-w-full"
-    style="height: calc(100vh - 57px)"
-    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
-  >
-  <div v-if="!showAddActionScriptDialog" class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-w-full tw-h-[71px] tw-border-b-[1px]"
-    :class="store.state.theme =='dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
-    >
-    <div class="tw-font-[600] tw-text-[20px]" data-test="alerts-list-title">
-            {{ t("actions.header") }}
-          </div>
-          <div class="tw-full-width tw-flex tw-items-center tw-justify-end">
-            <q-input
-              v-model="filterQuery"
-              borderless
-              dense
-              class="q-ml-auto no-border o2-search-input"
-              :placeholder="t('actions.search')"
-              data-test="action-list-search-input"
-              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
-            >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
-              </template>
-            </q-input>
-          <q-btn
-            data-test="action-list-add-btn"
-            class="q-ml-md o2-primary-button tw-h-[36px]"
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            no-caps
-            :label="t(`actions.add`)"
-            @click="showAddUpdateFn({})"
-          />
-          </div>
-  </div>
-    <div
-      v-if="!showAddActionScriptDialog"
-      class="full-width action-scripts-table"
-      style="height: calc(100vh - 112px) ; overflow-y: auto;"
-
-    >
-      <q-table
-        data-test="action-scripts-table"
-        ref="qTable"
-        :rows="visibleRows"
-        :columns="columns"
-        row-key="id"
-        :pagination="pagination"
-        style="width: 100%;"
-        :style="{ height: hasVisibleRows ? 'calc(100vh - 112px)' : '' }"
-        class="o2-quasar-table o2-quasar-table-header-sticky o2-last-row-border"
-        :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
-        >
-        <template #no-data>
-          <NoData />
-        </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <div
-              data-test="action-scripts-loading"
-              v-if="alertStateLoadingMap[props.row.uuid]"
-              style="display: inline-block; width: 33.14px; height: auto"
-              class="flex justify-center items-center q-ml-xs"
-              :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
-            >
-              <q-circular-progress
-                indeterminate
-                rounded
-                size="16px"
-                :value="1"
-                color="secondary"
-              />
-            </div>
-            <q-btn
-              :data-test="`alert-list-${props.row.name}-update-alert`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.edit')"
-              @click="showAddUpdateFn(props)"
-            ></q-btn>
-            <q-btn
-              :data-test="`alert-list-${props.row.name}-delete-alert`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.delete')"
-              @click="showDeleteDialogFn(props)"
-            ></q-btn>
-          </q-td>
-        </template>
-
-        <template v-slot:body-cell-function="props">
-          <q-td :props="props">
-            <q-tooltip>
-              <pre>{{ props.row.sql }}</pre>
-            </q-tooltip>
-            <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
-          </q-td>
-        </template>
-
-        <template #bottom="scope">
-          <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
-                  {{ resultTotal }} {{ t('actions.header') }}
+  <div data-test="action-scripts-list-page">
+    <div v-if="!showAddActionScriptDialog" class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
+      <div class="card-container tw-mb-[0.625rem]">
+        <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-w-full tw-h-[68px]">
+          <div class="tw-font-[600] tw-text-[20px]" data-test="alerts-list-title">
+                  {{ t("actions.header") }}
                 </div>
-            <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-          </div>
-        </template>
+                <div class="tw-full-width tw-flex tw-items-center tw-justify-end">
+                  <q-input
+                    v-model="filterQuery"
+                    borderless
+                    dense
+                    class="q-ml-auto no-border o2-search-input"
+                    :placeholder="t('actions.search')"
+                    data-test="action-list-search-input"
+                  >
+                    <template #prepend>
+                      <q-icon class="o2-search-input-icon" name="search" />
+                    </template>
+                  </q-input>
+                <q-btn
+                  data-test="action-list-add-btn"
+                  class="q-ml-sm o2-primary-button tw-h-[36px]"
+                  flat
+                  no-caps
+                  :label="t(`actions.add`)"
+                  @click="showAddUpdateFn({})"
+                />
+                </div>
+        </div>
+      </div>
+      <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+        <div class="card-container tw-h-[calc(100vh-124px)]">
+          <q-table
+            data-test="action-scripts-table"
+            ref="qTable"
+            :rows="visibleRows"
+            :columns="columns"
+            row-key="id"
+            :pagination="pagination"
+            style="width: 100%;"
+            :style="{ height: hasVisibleRows ? 'calc(100vh - 124px)' : '' }"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky o2-last-row-border"
+            >
+            <template #no-data>
+              <NoData />
+            </template>
+            <template v-slot:body-cell-actions="props">
+              <q-td :props="props">
+                <div
+                  data-test="action-scripts-loading"
+                  v-if="alertStateLoadingMap[props.row.uuid]"
+                  style="display: inline-block; width: 33.14px; height: auto"
+                  class="flex justify-center items-center q-ml-xs"
+                  :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
+                >
+                  <q-circular-progress
+                    indeterminate
+                    rounded
+                    size="16px"
+                    :value="1"
+                    color="secondary"
+                  />
+                </div>
+                <q-btn
+                  :data-test="`alert-list-${props.row.name}-update-alert`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  icon="edit"
+                  :title="t('alerts.edit')"
+                  @click="showAddUpdateFn(props)"
+                >
+              </q-btn>
+                <q-btn
+                  :data-test="`alert-list-${props.row.name}-delete-alert`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  :icon="outlinedDelete"
+                  flat
+                  :title="t('alerts.delete')"
+                  @click="showDeleteDialogFn(props)"
+                >
+              </q-btn>
+              </q-td>
+            </template>
 
-        <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Rendering the of the columns -->
-               <!-- here we can add the classes class so that the head will be sticky -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
-      </q-table>
+            <template v-slot:body-cell-function="props">
+              <q-td :props="props">
+                <q-tooltip>
+                  <pre>{{ props.row.sql }}</pre>
+                </q-tooltip>
+                <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
+              </q-td>
+            </template>
+
+            <template #bottom="scope">
+              <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
+                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+                      {{ resultTotal }} {{ t('actions.header') }}
+                    </div>
+                <QTablePagination
+                :scope="scope"
+                :position="'bottom'"
+                :resultTotal="resultTotal"
+                :perPageOptions="perPageOptions"
+                @update:changeRecordPerPage="changePagination"
+              />
+              </div>
+            </template>
+
+            <template v-slot:header="props">
+                <q-tr :props="props">
+                  <!-- Rendering the of the columns -->
+                  <!-- here we can add the classes class so that the head will be sticky -->
+                  <q-th
+                    v-for="col in props.cols"
+                    :key="col.name"
+                    :props="props"
+                    :class="col.classes"
+                    :style="col.style"
+                  >
+                    {{ col.label }}
+                  </q-th>
+                </q-tr>
+              </template>
+          </q-table>
+        </div>
+      </div>
     </div>
     <template v-else>
       <div class="tw-w-full">
@@ -377,7 +368,7 @@ export default defineComponent({
         name: "#",
         label: "#",
         field: "#",
-        align: "left",
+        align: "center",
         style: "width: 67px;",
       },
       {
@@ -436,11 +427,13 @@ export default defineComponent({
         align: "center",
         sortable: false,
         classes: "actions-column",
+        style: "width: 100px"
       },
     ]);
     const activeTab: any = ref("alerts");
     const destinations = ref([0]);
     const templates = ref([0]);
+
     const getActionScripts = () => {
       const dismiss = $q.notify({
         spinner: true,
@@ -462,13 +455,10 @@ export default defineComponent({
           actionsScriptRows.value = alerts.value.map((data: any) => {
             if (data.execution_details_type === "repeat")
               data.execution_details_type = "Cron Job";
-
             if (data.execution_details_type === "service")
               data.execution_details_type = "Real Time";
-
             if (data.execution_details_type === "once")
               data.execution_details_type = "Once";
-
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.id,
@@ -918,7 +908,12 @@ export default defineComponent({
       return filterData(actionsScriptRows.value || [], filterQuery.value)
     });
 
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+    // Watch visibleRows to sync resultTotal with search filter
+    watch(visibleRows, (newVisibleRows) => {
+      resultTotal.value = newVisibleRows.length;
+    }, { immediate: true });
 
     return {
       t,

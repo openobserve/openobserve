@@ -20,12 +20,8 @@ use config::meta::short_url::{ShortenUrlRequest, ShortenUrlResponse};
 use serde::Deserialize;
 
 use crate::{
-    common::{
-        meta::http::HttpResponse as MetaHttpResponse,
-        utils::redirect_response::RedirectResponseBuilder,
-    },
-    handler::http::request::search::error_utils::map_error_to_http_response,
-    service::short_url,
+    common::utils::redirect_response::RedirectResponseBuilder,
+    handler::http::request::search::error_utils::map_error_to_http_response, service::short_url,
 };
 
 /// Shorten a URL
@@ -36,7 +32,7 @@ use crate::{
     summary = "Create short URL",
     description = "Generates a shortened URL from a longer original URL. This is useful for creating more manageable links for dashboards, reports, or search queries that can be easily shared via email, chat, or documentation. The short URL remains valid and can be used to redirect back to the original destination.",
     request_body(
-        content = ShortenUrlRequest,
+        content = inline(ShortenUrlRequest),
         description = "The original URL to shorten",
         content_type = "application/json",
         example = json!({
@@ -47,7 +43,7 @@ use crate::{
         (
             status = 200,
             description = "Shortened URL",
-            body = ShortenUrlResponse,
+            body = inline(ShortenUrlResponse),
             content_type = "application/json",
             example = json!({
                 "short_url": "http://localhost:5080/short/ddbffcea3ad44292"
@@ -61,12 +57,10 @@ use crate::{
     tag = "Short Url"
 )]
 #[post("/{org_id}/short")]
-pub async fn shorten(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
-    let req: ShortenUrlRequest = match serde_json::from_slice(&body) {
-        Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
-
+pub async fn shorten(
+    org_id: web::Path<String>,
+    web::Json(req): web::Json<ShortenUrlRequest>,
+) -> Result<HttpResponse, Error> {
     match short_url::shorten(&org_id, &req.original_url).await {
         Ok(short_url) => {
             let response = ShortenUrlResponse {

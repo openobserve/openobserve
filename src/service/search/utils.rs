@@ -15,12 +15,16 @@
 
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use config::meta::{inverted_index::UNKNOWN_NAME, search::ScanStats};
+use config::meta::{
+    inverted_index::UNKNOWN_NAME,
+    search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats},
+};
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use sqlparser::ast::{BinaryOperator, Expr};
 use tokio::sync::Mutex;
 
-use super::{DATAFUSION_RUNTIME, datafusion::distributed_plan::remote_scan::RemoteScanExec};
+use super::{DATAFUSION_RUNTIME, datafusion::distributed_plan::remote_scan_exec::RemoteScanExec};
+use crate::{common::meta::search::CAPPED_RESULTS_MSG, service::search::sql::Sql};
 
 type Cleanup = Pin<Box<dyn Future<Output = ()> + Send>>;
 
@@ -177,11 +181,86 @@ pub fn get_field_name(expr: &Expr) -> String {
     }
 }
 
+pub fn check_query_default_limit_exceeded(num_rows: usize, partial_err: &mut String, sql: &Sql) {
+    if is_default_query_limit_exceeded(num_rows, sql) {
+        let capped_err = CAPPED_RESULTS_MSG.to_string();
+        if !partial_err.is_empty() {
+            partial_err.push('\n');
+            partial_err.push_str(&capped_err);
+        } else {
+            *partial_err = capped_err;
+        }
+    }
+}
+
+pub fn is_default_query_limit_exceeded(num_rows: usize, sql: &Sql) -> bool {
+    let default_query_limit = config::get_config().limit.query_default_limit as usize;
+    if sql.limit > config::QUERY_WITH_NO_LIMIT && sql.limit <= 0 {
+        num_rows > default_query_limit
+    } else {
+        false
+    }
+}
+
+pub fn is_permissable_function_error(function_error: &[String]) -> bool {
+    if function_error.is_empty() {
+        return true;
+    }
+
+    function_error.iter().all(|error| {
+        // Empty or whitespace-only errors are cachable (no actual error)
+        let trimmed = error.trim();
+        if trimmed.is_empty() {
+            return true;
+        }
+
+        // Check if error contains only cachable messages
+        error.contains(CAPPED_RESULTS_MSG) || error.contains(PARTIAL_ERROR_RESPONSE_MESSAGE)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use sqlparser::ast::{BinaryOperator, Expr, Ident, Value};
 
     use super::*;
+
+    #[test]
+    fn test_is_cachable_function_error() {
+        let error = vec![];
+        assert!(is_permissable_function_error(&error));
+
+        let error = vec!["".to_string()];
+        assert!(is_permissable_function_error(&error));
+
+        let error = vec![
+            CAPPED_RESULTS_MSG.to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+        ];
+        assert!(is_permissable_function_error(&error)); // only this is cachable
+
+        let error = vec![
+            CAPPED_RESULTS_MSG.to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+            "parquet not found".to_string(),
+        ];
+        assert!(!is_permissable_function_error(&error));
+
+        let error = vec![
+            "parquet not found".to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+        ];
+        assert!(!is_permissable_function_error(&error));
+
+        let error = vec!["parquet not found".to_string()];
+        assert!(!is_permissable_function_error(&error));
+
+        let error = vec![
+            "parquet not found".to_string(),
+            CAPPED_RESULTS_MSG.to_string(),
+        ];
+        assert!(!is_permissable_function_error(&error));
+    }
 
     #[test]
     fn test_split_conjunction() {

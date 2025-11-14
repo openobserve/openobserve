@@ -54,22 +54,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="tw-flex tw-items-center">
-            <app-tabs
-              class="q-mr-md"
-              :tabs="reportTypeTabs"
-              v-model:active-tab="activeTab"
-              @update:active-tab="filterReports"
-            />
+            <div class="app-tabs-container tw-h-[36px] q-mr-sm">
+              <app-tabs
+                class="tabs-selection-container"
+                :tabs="reportTypeTabs"
+                v-model:active-tab="activeTab"
+                @update:active-tab="filterReports"
+              />
+            </div>
 
             <q-input
               data-test="alert-list-search-input"
               v-model="filterQuery"
               borderless
-              filled
               dense
               class="q-ml-auto no-border"
               :placeholder="t('reports.search')"
-            >
+             hide-bottom-space>
               <template #prepend>
                 <q-icon name="search" class="cursor-pointer" />
               </template>
@@ -77,20 +78,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-btn
               data-test="alert-list-add-alert-btn"
-              class="q-ml-md text-bold no-border"
-              padding="sm lg"
-              color="secondary"
-              no-caps
+              class="o2-primary-button tw-h-[36px] q-ml-md"
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              flat
               :label="t(`dashboard.newReport`)"
               @click="createNewReport"
             />
 
             <div class="q-ml-sm">
-              <q-btn
+              <q-icon
+                name="cancel"
+                class="cursor-pointer"
+                size="20px"
                 v-close-popup="true"
-                round
-                flat
-                :icon="'img:' + getImageURL('images/common/close_icon.svg')"
               />
             </div>
           </div>
@@ -427,6 +427,10 @@ const getTimeRangeValue = (dateTime: any) => {
   :deep(.q-table__top) {
     padding-left: 0;
     padding-right: 0;
+  }
+
+  :deep(thead tr) {
+    background-color: var(--o2-table-header-bg) !important;
   }
 
   :deep(.rum-tabs) {

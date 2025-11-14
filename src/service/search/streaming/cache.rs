@@ -39,6 +39,7 @@ pub async fn write_results_to_cache(
     start_time: i64,
     end_time: i64,
     accumulated_results: &mut Vec<SearchResultType>,
+    clear_cache: bool,
 ) -> Result<(), infra::errors::Error> {
     if accumulated_results.is_empty() {
         return Ok(());
@@ -80,6 +81,15 @@ pub async fn write_results_to_cache(
         && !merged_response.hits.is_empty();
 
     if cfg.common.result_cache_enabled && should_cache_results {
+        // Determine if this is a non-timestamp histogram query for websocket streaming
+        let is_histogram_non_ts_order = c_resp.histogram_interval > 0
+            && !merged_response.order_by_metadata.is_empty()
+            && merged_response
+                .order_by_metadata
+                .first()
+                .map(|(field, _)| field != &c_resp.ts_column)
+                .unwrap_or(false);
+
         cache::write_results(
             &c_resp.trace_id,
             &c_resp.ts_column,
@@ -89,6 +99,8 @@ pub async fn write_results_to_cache(
             c_resp.file_path.clone(),
             c_resp.is_aggregate,
             c_resp.is_descending,
+            clear_cache,
+            is_histogram_non_ts_order,
         )
         .await;
         log::info!(
@@ -293,7 +305,7 @@ pub async fn handle_cache_responses_and_deltas(
         }
 
         // Stop if reached the requested result size
-        if req_size != -1 && curr_res_size >= req_size {
+        if req_size != -1 && req_size != 0 && curr_res_size >= req_size {
             log::info!(
                 "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size: {req_size}, stopping search",
             );
@@ -462,6 +474,7 @@ pub async fn write_partial_results_to_cache(
     start_time: i64,
     end_time: i64,
     accumulated_results: &mut Vec<SearchResultType>,
+    clear_cache: bool,
 ) {
     // TEMPORARY: disable writing partial cache
     return;
@@ -474,7 +487,15 @@ pub async fn write_partial_results_to_cache(
                 "[HTTP2_STREAM trace_id {trace_id}] Search cancelled, writing results to cache",
             );
             // write the result to cache
-            match write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await {
+            match write_results_to_cache(
+                c_resp,
+                start_time,
+                end_time,
+                accumulated_results,
+                clear_cache,
+            )
+            .await
+            {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!(

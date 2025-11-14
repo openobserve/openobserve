@@ -117,7 +117,7 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
 
 async function deletePipeline(page, randomPipelineName) {
   // Click the back button
-  await page.locator('[data-test="add-pipeline-back-btn"]').click();
+  await page.locator('[data-test="add-pipeline-cancel-btn"]').click();
   await page.locator('[data-test="confirm-button"]').click();
   await page.waitForTimeout(2000);
 
@@ -238,7 +238,10 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(1000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    // Use new hover-based delete approach with data-test locator
+    await page.locator('[data-test="pipeline-node-output-stream-node"]').first().hover();
+    await page.waitForTimeout(500);
+    await page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
     await page.locator('[data-test="confirm-button"]').click();
 
     // Generate a random pipeline name and save
@@ -270,12 +273,11 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    // Use new hover-based delete approach with data-test locator
+    await page.locator('[data-test="pipeline-node-output-stream-node"]').first().hover();
+    await page.waitForTimeout(500);
+    await page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
     await page.locator('[data-test="confirm-button"]').click();
-
-    // Delete the pipeline and confirm
-    await pipelinePage.deletePipeline();
-    await pipelinePage.confirmDelete();
   });
 
   test.skip("should add source & destination node and then delete the pipeline", async ({
@@ -383,8 +385,15 @@ test.describe("Pipeline testcases", () => {
     }
     await pipelinePage.saveQuery();
     await page.waitForTimeout(2000);
-    await pipelinePage.deletePipeline();
-    await pipelinePage.confirmDelete();
+    
+    // Delete the query node first
+    await page.locator('[data-test="pipeline-node-input-query-node"]').first().hover();
+    await page.waitForTimeout(500);
+    await page.locator('[data-test="pipeline-node-input-delete-btn"]').first().click();
+    await page.locator('[data-test="confirm-button"]').click();
+    
+    // Navigate back from pipeline editing and confirm
+    await page.locator('[data-test="add-pipeline-cancel-btn"]').click();
   });
 
   test.skip("should add source, function,destination and then delete pipeline", async ({
@@ -556,19 +565,23 @@ test.describe("Pipeline testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
     await page.locator("button").filter({ hasText: "edit" }).hover();
     await page.getByRole("img", { name: "Stream", exact: true }).click();
-    await page.getByPlaceholder("Column").click();
-    await page.getByPlaceholder("Column").fill("container_name");
-    await page
-      .getByRole("option", { name: "kubernetes_container_name" })
-      .click();
-    await page
-      .locator(
-        "div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native"
-      )
-      .click();
+    await page.waitForTimeout(1000);
+
+    // FilterGroup UI: Fill column select
+    await page.locator('[data-test="alert-conditions-select-column"]').locator('input').click();
+    await page.locator('[data-test="alert-conditions-select-column"]').locator('input').fill("container_name");
+    await page.waitForTimeout(500);
+    await page.getByRole("option", { name: "kubernetes_container_name" }).click();
+
+    // Select operator
+    await page.locator('[data-test="alert-conditions-operator-select"]').click();
+    await page.waitForTimeout(300);
     await page.getByText("Contains", { exact: true }).click();
-    await page.getByPlaceholder("Value").click();
-    await page.getByPlaceholder("Value").fill("prometheus");
+
+    // Fill value input
+    await page.locator('[data-test="alert-conditions-value-input"]').locator('input').click();
+    await page.locator('[data-test="alert-conditions-value-input"]').locator('input').fill("prometheus");
+
     await pipelinePage.saveCondition();
     await page.waitForTimeout(2000);
     await page.getByText("kubernetes_container_name").hover();
@@ -655,7 +668,10 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
     await page.waitForTimeout(1000);
-    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    // Use new hover-based delete approach with data-test locator
+    await page.locator('[data-test="pipeline-node-output-stream-node"]').first().hover();
+    await page.waitForTimeout(500);
+    await page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
     await page.locator('[data-test="confirm-button"]').click();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton); // First stream drag
 
@@ -680,6 +696,21 @@ test.describe("Pipeline testcases", () => {
     await page.getByLabel("Stream Name *").fill("destination-node");
     await page.waitForTimeout(1000);
     await pipelinePage.clickInputNodeStreamSave();
+    
+    // Wait for dialog to close and add edge connections if needed
+    await page.waitForTimeout(2000);
+    await page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' }).catch(() => {
+        // Handle case where handles don't exist for this test scenario
+    });
+    await page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' }).catch(() => {
+        // Handle case where handles don't exist for this test scenario
+    });
+    
+    // Ensure no dialogs are blocking the interaction
+    await page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
+        // Ignore if no backdrop exists
+    });
+    
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();

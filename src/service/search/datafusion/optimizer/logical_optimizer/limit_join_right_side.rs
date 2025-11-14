@@ -227,17 +227,7 @@ mod tests {
         let plan = ctx.state().create_logical_plan(sql).await?;
         let plan = ctx.state().optimize(&plan)?;
 
-        // println!("{}", plan.to_string());
-
         let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-
-        // use datafusion::physical_plan::displayable;
-        // println!(
-        //     "{}",
-        //     displayable(physical_plan.as_ref())
-        //         .indent(false)
-        //         .to_string()
-        // );
 
         let expected = vec![
             "ProjectionExec: expr=[count(Int64(1))@0 as count(*)]",
@@ -372,17 +362,7 @@ mod tests {
         let plan = ctx.state().create_logical_plan(sql).await?;
         let plan = ctx.state().optimize(&plan)?;
 
-        // println!("{}", plan.to_string());
-
         let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-
-        // use datafusion::physical_plan::displayable;
-        // println!(
-        //     "{}",
-        //     displayable(physical_plan.as_ref())
-        //         .indent(false)
-        //         .to_string()
-        // );
 
         let expected = vec![
             "CoalesceBatchesExec: target_batch_size=8192",

@@ -620,19 +620,16 @@ pub async fn get_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
-) -> Result<Alert, AlertError> {
-    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
-        Some((_f, a)) => Ok(a),
+) -> Result<(Folder, Alert), AlertError> {
+    match db::alerts::alert::get_by_id(conn, org_id, alert_id).await? {
+        Some(f_a) => Ok(f_a),
         None => Err(AlertError::AlertNotFound),
     }
 }
 
 pub async fn get_by_id_db(org_id: &str, alert_id: Ksuid) -> Result<Alert, AlertError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
-        Some((_f, a)) => Ok(a),
-        None => Err(AlertError::AlertNotFound),
-    }
+    get_by_id(conn, org_id, alert_id).await.map(|f_a| f_a.1)
 }
 
 pub async fn get_folder_alert_by_id_db(
@@ -1916,5 +1913,343 @@ mod tests {
         };
         let sql = build_expr(&condition, "", &DataType::Utf8).unwrap();
         assert_eq!(sql, "str_match(\"auth_username\", 'enrique')");
+    }
+
+    #[test]
+    fn test_to_float_from_number() {
+        let val = json!(42.5);
+        assert_eq!(to_float(&val), 42.5);
+
+        let val = json!(100);
+        assert_eq!(to_float(&val), 100.0);
+
+        let val = json!(0);
+        assert_eq!(to_float(&val), 0.0);
+
+        let val = json!(-50.25);
+        assert_eq!(to_float(&val), -50.25);
+    }
+
+    #[test]
+    fn test_to_float_from_string() {
+        let val = json!("42.5");
+        assert_eq!(to_float(&val), 42.5);
+
+        let val = json!("100");
+        assert_eq!(to_float(&val), 100.0);
+
+        let val = json!("0");
+        assert_eq!(to_float(&val), 0.0);
+
+        let val = json!("-50.25");
+        assert_eq!(to_float(&val), -50.25);
+    }
+
+    #[test]
+    fn test_to_float_invalid_string() {
+        let val = json!("not a number");
+        assert_eq!(to_float(&val), 0.0);
+
+        let val = json!("");
+        assert_eq!(to_float(&val), 0.0);
+    }
+
+    #[test]
+    fn test_to_float_null() {
+        let val = json!(null);
+        assert_eq!(to_float(&val), 0.0);
+    }
+
+    #[test]
+    fn test_var_value_str_len() {
+        let val = VarValue::Str("hello");
+        assert_eq!(val.len(), 5);
+
+        let val = VarValue::Str("");
+        assert_eq!(val.len(), 0);
+
+        let val = VarValue::Str("你好世界");
+        assert_eq!(val.len(), 4);
+    }
+
+    #[test]
+    fn test_var_value_vector_len() {
+        let strings = vec!["one".to_string(), "two".to_string(), "three".to_string()];
+        let val = VarValue::Vector(&strings);
+        assert_eq!(val.len(), 3);
+
+        let empty: Vec<String> = vec![];
+        let val = VarValue::Vector(&empty);
+        assert_eq!(val.len(), 0);
+    }
+
+    #[test]
+    fn test_var_value_str_to_string_with_length() {
+        let val = VarValue::Str("hello world");
+        assert_eq!(val.to_string_with_length(5, false), "hello");
+        assert_eq!(val.to_string_with_length(100, false), "hello world");
+        assert_eq!(val.to_string_with_length(0, false), "hello world");
+    }
+
+    #[test]
+    fn test_var_value_vector_to_string_with_length() {
+        let strings = vec![
+            "line1".to_string(),
+            "line2".to_string(),
+            "line3".to_string(),
+        ];
+        let val = VarValue::Vector(&strings);
+
+        // Test with separator for non-email
+        assert_eq!(val.to_string_with_length(2, false), "line1\\nline2");
+        assert_eq!(val.to_string_with_length(3, false), "line1\\nline2\\nline3");
+        assert_eq!(
+            val.to_string_with_length(100, false),
+            "line1\\nline2\\nline3"
+        );
+
+        // Test with no separator for email
+        assert_eq!(val.to_string_with_length(2, true), "line1line2");
+        assert_eq!(val.to_string_with_length(3, true), "line1line2line3");
+    }
+
+    #[test]
+    fn test_var_value_with_special_characters() {
+        let val = VarValue::Str("hello\nworld\t!");
+        let result = val.to_string_with_length(100, false);
+        assert_eq!(result, "hello\\nworld\\t!");
+    }
+
+    #[test]
+    fn test_process_variable_replace_simple() {
+        let mut tpl = "Hello {name}, welcome!".to_string();
+        process_variable_replace(&mut tpl, "name", &VarValue::Str("Alice"), false);
+        assert_eq!(tpl, "Hello Alice, welcome!");
+    }
+
+    #[test]
+    fn test_process_variable_replace_with_length() {
+        let mut tpl = "Message: {msg:10}".to_string();
+        process_variable_replace(
+            &mut tpl,
+            "msg",
+            &VarValue::Str("This is a very long message"),
+            false,
+        );
+        assert_eq!(tpl, "Message: This is a ");
+    }
+
+    #[test]
+    fn test_process_variable_replace_vector() {
+        let strings = vec!["row1".to_string(), "row2".to_string()];
+        let mut tpl = "Rows: {rows}".to_string();
+        process_variable_replace(&mut tpl, "rows", &VarValue::Vector(&strings), false);
+        assert_eq!(tpl, "Rows: row1\\nrow2");
+    }
+
+    #[test]
+    fn test_process_variable_replace_no_match() {
+        let mut tpl = "Hello {name}".to_string();
+        let original = tpl.clone();
+        process_variable_replace(&mut tpl, "age", &VarValue::Str("30"), false);
+        assert_eq!(tpl, original); // Should remain unchanged
+    }
+
+    #[test]
+    fn test_process_variable_replace_multiple_occurrences() {
+        let mut tpl = "{name} says hello to {name}".to_string();
+        process_variable_replace(&mut tpl, "name", &VarValue::Str("Bob"), false);
+        assert_eq!(tpl, "Bob says hello to Bob");
+    }
+
+    #[test]
+    fn test_get_row_column_map_empty() {
+        let rows: Vec<Map<String, Value>> = vec![];
+        let result = get_row_column_map(&rows);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_get_row_column_map_single_row() {
+        let mut row = Map::new();
+        row.insert("name".to_string(), json!("Alice"));
+        row.insert("age".to_string(), json!(30));
+        let rows = vec![row];
+
+        let result = get_row_column_map(&rows);
+        assert_eq!(result.len(), 2);
+        assert!(result.contains_key("name"));
+        assert!(result.contains_key("age"));
+        assert!(result.get("name").unwrap().contains("Alice"));
+        assert!(result.get("age").unwrap().contains("30"));
+    }
+
+    #[test]
+    fn test_get_row_column_map_multiple_rows() {
+        let mut row1 = Map::new();
+        row1.insert("name".to_string(), json!("Alice"));
+        row1.insert("score".to_string(), json!(95.5));
+
+        let mut row2 = Map::new();
+        row2.insert("name".to_string(), json!("Bob"));
+        row2.insert("score".to_string(), json!(87.3));
+
+        let rows = vec![row1, row2];
+
+        let result = get_row_column_map(&rows);
+        assert_eq!(result.len(), 2);
+
+        let names = result.get("name").unwrap();
+        assert_eq!(names.len(), 2);
+        assert!(names.contains("Alice"));
+        assert!(names.contains("Bob"));
+
+        let scores = result.get("score").unwrap();
+        assert_eq!(scores.len(), 2);
+        assert!(scores.contains("95.50"));
+        assert!(scores.contains("87.30"));
+    }
+
+    #[test]
+    fn test_get_row_column_map_duplicate_values() {
+        let mut row1 = Map::new();
+        row1.insert("status".to_string(), json!("active"));
+
+        let mut row2 = Map::new();
+        row2.insert("status".to_string(), json!("active"));
+
+        let rows = vec![row1, row2];
+
+        let result = get_row_column_map(&rows);
+        let statuses = result.get("status").unwrap();
+        // HashSet should deduplicate
+        assert_eq!(statuses.len(), 1);
+        assert!(statuses.contains("active"));
+    }
+
+    #[test]
+    fn test_get_alert_start_end_time_with_given_time() {
+        let vars = HashMap::new();
+        let period = 5;
+        let rows_end_time = 1000000;
+        let start_time = Some(500000);
+        let use_given_time = true;
+
+        let (start, end) =
+            get_alert_start_end_time(&vars, period, rows_end_time, start_time, use_given_time);
+        assert_eq!(start, 500000);
+        assert_eq!(end, 1000000);
+    }
+
+    #[test]
+    fn test_get_alert_start_end_time_calculate_from_period() {
+        let vars = HashMap::new();
+        let period = 5; // 5 minutes
+        let rows_end_time = 1000000;
+        let start_time = None;
+        let use_given_time = true;
+
+        let (start, end) =
+            get_alert_start_end_time(&vars, period, rows_end_time, start_time, use_given_time);
+        assert_eq!(end, 1000000);
+        assert!(start < end);
+        // Should be approximately 5 minutes (300 seconds = 300,000,000 microseconds) before end
+        assert!(end - start >= 299_000_000 && end - start <= 301_000_000);
+    }
+
+    #[test]
+    fn test_get_alert_start_end_time_from_timestamp() {
+        let mut vars = HashMap::new();
+        let mut timestamps = HashSet::new();
+        timestamps.insert("800000".to_string());
+        timestamps.insert("900000".to_string());
+        vars.insert(TIMESTAMP_COL_NAME.to_string(), timestamps);
+
+        let period = 5;
+        let rows_end_time = 1000000;
+        let start_time = None;
+        let use_given_time = false;
+
+        let (start, end) =
+            get_alert_start_end_time(&vars, period, rows_end_time, start_time, use_given_time);
+        assert_eq!(start, 800000);
+        // end should be 900000 + 1 minute (60,000,000 microseconds)
+        assert_eq!(end, 60900000);
+    }
+
+    #[test]
+    fn test_get_alert_start_end_time_from_sql_time() {
+        let mut vars = HashMap::new();
+        let mut min_times = HashSet::new();
+        min_times.insert("700000".to_string());
+        vars.insert("zo_sql_min_time".to_string(), min_times);
+
+        let mut max_times = HashSet::new();
+        max_times.insert("950000".to_string());
+        vars.insert("zo_sql_max_time".to_string(), max_times);
+
+        let period = 5;
+        let rows_end_time = 1000000;
+        let start_time = None;
+        let use_given_time = false;
+
+        let (start, end) =
+            get_alert_start_end_time(&vars, period, rows_end_time, start_time, use_given_time);
+        assert_eq!(start, 700000);
+        // end should be 950000 + 1 minute (60,000,000 microseconds)
+        assert_eq!(end, 60950000);
+    }
+
+    #[test]
+    fn test_get_alert_start_end_time_no_data() {
+        let vars = HashMap::new();
+        let period = 10; // 10 minutes
+        let rows_end_time = 2000000;
+        let start_time = None;
+        let use_given_time = false;
+
+        let (start, end) =
+            get_alert_start_end_time(&vars, period, rows_end_time, start_time, use_given_time);
+        // Should use rows_end_time as end
+        assert_eq!(end, 2000000);
+        // Should calculate start from period
+        assert!(end - start >= 599_000_000 && end - start <= 601_000_000); // ~10 minutes
+    }
+
+    #[test]
+    fn test_get_alert_start_end_time_time_range_too_small() {
+        let mut vars = HashMap::new();
+        let mut timestamps = HashSet::new();
+        // Very close timestamps (less than 1 minute apart)
+        timestamps.insert("1000000".to_string());
+        timestamps.insert("1001000".to_string());
+        vars.insert(TIMESTAMP_COL_NAME.to_string(), timestamps);
+
+        let period = 5;
+        let rows_end_time = 1002000;
+        let start_time = Some(1000000);
+        let use_given_time = false;
+
+        let (start, end) =
+            get_alert_start_end_time(&vars, period, rows_end_time, start_time, use_given_time);
+        // The end time will be max timestamp + 1 minute = 1001000 + 60,000,000
+        assert_eq!(end, 61001000);
+        // When time range is too small and start_time is provided, it should use provided
+        // start_time
+        assert_eq!(start, 1000000);
+    }
+
+    #[test]
+    fn test_get_alert_start_end_time_with_explicit_start_time() {
+        let vars = HashMap::new();
+        let period = 15;
+        let rows_end_time = 3000000;
+        let start_time = Some(1500000);
+        let use_given_time = false;
+
+        let (start, _end) =
+            get_alert_start_end_time(&vars, period, rows_end_time, start_time, use_given_time);
+        // When range is too small, should use provided start_time
+        assert!(start <= 1500000 || start == 3000000 - 15 * 60 * 1_000_000);
     }
 }

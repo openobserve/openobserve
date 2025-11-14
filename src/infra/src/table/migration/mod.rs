@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// Allow enterprise feature cfg check (defined at workspace level)
+#![allow(unexpected_cfgs)]
+
 use config::meta::meta_store::MetaStore;
 pub use sea_orm_migration::prelude::*;
 
@@ -64,7 +67,10 @@ mod m20250716_000001_create_enrichment_table;
 mod m20250731_000001_create_compactor_manual_jobs;
 mod m20250801_000001_create_system_prompts_table;
 mod m20250822_093713_add_updated_at_for_file_list_table;
-mod m20251023_000001_update_enrichment_table_data_size;
+mod m20250923_000001_update_enrichment_table_data_size;
+mod m20250930_000001_create_pipeline_last_errors_table;
+mod m20251024_000001_add_alert_deduplication;
+mod m20251105_000001_update_enrichment_table_created_at_mysql;
 
 pub struct Migrator;
 
@@ -121,7 +127,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20250731_000001_create_compactor_manual_jobs::Migration),
             Box::new(m20250801_000001_create_system_prompts_table::Migration),
             Box::new(m20250822_093713_add_updated_at_for_file_list_table::Migration),
-            Box::new(m20251023_000001_update_enrichment_table_data_size::Migration),
+            Box::new(m20250923_000001_update_enrichment_table_data_size::Migration),
+            Box::new(m20250930_000001_create_pipeline_last_errors_table::Migration),
+            Box::new(m20251024_000001_add_alert_deduplication::Migration),
+            Box::new(m20251105_000001_update_enrichment_table_created_at_mysql::Migration),
         ]
     }
 }

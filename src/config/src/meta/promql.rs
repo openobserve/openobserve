@@ -134,8 +134,8 @@ pub struct RequestRangeQuery {
     pub step: Option<String>,
     /// Evaluation timeout.
     pub timeout: Option<String>,
-    /// Do not use cache.
-    pub no_cache: Option<bool>,
+    /// Use cache.
+    pub use_cache: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -279,24 +279,6 @@ impl DownsamplingRule {
         } else {
             true
         }
-    }
-}
-
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub enum HashLabelValue {
-    String(String),
-    Number(u64),
-}
-
-impl From<&str> for HashLabelValue {
-    fn from(value: &str) -> Self {
-        Self::String(value.to_string())
-    }
-}
-
-impl From<u64> for HashLabelValue {
-    fn from(value: u64) -> Self {
-        Self::Number(value)
     }
 }
 

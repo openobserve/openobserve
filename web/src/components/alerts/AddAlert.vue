@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width q-mx-lg "  >
-    <div class="row items-center no-wrap q-mx-md q-my-sm">
-      <div class="flex items-center justify-between tw-w-full">
+  <div class="full-width q-mx-lg q-pt-xs">
+    <div class="row items-center no-wrap card-container tw-mx-[0.625rem]  tw-mb-[0.625rem]">
+      <div class="flex items-center justify-between tw-w-full card-container tw-h-[68px] tw-px-2 tw-py-3">
         <div class="flex items-center">
           <div
           data-test="add-alert-back-btn"
@@ -56,23 +56,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-separator />
     <div
       ref="addAlertFormRef"
       style="
-        max-height: calc(100vh - 165px);
+        max-height: calc(100vh - 194px);
         overflow: auto;
         scroll-behavior: smooth;
       "
+      class="tw-mb-2"
     >
-      <div class="row flex tw-gap-2 items-start" style="width: 100%">
-        <div class="col" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+      <div class="row flex items-start" style="width: 100%">
+        <div class="col" :class="store.state.theme === 'dark' ? 'dark-mode1' : 'light-mode1'">
           <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <!-- alerts setup  section -->
+             <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
             <div
-              class="flex tw-mt-1 justify-start items-center flex-wrap "
+              class="flex justify-start items-center flex-wrap card-container"
             >
-              <div class="tw-w-full tw-ml-2   ">
+              <div class="tw-w-full tw-ml-2">
                 <AlertsContainer 
                   name="query"
                   v-model:is-expanded="expandState.alertSetup"
@@ -81,29 +82,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon="edit"
                   class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
                   :iconClass="'tw-mt-[2px]'"
-              />
+                />
               </div>
-              <div v-if="expandState.alertSetup" class="tw-w-full row alert-setup-container">
+              <div v-if="expandState.alertSetup" class="tw-w-full row alert-setup-container o2-alert-tab-border tw-px-4 tw-pt-2 tw-pb-3">
     
               <div class="tw-w-full ">
 
                 <div
-                  class="alert-name-input o2-input flex justify-between items-center tw-gap-10 tw-pb-3"
-                  style="padding-top: 12px;"
+                  class="alert-name-input flex justify-between items-center tw-gap-10 tw-pb-3"
                   data-test="add-alert-name-input-container"
                 >
                   <q-input
                     data-test="add-alert-name-input row"
                     v-model="formData.name"
                     :label="t('alerts.name') + ' *'"
-                    color="input-border"
                       class="showLabelOnTop col"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                     stack-label
-                    outlined
-                    filled
                     dense
-                    hide-bottom-space
+                    borderless
                     v-bind:readonly="beingUpdated"
                     v-bind:disable="beingUpdated"
                     :rules="[
@@ -114,15 +110,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : t('common.nameRequired'),
                     ]"
                     tabindex="0"
+                    hide-bottom-space
                   />
-                  <div class="col" style="height: 62px;">
+                  <div class="col" style="height: 68px;">
                     <SelectFolderDropDown
                       :disableDropdown="beingUpdated"
                       :type="'alerts'"
-                      :style="'height: 30px'"
+                      :style="'height: 36px;'"
                       @folder-selected="updateActiveFolderId"
                       :activeFolderId="activeFolderId"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                   />
                   </div>
                 
@@ -130,13 +126,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                  class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-3"
+                  class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-4"
                   style="padding-top: 0px"
                   data-test="add-alert-stream-type-select-container"
                 >
                   <div
                     data-test="add-alert-stream-type-select"
-                    class="alert-stream-type o2-input tw-w-full col "
+                    class="tw-w-full col "
                     style="padding-top: 0"
 
                   >
@@ -146,13 +142,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="streamTypes"
                       :label="t('alerts.streamType') + ' *'"
                       :popup-content-style="{ textTransform: 'lowercase' }"
-                      color="input-border"
                       class="q-py-sm showLabelOnTop no-case col"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                       stack-label
-                      outlined
-                      filled
+                      borderless
                       dense
+                      hide-bottom-space
                       v-bind:readonly="beingUpdated"
                       v-bind:disable="beingUpdated"
                       @update:model-value="updateStreams()"
@@ -161,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     data-test="add-alert-stream-select"
-                    class="o2-input col"
+                    class="col"
                     style="padding-top: 0"
                   >
                     <q-select
@@ -172,12 +166,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :loading="isFetchingStreams"
                       color="input-border"
                       class="q-py-sm showLabelOnTop no-case col"
-                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                      filled
                       stack-label
                       dense
                       use-input
+                      borderless
                       hide-selected
+                      hide-bottom-space
                       fill-input
                       :input-debounce="400"
                       v-bind:readonly="beingUpdated"
@@ -202,7 +196,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   :label="t('alerts.scheduled')"
                   class="q-ml-none o2-radio-button"
-                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'"
                 />
                 <q-radio
                   data-test="add-alert-realtime-alert-radio"
@@ -214,16 +207,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   :label="t('alerts.realTime')"
                   class="q-ml-none o2-radio-button"
-                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'" 
                   />
               </div>
               </div>
             </div>
-            
+          </div>
 
             <div
               v-if="formData.is_real_time === 'true'"
-              class="q-pr-sm q-pa-none q-ma-none"
+              class="q-pa-none q-ma-none"
               data-test="add-alert-query-input-title"
             >
               <real-time-alert
@@ -243,8 +235,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               />
             </div>
-            <div v-else class="q-pa-none q-ma-none q-pr-sm  ">
+            <div v-else class="q-pa-none q-ma-none  ">
               <scheduled-alert
+                v-if="!isLoadingPanelData"
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
                 :conditions="formData.query_condition?.conditions || {}"
@@ -282,13 +275,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:silence="updateSilence"
                 @refresh:destinations="refreshDestinations"
                 @update:destinations="updateDestinations"
-                class="q-mt-sm"
               />
             </div>
   
             <!-- additional setup starts here -->
-            <div
-              class="flex tw-mt-1 justify-start items-center q-pb-sm flex-wrap "
+             <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
+                   <div
+              class="flex justify-start items-center q-pb-sm flex-wrap card-container"
             >
               <div class="tw-w-full tw-ml-2   ">
                 <AlertsContainer 
@@ -299,19 +292,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
                     />
             </div>
-            <div v-if="expandState.advancedSetup" class=" tw-w-full row alert-setup-container" >
+            <div v-if="expandState.advancedSetup" class=" tw-w-full row alert-setup-container tw-px-4 tw-pt-2 tw-pb-3 o2-alert-tab-border" >
 
-            <div class="tw-w-full row" >
-              <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full">
+            <div class="tw-w-full row">
+              <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full ">
               <variables-input
-                class="o2-input"
                 :variables="formData.context_attributes"
                 @add:variable="addVariable"
                 @remove:variable="removeVariable"
               />
             </div>
-
-            <div v-if="expandState.advancedSetup" class=" tw-w-full">
+            <!-- TODO: make text area also similar to qinput -->
+            <div v-if="expandState.advancedSetup" class=" tw-w-full t">
               <div data-test="add-alert-description-input tw-w-full " :class="store.state.theme === 'dark' ? '' : 'light-mode'">
                 <div class="flex items-center q-mb-sm ">
                   <span class="text-bold custom-input-label">Description</span>
@@ -330,7 +322,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="textarea"
                   placeholder="Type something"
                   rows="5"
-                  
                 />
               </div>
               <div data-test="add-alert-row-input tw-w-full">
@@ -377,6 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             
+             </div>
 
 
 
@@ -385,11 +377,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <div
-          style="width: 420px; height: 320px; position: sticky; top: 0 "
+          style="width: 430px; height: 320px; position: sticky; top: 0 "
           class=" col-2"
         >
           <preview-alert
-            style="border: 1px solid #ececec; height: 300px; width: 412px;"
+            style="border: 1px solid #ececec; height: 300px; width: 430px;"
             ref="previewAlertRef"
             :formData="formData"
             :query="previewQuery"
@@ -402,27 +394,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
     </div>
-    <div class="flex justify-end items-center q-px-lg " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: fixed; bottom: 0; left: 0; right: 0; height: 70px !important; z-index: 100;">
-      <q-btn
-        data-test="add-alert-cancel-btn"
-        v-close-popup="true"
-        class="q-mr-md o2-secondary-button tw-h-[36px]"
-        :label="t('alerts.cancel')"
-        no-caps
-        flat
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-        @click="$emit('cancel:hideform')"
-      />
-      <q-btn
-        data-test="add-alert-submit-btn"
-        class="o2-primary-button no-border tw-h-[36px]"
-        :label="t('alerts.save')"
-        type="submit"
-        no-caps
-        flat
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        @click="onSubmit"
-      />
+    <div class="tw-mx-2">
+      <div
+          class="flex justify-end q-px-md full-width tw-py-3 card-container"
+          style="position: sticky; bottom: 0px; z-index: 2"
+        >
+        <q-btn
+          data-test="add-alert-cancel-btn"
+          v-close-popup="true"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
+          :label="t('alerts.cancel')"
+          no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          @click="$emit('cancel:hideform')"
+        />
+        <q-btn
+          data-test="add-alert-submit-btn"
+          class="o2-primary-button no-border tw-h-[36px]"
+          :label="t('alerts.save')"
+          type="submit"
+          no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          @click="onSubmit"
+        />
+      </div>
     </div>
 
   </div>
@@ -453,6 +450,7 @@ import {
   defineComponent,
   ref,
   onMounted,
+  onUnmounted,
   watch,
   type Ref,
   computed,
@@ -498,6 +496,7 @@ import {
 } from "@/utils/alerts/alertPayload";
 import {
   getParser as getParserUtil,
+  addHavingClauseToQuery,
   type SqlUtilsContext,
 } from "@/utils/alerts/alertSqlUtils";
 
@@ -505,6 +504,7 @@ import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertsContainer from "./AlertsContainer.vue";
 import JsonEditor from "../common/JsonEditor.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import {
   updateGroup as updateGroupUtil,
   removeConditionGroup as removeConditionGroupUtil,
@@ -671,9 +671,11 @@ export default defineComponent({
     const vrlFunctionError = ref("");
 
     const showTimezoneWarning = ref(false);
-    
+
     const showJsonEditorDialog = ref(false);
     const validationErrors = ref([]);
+
+    const isLoadingPanelData = ref(false);
 
     const { track } = useReo();
 
@@ -711,7 +713,18 @@ export default defineComponent({
     const suffixCode = ref("");
     const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
-    onMounted(async () => {});
+    onMounted(async () => {
+      // Set up alerts context provider
+      const alertsProvider = createAlertsContextProvider(formData, store, props.isUpdated);
+      contextRegistry.register('alerts', alertsProvider);
+      contextRegistry.setActive('alerts');
+    });
+
+    onUnmounted(() => {
+      // Clean up alerts-specific context provider
+      contextRegistry.unregister('alerts');
+      contextRegistry.setActive('');
+    });
 
     const updateEditorContent = async (stream_name: string) => {
       triggerCols.value = [];
@@ -1046,10 +1059,219 @@ export default defineComponent({
 
     const navigateToErrorField = (formRef: any) => {
       const errorField = formRef.$el.querySelector('.q-field--error');
-      if (errorField) { 
+      if (errorField) {
         errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
+
+    const loadPanelDataIfPresent = async () => {
+      const route = router.currentRoute.value;
+
+      if (route.query.fromPanel === "true" && route.query.panelData) {
+        isLoadingPanelData.value = true;
+        try {
+          const panelData = JSON.parse(decodeURIComponent(route.query.panelData as string));
+
+          if (panelData.queries && panelData.queries.length > 0) {
+            const query = panelData.queries[0];
+
+            formData.value.name = `Alert from ${panelData.panelTitle}`;
+
+            // Show notification that query was imported
+            q.notify({
+              type: "positive",
+              message: t("alerts.importedFromPanel", { panelTitle: panelData.panelTitle }),
+              timeout: 3000,
+            });
+
+            if (query.fields?.stream_type) {
+              formData.value.stream_type = query.fields.stream_type;
+            }
+
+            if (query.fields?.stream) {
+              formData.value.stream_name = query.fields.stream;
+              await updateStreams(false);
+              await updateStreamFields(query.fields.stream);
+            }
+
+            // Set query type based on panel (SQL or PromQL)
+            // Always set a specific type - never leave it as empty string to avoid defaulting to quick mode
+            if (panelData.queryType === "sql") {
+              formData.value.query_condition.type = "sql";
+              // Use executedQuery if available (has variables replaced), otherwise use query.query
+              const sourceQuery = panelData.executedQuery || query.query;
+              if (sourceQuery) {
+                let sqlQuery = sourceQuery;
+
+                // If threshold is provided and we have a SQL query with GROUP BY,
+                // add a HAVING clause to filter the aggregated column
+                if (panelData.threshold !== undefined && panelData.condition && panelData.yAxisColumn) {
+                  const threshold = panelData.threshold;
+                  const operator = panelData.condition === 'above' ? '>=' : '<=';
+                  const yAxisColumn = panelData.yAxisColumn;
+
+                  // Use node-sql-parser to properly insert HAVING clause in the correct position
+                  // This handles queries with ORDER BY, LIMIT, OFFSET, etc.
+                  // Ensure parser is initialized first
+                  if (!parser) {
+                    await importSqlParser();
+                  }
+                  sqlQuery = addHavingClauseToQuery(sqlQuery, yAxisColumn, operator, threshold, parser);
+                }
+
+                formData.value.query_condition.sql = sqlQuery;
+              }
+            } else if (panelData.queryType === "promql") {
+              formData.value.query_condition.type = "promql";
+              // Use executedQuery if available (has variables replaced), otherwise use query.query
+              const sourceQuery = panelData.executedQuery || query.query;
+              if (sourceQuery) {
+                formData.value.query_condition.promql = sourceQuery;
+              }
+            } else {
+              // Default to SQL mode if queryType is not specified
+              // This prevents falling back to quick mode
+              formData.value.query_condition.type = "sql";
+            }
+
+            // Handle query builder fields for SQL panels
+            if (panelData.queryType === "sql" && query.customQuery === false && query.fields) {
+              // Enable aggregation for query builder generated SQL
+              isAggregationEnabled.value = true;
+
+              if (query.fields.x && query.fields.x.length > 0) {
+                if (!formData.value.query_condition.aggregation) {
+                  formData.value.query_condition.aggregation = {
+                    group_by: [],
+                    function: "count",
+                    having: {
+                      column: "",
+                      operator: ">=",
+                      value: 1,
+                    },
+                  };
+                }
+                formData.value.query_condition.aggregation.group_by = query.fields.x.map((x: any) => x.alias || x.column);
+              }
+
+              if (query.fields.y && query.fields.y.length > 0) {
+                const yField = query.fields.y[0];
+                if (yField.aggregationFunction) {
+                  if (!formData.value.query_condition.aggregation) {
+                    formData.value.query_condition.aggregation = {
+                      group_by: [""],
+                      function: "count",
+                      having: {
+                        column: "",
+                        operator: ">=",
+                        value: 1,
+                      },
+                    };
+                  }
+                  formData.value.query_condition.aggregation.function = yField.aggregationFunction.toLowerCase();
+                  // Set the having.column to the Y-axis field for threshold comparison
+                  formData.value.query_condition.aggregation.having.column = yField.alias || yField.column;
+                }
+              }
+
+              if (query.fields.filter && query.fields.filter.length > 0) {
+                const conditions: any[] = [];
+                query.fields.filter.forEach((filter: any) => {
+                  if (filter.type === 'list' && filter.values && filter.values.length > 0) {
+                    conditions.push({
+                      column: filter.column,
+                      operator: "=",
+                      value: filter.values[0],
+                      ignore_case: false
+                    });
+                  }
+                });
+
+                if (conditions.length > 0) {
+                  formData.value.query_condition.conditions = {
+                    groupId: getUUID(),
+                    label: 'and',
+                    items: conditions
+                  };
+                }
+              }
+            }
+
+            if (query.vrlFunctionQuery) {
+              showVrlFunction.value = true;
+              formData.value.query_condition.vrl_function = query.vrlFunctionQuery;
+            }
+
+            if (panelData.timeRange?.value_type === "relative") {
+              const relativeValue = panelData.timeRange.relative_value || 15;
+              const relativePeriod = panelData.timeRange.relative_period || "Minutes";
+
+              let periodInMinutes = relativeValue;
+              if (relativePeriod === "Hours") {
+                periodInMinutes = relativeValue * 60;
+              } else if (relativePeriod === "Days") {
+                periodInMinutes = relativeValue * 60 * 24;
+              } else if (relativePeriod === "Weeks") {
+                periodInMinutes = relativeValue * 60 * 24 * 7;
+              }
+
+              formData.value.trigger_condition.period = periodInMinutes;
+            }
+
+            // Handle threshold and condition from context menu
+            if (panelData.threshold !== undefined && panelData.condition) {
+              // For SQL with aggregation: use HAVING clause for value comparison
+              // For PromQL: use promql_condition for value comparison
+              // In both cases, set trigger_condition.threshold to 1 (fire when any row/result is returned)
+
+              if (panelData.queryType === 'promql') {
+                // For PromQL: Set up promql_condition with the threshold
+                if (!formData.value.query_condition.promql_condition) {
+                  formData.value.query_condition.promql_condition = {
+                    operator: '>=',
+                    value: 1,
+                  };
+                }
+                formData.value.query_condition.promql_condition.value = panelData.threshold;
+                formData.value.query_condition.promql_condition.operator =
+                  panelData.condition === 'above' ? '>=' : '<=';
+              } else {
+                // For SQL: Set up aggregation HAVING clause with the threshold
+                // If aggregation is enabled, set the having clause
+                if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+                  if (!formData.value.query_condition.aggregation.having) {
+                    formData.value.query_condition.aggregation.having = {
+                      column: "",
+                      operator: ">=",
+                      value: 1,
+                    };
+                  }
+                  formData.value.query_condition.aggregation.having.value = panelData.threshold;
+                  formData.value.query_condition.aggregation.having.operator =
+                    panelData.condition === 'above' ? '>=' : '<=';
+                }
+              }
+
+              // Set alert trigger threshold to 1 and operator to >=
+              // This means: fire the alert when ANY row is returned from the query
+              // (The actual value comparison is done in HAVING clause for SQL or in PromQL query)
+              formData.value.trigger_condition.threshold = 1;
+              formData.value.trigger_condition.operator = '>=';
+            }
+          }
+        } catch (error) {
+          console.error("Error loading panel data:", error);
+          q.notify({
+            type: "negative",
+            message: "Failed to load panel data",
+            timeout: 2000
+          });
+        } finally {
+          isLoadingPanelData.value = false;
+        }
+      }
+    };
+
 
     const openJsonEditor = () => {
       showJsonEditorDialog.value = true;
@@ -1175,17 +1397,31 @@ export default defineComponent({
       originalStreamFields,
       generateSqlQuery: generateSqlQueryLocal,
       track,
+      loadPanelDataIfPresent,
+      isLoadingPanelData,
     };
   },
 
-  created() {
+  async created() {
     // TODO OK: Refactor this code
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
+
+    // Check if this is from a dashboard panel - if so, don't set default query type
+    const route = this.router.currentRoute.value;
+    const isFromPanel = route.query.fromPanel === "true" && route.query.panelData;
+
     if(!this.isUpdated){
       this.formData.is_real_time = this.alertType === 'realTime'? true : false;
     }
       this.formData.is_real_time = this.formData.is_real_time.toString();
+
+    // If from panel, load panel data BEFORE initializing child components
+    // This ensures the correct query type is set before ScheduledAlert initializes
+    if (isFromPanel) {
+      this.formData.query_condition.type = ""; // Temporarily set to empty
+      await this.loadPanelDataIfPresent(); // Load panel data and set correct type
+    }
 
     // Set default frequency to min_auto_refresh_interval
     if (this.store.state?.zoConfig?.min_auto_refresh_interval)
@@ -1377,7 +1613,7 @@ export default defineComponent({
               message: "Error while validating sql query. Please check the query and try again.",
               timeout: 1500,
             });
-            console.log("Error while validating sql query",error);
+            console.error("Error while validating sql query",error);
             return false;
           }
         }
@@ -1608,7 +1844,9 @@ export default defineComponent({
 }
 
 
-
+.o2-alert-tab-border{
+  border-top: 0.0625rem solid var(--o2-border-color);
+}
   
 
 

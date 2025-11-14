@@ -14,9 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
-use o2_dex::meta::auth::RoleRequest;
+use {
+    crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers},
+    o2_dex::meta::auth::RoleRequest,
+};
 
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
@@ -37,7 +40,7 @@ use crate::common::meta::{
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserRoleRequest, description = "UserRoleRequest", content_type = "application/json"),
+    request_body(content = inline(UserRoleRequest), description = "UserRoleRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
@@ -91,7 +94,7 @@ pub async fn create_role(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserRoleRequest, description = "UserRoleRequest", content_type = "application/json"),
+    request_body(content = inline(UserRoleRequest), description = "UserRoleRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
@@ -185,7 +188,7 @@ pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpRespo
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -193,15 +196,17 @@ pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpRespo
     )
 )]
 #[get("/{org_id}/roles")]
-pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn get_roles(
+    org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let mut permitted;
     // Get List of allowed objects
 
-    let user_id = req.headers().get("user_id").unwrap();
     match crate::handler::http::auth::validator::list_objects_for_user(
         &org_id,
-        user_id.to_str().unwrap(),
+        &user_email.user_id,
         "GET",
         "role",
     )
@@ -216,18 +221,18 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
     }
     // Get List of allowed objects ends
 
-    if let Some(mut local_permitted) = permitted {
+    if let Some(local_permitted) = permitted.as_mut() {
         let prefix = "role:";
         for value in local_permitted.iter_mut() {
-            if value.starts_with(prefix) {
-                *value = value.strip_prefix(prefix).unwrap().to_string();
+            if let Some(remaining) = value.strip_prefix(prefix) {
+                *value = remaining.to_string();
             }
+
             let role_prefix = format!("{org_id}/");
-            if value.starts_with(&role_prefix) {
-                *value = value.strip_prefix(&role_prefix).unwrap().to_string()
+            if let Some(remaining) = value.strip_prefix(&role_prefix) {
+                *value = remaining.to_string()
             }
         }
-        permitted = Some(local_permitted);
     }
 
     match o2_openfga::authorizer::roles::get_all_roles(&org_id, permitted).await {
@@ -250,7 +255,7 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -258,10 +263,7 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
     )
 )]
 #[get("/{org_id}/roles")]
-pub async fn get_roles(
-    _org_id: web::Path<String>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+pub async fn get_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
@@ -280,7 +282,7 @@ pub async fn get_roles(
         ("org_id" = String, Path, description = "Organization name"),
         ("role_id" = String, Path, description = "Role Id"),
     ),
-    request_body(content = RoleRequest, description = "RoleRequest", content_type = "application/json"),
+    request_body(content = inline(RoleRequest), description = "RoleRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
@@ -326,7 +328,6 @@ pub async fn update_role(
         ("org_id" = String, Path, description = "Organization name"),
         ("role_id" = String, Path, description = "Role Id"),
     ),
-    request_body(content = Object, description = "RoleRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
@@ -357,7 +358,7 @@ pub async fn update_role(
         ("resource" = String, Path, description = "resource"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -388,7 +389,7 @@ pub async fn get_role_permissions(
         ("resource" = String, Path, description = "resource"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -415,7 +416,7 @@ pub async fn get_role_permissions(
         ("role_id" = String, Path, description = "Role Id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -443,7 +444,7 @@ pub async fn get_users_with_role(path: web::Path<(String, String)>) -> Result<Ht
         ("role_id" = String, Path, description = "Role Id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -470,7 +471,7 @@ pub async fn get_users_with_role(
         ("user_email" = String, Path, description = "User email address"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -497,7 +498,7 @@ pub async fn get_roles_for_user(path: web::Path<(String, String)>) -> Result<Htt
         ("user_email" = String, Path, description = "User email address"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -522,7 +523,7 @@ pub async fn get_roles_for_user(_path: web::Path<(String, String)>) -> Result<Ht
         ("user_email" = String, Path, description = "User email address"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -550,7 +551,7 @@ pub async fn get_groups_for_user(path: web::Path<(String, String)>) -> Result<Ht
         ("user_email" = String, Path, description = "User email address"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -575,7 +576,7 @@ pub async fn get_groups_for_user(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserGroup, description = "UserGroup", content_type = "application/json"),
+    request_body(content = inline(UserGroup), description = "UserGroup", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
@@ -617,7 +618,7 @@ pub async fn create_group(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserGroup, description = "UserGroup", content_type = "application/json"),
+    request_body(content = inline(UserGroup), description = "UserGroup", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
@@ -646,7 +647,7 @@ pub async fn create_group(
         ("org_id" = String, Path, description = "Organization name"),
         ("group_name" = String, Path, description = "Group name"),
     ),
-    request_body(content = UserGroupRequest, description = "UserGroupRequest", content_type = "application/json"),
+    request_body(content = inline(UserGroupRequest), description = "UserGroupRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
@@ -689,7 +690,7 @@ pub async fn update_group(
         ("org_id" = String, Path, description = "Organization name"),
         ("group_name" = String, Path, description = "Group name"),
     ),
-    request_body(content = UserGroupRequest, description = "UserGroupRequest", content_type = "application/json"),
+    request_body(content = inline(UserGroupRequest), description = "UserGroupRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
@@ -718,21 +719,23 @@ pub async fn update_group(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/groups")]
-pub async fn get_groups(path: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn get_groups(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
     let mut permitted;
     // Get List of allowed objects
 
-    let user_id = req.headers().get("user_id").unwrap();
     match crate::handler::http::auth::validator::list_objects_for_user(
         &org_id,
-        user_id.to_str().unwrap(),
+        &user_email.user_id,
         "GET",
         "group",
     )
@@ -783,7 +786,7 @@ pub async fn get_groups(path: web::Path<String>, req: HttpRequest) -> Result<Htt
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -807,7 +810,7 @@ pub async fn get_groups(_path: web::Path<String>) -> Result<HttpResponse, Error>
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserGroup),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(UserGroup)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -835,7 +838,7 @@ pub async fn get_group_details(path: web::Path<(String, String)>) -> Result<Http
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserGroup),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(UserGroup)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -859,7 +862,7 @@ pub async fn get_group_details(_path: web::Path<(String, String)>) -> Result<Htt
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -893,7 +896,7 @@ pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, E
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -1135,7 +1138,7 @@ mod tests {
             let app = test::init_service(App::new().service(update_role)).await;
             let req = test::TestRequest::post()
                 .uri("/test_org/roles/test_role")
-                .set_json(&"test")
+                .set_json("test")
                 .to_request();
 
             let resp = test::call_service(&app, req).await;

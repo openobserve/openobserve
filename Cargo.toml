@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.15.0"
+version = "0.16.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -45,6 +45,7 @@ inherits = "release"
 debug = true
 strip = false
 codegen-units = 4
+split-debuginfo = "packed"
 
 [dependencies]
 actix-cors = "0.7"
@@ -90,6 +91,7 @@ datafusion-functions-aggregate-common.workspace = true
 datafusion-functions-json.workspace = true
 arrow.workspace = true
 arrow-flight.workspace = true
+arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
@@ -104,7 +106,8 @@ http-auth-basic = "0.3"
 itertools.workspace = true
 jsonwebtoken = "9.3"
 log.workspace = true
-maxminddb = "0.25"
+maxminddb = "0.26"
+md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.43", default-features = false, optional = true }
 once_cell.workspace = true
@@ -114,7 +117,7 @@ opentelemetry-otlp.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
 prometheus.workspace = true
-promql-parser = "0.4"
+promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-parser", branch = "openobserve" }
 prost.workspace = true
 prost-wkt-types.workspace = true
 proto.workspace = true
@@ -170,9 +173,8 @@ tantivy.workspace = true
 tantivy-fst.workspace = true
 zip.workspace = true
 futures-util = "0.3.31"
-tokio-tungstenite = "0.24.0"
 tokio-util = "0.7.13"
-pprof = { version = "0.14", features = [
+pprof = { version = "0.15.0", features = [
     "flamegraph",
     "prost-codec",
 ], optional = true }
@@ -194,7 +196,7 @@ async-walkdir.workspace = true
 expect-test.workspace = true
 base64 = "0.22"
 float-cmp = "0.10"
-rcgen = "0.13"
+rcgen = "0.14.4"
 
 [workspace]
 members = [
@@ -237,7 +239,7 @@ async-nats = "0.42"
 async-stream = "0.3.6"
 async-trait = "0.1"
 async-recursion = "1.0"
-async-walkdir = "1.0.0"
+async-walkdir = "2.1.0"
 aws-config = "1.5.17"
 aws-sdk-sns = "1.61.0"
 base64 = "0.22"
@@ -249,13 +251,14 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
     "_fetcher-rusttls-tokio",
 ], default-features = false, rev = "6f2392f78ae851e2acf33df8e9764cc299d837db" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+chrono-tz = "0.10"
 cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "50.0.0"
-datafusion-proto = "50.0.0"
-datafusion-functions-aggregate-common = "50.0.0"
+datafusion = "50.2.0"
+datafusion-proto = "50.2.0"
+datafusion-functions-aggregate-common = "50.2.0"
 datafusion-functions-json = "0.50.0"
 expect-test = "1.4"
 arrow = { version = "56.0.0", features = ["ipc_compression", "prettyprint"] }
@@ -284,6 +287,7 @@ lettre = { version = "0.11", default-features = false, features = [
     "pool",
     "tokio1",
     "tokio1-rustls-tls",
+    "aws-lc-rs",
 ] }
 log = "0.4"
 md5 = "0.8.0"
@@ -305,7 +309,7 @@ opentelemetry-otlp = { version = "0.30", features = [
     "serde",
     "trace",
     "reqwest-client",
-    "grpc-tonic"
+    "grpc-tonic",
 ] }
 opentelemetry-proto = { version = "0.30", features = [
     "gen-tonic",
@@ -315,7 +319,7 @@ opentelemetry-proto = { version = "0.30", features = [
     "trace",
 ] }
 parking_lot = "0.12"
-prometheus = { version = "0.13", features = ["process"] }
+prometheus = { version = "0.14", features = ["process"] }
 prost = "0.13.1"
 prost-wkt-types = "0.6"
 rand = "0.9.2"
@@ -348,7 +352,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
 sha1 = "0.10.6"
 sha256 = "1.4.0"
-snafu = "0.7.5"
+snafu = "0.8.9"
 snap = "1"
 sqlx = { version = "0.8.3", features = [
     "runtime-tokio-rustls",
@@ -360,10 +364,10 @@ sqlx = { version = "0.8.3", features = [
 strum = { version = "0.27", features = ["derive"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.37"
-tantivy = { version = "0.24", features = ["quickwit"] }
+tantivy = { version = "0.25", features = ["quickwit"] }
 tantivy-fst = "0.5"
 tempfile = "3"
-thiserror = "1.0"
+thiserror = "2.0.17"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-rustls = { version = "0.26", default-features = false, features = [
@@ -387,7 +391,7 @@ urlencoding = "2.1"
 utoipa = { version = "5", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 uuid = { version = "1.18.1", features = ["v7"] }
-vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "063cabbbf4bc6f75794fa0ccd3b0bd5c074f0e35" }
-vrl = { version = "0.22", features = ["value", "compiler", "test"] }
-zip = "5.1.1"
+vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "v0.49.0-24092025" }
+vrl = { version = "0.26.0", features = ["value", "compiler", "test"] }
+zip = "6.0.0"
 zstd = "0.13"

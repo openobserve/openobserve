@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod auth;
+pub mod extractors;
 pub mod models;
 pub mod request;
 pub mod router;

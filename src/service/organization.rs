@@ -61,7 +61,11 @@ use crate::{
 pub async fn get_summary(org_id: &str) -> OrgSummary {
     let streams = get_streams(org_id, None, false, None).await;
     let mut stream_summary = StreamSummary::default();
+    let mut has_trigger_stream = false;
     for stream in streams.iter() {
+        if stream.name == usage::TRIGGERS_STREAM {
+            has_trigger_stream = true;
+        }
         if !stream.stream_type.eq(&StreamType::Index)
             && !stream.stream_type.eq(&StreamType::Metadata)
         {
@@ -73,19 +77,23 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
         }
     }
 
-    let sql = format!(
-        "SELECT module, status FROM {} WHERE org = '{}' GROUP BY module, status, key",
-        usage::TRIGGERS_USAGE_STREAM,
-        org_id
-    );
-    let end_time = time::now_micros();
-    let start_time = end_time - time::second_micros(900); // 15 mins
-    let trigger_status_results = self_reporting::search::get_usage(sql, start_time, end_time)
-        .await
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|v| json::from_value::<TriggerStatusSearchResult>(v).ok())
-        .collect::<Vec<_>>();
+    let trigger_status_results = if !has_trigger_stream {
+        vec![]
+    } else {
+        let sql = format!(
+            "SELECT module, status FROM {} WHERE org = '{}' GROUP BY module, status, key",
+            usage::TRIGGERS_STREAM,
+            org_id
+        );
+        let end_time = time::now_micros();
+        let start_time = end_time - time::second_micros(900); // 15 mins
+        self_reporting::search::get_usage(sql, start_time, end_time)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|v| json::from_value::<TriggerStatusSearchResult>(v).ok())
+            .collect::<Vec<_>>()
+    };
 
     let pipelines = db::pipeline::list_by_org(org_id).await.unwrap_or_default();
     let pipeline_summary = PipelineSummary {

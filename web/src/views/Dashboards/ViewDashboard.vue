@@ -17,12 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier">
+  <q-page :key="store.state.selectedOrganization.identifier" class="tw-h-full">
     <div
       ref="fullscreenDiv"
-      :class="`${isFullscreen ? 'fullscreen' : ''}  ${
-        store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
-      }`"
+      :class="{
+        fullscreen: isFullscreen,
+        'tw-h-[calc(100vh-105px)]': !store.state.printMode,
+        'print-mode-container': store.state.printMode,
+      }"
+      class="tw-mx-[0.625rem] q-pt-xs"
     >
       <div
         :class="`${
@@ -32,9 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'fullscreenHeader'
             : ''
         }`"
+        class="tw-mb-[0.625rem]"
       >
         <div
-          class="tw-flex justify-between items-center q-pa-xs tw-w-full tw-min-w-0"
+          class="tw-flex justify-between items-center tw-w-full tw-px-[0.626rem] tw-min-w-0 card-container tw-h-[48px]"
         >
           <div class="tw-flex tw-flex-1 tw-overflow-hidden">
             <q-btn
@@ -45,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outline
               icon="arrow_back_ios_new"
               data-test="dashboard-back-btn"
-              class="hideOnPrintMode"
+              class="hideOnPrintMode el-border"
             />
             <span
               class="q-table__title folder-name tw-px-2 tw-cursor-pointer tw-transition-all tw-rounded-sm tw-ml-2"
@@ -72,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="add"
@@ -118,13 +122,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               @trigger="refreshData"
-              class="dashboard-icons hideOnPrintMode"
+              class="dashboard-icons hideOnPrintMode q-ml-sm"
+              style="padding-left: 0px; padding-right: 0px;"
               size="sm"
             />
             <q-btn
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="cancel"
@@ -137,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-else
               :outline="isVariablesChanged ? false : true"
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="refresh"
@@ -158,13 +163,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <ExportDashboard
               v-if="!isFullscreen"
-              class="hideOnPrintMode"
+              class="hideOnPrintMode el-border"
               :dashboardId="currentDashboardData.data?.dashboardId"
             />
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="share"
@@ -176,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="settings"
@@ -187,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
             <q-btn
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
+              class="dashboard-icons q-px-sm q-ml-sm el-border"
               size="sm"
               no-caps
               :icon="store.state.printMode === true ? 'close' : 'print'"
@@ -201,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <q-btn
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               :icon="
@@ -218,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               :icon="outlinedDescription"
@@ -231,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
               size="sm"
               no-caps
               icon="code"
@@ -257,9 +262,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :folderId="route.query.folder"
         :reportId="reportId"
         :currentTimeObj="currentTimeObjPerPanel"
+        :shouldRefreshWithoutCacheObj="shouldRefreshWithoutCachePerPanel"
         :dashboardName="currentDashboardData.data?.title"
         :folderName="folderNameFromFolderId"
         :selectedDateForViewPanel="selectedDate"
+        :allowAlertCreation="true"
         @onDeletePanel="onDeletePanel"
         @onMovePanel="onMovePanel"
         @updated:data-zoom="onDataZoom"
@@ -374,6 +381,10 @@ import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
+import {
+  createDashboardsContextProvider,
+  contextRegistry,
+} from "@/composables/contextProviders";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -626,6 +637,17 @@ export default defineComponent({
       if (!store.state.organizationData.folders.length) {
         await getFoldersList(store);
       }
+
+      // Set up dashboard context provider
+      const dashboardProvider = createDashboardsContextProvider(
+        route,
+        store,
+        undefined,
+        false,
+        currentDashboardData,
+      );
+      contextRegistry.register("dashboards", dashboardProvider);
+      contextRegistry.setActive("dashboards");
     });
 
     const setTimeString = () => {
@@ -658,7 +680,7 @@ export default defineComponent({
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
-        (route.query.folder ?? "default"),
+        route.query.folder ?? "default",
       );
 
       if (
@@ -820,7 +842,7 @@ export default defineComponent({
       return router.push({
         path: "/dashboards",
         query: {
-          folder: (route.query.folder ?? "default"),
+          folder: route.query.folder ?? "default",
         },
       });
     };
@@ -832,7 +854,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
-          folder: (route.query.folder ?? "default"),
+          folder: route.query.folder ?? "default",
           tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         },
       });
@@ -842,6 +864,19 @@ export default defineComponent({
       if (!arePanelsLoading.value) {
         // Generate new run ID for whole dashboard refresh
         generateNewDashboardRunId();
+
+        // Set shouldRefreshWithoutCache to false for all panels
+        const allPanelIds = [];
+        currentDashboardData.data.tabs?.forEach((tab: any) => {
+          tab.panels?.forEach((panel: any) => {
+            if(panel.id){
+              allPanelIds.push(panel?.id);
+              shouldRefreshWithoutCachePerPanel.value[panel.id] = false;
+            }
+          });
+        });
+
+        // Refresh the dashboard
         dateTimePicker.value.refresh();
       }
     };
@@ -951,7 +986,7 @@ export default defineComponent({
           store,
           route.query.dashboard,
           panelId,
-          (route.query.folder ?? "default"),
+          route.query.folder ?? "default",
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         );
         await loadDashboard();
@@ -981,7 +1016,7 @@ export default defineComponent({
           store,
           route.query.dashboard,
           panelId,
-          (route.query.folder ?? "default"),
+          route.query.folder ?? "default",
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           newTabId,
         );
@@ -1114,7 +1149,11 @@ export default defineComponent({
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
-      
+
+      // Clean up dashboard context provider
+      contextRegistry.unregister("dashboards");
+      contextRegistry.setActive("");
+
       // Clear all refs
       cleanupRefs();
     });
@@ -1124,10 +1163,17 @@ export default defineComponent({
     });
 
     const currentTimeObjPerPanel = ref({});
+    const shouldRefreshWithoutCachePerPanel = ref({});
 
-    const refreshPanelRequest = (panelId) => {
+    const refreshPanelRequest = (panelId, shouldRefreshWithoutCache) => {
       // Set the panel ID to be refreshed
       panelIdToBeRefreshed.value = panelId;
+
+      // Store the shouldRefreshWithoutCache value for this panel
+      shouldRefreshWithoutCachePerPanel.value = {
+        ...shouldRefreshWithoutCachePerPanel.value,
+        [panelId]: shouldRefreshWithoutCache || false,
+      };
 
       // when the date changes from the picker, update the current time object for the dashboard
       if (selectedDate.value && dateTimePicker.value) {
@@ -1200,6 +1246,7 @@ export default defineComponent({
       selectedDate,
       currentTimeObj,
       currentTimeObjPerPanel,
+      shouldRefreshWithoutCachePerPanel,
       refreshInterval,
       // ----------------
       refreshData,
@@ -1283,28 +1330,131 @@ export default defineComponent({
 }
 .stickyHeader.fullscreenHeader {
   top: 0px;
+  z-index: 5100 !important;
 }
 
 .fullscreen {
-  width: 100vw;
-  height: 100vh;
-  overflow-y: auto; /* Enables scrolling within the div */
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 10000; /* Ensure it's on top */
-  /* Additional styling as needed */
+  width: 100vw !important;
+  height: 100vh !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 5000 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: var(--q-color-page-background, #ffffff) !important;
+}
+
+.print-mode-container {
+  height: 100vh !important;
+  overflow-y: auto !important;
+}
+
+@media print {
+  .print-mode-container {
+    height: auto !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
 }
 
 .dashboard-icons {
   height: 30px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+
+  :deep(.date-time-button) {
+    height: 30px;
+    min-height: 30px;
+  }
+
+  :deep(.q-btn-dropdown) {
+    height: 30px;
+    min-height: 30px;
+    padding: 0 8px;
+
+    .q-btn__content {
+      line-height: normal;
+      align-items: center;
+    }
+  }
 }
 
 .folder-name {
-  color: $primary !important;
+  color: var(--o2-menu-color) !important;
 }
 
 .folder-name:hover {
-  background-color: $accent !important;
+  border-radius: 0.325rem;
+  background-color: var(--o2-tab-bg) !important;
+}
+
+.el-border {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
+}
+
+.el-border {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
+}
+
+/* Outline state borders */
+.refresh-btn-group .apply-btn-refresh.q-btn--outline::before {
+  border-right: none !important;
+}
+
+.refresh-btn-group .apply-btn-dropdown.q-btn--outline::before {
+  border-left: 1px solid $border-color !important;
+}
+
+/* Flat state borders (when loading/cancel) - using pseudo-elements to avoid layout shifts */
+.refresh-btn-group .apply-btn-refresh.q-btn--flat::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid $border-color !important;
+  border-right: none !important;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.refresh-btn-group .apply-btn-dropdown.q-btn--flat::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid $border-color !important;
+  border-left: 1px solid $border-color !important;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.apply-btn-refresh {
+  border-top-left-radius: 4px !important;
+  border-bottom-left-radius: 4px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.apply-btn-dropdown {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-top-right-radius: 4px !important;
+  border-bottom-right-radius: 4px !important;
 }
 </style>

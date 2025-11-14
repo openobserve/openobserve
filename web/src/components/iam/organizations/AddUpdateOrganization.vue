@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height" style="width: 30vw">
-    <q-card-section class="q-px-md q-py-sm ">
+  <q-card class="o2-side-dialog column full-height">
+    <q-card-section class="q-py-md tw-w-full">
       <div class="row items-center no-wrap q-py-sm">
         <div class="col">
           <div
@@ -40,84 +40,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section class="q-w-md">
-      <q-form ref="addOrganizationForm" @submit="onSubmit">
-        <q-input
-          v-if="beingUpdated"
-          v-model="organizationData.id"
-          :readonly="beingUpdated"
-          :disabled="beingUpdated"
-          stack-label
-          outlined
-          filled
-          dense
-          :label="t('organization.id')"
-          class="showLabelOnTop"
-        />
 
-        <q-input
-          v-model.trim="organizationData.name"
-          :label="t('organization.name') + '*'"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          :rules="[
-            (val: any) =>
-              !!val
-                ? isValidOrgName ||
-                  'Use alphanumeric characters, space and underscore only.'
-                : t('organization.nameRequired'),
-          ]"
-          data-test="org-name"
-          maxlength="100"
-          hide-bottom-space
-        >
-        <template v-slot:hint>
-                Use alphanumeric characters, space and underscore only.
-          </template>
-      </q-input>
+      <q-separator />
+      <div>
+        <q-form ref="addOrganizationForm" @submit="onSubmit">
+          <q-input
+            v-if="beingUpdated"
+            v-model="organizationData.id"
+            :readonly="beingUpdated"
+            :disabled="beingUpdated"
+            stack-label
+            borderless
+            hide-bottom-space
+            dense
+            :label="t('organization.id')"
+            class="showLabelOnTop tw-mt-2"
+          />
 
-        <div class="flex ">
-          <q-btn
-            v-close-popup="true"
-            class="q-mr-md o2-secondary-button tw-h-[36px]"
-            :label="t('organization.cancel')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            @click="router.replace({ name: 'organizations' })"
-            data-test="cancel-organizations-modal"
-          />
-          <q-btn
-            :disable="organizationData.name === '' && !proPlanRequired"
-            :label="t('organization.save')"
-            class="o2-primary-button no-border tw-h-[36px]"
-            type="submit"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            data-test="add-org"
-          />
-        </div>
+          <q-input
+            v-model.trim="organizationData.name"
+            :label="t('organization.name') + '*'"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop tw-mt-2"
+            stack-label
+            borderless
+            dense
+            :rules="[
+              (val: any) =>
+                !!val
+                  ? isValidOrgName ||
+                    'Use alphanumeric characters, space and underscore only.'
+                  : t('organization.nameRequired'),
+            ]"
+            data-test="org-name"
+            maxlength="100"
+            hide-bottom-space
+          >
+            <template v-slot:hint>
+              Use alphanumeric characters, space and underscore only.
+            </template>
+          </q-input>
 
-        <div class="flex justify-center q-mt-lg" v-if="proPlanRequired">
-          <q-btn
-            class="q-mb-md text-bold no-border q-ml-md"
-            :label="t('organization.proceed_subscription')"
-            text-color="light-text"
-            padding="sm xl"
-            color="secondary"
-            no-caps
-            @click="completeSubscriptionProcess"
-          />
-        </div>
-      </q-form>
+          <div class="flex justify-start tw-mt-6">
+            <q-btn
+              v-close-popup="true"
+              class="q-mr-md o2-secondary-button tw-h-[36px]"
+              :label="t('organization.cancel')"
+              no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              @click="router.replace({ name: 'organizations' })"
+              data-test="cancel-organizations-modal"
+            />
+            <q-btn
+              :disable="organizationData.name === '' && !proPlanRequired"
+              :label="t('organization.save')"
+              class="o2-primary-button no-border tw-h-[36px]"
+              type="submit"
+              no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              data-test="add-org"
+            />
+          </div>
+
+          <div class="flex justify-center q-mt-lg" v-if="proPlanRequired">
+            <q-btn
+              class="q-mb-md text-bold no-border q-ml-md"
+              :label="t('organization.proceed_subscription')"
+              text-color="light-text"
+              padding="sm xl"
+              color="secondary"
+              no-caps
+              @click="completeSubscriptionProcess"
+            />
+          </div>
+        </q-form>
+      </div>
     </q-card-section>
   </q-card>
 </template>

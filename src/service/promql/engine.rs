@@ -19,8 +19,11 @@ use arrow::array::Array;
 use async_recursion::async_recursion;
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, HashLabelValue, NAME_LABEL, VALUE_LABEL},
-    utils::json,
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    utils::{
+        hash::{Sum64, gxhash},
+        json,
+    },
 };
 use datafusion::{
     arrow::{
@@ -29,6 +32,9 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     functions_aggregate::min_max::max,
+    physical_plan::{
+        Partitioning, execute_stream_partitioned, expressions::Column, repartition::RepartitionExec,
+    },
     prelude::{DataFrame, SessionContext, col, lit},
 };
 use futures::{TryStreamExt, future::try_join_all};
@@ -41,35 +47,47 @@ use promql_parser::{
         VectorMatchCardinality, VectorSelector, token,
     },
 };
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
     PromqlContext,
     utils::{apply_label_selector, apply_matchers},
 };
 use crate::service::promql::{
-    DEFAULT_MAX_SERIES_PER_QUERY, aggregations, binaries, functions, micros, value::*,
+    aggregations, binaries, functions, micros, rewrite::remove_filter_all, value::*,
 };
 
 pub struct Engine {
+    trace_id: String,
+    /// PromQL evaluation context
     ctx: Arc<PromqlContext>,
-    /// The time boundaries for the evaluation.
-    time: i64,
+    /// Evaluation context for promql queries
+    eval_ctx: EvalContext,
     /// Filters to include certain columns
     col_filters: Option<HashSet<String>>,
+    /// The result type of the query
     result_type: Option<String>,
-    trace_id: String,
 }
 
 impl Engine {
-    pub fn new(trace_id: &str, ctx: Arc<PromqlContext>, time: i64) -> Self {
+    pub fn new(trace_id: &str, ctx: Arc<PromqlContext>, eval_ctx: EvalContext) -> Self {
         Self {
             ctx,
-            time,
+            eval_ctx,
             col_filters: Some(HashSet::new()),
             result_type: None,
             trace_id: trace_id.to_string(),
         }
+    }
+
+    /// Create a new engine with evaluation context for range queries
+    /// This is now an alias for `new()` since eval_ctx is always required
+    pub fn new_with_context(
+        trace_id: &str,
+        ctx: Arc<PromqlContext>,
+        eval_ctx: EvalContext,
+    ) -> Self {
+        Self::new(trace_id, ctx, eval_ctx)
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
@@ -179,29 +197,26 @@ impl Engine {
             PromExpr::Unary(UnaryExpr { expr }) => {
                 let val = self.exec_expr(expr).await?;
                 match val {
-                    Value::Vector(v) => {
-                        let out = v
+                    Value::Matrix(m) => {
+                        let out = m
                             .into_iter()
-                            .map(|mut instant| InstantValue {
-                                labels: std::mem::take(&mut instant.labels),
-                                sample: Sample {
-                                    timestamp: instant.sample.timestamp,
-                                    value: -instant.sample.value,
-                                },
+                            .map(|mut range| RangeValue {
+                                labels: std::mem::take(&mut range.labels).without_metric_name(),
+                                samples: range
+                                    .samples
+                                    .into_iter()
+                                    .map(|s| Sample {
+                                        timestamp: s.timestamp,
+                                        value: -s.value,
+                                    })
+                                    .collect(),
+                                exemplars: range.exemplars,
+                                time_window: range.time_window,
                             })
                             .collect();
-                        Value::Vector(out)
+                        Value::Matrix(out)
                     }
-                    Value::Float(f) => {
-                        let v = InstantValue {
-                            labels: Labels::default(),
-                            sample: Sample {
-                                timestamp: self.time,
-                                value: -f,
-                            },
-                        };
-                        Value::Vector(vec![v])
-                    }
+                    Value::Float(f) => Value::Float(-f),
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
                             "Unsupported Unary: {expr:?}"
@@ -217,10 +232,12 @@ impl Engine {
                 let op = expr.op.is_comparison_operator();
 
                 // This is a very special case, as we treat the float also a
-                // `Value::Vector(vec![element])` therefore, better convert it
+                // `Value::Matrix(vec![element])` therefore, better convert it
                 // back to its representation.
                 let rhs = match rhs {
-                    Value::Vector(v) if v.len() == 1 => Value::Float(v[0].sample.value),
+                    Value::Matrix(m) if m.len() == 1 && m[0].samples.len() == 1 => {
+                        Value::Float(m[0].samples[0].value)
+                    }
                     _ => rhs,
                 };
                 match (lhs, rhs) {
@@ -234,61 +251,40 @@ impl Engine {
                         )?;
                         Value::Float(value)
                     }
-                    (Value::Vector(left), Value::Vector(right)) => {
+                    (Value::Matrix(left), Value::Matrix(right)) => {
                         binaries::vector_bin_op(expr, left, right)?
                     }
-                    (Value::Vector(left), Value::Float(right)) => {
+                    (Value::Matrix(left), Value::Float(right)) => {
                         binaries::vector_scalar_bin_op(expr, left, right, false).await?
                     }
-                    (Value::Float(left), Value::Vector(right)) => {
+                    (Value::Float(left), Value::Matrix(right)) => {
                         binaries::vector_scalar_bin_op(expr, right, left, true).await?
                     }
                     (Value::None, Value::None) => Value::None,
                     _ => {
                         log::debug!(
-                            "[trace_id: {}] [PromExpr::Binary] either lhs or rhs vector is found to be empty",
+                            "[trace_id: {}] [PromExpr::Binary] either lhs or rhs matrix is found to be empty",
                             self.trace_id
                         );
-                        Value::Vector(vec![])
+                        Value::Matrix(vec![])
                     }
                 }
             }
             PromExpr::Paren(ParenExpr { expr }) => self.exec_expr(expr).await?,
             PromExpr::Subquery(expr) => {
                 let val = self.exec_expr(&expr.expr).await?;
-                let time_window = Some(TimeWindow::new(self.time, expr.range));
+                let range = expr.range;
                 let matrix = match val {
-                    Value::Vector(v) => v
-                        .iter()
-                        .map(|v| RangeValue {
-                            labels: v.labels.to_owned(),
-                            samples: vec![v.sample.clone()],
-                            exemplars: None,
-                            time_window: time_window.clone(),
-                        })
-                        .collect(),
-                    Value::Instant(v) => {
-                        vec![RangeValue {
-                            labels: v.labels.to_owned(),
-                            samples: vec![v.sample.clone()],
-                            exemplars: None,
-                            time_window,
-                        }]
+                    Value::Matrix(vs) => {
+                        // For matrix type, update the time_window range
+                        vs.into_iter()
+                            .map(|mut rv| {
+                                // Update time_window with new range
+                                rv.time_window = Some(TimeWindow::new(range));
+                                rv
+                            })
+                            .collect()
                     }
-                    Value::Range(v) => vec![v],
-                    Value::Matrix(vs) => vs,
-                    Value::Sample(s) => vec![RangeValue {
-                        labels: Labels::default(),
-                        samples: vec![s],
-                        exemplars: None,
-                        time_window,
-                    }],
-                    Value::Float(val) => vec![RangeValue {
-                        labels: Labels::default(),
-                        samples: vec![Sample::new(self.time, val)],
-                        exemplars: None,
-                        time_window,
-                    }],
                     v => {
                         return Err(DataFusionError::NotImplemented(format!(
                             "Unsupported subquery, the return value should have been a matrix but got {:?}",
@@ -301,16 +297,20 @@ impl Engine {
             }
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
-            PromExpr::VectorSelector(v) => {
-                let data = self.eval_vector_selector(v).await?;
+            PromExpr::VectorSelector(vs) => {
+                let mut vs = vs.clone();
+                remove_filter_all(&mut vs);
+                let data = self.eval_vector_selector(&vs).await?;
                 if data.is_empty() {
                     Value::None
                 } else {
-                    Value::Vector(data)
+                    Value::Matrix(data)
                 }
             }
             PromExpr::MatrixSelector(MatrixSelector { vs, range }) => {
-                let data = self.eval_matrix_selector(vs, *range).await?;
+                let mut vs = vs.clone();
+                remove_filter_all(&mut vs);
+                let data = self.eval_matrix_selector(&vs, *range).await?;
                 if data.is_empty() {
                     Value::None
                 } else {
@@ -330,91 +330,95 @@ impl Engine {
     /// timestamp.
     ///
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
-    async fn eval_vector_selector(
-        &mut self,
-        selector: &VectorSelector,
-    ) -> Result<Vec<InstantValue>> {
+    async fn eval_vector_selector(&mut self, selector: &VectorSelector) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
         }
 
         let mut selector = selector.clone();
         if selector.name.is_none() {
-            let name = selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .unwrap()
-                .value
-                .clone();
-
+            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
+                Some(mat) => mat.value.clone(),
+                None => {
+                    return Err(DataFusionError::Plan(
+                        "VectorSelector: metric name is required".into(),
+                    ));
+                }
+            };
             selector.name = Some(name);
         }
 
-        let data_cache_key = &selector.to_string();
+        let data = self.selector_load_data_owned(&selector, None).await?;
 
-        let cache_exists = {
-            self.ctx
-                .data_cache
-                .read()
-                .await
-                .contains_key(data_cache_key)
-        };
-        if !cache_exists {
-            self.selector_load_data(&selector, None).await?;
-        }
-        let metrics_cache = self.ctx.data_cache.read().await;
-        let metrics_cache = match metrics_cache.get(data_cache_key) {
-            Some(v) => match v.get_ref_matrix_values() {
-                Some(v) => v,
-                None => return Ok(vec![]),
-            },
+        let metrics_cache = match data.get_range_values() {
+            Some(v) => v,
             None => return Ok(vec![]),
         };
 
-        // Evaluation timestamp.
-        let eval_ts = self.time;
-        let start = eval_ts - self.ctx.lookback_delta;
-
-        let mut offset_modifier: i64 = 0;
+        let mut offset_modifier = 0;
         if let Some(offset) = selector.offset {
             match offset {
-                Offset::Pos(off) => {
-                    offset_modifier = micros(off);
+                Offset::Pos(offset) => {
+                    offset_modifier = micros(offset);
                 }
-                Offset::Neg(off) => {
-                    offset_modifier = -micros(off);
+                Offset::Neg(offset) => {
+                    offset_modifier = -micros(offset);
                 }
+            }
+        };
+
+        // Get all evaluation timestamps from the context
+        let eval_timestamps = self.eval_ctx.timestamps();
+
+        // For each metric, select appropriate samples at each evaluation timestamp
+        // TODO: make it parallel
+        let mut result = Vec::with_capacity(metrics_cache.len());
+        for metric in metrics_cache {
+            let mut selected_samples = Vec::with_capacity(eval_timestamps.len());
+
+            for &eval_ts in &eval_timestamps {
+                // Calculate lookback window for this evaluation timestamp
+                let start = eval_ts - self.ctx.lookback_delta;
+
+                // Find the sample for this evaluation timestamp
+                // Binary search for the last sample before or at eval_ts (considering offset)
+                let end_index = metric
+                    .samples
+                    .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
+
+                let match_sample = if end_index > 0 {
+                    metric.samples.get(end_index - 1).and_then(|sample| {
+                        let adjusted_ts = sample.timestamp + offset_modifier;
+                        if adjusted_ts >= start && adjusted_ts <= eval_ts {
+                            Some(sample)
+                        } else {
+                            None
+                        }
+                    })
+                } else {
+                    None
+                };
+
+                // Add the matched sample (already validated to be within range)
+                if let Some(sample) = match_sample {
+                    // Use eval_ts as the timestamp for the selected sample
+                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
+                    selected_samples.push(Sample::new(eval_ts, sample.value));
+                }
+            }
+
+            // Only include metrics that have at least one sample
+            if !selected_samples.is_empty() {
+                result.push(RangeValue {
+                    labels: metric.labels,
+                    samples: selected_samples,
+                    exemplars: metric.exemplars,
+                    time_window: metric.time_window,
+                });
             }
         }
 
-        let mut values = vec![];
-        for metric in metrics_cache {
-            let end_index = metric
-                .samples
-                .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
-            let match_sample = if end_index > 0 {
-                metric.samples.get(end_index - 1)
-            } else if !metric.samples.is_empty() {
-                metric.samples.first()
-            } else {
-                None
-            };
-            if let Some(sample) = match_sample
-                && sample.timestamp + offset_modifier <= eval_ts
-                && sample.timestamp + offset_modifier > start
-            {
-                let last_value = sample.value;
-                values.push(
-                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                    InstantValue {
-                        labels: metric.labels.clone(),
-                        sample: Sample::new(eval_ts, last_value),
-                    },
-                );
-            }
-        }
-        Ok(values)
+        Ok(result)
     }
 
     /// Range vector selector --- select a whole time range at each evaluation
@@ -446,30 +450,32 @@ impl Engine {
             selector.name = Some(name);
         }
 
-        let data_cache_key = &selector.to_string();
-        let cache_exists = {
-            self.ctx
-                .data_cache
-                .read()
-                .await
-                .contains_key(data_cache_key)
-        };
-        if !cache_exists {
-            self.selector_load_data(&selector, Some(range)).await?;
-        }
-        let metrics_cache = self.ctx.data_cache.read().await;
-        let metrics_cache = match metrics_cache.get(data_cache_key) {
-            Some(v) => match v.get_ref_matrix_values() {
-                Some(v) => v,
-                None => return Ok(vec![]),
-            },
+        let data = self
+            .selector_load_data_owned(&selector, Some(range))
+            .await?;
+
+        let values = match data.get_range_values() {
+            Some(v) => v,
             None => return Ok(vec![]),
         };
 
-        // Evaluation timestamp --- end of the time window.
-        let eval_ts = self.time;
-        // Start of the time window.
-        let start = eval_ts - micros(range); // e.g. [5m]
+        let start = std::time::Instant::now();
+        let values = values
+            .into_par_iter()
+            .map(|rv| RangeValue {
+                labels: rv.labels,
+                samples: rv.samples,
+                exemplars: rv.exemplars,
+                time_window: Some(TimeWindow::new(range)),
+            })
+            .collect::<Vec<_>>();
+
+        log::info!(
+            "[trace_id: {}] [PromQL Timing] eval_matrix_selector() processing took: {:?}",
+            self.trace_id,
+            start.elapsed()
+        );
+
         let mut offset_modifier = 0;
         if let Some(offset) = selector.offset {
             match offset {
@@ -482,71 +488,53 @@ impl Engine {
             }
         };
 
-        let mut values = Vec::with_capacity(metrics_cache.len());
-        for metric in metrics_cache {
-            // use binary search to find the start and end index
-            let start_index = metric
-                .samples
-                .partition_point(|v| v.timestamp + offset_modifier < start);
-            let end_index = metric
-                .samples
-                .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
-            let samples = metric.samples[start_index..end_index]
-                .iter()
-                .map(|v| Sample {
-                    timestamp: v.timestamp + offset_modifier,
-                    value: v.value,
+        // TODO: optimize this part
+        if offset_modifier != 0 {
+            let adjusted_values = values
+                .into_iter()
+                .map(|rv| {
+                    let adjusted_samples = rv
+                        .samples
+                        .into_iter()
+                        .map(|s| Sample {
+                            timestamp: s.timestamp + offset_modifier,
+                            value: s.value,
+                        })
+                        .collect();
+                    RangeValue {
+                        labels: rv.labels,
+                        samples: adjusted_samples,
+                        exemplars: rv.exemplars,
+                        time_window: rv.time_window,
+                    }
                 })
-                .collect::<Vec<_>>();
-            let exemplars = if self.ctx.query_exemplars {
-                metric.exemplars.clone()
-            } else {
-                None
-            };
-            values.push(RangeValue {
-                labels: metric.labels.clone(),
-                samples,
-                exemplars,
-                time_window: Some(TimeWindow::new(eval_ts, range)),
-            });
+                .collect();
+            return Ok(adjusted_values);
         }
 
         Ok(values)
     }
 
-    #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
-    async fn selector_load_data(
+    #[tracing::instrument(name = "promql:engine:load_data_owned", skip_all)]
+    async fn selector_load_data_owned(
         &mut self,
         selector: &VectorSelector,
         range: Option<Duration>,
-    ) -> Result<()> {
-        let data_cache_key = selector.to_string();
-        let mut data_loaded = self.ctx.data_loading.lock().await;
-        if data_loaded.contains(&data_cache_key) {
-            return Ok(()); // data is already loading
-        }
-
+    ) -> Result<Value> {
         let metrics = match self.selector_load_data_inner(selector, range).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
-                    "[trace_id: {}] [PromQL] Failed to load data for stream: {data_cache_key}, error: {e:?}",
+                    "[trace_id: {}] [PromQL] Failed to load data for stream, error: {e:?}",
                     self.trace_id
                 );
-                data_loaded.insert(data_cache_key);
                 return Err(e);
             }
         };
 
         // no data, return immediately
         if metrics.is_empty() {
-            self.ctx
-                .data_cache
-                .write()
-                .await
-                .insert(data_cache_key.clone(), Value::None);
-            data_loaded.insert(data_cache_key);
-            return Ok(());
+            return Ok(Value::None);
         }
 
         // cache data
@@ -566,13 +554,7 @@ impl Engine {
         } else {
             Value::Matrix(metric_values)
         };
-        self.ctx
-            .data_cache
-            .write()
-            .await
-            .insert(data_cache_key.clone(), values);
-        data_loaded.insert(data_cache_key);
-        Ok(())
+        Ok(values)
     }
 
     #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
@@ -580,7 +562,7 @@ impl Engine {
         &self,
         selector: &VectorSelector,
         range: Option<Duration>,
-    ) -> Result<HashMap<HashLabelValue, RangeValue>> {
+    ) -> Result<HashMap<u64, RangeValue>> {
         let start_time = std::time::Instant::now();
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
         let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
@@ -635,7 +617,7 @@ impl Engine {
             )
             .await?;
 
-        let mut tasks = Vec::new();
+        let mut tasks = Vec::with_capacity(ctxs.len());
         for (ctx, schema, scan_stats) in ctxs {
             let selector = selector.clone();
             let col_filters = &self.col_filters;
@@ -663,7 +645,7 @@ impl Engine {
             .await
             .map_err(|e| DataFusionError::Plan(format!("task error: {e}")))?;
 
-        let mut metrics: HashMap<HashLabelValue, RangeValue> = HashMap::default();
+        let mut metrics: HashMap<u64, RangeValue> = HashMap::default();
         let task_results_len = task_results.len();
         for task_result in task_results {
             if task_results_len == 1 {
@@ -697,36 +679,70 @@ impl Engine {
         param: &Option<Box<PromExpr>>,
         modifier: &Option<LabelModifier>,
     ) -> Result<Value> {
-        let sample_time = self.time;
         let input = self.exec_expr(expr).await?;
 
+        let eval_ctx = self.eval_ctx.clone();
+
         Ok(match op.id() {
-            token::T_SUM => aggregations::sum(sample_time, modifier, input)?,
-            token::T_AVG => aggregations::avg(sample_time, modifier, input)?,
-            token::T_COUNT => aggregations::count(sample_time, modifier, input)?,
-            token::T_MIN => aggregations::min(sample_time, modifier, input)?,
-            token::T_MAX => aggregations::max(sample_time, modifier, input)?,
-            token::T_GROUP => aggregations::group(sample_time, modifier, input)?,
-            token::T_STDDEV => aggregations::stddev(sample_time, modifier, input)?,
-            token::T_STDVAR => aggregations::stdvar(sample_time, modifier, input)?,
+            token::T_SUM => aggregations::sum(modifier, input, &eval_ctx)?,
+            token::T_AVG => aggregations::avg(modifier, input, &eval_ctx)?,
+            token::T_COUNT => aggregations::count(modifier, input, &eval_ctx)?,
+            token::T_MIN => aggregations::min(modifier, input, &eval_ctx)?,
+            token::T_MAX => aggregations::max(modifier, input, &eval_ctx)?,
+            token::T_GROUP => aggregations::group(modifier, input, &eval_ctx)?,
+            token::T_STDDEV => aggregations::stddev(modifier, input, &eval_ctx)?,
+            token::T_STDVAR => aggregations::stdvar(modifier, input, &eval_ctx)?,
             token::T_TOPK => {
-                aggregations::topk(self, param.clone().unwrap(), modifier, input).await?
+                let param_expr = param.clone().unwrap();
+                let k_value = self.exec_expr(&param_expr).await?;
+                let k = match k_value {
+                    Value::Float(f) => f as usize,
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "[topk] param must be a number".to_string(),
+                        ));
+                    }
+                };
+                aggregations::topk(k, modifier, input, &eval_ctx)?
             }
             token::T_BOTTOMK => {
-                aggregations::bottomk(self, param.clone().unwrap(), modifier, input).await?
+                let param_expr = param.clone().unwrap();
+                let k_value = self.exec_expr(&param_expr).await?;
+                let k = match k_value {
+                    Value::Float(f) => f as usize,
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "[bottomk] param must be a number".to_string(),
+                        ));
+                    }
+                };
+                aggregations::bottomk(k, modifier, input, &eval_ctx)?
             }
             token::T_COUNT_VALUES => {
-                aggregations::count_values(
-                    self,
-                    sample_time,
-                    param.clone().unwrap(),
-                    modifier,
-                    input,
-                )
-                .await?
+                let param_expr = param.clone().unwrap();
+                let label_name = self.exec_expr(&param_expr).await?;
+                let label_name_str = match label_name {
+                    Value::String(s) => s,
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "[count_values] param must be a string".to_string(),
+                        ));
+                    }
+                };
+                aggregations::count_values(&label_name_str, modifier, input, &eval_ctx)?
             }
             token::T_QUANTILE => {
-                aggregations::quantile(self, sample_time, param.clone().unwrap(), input).await?
+                let param_expr = param.clone().unwrap();
+                let qtile_value = self.exec_expr(&param_expr).await?;
+                let qtile = match qtile_value {
+                    Value::Float(f) => f,
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "[quantile] param must be a number".to_string(),
+                        ));
+                    }
+                };
+                aggregations::quantile(qtile, input, &eval_ctx)?
             }
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(
@@ -817,13 +833,20 @@ impl Engine {
         let input = match functions_without_args.contains(func.name) {
             true => match args.len() {
                 0 => {
-                    // Found no arg to pass to, lets use a `vector(time())` as the arg.
+                    // Found no arg to pass to, lets use a `matrix(time())` as the arg.
                     // https://prometheus.io/docs/prometheus/latest/querying/functions/#functions
-                    let default_now_vector = vec![InstantValue {
+                    let timestamps = self.eval_ctx.timestamps();
+                    let samples: Vec<Sample> = timestamps
+                        .iter()
+                        .map(|&ts| Sample::new(ts, ts as f64))
+                        .collect();
+                    let default_now_matrix = vec![RangeValue {
                         labels: Labels::default(),
-                        sample: Sample::new(self.time, self.time as f64),
+                        samples,
+                        exemplars: None,
+                        time_window: None,
                     }];
-                    Value::Vector(default_now_vector)
+                    Value::Matrix(default_now_matrix)
                 }
                 1 => self.call_expr_first_arg(args).await?,
 
@@ -843,11 +866,11 @@ impl Engine {
 
         Ok(match func_name {
             Func::Abs => functions::abs(input)?,
-            Func::Absent => functions::absent(input, self.time)?,
-            Func::AbsentOverTime => functions::absent_over_time(input)?,
-            Func::AvgOverTime => functions::avg_over_time(input)?,
+            Func::Absent => functions::absent(input, &self.eval_ctx)?,
+            Func::AbsentOverTime => functions::absent_over_time(input, &self.eval_ctx)?,
+            Func::AvgOverTime => functions::avg_over_time(input, &self.eval_ctx)?,
             Func::Ceil => functions::ceil(input)?,
-            Func::Changes => functions::changes(input)?,
+            Func::Changes => functions::changes(input, &self.eval_ctx)?,
             Func::Clamp => {
                 let err =
                     "Invalid args, expected \"clamp(v instant-vector, min scalar, max scalar)\"";
@@ -860,7 +883,7 @@ impl Engine {
                 let (min_f, max_f) = match (min, max) {
                     (Value::Float(min), Value::Float(max)) => {
                         if min > max {
-                            return Ok(Value::Vector(vec![]));
+                            return Ok(Value::Matrix(vec![]));
                         }
                         (min, max)
                     }
@@ -898,13 +921,13 @@ impl Engine {
                 };
                 functions::clamp(input, min_f, f64::MAX)?
             }
-            Func::CountOverTime => functions::count_over_time(input)?,
+            Func::CountOverTime => functions::count_over_time(input, &self.eval_ctx)?,
             Func::DayOfMonth => functions::day_of_month(input)?,
             Func::DayOfWeek => functions::day_of_week(input)?,
             Func::DayOfYear => functions::day_of_year(input)?,
             Func::DaysInMonth => functions::days_in_month(input)?,
-            Func::Delta => functions::delta(input)?,
-            Func::Deriv => functions::deriv(input)?,
+            Func::Delta => functions::delta(input, &self.eval_ctx)?,
+            Func::Deriv => functions::deriv(input, &self.eval_ctx)?,
             Func::Exp => functions::exp(input)?,
             Func::Floor => functions::floor(input)?,
             Func::HistogramCount => {
@@ -937,8 +960,9 @@ impl Engine {
                         }
                     }
                 };
-                let sample_time = self.time;
-                functions::histogram_quantile(sample_time, phi, input)?
+
+                // Use range version if we have an eval context
+                functions::histogram_quantile(phi, input, &self.eval_ctx)?
             }
             Func::HistogramSum => {
                 return Err(DataFusionError::NotImplemented(format!(
@@ -957,12 +981,12 @@ impl Engine {
                 let scaling_factor = self.parse_f64_else_err(&sf, err)?;
                 let trend_factor = self.parse_f64_else_err(&tf, err)?;
 
-                functions::holt_winters(input, scaling_factor, trend_factor)?
+                functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx)?
             }
             Func::Hour => functions::hour(input)?,
-            Func::Idelta => functions::idelta(input)?,
-            Func::Increase => functions::increase(input)?,
-            Func::Irate => functions::irate(input)?,
+            Func::Idelta => functions::idelta(input, &self.eval_ctx)?,
+            Func::Increase => functions::increase(input, &self.eval_ctx)?,
+            Func::Irate => functions::irate(input, &self.eval_ctx)?,
             Func::LabelJoin => {
                 let err = "Invalid args, expected \"label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)\"";
                 self.ensure_ge_three_args(args, err)?;
@@ -1011,12 +1035,12 @@ impl Engine {
 
                 functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)?
             }
-            Func::LastOverTime => functions::last_over_time(input)?,
+            Func::LastOverTime => functions::last_over_time(input, &self.eval_ctx)?,
             Func::Ln => functions::ln(input)?,
             Func::Log10 => functions::log10(input)?,
             Func::Log2 => functions::log2(input)?,
-            Func::MaxOverTime => functions::max_over_time(input)?,
-            Func::MinOverTime => functions::min_over_time(input)?,
+            Func::MaxOverTime => functions::max_over_time(input, &self.eval_ctx)?,
+            Func::MinOverTime => functions::min_over_time(input, &self.eval_ctx)?,
             Func::Minute => functions::minute(input)?,
             Func::Month => functions::month(input)?,
             Func::PredictLinear => {
@@ -1030,7 +1054,7 @@ impl Engine {
                         "Invalid prediction_steps, f64 expected".into(),
                     ),
                 )?;
-                functions::predict_linear(input, prediction_steps)?
+                functions::predict_linear(input, prediction_steps, &self.eval_ctx)?
             }
             Func::QuantileOverTime => {
                 let err = "Invalid args, expected \"quantile_over_time(scalar, range-vector)\"";
@@ -1045,10 +1069,10 @@ impl Engine {
                     }
                 };
                 let input = self.call_expr_second_arg(args).await?;
-                functions::quantile_over_time(self.time, phi_quantile, input)?
+                functions::quantile_over_time(phi_quantile, input, &self.eval_ctx)?
             }
-            Func::Rate => functions::rate(input)?,
-            Func::Resets => functions::resets(input)?,
+            Func::Rate => functions::rate(input, &self.eval_ctx)?,
+            Func::Resets => functions::resets(input, &self.eval_ctx)?,
             Func::Round => functions::round(input)?,
             Func::Scalar => match input {
                 Value::Float(_) => input,
@@ -1070,31 +1094,13 @@ impl Engine {
                 )));
             }
             Func::Sqrt => functions::sqrt(input)?,
-            Func::StddevOverTime => functions::stddev_over_time(input)?,
-            Func::StdvarOverTime => functions::stdvar_over_time(input)?,
-            Func::SumOverTime => functions::sum_over_time(input)?,
-            Func::Time => Value::Float((self.time / 1_000_000) as f64),
-            Func::Timestamp => match input {
-                Value::Vector(instant_value) => {
-                    let out: Vec<InstantValue> = instant_value
-                        .into_iter()
-                        .map(|mut instant| InstantValue {
-                            labels: std::mem::take(&mut instant.labels),
-                            sample: Sample {
-                                timestamp: instant.sample.timestamp,
-                                value: (instant.sample.timestamp / 1000 / 1000) as f64,
-                            },
-                        })
-                        .collect();
-                    Value::Vector(out)
-                }
-                _ => {
-                    return Err(DataFusionError::NotImplemented(format!(
-                        "Unexpected input to timestamp function: {input:?}"
-                    )));
-                }
-            },
-            Func::Vector => functions::vector(input, self.time)?,
+            Func::StddevOverTime => functions::stddev_over_time(input, &self.eval_ctx)?,
+            Func::StdvarOverTime => functions::stdvar_over_time(input, &self.eval_ctx)?,
+            Func::SumOverTime => functions::sum_over_time(input, &self.eval_ctx)?,
+            // TODO: check this implementation
+            Func::Time => Value::Float((self.eval_ctx.start / 1_000_000) as f64),
+            Func::Timestamp => functions::timestamp(input)?,
+            Func::Vector => functions::vector(input, &self.eval_ctx)?,
             Func::Year => functions::year(input)?,
         })
     }
@@ -1110,8 +1116,7 @@ async fn selector_load_data_from_datafusion(
     end: i64,
     label_selector: &Option<HashSet<String>>,
     query_exemplars: bool,
-) -> Result<HashMap<HashLabelValue, RangeValue>> {
-    let cfg = config::get_config();
+) -> Result<HashMap<u64, RangeValue>> {
     let table_name = selector.name.as_ref().unwrap();
     let mut df_group = match ctx.table(table_name).await {
         Ok(v) => v.filter(
@@ -1139,29 +1144,23 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
-    let label_cols = df_group
+    // get label columns
+    let mut label_cols = df_group
         .schema()
         .fields()
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == TIMESTAMP_COL_NAME
-                || name == VALUE_LABEL
-                || name == EXEMPLARS_LABEL
-                || name == NAME_LABEL
-            {
+            if name == TIMESTAMP_COL_NAME || name == VALUE_LABEL || name == EXEMPLARS_LABEL {
                 None
             } else {
-                Some(col(name))
+                Some(name)
             }
         })
         .collect::<Vec<_>>();
-
-    let max_series = if cfg.limit.metrics_max_series_per_query > 0 {
-        cfg.limit.metrics_max_series_per_query
-    } else {
-        DEFAULT_MAX_SERIES_PER_QUERY
-    };
+    // sort labels to have a consistent order
+    label_cols.sort();
+    let label_cols = label_cols.into_iter().map(col).collect::<Vec<_>>();
 
     // get hash & timestamp
     let start_time = std::time::Instant::now();
@@ -1171,13 +1170,11 @@ async fn selector_load_data_from_datafusion(
             vec![col(HASH_LABEL)],
             vec![max(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
         )?
-        .sort(vec![col(HASH_LABEL).sort(true, true)])?
-        .limit(0, Some(max_series))?
         .collect()
         .await?;
 
     let hash_field_type = schema.field_with_name(HASH_LABEL).unwrap().data_type();
-    let (mut timestamp_values, hash_value_set): (Vec<_>, HashSet<HashLabelValue>) =
+    let (timestamp_values, hash_value_set): (HashSet<i64>, HashSet<u64>) =
         if hash_field_type == &DataType::UInt64 {
             sub_batch
                 .iter()
@@ -1196,7 +1193,7 @@ async fn selector_load_data_from_datafusion(
                         .unwrap();
                     ts.iter()
                         .zip(hash.iter())
-                        .map(|(t, h)| (t.unwrap_or_default(), h.unwrap_or(0).into()))
+                        .map(|(t, h)| (t.unwrap_or_default(), h.unwrap_or_default()))
                 })
                 .unzip()
         } else {
@@ -1217,12 +1214,10 @@ async fn selector_load_data_from_datafusion(
                         .unwrap();
                     ts.iter()
                         .zip(hash.iter())
-                        .map(|(t, h)| (t.unwrap_or_default(), h.unwrap_or("").into()))
+                        .map(|(t, h)| (t.unwrap_or_default(), gxhash::new().sum64(h.unwrap_or(""))))
                 })
                 .unzip()
         };
-    timestamp_values.sort();
-    timestamp_values.dedup();
     let timestamp_values = timestamp_values.into_iter().map(lit).collect::<Vec<_>>();
 
     log::info!(
@@ -1238,13 +1233,13 @@ async fn selector_load_data_from_datafusion(
         .collect()
         .await?;
 
-    let mut metrics: HashMap<HashLabelValue, RangeValue> =
-        HashMap::with_capacity(hash_value_set.len());
+    let mut metrics: HashMap<u64, RangeValue> = HashMap::with_capacity(hash_value_set.len());
+    let mut labels = Vec::new();
     for batch in series {
         let columns = batch.columns();
         let schema = batch.schema();
         let fields = schema.fields();
-        let mut cols = fields
+        let cols = fields
             .iter()
             .zip(columns)
             .filter_map(|(field, col)| {
@@ -1257,8 +1252,6 @@ async fn selector_load_data_from_datafusion(
                 }
             })
             .collect::<Vec<(_, _)>>();
-        cols.sort_by(|a, b| a.0.cmp(b.0));
-        let mut labels = Vec::with_capacity(columns.len());
         if hash_field_type == &DataType::UInt64 {
             let hash_values = batch
                 .column_by_name(HASH_LABEL)
@@ -1267,7 +1260,7 @@ async fn selector_load_data_from_datafusion(
                 .downcast_ref::<UInt64Array>()
                 .unwrap();
             for i in 0..batch.num_rows() {
-                let hash = hash_values.value(i).into();
+                let hash = hash_values.value(i);
                 if !hash_value_set.contains(&hash) {
                     continue;
                 }
@@ -1294,7 +1287,7 @@ async fn selector_load_data_from_datafusion(
                 .downcast_ref::<StringArray>()
                 .unwrap();
             for i in 0..batch.num_rows() {
-                let hash = hash_values.value(i).into();
+                let hash: u64 = gxhash::new().sum64(hash_values.value(i));
                 if !hash_value_set.contains(&hash) {
                     continue;
                 }
@@ -1317,7 +1310,7 @@ async fn selector_load_data_from_datafusion(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] load series took: {:?}",
+        "[trace_id: {trace_id}] load hashing and series took: {:?}",
         start_time.elapsed()
     );
 
@@ -1339,25 +1332,32 @@ async fn selector_load_data_from_datafusion(
 async fn load_samples_from_datafusion(
     trace_id: &str,
     hash_field_type: &DataType,
-    metrics: &mut HashMap<HashLabelValue, RangeValue>,
+    metrics: &mut HashMap<u64, RangeValue>,
     df: DataFrame,
 ) -> Result<()> {
     let start_time = std::time::Instant::now();
-    let streams = df
+    let ctx = Arc::new(df.task_ctx());
+    let target_partitions = ctx.session_config().target_partitions();
+    let plan = df
         .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?
-        .execute_stream_partitioned()
+        .create_physical_plan()
         .await?;
-
-    log::info!(
-        "[trace_id: {trace_id}] load samples from datafusion took: {:?}",
-        start_time.elapsed()
-    );
+    let schema = plan.schema();
+    let plan = Arc::new(RepartitionExec::try_new(
+        plan,
+        Partitioning::Hash(
+            vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
+            target_partitions,
+        ),
+    )?);
+    let streams = execute_stream_partitioned(plan, ctx)?;
 
     let mut tasks = Vec::new();
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
-        let mut series = metrics.clone();
-        let task: tokio::task::JoinHandle<Result<HashMap<HashLabelValue, RangeValue>>> =
+        let mut series: HashMap<u64, Vec<Sample>> =
+            HashMap::with_capacity(metrics.len() * 2 / target_partitions);
+        let task: tokio::task::JoinHandle<Result<HashMap<u64, Vec<Sample>>>> =
             tokio::task::spawn(async move {
                 loop {
                     match stream.try_next().await {
@@ -1382,13 +1382,12 @@ async fn load_samples_from_datafusion(
                                     .downcast_ref::<UInt64Array>()
                                     .unwrap();
                                 for i in 0..batch.num_rows() {
-                                    let hash: HashLabelValue = hash_values.value(i).into();
-                                    if let Some(range_val) = series.get_mut(&hash) {
-                                        range_val.samples.push(Sample::new(
-                                            time_values.value(i),
-                                            value_values.value(i),
-                                        ));
-                                    }
+                                    let hash: u64 = hash_values.value(i);
+                                    let entry = series.entry(hash).or_default();
+                                    entry.push(Sample::new(
+                                        time_values.value(i),
+                                        value_values.value(i),
+                                    ));
                                 }
                             } else {
                                 let hash_values = batch
@@ -1398,13 +1397,12 @@ async fn load_samples_from_datafusion(
                                     .downcast_ref::<StringArray>()
                                     .unwrap();
                                 for i in 0..batch.num_rows() {
-                                    let hash: HashLabelValue = hash_values.value(i).into();
-                                    if let Some(range_val) = series.get_mut(&hash) {
-                                        range_val.samples.push(Sample::new(
-                                            time_values.value(i),
-                                            value_values.value(i),
-                                        ));
-                                    }
+                                    let hash: u64 = gxhash::new().sum64(hash_values.value(i));
+                                    let entry = series.entry(hash).or_default();
+                                    entry.push(Sample::new(
+                                        time_values.value(i),
+                                        value_values.value(i),
+                                    ));
                                 }
                             }
                         }
@@ -1425,15 +1423,15 @@ async fn load_samples_from_datafusion(
         let m = task
             .await
             .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        for (hash, value) in m {
+        for (hash, samples) in m {
             if let Some(range_val) = metrics.get_mut(&hash) {
-                range_val.samples.extend(value.samples);
+                range_val.samples = samples;
             }
         }
     }
 
     log::info!(
-        "[trace_id: {trace_id}] group batches took: {:?}",
+        "[trace_id: {trace_id}] load samples from datafusion took: {:?}",
         start_time.elapsed()
     );
 
@@ -1443,26 +1441,33 @@ async fn load_samples_from_datafusion(
 async fn load_exemplars_from_datafusion(
     trace_id: &str,
     hash_field_type: &DataType,
-    metrics: &mut HashMap<HashLabelValue, RangeValue>,
+    metrics: &mut HashMap<u64, RangeValue>,
     df: DataFrame,
 ) -> Result<()> {
     let start_time = std::time::Instant::now();
-    let streams = df
+    let ctx = Arc::new(df.task_ctx());
+    let target_partitions = ctx.session_config().target_partitions();
+    let plan = df
         .filter(col(EXEMPLARS_LABEL).is_not_null())?
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
-        .execute_stream_partitioned()
+        .create_physical_plan()
         .await?;
-
-    log::info!(
-        "[trace_id: {trace_id}] load exemplars from datafusion took: {:?}",
-        start_time.elapsed()
-    );
+    let schema = plan.schema();
+    let plan = Arc::new(RepartitionExec::try_new(
+        plan,
+        Partitioning::Hash(
+            vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
+            target_partitions,
+        ),
+    )?);
+    let streams = execute_stream_partitioned(plan, ctx)?;
 
     let mut tasks = Vec::new();
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
-        let mut series = metrics.clone();
-        let task: tokio::task::JoinHandle<Result<HashMap<HashLabelValue, RangeValue>>> =
+        let mut series: HashMap<u64, Vec<Arc<Exemplar>>> =
+            HashMap::with_capacity(metrics.len() * 2 / target_partitions);
+        let task: tokio::task::JoinHandle<Result<HashMap<u64, Vec<Arc<Exemplar>>>>> =
             tokio::task::spawn(async move {
                 loop {
                     match stream.try_next().await {
@@ -1481,22 +1486,15 @@ async fn load_exemplars_from_datafusion(
                                     .downcast_ref::<UInt64Array>()
                                     .unwrap();
                                 for i in 0..batch.num_rows() {
-                                    let hash: HashLabelValue = hash_values.value(i).into();
+                                    let hash: u64 = hash_values.value(i);
                                     let exemplar = exemplars_values.value(i);
-                                    if let Some(range_val) = series.get_mut(&hash)
-                                        && let Ok(exemplars) =
-                                            json::from_str::<Vec<json::Value>>(exemplar)
+                                    if let Ok(exemplars) =
+                                        json::from_str::<Vec<json::Value>>(exemplar)
                                     {
+                                        let entry = series.entry(hash).or_default();
                                         for exemplar in exemplars {
                                             if let Some(exemplar) = exemplar.as_object() {
-                                                if range_val.exemplars.is_none() {
-                                                    range_val.exemplars = Some(vec![]);
-                                                }
-                                                range_val
-                                                    .exemplars
-                                                    .as_mut()
-                                                    .unwrap()
-                                                    .push(Arc::new(Exemplar::from(exemplar)));
+                                                entry.push(Arc::new(Exemplar::from(exemplar)));
                                             }
                                         }
                                     }
@@ -1509,22 +1507,15 @@ async fn load_exemplars_from_datafusion(
                                     .downcast_ref::<StringArray>()
                                     .unwrap();
                                 for i in 0..batch.num_rows() {
-                                    let hash: HashLabelValue = hash_values.value(i).into();
+                                    let hash: u64 = gxhash::new().sum64(hash_values.value(i));
                                     let exemplar = exemplars_values.value(i);
-                                    if let Some(range_val) = series.get_mut(&hash)
-                                        && let Ok(exemplars) =
-                                            json::from_str::<Vec<json::Value>>(exemplar)
+                                    if let Ok(exemplars) =
+                                        json::from_str::<Vec<json::Value>>(exemplar)
                                     {
+                                        let entry = series.entry(hash).or_default();
                                         for exemplar in exemplars {
                                             if let Some(exemplar) = exemplar.as_object() {
-                                                if range_val.exemplars.is_none() {
-                                                    range_val.exemplars = Some(vec![]);
-                                                }
-                                                range_val
-                                                    .exemplars
-                                                    .as_mut()
-                                                    .unwrap()
-                                                    .push(Arc::new(Exemplar::from(exemplar)));
+                                                entry.push(Arc::new(Exemplar::from(exemplar)));
                                             }
                                         }
                                     }
@@ -1548,26 +1539,24 @@ async fn load_exemplars_from_datafusion(
         let m = task
             .await
             .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        for (hash, value) in m {
-            let Some(exemplars) = value.exemplars else {
-                continue;
-            };
+        for (hash, exemplars) in m {
             if let Some(range_val) = metrics.get_mut(&hash) {
                 if range_val.exemplars.is_none() {
                     range_val.exemplars = Some(vec![]);
                 }
-                range_val.exemplars.as_mut().unwrap().extend(exemplars);
+                range_val.exemplars = Some(exemplars);
             }
         }
     }
 
     log::info!(
-        "[trace_id: {trace_id}] group batches took: {:?}",
+        "[trace_id: {trace_id}] load exemplars from datafusion took: {:?}",
         start_time.elapsed()
     );
 
     Ok(())
 }
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -1616,10 +1605,9 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
-        assert_eq!(engine.time, 1640995200000000i64);
         assert_eq!(engine.trace_id, "test_trace");
         assert!(engine.col_filters.is_some());
         assert!(engine.result_type.is_none());
@@ -1635,7 +1623,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
 
@@ -1653,7 +1641,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
         let expr = PromExpr::StringLiteral(StringLiteral {
             val: "test".to_string(),
@@ -1673,7 +1661,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
         let inner_expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
         let expr = PromExpr::Paren(ParenExpr {
@@ -1694,7 +1682,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
         let inner_expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
         let expr = PromExpr::Unary(UnaryExpr {
@@ -1715,7 +1703,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let lhs = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1741,7 +1729,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let lhs = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1774,7 +1762,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let lhs = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1811,7 +1799,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1836,7 +1824,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1862,7 +1850,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1888,7 +1876,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs { args: vec![] };
@@ -1914,7 +1902,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let arg = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -1943,7 +1931,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         // Create a mock extension expression
@@ -1971,7 +1959,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         engine.extract_columns_from_modifier(&None, &create_test_token());
@@ -1989,7 +1977,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let modifier = Some(LabelModifier::Include(promql_parser::label::Labels {
@@ -2011,7 +1999,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let modifier = Some(LabelModifier::Include(promql_parser::label::Labels {
@@ -2033,7 +2021,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let modifier = Some(LabelModifier::Include(promql_parser::label::Labels {
@@ -2058,7 +2046,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let modifier = Some(LabelModifier::Exclude(promql_parser::label::Labels {
@@ -2080,7 +2068,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2104,7 +2092,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::StringLiteral(StringLiteral {
@@ -2130,7 +2118,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let inner_expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2158,7 +2146,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let inner_expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2169,11 +2157,10 @@ mod tests {
         let result = engine.exec_expr(&expr).await;
         assert!(result.is_ok());
 
-        if let Ok(Value::Vector(v)) = result {
-            assert_eq!(v.len(), 1);
-            assert_eq!(v[0].sample.value, -42.0);
+        if let Ok(Value::Float(val)) = result {
+            assert_eq!(val, -42.0);
         } else {
-            panic!("Expected Value::Vector");
+            panic!("Expected Value::Float");
         }
     }
 
@@ -2187,7 +2174,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let sample = Sample::new(1640995200000000i64, 42.0);
@@ -2219,7 +2206,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let lhs = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2251,7 +2238,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let lhs = PromExpr::Extension(Extension {
@@ -2282,7 +2269,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2295,15 +2282,14 @@ mod tests {
         });
 
         let result = engine.exec_expr(&subquery_expr).await;
-        assert!(result.is_ok());
-
-        if let Ok(Value::Matrix(matrix)) = result {
-            assert_eq!(matrix.len(), 1);
-            assert_eq!(matrix[0].samples.len(), 1);
-            assert_eq!(matrix[0].samples[0].value, 42.0);
-        } else {
-            panic!("Expected Value::Matrix");
-        }
+        // Subquery with float input should fail because subquery expects matrix input
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unsupported subquery")
+        );
     }
 
     #[tokio::test]
@@ -2316,7 +2302,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2330,7 +2316,14 @@ mod tests {
         });
 
         let result = engine.exec_expr(&subquery_expr).await;
-        assert!(result.is_ok());
+        // Subquery with float input should fail because subquery expects matrix input
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unsupported subquery")
+        );
     }
 
     #[tokio::test]
@@ -2343,7 +2336,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let sample = Sample::new(1640995200000000i64, 42.0);
@@ -2378,7 +2371,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let float_expr = PromExpr::Extension(Extension {
@@ -2408,7 +2401,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2435,7 +2428,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs { args: vec![] };
@@ -2463,7 +2456,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let extension_expr = PromExpr::Extension(Extension {
@@ -2490,7 +2483,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {
@@ -2527,7 +2520,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {
@@ -2569,7 +2562,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
@@ -2591,7 +2584,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2622,7 +2615,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2654,7 +2647,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2687,7 +2680,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2721,7 +2714,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let value = Value::Float(42.0);
@@ -2744,7 +2737,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2772,7 +2765,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2801,7 +2794,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2831,7 +2824,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2862,7 +2855,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let args = FunctionArgs {
@@ -2887,6 +2880,16 @@ mod tests {
     // Helper function to create test token types
     fn create_test_token() -> token::TokenType {
         token::TokenType::new(token::T_ADD)
+    }
+
+    // Helper function to create test EvalContext
+    fn create_test_eval_ctx() -> EvalContext {
+        EvalContext::new(
+            1640995200000000i64,
+            1640995200000000i64,
+            0,
+            "test_trace".to_string(),
+        )
     }
 
     // Simple mock provider that implements the required trait
@@ -2923,7 +2926,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {
@@ -2958,7 +2961,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {
@@ -2993,7 +2996,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {
@@ -3028,7 +3031,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {
@@ -3065,7 +3068,7 @@ mod tests {
                 false,
                 30,
             )),
-            1640995200000000i64,
+            create_test_eval_ctx(),
         );
 
         let matchers = Matchers {

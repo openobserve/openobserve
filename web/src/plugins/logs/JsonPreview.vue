@@ -3,8 +3,7 @@
     <div class="q-pb-xs flex justify-start q-px-md copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="logs-json-preview-tabs q-mr-sm"
-        style="border: 1px solid #8a8a8a; border-radius: 4px; overflow: hidden"
+        class="tw-mb-[0.375rem] logs-json-preview-tabs q-mr-sm tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-rounded-[0.25rem] tw-text-[]"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -16,7 +15,7 @@
         dense
         size="sm"
         no-caps
-        class="q-px-sm copy-log-btn q-mr-sm"
+        class="tw-mb-[0.375rem] q-px-sm copy-log-btn q-mr-sm tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-font-normal"
         icon="content_copy"
         @click="copyLogToClipboard"
       />
@@ -101,7 +100,8 @@
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <q-spinner-hourglass v-if="loading" size="lg" color="primary" />
+      <q-spinner-hourglass v-if="loading"
+size="lg" color="primary" />
       <div v-if="!loading">
         <code-query-editor
           v-model:query="unflattendData"
@@ -114,6 +114,7 @@
       </div>
     </div>
     <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
+      {
       <div
         class="log_json_content"
         v-for="(key, index) in Object.keys(value)"
@@ -130,7 +131,7 @@
           :name="'img:' + getImageURL('images/common/add_icon.svg')"
           aria-label="Add icon"
         >
-          <q-list>
+          <q-list class="logs-table-list">
             <q-item
               clickable
               v-close-popup
@@ -269,9 +270,14 @@
         </q-btn-dropdown>
 
         <span class="q-pl-xs" :data-test="`log-expand-detail-key-${key}`">
-          <LogsHighLighting :data="{ [key]: value[key] }" :show-braces="false" :query-string="highlightQuery" /><span v-if="index < Object.keys(value).length - 1">,</span>
+          <LogsHighLighting
+            :data="{ [key]: value[key] }"
+            :show-braces="false"
+            :query-string="highlightQuery"
+          /><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>
+      }
       <div
         v-if="showMenu"
         class="context-menu shadow-lg rounded-sm"
@@ -288,7 +294,8 @@
         "
       >
         <div class="context-menu-item" @click="copySelectedText">
-          <q-icon name="content_copy" size="xs" class="q-mr-sm" />
+          <q-icon name="content_copy"
+size="xs" class="q-mr-sm" />
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">
@@ -527,15 +534,8 @@ export default {
     };
 
     onBeforeMount(() => {
-      searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
-        if (
-          item.streams?.length == searchObj.data.stream.selectedStream.length
-        ) {
-          multiStreamFields.value.push(item.name);
-        }
-      });
       setViewTraceBtn();
-
+      updateMultiStreamFields();
       previewId.value = getUUID();
     });
 
@@ -655,12 +655,31 @@ export default {
       }
     };
 
+    const updateMultiStreamFields = () => {
+      searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
+        if (
+          item.streams?.length == searchObj.data.stream.selectedStream.length
+        ) {
+          multiStreamFields.value.push(item.name);
+        }
+      });
+    }
+
     watch(activeTab, async () => {
       if (activeTab.value === "unflattened") {
         unflattendData.value = "";
         await getOriginalData();
       }
     });
+
+    watch(()=>searchObj.data.stream.selectedStreamFields,
+    ()=>{
+       updateMultiStreamFields();
+    },
+    {
+      deep:true
+    }
+  );
 
     const filterStreamFn = (val: any = "") => {
       filteredTracesStreamOptions.value = tracesStreams.value.filter(
@@ -841,113 +860,5 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.monaco-editor {
-  --vscode-focusBorder: #515151 !important;
-}
-.log_json_content {
-  white-space: pre-wrap;
-  font-family: monospace;
-  font-size: 12px;
-}
-.monaco-editor {
-  width: calc(100% - 16px) !important;
-  height: calc(100vh - 250px) !important;
-
-  &.expanded {
-    height: 300px !important;
-    max-width: 1024px !important;
-  }
-}
-</style>
-
-<style lang="scss">
-.logs-trace-selector {
-  .q-select {
-    .q-field__control {
-      min-height: 30px !important;
-      height: 30px !important;
-      padding: 0px 8px !important;
-      width: 220px !important;
-
-      .q-field,
-      .q-field__native {
-        span {
-          display: inline-block;
-          width: 180px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          text-align: left;
-          font-weight: 400;
-        }
-      }
-
-      .q-field__append {
-        height: 27px !important;
-      }
-    }
-  }
-
-  .q-btn {
-    height: 30px !important;
-    padding: 2px 8px !important;
-    margin-left: -1px;
-
-    .q-btn__content {
-      span {
-        font-size: 11px;
-        font-weight: 400;
-      }
-    }
-  }
-}
-
-.logs-json-preview-tabs {
-  height: fit-content;
-  .rum-tab {
-    width: fit-content !important;
-    padding: 2px 12px !important;
-    border: none !important;
-    font-size: 12px !important;
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-
-.context-menu {
-  min-width: 200px;
-  padding: 4px 0;
-  font-size: 13px;
-
-  .context-menu-item {
-    padding: 6px 12px;
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-}
-
-.context-menu-dark {
-  background-color: #1a1a1a;
-  border: 1px solid #4a5568;
-  .context-menu-item {
-    color: #e2e8f0;
-    &:hover {
-      background-color: #4a5568;
-    }
-  }
-}
-.context-menu-light {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  .context-menu-item {
-    &:hover {
-      background-color: #f3f4f6;
-    }
-  }
-}
+@import "@/styles/logs/json-preview.scss";
 </style>

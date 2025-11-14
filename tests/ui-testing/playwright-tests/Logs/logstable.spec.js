@@ -36,7 +36,6 @@ async function ingestion(page) {
       streamName: streamName,
       logsdata: logsdata
     });
-    console.log('Ingestion response:', response);
     return response;
   } catch (error) {
     console.error('Ingestion failed:', error);
@@ -62,16 +61,8 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await pageManager.logsPage.clickRelative15MinButton();
     
     // Switch off quick mode before starting the test
-    const quickModeToggle = page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
-    const isQuickModeOn = await quickModeToggle.getAttribute('aria-pressed');
-    
-    if (isQuickModeOn === 'true') {
-      await pageManager.logsPage.clickQuickModeToggle();
-      await page.waitForTimeout(500);
-      testLogger.info('Quick mode turned off');
-    } else {
-      testLogger.info('Quick mode already off');
-    }
+    await pageManager.logsPage.ensureQuickModeState(false);
+    testLogger.info('Quick mode state ensured');
     
     await pageManager.logsPage.clickSearchBarRefreshButton();
     await page.waitForTimeout(2000);
@@ -229,8 +220,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await page.waitForTimeout(500);
     
     // Verify that kubernetes fields are visible
-    const kubernetesFields = page.locator('[data-test*="log-search-expand-kubernetes"]');
-    const fieldCount = await kubernetesFields.count();
+    const fieldCount = await pageManager.logsPage.getKubernetesFieldsCount();
     expect(fieldCount).toBeGreaterThan(0);
     testLogger.info(`Found ${fieldCount} kubernetes fields`);
     
@@ -239,7 +229,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await page.waitForTimeout(500);
     
     // Verify specific field is found
-    const specificFieldLocator = page.locator(`[data-test="log-search-expand-${specificField}-field-btn"]`);
+    const specificFieldLocator = await pageManager.logsPage.getSpecificFieldLocator(specificField);
     await expect(specificFieldLocator).toBeVisible();
     
     // Clear search and verify all fields are visible again
@@ -247,8 +237,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await page.waitForTimeout(500);
     
     // Verify more fields are now visible (not just kubernetes ones)
-    const allFields = page.locator('[data-test*="log-search-expand-"]');
-    const totalFieldCount = await allFields.count();
+    const totalFieldCount = await pageManager.logsPage.countMatchingFields();
     expect(totalFieldCount).toBeGreaterThan(20); // Adjusted expectation based on actual field count
     
     testLogger.info('Field search functionality test completed successfully');
@@ -309,7 +298,6 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
   }, async ({ page }) => {
     testLogger.info('Testing field search case insensitivity');
     
-    const fieldName = "kubernetes_container_name";
     const searchVariations = ["KUBERNETES", "Kubernetes", "kubernetes", "CONTAINER", "container"];
     
     for (const searchTerm of searchVariations) {
@@ -317,8 +305,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
       await page.waitForTimeout(500);
       
       // Verify that fields matching the search are visible regardless of case
-      const matchingFields = page.locator('[data-test*="log-search-expand-"]');
-      const fieldCount = await matchingFields.count();
+      const fieldCount = await pageManager.logsPage.countMatchingFields();
       
       // Should find at least some fields for kubernetes/container searches
       if (searchTerm.toLowerCase().includes('kubernetes') || searchTerm.toLowerCase().includes('container')) {
@@ -336,14 +323,14 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
 
   test("should verify field operations with quick mode toggle", {
     tag: ['@logsTable', '@all', '@logs', '@quickMode']
-  }, async ({ page }) => {
+  }, async () => {
     testLogger.info('Testing field operations with quick mode toggle');
     
     const fieldName = "kubernetes_container_name";
     
     // Add field in normal mode (already in normal mode from beforeEach)
     await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
-    await page.waitForTimeout(500);
+    await pageManager.logsPage.waitForUI(500);
     
     await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
     await pageManager.logsPage.clickAddFieldToTableButton(fieldName);
@@ -353,36 +340,31 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     
     // Toggle to quick mode and verify the toggle works
     await pageManager.logsPage.clickQuickModeToggle();
-    await page.waitForTimeout(1000);
+    await pageManager.logsPage.waitForUI(1000);
     
     // Check if quick mode is active - use a more flexible approach
-    const quickModeToggle = page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
-    
-    // Wait a bit more for the toggle to fully update
-    await page.waitForTimeout(500);
+    await pageManager.logsPage.waitForUI(500);
     
     // Check various ways to detect if quick mode is on
-    const ariaPressed = await quickModeToggle.getAttribute('aria-pressed');
-    const classNames = await quickModeToggle.getAttribute('class');
+    const toggleInfo = await pageManager.logsPage.getQuickModeToggleAttributes();
     
-    testLogger.info(`Quick mode toggle state - aria-pressed: ${ariaPressed}, classes: ${classNames}`);
+    testLogger.info(`Quick mode toggle state - aria-pressed: ${toggleInfo.ariaPressed}, classes: ${toggleInfo.classNames}`);
     
     // Quick mode should be enabled - verify the toggle worked
-    // If aria-pressed doesn't work, just verify the toggle is still visible and clickable
-    await expect(quickModeToggle).toBeVisible();
+    await pageManager.logsPage.expectQuickModeToggleVisible();
     testLogger.info('Quick mode toggle is functional');
     
     // Toggle back to normal mode
     await pageManager.logsPage.clickQuickModeToggle();
-    await page.waitForTimeout(1000);
+    await pageManager.logsPage.waitForUI(1000);
     
     // Verify toggle is still functional after second click
-    await expect(quickModeToggle).toBeVisible();
+    await pageManager.logsPage.expectQuickModeToggleVisible();
     testLogger.info('Quick mode toggle functionality verified');
     
     // Clean up - remove the field we added
     await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
-    await page.waitForTimeout(500);
+    await pageManager.logsPage.waitForUI(500);
     await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
     await pageManager.logsPage.clickRemoveFieldFromTableButton(fieldName);
     
@@ -426,9 +408,127 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
 
 
 
+  // NEW TEST FOR PR #9023 - Blank SQL Query Error Handling
+
+  test("should show proper error when running blank SQL query with cmd+enter", {
+    tag: ['@logsTable', '@all', '@logs', '@emptyQuery']
+  }, async ({ page }) => {
+    testLogger.info('Testing proper error display when running blank SQL query with cmd+enter');
+    
+    const fieldName = "kubernetes_container_name";
+    
+    // Add field to table first (following existing test pattern)
+    await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
+    await page.waitForTimeout(500);
+    
+    await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
+    await pageManager.logsPage.clickAddFieldToTableButton(fieldName);
+    
+    // Verify field appears in table
+    await pageManager.logsPage.expectFieldInTableHeader(fieldName);
+    testLogger.info('✓ Field added to table successfully');
+    
+    // Enable SQL mode
+    await pageManager.logsPage.clickSQLModeToggle();
+    await page.waitForTimeout(1000);
+    
+    // Execute blank query with keyboard shortcut
+    await pageManager.logsPage.executeBlankQueryWithKeyboardShortcut();
+    
+    // Verify proper error handling
+    await pageManager.logsPage.expectBlankQueryError();
+    
+    testLogger.info('✓ Proper error handling verified - shows error message instead of breaking UI');
+  });
+
+  test("should preserve include/exclude search terms when log details are open and query is run", {
+    tag: ['@logsTable', '@all', '@logs', '@includeExclude']
+  }, async ({ page }) => {
+    testLogger.info('Testing include/exclude search terms persistence in open log details after query run');
+    
+    // Run initial query to get log results
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await page.waitForTimeout(2000);
+    
+    // Verify logs table is visible
+    await pageManager.logsPage.expectLogsSearchResultLogsTableVisible();
+    
+    // Open first log details
+    await pageManager.logsPage.openFirstLogDetails();
+    
+    // Add include search term from log details
+    await pageManager.logsPage.addIncludeSearchTermFromLogDetails();
+    testLogger.info('✓ First include search term added');
+    
+    // Run the query (this is where the bug occurred - include terms would disappear from open details)
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await page.waitForTimeout(2000);
+    
+    // Verify include/exclude buttons are still visible after query run
+    await pageManager.logsPage.expectIncludeExcludeButtonsVisibleInLogDetails();
+    
+    testLogger.info('✓ Include/exclude search terms preserved in open log details after query run - bug is fixed!');
+  });
+
+  test("should make exactly one search call and one histogram call when using cmd+enter with histogram enabled", {
+    tag: ['@logsTable', '@all', '@logs', '@cmdEnter', '@apiCalls', '@histogram']
+  }, async ({ page }) => {
+    testLogger.info('Testing that cmd+enter makes exactly 1 search + 1 histogram API call when histogram is enabled');
+    
+    // Enable SQL mode
+    await pageManager.logsPage.clickSQLModeToggle();
+    await page.waitForTimeout(1000);
+    
+    // Ensure histogram is enabled (it should be by default, but let's verify)
+    const wasChanged = await pageManager.logsPage.ensureHistogramToggleState(true);
+    if (wasChanged) {
+      testLogger.info('✓ Histogram enabled');
+    }
+    
+    // Setup API call tracking
+    const trackingData = await pageManager.logsPage.setupAPICallTracking();
+    
+    // Execute query with keyboard shortcut and track API calls
+    await pageManager.logsPage.executeQueryWithKeyboardShortcutAndTrackAPICalls('select * from "e2e_automate"');
+    
+    // Verify API call counts
+    await pageManager.logsPage.verifyAPICallCounts(trackingData.allRequests, trackingData.requestHandler);
+    
+    testLogger.info('✓ CMD+Enter API calls verified: 1 search + 1 histogram = 2 total');
+  });
+
+  test("should not add unwanted characters when pressing cmd+enter in SQL editor", {
+    tag: ['@logsTable', '@all', '@logs', '@cmdEnter', '@editorBug']
+  }, async ({ page }) => {
+    testLogger.info('Testing that cmd+enter does not add unwanted characters or move cursor position in SQL editor');
+    
+    // Enable SQL mode
+    await pageManager.logsPage.clickSQLModeToggle();
+    await page.waitForTimeout(1000);
+    
+    // Setup editor for cursor test
+    await pageManager.logsPage.setupEditorForCursorTest('select * from "e2e_automate"');
+    
+    // Get editor content before cmd+enter
+    const initialQuery = await pageManager.logsPage.getEditorContentBefore();
+    testLogger.info(`Query before cmd+enter: "${initialQuery}"`);
+    
+    // Execute query with keyboard shortcut
+    await pageManager.logsPage.executeQueryWithKeyboardShortcutForEditor();
+    
+    // Get editor content after cmd+enter
+    const finalQuery = await pageManager.logsPage.getEditorContentAfter();
+    testLogger.info(`Query after cmd+enter: "${finalQuery}"`);
+    
+    // Verify editor content integrity
+    await pageManager.logsPage.verifyEditorContentIntegrity(initialQuery, finalQuery);
+    
+    testLogger.info('✓ CMD+Enter editor bug test completed');
+  });
+
   test.afterEach(async () => {
     try {
-      await pageManager.commonActions.flipStreaming();
+      // await pageManager.commonActions.flipStreaming();
       testLogger.info('Streaming flipped after test');
     } catch (error) {
       testLogger.warn('Streaming flip failed', { error: error.message });

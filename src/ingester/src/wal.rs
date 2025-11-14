@@ -125,7 +125,7 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
         let idx: usize = file_columns[file_columns.len() - 4]
             .parse()
             .unwrap_or_default();
-        let key = WriterKey::new(org_id, stream_type);
+        let key = WriterKey::new_replay(org_id, stream_type);
         let mut memtable = memtable::MemTable::new();
         let mut reader = match wal::Reader::from_path(wal_file) {
             Ok(v) => v,
@@ -177,6 +177,14 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
             };
             i += 1;
             total += entry.data.len();
+
+            // Use Entry org_id if available, otherwise fall back to file path
+            let org_id = if !entry.org_id.is_empty() {
+                entry.org_id.as_ref()
+            } else {
+                org_id
+            };
+
             let infer_schema =
                 infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
                     .context(InferJsonSchemaSnafu)?;
@@ -205,12 +213,14 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
 
         // update metrics
         metrics::INGEST_MEMTABLE_BYTES
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .sub(stat.json_size);
         metrics::INGEST_MEMTABLE_ARROW_BYTES
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .sub(stat.arrow_size as i64);
-        metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
+        metrics::INGEST_MEMTABLE_FILES
+            .with_label_values::<&str>(&[])
+            .dec();
 
         log::warn!(
             "replay wal file: {:?} done, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, took: {} ms",

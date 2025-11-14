@@ -47,6 +47,7 @@ use crate::{
         },
         utils::auth::{UserEmail, is_root_user},
     },
+    handler::http::extractors::Headers,
     service::organization::{self, get_passcode, get_rum_token, update_passcode, update_rum_token},
 };
 
@@ -62,14 +63,17 @@ use crate::{
         ("Authorization"= [])
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = OrganizationResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationResponse)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"}))
     )
 )]
 #[get("/organizations")]
-pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn organizations(
+    Headers(user_email): Headers<UserEmail>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let user_id = user_email.user_id.as_str();
     let mut id = 0;
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
@@ -166,7 +170,7 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
         ("Authorization"= [])
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = AllOrganizationResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(AllOrganizationResponse)),
     )
 )]
 #[get("/{org_id}/organizations")]
@@ -289,7 +293,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(PasscodeResponse)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -298,7 +302,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
 )]
 #[get("/{org_id}/passcode")]
 async fn get_user_passcode(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
@@ -331,7 +335,7 @@ async fn get_user_passcode(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(PasscodeResponse)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -340,7 +344,7 @@ async fn get_user_passcode(
 )]
 #[put("/{org_id}/passcode")]
 async fn update_user_passcode(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
@@ -373,7 +377,7 @@ async fn update_user_passcode(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(RumIngestionResponse)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -382,7 +386,7 @@ async fn update_user_passcode(
 )]
 #[get("/{org_id}/rumtoken")]
 async fn get_user_rumtoken(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
@@ -415,7 +419,7 @@ async fn get_user_rumtoken(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(RumIngestionResponse)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -424,7 +428,7 @@ async fn get_user_rumtoken(
 )]
 #[put("/{org_id}/rumtoken")]
 async fn update_user_rumtoken(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
@@ -457,7 +461,7 @@ async fn update_user_rumtoken(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(RumIngestionResponse)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -466,7 +470,7 @@ async fn update_user_rumtoken(
 )]
 #[post("/{org_id}/rumtoken")]
 async fn create_user_rumtoken(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
@@ -495,9 +499,9 @@ async fn create_user_rumtoken(
     security(
         ("Authorization"= [])
     ),
-    request_body(content = Organization, description = "Organization data", content_type = "application/json"),
+    request_body(content = inline(Organization), description = "Organization data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(RumIngestionResponse)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"}))
@@ -505,7 +509,7 @@ async fn create_user_rumtoken(
 )]
 #[post("/organizations")]
 async fn create_org(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     org: web::Json<Organization>,
 ) -> Result<HttpResponse, Error> {
     let mut org = org.into_inner();
@@ -528,7 +532,7 @@ async fn create_org(
     security(
         ("Authorization"= [])
     ),
-    request_body(content = ExtendTrialPeriodRequest, description = "Extend free trial request", content_type = "application/json"),
+    request_body(content = inline(ExtendTrialPeriodRequest), description = "Extend free trial request", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "text", body = String),
     )
@@ -593,14 +597,14 @@ async fn extend_trial_period(
     params(
         ("org_id" = String, Path, description = "Organization id"),
     ),
-    request_body(content = OrgRenameBody, description = "Organization new name", content_type = "application/json"),
+    request_body(content = inline(OrgRenameBody), description = "Organization new name", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
     )
 )]
 #[put("/{org_id}/rename")]
 async fn rename_org(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     path: web::Path<String>,
     new_name: web::Json<OrgRenameBody>,
 ) -> Result<HttpResponse, Error> {
@@ -636,7 +640,7 @@ async fn rename_org(
         ("org_id" = String, Path, description = "Organization id"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = OrganizationInviteUserRecord),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationInviteUserRecord)),
     )
 )]
 #[get("/{org_id}/invites")]
@@ -674,12 +678,12 @@ pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Er
         ("org_id" = String, Path, description = "Organization id"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
     )
 )]
 #[post("/{org_id}/invites")]
 pub async fn generate_org_invite(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     path: web::Path<String>,
     invites: web::Json<OrganizationInvites>,
 ) -> Result<HttpResponse, Error> {
@@ -708,7 +712,7 @@ pub async fn generate_org_invite(
         ("id" = String, Path, description = "invitation token"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
     )
 )]
 #[delete("/{org_id}/invites/{token}")]
@@ -738,12 +742,12 @@ pub async fn delete_org_invite(path: web::Path<(String, String)>) -> Result<Http
         ("invite_token" = String, Path, description = "The token sent to the user"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
     )
 )]
 #[put("/{org_id}/member_subscription/{invite_token}")]
 async fn accept_org_invite(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
     let (_org, invite_token) = path.into_inner();
@@ -783,7 +787,7 @@ async fn accept_org_invite(
         ("regions" = String, Query, description = "Optional comma-separated list of regions to filter by (e.g., 'us-east-1,us-west-2')")
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = NodeListResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(NodeListResponse)),
         (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
@@ -872,7 +876,7 @@ pub async fn node_list_impl(
         ("regions" = String, Query, description = "Optional comma-separated list of regions to filter by (e.g., 'us-east-1,us-west-2')")
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ClusterInfoResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(ClusterInfoResponse)),
         (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )

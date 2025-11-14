@@ -97,16 +97,16 @@ async fn search_in_cluster(
         query_exemplars,
     } = req.query.as_ref().unwrap();
 
-    // cache disabled if result cache is disabled or no_cache is true or start == end or step == 0
+    // cache disabled if result cache is disabled or use_cache is false or start == end or step == 0
     let cache_disabled =
-        !cfg.common.metrics_cache_enabled || req.no_cache || start == end || step == 0;
+        !cfg.common.metrics_cache_enabled || !req.use_cache || start == end || step == 0;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step, cache_disabled);
 
     log::info!(
-        "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, time_range: [{},{}), step: {}, query: {}",
+        "[trace_id {trace_id}] promql->search->start: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}",
         req.org_id,
-        cache_disabled,
+        !cache_disabled,
         start,
         end,
         step,
@@ -199,7 +199,7 @@ async fn search_in_cluster(
     };
 
     // make cluster request
-    let mut tasks = Vec::new();
+    let mut tasks = Vec::with_capacity(nodes.len());
     let mut worker_start = start;
     for node in nodes.iter() {
         let node = node.clone();
@@ -245,9 +245,8 @@ async fn search_in_cluster(
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "[trace_id {trace_id}] promql->search->grpc: node: {}, search err: {:?}",
+                            "[trace_id {trace_id}] promql->search->grpc: node: {}, search err: {err:?}",
                             &node.get_grpc_addr(),
-                            err
                         );
                         let err = ErrorCodes::from_json(err.message())
                             .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
@@ -257,9 +256,8 @@ async fn search_in_cluster(
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, files: {}, scan_size: {} bytes, took: {} ms",
+                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {req_need_wal}, files: {}, scan_size: {} mb, took: {} ms",
                     &node.get_grpc_addr(),
-                    req_need_wal,
                     scan_stats.files,
                     scan_stats.original_size,
                     response.took,
@@ -271,7 +269,7 @@ async fn search_in_cluster(
         tasks.push(task);
     }
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(tasks.len());
     let task_results = match try_join_all(tasks).await {
         Ok(res) => res,
         Err(err) => {
@@ -322,7 +320,7 @@ async fn search_in_cluster(
         return Err(server_internal_error("invalid result type"));
     };
     log::info!(
-        "[trace_id {trace_id}] promql->search->result: files: {}, scan_size: {} bytes, took: {} ms",
+        "[trace_id {trace_id}] promql->search->result: files: {}, scan_size: {} mb, took: {} ms",
         scan_stats.files,
         scan_stats.original_size,
         op_start.elapsed().as_millis(),
@@ -352,7 +350,7 @@ async fn search_in_cluster(
     .await;
 
     // cache the result
-    if !cache_disabled
+    if cfg.common.metrics_cache_enabled
         && let Some(matrix) = values.get_ref_matrix_values()
         && let Err(err) = cache::set(
             trace_id,
@@ -362,6 +360,7 @@ async fn search_in_cluster(
             end,
             step,
             matrix.to_vec(),
+            cache_disabled, // if the query with cache_disabled, we should update the exist cache
         )
         .await
     {

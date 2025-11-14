@@ -316,9 +316,9 @@ export default class DashboardSetting {
 
   //hide variable
   async hideVariable() {
-    await this.page
-      .locator('[data-test="dashboard-variable-hide_on_dashboard"]')
-      .click();
+    const toggle = this.page.locator('[data-test="dashboard-variable-hide_on_dashboard"]');
+    await toggle.scrollIntoViewIfNeeded();
+    await toggle.click({ force: true });
   }
 
   //close setting window

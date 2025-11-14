@@ -119,6 +119,11 @@ impl Sql {
             let schema = infra::schema::get(org_id, &stream_name, stream_type)
                 .await
                 .unwrap_or_else(|_| Schema::empty());
+            if schema.fields().is_empty() {
+                return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                    stream_name,
+                )));
+            }
             total_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(schema)));
         }
 
@@ -197,7 +202,7 @@ impl Sql {
         // 8. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
-            let has_original_column = has_original_column(&column_visitor.columns);
+            let has_original_column = has_original_column(&columns);
             used_schemas = generate_select_star_schema(
                 total_schemas,
                 &columns,

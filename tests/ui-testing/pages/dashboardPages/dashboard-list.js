@@ -15,7 +15,7 @@ export default class DashboardListPage {
 
   //Delete duplicate dashboard
   async deleteDuplicateDashboard(page, dashboardName) {
-    const dashboardRow = page.locator(`//tr[.//td[text()="${dashboardName}"]]`);
+    const dashboardRow = page.locator(`//tr[.//div[@title="${dashboardName}"]]`);
     const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
     await deleteButton.click();
 
@@ -26,14 +26,14 @@ export default class DashboardListPage {
 
     // Ensure the dashboard is removed
     await expect(
-      page.getByText("Dashboard deleted successfully")
+      page.getByText("Dashboard deleted successfully").first()
     ).toBeVisible();
   } // ...existing code...
 
   //Delete duplicate dashboard
   async deleteDuplicateDashboard(dashboardName) {
     const dashboardRow = this.page.locator(
-      `//tr[.//td[text()="${dashboardName}"]]`
+      `//tr[.//div[@title="${dashboardName}"]]`
     );
     const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
     await deleteButton.click();
@@ -45,7 +45,7 @@ export default class DashboardListPage {
 
     // Ensure the dashboard is removed
     await expect(
-      this.page.getByText("Dashboard deleted successfully")
+      this.page.getByText("Dashboard deleted successfully").first()
     ).toBeVisible();
   }
   // Move dashboard

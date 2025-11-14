@@ -18,8 +18,9 @@ use std::{collections::HashSet, sync::Arc};
 use config::meta::promql::NAME_LABEL;
 use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::service::promql::value::{InstantValue, Label, Value};
+use crate::service::promql::value::{Label, RangeValue, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#label_join
 pub(crate) fn label_join(
@@ -28,39 +29,42 @@ pub(crate) fn label_join(
     separator: &str,
     source_labels: Vec<String>,
 ) -> Result<Value> {
-    let data = match data {
-        Value::Vector(v) => v,
-        Value::None => return Ok(Value::None),
-        _ => {
-            return Err(DataFusionError::Plan(
-                "label_join: vector argument expected".into(),
-            ));
+    match data {
+        Value::Matrix(matrix) => {
+            let keep_source_labels: HashSet<String> = HashSet::from_iter(source_labels);
+
+            let out: Vec<RangeValue> = matrix
+                .into_par_iter()
+                .map(|mut range_value| {
+                    // Join the source label values into the new destination label
+                    let new_label_value = range_value
+                        .labels
+                        .iter()
+                        .filter(|l| l.name != NAME_LABEL && keep_source_labels.contains(&l.name))
+                        .map(|label| label.value.clone())
+                        .join(separator);
+
+                    let mut labels = std::mem::take(&mut range_value.labels);
+                    labels.push(Arc::new(Label {
+                        name: dest_label.to_string(),
+                        value: new_label_value,
+                    }));
+
+                    RangeValue {
+                        labels,
+                        samples: range_value.samples,
+                        exemplars: range_value.exemplars,
+                        time_window: range_value.time_window,
+                    }
+                })
+                .collect();
+            Ok(Value::Matrix(out))
         }
-    };
-
-    let keep_source_labels: HashSet<String> = HashSet::from_iter(source_labels);
-    let rate_values: Vec<InstantValue> = data
-        .iter()
-        .map(|instant| {
-            let new_label = instant
-                .labels
-                .iter()
-                .filter(|l| l.name != NAME_LABEL && keep_source_labels.contains(&l.name))
-                .map(|label| label.value.clone())
-                .join(separator);
-
-            let mut new_labels = instant.labels.clone();
-            new_labels.push(Arc::new(Label {
-                name: dest_label.to_string(),
-                value: new_label,
-            }));
-            InstantValue {
-                labels: new_labels,
-                sample: instant.sample.clone(),
-            }
-        })
-        .collect();
-    Ok(Value::Vector(rate_values))
+        Value::None => Ok(Value::None),
+        _ => Err(DataFusionError::Plan(
+            "label_join: matrix argument expected".into(),
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -69,17 +73,21 @@ mod tests {
 
     #[test]
     fn test_label_join_function() {
+        use crate::service::promql::value::{RangeValue, Sample};
+
         let eval_ts = 1000;
 
-        // Create instant values with labels
+        // Create range values with labels
         let labels1 = vec![
             Arc::new(Label::new("instance", "server1")),
             Arc::new(Label::new("job", "web")),
         ];
 
-        let instant_value1 = InstantValue {
+        let range_value1 = RangeValue {
             labels: labels1,
-            sample: crate::service::promql::value::Sample::new(eval_ts, 42.0),
+            samples: vec![Sample::new(eval_ts, 42.0)],
+            exemplars: None,
+            time_window: None,
         };
 
         let labels2 = vec![
@@ -87,28 +95,33 @@ mod tests {
             Arc::new(Label::new("job", "web")),
         ];
 
-        let instant_value2 = InstantValue {
+        let range_value2 = RangeValue {
             labels: labels2,
-            sample: crate::service::promql::value::Sample::new(eval_ts, 43.0),
+            samples: vec![Sample::new(eval_ts, 43.0)],
+            exemplars: None,
+            time_window: None,
         };
 
-        let vector = Value::Vector(vec![instant_value1, instant_value2]);
+        let matrix = Value::Matrix(vec![range_value1, range_value2]);
         let source_labels = vec!["instance".to_string(), "job".to_string()];
-        let result = label_join(vector, "combined", "-", source_labels).unwrap();
+        let result = label_join(matrix, "combined", "-", source_labels).unwrap();
 
-        // Should return a vector with joined labels
+        // Should return a matrix with joined labels
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 2);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 2);
                 // Check that the combined label was added
-                let combined_label1 = v[0].labels.iter().find(|l| l.name == "combined");
-                let combined_label2 = v[1].labels.iter().find(|l| l.name == "combined");
+                let combined_label1 = m[0].labels.iter().find(|l| l.name == "combined");
+                let combined_label2 = m[1].labels.iter().find(|l| l.name == "combined");
                 assert!(combined_label1.is_some());
                 assert!(combined_label2.is_some());
                 assert_eq!(combined_label1.unwrap().value, "server1-web");
                 assert_eq!(combined_label2.unwrap().value, "server2-web");
+                // Verify samples are preserved
+                assert_eq!(m[0].samples[0].value, 42.0);
+                assert_eq!(m[1].samples[0].value, 43.0);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }

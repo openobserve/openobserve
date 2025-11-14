@@ -20,8 +20,9 @@ use hashbrown::HashMap;
 use infra::schema::{SchemaCache, get_stream_setting_fts_fields};
 use sqlparser::ast::{Expr, FunctionArguments, Query, TableFactor, VisitorMut, visit_expressions};
 
-use crate::service::search::datafusion::udf::match_all_udf::{
-    FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME,
+use crate::service::search::datafusion::udf::{
+    match_all_hash_udf::MATCH_ALL_HASH_UDF_NAME,
+    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
 };
 
 /// get all item from match_all functions
@@ -143,7 +144,9 @@ pub fn has_match_all(expr: &Expr) -> bool {
     let _ = visit_expressions(expr, |expr| {
         if let Expr::Function(func) = expr {
             let name = func.name.to_string().to_lowercase();
-            if (name == MATCH_ALL_UDF_NAME || name == FUZZY_MATCH_ALL_UDF_NAME)
+            if (name == MATCH_ALL_UDF_NAME
+                || name == FUZZY_MATCH_ALL_UDF_NAME
+                || name == MATCH_ALL_HASH_UDF_NAME)
                 && let FunctionArguments::List(list) = &func.args
                 && !list.args.is_empty()
             {

@@ -53,6 +53,7 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
+        is_aggregate: bool,
         _is_streaming_aggregate: bool,
         _streaming_interval_micros: i64,
         add_mini_partition: bool,
@@ -75,6 +76,8 @@ impl PartitionGenerator {
                 order_by,
                 add_mini_partition,
             )
+        } else if is_aggregate {
+            vec![[start_time, end_time]]
         } else {
             self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
         }
@@ -414,6 +417,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             false, // add_mini_partition = false
         );
@@ -440,6 +444,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             false, // add_mini_partition = false
@@ -484,6 +489,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             false, // add_mini_partition = false
         );
@@ -512,6 +518,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             false, // add_mini_partition = false
@@ -557,6 +564,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             false, // add_mini_partition = false
         );
@@ -585,6 +593,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             false, // add_mini_partition = false
@@ -628,6 +637,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             false, // add_mini_partition = false
         );
@@ -656,6 +666,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             false, // add_mini_partition = false
@@ -699,6 +710,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             true, // add_mini_partition = true
         );
@@ -728,6 +740,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             true, // add_mini_partition = true
@@ -776,6 +789,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             true, // add_mini_partition = true
         );
@@ -802,6 +816,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             true, // add_mini_partition = true
@@ -847,6 +862,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             true, // add_mini_partition = true
         );
@@ -876,6 +892,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             true, // add_mini_partition = true
@@ -924,6 +941,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             true, // add_mini_partition = true
         );
@@ -951,6 +969,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             true, // add_mini_partition = true
@@ -997,6 +1016,7 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
+            false,
             0,
             true, // add_mini_partition = true
         );
@@ -1017,6 +1037,7 @@ mod tests {
             end_time,
             step,
             OrderBy::Asc,
+            false,
             false,
             0,
             true, // add_mini_partition = true
@@ -1059,6 +1080,7 @@ mod enterprise_tests {
             step,
             OrderBy::Desc,
             true,
+            true,
             interval,
             false,
         );
@@ -1077,6 +1099,7 @@ mod enterprise_tests {
             end_time,
             step,
             OrderBy::Asc,
+            true,
             true,
             interval,
             false,
@@ -1105,6 +1128,7 @@ mod enterprise_tests {
             end_time,
             step,
             OrderBy::Desc,
+            true,
             true,
             interval,
             false,

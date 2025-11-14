@@ -169,8 +169,9 @@ mod tests {
 
     #[test]
     fn test_remove_dashboard_all_visitor() {
-        let sql = "select * from t where field1 = '_o2_all_'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let sql = format!("select * from t where field1 = '{placeholder}'");
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -182,8 +183,9 @@ mod tests {
 
     #[test]
     fn test_remove_dashboard_all_visitor_with_in_list() {
-        let sql = "select * from t where field1 in ('_o2_all_')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let sql = format!("select * from t where field1 in ('{placeholder}')");
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -195,8 +197,9 @@ mod tests {
 
     #[test]
     fn test_remove_dashboard_all_visitor_with_in_list_and_negated() {
-        let sql = "select * from t where field1 not in ('_o2_all_')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let sql = format!("select * from t where field1 not in ('{placeholder}')");
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -208,8 +211,10 @@ mod tests {
 
     #[test]
     fn test_remove_dashboard_all_visitor_with_in_list_and_negated_and_other_filter() {
-        let sql = "select * from t where field1 not in ('_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let sql =
+            format!("select * from t where field1 not in ('{placeholder}') and field2 = 'value2'");
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -222,8 +227,11 @@ mod tests {
     // test multi and/or with _o2_all_
     #[test]
     fn test_remove_dashboard_all_visitor_with_multi_and_or_with_o2_all() {
-        let sql = "select * from t where field1 = '_o2_all_' and (field2 = '_o2_all_' or field3 = '_o2_all_')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let sql = format!(
+            "select * from t where field1 = '{placeholder}' and (field2 = '{placeholder}' or field3 = '{placeholder}')"
+        );
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -236,8 +244,11 @@ mod tests {
     // test _o2_all_ with like and not like
     #[test]
     fn test_remove_dashboard_all_visitor_with_like_and_not_like() {
-        let sql = "select * from t where field1 like '_o2_all_' and field2 not like '_o2_all_'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let sql = format!(
+            "select * from t where field1 like '{placeholder}' and field2 not like '{placeholder}'"
+        );
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -250,8 +261,11 @@ mod tests {
     // test _o2_all_ with like and not like
     #[test]
     fn test_remove_dashboard_all_visitor_with_like_and_not_like_and_other_filter() {
-        let sql = "select * from t where field1 like '_o2_all_' and field2 not like '_o2_all_' and field3 = 'value3'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let sql = format!(
+            "select * from t where field1 like '{placeholder}' and field2 not like '{placeholder}' and field3 = 'value3'"
+        );
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -263,8 +277,11 @@ mod tests {
 
     #[test]
     fn test_remove_dashboard_all_visitor_with_str_match_and_other_filter() {
-        let sql = "select * from t where str_match(field1, '_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let sql = format!(
+            "select * from t where str_match(field1, '{placeholder}') and field2 = 'value2'"
+        );
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -276,8 +293,11 @@ mod tests {
 
     #[test]
     fn test_remove_dashboard_all_visitor_with_match_field_and_other_filter() {
-        let sql = "select * from t where match_field(field1, '_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let sql = format!(
+            "select * from t where match_field(field1, '{placeholder}') and field2 = 'value2'"
+        );
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
             .unwrap();

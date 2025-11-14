@@ -37,6 +37,8 @@ pub struct Dashboard {
     pub v3: Option<v3::Dashboard>,
     pub v4: Option<v4::Dashboard>,
     pub v5: Option<v5::Dashboard>,
+    pub v6: Option<v6::Dashboard>,
+    pub v7: Option<v7::Dashboard>,
     pub version: i32,
     pub hash: String,
     #[serde(default)]
@@ -69,17 +71,17 @@ macro_rules! make_getter {
 }
 
 impl Dashboard {
-    make_getter!(dashboard_id; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
-    make_setter!(dashboard_id; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
+    make_getter!(dashboard_id; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5, 6 v6, 7 v7);
+    make_setter!(dashboard_id; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5, 6 v6, 7 v7);
 
-    make_getter!(owner; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
-    make_setter!(owner; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
+    make_getter!(owner; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5, 6 v6, 7 v7);
+    make_setter!(owner; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5, 6 v6, 7 v7);
 
-    make_getter!(title; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
-    make_setter!(title; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
+    make_getter!(title; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5, 6 v6, 7 v7);
+    make_setter!(title; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5, 6 v6, 7 v7);
 
-    make_getter!(description; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
-    make_getter!(role; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
+    make_getter!(description; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5, 6 v6, 7 v7);
+    make_getter!(role; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5, 6 v6, 7 v7);
 
     pub fn set_updated_at(&mut self) {
         self.updated_at = Utc::now().timestamp_micros();
@@ -88,7 +90,7 @@ impl Dashboard {
     /// Returns the timestamp with timezone of the time at which the dashboard
     /// was created.
     ///
-    /// This value is stored in JSON for versions 1-5 of the dashboard. However
+    /// This value is stored in JSON for versions 1-7 of the dashboard. However
     /// future versions of the dashboard should utilize the `created_at` Unix
     /// timestamp field in the database to represent the creation timestamp.
     pub fn created_at_deprecated(&self) -> Option<DateTime<FixedOffset>> {
@@ -98,6 +100,8 @@ impl Dashboard {
             3 => self.v3.as_ref().map(|inner| inner.created),
             4 => self.v4.as_ref().map(|inner| inner.created),
             5 => self.v5.as_ref().map(|inner| inner.created),
+            6 => self.v6.as_ref().map(|inner| inner.created),
+            7 => self.v7.as_ref().map(|inner| inner.created),
             _ => None,
         }
     }
@@ -110,6 +114,8 @@ pub mod v2;
 pub mod v3;
 pub mod v4;
 pub mod v5;
+pub mod v6;
+pub mod v7;
 
 pub fn datetime_now() -> DateTime<FixedOffset> {
     Utc::now().with_timezone(&FixedOffset::east_opt(0).expect(

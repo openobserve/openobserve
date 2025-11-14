@@ -16,10 +16,17 @@ vi.mock("@/utils/commons", () => ({
   getDashboard: vi.fn(),
 }));
 
+// Mock date-fns-tz to return the input date unchanged (simulate UTC timezone)
+vi.mock("date-fns-tz", () => ({
+  fromZonedTime: (date: Date, _timezone: string) => date,
+}));
+
 const mockGetDashboard = vi.mocked(getDashboard);
 
 const mockStore = {
-  state: {},
+  state: {
+    timezone: "UTC",
+  },
   commit: vi.fn(),
   dispatch: vi.fn(),
 };
@@ -140,12 +147,13 @@ describe("useAnnotationsData", () => {
   describe("handleAddAnnotation", () => {
     it("should create annotation with start and end times", () => {
       const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
-      composable.handleAddAnnotation(1.5, 2.5);
-      
+
+      // Input is in milliseconds (chart timestamp format)
+      composable.handleAddAnnotation(1500, 2500);
+
       expect(composable.annotationToAddEdit.value).toEqual({
-        start_time: 1500,
-        end_time: 2500,
+        start_time: 1500000, // microseconds
+        end_time: 2500000, // microseconds
         title: "",
         text: "",
         tags: [],
@@ -156,11 +164,11 @@ describe("useAnnotationsData", () => {
 
     it("should create annotation with only start time", () => {
       const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
-      composable.handleAddAnnotation(1.5, null);
-      
+
+      composable.handleAddAnnotation(1500, null);
+
       expect(composable.annotationToAddEdit.value).toEqual({
-        start_time: 1500,
+        start_time: 1500000,
         end_time: null,
         title: "",
         text: "",
@@ -171,12 +179,12 @@ describe("useAnnotationsData", () => {
 
     it("should create annotation with null start time", () => {
       const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
-      composable.handleAddAnnotation(null, 2.5);
-      
+
+      composable.handleAddAnnotation(null, 2500);
+
       expect(composable.annotationToAddEdit.value).toEqual({
         start_time: null,
-        end_time: 2500,
+        end_time: 2500000,
         title: "",
         text: "",
         tags: [],
@@ -186,9 +194,9 @@ describe("useAnnotationsData", () => {
 
     it("should create annotation with both null times", () => {
       const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+
       composable.handleAddAnnotation(null, null);
-      
+
       expect(composable.annotationToAddEdit.value).toEqual({
         start_time: null,
         end_time: null,
@@ -201,9 +209,9 @@ describe("useAnnotationsData", () => {
 
     it("should handle zero times", () => {
       const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+
       composable.handleAddAnnotation(0, 0);
-      
+
       expect(composable.annotationToAddEdit.value).toEqual({
         start_time: null,
         end_time: null,
@@ -216,12 +224,12 @@ describe("useAnnotationsData", () => {
 
     it("should handle negative times", () => {
       const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
-      composable.handleAddAnnotation(-1.5, -0.5);
-      
+
+      composable.handleAddAnnotation(-1500, -500);
+
       expect(composable.annotationToAddEdit.value).toEqual({
-        start_time: -1500,
-        end_time: -500,
+        start_time: -1500000,
+        end_time: -500000,
         title: "",
         text: "",
         tags: [],
@@ -231,9 +239,9 @@ describe("useAnnotationsData", () => {
 
     it("should use correct panelId in annotation", () => {
       const composable = useAnnotationsData("test-org", "test-dashboard", "different-panel", "test-folder");
-      
-      composable.handleAddAnnotation(1, 2);
-      
+
+      composable.handleAddAnnotation(1000, 2000);
+
       expect(composable.annotationToAddEdit.value.panels).toEqual(["different-panel"]);
     });
   });
@@ -564,16 +572,16 @@ describe("useAnnotationsData", () => {
 
   it("should handle multiple annotation operations", () => {
     const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-    
-    // Add annotation
-    composable.handleAddAnnotation(1, 2);
-    expect(composable.annotationToAddEdit.value.start_time).toBe(1000);
-    
+
+    // Add annotation (input in milliseconds, output in microseconds)
+    composable.handleAddAnnotation(1000, 2000);
+    expect(composable.annotationToAddEdit.value.start_time).toBe(1000000);
+
     // Edit annotation
     const editData = { id: 1, title: "Edited" };
     composable.editAnnotation(editData);
     expect(composable.annotationToAddEdit.value).toEqual(editData);
-    
+
     // Close dialog
     composable.closeAddAnnotation();
     expect(composable.annotationToAddEdit.value).toBe(null);

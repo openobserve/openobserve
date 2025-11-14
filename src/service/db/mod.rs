@@ -32,6 +32,8 @@ pub mod functions;
 #[cfg(feature = "enterprise")]
 pub mod keys;
 pub mod kv;
+#[cfg(feature = "enterprise")]
+pub mod license;
 pub mod metas;
 pub mod metrics;
 #[cfg(feature = "enterprise")]
@@ -39,6 +41,7 @@ pub mod ofga;
 pub mod org_users;
 pub mod organization;
 pub mod pipeline;
+pub mod pipeline_errors;
 #[cfg(feature = "enterprise")]
 pub mod re_pattern;
 pub mod saved_view;

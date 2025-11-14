@@ -3,6 +3,7 @@
 pub mod prelude;
 
 pub mod action_scripts;
+pub mod alert_dedup_state;
 pub mod alerts;
 pub mod cipher_keys;
 pub mod compactor_manual_jobs;
@@ -13,6 +14,7 @@ pub mod enrichment_tables;
 pub mod folders;
 pub mod org_users;
 pub mod organizations;
+pub mod pipeline_last_errors;
 pub mod rate_limit_rules;
 pub mod re_pattern_stream_map;
 pub mod re_patterns;

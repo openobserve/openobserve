@@ -29,10 +29,12 @@ export class PipelinesPage {
         this.savePipelineButton = page.locator(
           '[data-test="add-pipeline-save-btn"]'
         );
-        this.pipelineNameRequiredMessage = page.getByText(
+        // Target the form field error inside q-field__bottom, not the notification
+        this.pipelineNameRequiredMessage = page.locator('.q-field__bottom [role="alert"]').getByText(
           "Pipeline name is required"
         );
-        this.pipelineNameInput = page.getByLabel("Enter Pipeline Name");
+        // Updated selector to use placeholder since aria-label doesn't exist
+        this.pipelineNameInput = page.locator('input[placeholder="Enter Pipeline Name"]');
         this.sourceNodeRequiredMessage = page.getByText("Source node is required");
         this.streamNameInput = page.getByLabel("Stream Name *");
         this.e2eAutomateOption = page.getByRole("option", { name: "e2e_automate" , exact: true});
@@ -66,7 +68,11 @@ export class PipelinesPage {
         this.functionNameRequiredError = page.getByText('Function Name is required')
         this.functionRequiredError = page.getByText('Function is required')
         this.streamSelectionError = page.getByText('Please select Stream from the')
-        this.columnInput = page.getByPlaceholder('Column'); // Locator for the "Column" input field
+        // FilterGroup selectors for new condition UI
+        this.columnSelect = page.locator('[data-test="alert-conditions-select-column"]');
+        this.operatorSelect = page.locator('[data-test="alert-conditions-operator-select"]');
+        this.valueInput = page.locator('[data-test="alert-conditions-value-input"]');
+        this.addConditionButton = page.locator('[data-test="alert-conditions-add-condition-btn"]');
         this.columnOption = page.getByRole('option', { name: 'kubernetes_container_name' })
         this.fieldRequiredError = page.getByText('Field is required!')
         this.tableRowsLocator = page.locator("tbody tr");
@@ -97,7 +103,6 @@ export class PipelinesPage {
         this.streamIcon = page.getByRole("img", { name: "Stream", exact: true });
         this.outputStreamIcon = page.getByRole("img", { name: "Output Stream" });
         this.containsOption = page.getByText("Contains", { exact: true });
-        this.valueInput = page.getByPlaceholder("Value");
         this.kubernetesContainerNameOption = page.getByRole("option", { name: "kubernetes_container_name" });
         this.conditionText = page.getByText('kubernetes_container_name');
         this.pipelineSavedMessage = page.getByText('Pipeline saved successfully');
@@ -184,6 +189,7 @@ export class PipelinesPage {
     }
 
     async enterPipelineName(pipelineName) {
+        await this.pipelineNameInput.waitFor({ state: 'visible', timeout: 10000 });
         await this.pipelineNameInput.click();
         await this.pipelineNameInput.fill(pipelineName);
     }
@@ -208,7 +214,8 @@ export class PipelinesPage {
         await this.destinationNodeRequiredMessage.click();
     }
     async deletePipeline() {
-        await this.deleteButton.click();
+        // Navigate back from pipeline editing
+        await this.page.locator('[data-test="add-pipeline-back-btn"]').click();
     }
 
     async confirmDelete() {
@@ -217,7 +224,7 @@ export class PipelinesPage {
 
     async selectAndDragSecondStream() {
         await this.secondStreamButton.click();
-        await this.dragStreamToTarget(this.secondStreamButton,{ x: 80, y: 80 });
+        await this.dragStreamToTarget(this.secondStreamButton,{ x: 120, y: 120 });
     }
 
     async selectAndDragFunction() {
@@ -320,11 +327,12 @@ export class PipelinesPage {
     }
 
     async selectAndDragCondition() {
-        await this.dragStreamToTarget(this.conditionButton, { x: 50, y: 50 });
+        await this.dragStreamToTarget(this.conditionButton, { x: 250, y: 250 });
     }
     async fillColumnAndSelectOption(columnName) {
-        await this.columnInput.click();
-        await this.columnInput.fill(columnName);
+        // Click the column select (q-select in FilterCondition)
+        await this.columnSelect.locator('input').click();
+        await this.columnSelect.locator('input').fill(columnName);
         await this.columnOption.click();
     }
     async saveCondition() {
@@ -482,28 +490,61 @@ export class PipelinesPage {
     }
 
     async setupContainerNameCondition() {
-        await this.editButton.hover();
-        await this.streamIcon.click();
-        await this.columnInput.click();
-        await this.columnInput.fill("container_name");
+        // Use drag and drop approach for condition node
+        await this.selectAndDragCondition();
         await this.page.waitForTimeout(1000);
-        await this.kubernetesContainerNameOption.click();
-        await this.conditionDropdown.click();
+
+        // FilterGroup UI: Click column select and fill
+        await this.columnSelect.locator('input').click();
+        await this.columnSelect.locator('input').fill("container_name");
+        await this.page.waitForTimeout(500);
+        await this.page.getByRole("option", { name: "kubernetes_container_name" }).click();
+
+        // Click operator select and choose Contains
+        await this.operatorSelect.click();
+        await this.page.waitForTimeout(300);
         await this.containsOption.click();
-        await this.valueInput.click();
-        await this.valueInput.fill("ziox");
+
+        // Fill value input
+        await this.valueInput.locator('input').click();
+        await this.valueInput.locator('input').fill("ziox");
+
         await this.saveCondition();
         await this.page.waitForTimeout(2000);
-        await this.conditionText.hover();
     }
 
     async setupDestinationStream(dynamicDestinationName) {
-        await this.outputStreamIcon.click();
+        // Use drag and drop approach instead of icon click
+        await this.selectAndDragSecondStream();
         await this.streamNameInput.click();
         await this.page.waitForTimeout(1000);
         await this.streamNameInput.fill(dynamicDestinationName);
         await this.page.waitForTimeout(1000);
         await this.clickInputNodeStreamSave();
+        
+        // Wait for dialog to close and add edge connections
+        await this.page.waitForTimeout(2000);
+        await this.page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' });
+        await this.page.waitForSelector('[data-test="pipeline-node-default-input-handle"]', { state: 'visible' });
+        await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
+        
+        // Ensure no dialogs are blocking the interaction
+        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
+            // Ignore if no backdrop exists
+        });
+        
+        // Connect the input node to condition to output node by creating edges
+        await this.page.locator('[data-test="pipeline-node-input-output-handle"]').hover({ force: true });
+        await this.page.mouse.down();
+        await this.page.locator('[data-test="pipeline-node-default-input-handle"]').hover({ force: true });
+        await this.page.mouse.up();
+        await this.page.waitForTimeout(500);
+        
+        await this.page.locator('[data-test="pipeline-node-default-output-handle"]').hover({ force: true });
+        await this.page.mouse.down();
+        await this.page.locator('[data-test="pipeline-node-output-input-handle"]').hover({ force: true });
+        await this.page.mouse.up();
+        await this.page.waitForTimeout(1000);
     }
 
     async waitForPipelineSaved() {
@@ -556,7 +597,10 @@ export class PipelinesPage {
         await this.page.getByRole("option", { name: sourceStream, exact: true }).click();
         await this.saveInputNodeStream();
         await this.page.waitForTimeout(2000);
-        await this.deleteButtonNth1.click();
+        // Use new hover-based delete approach with data-test locator
+        await this.page.locator('[data-test="pipeline-node-output-stream-node"]').first().hover();
+        await this.page.waitForTimeout(500);
+        await this.page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
         await this.confirmDeleteButton.click();
     }
 

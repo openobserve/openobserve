@@ -18,8 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit" >
 
     <div v-if="!showDestinationEditor && !showImportDestination" >
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
-      :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
       >
         <div class="q-table__title tw-font-[600]" data-test="alert-destinations-list-title">
             {{ t("alert_destinations.header") }}
@@ -32,15 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="destination-list-search-input"
               class="q-ml-auto no-border o2-search-input"
               :placeholder="t('alert_destinations.search')"
-              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
           <q-btn
-            class="o2-secondary-button q-ml-md tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            class="o2-secondary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`dashboard.import`)"
@@ -49,8 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             data-test="alert-destination-list-add-alert-btn"
-            class="o2-primary-button q-ml-md tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            class="o2-primary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :disable="!templates.length"
@@ -67,11 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="id"
         :pagination="pagination"
 
-        class="o2-quasar-table o2-quasar-table-header-sticky"
+        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
         :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;' 
+            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
             : 'width: 100%'"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
       >
         <template #no-data>
           <div
@@ -103,47 +98,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn
-              icon="download"
-              title="Export Destination"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click.stop="exportDestination(props.row)"
-              data-test="destination-export"
-            ></q-btn>
-            <q-btn
-              :data-test="`alert-destination-list-${props.row.name}-update-destination`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alert_destinations.edit')"
-              @click="editDestination(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alert_destinations.delete')"
-              @click="conformDeleteDestination(props.row)"
-            ></q-btn>
+            <div class="tw-flex tw-items-center tw-gap-1 tw-justify-center">
+              <q-btn
+                data-test="destination-export"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                title="Export Destination"
+                icon="download"
+                @click.stop="exportDestination(props.row)"
+              >
+              </q-btn>
+              <q-btn
+                :data-test="`alert-destination-list-${props.row.name}-update-destination`"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                icon="edit"
+                :title="t('alert_destinations.edit')"
+                @click="editDestination(props.row)"
+              >
+              </q-btn>
+              <q-btn
+                :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :icon="outlinedDelete"
+                :title="t('alert_destinations.delete')"
+                @click="conformDeleteDestination(props.row)"
+              >
+              </q-btn>
+            </div>
           </q-td>
         </template>
         <template #bottom="scope">
           <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-sm">
                   {{ resultTotal }} {{ t('alert_destinations.header') }}
                 </div>
           <QTablePagination
@@ -222,10 +219,10 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationPayload } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
 
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportDestination from "./ImportDestination.vue";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 interface ConformDelete {
   visible: boolean;
@@ -340,14 +337,14 @@ export default defineComponent({
     const getActions = async () => {
       const dismiss = q.notify({
         spinner: true,
-        message: "Please wait while loading actions...",
+        message: "Please wait while loading alert destination...",
       });
       if (store.state.organizationData.actions.length == 0) {
         await getAllActions()
           .catch(() => {
             q.notify({
               type: "negative",
-              message: "Error while loading actions.",
+              message: "Error while loading alert destination.",
             });
           })
           .finally(() => dismiss());
@@ -557,7 +554,12 @@ export default defineComponent({
       if (!filterQuery.value) return destinations.value || [];
       return filterData(destinations.value || [], filterQuery.value);
     });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+    // Watch visibleRows to sync resultTotal with search filter
+    watch(visibleRows, (newVisibleRows) => {
+      resultTotal.value = newVisibleRows.length;
+    }, { immediate: true });
 
     return {
       t,
@@ -581,7 +583,6 @@ export default defineComponent({
       perPageOptions,
       resultTotal,
       pagination,
-      outlinedDelete,
       routeTo,
       exportDestination,
       showImportDestination,
@@ -596,8 +597,8 @@ export default defineComponent({
       selectedPerPage,
       visibleRows,
       hasVisibleRows,
+      outlinedDelete
     };
   },
 });
 </script>
-<style lang=""></style>

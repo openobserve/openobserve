@@ -438,7 +438,7 @@ test.describe("dashboard Import testcases", () => {
 
     await expect(
       page
-        .getByRole("cell", { name: "Kubernetes / Compute Resources / Cluster" })
+        .locator('div[title="Kubernetes / Compute Resources / Cluster"]')
         .first()
     ).toBeVisible();
 
