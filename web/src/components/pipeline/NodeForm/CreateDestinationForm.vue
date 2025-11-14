@@ -70,11 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="formData.destination_type === destType.value"
                 class="check-icon"
               >
-                <q-icon
-                  name="check_circle"
-                  size="20px"
-                  color="positive"
-                />
+                <q-icon name="check_circle" size="20px" color="positive" />
               </div>
             </div>
           </div>
@@ -123,13 +119,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               stack-label
               :rules="[
                 (val: any) => !!val.trim() || 'Field is required!',
-                (val: any) => !val.trim().endsWith('/') || 'URL should not end with a trailing slash',
+                (val: any) =>
+                  !val.trim().endsWith('/') ||
+                  'URL should not end with a trailing slash',
               ]"
               tabindex="0"
             >
               <template #hint>
                 <span class="text-caption"
-                  >Base URL without trailing slash (e.g., https://your-domain.com)</span
+                  >Base URL without trailing slash (e.g.,
+                  https://your-domain.com)</span
                 >
               </template>
             </q-input>
@@ -138,7 +137,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-input
               data-test="add-destination-url-endpoint-input"
               v-model="formData.url_endpoint"
-              :label="formData.destination_type === 'custom' ? 'Endpoint Path' : 'Endpoint Path *'"
+              :label="
+                formData.destination_type === 'custom'
+                  ? 'Endpoint Path'
+                  : 'Endpoint Path *'
+              "
               class="no-border showLabelOnTop"
               borderless
               dense
@@ -146,8 +149,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               stack-label
               bottom-slots
               :rules="[
-                ...(formData.destination_type === 'custom' ? [] : [(val: any) => !!val.trim() || 'Field is required!']),
-                (val: any) => !val.trim() || val.trim().startsWith('/') || 'Endpoint path must start with /',
+                ...(formData.destination_type === 'custom'
+                  ? []
+                  : [(val: any) => !!val.trim() || 'Field is required!']),
+                (val: any) =>
+                  !val.trim() ||
+                  val.trim().startsWith('/') ||
+                  'Endpoint path must start with /',
               ]"
               tabindex="0"
             >
@@ -204,7 +212,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               flat
               stack-label
-              :rules="[(val: any) => !!val?.trim() || 'Index name is required for ESBulk format']"
+              :rules="[
+                (val: any) =>
+                  !!val?.trim() || 'Index name is required for ESBulk format',
+              ]"
               tabindex="0"
             >
               <template v-slot:hint>
@@ -255,9 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`add-destination-header-${header['key']}-delete-btn`"
                   icon="delete"
                   class="q-ml-xs iconHoverBtn el-border el-border-radius"
-                  :class="
-                    store.state?.theme === 'dark' ? 'icon-dark' : ''
-                  "
+                  :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
                   padding="sm"
                   dense
                   flat
@@ -268,9 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-destination-add-header-btn"
                   v-if="index === apiHeaders.length - 1"
                   icon="add"
-                  :class="
-                    store.state?.theme === 'dark' ? 'icon-dark' : ''
-                  "
+                  :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
                   class="q-ml-xs iconHoverBtn el-border el-border-radius"
                   padding="sm"
                   size="sm"
@@ -303,9 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             bordered
             class="connection-notes-card q-mb-lg q-mt-md"
-            :class="
-              store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-blue-1'
-            "
+            :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-blue-1'"
           >
             <q-card-section>
               <div class="row items-center q-mb-sm">
@@ -333,15 +338,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="connectionNotes.example"
                   class="q-mt-sm q-pa-sm example-url"
                   :class="
-                    store.state.theme === 'dark'
-                      ? 'bg-grey-8'
-                      : 'bg-white'
+                    store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-white'
                   "
                 >
                   <strong>Example:</strong>
-                  <code class="q-ml-xs">{{
-                    connectionNotes.example
-                  }}</code>
+                  <code class="q-ml-xs">{{ connectionNotes.example }}</code>
                 </div>
               </div>
             </q-card-section>
@@ -604,30 +605,50 @@ const populateFormForEdit = (destination: DestinationData) => {
   formData.value.template = (destination.template as string) || "";
 
   // Parse output format - check if it's esbulk with index
-  let outputFormat = destination.output_format || "json";
-  if (outputFormat.startsWith('{"esbulk"')) {
-    try {
-      const parsed = JSON.parse(outputFormat);
-      if (parsed.esbulk && parsed.esbulk.index) {
-        formData.value.output_format = "esbulk";
-        formData.value.esbulk_index = parsed.esbulk.index;
-      } else {
+  let outputFormat: any = destination.output_format || "json";
+
+  // Check if output_format is an object (esbulk case)
+  if (typeof outputFormat === "object" && outputFormat !== null) {
+    if (outputFormat.esbulk && outputFormat.esbulk.index) {
+      formData.value.output_format = "esbulk";
+      formData.value.esbulk_index = outputFormat.esbulk.index;
+    } else {
+      // Fallback for unknown object format
+      formData.value.output_format = "json";
+      formData.value.esbulk_index = "";
+    }
+  }
+  // Backward compatibility: handle string format
+  else if (typeof outputFormat === "string") {
+    if (outputFormat.startsWith('{"esbulk"')) {
+      try {
+        const parsed = JSON.parse(outputFormat);
+        if (parsed.esbulk && parsed.esbulk.index) {
+          formData.value.output_format = "esbulk";
+          formData.value.esbulk_index = parsed.esbulk.index;
+        } else {
+          formData.value.output_format = outputFormat;
+          formData.value.esbulk_index = "";
+        }
+      } catch {
         formData.value.output_format = outputFormat;
         formData.value.esbulk_index = "";
       }
-    } catch {
+    } else {
       formData.value.output_format = outputFormat;
       formData.value.esbulk_index = "";
     }
   } else {
-    formData.value.output_format = outputFormat;
+    formData.value.output_format = "json";
     formData.value.esbulk_index = "";
   }
 
   // Use destination_type_name from backend, fallback to destination_type or default
   // Handle null, undefined, and empty string cases
-  const destType = destination.destination_type_name || destination.destination_type;
-  formData.value.destination_type = destType && destType.trim() !== "" ? destType : "openobserve";
+  const destType =
+    destination.destination_type_name || destination.destination_type;
+  formData.value.destination_type =
+    destType && destType.trim() !== "" ? destType : "openobserve";
 
   // Split URL into hostname and endpoint for all destination types
   const fullUrl = destination.url || "";
@@ -886,12 +907,16 @@ const createDestination = () => {
   });
 
   // Merge URL + URL endpoint for all destination types
-  const fullUrl = formData.value.url + (formData.value.url_endpoint || '');
+  const fullUrl = formData.value.url + (formData.value.url_endpoint || "");
 
-  // Handle output format - for esbulk, format as JSON with index
-  let outputFormat = formData.value.output_format;
+  // Handle output format - for esbulk, format as JSON object with index
+  let outputFormat: any = formData.value.output_format;
   if (outputFormat === "esbulk" && formData.value.esbulk_index) {
-    outputFormat = `{"esbulk":{"index":"${formData.value.esbulk_index}"}}`;
+    outputFormat = {
+      esbulk: {
+        index: formData.value.esbulk_index,
+      },
+    };
   }
 
   const payload: any = {
