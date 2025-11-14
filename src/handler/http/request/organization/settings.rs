@@ -126,6 +126,10 @@ async fn create(
     if let Some(dark_mode_theme_color) = settings.dark_mode_theme_color {
         field_found = true;
         data.dark_mode_theme_color = Some(dark_mode_theme_color);
+    #[cfg(feature = "enterprise")]
+    if let Some(claim_parser_function) = settings.claim_parser_function {
+        field_found = true;
+        data.claim_parser_function = claim_parser_function;
     }
 
     #[cfg(feature = "enterprise")]

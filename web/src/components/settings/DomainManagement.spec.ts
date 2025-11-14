@@ -39,37 +39,9 @@ vi.mock("@/services/domainManagement", () => ({
   },
 }));
 
-// Mock jstransform service
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
-
-// Mock organizations service
-vi.mock("@/services/organizations", () => ({
-  default: {
-    post_organization_settings: vi.fn(),
-  },
-}));
-
-// Mock search service
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn(),
-  },
-}));
-
-// Import the mocked services
+// Import the mocked service
 import domainManagement from "@/services/domainManagement";
-import jstransform from "@/services/jstransform";
-import organizations from "@/services/organizations";
-import searchService from "@/services/search";
-
 const mockDomainManagement = domainManagement as any;
-const mockJstransform = jstransform as any;
-const mockOrganizations = organizations as any;
-const mockSearchService = searchService as any;
 
 // Mock Vuex store
 const mockStore = {
@@ -80,13 +52,7 @@ const mockStore = {
     selectedOrganization: {
       identifier: "test-meta-org",
     },
-    organizationData: {
-      organizationSettings: {
-        claim_parser_function: "",
-      },
-    },
   },
-  dispatch: vi.fn(),
 };
 
 vi.mock("vuex", () => ({
@@ -108,7 +74,7 @@ describe("DomainManagement Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetAllMocks();
-
+    
     // Mock successful API response by default
     mockDomainManagement.getDomainRestrictions.mockResolvedValue({
       data: {
@@ -129,25 +95,6 @@ describe("DomainManagement Component", () => {
 
     mockDomainManagement.updateDomainRestrictions.mockResolvedValue({
       success: true,
-    });
-
-    // Mock jstransform service
-    mockJstransform.list.mockResolvedValue({
-      data: {
-        list: [],
-      },
-    });
-
-    // Mock organizations service
-    mockOrganizations.post_organization_settings.mockResolvedValue({
-      success: true,
-    });
-
-    // Mock search service
-    mockSearchService.search.mockResolvedValue({
-      data: {
-        hits: [],
-      },
     });
   });
 
@@ -184,12 +131,6 @@ describe("DomainManagement Component", () => {
       props,
       global: {
         plugins: [i18n],
-        stubs: {
-          QDrawer: {
-            template: '<div class="q-drawer-stub"><slot /></div>',
-            props: ['modelValue', 'side', 'bordered', 'width', 'overlay', 'elevated'],
-          },
-        },
       },
     });
   };
@@ -204,22 +145,16 @@ describe("DomainManagement Component", () => {
 
     it("should display correct title and description", async () => {
       wrapper = createWrapper();
+      
+      const titles = wrapper.findAll(".text-h6");
+      const descriptions = wrapper.findAll(".text-body2");
 
-      // Check that the main container exists
-      const mainContainer = wrapper.find(".domain_management");
-      expect(mainContainer.exists()).toBeTruthy();
+      // Check first section - Claim Parser Function
+      expect(titles[0].text()).toContain("Claim Parser Function");
 
-      // Check for Claim Parser section title (should contain "Claim Parser")
-      const claimParserTitle = mainContainer.findAll(".text-h6").find((el: any) =>
-        el.text().includes("Claim Parser")
-      );
-      expect(claimParserTitle).toBeTruthy();
-
-      // Check for Domain Restrictions section title
-      const domainRestrictionsTitle = mainContainer.findAll(".text-h6").find((el: any) =>
-        el.text().includes("Domain") || el.text().includes("Restriction")
-      );
-      expect(domainRestrictionsTitle).toBeTruthy();
+      // Check second section - Domain Restrictions
+      expect(titles[1].text()).toContain("Domain Restrictions");
+      expect(descriptions[1].text()).toContain("Control which domains");
     });
 
     it("should load domain settings on mount", async () => {
