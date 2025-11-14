@@ -28,6 +28,7 @@ pub const USAGE_STREAM: &str = "usage";
 pub const STATS_STREAM: &str = "stats";
 pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";
+pub const DATA_RETENTION_USAGE_STREAM: &str = "data_retention_usage";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum TriggerDataStatus {
@@ -148,6 +149,20 @@ pub struct GroupKey {
 pub struct AggregatedData {
     pub usage_data: UsageData,
     pub count: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DataRetentionUsageData {
+    pub _timestamp: i64,
+    pub org_id: String,
+    pub year: i32,
+    pub month: u32,
+    pub day: u32,
+    pub hour: u32,
+    pub event_time_hour: String,
+    pub mb_hours: f64,
+    pub storage_size_mb: f64,
+    pub unit: String,
 }
 
 #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
