@@ -280,9 +280,7 @@ pub(super) async fn ingest_reporting_data(
 }
 
 #[cfg(feature = "cloud")]
-pub async fn ingest_data_retention_usages(
-    data_retention_usages: Vec<DataRetentionUsageData>,
-) {
+pub async fn ingest_data_retention_usages(data_retention_usages: Vec<DataRetentionUsageData>) {
     if data_retention_usages.is_empty() {
         log::info!("[SELF-REPORTING] Returning as no data retention usages reported");
         return;
