@@ -794,7 +794,8 @@ export const usePanelDataLoader = (
 
       state.lastTriggeredAt = new Date().getTime();
 
-      if (runCount == 0) {
+      // if force load is true, skip restoring from cache
+      if (runCount == 0 && forceLoad?.value != true) {
         log("loadData: panelcache: run count is 0");
         // restore from the cache and return
         const isRestoredFromCache = await restoreFromCache();
