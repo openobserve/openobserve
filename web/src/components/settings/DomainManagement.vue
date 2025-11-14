@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="row q-gutter-md items-end">
-        <div class="col-auto" style="min-width: 400px;">
+        <div class="col-auto claim-parser-select">
           <q-select
             v-model="claimParserFunction"
             :options="functionOptions"
@@ -67,7 +67,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="savingClaimParser"
           />
         </div>
+        <div class="col-auto">
+          <q-btn
+            flat
+            round
+            dense
+            icon="help_outline"
+            @click="showVrlInfo = true"
+          >
+            <q-tooltip>{{ t("settings.claimParserFunctionInfoTitle") }}</q-tooltip>
+          </q-btn>
+        </div>
       </div>
+
+      <!-- Right Drawer for VRL Information -->
+      <q-drawer
+        v-model="showVrlInfo"
+        side="right"
+        bordered
+        :width="450"
+        overlay
+        elevated
+      >
+        <div class="q-pa-md">
+          <div class="row items-center q-mb-md">
+            <div class="col text-h6 text-bold">
+              {{ t("settings.claimParserFunctionInfoTitle") }}
+            </div>
+            <div class="col-auto">
+              <q-btn
+                flat
+                round
+                dense
+                icon="close"
+                @click="showVrlInfo = false"
+              />
+            </div>
+          </div>
+
+          <div class="text-body2">
+            <div class="q-mb-md q-pa-md info-box">
+              <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionInputTitle") }}</div>
+              <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
+            </div>
+
+            <div class="q-pa-md info-box">
+              <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
+              <div class="q-mb-sm">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
+              <div class="q-ml-md">
+                <div class="q-mb-xs">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
+                <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </q-drawer>
     </div>
 
     <!-- Divider -->
@@ -278,6 +332,7 @@ const functionOptions = ref<string[]>([]);
 const allFunctions = ref<string[]>([]);
 const loadingFunctions = ref(false);
 const savingClaimParser = ref(false);
+const showVrlInfo = ref(false);
 
 const emit = defineEmits(["cancel", "saved"]);
 
@@ -622,6 +677,15 @@ const resetForm = () => {
 </script>
 
 <style scoped lang="scss">
+.claim-parser-select {
+  min-width: 400px;
+}
+
+.info-box {
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
 .domain-input {
   width: 300px;
 }
@@ -657,6 +721,10 @@ const resetForm = () => {
 }
 
 .body--dark {
+  .info-box {
+    background-color: #2a2a2a;
+  }
+
   .domain-card {
     border-color: #444;
     background: #1e1e1e;
