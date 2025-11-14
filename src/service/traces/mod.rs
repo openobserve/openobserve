@@ -562,10 +562,19 @@ pub async fn handle_otlp_request(
     if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
     {
         log::error!("Error while writing traces: {e}");
-        return Ok(HttpResponse::InternalServerError()
+        // Check if this is a schema validation error (InvalidData)
+        let (status_code, mut http_status) = if e.kind() == std::io::ErrorKind::InvalidData {
+            (http::StatusCode::BAD_REQUEST, HttpResponse::BadRequest())
+        } else {
+            (
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                HttpResponse::InternalServerError(),
+            )
+        };
+        return Ok(http_status
             .append_header((ERROR_HEADER, format!("error while writing trace data: {e}")))
             .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
+                status_code,
                 format!("error while writing trace data: {e}"),
             )));
     }
@@ -699,10 +708,19 @@ pub async fn ingest_json(
     if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
     {
         log::error!("Error while writing traces: {e}");
-        return Ok(HttpResponse::InternalServerError()
+        // Check if this is a schema validation error (InvalidData)
+        let (status_code, mut http_status) = if e.kind() == std::io::ErrorKind::InvalidData {
+            (http::StatusCode::BAD_REQUEST, HttpResponse::BadRequest())
+        } else {
+            (
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                HttpResponse::InternalServerError(),
+            )
+        };
+        return Ok(http_status
             .append_header((ERROR_HEADER, format!("error while writing trace data: {e}")))
             .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
+                status_code,
                 format!("error while writing trace data: {e}"),
             )));
     }
@@ -878,7 +896,7 @@ async fn write_traces(
 
     // Start check for schema
     let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
-    let _ = check_for_schema(
+    let (_schema_evolution, _infer_schema) = check_for_schema(
         org_id,
         stream_name,
         StreamType::Traces,
@@ -887,7 +905,8 @@ async fn write_traces(
         *min_timestamp,
         false, // is_derived is false for traces
     )
-    .await;
+    .await
+    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
     let record_schema = traces_schema_map
         .get(stream_name)
         .unwrap()
