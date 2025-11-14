@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-td
           class="field_list field-group-header !tw-flex tw-justify-between tw-items-center tw-rounded-[0.25rem]"
-          :class="theme === 'dark' ? 'text-grey-5' : 'bg-grey-3'"
+          :class="[theme === 'dark' ? 'text-grey-5' : 'bg-grey-3']"
         >
           <div class="tw-w-[calc(100%-1.25rem)] ellipsis">
             {{ props.row.name }} ({{
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :name="
               expandGroupRows[props.row.group] ? 'expand_less' : 'expand_more'
             "
-            size="20px"
+            size="1.25rem"
             class="float-right q-mt-xs"
           ></q-icon>
         </q-td>
@@ -87,7 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         v-show="expandGroupRows[props.row.group]"
       >
-        <q-td :props="props" class="field_list">
+        <q-td
+          :props="props"
+          class="field_list"
+          :class="selectedFields.includes(props.row.name) ? 'selected' : ''"
+        >
           <FieldRow
             :field="props.row"
             :selected-fields="selectedFields"
@@ -145,13 +149,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="indexlist-search-input tw-mb-[0.25rem]"
         >
           <template #prepend>
-            <q-icon name="search" size="20px" class="o2-search-input-icon" />
+            <q-icon name="search" size="1.25rem" class="o2-search-input-icon" />
           </template>
         </q-input>
         <q-tr v-if="loadingStream == true">
           <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
             <div class="text-subtitle2 text-weight-bold">
-              <q-spinner-hourglass size="20px" />
+              <q-spinner-hourglass size="1.25rem" />
               {{ t("confirmDialog.loading") }}
             </div>
           </q-td>
@@ -265,32 +269,32 @@ defineExpose({
 }
 
 .indexlist-search-input {
-  height: 36px;
+  height: 2.25rem;
   .q-field__control {
-    height: 36px;
+    height: 2.25rem;
     display: flex;
     align-items: center;
-    font-size: 13px;
-    padding: 0px 6px !important;
+    font-size: 0.8125rem;
+    padding: 0 0.375rem !important;
     font-weight: 500;
   }
   .q-field__prepend {
-    height: 36px !important;
-    padding-bottom: 4px !important;
+    height: 2.25rem !important;
+    padding-bottom: 0.25rem !important;
   }
   .q-field__append {
-    padding-top: 8px !important;
+    padding-top: 0.5rem !important;
   }
 
   .q-icon {
-    height: 16px;
-    width: 16px;
-    margin-right: 10px;
+    height: 1rem;
+    width: 1rem;
+    margin-right: 0.625rem;
   }
 }
 
 .field_list {
-  padding: 2px 4px;
+  padding: 0;
 
   &.field-group-header {
     font-weight: 600;

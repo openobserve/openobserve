@@ -1521,7 +1521,6 @@ export default defineComponent({
       setRumUser,
       openPredefinedThemes,
       isPredefinedThemesOpen,
-      showThemes,
       handleMenuHover,
     };
   },

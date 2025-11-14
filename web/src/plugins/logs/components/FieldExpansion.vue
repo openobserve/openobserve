@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-show="fieldValues?.isLoading"
             class="q-pl-md q-py-xs"
-            style="height: 60px"
+            style="height: 3.75rem"
           >
             <q-inner-loading
               size="xs"
@@ -142,14 +142,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex row wrap justify-between"
                   :style="
                     selectedStreamsCount == field.streams.length
-                      ? 'width: calc(100% - 42px)'
-                      : 'width: calc(100% - 0px)'
+                      ? 'width: calc(100% - 2.625rem)'
+                      : 'width: 100%'
                   "
                 >
                   <div
                     :title="value.key"
                     class="ellipsis q-pr-xs"
-                    style="width: calc(100% - 50px)"
+                    style="width: calc(100% - 3.125rem)"
                   >
                     {{ value.key }}
                   </div>
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="display: contents"
                     :style="
                       selectedStreamsCount == field.streams.length
-                        ? 'width: 50px'
+                        ? 'width: 3.125rem'
                         : ''
                     "
                   >
@@ -174,27 +174,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="theme === 'dark' ? 'text-white' : 'text-black'"
                 >
                   <q-btn
-                    class="o2-custom-button-hover tw-ml-[0.25rem] !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
-                    size="5px"
-                    style="margin-right: 4px"
+                    class="o2-custom-button-hover tw-ml-[0.25rem] tw-mr-[0.25rem] !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                    size="0.3125rem"
                     @click="handleAddSearchTerm(field.name, value.key, 'include')"
                     title="Include Term"
                     round
                     :data-test="`log-search-subfield-list-equal-${field.name}-field-btn`"
                   >
-                    <q-icon style="height: 8px; width: 8px">
+                    <q-icon class="tw-h-[0.5rem] tw-w-[0.5rem]">
                       <EqualIcon></EqualIcon>
                     </q-icon>
                   </q-btn>
                   <q-btn
                     class="o2-custom-button-hover !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
-                    size="5px"
+                    size="0.3125rem"
                     @click="handleAddSearchTerm(field.name, value.key, 'exclude')"
                     title="Exclude Term"
                     round
                     :data-test="`log-search-subfield-list-not-equal-${field.name}-field-btn`"
                   >
-                    <q-icon style="height: 8px; width: 8px">
+                    <q-icon class="tw-h-[0.5rem] tw-w-[0.5rem]">
                       <NotEqualIcon></NotEqualIcon>
                     </q-icon>
                   </q-btn>
@@ -272,7 +271,7 @@ const handleAddSearchTerm = (
   bottom: 0;
   display: none;
   align-items: center;
-  padding: 0 4px;
+  padding: 0 0.25rem;
   background: var(--q-dark);
 }
 
