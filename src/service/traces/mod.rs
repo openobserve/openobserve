@@ -405,6 +405,7 @@ pub async fn handle_otlp_request(
                             Arc::from(span_id.as_str()),
                             parent_span_id_opt,
                             Arc::from(service_name.as_str()),
+                            Arc::from(traces_stream_name.as_str()),
                             &local_val.span_kind,
                             start_time,
                             end_time,
