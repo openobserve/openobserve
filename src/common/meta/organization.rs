@@ -293,6 +293,10 @@ pub struct OrganizationSettingPayload {
     pub enable_streaming_search: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_auto_refresh_interval: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub light_mode_theme_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dark_mode_theme_color: Option<String>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -317,6 +321,10 @@ pub struct OrganizationSetting {
     // and only applicable for cloud
     #[serde(skip_serializing_if = "Option::is_none")]
     pub free_trial_expiry: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub light_mode_theme_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dark_mode_theme_color: Option<String>,
 }
 
 impl Default for OrganizationSetting {
@@ -330,6 +338,8 @@ impl Default for OrganizationSetting {
             enable_streaming_search: default_enable_streaming_search(),
             min_auto_refresh_interval: default_auto_refresh_interval(),
             free_trial_expiry: None,
+            light_mode_theme_color: None,
+            dark_mode_theme_color: None,
         }
     }
 }
