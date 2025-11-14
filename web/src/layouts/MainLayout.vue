@@ -1338,6 +1338,7 @@ export default defineComponent({
           streaming_aggregation_enabled:
             orgSettings?.data?.data?.streaming_aggregation_enabled ?? false,
           free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? "",
+          claim_parser_function: orgSettings?.data?.data?.claim_parser_function ?? "",
         });
 
         if (

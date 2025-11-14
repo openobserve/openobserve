@@ -16,11 +16,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="q-px-md q-py-md domain_management">
+    <!-- Claim Parser Function Selection -->
+    <div class="q-mb-xl">
+      <div class="text-h6 text-bold q-mb-xs">
+        {{ t("settings.claimParserFunction") }}
+      </div>
+      <div class="text-body2 text-grey-7 q-mb-md">
+        {{ t("settings.claimParserFunctionDescription") }}
+      </div>
+
+      <div class="row q-gutter-md items-end">
+        <div class="col-auto" style="min-width: 400px;">
+          <q-select
+            v-model="claimParserFunction"
+            :options="functionOptions"
+            :label="t('settings.claimParserFunctionLabel')"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop"
+            stack-label
+            outlined
+            dense
+            :loading="loadingFunctions"
+            @filter="filterFunctions"
+            use-input
+            fill-input
+            hide-selected
+            input-debounce="300"
+            clearable
+          >
+            <template v-slot:hint>
+              {{ t("settings.claimParserFunctionHint") }}
+            </template>
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">
+                  {{ t("settings.noVrlFunctionsFound") }}
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
+        </div>
+        <div class="col-auto">
+          <q-btn
+            :label="t('common.save')"
+            color="primary"
+            class="text-bold text-capitalize no-border"
+            unelevated
+            @click="saveClaimParserFunction"
+            :loading="savingClaimParser"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <q-separator class="q-mb-xl" />
+
     <div class="text-h6 text-bold q-mb-xs">
-      {{ t("settings.ssoDomainRestrictions") }}
+      {{ t("settings.domainRestrictionsSubsection") }}
     </div>
     <div class="text-body2 text-grey-7 q-mb-lg">
-      {{ t("settings.ssoDomainRestrictionsDescription") }}
+      {{ t("settings.domainRestrictionsSubsectionDescription") }}
     </div>
 
     <!-- Domain Input Section -->
@@ -196,6 +253,8 @@ import { useStore } from "vuex";
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
 import { add } from "date-fns";
+import jstransform from "@/services/jstransform";
+import organizations from "@/services/organizations";
 
 interface Domain {
   name: string;
@@ -213,11 +272,19 @@ const newDomain = ref("");
 const domains = reactive<Domain[]>([]);
 const saving = ref(false);
 
+// Claim parser function state
+const claimParserFunction = ref("");
+const functionOptions = ref<string[]>([]);
+const allFunctions = ref<string[]>([]);
+const loadingFunctions = ref(false);
+const savingClaimParser = ref(false);
+
 const emit = defineEmits(["cancel", "saved"]);
 
 onMounted(() => {
   if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
     loadDomainSettings();
+    loadFunctions();
   } else {
     router.replace({
       name: "general",
@@ -231,6 +298,7 @@ onMounted(() => {
 onActivated(() => {
   if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
     loadDomainSettings();
+    loadFunctions();
   } else {
     router.replace({
       name: "general",
@@ -244,7 +312,7 @@ onActivated(() => {
 const loadDomainSettings = async () => {
   try {
     const response = await domainManagement.getDomainRestrictions(store.state.zoConfig.meta_org);
-    
+
     if (response.data && response.data.domains) {
       const loadedDomains = response.data.domains
         .filter((domain: any) => domain && typeof domain === 'object' && domain.domain) // Filter out invalid entries
@@ -255,12 +323,18 @@ const loadDomainSettings = async () => {
         }));
       domains.splice(0, domains.length, ...loadedDomains);
     }
+
+    // Load claim parser function from organization settings
+    const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function;
+    if (storedFunction) {
+      claimParserFunction.value = storedFunction;
+    }
   } catch (error: any) {
     // If the API doesn't exist yet or returns an error, use example data
     console.warn("Domain restrictions API not available, using example data:", error);
-    
+
     const existingDomains = [];
-    
+
     domains.splice(0, domains.length, ...existingDomains);
   }
 };
@@ -422,6 +496,78 @@ const removeEmail = (domain: Domain, emailIndex: number) => {
   });
 };
 
+// Load VRL functions from _meta org
+const loadFunctions = async () => {
+  try {
+    loadingFunctions.value = true;
+    const response = await jstransform.list(1, 10000, "name", false, "", store.state.zoConfig.meta_org);
+
+    allFunctions.value = response.data.list.map((fn: any) => fn.name);
+    functionOptions.value = allFunctions.value;
+
+    // Set the current value from store if it exists
+    const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function;
+    if (storedFunction) {
+      claimParserFunction.value = storedFunction;
+    }
+  } catch (e: any) {
+    console.error("Error loading functions:", e);
+  } finally {
+    loadingFunctions.value = false;
+  }
+};
+
+// Filter functions for autocomplete
+const filterFunctions = (val: string, update: Function) => {
+  update(() => {
+    if (val === "") {
+      functionOptions.value = allFunctions.value;
+    } else {
+      const needle = val.toLowerCase();
+      functionOptions.value = allFunctions.value.filter(
+        (v) => v.toLowerCase().indexOf(needle) > -1
+      );
+    }
+  });
+};
+
+// Save claim parser function separately
+const saveClaimParserFunction = async () => {
+  savingClaimParser.value = true;
+
+  try {
+    const orgSettingsPayload: any = {
+      claim_parser_function: claimParserFunction.value || "",
+    };
+
+    await organizations.post_organization_settings(
+      store.state.zoConfig.meta_org,
+      orgSettingsPayload,
+    );
+
+    // Update store with new settings
+    const updatedSettings: any = {
+      ...store.state?.organizationData?.organizationSettings,
+      claim_parser_function: claimParserFunction.value || "",
+    };
+    store.dispatch("setOrganizationSettings", updatedSettings);
+
+    q.notify({
+      type: "positive",
+      message: t("settings.claimParserFunctionSaved"),
+      timeout: 3000,
+    });
+  } catch (error: any) {
+    q.notify({
+      type: "negative",
+      message: error?.message || t("settings.errorSavingClaimParserFunction"),
+      timeout: 3000,
+    });
+  } finally {
+    savingClaimParser.value = false;
+  }
+};
+
 const saveChanges = async () => {
   saving.value = true;
   
@@ -482,6 +628,10 @@ const resetForm = () => {
 
 .email-input {
   min-width: 250px;
+}
+
+.function-select {
+  max-width: 500px;
 }
 
 .domain-card {

@@ -83,50 +83,256 @@ pub async fn process_token(
 
         let dex_cfg = get_dex_config();
         let openfga_cfg = get_openfga_config();
-        let groups = match dec_token.claims.get(&dex_cfg.group_claim) {
-            None => vec![],
-            Some(groups) => {
-                if !groups.is_array() {
-                    vec![]
-                } else {
-                    groups.as_array().unwrap().to_vec()
-                }
-            }
-        };
 
         let mut source_orgs: Vec<UserOrg> = vec![];
         let mut custom_roles: Vec<String> = vec![];
         let mut tuples_to_add = HashMap::new();
-        if groups.is_empty() {
-            let role = if let Some(role) = &res.0.user_role {
-                role.clone()
-            } else {
-                UserRole::from_str(&dex_cfg.default_role).unwrap()
+        let mut use_custom_parsing = false;
+
+        // Try custom claim parsing first if enabled
+        if openfga_cfg.custom_claim_parsing_enabled {
+            log::info!("Custom claim parsing enabled, attempting VRL-based parsing");
+
+            // Create closures for IAM settings and org validation
+            let iam_settings_fn = || {
+                Box::pin(async {
+                    // Get claim parser function from _meta org settings
+                    match db::organization::get_org_setting("_meta").await {
+                        Ok(settings) => settings.claim_parser_function,
+                        Err(_) => "claim_parser".to_string(), // Default value
+                    }
+                })
+                    as std::pin::Pin<Box<dyn std::future::Future<Output = String> + Send>>
             };
-            source_orgs.push(UserOrg {
-                role,
-                name: dex_cfg.default_org.clone(),
-                token: Default::default(),
-                rum_token: Default::default(),
-            });
-        } else {
-            for group in groups {
-                let role_org = parse_dn(group.as_str().unwrap()).unwrap();
-                if openfga_cfg.map_group_to_role {
-                    custom_roles.push(format_role_name(
-                        &role_org.org,
-                        &role_org.custom_role.unwrap(),
-                    ));
-                } else {
-                    source_orgs.push(UserOrg {
-                        role: role_org.role,
-                        name: role_org.org,
-                        token: Default::default(),
-                        rum_token: Default::default(),
-                    });
+
+            let org_exists_fn = |org_name: &str| {
+                let org_name = org_name.to_string();
+                Box::pin(async move {
+                    match db::organization::get_org(&org_name).await {
+                        Ok(_) => Ok(true),
+                        Err(_) => Ok(false),
+                    }
+                })
+                    as std::pin::Pin<
+                        Box<dyn std::future::Future<Output = Result<bool, anyhow::Error>> + Send>,
+                    >
+            };
+
+            let function_loader_fn = |function_name: &str| {
+                let function_name = function_name.to_string();
+                Box::pin(async move {
+                    match db::functions::get("_meta", &function_name).await {
+                        Ok(func) => Ok(func.function),
+                        Err(e) => Err(anyhow::anyhow!(
+                            "Failed to load function '{}' from _meta org: {}",
+                            function_name,
+                            e
+                        )),
+                    }
+                })
+                    as std::pin::Pin<
+                        Box<dyn std::future::Future<Output = Result<String, anyhow::Error>> + Send>,
+                    >
+            };
+
+            // Create VRL compile and execute closures
+            // Note: We use String as the compiled program type for simplicity and Send
+            // compatibility Actual compilation happens in the execute closure
+            let vrl_compile_fn = |function_content: &str| -> Result<String, anyhow::Error> {
+                // Just validate that it compiles, but return the source for execution
+                crate::service::ingestion::compile_vrl_function(function_content, "_meta")
+                    .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
+                Ok(function_content.to_string())
+            };
+
+            let vrl_execute_fn = |function_content: &String,
+                                  claims: serde_json::Value|
+             -> Result<serde_json::Value, anyhow::Error> {
+                use vrl::compiler::{TargetValue, runtime::Runtime};
+
+                // Compile the VRL function
+                let vrl_config =
+                    crate::service::ingestion::compile_vrl_function(function_content, "_meta")
+                        .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
+
+                let mut runtime = Runtime::default();
+                let timezone = vrl::compiler::TimeZone::Local;
+                let mut target = TargetValue {
+                    value: claims.into(),
+                    metadata: vrl::value::Value::Object(Default::default()),
+                    secrets: vrl::value::Secrets::new(),
+                };
+
+                let result = match vrl::compiler::VrlRuntime::default() {
+                    vrl::compiler::VrlRuntime::Ast => {
+                        runtime.resolve(&mut target, &vrl_config.program, &timezone)
+                    }
+                };
+
+                match result {
+                    Ok(res) => {
+                        let output: serde_json::Value = res.try_into().map_err(|e| {
+                            anyhow::anyhow!("Failed to convert VRL result: {:?}", e)
+                        })?;
+                        Ok(output)
+                    }
+                    Err(e) => Err(anyhow::anyhow!("VRL execution failed: {}", e)),
+                }
+            };
+
+            // Create error publish closure
+            let error_publish_fn =
+                |error: o2_enterprise::enterprise::auth::claim_parser::ClaimParserError| {
+                    Box::pin(async move {
+                        use chrono::Utc;
+                        use config::meta::{
+                            self_reporting::error::{ErrorData, ErrorSource, SsoClaimParserError},
+                            stream::StreamParams,
+                        };
+
+                        let claims_json = error
+                            .claims
+                            .as_ref()
+                            .map(|c| serde_json::to_string(c).unwrap_or_default());
+
+                        let error_data = ErrorData {
+                            _timestamp: Utc::now().timestamp_micros(),
+                            stream_params: StreamParams::default(),
+                            error_source: ErrorSource::SsoClaimParser(SsoClaimParserError {
+                                function_name: error.function_name,
+                                error_type: error.error_type,
+                                error: error.error,
+                                claims_json,
+                            }),
+                        };
+
+                        crate::service::self_reporting::publish_error(error_data).await;
+                    })
+                        as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                };
+
+            match o2_enterprise::enterprise::auth::claim_parser::parse_claims(
+                &dec_token.claims,
+                iam_settings_fn,
+                org_exists_fn,
+                function_loader_fn,
+                vrl_compile_fn,
+                vrl_execute_fn,
+                error_publish_fn,
+            )
+            .await
+            {
+                Ok(Some(assignments)) => {
+                    log::info!(
+                        "Custom claim parsing successful, processing {} assignments",
+                        assignments.len()
+                    );
+
+                    // Convert parsed assignments into source_orgs
+                    // Note: Validation is already done inside parse_claims
+                    for assignment in assignments {
+                        let role = UserRole::from_str(&assignment.role)
+                            .unwrap_or(UserRole::from_str(&dex_cfg.default_role).unwrap());
+                        source_orgs.push(UserOrg {
+                            role,
+                            name: assignment.org.clone(),
+                            token: Default::default(),
+                            rum_token: Default::default(),
+                        });
+                        log::info!(
+                            "Added user to org '{}' with role '{}'",
+                            assignment.org,
+                            assignment.role
+                        );
+                    }
+
+                    // If we have valid assignments, mark that we used custom parsing
+                    if !source_orgs.is_empty() {
+                        use_custom_parsing = true;
+                        log::info!(
+                            "Using custom claim parsing results ({} orgs)",
+                            source_orgs.len()
+                        );
+                    } else {
+                        log::warn!(
+                            "Custom claim parsing returned no valid assignments, falling back to O2_DEX_DEFAULT_ORG"
+                        );
+                        // Fall back to default org
+                        let role = if let Some(role) = &res.0.user_role {
+                            role.clone()
+                        } else {
+                            UserRole::from_str(&dex_cfg.default_role).unwrap()
+                        };
+                        source_orgs.push(UserOrg {
+                            role,
+                            name: dex_cfg.default_org.clone(),
+                            token: Default::default(),
+                            rum_token: Default::default(),
+                        });
+                        use_custom_parsing = true;
+                    }
+                }
+                Ok(None) => {
+                    log::info!(
+                        "Custom claim parsing returned None, using legacy parsing (backward compatible)"
+                    );
+                    // Fall through to legacy parsing
+                }
+                Err(e) => {
+                    log::error!("Custom claim parsing failed: {}", e);
+                    if openfga_cfg.claim_parsing_deny_on_failure {
+                        return Err(e);
+                    }
+                    log::info!("Falling back to legacy parsing due to error");
+                    // Fall through to legacy parsing
                 }
             }
         }
+
+        // Legacy claim parsing (existing behavior) - only if custom parsing didn't run
+        if !use_custom_parsing {
+            let groups = match dec_token.claims.get(&dex_cfg.group_claim) {
+                None => vec![],
+                Some(groups) => {
+                    if !groups.is_array() {
+                        vec![]
+                    } else {
+                        groups.as_array().unwrap().to_vec()
+                    }
+                }
+            };
+
+            if groups.is_empty() {
+                let role = if let Some(role) = &res.0.user_role {
+                    role.clone()
+                } else {
+                    UserRole::from_str(&dex_cfg.default_role).unwrap()
+                };
+                source_orgs.push(UserOrg {
+                    role,
+                    name: dex_cfg.default_org.clone(),
+                    token: Default::default(),
+                    rum_token: Default::default(),
+                });
+            } else {
+                for group in groups {
+                    let role_org = parse_dn(group.as_str().unwrap()).unwrap();
+                    if openfga_cfg.map_group_to_role {
+                        custom_roles.push(format_role_name(
+                            &role_org.org,
+                            &role_org.custom_role.unwrap(),
+                        ));
+                    } else {
+                        source_orgs.push(UserOrg {
+                            role: role_org.role,
+                            name: role_org.org,
+                            token: Default::default(),
+                            rum_token: Default::default(),
+                        });
+                    }
+                }
+            }
+        } // End of legacy claim parsing block
 
         // Assign users custom roles in RBAC
         if openfga_cfg.map_group_to_role {

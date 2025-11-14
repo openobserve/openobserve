@@ -37,6 +37,7 @@ pub enum ErrorSource {
     Dashboard,
     Ingestion,
     Pipeline(PipelineError),
+    SsoClaimParser(SsoClaimParserError),
     Search,
     Other,
 }
@@ -68,6 +69,18 @@ impl Serialize for ErrorSource {
                 if let Some(error) = &pe.error {
                     state
                         .serialize_field("error", &error.truncate_utf8(PIPELINE_ERROR_MAX_SIZE))?;
+                }
+            }
+            ErrorSource::SsoClaimParser(ce) => {
+                state.serialize_field("error_source", &ce.function_name)?;
+                state.serialize_field("pipeline_name", &"sso_claim_parser")?;
+                state.serialize_field("error_type", &ce.error_type)?;
+                state.serialize_field("error", &ce.error.truncate_utf8(PIPELINE_ERROR_MAX_SIZE))?;
+                if let Some(claims) = &ce.claims_json {
+                    state.serialize_field(
+                        "claims",
+                        &claims.truncate_utf8(PIPELINE_ERROR_MAX_SIZE),
+                    )?;
                 }
             }
         }
@@ -132,6 +145,31 @@ impl NodeErrors {
     pub fn add_error(&mut self, error: String) {
         self.error_count += 1;
         self.errors.insert(error);
+    }
+}
+
+/// SSO Claim Parser Error
+#[derive(Clone, Debug, PartialEq)]
+pub struct SsoClaimParserError {
+    pub function_name: String,
+    pub error_type: String, // compile_error, exec_error, timeout, parse_error, validation_error
+    pub error: String,
+    pub claims_json: Option<String>, // JSON string of input claims for debugging
+}
+
+impl SsoClaimParserError {
+    pub fn new(function_name: String, error_type: String, error: String) -> Self {
+        Self {
+            function_name,
+            error_type,
+            error,
+            claims_json: None,
+        }
+    }
+
+    pub fn with_claims(mut self, claims_json: String) -> Self {
+        self.claims_json = Some(claims_json);
+        self
     }
 }
 
