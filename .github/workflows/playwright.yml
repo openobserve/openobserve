@@ -519,27 +519,250 @@ jobs:
       - name: Install project dependencies
         run: cd tests/ui-testing && npm ci
 
-      - name: Download blob reports from GitHub Actions Artifacts
+      - name: Clean up cancelled shard artifacts from previous attempts
+        if: ${{ github.run_attempt > 1 }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "::group::Cleaning up cancelled shard artifacts"
+          echo "::notice::[TESTDINO_RERUN_OPT] 🔍 Starting cleanup step for attempt #${{ github.run_attempt }}"
+          echo "::notice::[TESTDINO_RERUN_OPT] Current workflow run ID: ${{ github.run_id }}"
+          echo "::notice::[TESTDINO_RERUN_OPT] Current repository: ${{ github.repository }}"
+
+          # Check previous attempt (Attempt N-1)
+          PREV_ATTEMPT=$((${{ github.run_attempt }} - 1))
+          echo "::notice::[TESTDINO_RERUN_OPT] 🔎 Checking attempt #$PREV_ATTEMPT for cancelled shards..."
+
+          # Get all matrix jobs from previous attempt
+          echo "::notice::[TESTDINO_RERUN_OPT] 📡 Calling GitHub API to fetch jobs from attempt #$PREV_ATTEMPT..."
+          API_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/$PREV_ATTEMPT/jobs")
+
+          echo "::notice::[TESTDINO_RERUN_OPT] 📦 API Response received (length: ${#API_RESPONSE} chars)"
+          echo "::debug::[TESTDINO_RERUN_OPT] Full API response: $API_RESPONSE"
+
+          # Extract job names and their conclusions
+          # Job name format: "e2e / {testfolder}"
+          echo "::notice::[TESTDINO_RERUN_OPT] 🔍 Extracting cancelled shards from API response..."
+          CANCELLED_SHARDS=$(echo "$API_RESPONSE" | jq -r '.jobs[] | select(.name | startswith("e2e / ")) | select(.conclusion == "cancelled" or .conclusion == null or .conclusion == "") | .name' | sed 's/e2e \/ //')
+
+          echo "::notice::[TESTDINO_RERUN_OPT] 📋 Cancelled shards detected: ${CANCELLED_SHARDS:-<none>}"
+
+          if [ -z "$CANCELLED_SHARDS" ]; then
+            echo "::notice::[TESTDINO_RERUN_OPT] ✅ No cancelled shards found in attempt #$PREV_ATTEMPT"
+            echo "::notice::[TESTDINO_RERUN_OPT] All shards from previous attempt completed successfully or failed cleanly"
+          else
+            echo "::warning::[TESTDINO_RERUN_OPT] ⚠️ Found cancelled shards in attempt #$PREV_ATTEMPT:"
+            echo "[TESTDINO_RERUN_OPT] Cancelled shard list:"
+            echo "$CANCELLED_SHARDS" | while read shard; do
+              echo "  - $shard"
+            done
+
+            # Fetch all artifacts for this run first
+            echo "::notice::[TESTDINO_RERUN_OPT] 📡 Fetching all artifacts for run ${{ github.run_id }}..."
+            ALL_ARTIFACTS=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts")
+
+            echo "::notice::[TESTDINO_RERUN_OPT] 📦 Total artifacts found: $(echo "$ALL_ARTIFACTS" | jq '.total_count')"
+            echo "::debug::[TESTDINO_RERUN_OPT] Artifact list: $(echo "$ALL_ARTIFACTS" | jq -r '.artifacts[].name')"
+
+            # Delete artifacts for cancelled shards
+            DELETED_COUNT=0
+            SKIPPED_COUNT=0
+
+            for shard in $CANCELLED_SHARDS; do
+              ARTIFACT_NAME="blob-report-${shard}-attempt-${PREV_ATTEMPT}"
+              echo "::warning::[TESTDINO_RERUN_OPT] 🗑️ Processing deletion for artifact: $ARTIFACT_NAME"
+
+              # Get artifact ID
+              ARTIFACT_ID=$(echo "$ALL_ARTIFACTS" | jq -r ".artifacts[] | select(.name == \"$ARTIFACT_NAME\") | .id")
+
+              if [ -n "$ARTIFACT_ID" ] && [ "$ARTIFACT_ID" != "null" ]; then
+                echo "::warning::[TESTDINO_RERUN_OPT] 🔍 Found artifact ID: $ARTIFACT_ID for $ARTIFACT_NAME"
+                echo "::warning::[TESTDINO_RERUN_OPT] 🗑️ Deleting artifact via GitHub API..."
+
+                # Delete the artifact
+                DELETE_RESPONSE=$(curl -X DELETE -s -w "\n%{http_code}" -H "Authorization: token $GH_TOKEN" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID")
+
+                HTTP_CODE=$(echo "$DELETE_RESPONSE" | tail -1)
+                echo "::notice::[TESTDINO_RERUN_OPT] Delete API response code: $HTTP_CODE"
+
+                if [ "$HTTP_CODE" = "204" ]; then
+                  echo "::notice::[TESTDINO_RERUN_OPT] ✅ Successfully deleted artifact: $ARTIFACT_NAME (ID: $ARTIFACT_ID)"
+                  DELETED_COUNT=$((DELETED_COUNT + 1))
+                else
+                  echo "::error::[TESTDINO_RERUN_OPT] ❌ Failed to delete artifact: $ARTIFACT_NAME (HTTP: $HTTP_CODE)"
+                fi
+              else
+                echo "::notice::[TESTDINO_RERUN_OPT] ⏭️ Artifact not found: $ARTIFACT_NAME"
+                echo "::notice::[TESTDINO_RERUN_OPT] Reason: May have already been deleted, never uploaded, or cancelled before blob upload step"
+                SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+              fi
+            done
+
+            echo "::notice::[TESTDINO_RERUN_OPT] 📊 Deletion Summary:"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Artifacts deleted: $DELETED_COUNT"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Artifacts skipped (not found): $SKIPPED_COUNT"
+          fi
+          echo "::notice::[TESTDINO_RERUN_OPT] ✅ Cleanup step completed"
+          echo "::endgroup::"
+
+      - name: Download blob reports from current attempt
         uses: actions/download-artifact@v4
         with:
           path: tests/ui-testing/all-blob-reports
           pattern: blob-report-*-attempt-${{ github.run_attempt }}
           merge-multiple: true
 
+      - name: List downloaded artifacts from current attempt
+        run: |
+          echo "::notice::[TESTDINO_RERUN_OPT] 📂 Listing artifacts downloaded from attempt #${{ github.run_attempt }}:"
+          ls -lah tests/ui-testing/all-blob-reports/
+          echo "::notice::[TESTDINO_RERUN_OPT] Total blob files in current attempt:"
+          find tests/ui-testing/all-blob-reports/ -name "*.zip" | wc -l
+          echo "::notice::[TESTDINO_RERUN_OPT] Blob file list:"
+          find tests/ui-testing/all-blob-reports/ -name "*.zip" -exec basename {} \;
+
+      - name: Download successful shard reports from previous attempts (if rerun)
+        if: ${{ github.run_attempt > 1 }}
+        run: |
+          echo "::group::[TESTDINO_RERUN_OPT] Downloading successful shards from ALL previous attempts"
+          CURRENT_ATTEMPT=${{ github.run_attempt }}
+          echo "::notice::[TESTDINO_RERUN_OPT] 📥 Current attempt: #$CURRENT_ATTEMPT"
+          echo "::notice::[TESTDINO_RERUN_OPT] Will download artifacts from attempts 1 to $((CURRENT_ATTEMPT - 1))"
+
+          # Download using actions/download-artifact would require dynamic pattern
+          # Instead, we'll use GitHub API to download specific artifacts
+          cd tests/ui-testing
+
+          # Get all artifacts for this workflow run
+          echo "::notice::[TESTDINO_RERUN_OPT] 📡 Fetching artifact list from GitHub API..."
+          ARTIFACTS=$(curl -s -H "Authorization: token ${{ github.token }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts")
+
+          echo "::notice::[TESTDINO_RERUN_OPT] 📦 Total artifacts in workflow run: $(echo "$ARTIFACTS" | jq '.total_count')"
+
+          # Filter artifacts from ALL previous attempts (those that survived cleanup)
+          # This includes attempt-1, attempt-2, ..., attempt-(N-1)
+          echo "::notice::[TESTDINO_RERUN_OPT] 🔍 Filtering blob artifacts from previous attempts..."
+          PREV_ATTEMPT_ARTIFACTS=$(echo "$ARTIFACTS" | jq -r ".artifacts[] | select(.name | startswith(\"blob-report-\")) | select(.name | contains(\"attempt-\")) | select(.name | test(\"attempt-$CURRENT_ATTEMPT\") | not) | .name")
+
+          echo "::notice::[TESTDINO_RERUN_OPT] 📋 All previous attempt artifacts (after cleanup):"
+          if [ -z "$PREV_ATTEMPT_ARTIFACTS" ]; then
+            echo "::notice::[TESTDINO_RERUN_OPT] ℹ️ No artifacts found from previous attempts"
+            echo "::notice::[TESTDINO_RERUN_OPT] This is expected if all shards ran in current attempt"
+          else
+            echo "$PREV_ATTEMPT_ARTIFACTS" | while read artifact_name; do
+              echo "  - $artifact_name"
+            done
+
+            DOWNLOAD_COUNT=0
+            DOWNLOAD_FAIL_COUNT=0
+
+            echo "$PREV_ATTEMPT_ARTIFACTS" | while read artifact_name; do
+              echo "::notice::[TESTDINO_RERUN_OPT] 📥 Processing artifact: $artifact_name"
+
+              # Get download URL
+              ARTIFACT_ID=$(echo "$ARTIFACTS" | jq -r ".artifacts[] | select(.name == \"$artifact_name\") | .id")
+
+              if [ -n "$ARTIFACT_ID" ] && [ "$ARTIFACT_ID" != "null" ]; then
+                echo "::notice::[TESTDINO_RERUN_OPT] 🔗 Artifact ID: $ARTIFACT_ID"
+                echo "::notice::[TESTDINO_RERUN_OPT] 📥 Downloading via GitHub API..."
+
+                # Download and extract artifact
+                HTTP_CODE=$(curl -L -w "%{http_code}" -H "Authorization: token ${{ github.token }}" \
+                  -H "Accept: application/vnd.github+json" \
+                  "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" \
+                  -o "all-blob-reports/${artifact_name}.zip")
+
+                if [ "$HTTP_CODE" = "200" ]; then
+                  echo "::notice::[TESTDINO_RERUN_OPT] ✅ Download successful (HTTP 200)"
+                  echo "::notice::[TESTDINO_RERUN_OPT] 📦 Extracting artifact..."
+
+                  # Extract
+                  cd all-blob-reports
+                  unzip -q "${artifact_name}.zip" -d temp_extract 2>&1 | head -5
+
+                  # Count extracted files
+                  EXTRACTED_FILES=$(find temp_extract -name "*.zip" | wc -l)
+                  echo "::notice::[TESTDINO_RERUN_OPT] 📊 Extracted $EXTRACTED_FILES blob files"
+
+                  # Move extracted blob files to main directory
+                  find temp_extract -name "*.zip" -exec mv {} . \;
+                  rm -rf temp_extract "${artifact_name}.zip"
+                  cd ..
+
+                  echo "::notice::[TESTDINO_RERUN_OPT] ✅ Successfully processed $artifact_name"
+                  DOWNLOAD_COUNT=$((DOWNLOAD_COUNT + 1))
+                else
+                  echo "::error::[TESTDINO_RERUN_OPT] ❌ Download failed with HTTP code: $HTTP_CODE"
+                  DOWNLOAD_FAIL_COUNT=$((DOWNLOAD_FAIL_COUNT + 1))
+                fi
+              else
+                echo "::error::[TESTDINO_RERUN_OPT] ❌ Could not get artifact ID for $artifact_name"
+                DOWNLOAD_FAIL_COUNT=$((DOWNLOAD_FAIL_COUNT + 1))
+              fi
+            done
+
+            echo "::notice::[TESTDINO_RERUN_OPT] 📊 Download Summary:"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Successfully downloaded: $DOWNLOAD_COUNT"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Failed downloads: $DOWNLOAD_FAIL_COUNT"
+          fi
+          echo "::notice::[TESTDINO_RERUN_OPT] ✅ Previous attempt download step completed"
+          echo "::endgroup::"
+        continue-on-error: true
+
+      - name: List all blob reports before merge
+        run: |
+          echo "::notice::[TESTDINO_RERUN_OPT] 📂 Final blob report directory contents before merge:"
+          ls -lah tests/ui-testing/all-blob-reports/
+          echo "::notice::[TESTDINO_RERUN_OPT] 📊 Total blob files to merge:"
+          find tests/ui-testing/all-blob-reports/ -name "*.zip" | wc -l
+          echo "::notice::[TESTDINO_RERUN_OPT] 📋 Complete blob file list:"
+          find tests/ui-testing/all-blob-reports/ -name "*.zip" -exec basename {} \; | sort
+
       - name: Merge Reports
         run: |
           cd tests/ui-testing
 
+          echo "::notice::[TESTDINO_RERUN_OPT] 🔀 Starting merge-reports process..."
+          echo "::notice::[TESTDINO_RERUN_OPT] Current attempt: #${{ github.run_attempt }}"
+
           # Unset CI to use non-CI reporter config (html + json instead of blob)
           unset CI
+          echo "::notice::[TESTDINO_RERUN_OPT] Running: npx playwright merge-reports --config playwright.config.js ./all-blob-reports"
           npx playwright merge-reports --config playwright.config.js ./all-blob-reports
 
-          echo "Contents of playwright-results:"
+          echo "::notice::[TESTDINO_RERUN_OPT] ✅ Merge completed successfully"
+          echo "::notice::[TESTDINO_RERUN_OPT] 📂 Contents of playwright-results:"
           ls -la playwright-results/
-          echo "Contents of html-report:"
+          echo "::notice::[TESTDINO_RERUN_OPT] 📂 Contents of html-report:"
           ls -la playwright-results/html-report/
-          echo "Checking report.json:"
+          echo "::notice::[TESTDINO_RERUN_OPT] 📄 Checking report.json:"
           ls -lh playwright-results/report.json
+
+          # Parse report.json to show test counts
+          echo "::notice::[TESTDINO_RERUN_OPT] 📊 Analyzing merged report.json..."
+          if [ -f "playwright-results/report.json" ]; then
+            TOTAL_TESTS=$(jq '[.suites[].specs[]] | length' playwright-results/report.json 2>/dev/null || echo "0")
+            PASSED_TESTS=$(jq '[.suites[].specs[].tests[].results[] | select(.status == "passed")] | length' playwright-results/report.json 2>/dev/null || echo "0")
+            FAILED_TESTS=$(jq '[.suites[].specs[].tests[].results[] | select(.status == "failed")] | length' playwright-results/report.json 2>/dev/null || echo "0")
+            SKIPPED_TESTS=$(jq '[.suites[].specs[].tests[].results[] | select(.status == "skipped")] | length' playwright-results/report.json 2>/dev/null || echo "0")
+
+            echo "::notice::[TESTDINO_RERUN_OPT] 📊 Test Results Summary:"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Total test specs: $TOTAL_TESTS"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Passed: $PASSED_TESTS"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Failed: $FAILED_TESTS"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Skipped: $SKIPPED_TESTS"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Total executions: $(($PASSED_TESTS + $FAILED_TESTS + $SKIPPED_TESTS))"
+          else
+            echo "::error::[TESTDINO_RERUN_OPT] ❌ report.json not found!"
+          fi
 
       - name: Cache test failures to TestDino
         if: always()
