@@ -1018,7 +1018,7 @@ async fn write_traces(
     }
 
     // send trace metadata
-    if get_config().common.traces_list_index_enabled
+    if cfg.common.traces_list_index_enabled
         && !trace_index_values.is_empty()
         && let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await
     {
