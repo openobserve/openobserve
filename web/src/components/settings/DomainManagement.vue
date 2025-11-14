@@ -111,12 +111,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
             </div>
 
-            <div class="q-pa-md info-box">
+            <div class="q-mb-md q-pa-md info-box">
               <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
               <div class="q-mb-sm">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
               <div class="q-ml-md">
                 <div class="q-mb-xs">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
                 <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
+              </div>
+            </div>
+
+            <!-- Recent Errors Section -->
+            <div v-if="claimParserFunction" class="q-pa-md info-box error-section">
+              <div class="row items-center q-mb-sm">
+                <div class="col text-weight-medium">{{ t("settings.claimParserRecentErrors") }}</div>
+                <div class="col-auto">
+                  <q-btn
+                    flat
+                    dense
+                    size="sm"
+                    icon="refresh"
+                    @click="loadRecentErrors"
+                    :loading="loadingErrors"
+                  >
+                    <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+                  </q-btn>
+                </div>
+              </div>
+
+              <div v-if="loadingErrors" class="text-center q-py-md">
+                <q-spinner color="primary" size="sm" />
+              </div>
+
+              <div v-else-if="recentErrors.length === 0" class="text-grey-7 text-center q-py-sm">
+                {{ t("settings.noRecentErrors") }}
+              </div>
+
+              <div v-else class="error-list">
+                <div
+                  v-for="(error, index) in recentErrors.slice(0, 3)"
+                  :key="index"
+                  class="error-item q-pa-sm q-mb-xs"
+                >
+                  <div class="row items-start q-mb-xs">
+                    <q-icon name="error" color="negative" size="xs" class="q-mr-xs q-mt-xs" />
+                    <div class="col">
+                      <div class="text-caption text-weight-medium">{{ error.error_type }}</div>
+                      <div class="text-caption text-grey-7">{{ formatTimestamp(error._timestamp) }}</div>
+                    </div>
+                  </div>
+                  <div class="text-caption error-message">{{ error.error }}</div>
+                </div>
+
+                <!-- Show More Button -->
+                <div class="q-mt-sm text-center">
+                  <q-btn
+                    flat
+                    dense
+                    color="primary"
+                    :label="t('common.showMore')"
+                    icon-right="open_in_new"
+                    size="sm"
+                    @click="viewAllErrors"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -300,15 +357,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onActivated } from "vue";
+import { ref, reactive, onMounted, onActivated, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
-import { add } from "date-fns";
+import { add, formatDistanceToNow } from "date-fns";
 import jstransform from "@/services/jstransform";
 import organizations from "@/services/organizations";
+import searchService from "@/services/search";
 
 interface Domain {
   name: string;
@@ -333,6 +391,8 @@ const allFunctions = ref<string[]>([]);
 const loadingFunctions = ref(false);
 const savingClaimParser = ref(false);
 const showVrlInfo = ref(false);
+const recentErrors = ref<any[]>([]);
+const loadingErrors = ref(false);
 
 const emit = defineEmits(["cancel", "saved"]);
 
@@ -623,6 +683,104 @@ const saveClaimParserFunction = async () => {
   }
 };
 
+// Build SQL query for claim parser errors
+const buildErrorsQuery = (functionName: string, limit?: number): string => {
+  const limitClause = limit ? ` LIMIT ${limit}` : '';
+  return `SELECT * FROM "errors" WHERE error_source='${functionName}' ORDER BY _timestamp DESC${limitClause}`;
+};
+
+// Load recent errors for the claim parser function
+const loadRecentErrors = async () => {
+  if (!claimParserFunction.value) {
+    recentErrors.value = [];
+    return;
+  }
+
+  loadingErrors.value = true;
+  try {
+    const now = new Date();
+    const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const query = {
+      query: {
+        sql: buildErrorsQuery(claimParserFunction.value, 10),
+        start_time: last24Hours.getTime() * 1000, // microseconds
+        end_time: now.getTime() * 1000,
+        from: 0,
+        size: 10,
+      },
+    };
+
+    const response = await searchService.search(
+      {
+        org_identifier: store.state.zoConfig.meta_org,
+        query: query,
+        page_type: "logs",
+      },
+      "ui"
+    );
+
+    if (response.data && response.data.hits) {
+      recentErrors.value = response.data.hits.map((hit: any) => hit);
+    } else {
+      recentErrors.value = [];
+    }
+  } catch (error: any) {
+    console.error("Error loading recent errors:", error);
+    recentErrors.value = [];
+  } finally {
+    loadingErrors.value = false;
+  }
+};
+
+// Format timestamp for display
+const formatTimestamp = (timestamp: number) => {
+  try {
+    const date = new Date(timestamp / 1000); // Convert microseconds to milliseconds
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch (e) {
+    return "Unknown time";
+  }
+};
+
+// Watch for drawer opening and load errors
+watch(showVrlInfo, (newVal) => {
+  if (newVal && claimParserFunction.value) {
+    loadRecentErrors();
+  }
+});
+
+// Navigate to logs page with error filters
+const viewAllErrors = () => {
+  const now = new Date();
+  const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  // Build the SQL query for the logs page using the reusable function
+  const sqlQuery = buildErrorsQuery(claimParserFunction.value);
+
+  // Base64 encode the query
+  const encodedQuery = btoa(sqlQuery);
+
+  // Navigate to logs page with pre-filled parameters
+  router.push({
+    path: "/logs",
+    query: {
+      org_identifier: store.state.zoConfig.meta_org,
+      stream: "errors",
+      stream_type: "logs",
+      from: last24Hours.getTime() * 1000, // microseconds
+      to: now.getTime() * 1000,
+      refresh: "0",
+      sql_mode: "true",
+      query: encodedQuery,
+      type: "logs",
+    },
+  });
+
+  // Close the drawer
+  showVrlInfo.value = false;
+};
+
 const saveChanges = async () => {
   saving.value = true;
   
@@ -720,6 +878,26 @@ const resetForm = () => {
   border: 1px solid #e0e0e0;
 }
 
+.error-section {
+  border-left: 3px solid #c10015;
+}
+
+.error-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.error-item {
+  background: #fff9f9;
+  border-radius: 4px;
+  border-left: 2px solid #ff9e9e;
+}
+
+.error-message {
+  color: #666;
+  word-break: break-word;
+}
+
 .body--dark {
   .info-box {
     background-color: #2a2a2a;
@@ -738,6 +916,19 @@ const resetForm = () => {
   .email-item {
     background: #2a2a2a;
     border-color: #444;
+  }
+
+  .error-section {
+    border-left-color: #ff6b6b;
+  }
+
+  .error-item {
+    background: #2a1f1f;
+    border-left-color: #ff6b6b;
+  }
+
+  .error-message {
+    color: #ccc;
   }
 }
 </style>
