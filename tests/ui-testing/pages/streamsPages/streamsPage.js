@@ -144,16 +144,16 @@ export class StreamsPage {
             await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
         } catch (error) {
             console.warn('Retry clicking streams menu:', error.message);
-            await this.page.waitForTimeout(2000);
+            await this.waitForUI(2000);
             await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
         }
-        await this.page.waitForTimeout(1000);
+        await this.waitForUI(1000);
     }
 
     async searchStream(streamName) {
         await this.page.getByPlaceholder("Search Stream").click();
         await this.page.getByPlaceholder("Search Stream").fill(streamName);
-        await this.page.waitForTimeout(3000);
+        await this.waitForUI(3000);
     }
 
     async verifyStreamNameVisibility(streamName) {
@@ -164,7 +164,7 @@ export class StreamsPage {
         const streamButton = this.page.getByRole("button", { name: 'Explore' });
         await expect(streamButton).toBeVisible();
         await streamButton.click({ force: true });
-        await this.page.waitForTimeout(1000);
+        await this.waitForUI(1000);
     }
 
     async verifyStreamExploration() {
@@ -173,7 +173,7 @@ export class StreamsPage {
 
     async goBack() {
         await this.page.goBack();
-        await this.page.waitForTimeout(1000);
+        await this.waitForUI(1000);
     }
 
     // Ingestion methods - delegate to IngestionPage
@@ -250,5 +250,91 @@ export class StreamsPage {
 
     async streamsURLValidation() {
         await expect(this.page).toHaveURL(/streams/);
+    }
+
+    // Stream Settings Methods (minimal set for stream-settings.spec.js)
+    async expectStreamExistsExact(streamName) {
+        await expect(this.page.getByRole('cell', { name: streamName, exact: true })).toBeVisible();
+    }
+
+    async openStreamDetail(streamName) {
+        await this.page.getByRole('button', { name: 'Stream Detail' }).first().click();
+    }
+
+    async searchForField(fieldName) {
+        await this.page.locator('[data-test="schema-field-search-input"]').click();
+        await this.page.locator('[data-test="schema-field-search-input"]').fill(fieldName);
+    }
+
+    async selectFullTextSearch() {
+        await this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1).click();
+    }
+
+    async selectSecondaryIndex() {
+        await this.page.getByText('Secondary index').click();
+    }
+
+    async clickUpdateSettingsButton() {
+        await this.page.locator('[data-test="schema-update-settings-button"]').click();
+    }
+
+    async expectValidationErrorVisible() {
+        await expect(this.page.getByText("Field(s) 'body' cannot have")).toBeVisible();
+    }
+
+    async verifyIndexTypeOptions() {
+        // Wait a bit for the page to load completely
+        await this.waitForUI(2000);
+        
+        // Check if Full text search and Secondary index options are visible
+        const fullTextOption = this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1);
+        const secondaryIndexOption = this.page.getByText('Secondary index');
+        
+        const options = [];
+        try {
+            if (await fullTextOption.isVisible({ timeout: 3000 })) options.push('Full text search');
+        } catch (e) {
+            // Element not found
+        }
+        
+        try {
+            if (await secondaryIndexOption.isVisible({ timeout: 3000 })) options.push('Secondary index');
+        } catch (e) {
+            // Element not found
+        }
+        
+        return options;
+    }
+
+    async clearIndexTypeSelection(indexType) {
+        if (indexType === 'Full text search') {
+            // When both are selected, UI shows "Secondary index, Full text" 
+            // We need to click the combined option first, then clear full text
+            try {
+                // First check if both are selected (combined state)
+                const combinedOption = this.page.getByText('Secondary index, Full text');
+                if (await combinedOption.isVisible({ timeout: 2000 })) {
+                    await this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1).click();
+                    return;
+                }
+            } catch (e) {
+                // Fallback to individual clearing
+            }
+            
+            // Try individual selector
+            try {
+                const element = this.page.locator('tr:has-text("Full text search") .q-checkbox__inner');
+                if (await element.isVisible({ timeout: 1000 })) {
+                    await element.click();
+                }
+            } catch (e) {
+                // Continue silently
+            }
+        }
+        await this.waitForUI(1000);
+    }
+
+    async waitForUI(milliseconds) {
+        await this.page.waitForTimeout(milliseconds);
     }
 } 
