@@ -1,14 +1,48 @@
 <template>
     <q-card flat class="tw-h-full">
       <q-card-section class="tw-p-[0.375rem] tw-h-full card-container">
-        <div class="row items-center justify-between q-mb-md">
-          <div class="col">
-            <div class="text-h5 text-bold">Service Graph</div>
-            <div class="text-subtitle2 text-grey-7">
-              Visualize service dependencies and communication patterns from distributed traces
-            </div>
+        <!-- Top row with search and control buttons -->
+        <div class="row items-center q-col-gutter-sm q-mb-md">
+          <div class="col-12 col-md-5 tw-flex tw-gap-[0.5rem]">
+            <!-- Stream selector - always show, populated once streams are discovered -->
+            <q-select
+              v-model="streamFilter"
+              :options="availableStreams.length > 0
+                ? [{ label: 'All Streams', value: 'all' }, ...availableStreams.map(s => ({ label: s, value: s }))]
+                : [{ label: 'All Streams', value: 'all' }]"
+              dense
+              outlined
+              emit-value
+              map-options
+              class="tw-w-[180px] tw-flex-shrink-0"
+              @update:model-value="onStreamFilterChange"
+              :disable="availableStreams.length === 0"
+            >
+              <template #prepend>
+                <q-icon name="storage" size="xs" />
+              </template>
+              <q-tooltip v-if="availableStreams.length === 0">
+                No streams detected. Ensure service graph metrics include stream_name labels.
+              </q-tooltip>
+            </q-select>
+
+            <!-- Search input -->
+            <q-input
+              v-model="searchFilter"
+              borderless
+              dense
+              class="no-border tw-h-[36px] tw-flex-grow"
+              placeholder="Search services..."
+              debounce="300"
+              @update:model-value="applyFilters"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
           </div>
-          <div class="col-auto row q-gutter-sm">
+          <div class="col-12 col-md-7 tw-flex tw-justify-end tw-items-center tw-gap-[0.75rem]">
+            <!-- 1. Refresh button -->
             <q-btn
               data-test="service-graph-refresh-btn"
               no-caps
@@ -21,151 +55,61 @@
             >
               <q-tooltip>Refresh Service Graph</q-tooltip>
             </q-btn>
-            <q-btn-dropdown
-              data-test="service-graph-layout-dropdown"
-              size="12px"
-              icon="tune"
-              label="Layout"
-              class="saved-views-dropdown btn-function el-border hover:tw-bg-[var(--o2-hover-accent)]"
-              @click="() => {}"
-            >
-              <q-list>
-                <q-item clickable v-close-popup @click="setLayout('hierarchical')">
-                  <q-item-section>
-                    <q-item-label>Hierarchical</q-item-label>
-                  </q-item-section>
-                </q-item>
-                <q-item clickable v-close-popup @click="setLayout('force')">
-                  <q-item-section>
-                    <q-item-label>Force-Directed</q-item-label>
-                  </q-item-section>
-                </q-item>
-                <q-item clickable v-close-popup @click="setLayout('circular')">
-                  <q-item-section>
-                    <q-item-label>Circular</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </q-list>
-            </q-btn-dropdown>
-            <q-btn
-              data-test="service-graph-settings-btn"
-              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border hover:tw-bg-[var(--o2-hover-accent)]"
-              size="xs"
-              icon="settings"
-              @click="showSettings = true"
-            >
-              <q-tooltip>Settings</q-tooltip>
-            </q-btn>
-          </div>
-        </div>
 
-        <!-- Enhanced Stats Bar -->
-        <div class="row q-col-gutter-md q-mb-md">
-          <div class="col-12 col-md-2">
-            <q-card flat bordered class="stat-card">
-              <q-card-section class="!tw-p-[0.375rem]">
-                <div class="row items-center">
-                  <q-icon name="hub" size="1.5rem" color="primary" class="q-mr-sm" />
-                  <div>
-                    <div class="text-caption text-grey-7">Services</div>
-                    <div class="tw-text-[1.25rem] text-bold">{{ stats?.services || 0 }}</div>
-                  </div>
-                </div>
-              </q-card-section>
-            </q-card>
-          </div>
-          <div class="col-12 col-md-2">
-            <q-card flat bordered class="stat-card">
-              <q-card-section class="tw-p-[0.375rem]">
-                <div class="row items-center">
-                  <q-icon name="share" size="1.5rem" color="blue" class="q-mr-sm" />
-                  <div>
-                    <div class="text-caption text-grey-7">Connections</div>
-                    <div class="tw-text-[1.25rem] text-bold">{{ stats?.connections || 0 }}</div>
-                  </div>
-                </div>
-              </q-card-section>
-            </q-card>
-          </div>
-          <div class="col-12 col-md-3">
-            <q-card flat bordered class="stat-card">
-              <q-card-section class="tw-p-[0.375rem]">
-                <div class="row items-center">
-                  <q-icon name="speed" size="1.5rem" color="orange" class="q-mr-sm" />
-                  <div>
-                    <div class="text-caption text-grey-7">Total Requests</div>
-                    <div class="tw-text-[1.25rem] text-bold">{{ formatNumber(stats?.totalRequests || 0) }}</div>
-                  </div>
-                </div>
-              </q-card-section>
-            </q-card>
-          </div>
-          <div class="col-12 col-md-3">
-            <q-card flat bordered class="stat-card">
-              <q-card-section class="tw-p-[0.375rem]">
-                <div class="row items-center">
-                  <q-icon name="error_outline" size="1.5rem" :color="stats?.errorRate > 5 ? 'negative' : 'grey-5'" class="q-mr-sm" />
-                  <div>
-                    <div class="text-caption text-grey-7">Error Rate</div>
-                    <div class="tw-text-[1.25rem] text-bold" :class="stats?.errorRate > 5 ? 'text-negative' : ''">
-                      {{ stats?.errorRate?.toFixed(2) || 0 }}%
-                    </div>
-                  </div>
-                </div>
-              </q-card-section>
-            </q-card>
-          </div>
-          <div class="col-12 col-md-2">
-            <q-card flat bordered class="stat-card">
-              <q-card-section class="tw-p-[0.375rem]">
-                <div class="row items-center">
-                  <q-icon name="check_circle" size="1.5rem" :color="storeStats?.enabled ? 'positive' : 'grey'" class="q-mr-sm" />
-                  <div>
-                    <div class="text-caption text-grey-7">Status</div>
-                    <div class="tw-text-[1.25rem] text-bold">
-                      {{ storeStats?.enabled ? 'Active' : 'Inactive' }}
-                    </div>
-                  </div>
-                </div>
-              </q-card-section>
-            </q-card>
-          </div>
-        </div>
-
-        <!-- Filters -->
-        <div class="row q-col-gutter-sm q-mb-md">
-          <div class="col-12 col-md-4">
-            <q-input
-              v-model="searchFilter"
-              borderless
-              dense
-              class="no-border tw-h-[36px]"
-              placeholder="Search services..."
-              debounce="300"
-              @update:model-value="applyFilters"
-            >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
-              </template>
-            </q-input>
-          </div>
-          <div class="col-12 col-md-8">
-            <div class="app-tabs-container tw-h-[36px] tw-w-fit">
-              <app-tabs
-                class="tabs-selection-container"
-                :tabs="connectionTypeTabs"
-                :activeTab="connectionTypeFilter"
-                @update:activeTab="connectionTypeFilter = $event; applyFilters()"
+            <!-- 2. Auto-refresh toggle with interval input -->
+            <div class="tw-flex tw-items-center tw-gap-[0.5rem]">
+              <span class="tw-text-[0.875rem]" :class="{ 'tw-text-gray-400': !autoRefresh }">Refresh every</span>
+              <q-toggle
+                v-model="autoRefresh"
+                dense
+                size="sm"
+                @update:model-value="toggleAutoRefresh"
               />
+              <q-input
+                v-model.number="refreshInterval"
+                type="number"
+                dense
+                filled
+                class="tw-w-[80px]"
+                input-class="tw-text-center"
+                :disable="!autoRefresh"
+                min="5"
+                max="300"
+              />
+              <span class="tw-text-[0.875rem]" :class="{ 'tw-text-gray-400': !autoRefresh }">seconds</span>
             </div>
+
+            <!-- 3. Tree/Graph view toggle buttons -->
+            <q-btn-toggle
+              v-model="visualizationType"
+              toggle-color="primary"
+              :options="[
+                { label: 'Tree View', value: 'tree', icon: 'account_tree' },
+                { label: 'Graph View', value: 'graph', icon: 'hub' }
+              ]"
+              dense
+              no-caps
+              @update:model-value="setVisualizationType"
+            />
+
+            <!-- 4. Layout dropdown -->
+            <q-select
+              v-model="layoutType"
+              :options="layoutOptions"
+              dense
+              filled
+              class="tw-w-[160px]"
+              emit-value
+              map-options
+              @update:model-value="setLayout"
+            />
           </div>
         </div>
 
         <!-- Graph Visualization -->
-        <q-card flat bordered class="graph-card  tw-h-[calc(100%-15.25rem)]">
+        <q-card flat bordered class="graph-card tw-h-[calc(100%-4rem)]">
           <q-card-section class="q-pa-none tw-h-full" style="height: 100%;">
             <div
-              ref="graphContainer"
               class="graph-container tw-h-full tw-bg-[var(--o2-bg)]"
             >
               <div v-if="loading" class="flex flex-center tw-h-full">
@@ -211,78 +155,18 @@
                   />
                 </div>
               </div>
-              <div v-else style="position: relative; width: 100%; height: 100%;">
-                <div id="graph-network"></div>
-                <!-- Node Details Panel (shown on node click) -->
-                <q-card
-                  v-if="selectedNode"
-                  class="node-details-card"
-                  flat
-                  bordered
-                >
-                  <q-card-section class="tw-p-[0.675rem]">
-                    <div class="row items-center justify-between q-mb-sm">
-                      <div class="text-h6">{{ selectedNode.label }}</div>
-                      <q-btn
-                        flat
-                        dense
-                        round
-                        icon="close"
-                        size="sm"
-                        @click="selectedNode = null"
-                      />
-                    </div>
-                    <q-separator class="q-mb-sm" />
-                    <div class="text-caption text-grey-7 q-mb-xs">Connections</div>
-                    <div class="q-mb-sm">
-                      <div><strong>Incoming:</strong> {{ getIncomingConnections(selectedNode.id).length }}</div>
-                      <div><strong>Outgoing:</strong> {{ getOutgoingConnections(selectedNode.id).length }}</div>
-                    </div>
-                    <div class="text-caption text-grey-7 q-mb-xs">Traffic</div>
-                    <div>
-                      <div><strong>Requests:</strong> {{ formatNumber(getNodeRequests(selectedNode.id)) }}</div>
-                      <div><strong>Errors:</strong> {{ getNodeErrors(selectedNode.id) }}</div>
-                    </div>
-                  </q-card-section>
-                </q-card>
+              <div v-else class="tw-h-full">
+                <ChartRenderer
+                  ref="chartRendererRef"
+                  data-test="service-graph-chart"
+                  :data="chartData"
+                  :key="chartKey"
+                  class="tw-h-full"
+                />
               </div>
             </div>
           </q-card-section>
         </q-card>
-
-        <!-- Enhanced Legend -->
-        <div class="row items-center tw-mt-[0.5rem]">
-          <div class="col-auto text-subtitle2 text-grey-7 q-mr-md">
-            Connection Types:
-          </div>
-          <div class="col">
-            <div class="row q-col-gutter-sm">
-              <div class="col-auto">
-                <q-chip dense square color="blue" text-color="white" icon="sync_alt" class="tw-px-[0.6rem] !tw-py-[0.8rem]">
-                  Standard
-                </q-chip>
-              </div>
-              <div class="col-auto">
-                <q-chip dense square color="purple" text-color="white" icon="message" class="tw-px-[0.6rem] !tw-py-[0.8rem]">
-                  Messaging
-                </q-chip>
-              </div>
-              <div class="col-auto">
-                <q-chip dense square color="orange" text-color="white" icon="storage" class="tw-px-[0.6rem] !tw-py-[0.8rem]">
-                  Database
-                </q-chip>
-              </div>
-              <div class="col-auto">
-                <q-chip dense square color="grey" text-color="white" icon="cloud" class="tw-px-[0.6rem] !tw-py-[0.8rem]">
-                  Virtual/External
-                </q-chip>
-              </div>
-            </div>
-          </div>
-          <div class="col-auto text-caption text-grey-6">
-            Last updated: {{ lastUpdated }}
-          </div>
-        </div>
       </q-card-section>
     </q-card>
 
@@ -295,30 +179,10 @@
         <q-separator />
         <q-card-section>
           <div class="q-gutter-md">
-            <q-input
-              v-model.number="graphHeight"
-              type="number"
-              label="Graph Height (px)"
-              :min="400"
-              :max="1200"
-              borderless
-              dense
-              class="o2-input showLabelOnTop"
-            />
             <q-toggle
               v-model="autoRefresh"
               label="Auto-refresh (every 30 seconds)"
               @update:model-value="toggleAutoRefresh"
-            />
-            <q-toggle
-              v-model="showLabels"
-              label="Show edge labels"
-              @update:model-value="renderGraph"
-            />
-            <q-toggle
-              v-model="enablePhysics"
-              label="Enable physics simulation"
-              @update:model-value="updatePhysics"
             />
             <div class="text-caption text-grey-7 q-mt-md">
               Store Size: {{ storeStats?.store_size || 0 }} edges
@@ -329,40 +193,58 @@
         <q-separator />
         <q-card-actions align="right">
           <q-btn flat dense no-caps label="Close" color="primary" v-close-popup class="o2-secondary-button tw-h-[2rem]" />
-          <q-btn label="Reset" @click="resetSettings" class="o2-primary-button tw-h-[2rem]" />  
+          <q-btn label="Reset" @click="resetSettings" class="o2-primary-button tw-h-[2rem]" />
         </q-card-actions>
       </q-card>
     </q-dialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onBeforeUnmount } from "vue";
+import { defineComponent, ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { useStore } from "vuex";
 import serviceGraphService from "@/services/service_graph";
 import AppTabs from "@/components/common/AppTabs.vue";
+import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
+import { convertServiceGraphToTree, convertServiceGraphToNetwork } from "@/utils/traces/convertTraceData";
 
 export default defineComponent({
   name: "ServiceGraph",
   components: {
     AppTabs,
+    ChartRenderer,
   },
   setup() {
     const store = useStore();
 
     const loading = ref(false);
     const error = ref<string | null>(null);
-    const graphContainer = ref<HTMLElement | null>(null);
     const showSettings = ref(false);
-    const graphHeight = ref(650);
     const autoRefresh = ref(true);
-    const showLabels = ref(true);
-    const enablePhysics = ref(false);  // Disabled by default for stable graph
+    const refreshInterval = ref(30); // Default 30 seconds
     const lastUpdated = ref("");
-    const layoutType = ref("force");
+
+    // Persist visualization type in localStorage
+    const storedVisualizationType = localStorage.getItem('serviceGraph_visualizationType');
+    const visualizationType = ref<"tree" | "graph">(
+      (storedVisualizationType as "tree" | "graph") || "tree"
+    );
+
+    // Initialize layout type based on visualization type
+    const storedLayoutType = localStorage.getItem('serviceGraph_layoutType');
+    let defaultLayoutType = "horizontal";
+    if (visualizationType.value === "graph") {
+      defaultLayoutType = "force";
+    }
+    const layoutType = ref(storedLayoutType || defaultLayoutType);
+    const chartRendererRef = ref<any>(null);
 
     const searchFilter = ref("");
     const connectionTypeFilter = ref("all");
-    const selectedNode = ref<any>(null);
+
+    // Stream filter
+    const storedStreamFilter = localStorage.getItem('serviceGraph_streamFilter');
+    const streamFilter = ref(storedStreamFilter || "all");
+    const availableStreams = ref<string[]>([]);
 
     // Connection type tabs configuration
     const connectionTypeTabs = [
@@ -376,6 +258,7 @@ export default defineComponent({
     const graphData = ref<any>({
       nodes: [],
       edges: [],
+      availableStreams: [],
     });
 
     const filteredGraphData = ref<any>({
@@ -386,8 +269,72 @@ export default defineComponent({
     const stats = ref<any>(null);
     const storeStats = ref<any>(null);
 
-    let networkInstance: any = null;
-    let refreshInterval: any = null;
+    let refreshIntervalTimer: any = null;
+
+    // Store node positions for graph view to prevent re-layout on updates
+    const graphNodePositions = ref<Map<string, { x: number; y: number }>>(new Map());
+
+    // Key to control chart recreation - only change when layout/visualization type changes
+    const chartKey = ref(0);
+
+    // Track last chart options to prevent unnecessary recreation for graph view
+    const lastChartOptions = ref<any>(null);
+
+    // Layout options based on visualization type
+    const layoutOptions = computed(() => {
+      if (visualizationType.value === "tree") {
+        return [
+          { label: 'Horizontal', value: 'horizontal' },
+          { label: 'Vertical', value: 'vertical' },
+          { label: 'Radial', value: 'radial' }
+        ];
+      } else {
+        return [
+          { label: 'Force Directed', value: 'force' },
+          { label: 'Circular', value: 'circular' }
+        ];
+      }
+    });
+
+    const chartData = computed(() => {
+      if (!filteredGraphData.value.nodes.length) {
+        return { options: {}, notMerge: true };
+      }
+
+      // For graph view, only regenerate options when chartKey changes (layout/type change)
+      // This prevents chart recreation on data refreshes, keeping positions stable
+      if (visualizationType.value === "graph" && lastChartOptions.value && chartKey.value === lastChartOptions.value.key) {
+        console.log('[ServiceGraph] Reusing cached chart options, chartKey:', chartKey.value);
+        // Return with notMerge: false to update data incrementally without re-layout
+        return {
+          options: lastChartOptions.value.data.options,
+          notMerge: false, // Incremental update - preserves positions
+          lazyUpdate: true
+        };
+      }
+
+      console.log('[ServiceGraph] Generating new chart options, chartKey:', chartKey.value);
+      const newOptions = visualizationType.value === "tree"
+        ? convertServiceGraphToTree(filteredGraphData.value, layoutType.value)
+        : convertServiceGraphToNetwork(
+            filteredGraphData.value,
+            layoutType.value,
+            graphNodePositions.value
+          );
+
+      // Cache the options with the current key for graph view
+      if (visualizationType.value === "graph") {
+        lastChartOptions.value = {
+          key: chartKey.value,
+          data: newOptions
+        };
+      }
+
+      return {
+        ...newOptions,
+        notMerge: visualizationType.value === "graph" ? false : true // Merge for graph, replace for tree
+      };
+    });
 
     const loadServiceGraph = async () => {
       loading.value = true;
@@ -415,9 +362,23 @@ export default defineComponent({
           return;
         }
 
-        // Load metrics and parse
-        const metricsResponse = await serviceGraphService.getMetrics(orgId);
-        const parsedData = parsePrometheusMetrics(metricsResponse.data);
+        // First, load all metrics to discover available streams
+        const allMetricsResponse = await serviceGraphService.getMetrics(orgId);
+        const allParsedData = parsePrometheusMetrics(allMetricsResponse.data);
+        availableStreams.value = allParsedData.availableStreams || [];
+
+        // Log available streams for debugging
+        console.log('[ServiceGraph] Available streams:', availableStreams.value);
+        console.log('[ServiceGraph] Active stream filter:', streamFilter.value);
+
+        // Now parse with stream filter if one is active
+        let parsedData;
+        if (streamFilter.value && streamFilter.value !== "all") {
+          const filteredResponse = await serviceGraphService.getMetrics(orgId, streamFilter.value);
+          parsedData = parsePrometheusMetrics(filteredResponse.data);
+        } else {
+          parsedData = allParsedData;
+        }
 
         graphData.value = parsedData;
 
@@ -462,6 +423,7 @@ export default defineComponent({
     const parsePrometheusMetrics = (metricsText: string) => {
       const nodes = new Map<string, any>();
       const edges: any[] = [];
+      const availableStreams = new Set<string>();
 
       const lines = metricsText.split("\n");
 
@@ -482,6 +444,11 @@ export default defineComponent({
         }
 
         if (!labels.client || !labels.server) continue;
+
+        // Track available stream names for the stream selector
+        if (labels.stream_name) {
+          availableStreams.add(labels.stream_name);
+        }
 
         // Add nodes
         if (!nodes.has(labels.client)) {
@@ -543,7 +510,16 @@ export default defineComponent({
       return {
         nodes: Array.from(nodes.values()),
         edges,
+        availableStreams: Array.from(availableStreams).sort(),
       };
+    };
+
+    const onStreamFilterChange = (stream: string) => {
+      streamFilter.value = stream;
+      localStorage.setItem('serviceGraph_streamFilter', stream);
+
+      // Reload service graph with new stream filter
+      loadServiceGraph();
     };
 
     const applyFilters = () => {
@@ -574,270 +550,30 @@ export default defineComponent({
       }
 
       filteredGraphData.value = { nodes, edges };
-
-      if (nodes.length > 0) {
-        setTimeout(() => renderGraph(), 100);
-      }
     };
 
     const setLayout = (type: string) => {
       layoutType.value = type;
-      renderGraph();
+      // Persist layout type to localStorage
+      localStorage.setItem('serviceGraph_layoutType', type);
+      // Force chart recreation when layout changes
+      chartKey.value++;
     };
 
-    const renderGraph = () => {
-      if (!graphContainer.value || !(window as any).vis) {
-        console.warn("Graph container or vis.js not available");
-        return;
-      }
-
-      const container = document.getElementById("graph-network");
-      if (!container) return;
-
-      // Calculate error rates for each node
-      const nodeErrorRates = new Map<string, { total: number; errors: number }>();
-      filteredGraphData.value.edges.forEach((edge: any) => {
-        const calcRate = (nodeId: string) => {
-          const current = nodeErrorRates.get(nodeId) || { total: 0, errors: 0 };
-          nodeErrorRates.set(nodeId, {
-            total: current.total + edge.total_requests,
-            errors: current.errors + edge.failed_requests,
-          });
-        };
-        calcRate(edge.from);
-        calcRate(edge.to);
-      });
-
-      // Prepare nodes for vis.js with Tempo-style arc borders
-      const nodes = filteredGraphData.value.nodes.map((node: any) => {
-        const errorData = nodeErrorRates.get(node.id);
-        const errorRate = errorData && errorData.total > 0
-          ? (errorData.errors / errorData.total) * 100
-          : 0;
-
-        // Calculate border color based on error rate
-        let borderColor = "#4CAF50"; // Green for no/low errors
-        if (errorRate > 0 && errorRate <= 1) {
-          borderColor = "#8BC34A"; // Light green
-        } else if (errorRate > 1 && errorRate <= 5) {
-          borderColor = "#FFC107"; // Yellow
-        } else if (errorRate > 5 && errorRate <= 10) {
-          borderColor = "#FF9800"; // Orange
-        } else if (errorRate > 10) {
-          borderColor = "#F44336"; // Red
-        }
-
-        return {
-          id: node.id,
-          label: node.label,
-          title: `${node.label}\nRequests: ${formatNumber(errorData?.total || 0)}\nErrors: ${errorData?.errors || 0}\nError Rate: ${errorRate.toFixed(2)}%`,
-          color: {
-            background: node.is_virtual ? "#ECEFF1" : "#E3F2FD",
-            border: borderColor,
-            highlight: {
-              background: node.is_virtual ? "#CFD8DC" : "#BBDEFB",
-              border: borderColor,
-            },
-          },
-          shape: "circle",
-          size: 40,
-          margin: 15,
-          font: {
-            size: 13,
-            color: "#263238",
-            face: "Arial",
-            bold: true,
-          },
-          borderWidth: 4,
-          borderWidthSelected: 6,
-          shadow: {
-            enabled: true,
-            color: "rgba(0,0,0,0.2)",
-            size: 8,
-            x: 2,
-            y: 2,
-          },
-        };
-      });
-
-      // Prepare edges for vis.js
-      const edges = filteredGraphData.value.edges.map((edge: any) => {
-        const errorRate =
-          edge.total_requests > 0
-            ? (edge.failed_requests / edge.total_requests) * 100
-            : 0;
-
-        const color = getConnectionTypeColor(edge.connection_type);
-        const width = Math.max(2, Math.min(10, Math.log10(edge.total_requests + 1) * 2));
-
-        const hasErrors = errorRate > 0;
-        const label = showLabels.value
-          ? `${formatNumber(edge.total_requests)}${hasErrors ? '\n' + errorRate.toFixed(1) + '% err' : ''}`
-          : '';
-
-        return {
-          from: edge.from,
-          to: edge.to,
-          label,
-          arrows: { to: { enabled: true, scaleFactor: 0.8 } },
-          color: {
-            color,
-            highlight: color,
-            opacity: errorRate > 5 ? 0.5 : 1.0,
-          },
-          width,
-          font: { size: 11, align: "middle", background: "white" },
-          smooth: { type: "curvedCW", roundness: 0.2 },
-          dashes: errorRate > 10,
-        };
-      });
-
-      const data = { nodes, edges };
-
-      let layoutOptions: any = {};
-
-      if (layoutType.value === "hierarchical") {
-        layoutOptions = {
-          hierarchical: {
-            enabled: true,
-            direction: "UD",
-            sortMethod: "directed",
-            levelSeparation: 150,
-            nodeSpacing: 150,
-          },
-        };
-      } else if (layoutType.value === "circular") {
-        layoutOptions = {
-          hierarchical: false,
-        };
+    const setVisualizationType = (type: "tree" | "graph") => {
+      visualizationType.value = type;
+      // Persist visualization type to localStorage
+      localStorage.setItem('serviceGraph_visualizationType', type);
+      // Set default layout for each visualization type
+      if (type === "tree") {
+        layoutType.value = "horizontal";
       } else {
-        layoutOptions = {
-          improvedLayout: true,
-          hierarchical: { enabled: false },
-        };
+        layoutType.value = "force";
+        // Clear cached positions when switching to graph view to allow fresh layout
+        graphNodePositions.value = new Map();
       }
-
-      const options = {
-        layout: layoutOptions,
-        physics: {
-          enabled: enablePhysics.value,
-          stabilization: {
-            enabled: true,
-            iterations: 400,
-            updateInterval: 20,
-          },
-          barnesHut: {
-            gravitationalConstant: -15000, // Much stronger repulsion for sparse layout
-            centralGravity: 0.1, // Less central pull
-            springLength: 400, // Longer springs = more spacing
-            springConstant: 0.01, // Weaker springs
-            damping: 0.7,
-            avoidOverlap: 1,
-          },
-          solver: 'barnesHut',
-          minVelocity: 0.75,
-        },
-        interaction: {
-          hover: true,
-          tooltipDelay: 200,
-          navigationButtons: true,
-          keyboard: true,
-          zoomView: true,
-          dragView: true,
-        },
-        nodes: {
-          borderWidth: 5,
-          borderWidthSelected: 7,
-        },
-        edges: {
-          smooth: {
-            enabled: true,
-            type: "curvedCW",
-            roundness: 0.2,
-          },
-        },
-        configure: {
-          enabled: false,
-        },
-      };
-
-      if (networkInstance) {
-        networkInstance.destroy();
-      }
-
-      networkInstance = new (window as any).vis.Network(container, data, options);
-
-      // Stabilize then disable physics for static display
-      if (!enablePhysics.value) {
-        networkInstance.once("stabilizationIterationsDone", () => {
-          networkInstance.setOptions({ physics: false });
-        });
-      }
-
-      // Add click handler
-      networkInstance.on("click", (params: any) => {
-        if (params.nodes.length > 0) {
-          const nodeId = params.nodes[0];
-          const node = filteredGraphData.value.nodes.find((n: any) => n.id === nodeId);
-          selectedNode.value = node;
-        } else {
-          selectedNode.value = null;
-        }
-      });
-
-      // Circular layout implementation
-      if (layoutType.value === "circular") {
-        const positions: any = {};
-        const nodeCount = nodes.length;
-        const radius = Math.max(250, nodeCount * 30);
-
-        nodes.forEach((node: any, i: number) => {
-          const angle = (i / nodeCount) * 2 * Math.PI;
-          positions[node.id] = {
-            x: radius * Math.cos(angle),
-            y: radius * Math.sin(angle),
-          };
-        });
-
-        networkInstance.setOptions({ physics: { enabled: false } });
-        setTimeout(() => {
-          networkInstance.setPositions(positions);
-          networkInstance.fit();
-        }, 100);
-      }
-    };
-
-    const getConnectionTypeColor = (type: string) => {
-      switch (type) {
-        case "messaging":
-          return "#9C27B0"; // Purple
-        case "database":
-          return "#FF9800"; // Orange
-        case "virtual":
-          return "#9E9E9E"; // Grey
-        default:
-          return "#2196F3"; // Blue
-      }
-    };
-
-    const getIncomingConnections = (nodeId: string) => {
-      return filteredGraphData.value.edges.filter((e: any) => e.to === nodeId);
-    };
-
-    const getOutgoingConnections = (nodeId: string) => {
-      return filteredGraphData.value.edges.filter((e: any) => e.from === nodeId);
-    };
-
-    const getNodeRequests = (nodeId: string) => {
-      const incoming = getIncomingConnections(nodeId);
-      const outgoing = getOutgoingConnections(nodeId);
-      return [...incoming, ...outgoing].reduce((sum, e) => sum + e.total_requests, 0);
-    };
-
-    const getNodeErrors = (nodeId: string) => {
-      const incoming = getIncomingConnections(nodeId);
-      const outgoing = getOutgoingConnections(nodeId);
-      return [...incoming, ...outgoing].reduce((sum, e) => sum + e.failed_requests, 0);
+      // Force chart recreation when visualization type changes
+      chartKey.value++;
     };
 
     const formatNumber = (num: number) => {
@@ -847,104 +583,75 @@ export default defineComponent({
     };
 
     const toggleAutoRefresh = (enabled: boolean) => {
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-        refreshInterval = null;
+      if (refreshIntervalTimer) {
+        clearInterval(refreshIntervalTimer);
+        refreshIntervalTimer = null;
       }
 
       if (enabled) {
-        refreshInterval = setInterval(loadServiceGraph, 30000);
+        // Convert seconds to milliseconds
+        const intervalMs = refreshInterval.value * 1000;
+        refreshIntervalTimer = setInterval(loadServiceGraph, intervalMs);
       }
     };
 
-    const updatePhysics = () => {
-      if (networkInstance) {
-        networkInstance.setOptions({
-          physics: { enabled: enablePhysics.value },
-        });
+    // Watch for changes in refreshInterval and restart the timer if auto-refresh is enabled
+    watch(refreshInterval, () => {
+      if (autoRefresh.value) {
+        toggleAutoRefresh(true);
       }
-    };
-
-    const resetSettings = () => {
-      graphHeight.value = 650;
-      autoRefresh.value = true;
-      showLabels.value = true;
-      enablePhysics.value = false;
-      layoutType.value = "force";
-      toggleAutoRefresh(true);
-      renderGraph();
-    };
+    });
 
     onMounted(() => {
-      // Load vis.js library
-      const script = document.createElement("script");
-      script.src = "https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js";
-      script.onload = () => {
-        loadServiceGraph();
+      loadServiceGraph();
 
-        // Auto-refresh every 30 seconds
-        if (autoRefresh.value) {
-          refreshInterval = setInterval(loadServiceGraph, 30000);
-        }
-      };
-      document.head.appendChild(script);
-
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/vis-network@9.1.6/dist/dist/vis-network.min.css";
-      document.head.appendChild(link);
+      // Start auto-refresh if enabled
+      if (autoRefresh.value) {
+        toggleAutoRefresh(true);
+      }
     });
 
     onBeforeUnmount(() => {
-      if (networkInstance) {
-        networkInstance.destroy();
-      }
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
+      if (refreshIntervalTimer) {
+        clearInterval(refreshIntervalTimer);
       }
     });
 
     return {
       loading,
       error,
-      graphContainer,
       graphData,
       filteredGraphData,
       stats,
       storeStats,
       showSettings,
-      graphHeight,
       autoRefresh,
-      showLabels,
-      enablePhysics,
+      refreshInterval,
       lastUpdated,
       searchFilter,
+      streamFilter,
+      availableStreams,
       connectionTypeFilter,
       connectionTypeTabs,
-      selectedNode,
+      visualizationType,
+      layoutType,
+      layoutOptions,
+      chartData,
+      chartKey,
+      chartRendererRef,
       loadServiceGraph,
       formatNumber,
       applyFilters,
+      onStreamFilterChange,
       setLayout,
+      setVisualizationType,
       toggleAutoRefresh,
-      updatePhysics,
-      resetSettings,
-      getIncomingConnections,
-      getOutgoingConnections,
-      getNodeRequests,
-      getNodeErrors,
-      renderGraph,
     };
   },
 });
 </script>
 
 <style scoped lang="scss">
-.service-graph-container {
-  height: 100%;
-  padding: 16px;
-}
-
 .stat-card {
   transition: all 0.3s ease;
 
@@ -964,28 +671,6 @@ export default defineComponent({
   width: 100%;
   border-radius: 4px;
   overflow: hidden;
-}
-
-#graph-network {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(to bottom, #ffffff 0%, #f9f9f9 100%);
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-
-.node-details-card {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 280px;
-  background: white;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  border-radius: 8px;
-  z-index: 1000;
 }
 
 code {
