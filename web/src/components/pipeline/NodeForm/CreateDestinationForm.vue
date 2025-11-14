@@ -185,11 +185,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               flat
               stack-label
-              :popup-content-style="{ textTransform: 'uppercase' }"
+              emit-value
+              map-options
               :rules="[(val: any) => !!val || 'Field is required!']"
               :disable="formData.destination_type !== 'custom'"
               tabindex="0"
             />
+
+            <!-- ESBulk Index Name field - only shown when output format is esbulk -->
+            <q-input
+              v-if="formData.output_format === 'esbulk'"
+              data-test="add-destination-esbulk-index-input"
+              v-model="formData.esbulk_index"
+              :label="'ESBulk Index Name *'"
+              :placeholder="'Enter index name (e.g., logs, events)'"
+              class="no-border showLabelOnTop q-mt-sm"
+              borderless
+              dense
+              flat
+              stack-label
+              :rules="[(val: any) => !!val?.trim() || 'Index name is required for ESBulk format']"
+              tabindex="0"
+            >
+              <template v-slot:hint>
+                Index name where data will be written in Elasticsearch
+              </template>
+            </q-input>
           </div>
 
           <div class="q-gutter-sm">
@@ -415,7 +436,12 @@ const { t } = useI18n();
 const isEditMode = computed(() => !!props.destination);
 
 const apiMethods = ["get", "post", "put"];
-const outputFormats = ["json", "ndjson"];
+const outputFormats = [
+  { label: "JSON", value: "json" },
+  { label: "NDJSON", value: "ndjson" },
+  { label: "NestedEvent", value: "nestedevent" },
+  { label: "ESBulk", value: "esbulk" },
+];
 const destinationTypes = [
   {
     label: "OpenObserve",
@@ -476,6 +502,7 @@ const formData: Ref<DestinationData> = ref({
   type: "http",
   output_format: "json",
   destination_type: "openobserve",
+  esbulk_index: "",
 });
 
 // Helper function to get default headers for each destination type
@@ -575,7 +602,28 @@ const populateFormForEdit = (destination: DestinationData) => {
   formData.value.method = destination.method || "post";
   formData.value.skip_tls_verify = destination.skip_tls_verify || false;
   formData.value.template = (destination.template as string) || "";
-  formData.value.output_format = destination.output_format || "json";
+
+  // Parse output format - check if it's esbulk with index
+  let outputFormat = destination.output_format || "json";
+  if (outputFormat.startsWith('{"esbulk"')) {
+    try {
+      const parsed = JSON.parse(outputFormat);
+      if (parsed.esbulk && parsed.esbulk.index) {
+        formData.value.output_format = "esbulk";
+        formData.value.esbulk_index = parsed.esbulk.index;
+      } else {
+        formData.value.output_format = outputFormat;
+        formData.value.esbulk_index = "";
+      }
+    } catch {
+      formData.value.output_format = outputFormat;
+      formData.value.esbulk_index = "";
+    }
+  } else {
+    formData.value.output_format = outputFormat;
+    formData.value.esbulk_index = "";
+  }
+
   // Use destination_type_name from backend, fallback to destination_type or default
   // Handle null, undefined, and empty string cases
   const destType = destination.destination_type_name || destination.destination_type;
@@ -627,7 +675,13 @@ watch(
 
         // Set output_format based on destination type
         if (newType === "splunk") {
-          formData.value.output_format = "ndjson";
+          formData.value.output_format = "nestedevent";
+        } else if (newType === "elasticsearch") {
+          formData.value.output_format = "esbulk";
+          // Set default index name if not already set
+          if (!formData.value.esbulk_index) {
+            formData.value.esbulk_index = "default";
+          }
         } else {
           formData.value.output_format = "json";
         }
@@ -834,6 +888,12 @@ const createDestination = () => {
   // Merge URL + URL endpoint for all destination types
   const fullUrl = formData.value.url + (formData.value.url_endpoint || '');
 
+  // Handle output format - for esbulk, format as JSON with index
+  let outputFormat = formData.value.output_format;
+  if (outputFormat === "esbulk" && formData.value.esbulk_index) {
+    outputFormat = `{"esbulk":{"index":"${formData.value.esbulk_index}"}}`;
+  }
+
   const payload: any = {
     url: fullUrl,
     method: formData.value.method,
@@ -842,7 +902,7 @@ const createDestination = () => {
     headers: headers,
     name: formData.value.name,
     type: "http",
-    output_format: formData.value.output_format,
+    output_format: outputFormat,
     destination_type_name: formData.value.destination_type,
   };
 
@@ -930,6 +990,7 @@ const resetForm = () => {
     type: "http",
     output_format: "json",
     destination_type: defaultDestinationType,
+    esbulk_index: "",
   };
   // Set default headers for OpenObserve
   apiHeaders.value = getDefaultHeaders(defaultDestinationType);

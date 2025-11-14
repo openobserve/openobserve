@@ -103,9 +103,10 @@ export interface Destination {
   emails?: string;
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
-  output_format?: "json" | "ndjson";
+  output_format?: "json" | "ndjson" | "nestedevent" | string; // string allows esbulk with dynamic index
   destination_type?: string; // Frontend internal use
   destination_type_name?: string; // From backend
+  esbulk_index?: string; // For esbulk format index name
 }
 
 export interface DestinationPayload {
@@ -118,7 +119,7 @@ export interface DestinationPayload {
   emails?: string[];
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
-  output_format?: "json" | "ndjson";
+  output_format?: "json" | "ndjson" | "nestedevent" | string; // string allows esbulk with dynamic index
   destination_type?: string; // New field added
 }
 
