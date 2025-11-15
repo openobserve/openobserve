@@ -114,6 +114,13 @@ pub async fn remote_write(
     // parse metadata
     for item in request.metadata {
         let metric_name = format_stream_name(&item.metric_family_name.clone());
+        let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
+            .await
+            .unwrap_or(Schema::empty());
+        if schema.metadata().contains_key(METADATA_LABEL) {
+            // already has metadata, skip
+            continue;
+        }
         let metadata = Metadata {
             metric_family_name: item.metric_family_name.clone(),
             metric_type: item.r#type().into(),
@@ -125,27 +132,10 @@ pub async fn remote_write(
             METADATA_LABEL.to_string(),
             json::to_string(&metadata).unwrap(),
         );
-        let stream_schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
-            .await
-            .unwrap_or(Schema::empty());
-        let schema_metadata = stream_schema.metadata();
-        // check if need to update metadata
-        let mut need_update = false;
-        for (k, v) in extra_metadata.iter() {
-            if schema_metadata.contains_key(k) && schema_metadata.get(k).unwrap() == v {
-                continue;
-            }
-            need_update = true;
-            break;
-        }
-        if need_update
-            && let Err(e) = db::schema::update_setting(
-                org_id,
-                &metric_name,
-                StreamType::Metrics,
-                extra_metadata,
-            )
-            .await
+        log::info!("Metadata for stream {metric_name} needs to be updated");
+        if let Err(e) =
+            db::schema::update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata)
+                .await
         {
             log::error!("Error updating metadata for stream: {metric_name}, err: {e}");
         }
