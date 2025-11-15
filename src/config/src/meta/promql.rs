@@ -102,6 +102,17 @@ pub struct Metadata {
     pub unit: String,
 }
 
+impl Metadata {
+    pub fn new(name: &str) -> Self {
+        Self {
+            metric_type: MetricType::Unknown,
+            metric_family_name: name.to_string(),
+            help: String::new(),
+            unit: String::new(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {

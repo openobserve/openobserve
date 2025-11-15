@@ -609,7 +609,7 @@ pub async fn stream_schema_exists(
         conforms: true,
         has_fields: false,
         has_partition_keys: false,
-        has_metadata: false,
+        has_metrics_metadata: false,
     };
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
@@ -633,7 +633,7 @@ pub async fn stream_schema_exists(
         schema_chk.has_partition_keys = true;
     }
     if schema.metadata().contains_key(METADATA_LABEL) {
-        schema_chk.has_metadata = true;
+        schema_chk.has_metrics_metadata = true;
     }
     schema_chk
 }
