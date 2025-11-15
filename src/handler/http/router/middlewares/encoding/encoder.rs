@@ -281,8 +281,32 @@ where
 fn update_head(encoding: ContentEncoding, head: &mut ResponseHead) {
     head.headers_mut()
         .insert(header::CONTENT_ENCODING, encoding.to_header_value());
-    head.headers_mut()
-        .append(header::VARY, HeaderValue::from_static("accept-encoding"));
+
+    // Collect all existing Vary header values
+    let mut vary_values: Vec<String> = head
+        .headers()
+        .get_all(header::VARY)
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|s| s.split(','))
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .map(str::to_string)
+        .collect();
+
+    // Add accept-encoding if not already present
+    if !vary_values
+        .iter()
+        .any(|v| v.eq_ignore_ascii_case("accept-encoding"))
+    {
+        vary_values.push("accept-encoding".to_string());
+    }
+
+    // Remove all existing Vary headers and insert a single combined one
+    head.headers_mut().remove(header::VARY);
+    let combined = vary_values.join(", ");
+    if let Ok(header_value) = HeaderValue::from_str(&combined) {
+        head.headers_mut().insert(header::VARY, header_value);
+    }
 
     head.no_chunking(false);
 }
@@ -1030,8 +1054,59 @@ mod tests {
 
         update_head(ContentEncoding::Gzip, &mut head);
 
+        // Should combine into a single Vary header
         let vary_values: Vec<_> = head.headers().get_all(header::VARY).collect();
-        assert_eq!(vary_values.len(), 2);
+        assert_eq!(vary_values.len(), 1);
+        let combined = vary_values[0].to_str().unwrap();
+        assert!(combined.contains("origin"));
+        assert!(combined.contains("accept-encoding"));
+    }
+
+    #[test]
+    fn test_update_head_cors_vary_headers() {
+        let mut head = ResponseHead::new(StatusCode::OK);
+        // Simulate CORS middleware adding Vary header with multiple comma-separated values
+        head.headers_mut().append(
+            header::VARY,
+            HeaderValue::from_static(
+                "Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+            ),
+        );
+
+        update_head(ContentEncoding::Gzip, &mut head);
+
+        // Should combine into a single Vary header
+        let vary_values: Vec<_> = head.headers().get_all(header::VARY).collect();
+        assert_eq!(vary_values.len(), 1);
+        let combined = vary_values[0].to_str().unwrap();
+        assert!(combined.contains("Origin"));
+        assert!(combined.contains("Access-Control-Request-Method"));
+        assert!(combined.contains("Access-Control-Request-Headers"));
+        assert!(combined.contains("accept-encoding"));
+    }
+
+    #[test]
+    fn test_update_head_no_duplicate_accept_encoding() {
+        let mut head = ResponseHead::new(StatusCode::OK);
+        // Already has accept-encoding in Vary
+        head.headers_mut().append(
+            header::VARY,
+            HeaderValue::from_static("Origin, Accept-Encoding"),
+        );
+
+        update_head(ContentEncoding::Gzip, &mut head);
+
+        // Should not add accept-encoding again (case-insensitive check)
+        let vary_values: Vec<_> = head.headers().get_all(header::VARY).collect();
+        assert_eq!(vary_values.len(), 1);
+        let combined = vary_values[0].to_str().unwrap();
+        // Count occurrences of "accept-encoding" (case-insensitive)
+        let count = combined
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| s.eq_ignore_ascii_case("accept-encoding"))
+            .count();
+        assert_eq!(count, 1);
     }
 
     #[test]
