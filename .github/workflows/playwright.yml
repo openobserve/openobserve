@@ -211,6 +211,7 @@ jobs:
                 "multiselect-stream.spec.js",
                 "streamname.spec.js",
                 "streaming.spec.js",
+                "stream-settings.spec.js",
               ]
     steps:
       - name: Clone the current repo
