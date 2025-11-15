@@ -469,7 +469,7 @@ impl Writer {
         // Clear the heavy data field after conversion to avoid memory duplication
         // The JSON data is already in bytes_entries and Arrow format in batch_entries
         for entry in entries.iter_mut() {
-            entry.data.clear();
+            let _ = std::mem::take(&mut entry.data);
         }
 
         let _start_preprocess_batch_duration = _start_preprocess_batch.elapsed();
