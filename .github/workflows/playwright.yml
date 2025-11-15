@@ -276,30 +276,19 @@ jobs:
 
           if [ "$IS_RERUN" = "true" ]; then
             echo "::group::Fetching last failed tests from TestDino"
-            # Use custom cache ID that includes run_id to distinguish separate workflow runs
-            # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
-            CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
-            echo "::notice::Using cache ID: $CACHE_ID"
+            # Use custom cache ID that includes run_id AND attempt to fetch from PREVIOUS attempt
+            # CRITICAL: On Attempt #2, fetch from Attempt #1's cache!
+            # Format: gh_openobserve_branch_runid_attempt1
+            PREV_ATTEMPT=$((${{ github.run_attempt }} - 1))
+            CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}_attempt${PREV_ATTEMPT}"
+            echo "::notice::Using cache ID: $CACHE_ID (fetching from attempt #$PREV_ATTEMPT)"
             # Try to get last failed tests from TestDino
             # Redirect stderr to /dev/null to avoid capturing npm warnings
             # Filter out TestDino debug output (lines starting with ===, DEBUG:, or spaces)
             if RAW_OUTPUT="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
-              # Filter debug lines and get the actual test path
-              # Remove debug output, empty lines, and metadata lines
-              LAST_FAILED_FLAGS="$(echo "$RAW_OUTPUT" | \
-                grep -v '^===' | \
-                grep -v '^DEBUG:' | \
-                grep -v '^   ' | \
-                grep -v '^$' | \
-                grep -v '🔍' | \
-                grep -v '📁' | \
-                grep -v '📋' | \
-                grep -v '⚠️' | \
-                grep -v '🏗️' | \
-                grep -v '📤' | \
-                grep -v '✅' | \
-                grep -v '✓' | \
-                tail -1)"
+              # Filter debug lines and extract ONLY lines containing .spec.js
+              # TestDino output format: "Folder/file.spec.js" or "Folder/file.spec.js -g test name"
+              LAST_FAILED_FLAGS="$(echo "$RAW_OUTPUT" | grep '\.spec\.js' | tail -1)"
               # Trim whitespace
               LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
 
@@ -799,10 +788,11 @@ jobs:
             # tdpw cache expects to be run from the directory containing report.json
             # Change to playwright-results directory where report.json lives
             cd playwright-results
-            # Use custom cache ID that includes run_id to distinguish separate workflow runs
-            # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
-            CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
-            echo "::notice::Using cache ID: $CACHE_ID"
+            # Use custom cache ID that includes run_id AND attempt number
+            # CRITICAL: Each attempt caches with its own attempt number!
+            # Format: gh_openobserve_branch_runid_attempt1 (Attempt #1 saves to attempt1)
+            CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}_attempt${{ github.run_attempt }}"
+            echo "::notice::Using cache ID: $CACHE_ID (saving attempt #${{ github.run_attempt }} data)"
             if npx tdpw cache --cache-id "$CACHE_ID"; then
               echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
               echo "::notice::This data will be used for optimized reruns if tests fail"
