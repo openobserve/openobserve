@@ -78,7 +78,7 @@ pub struct StreamSchemaChk {
     pub conforms: bool,
     pub has_fields: bool,
     pub has_partition_keys: bool,
-    pub has_metadata: bool,
+    pub has_metrics_metadata: bool,
 }
 
 pub const INGESTION_EP: [&str; 16] = [
@@ -447,13 +447,13 @@ mod tests {
             conforms: true,
             has_fields: true,
             has_partition_keys: true,
-            has_metadata: true,
+            has_metrics_metadata: true,
         };
 
         assert!(chk.conforms);
         assert!(chk.has_fields);
         assert!(chk.has_partition_keys);
-        assert!(chk.has_metadata);
+        assert!(chk.has_metrics_metadata);
     }
 
     #[test]
