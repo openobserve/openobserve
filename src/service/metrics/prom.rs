@@ -132,7 +132,7 @@ pub async fn remote_write(
             METADATA_LABEL.to_string(),
             json::to_string(&metadata).unwrap(),
         );
-        log::info!("Metadata for stream {metric_name} needs to be updated");
+        log::info!("Metadata for stream {org_id}/metrics/{metric_name} needs to be updated");
         if let Err(e) =
             db::schema::update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata)
                 .await
