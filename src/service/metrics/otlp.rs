@@ -1214,10 +1214,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Gauge(gauge)) = &metric.data {
-            let result = process_gauge(&mut rec, gauge, metadata.clone(), &mut prom_meta);
+            let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             let processed_data = &result[0];
             assert_eq!(processed_data["__name__"], "test_gauge");
             assert_eq!(processed_data["__type__"], "gauge");
@@ -1244,10 +1248,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Sum(sum)) = &metric.data {
-            let result = process_sum(&mut rec, sum, metadata.clone(), &mut prom_meta);
+            let result = process_sum(&mut rec, sum, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             let processed_data = &result[0];
             assert_eq!(processed_data["__name__"], "test_counter");
             assert_eq!(processed_data["__type__"], "counter");
@@ -1279,10 +1287,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Histogram(hist)) = &metric.data {
-            let result = process_histogram(&mut rec, hist, metadata.clone(), &mut prom_meta);
+            let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             assert_eq!(metadata.metric_type, MetricType::Histogram);
 
             // Should have count, sum, min, max, and bucket records
@@ -1308,11 +1320,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::ExponentialHistogram(hist)) = &metric.data {
-            let result =
-                process_exponential_histogram(&mut rec, hist, metadata.clone(), &mut prom_meta);
+            let result = process_exponential_histogram(&mut rec, hist, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             assert_eq!(metadata.metric_type, MetricType::ExponentialHistogram);
         } else {
             panic!("Expected exponential histogram metric");
@@ -1335,10 +1350,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Summary(summary)) = &metric.data {
-            let result = process_summary(&rec, summary, metadata.clone(), &mut prom_meta);
+            let result = process_summary(&rec, summary, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             assert_eq!(metadata.metric_type, MetricType::Summary);
         } else {
             panic!("Expected summary metric");
