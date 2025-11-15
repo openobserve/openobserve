@@ -258,8 +258,8 @@ pub async fn handle_otlp_request(
                 }
                 rec[NAME_LABEL] = metric_name.to_owned().into();
 
-                // metadata handling
-                let mut metadata = Metadata {
+                // process metadata
+                let metadata = Metadata {
                     metric_family_name: rec[NAME_LABEL].to_string(),
                     metric_type: MetricType::Unknown,
                     help: metric.description.to_owned(),
@@ -270,37 +270,51 @@ pub async fn handle_otlp_request(
                 let records = match &metric.data {
                     Some(data) => match data {
                         Data::Gauge(gauge) => {
-                            process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta)
+                            process_gauge(&mut rec, gauge, metadata, &mut prom_meta)
                         }
-                        Data::Sum(sum) => process_sum(&mut rec, sum, &mut metadata, &mut prom_meta),
+                        Data::Sum(sum) => process_sum(&mut rec, sum, metadata, &mut prom_meta),
                         Data::Histogram(hist) => {
-                            process_histogram(&mut rec, hist, &mut metadata, &mut prom_meta)
+                            process_histogram(&mut rec, hist, metadata, &mut prom_meta)
                         }
                         Data::ExponentialHistogram(exp_hist) => process_exponential_histogram(
                             &mut rec,
                             exp_hist,
-                            &mut metadata,
+                            metadata,
                             &mut prom_meta,
                         ),
                         Data::Summary(summary) => {
-                            process_summary(&rec, summary, &mut metadata, &mut prom_meta)
+                            process_summary(&rec, summary, metadata, &mut prom_meta)
                         }
                     },
                     None => vec![],
                 };
 
                 // update schema metadata
-                if !schema_exists.has_metadata
-                    && let Err(e) = db::schema::update_setting(
+                if !schema_exists.has_metrics_metadata {
+                    if !prom_meta.contains_key(METADATA_LABEL) {
+                        prom_meta.insert(
+                            METADATA_LABEL.to_string(),
+                            json::to_string(&Metadata::new(metric_name)).unwrap(),
+                        );
+                    }
+                    log::info!(
+                        "Metadata for stream {org_id}/metrics/{metric_name} needs to be updated"
+                    );
+                    if let Err(e) = db::schema::update_setting(
                         org_id,
                         metric_name,
                         StreamType::Metrics,
                         prom_meta,
                     )
                     .await
-                {
-                    log::error!("Failed to set metadata for metric: {metric_name} with error: {e}");
+                    {
+                        log::error!(
+                            "Failed to set metadata for metric: {metric_name} with error: {e}"
+                        );
+                    }
                 }
+
+                // process data points
                 for mut rec in records {
                     // flattening
                     rec = flatten::flatten(rec)?;
@@ -652,7 +666,7 @@ pub async fn handle_otlp_request(
 fn process_gauge(
     rec: &mut json::Value,
     gauge: &Gauge,
-    metadata: &mut Metadata,
+    mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     let mut records = vec![];
@@ -677,7 +691,7 @@ fn process_gauge(
 fn process_sum(
     rec: &mut json::Value,
     sum: &Sum,
-    metadata: &mut Metadata,
+    mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
@@ -704,7 +718,7 @@ fn process_sum(
 fn process_histogram(
     rec: &mut json::Value,
     hist: &Histogram,
-    metadata: &mut Metadata,
+    mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
@@ -731,7 +745,7 @@ fn process_histogram(
 fn process_exponential_histogram(
     rec: &mut json::Value,
     hist: &ExponentialHistogram,
-    metadata: &mut Metadata,
+    mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
@@ -757,7 +771,7 @@ fn process_exponential_histogram(
 fn process_summary(
     rec: &json::Value,
     summary: &Summary,
-    metadata: &mut Metadata,
+    mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
@@ -1191,7 +1205,7 @@ mod tests {
             "__name__": "test_gauge",
             "__type__": "gauge"
         });
-        let mut metadata = Metadata {
+        let metadata = Metadata {
             metric_type: MetricType::Unknown,
             metric_family_name: "test_gauge".to_string(),
             help: "Test gauge metric".to_string(),
@@ -1200,10 +1214,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Gauge(gauge)) = &metric.data {
-            let result = process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta);
+            let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             let processed_data = &result[0];
             assert_eq!(processed_data["__name__"], "test_gauge");
             assert_eq!(processed_data["__type__"], "gauge");
@@ -1221,7 +1239,7 @@ mod tests {
             "__name__": "test_counter",
             "__type__": "counter"
         });
-        let mut metadata = Metadata {
+        let metadata = Metadata {
             metric_type: MetricType::Unknown,
             metric_family_name: "test_counter".to_string(),
             help: "Test counter metric".to_string(),
@@ -1230,10 +1248,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Sum(sum)) = &metric.data {
-            let result = process_sum(&mut rec, sum, &mut metadata, &mut prom_meta);
+            let result = process_sum(&mut rec, sum, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             let processed_data = &result[0];
             assert_eq!(processed_data["__name__"], "test_counter");
             assert_eq!(processed_data["__type__"], "counter");
@@ -1256,7 +1278,7 @@ mod tests {
             "__name__": "test_histogram",
             "__type__": "histogram"
         });
-        let mut metadata = Metadata {
+        let metadata = Metadata {
             metric_type: MetricType::Unknown,
             metric_family_name: "test_histogram".to_string(),
             help: "Test histogram metric".to_string(),
@@ -1265,10 +1287,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Histogram(hist)) = &metric.data {
-            let result = process_histogram(&mut rec, hist, &mut metadata, &mut prom_meta);
+            let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             assert_eq!(metadata.metric_type, MetricType::Histogram);
 
             // Should have count, sum, min, max, and bucket records
@@ -1285,7 +1311,7 @@ mod tests {
             "__name__": "test_exp_histogram",
             "__type__": "exponential_histogram"
         });
-        let mut metadata = Metadata {
+        let metadata = Metadata {
             metric_type: MetricType::Unknown,
             metric_family_name: "test_exp_histogram".to_string(),
             help: "Test exponential histogram metric".to_string(),
@@ -1294,11 +1320,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::ExponentialHistogram(hist)) = &metric.data {
-            let result =
-                process_exponential_histogram(&mut rec, hist, &mut metadata, &mut prom_meta);
+            let result = process_exponential_histogram(&mut rec, hist, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             assert_eq!(metadata.metric_type, MetricType::ExponentialHistogram);
         } else {
             panic!("Expected exponential histogram metric");
@@ -1312,7 +1341,7 @@ mod tests {
             "__name__": "test_summary",
             "__type__": "summary"
         });
-        let mut metadata = Metadata {
+        let metadata = Metadata {
             metric_type: MetricType::Unknown,
             metric_family_name: "test_summary".to_string(),
             help: "Test summary metric".to_string(),
@@ -1321,10 +1350,14 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Summary(summary)) = &metric.data {
-            let result = process_summary(&rec, summary, &mut metadata, &mut prom_meta);
+            let result = process_summary(&rec, summary, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
+            let metadata = prom_meta
+                .get(METADATA_LABEL)
+                .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                .unwrap();
             assert_eq!(metadata.metric_type, MetricType::Summary);
         } else {
             panic!("Expected summary metric");
@@ -1582,7 +1615,7 @@ mod tests {
             "__name__": "test_metric_with_attrs",
             "__type__": "gauge"
         });
-        let mut metadata = Metadata {
+        let metadata = Metadata {
             metric_type: MetricType::Unknown,
             metric_family_name: "test_metric_with_attrs".to_string(),
             help: "Test metric with attributes".to_string(),
@@ -1591,7 +1624,7 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Gauge(gauge)) = &metric.data {
-            let result = process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta);
+            let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
 
             // Verify the processed data has required fields
             assert!(!result.is_empty());
@@ -1686,7 +1719,7 @@ mod tests {
         fn test_gauge_with_zero_value() {
             let metric = create_test_gauge_metric("zero_gauge", 0.0);
             let mut rec = json!({"__name__": "zero_gauge", "__type__": "gauge"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1695,7 +1728,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Gauge(gauge)) = &metric.data {
-                let result = process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta);
+                let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
                 assert!(!result.is_empty());
                 assert_eq!(result[0]["value"], 0.0);
             }
@@ -1705,7 +1738,7 @@ mod tests {
         fn test_gauge_with_negative_value() {
             let metric = create_test_gauge_metric("negative_gauge", -42.5);
             let mut rec = json!({"__name__": "negative_gauge", "__type__": "gauge"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1714,7 +1747,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Gauge(gauge)) = &metric.data {
-                let result = process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta);
+                let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
                 assert!(!result.is_empty());
                 assert_eq!(result[0]["value"], -42.5);
             }
@@ -1724,7 +1757,7 @@ mod tests {
         fn test_gauge_with_infinity() {
             let metric = create_test_gauge_metric("infinity_gauge", f64::INFINITY);
             let mut rec = json!({"__name__": "infinity_gauge", "__type__": "gauge"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1733,7 +1766,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Gauge(gauge)) = &metric.data {
-                let result = process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta);
+                let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
                 assert!(!result.is_empty());
                 // Check that the value is infinite (JSON might not preserve exact infinity)
                 let value = &result[0]["value"];
@@ -1752,7 +1785,7 @@ mod tests {
         fn test_sum_non_monotonic() {
             let metric = create_test_sum_metric("non_monotonic_sum", 50.0, false);
             let mut rec = json!({"__name__": "non_monotonic_sum", "__type__": "counter"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1761,7 +1794,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Sum(sum)) = &metric.data {
-                let result = process_sum(&mut rec, sum, &mut metadata, &mut prom_meta);
+                let result = process_sum(&mut rec, sum, metadata, &mut prom_meta);
                 assert!(!result.is_empty());
                 assert_eq!(result[0]["is_monotonic"], "false");
             }
@@ -1771,7 +1804,7 @@ mod tests {
         fn test_histogram_empty_buckets() {
             let metric = create_test_histogram_metric("empty_hist", vec![], vec![]);
             let mut rec = json!({"__name__": "empty_hist", "__type__": "histogram"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1780,7 +1813,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Histogram(hist)) = &metric.data {
-                let result = process_histogram(&mut rec, hist, &mut metadata, &mut prom_meta);
+                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
                 // Should still have count, sum, min, max records
                 assert!(result.len() >= 4);
             }
@@ -1790,7 +1823,7 @@ mod tests {
         fn test_histogram_single_bucket() {
             let metric = create_test_histogram_metric("single_bucket", vec![100], vec![10.0]);
             let mut rec = json!({"__name__": "single_bucket", "__type__": "histogram"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1799,7 +1832,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Histogram(hist)) = &metric.data {
-                let result = process_histogram(&mut rec, hist, &mut metadata, &mut prom_meta);
+                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
                 // Should have count, sum, min, max, and 1 bucket
                 assert_eq!(result.len(), 5);
 
@@ -1817,7 +1850,7 @@ mod tests {
             let bounds = vec![1.0, 2.0, 3.0, 4.0, 5.0];
             let metric = create_test_histogram_metric("many_buckets", counts, bounds);
             let mut rec = json!({"__name__": "many_buckets", "__type__": "histogram"});
-            let mut metadata = Metadata {
+            let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
                 help: String::new(),
@@ -1826,7 +1859,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Histogram(hist)) = &metric.data {
-                let result = process_histogram(&mut rec, hist, &mut metadata, &mut prom_meta);
+                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
                 // Should have count, sum, min, max, and 5 buckets
                 assert_eq!(result.len(), 9);
             }
