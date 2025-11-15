@@ -297,7 +297,9 @@ pub async fn handle_otlp_request(
                             json::to_string(&Metadata::new(metric_name)).unwrap(),
                         );
                     }
-                    log::info!("Metadata for stream {metric_name} needs to be updated");
+                    log::info!(
+                        "Metadata for stream {org_id}/metrics/{metric_name} needs to be updated"
+                    );
                     if let Err(e) = db::schema::update_setting(
                         org_id,
                         metric_name,
