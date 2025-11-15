@@ -1234,16 +1234,8 @@ export default defineComponent({
           //   currentQuery.toLowerCase().indexOf("select ") == 0;
           if (!hasSelect) {
             if (currentQuery != "") {
-              currentQuery = currentQuery.split("|");
-              if (currentQuery.length > 1) {
-                selectFields = "," + currentQuery[0].trim();
-                if (currentQuery[1].trim() != "") {
-                  whereClause = "WHERE " + currentQuery[1].trim();
-                }
-              } else if (currentQuery[0].trim() != "") {
-                if (currentQuery[0].trim() != "") {
-                  whereClause = "WHERE " + currentQuery[0].trim();
-                }
+              if (currentQuery.trim() != "") {
+                  whereClause = "WHERE " + currentQuery;
               }
             }
 
