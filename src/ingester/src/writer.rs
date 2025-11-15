@@ -544,7 +544,7 @@ impl Writer {
         }
 
         let _start_consume_processed_duration = _start_consume_processed.elapsed();
-        if _start_consume_processed_duration.as_millis() > 100 {
+        if _start_consume_processed_duration.as_millis() > 500 {
             log::warn!("_start_consume_processed_duration: {_start_consume_processed_duration:?}");
         }
 
