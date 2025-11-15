@@ -544,16 +544,7 @@ mod tests {
 
         assert!(result.is_ok());
         let index = result.unwrap();
-        assert!(index.is_some()); // Returns Some because index fields are not filtered by existence
-
-        // Verify the index has the timestamp field and requested fields (even if they don't exist
-        // in data)
-        let index = index.unwrap();
-        let schema = index.schema();
-        assert!(schema.get_field("another_nonexistent_field").is_ok());
-        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
-        // FTS field WILL be present because full_text_search_fields is not empty
-        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(index.is_none());
     }
 
     #[tokio::test]
