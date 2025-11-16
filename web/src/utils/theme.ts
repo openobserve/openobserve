@@ -29,6 +29,33 @@ export const hexToRgba = (hex: string, opacity: number): string => {
 };
 
 /**
+ * Mix two colors together (similar to CSS color-mix)
+ * @param color1 - First hex color code (e.g., "#3F7994")
+ * @param color2 - Second hex color code (e.g., "#FFFFFF")
+ * @param percentage - Percentage of color1 (0-100, where 100 = fully color1)
+ * @returns Hex color string of the mixed result
+ */
+export const mixColors = (color1: string, color2: string, percentage: number): string => {
+  color1 = color1.replace('#', '');
+  color2 = color2.replace('#', '');
+
+  const r1 = parseInt(color1.substring(0, 2), 16);
+  const g1 = parseInt(color1.substring(2, 4), 16);
+  const b1 = parseInt(color1.substring(4, 6), 16);
+
+  const r2 = parseInt(color2.substring(0, 2), 16);
+  const g2 = parseInt(color2.substring(2, 4), 16);
+  const b2 = parseInt(color2.substring(4, 6), 16);
+
+  const ratio = percentage / 100;
+  const r = Math.round(r1 * ratio + r2 * (1 - ratio));
+  const g = Math.round(g1 * ratio + g2 * (1 - ratio));
+  const b = Math.round(b1 * ratio + b2 * (1 - ratio));
+
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+};
+
+/**
  * Apply theme colors directly to CSS variables
  * @param themeColor - Hex color code for the theme
  * @param mode - Theme mode ("light" or "dark")
@@ -43,8 +70,8 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     document.body.style.setProperty('--o2-dark-theme-color', rgbaColor);
     document.body.style.setProperty('--o2-theme-color', rgbaColor);
 
-    // Apply table header background color (80% theme color mixed with white)
-    const tableHeaderBg = hexToRgba(themeColor, 1); // 0.8 alpha (80%)
+    // Apply table header background color (80% theme color mixed with 20% black for dark mode)
+    const tableHeaderBg = mixColors(themeColor, '#000000', 40);
     document.body.style.setProperty('--o2-table-header-bg', tableHeaderBg);
 
     // Apply tab background colors for dark mode
@@ -105,8 +132,8 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
     document.body.style.setProperty('background', gradient, 'important');
 
-    // Apply table header background color (20% theme color mixed with white)
-    const tableHeaderBg = hexToRgba(themeColor, 1); // 0.2 alpha (20%)
+    // Apply table header background color (80% theme color mixed with 20% white)
+    const tableHeaderBg = mixColors(themeColor, '#FFFFFF', 30);
     document.documentElement.style.setProperty('--o2-table-header-bg', tableHeaderBg);
 
     // Apply tab background colors for light mode
