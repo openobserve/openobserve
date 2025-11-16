@@ -761,17 +761,27 @@ jobs:
           # Parse report.json to show test counts
           echo "::notice::[TESTDINO_RERUN_OPT] 📊 Analyzing merged report.json..."
           if [ -f "playwright-results/report.json" ]; then
-            TOTAL_TESTS=$(jq '[.suites[].specs[]] | length' playwright-results/report.json 2>/dev/null || echo "0")
-            PASSED_TESTS=$(jq '[.suites[].specs[].tests[].results[] | select(.status == "passed")] | length' playwright-results/report.json 2>/dev/null || echo "0")
-            FAILED_TESTS=$(jq '[.suites[].specs[].tests[].results[] | select(.status == "failed")] | length' playwright-results/report.json 2>/dev/null || echo "0")
-            SKIPPED_TESTS=$(jq '[.suites[].specs[].tests[].results[] | select(.status == "skipped")] | length' playwright-results/report.json 2>/dev/null || echo "0")
+            # Debug: Show report structure
+            echo "::debug::[TESTDINO_RERUN_OPT] Report top-level keys:"
+            jq 'keys' playwright-results/report.json || echo "jq failed"
 
-            echo "::notice::[TESTDINO_RERUN_OPT] 📊 Test Results Summary:"
-            echo "::notice::[TESTDINO_RERUN_OPT]   - Total test specs: $TOTAL_TESTS"
-            echo "::notice::[TESTDINO_RERUN_OPT]   - Passed: $PASSED_TESTS"
-            echo "::notice::[TESTDINO_RERUN_OPT]   - Failed: $FAILED_TESTS"
-            echo "::notice::[TESTDINO_RERUN_OPT]   - Skipped: $SKIPPED_TESTS"
-            echo "::notice::[TESTDINO_RERUN_OPT]   - Total executions: $(($PASSED_TESTS + $FAILED_TESTS + $SKIPPED_TESTS))"
+            # Try different parsing methods for Playwright JSON report format
+            # Method 1: Count specs directly
+            TOTAL_SPECS=$(jq '[.. | .specs? // empty | .[]] | length' playwright-results/report.json 2>/dev/null || echo "0")
+
+            # Method 2: Count by status in stats object (if exists)
+            EXPECTED=$(jq '.stats.expected // 0' playwright-results/report.json 2>/dev/null || echo "0")
+            UNEXPECTED=$(jq '.stats.unexpected // 0' playwright-results/report.json 2>/dev/null || echo "0")
+            FLAKY=$(jq '.stats.flaky // 0' playwright-results/report.json 2>/dev/null || echo "0")
+            SKIPPED=$(jq '.stats.skipped // 0' playwright-results/report.json 2>/dev/null || echo "0")
+
+            echo "::notice::[TESTDINO_RERUN_OPT] 📊 Test Results Summary (from stats):"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Expected (passed): $EXPECTED"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Unexpected (failed): $UNEXPECTED"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Flaky: $FLAKY"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Skipped: $SKIPPED"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Total specs found: $TOTAL_SPECS"
+            echo "::notice::[TESTDINO_RERUN_OPT]   - Total tests: $(($EXPECTED + $UNEXPECTED + $FLAKY + $SKIPPED))"
           else
             echo "::error::[TESTDINO_RERUN_OPT] ❌ report.json not found!"
           fi
