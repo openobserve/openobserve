@@ -59,14 +59,12 @@ export default {
 
     // Watch for organization settings changes (loaded asynchronously from backend)
     // This handles the race condition where App.vue mounts before MainLayout loads org settings
-    // In production builds, timing is more deterministic and causes theme colors to not apply initially
     watch(
       () => store.state.organizationData?.organizationSettings,
       (newSettings) => {
         // Only reinitialize if settings actually changed (not just initial undefined -> object)
         // Check if theme colors were loaded from backend
         if (newSettings?.light_mode_theme_color || newSettings?.dark_mode_theme_color) {
-          // Check if user is actively previewing colors in General Settings
           const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
           if (!hasTempColors) {
             initializeThemeColors();
