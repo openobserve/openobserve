@@ -149,7 +149,7 @@
   
   const addCondition = (groupId: string) => {
     groups.value.items.push({
-      column: '',
+      column: { field: "", streamAlias: "" },
       operator: '=',
       value: '',
       ignore_case: true,
@@ -165,7 +165,7 @@
       label: 'or',
       items: [
         {
-          column: '',
+          column: { field: "", streamAlias: "" },
           operator: '=',
           value: '',
           ignore_case: true,

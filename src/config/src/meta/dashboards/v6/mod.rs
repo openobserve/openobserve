@@ -68,6 +68,7 @@ impl From<Dashboard> for super::Dashboard {
             v5: None,
             v6: Some(value),
             v7: None,
+            v8: None,
             version,
             hash,
             updated_at,
@@ -238,11 +239,18 @@ pub struct BackgroundValue {
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct StreamFieldObj {
+    pub field: Option<String>,
+    pub stream_alias: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FilterCondition {
     #[serde(rename = "type")]
     pub typ: String,
     pub values: Vec<String>,
-    pub column: String,
+    pub column: Option<StreamFieldObj>,
     pub operator: Option<String>,
     pub value: Option<String>,
     pub logical_operator: String,
