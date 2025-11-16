@@ -57,6 +57,23 @@ export default {
       }
     );
 
+    // Watch for organization settings changes (loaded asynchronously from backend)
+    // This handles the race condition where App.vue mounts before MainLayout loads org settings
+    watch(
+      () => store.state.organizationData?.organizationSettings,
+      (newSettings) => {
+        // Only reinitialize if settings actually changed (not just initial undefined -> object)
+        // Check if theme colors were loaded from backend
+        if (newSettings?.light_mode_theme_color || newSettings?.dark_mode_theme_color) {
+          const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+          if (!hasTempColors) {
+            initializeThemeColors();
+          }
+        }
+      },
+      { deep: true }
+    );
+
     /**
      * Initialize and apply theme colors based on priority order
      * Priority (highest to lowest):
