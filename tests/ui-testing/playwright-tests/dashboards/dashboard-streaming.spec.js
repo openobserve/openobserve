@@ -3,6 +3,7 @@ const {
   expect,
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require("../utils/test-logger.js");
 import logData from "../../fixtures/log.json";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
@@ -44,7 +45,7 @@ test.describe("dashboard streaming testcases", () => {
     const pm = new PageManager(page);
 
     // Enable streaming mode by setting use_streaming=true
-    await pm.managementPage.setStreamingState(true);
+    // await pm.managementPage.setStreamingState(true);
 
     const panelName = pm.dashboardPanelActions.generateUniquePanelName(
       "panel-test-streaming"
@@ -67,11 +68,13 @@ test.describe("dashboard streaming testcases", () => {
       "logs",
       "e2e_automate",
       "kubernetes_container_name",
-      true
+      true, // customValueSearc
+      null, // filterConfig
+      true  // showMultipleValues
     );
 
     // await page.waitForTimeout(3000);
-    await page.waitForLoadState("networkidle");
+    // await page.waitForLoadState("networkidle");
 
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -147,7 +150,7 @@ test.describe("dashboard streaming testcases", () => {
       randomDashboardName + "_streaming"
     );
 
-    await pm.managementPage.setStreamingState(false);
+    // await pm.managementPage.setStreamingState(false);
   });
 
   test("should add dashboard variable with filter configuration", async ({
@@ -171,7 +174,7 @@ test.describe("dashboard streaming testcases", () => {
     const pm = new PageManager(page);
 
     // Enable streaming mode by setting use_streaming=true
-    await pm.managementPage.setStreamingState(true);
+    // await pm.managementPage.setStreamingState(true);
 
     const panelName = pm.dashboardPanelActions.generateUniquePanelName(
       "panel-filter-test"
@@ -258,7 +261,8 @@ test.describe("dashboard streaming testcases", () => {
       );
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+    await waitForDateTimeButtonToBeEnabled(page);
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
 

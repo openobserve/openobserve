@@ -30,11 +30,16 @@ pub mod folders;
 pub mod functions;
 pub mod keys;
 pub mod kv;
+#[cfg(feature = "enterprise")]
+pub mod license;
 pub mod logs;
 pub mod mcp;
 pub mod metrics;
 pub mod organization;
+#[cfg(feature = "enterprise")]
+pub mod patterns;
 pub mod pipeline;
+pub mod pipelines;
 pub mod promql;
 pub mod ratelimit;
 #[cfg(feature = "enterprise")]

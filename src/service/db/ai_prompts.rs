@@ -40,26 +40,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Put(_) => {
                 // Call the enterprise update_prompt_in_memory function to update the cache
                 if let Err(e) =
-                    o2_enterprise::enterprise::ai::prompt::service::update_prompt_in_memory().await
+                    o2_enterprise::enterprise::ai::agent::prompt::service::update_prompt_in_memory()
+                        .await
                 {
                     log::error!("Failed to update AI prompt in memory cache: {e}");
                 }
                 log::debug!("Updated AI prompt in memory cache");
             }
-            // db::Event::Delete(ev) => {
-            //     let prompt_id = ev.key.strip_prefix(AI_PROMPTS_WATCH_PREFIX).unwrap();
-            //     // For delete events, we need to remove from memory cache
-            //     // Assuming there's a delete_prompt_in_memory function or we need to reload
-            //     if let Err(e) =
-            //         o2_enterprise::enterprise::ai::prompt::service::delete_prompt_in_memory(
-            //             prompt_id,
-            //         )
-            //         .await
-            //     {
-            //         log::error!("Failed to delete AI prompt from memory cache: {e}");
-            //     }
-            //     log::debug!("Deleted AI prompt from memory cache: {prompt_id}");
-            // }
             db::Event::Empty | db::Event::Delete(_) => {}
         }
     }
@@ -69,7 +56,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 #[cfg(feature = "enterprise")]
 pub async fn cache() -> Result<(), anyhow::Error> {
     // Use the existing enterprise prompt manager to load all prompts
-    o2_enterprise::enterprise::ai::prompt::prompts::load_system_prompt().await?;
+    o2_enterprise::enterprise::ai::agent::prompt::prompts::load_system_prompt().await?;
     log::info!("AI prompts loaded into enterprise prompt manager cache");
     Ok(())
 }

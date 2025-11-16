@@ -429,9 +429,10 @@ describe("AppGroups Component", () => {
       
       const header = wrapper.find('.tw-flex.tw-justify-between.tw-items-center.tw-px-4.tw-py-3');
       const table = wrapper.find('[data-test="iam-groups-table-section"]');
-      
-      expect(header.classes()).toContain('o2-table-header-dark');
-      expect(table.classes()).toContain('o2-quasar-app-table-dark');
+
+      expect(header.exists()).toBe(true);
+      expect(table.exists()).toBe(true);
+      // Theme classes have been removed from the component
     });
   });
 

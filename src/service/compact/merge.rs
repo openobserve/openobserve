@@ -786,6 +786,7 @@ pub async fn merge_files(
     let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema);
         let latest_schema = generate_schema_for_defined_schema_fields(
+            stream_type,
             &latest_schema,
             &defined_schema_fields,
             need_original,
@@ -1195,7 +1196,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
         return Ok(Vec::new());
     };
 
-    let mut tasks = Vec::new();
+    let mut tasks = Vec::with_capacity(files.len());
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for file in files.iter() {
         let file_account = file.account.to_string();
@@ -1299,14 +1300,13 @@ fn generate_schema_diff(
 fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
     let files_num = file_list.len();
     file_list.sort_by_key(|f| f.meta.min_ts);
-    let mut groups: Vec<Vec<FileKey>> = Vec::new();
+    let mut groups: Vec<Vec<FileKey>> = Vec::with_capacity(files_num);
     for file in file_list {
         let mut inserted = None;
         for (i, group) in groups.iter().enumerate() {
             if group
                 .last()
-                .map(|f| file.meta.min_ts >= f.meta.max_ts)
-                .unwrap_or(false)
+                .is_some_and(|f| file.meta.min_ts >= f.meta.max_ts)
             {
                 inserted = Some(i);
                 break;

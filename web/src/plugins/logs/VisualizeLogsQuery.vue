@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="height: 100%; width: 100%">
-    <q-separator></q-separator>
     <div class="row" style="height: 100%">
+      <div class="tw-pl-[0.625rem]" style="overflow-y: auto;">
       <div
-        class="col scroll"
+        class="col scroll card-container tw-mr-[0.625rem]"
         style="
           overflow-y: auto;
           height: 100%;
@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-chart-type="handleChartTypeChange"
         />
       </div>
+      </div>
       <q-separator vertical />
       <!-- for query related chart only -->
       <div
@@ -55,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- collapse field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="field-list-sidebar-header-collapsed"
+          class="field-list-sidebar-header-collapsed card-container"
           @click="collapseFieldList"
           style="width: 50px; height: 100%"
         >
@@ -73,7 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; height: 100%"
         >
           <template #before>
-            <div class="col scroll" style="height: 100%; overflow-y: auto">
+            <div class="tw-w-full tw-h-full">
+            <div class="col scroll card-container" style="height: 100%; overflow-y: auto">
               <div class="column" style="height: 100%">
                 <div class="col-auto q-pa-sm">
                   <span class="text-weight-bold">{{ t("panel.fields") }}</span>
@@ -82,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <FieldList :editMode="true" :hideAllFieldsSelection="true" />
                 </div>
               </div>
+            </div>
             </div>
           </template>
           <template #separator>
@@ -102,12 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div
-              class="row"
+              class="row card-container"
               :style="{
                 height: '100%',
                 width: dashboardPanelData.layout.showFieldList
                   ? '100%'
-                  : 'calc(100% - 50px)',
+                  : 'calc(100% - 58px)',
               }"
             >
               <div class="col" style="height: 100%">
@@ -168,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
                         :is_ui_histogram="is_ui_histogram"
+                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
                       />
@@ -276,27 +280,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'html'"
-        class="col column"
-        style="width: 100%; height: 100%; flex: 1"
+        class="col column tw-mr-[0.625rem]"
+        style="height: 100%; flex: 1"
       >
-        <CustomHTMLEditor
-          v-model="dashboardPanelData.data.htmlContent"
-          style="width: 100%; height: 100%"
-          class="col"
-        />
-        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <CustomHTMLEditor
+            v-model="dashboardPanelData.data.htmlContent"
+            style="flex: 1; min-height: 0"
+          />
+          <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
+        </div>
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'markdown'"
-        class="col column"
-        style="width: 100%; height: 100%; flex: 1"
+        class="col column tw-mr-[0.625rem]"
+        style="height: 100%; flex: 1"
       >
-        <CustomMarkdownEditor
-          v-model="dashboardPanelData.data.markdownContent"
-          style="width: 100%; height: 100%"
-          class="col"
-        />
-        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+        <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <CustomMarkdownEditor
+            v-model="dashboardPanelData.data.markdownContent"
+            style="flex: 1; min-height: 0"
+          />
+          <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
+        </div>
       </div>
 
       <div
@@ -404,6 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
                         :is_ui_histogram="is_ui_histogram"
+                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
                       />
@@ -514,6 +521,11 @@ export default defineComponent({
       required: false,
       default: false,
     },
+    shouldRefreshWithoutCache: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
   },
   components: {
     ChartSelection,
@@ -556,10 +568,11 @@ export default defineComponent({
     };
     const { showErrorNotification } = useNotifications();
 
+
     const { searchObj } = searchState();
     const { buildSearch } = useSearchStream();
 
-    const { visualizeChartData, is_ui_histogram }: any = toRefs(props);
+    const { visualizeChartData, is_ui_histogram, shouldRefreshWithoutCache }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
 
     const showAddToDashboardDialog = ref(false);
@@ -942,6 +955,7 @@ export default defineComponent({
       splitterModel,
       collapseFieldList,
       is_ui_histogram,
+      shouldRefreshWithoutCache,
       onResultMetadataUpdate,
       hoveredSeriesState,
       resultMetaData,

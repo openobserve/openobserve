@@ -171,6 +171,14 @@ async fn query(
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
     #[cfg(feature = "enterprise")]
     {
+        if let Err(e) = crate::service::search::check_search_allowed(org_id, None) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
         use crate::{
             common::utils::auth::{AuthExtractor, is_root_user},
             service::db::org_users::get_cached_user_org,
@@ -233,7 +241,7 @@ async fn query(
         end,
         step: 300_000_000, // 5m
         query_exemplars: false,
-        no_cache: None,
+        use_cache: None,
     };
 
     search(&trace_id, org_id, &req, user_email, timeout).await
@@ -466,6 +474,15 @@ async fn query_range(
             service::db::org_users::get_cached_user_org,
         };
 
+        if let Err(e) = crate::service::search::check_search_allowed(org_id, None) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
+
         let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
             Ok(v) => v,
             Err(e) => {
@@ -562,7 +579,7 @@ async fn query_range(
         end,
         step,
         query_exemplars,
-        no_cache: req.no_cache,
+        use_cache: req.use_cache,
     };
     search(&trace_id, org_id, &req, user_email, timeout).await
 }
@@ -722,6 +739,18 @@ async fn series(
                 .json(promql::ApiFuncResponse::<()>::err_bad_data(e, None)));
         }
     };
+
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) = crate::service::search::check_search_allowed(org_id, None) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
+    }
 
     #[cfg(feature = "enterprise")]
     {

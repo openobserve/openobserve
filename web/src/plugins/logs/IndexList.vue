@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="column logs-index-menu full-height"
+    class="column logs-index-menu !tw-p-[0.375rem] tw-h-[calc(100%-0.7rem)]"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div>
@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :placeholder="placeHolderText"
         input-debounce="0"
         behavior="menu"
-        filled
         borderless
         dense
         use-input
@@ -74,12 +73,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-no-field-found-text"
         class="text-center col-10 q-mx-none"
       >
-        <q-icon name="info" color="primary" size="xs" /> No field found in
+        <q-icon name="info" color="primary"
+size="xs" /> No field found in
         selected stream.
       </h3>
     </div>
     <div v-else class="index-table q-mt-xs">
       <q-table
+        ref="fieldListRef"
         data-test="log-search-index-list-fields-table"
         v-model="sortedStreamFields"
         :visible-columns="['name']"
@@ -99,8 +100,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #body-cell-name="props">
           <q-tr
+            v-if="props.row.name === 'no-fields-found'"
+            class="tw-text-center tw-py-[0.725rem] tw-flex tw-items-center tw-justify-center"
+          >
+            <q-icon name="info" color="primary" size="xs" />
+            <span class="tw-pl-[0.375rem]">No matching fields found.</span>
+          </q-tr>
+          <q-tr
             :props="props"
-            v-if="
+            v-else-if="
               props.row.label &&
               (showOnlyInterestingFields
                 ? searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
@@ -172,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !props.row.isSchemaField ||
                   !props.row.showValues
                 "
-                class="field-container flex content-center ellipsis q-pl-lg full-width"
+                class="field-container flex content-center ellipsis q-pl-lg full-width hover:tw-bg-[var(--o2-hover-accent)] tw-rounded-[0.25rem]"
                 :title="props.row.name"
               >
                 <div
@@ -208,7 +216,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </span>
                 </div>
-                <div class="field_overlay" v-if="props.row.name !== store.state.zoConfig.timestamp_column">
+                <div
+                  class="field_overlay tw-rounded-[0.25rem]"
+                  v-if="
+                    props.row.name !== store.state.zoConfig.timestamp_column
+                  "
+                >
                   <q-btn
                     v-if="
                       props.row.isSchemaField &&
@@ -227,7 +240,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="
                       !searchObj.data.stream.selectedFields.includes(
                         props.row.name,
-                      ) && props.row.name !== store.state.zoConfig.timestamp_column
+                      ) &&
+                      props.row.name !== store.state.zoConfig.timestamp_column
                     "
                     :name="outlinedVisibility"
                     style="margin-right: 0.375rem"
@@ -284,6 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 expanded-icon="
                   expand_less
                 "
+                class="hover:tw-bg-[var(--o2-hover-accent)] tw-rounded-[0.25rem]"
                 @before-show="
                   (event: any) => openFilterCreator(event, props.row)
                 "
@@ -327,7 +342,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </span>
                     </div>
-                    <div class="field_overlay">
+                    <div
+                      class="field_overlay tw-rounded-[0.25rem] tw-overflow-hidden"
+                    >
                       <q-btn
                         v-if="props.row.isSchemaField"
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
@@ -459,7 +476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 searchObj.data.stream.selectedStream.length ==
                                 props.row.streams.length
                               "
-                              class="flex row"
+                              class="flex row tw-ml-[0.125rem]"
                               :class="
                                 store.state.theme === 'dark'
                                   ? 'text-white'
@@ -467,8 +484,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               "
                             >
                               <q-btn
-                                class="q-mr-xs"
-                                size="6px"
+                                class="o2-custom-button-hover tw-ml-[0.25rem] !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                                size="5px"
+                                style="margin-right: 4px;"
                                 @click="
                                   addSearchTerm(
                                     props.row.name,
@@ -480,12 +498,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 round
                                 :data-test="`log-search-subfield-list-equal-${props.row.name}-field-btn`"
                               >
-                                <q-icon>
+                                 <q-icon style="height: 8px; width: 8px;">
                                   <EqualIcon></EqualIcon>
                                 </q-icon>
                               </q-btn>
                               <q-btn
-                                size="6px"
+                                class="o2-custom-button-hover !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                                size="5px"
                                 @click="
                                   addSearchTerm(
                                     props.row.name,
@@ -497,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 round
                                 :data-test="`log-search-subfield-list-not-equal-${props.row.name}-field-btn`"
                               >
-                                <q-icon>
+                                 <q-icon style="height: 8px; width: 8px;">
                                   <NotEqualIcon></NotEqualIcon>
                                 </q-icon>
                               </q-btn>
@@ -517,19 +536,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="log-search-index-list-field-search-input"
             v-model="searchObj.data.stream.filterField"
             data-cy="index-field-search-input"
-            filled
             borderless
             dense
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
+            class="!tw-mb-[0.375rem] indexlist-search-input"
           >
             <template #prepend>
-              <q-icon name="search" />
+              <q-icon name="search" size="20px"
+class="o2-search-input-icon" />
             </template>
           </q-input>
           <q-tr v-if="searchObj.loadingStream == true">
-            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
+            <q-td colspan="100%" class="text-bold"
+style="opacity: 0.7">
               <div class="text-subtitle2 text-weight-bold">
                 <q-spinner-hourglass size="20px" />
                 {{ t("confirmDialog.loading") }}
@@ -538,204 +559,219 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
         </template>
         <template v-slot:pagination="scope">
-          <div v-if="showUserDefinedSchemaToggle">
-            <q-btn-toggle
-              no-caps
-              v-model="searchObj.meta.useUserDefinedSchemas"
-              data-test="logs-page-field-list-user-defined-schema-toggle"
-              class="schema-field-toggle q-mr-xs"
-              toggle-color="primary"
-              bordered
-              size="8px"
-              color="white"
-              text-color="primary"
-              @update:model-value="toggleSchema"
-              :options="userDefinedSchemaBtnGroupOption"
-            >
-              <template v-slot:user_defined_slot>
-                <div data-test="logs-user-defined-fields-btn">
-                  <q-icon name="person"></q-icon>
-                  <q-icon name="schema"></q-icon>
-                  <q-tooltip
-                    data-test="logs-page-fields-list-user-defined-fields-warning-tooltip"
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    class="text-body2"
-                  >
-                    <span class="text-bold" color="white">{{
-                      t("search.userDefinedSchemaLabel")
-                    }}</span>
-                  </q-tooltip>
-                </div>
-              </template>
-              <template v-slot:all_fields_slot>
-                <div data-test="logs-all-fields-btn">
-                  <q-icon name="schema"></q-icon>
-                  <q-tooltip
-                    data-test="logs-page-fields-list-all-fields-warning-tooltip"
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    class="text-body2"
-                  >
-                    <span class="text-bold" color="white">{{
-                      t("search.allFieldsLabel")
-                    }}</span>
-                    <q-separator color="white" class="q-mt-xs q-mb-xs" />
-                    {{ t("search.allFieldsWarningMsg") }}
-                  </q-tooltip>
-                </div>
-              </template>
-              <template
-                v-slot:interesting_fields_slot
-                v-if="searchObj.meta.quickMode"
+          <div
+            class="tw-pt-[0.375rem] tw-justify-between tw-w-full"
+            :class="
+              showUserDefinedSchemaToggle || searchObj.meta.quickMode
+                ? 'tw-flex'
+                : ''
+            "
+          >
+            <div v-if="showUserDefinedSchemaToggle">
+              <q-btn-toggle
+                no-caps
+                v-model="searchObj.meta.useUserDefinedSchemas"
+                data-test="logs-page-field-list-user-defined-schema-toggle"
+                class="schema-field-toggle q-mr-xs tw-p-0"
+                toggle-color="primary"
+                bordered
+                size="8px"
+                text-color="primary"
+                bg-color="primary"
+                @update:model-value="toggleSchema"
+                :options="userDefinedSchemaBtnGroupOption"
               >
-                <div data-test="logs-interesting-fields-btn">
-                  <q-icon name="info" />
-                  <q-icon name="schema"></q-icon>
-                  <q-tooltip
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    class="text-body2"
-                  >
-                    <span class="text-bold" color="white">{{
-                      t("search.showOnlyInterestingFields")
-                    }}</span>
-                  </q-tooltip>
-                </div>
-              </template>
-            </q-btn-toggle>
-          </div>
-          <div v-else-if="searchObj.meta.quickMode">
-            <q-btn-toggle
-              no-caps
-              v-model="showOnlyInterestingFields"
-              data-test="logs-page-field-list-user-defined-schema-toggle"
-              class="schema-field-toggle q-mr-xs"
-              toggle-color="primary"
-              bordered
-              size="8px"
-              color="white"
-              text-color="primary"
-              :options="selectedFieldsBtnGroupOption"
-              @update:model-value="toggleInterestingFields"
-            >
-              <template v-slot:all_fields_slot>
-                <div data-test="logs-all-fields-btn">
-                  <q-icon name="schema"></q-icon>
-                  <q-tooltip
-                    data-test="logs-page-fields-list-all-fields-warning-tooltip"
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    class="text-body2"
-                  >
-                    <span class="text-bold" color="white">{{
-                      t("search.allFieldsLabel")
-                    }}</span>
-                    <q-separator color="white" class="q-mt-xs q-mb-xs" />
-                    {{ t("search.allFieldsWarningMsg") }}
-                  </q-tooltip>
-                </div>
-              </template>
-              <template
-                v-slot:interesting_fields_slot
-                v-if="searchObj.meta.quickMode"
-              >
-                <div data-test="logs-interesting-fields-btn">
-                  <q-icon name="info" />
-                  <q-icon name="schema"></q-icon>
-                  <q-tooltip
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    class="text-body2"
-                  >
-                    <span class="text-bold" color="white">{{
-                      t("search.showOnlyInterestingFields")
-                    }}</span>
-                  </q-tooltip>
-                </div>
-              </template>
-            </q-btn-toggle>
-          </div>
-          <div class="col"></div>
-          <div class="tw-flex tw-items-center tw-justify-end tw-gap-2">
-            <div v-if="scope.pagesNumber > 1" class="field-list-pagination">
-              <q-tooltip
-                data-test="logs-page-fields-list-pagination-tooltip"
-                anchor="center left"
-                self="center right"
-                max-width="300px"
-                class="text-body2"
-              >
-                Total Fields:
-                {{
-                  searchObj.data.stream.selectedStream.length > 1
-                    ? searchObj.data.stream.selectedStreamFields.length -
-                      (searchObj.data.stream.selectedStream.length + 1)
-                    : searchObj.data.stream.selectedStreamFields.length
-                }}
-              </q-tooltip>
-
-              <!-- First page button -->
-              <q-btn
-                data-test="logs-page-fields-list-pagination-firstpage-button"
-                icon="skip_previous"
-                color="primary"
-                flat
-                :disable="scope.isFirstPage"
-                @click="scope.firstPage"
-                class="pagination-nav-btn"
-                aria-label="First page"
-              />
-
-              <!-- Page number buttons (3 at a time) -->
-              <template v-for="page in getPageNumbers(scope.pagination.page, scope.pagesNumber)" :key="page">
-                <q-btn
-                  flat
-                  :data-test="`logs-page-fields-list-pagination-page-${page}-button`"
-                  :class="[
-                    'pagination-page-btn',
-                    scope.pagination.page === page ? 'pagination-page-active' : ''
-                  ]"
-                  @click="setPage(page)"
-                  >{{ page }}</q-btn
+                <template v-slot:user_defined_slot>
+                  <div data-test="logs-user-defined-fields-btn">
+                    <q-icon name="person" class="!tw-text-[12px]"></q-icon>
+                    <q-icon name="schema" class="!tw-text-[12px]"></q-icon>
+                    <q-tooltip
+                      data-test="logs-page-fields-list-user-defined-fields-warning-tooltip"
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                      class="text-body2"
+                    >
+                      <span class="text-bold" color="white">{{
+                        t("search.userDefinedSchemaLabel")
+                      }}</span>
+                    </q-tooltip>
+                  </div>
+                </template>
+                <template v-slot:all_fields_slot>
+                  <div data-test="logs-all-fields-btn">
+                    <q-icon name="schema" class="!tw-text-[12px]"></q-icon>
+                    <q-tooltip
+                      data-test="logs-page-fields-list-all-fields-warning-tooltip"
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                      class="text-body2"
+                    >
+                      <span class="text-bold" color="white">{{
+                        t("search.allFieldsLabel")
+                      }}</span>
+                      <q-separator color="white" class="q-mt-xs q-mb-xs" />
+                      {{ t("search.allFieldsWarningMsg") }}
+                    </q-tooltip>
+                  </div>
+                </template>
+                <template
+                  v-slot:interesting_fields_slot
+                  v-if="searchObj.meta.quickMode"
                 >
-              </template>
-
-              <!-- Last page button -->
-              <q-btn
-                data-test="logs-page-fields-list-pagination-lastpage-button"
-                icon="skip_next"
-                color="primary"
-                flat
-                :disable="scope.isLastPage"
-                @click="scope.lastPage"
-                class="pagination-nav-btn"
-                aria-label="Last page"
-              />
+                  <div data-test="logs-interesting-fields-btn">
+                    <q-icon name="info" class="!tw-text-[12px]" />
+                    <q-icon name="schema" class="!tw-text-[12px]"></q-icon>
+                    <q-tooltip
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                      class="text-body2"
+                    >
+                      <span class="text-bold" color="white">{{
+                        t("search.showOnlyInterestingFields")
+                      }}</span>
+                    </q-tooltip>
+                  </div>
+                </template>
+              </q-btn-toggle>
             </div>
-            <div class="field-list-reset">
-              <q-icon
-                name="restart_alt"
-                data-test="logs-page-fields-list-reset-icon"
-                class="cursor-pointer reset-icon"
-                @click="resetSelectedFileds"
-              />
-              <q-tooltip
-                data-test="logs-page-fields-list-reset-tooltip"
-                anchor="center left"
-                self="center right"
-                max-width="300px"
-                class="text-body2"
+            <div v-else-if="searchObj.meta.quickMode">
+              <q-btn-toggle
+                no-caps
+                v-model="showOnlyInterestingFields"
+                data-test="logs-page-field-list-user-defined-schema-toggle"
+                class="schema-field-toggle q-mr-xs"
+                toggle-color="primary"
+                bordered
+                size="8px"
+                text-color="primary"
+                :options="selectedFieldsBtnGroupOption"
+                @update:model-value="toggleInterestingFields"
               >
-                <span class="text-bold" color="white">{{
-                  t("search.resetFields")
-                }}</span>
-              </q-tooltip>
+                <template v-slot:all_fields_slot>
+                  <div data-test="logs-all-fields-btn">
+                    <q-icon name="schema" class="!tw-text-[12px]"></q-icon>
+                    <q-tooltip
+                      data-test="logs-page-fields-list-all-fields-warning-tooltip"
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                      class="text-body2"
+                    >
+                      <span class="text-bold" color="white">{{
+                        t("search.allFieldsLabel")
+                      }}</span>
+                      <q-separator color="white" class="q-mt-xs q-mb-xs" />
+                      {{ t("search.allFieldsWarningMsg") }}
+                    </q-tooltip>
+                  </div>
+                </template>
+                <template
+                  v-slot:interesting_fields_slot
+                  v-if="searchObj.meta.quickMode"
+                >
+                  <div data-test="logs-interesting-fields-btn">
+                    <q-icon name="info" class="!tw-text-[12px]" />
+                    <q-icon name="schema" class="!tw-text-[12px]"></q-icon>
+                    <q-tooltip
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                      class="text-body2"
+                    >
+                      <span class="text-bold" color="white">{{
+                        t("search.showOnlyInterestingFields")
+                      }}</span>
+                    </q-tooltip>
+                  </div>
+                </template>
+              </q-btn-toggle>
+            </div>
+            <div class="tw-flex tw-items-center tw-justify-end tw-gap-2">
+              <div v-if="scope.pagesNumber > 1" class="field-list-pagination">
+                <q-tooltip
+                  data-test="logs-page-fields-list-pagination-tooltip"
+                  anchor="center left"
+                  self="center right"
+                  max-width="300px"
+                  class="text-body2"
+                >
+                  Total Fields:
+                  {{
+                    searchObj.data.stream.selectedStream.length > 1
+                      ? searchObj.data.stream.selectedStreamFields.length -
+                        (searchObj.data.stream.selectedStream.length + 1)
+                      : searchObj.data.stream.selectedStreamFields.length
+                  }}
+                </q-tooltip>
+
+                <!-- First page button -->
+                <q-btn
+                  data-test="logs-page-fields-list-pagination-firstpage-button"
+                  icon="fast_rewind"
+                  color="primary"
+                  flat
+                  :disable="scope.isFirstPage"
+                  @click="scope.firstPage"
+                  class="pagination-nav-btn"
+                  aria-label="First page"
+                />
+
+                <!-- Page number buttons (3 at a time) -->
+                <template
+                  v-for="page in getPageNumbers(
+                    scope.pagination.page,
+                    scope.pagesNumber,
+                  )"
+                  :key="page"
+                >
+                  <q-btn
+                    flat
+                    :data-test="`logs-page-fields-list-pagination-page-${page}-button`"
+                    :class="[
+                      'pagination-page-btn',
+                      scope.pagination.page === page
+                        ? 'pagination-page-active'
+                        : '',
+                    ]"
+                    @click="setPage(page)"
+                    >{{ page }}</q-btn
+                  >
+                </template>
+
+                <!-- Last page button -->
+                <q-btn
+                  data-test="logs-page-fields-list-pagination-lastpage-button"
+                  icon="fast_forward"
+                  color="primary"
+                  flat
+                  :disable="scope.isLastPage"
+                  @click="scope.lastPage"
+                  class="pagination-nav-btn"
+                  aria-label="Last page"
+                />
+              </div>
+              <div class="field-list-reset">
+                <q-icon
+                  name="restart_alt"
+                  data-test="logs-page-fields-list-reset-icon"
+                  class="cursor-pointer reset-icon"
+                  @click="resetSelectedFileds"
+                />
+                <q-tooltip
+                  data-test="logs-page-fields-list-reset-tooltip"
+                  anchor="center left"
+                  self="center right"
+                  max-width="300px"
+                  class="text-body2"
+                >
+                  <span class="text-bold" color="white">{{
+                    t("search.resetFields")
+                  }}</span>
+                </q-tooltip>
+              </div>
             </div>
           </div>
         </template>
@@ -767,11 +803,8 @@ import {
   formatLargeNumber,
   useLocalInterestingFields,
   generateTraceContext,
-  isWebSocketEnabled,
   isStreamingEnabled,
-  b64EncodeStandard,
   addSpacesToOperators,
-  deepCopy,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import {
@@ -799,7 +832,7 @@ interface Filter {
 }
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
-  components: { EqualIcon, NotEqualIcon },
+  components: { EqualIcon, NotEqualIcon},
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {
@@ -851,7 +884,8 @@ export default defineComponent({
     const { onStreamChange, handleQueryData } = useSearchBar();
     const { validateFilterForMultiStream } = useSearchStream();
 
-    const {fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField} = logsUtils();
+    const { fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField } =
+      logsUtils();
 
     const {
       fetchQueryDataWithWebSocket,
@@ -911,6 +945,11 @@ export default defineComponent({
       };
     }> = ref({});
 
+    const pagination = ref({
+      page: 1,
+      rowsPerPage: 25,
+    });
+
     const streamTypes = [
       { label: t("search.logs"), value: "logs" },
       { label: t("search.enrichmentTables"), value: "enrichment_tables" },
@@ -960,9 +999,33 @@ export default defineComponent({
       searchObj.loadingStream = false;
     };
 
+    const fieldListRef = ref<HTMLElement | null>(null);
+
+    const scrollToTop = () => {
+      if (fieldListRef.value) {
+        // Find the scrollable container within the q-table
+        const scrollContainer = fieldListRef.value.querySelector(
+          ".q-table__middle.scroll",
+        );
+        if (scrollContainer) {
+          scrollContainer.scrollTop = 0;
+        }
+      }
+    };
+
+    const resetPagination = () => {
+      pagination.value.page = 1;
+
+      // Reset scroll position when changing tabs
+      nextTick(() => {
+        scrollToTop();
+      });
+    };
+
     watch(
       () => searchObj.meta.quickMode,
       (isActive) => {
+
         if (isActive) {
           // check if its present in the array dont add it again
           if (
@@ -976,7 +1039,6 @@ export default defineComponent({
               slot: "interesting_fields_slot",
             });
           }
-
           setDefaultFieldTab();
         } else {
           userDefinedSchemaBtnGroupOption.value =
@@ -985,8 +1047,13 @@ export default defineComponent({
             );
 
           if (searchObj.meta.useUserDefinedSchemas === "interesting_fields") {
+            // As we are changing the tab reset the pagination
+            if (pagination.value) resetPagination();
             searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
           }
+
+          if(showOnlyInterestingFields.value)if (pagination.value) resetPagination();
+          
           showOnlyInterestingFields.value = false;
         }
       },
@@ -1043,9 +1110,13 @@ export default defineComponent({
     // store.state.zoConfig.interesting_field_enabled was set as interesting fields was getting set by default with _timestamp field
     function setDefaultFieldTab() {
       if (store.state.zoConfig.log_page_default_field_list === "uds") {
+        // reset pagination only if tab has changed
+        if(searchObj.meta.useUserDefinedSchemas !== 'user_defined_schema') resetPagination();
         searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
         showOnlyInterestingFields.value = false;
       } else {
+        // reset pagination only if tab has changed
+        if(searchObj.meta.useUserDefinedSchemas !== 'interesting_fields') resetPagination();
         searchObj.meta.useUserDefinedSchemas = "interesting_fields";
         showOnlyInterestingFields.value = true;
       }
@@ -1066,6 +1137,9 @@ export default defineComponent({
           }
         }
       }
+      if(!filtered.length){
+        return [{name: "no-fields-found", label: "No matching fields found"}];
+      }
       return filtered;
     };
 
@@ -1082,7 +1156,7 @@ export default defineComponent({
         selectedFields.push(row.name);
       }
 
-      searchObj.data.stream.selectedFields = selectedFields;
+      searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || '_timestamp'));;
 
       searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;
@@ -1294,112 +1368,25 @@ export default defineComponent({
           if (query_context !== "") {
             query_context = query_context == undefined ? "" : query_context;
 
-            // Implement websocket based field values, check getQueryData in useLogs for websocket enabled
-            if (
-              isWebSocketEnabled(store.state) ||
-              isStreamingEnabled(store.state)
-            ) {
-              fetchValuesWithWebsocket({
-                fields: [name],
-                size: 10,
-                no_count: false,
-                regions: searchObj.meta.regions,
-                clusters: searchObj.meta.clusters,
-                vrl_fn: query_fn,
-                start_time: startISOTimestamp,
-                end_time: endISOTimestamp,
-                timeout: 30000,
-                stream_name: selectedStream,
-                stream_type: searchObj.data.stream.streamType,
-                use_cache: (window as any).use_cache ?? true,
-                sql:
-                  b64EncodeUnicode(
-                    query_context.replace("[INDEX_NAME]", selectedStream),
-                  ) || "",
-              });
-              continue;
-            }
-
-            //TODO : add comments for this in future
-            //for future reference
-            //values api using partition based api
-            let queryToBeSent = query_context.replace(
-              "[INDEX_NAME]",
-              selectedStream,
-            );
-
-            const response = await getValuesPartition(
-              startISOTimestamp,
-              endISOTimestamp,
-              name,
-              queryToBeSent,
-            );
-            const partitions: any = response?.data.partitions || [];
-
-            for (const partition of partitions) {
-              try {
-                //check if the field is opened because sometimes
-                // user might close the field before all the subsequent requests are completed
-                if (!openedFilterFields.value.includes(name)) {
-                  return;
-                }
-
-                const res: any = await streamService.fieldValues({
-                  org_identifier: store.state.selectedOrganization.identifier,
-                  stream_name: selectedStream,
-                  start_time: partition[0],
-                  end_time: partition[1],
-                  fields: [name],
-                  size: 10,
-                  query_context: b64EncodeUnicode(queryToBeSent) || "",
-                  query_fn: query_fn,
-                  action_id,
-                  type: searchObj.data.stream.streamType,
-                  clusters:
-                    Object.hasOwn(searchObj.meta, "clusters") &&
-                    searchObj.meta.clusters.length > 0
-                      ? searchObj.meta.clusters.join(",")
-                      : "",
-                  traceparent: generateTraceContext().traceId,
-                });
-
-                if (res.data.hits.length) {
-                  res.data.hits.forEach((item: any) => {
-                    item.values.forEach((subItem: any) => {
-                      const index = fieldValues.value[name]["values"].findIndex(
-                        (value: any) => value.key === subItem.zo_sql_key,
-                      );
-                      if (index !== -1) {
-                        fieldValues.value[name]["values"][index].count +=
-                          parseInt(subItem.zo_sql_num);
-                      } else {
-                        fieldValues.value[name]["values"].push({
-                          key: subItem.zo_sql_key,
-                          count: parseInt(subItem.zo_sql_num),
-                        });
-                      }
-                    });
-                  });
-
-                  if (fieldValues.value[name]["values"].length > 10) {
-                    fieldValues.value[name]["values"].sort(
-                      (a, b) => b.count - a.count,
-                    );
-                    fieldValues.value[name]["values"] = fieldValues.value[name][
-                      "values"
-                    ].slice(0, 10);
-                  }
-                }
-              } catch (err: any) {
-                console.error("Failed to fetch field values:", err);
-                fieldValues.value[name].errMsg = "Failed to fetch field values";
-              } finally {
-                countTotal--;
-                if (countTotal <= 0) {
-                  fieldValues.value[name].isLoading = false;
-                }
-              }
-            }
+            // Implement streaming based field values, check getQueryData in useLogs for streaming enabled
+            fetchValuesWithWebsocket({
+              fields: [name],
+              size: 10,
+              no_count: false,
+              regions: searchObj.meta.regions,
+              clusters: searchObj.meta.clusters,
+              vrl_fn: query_fn,
+              start_time: startISOTimestamp,
+              end_time: endISOTimestamp,
+              timeout: 30000,
+              stream_name: selectedStream,
+              stream_type: searchObj.data.stream.streamType,
+              use_cache: (window as any).use_cache ?? true,
+              sql:
+                b64EncodeUnicode(
+                  query_context.replace("[INDEX_NAME]", selectedStream),
+                ) || "",
+            });
           }
         }
 
@@ -1439,15 +1426,6 @@ export default defineComponent({
         });
       }
     };
-    //   const query = searchObj.meta.sqlMode
-    //     ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
-    //     : "";
-
-    //   searchObj.data.editorValue = query;
-    //   searchObj.data.query = query;
-
-    //   handleQueryData();
-    // };
 
     let fieldIndex: any = -1;
     const addToInterestingFieldList = (
@@ -1680,14 +1658,10 @@ export default defineComponent({
         ] + 1;
     };
 
-    const pagination = ref({
-      page: 1,
-      rowsPerPage: 25,
-    });
 
     const toggleSchema = async () => {
       // Reset pagination to page 1 before resetting fields
-      pagination.value.page = 1;
+      resetPagination();
 
       const isInterestingFields =
         searchObj.meta.useUserDefinedSchemas === "interesting_fields";
@@ -1699,12 +1673,12 @@ export default defineComponent({
       }
 
       await resetFields();
+      
     };
 
     const toggleInterestingFields = () => {
       // Reset pagination to page 1 before resetting fields
-      pagination.value.page = 1;
-
+      resetPagination();
       resetFields();
     };
 
@@ -1746,18 +1720,7 @@ export default defineComponent({
     };
 
     const initializeWebSocketConnection = (payload: any) => {
-      if (isWebSocketEnabled(store.state)) {
-        fetchQueryDataWithWebSocket(payload, {
-          open: sendSearchMessage,
-          close: handleSearchClose,
-          error: handleSearchError,
-          message: handleSearchResponse,
-          reset: handleSearchReset,
-        }) as string;
-        return;
-      }
-
-      if (isStreamingEnabled(store.state)) {
+      // if (isStreamingEnabled(store.state)) {
         fetchQueryDataWithHttpStream(payload, {
           data: handleSearchResponse,
           error: handleSearchError,
@@ -1765,7 +1728,7 @@ export default defineComponent({
           reset: handleSearchReset,
         });
         return;
-      }
+      // }
     };
 
     const sendSearchMessage = (queryReq: any) => {
@@ -1952,11 +1915,7 @@ export default defineComponent({
     const cancelFilterCreator = (row: any) => {
       //if it is websocker based then cancel the trace id
       //else cancel the further value api calls using the openedFilterFields
-      if (isWebSocketEnabled(store.state)) {
-        cancelTraceId(row.name);
-      } else {
-        cancelValueApi(row.name);
-      }
+      cancelValueApi(row.name);
     };
 
     const cancelTraceId = (field: string) => {
@@ -2037,6 +1996,7 @@ export default defineComponent({
       pagination,
       toggleSchema,
       toggleInterestingFields,
+      fieldListRef,
       streamFieldsRows: computed(() => {
         let expandKeys = Object.keys(
           searchObj.data.stream.expandGroupRows,
@@ -2078,7 +2038,6 @@ export default defineComponent({
           }
           count++;
         }
-        // console.log(JSON.parse(JSON.stringify(selectedStreamFields)));
         return selectedStreamFields;
       }),
       formatLargeNumber,
@@ -2115,4 +2074,29 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.indexlist-search-input {
+  height: 36px;
+  .q-field__control {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    padding: 0px 6px !important;
+    font-weight: 500;
+  }
+  .q-field__prepend {
+    height: 36px !important;
+    padding-bottom: 4px !important;
+  }
+  .q-field__append {
+    padding-top: 8px !important;
+  }
+
+  .q-icon {
+    height: 16px;
+    width: 16px;
+    margin-right: 10px;
+  }
+}
+</style>

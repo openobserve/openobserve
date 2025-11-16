@@ -26,6 +26,10 @@ use hashbrown::HashMap;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
+#[cfg(feature = "cloud")]
+use crate::service::ingestion::check_ingestion_allowed;
+// Re-export service graph API handlers
+pub use crate::service::traces::service_graph::{self, get_service_graph_metrics, get_store_stats};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -90,6 +94,20 @@ async fn handle_req(
     };
 
     let org_id = org_id.into_inner();
+
+    #[cfg(feature = "cloud")]
+    match check_ingestion_allowed(&org_id, StreamType::Traces, None).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
+    }
+
     let content_type = req
         .headers()
         .get("Content-Type")
@@ -171,6 +189,21 @@ pub async fn get_latest_traces(
     let cfg = get_config();
 
     let (org_id, stream_name) = path.into_inner();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+            use actix_http::StatusCode;
+
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
+    }
+
     let (http_span, trace_id) = if cfg.common.tracing_search_enabled {
         let uuid_v7_trace_id = config::ider::generate_trace_id();
         let span = tracing::info_span!(
@@ -336,6 +369,7 @@ pub async fn get_latest_traces(
         search_type: None,
         search_event_context: None,
         use_cache: default_use_cache(),
+        clear_cache: false,
         local_mode: None,
     };
 

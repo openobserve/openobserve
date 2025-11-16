@@ -18,8 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
     <div v-if="!showAddDialog" >
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
-      :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
       >
             <div
               class="q-table__title tw-font-[600]"
@@ -34,15 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 class="q-ml-auto no-border o2-search-input"
                 :placeholder="t('cipherKey.search')"
-                :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
               >
                 <template #prepend>
-                  <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                  <q-icon class="o2-search-input-icon" name="search" />
                 </template>
               </q-input>
               <q-btn
-                class="o2-primary-button q-ml-md tw-h-[36px]"
-                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                class="o2-primary-button q-ml-sm tw-h-[36px]"
                 no-caps
                 flat
                 :label="t(`cipherKey.add`)"
@@ -56,11 +53,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :pagination="pagination"
-        class="o2-quasar-table o2-quasar-table-header-sticky"
+        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
         :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;' 
+            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;' 
             : 'width: 100%'"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
       >
         <template #no-data><NoData /></template>
         <template v-slot:body-cell-actions="props">
@@ -399,7 +395,12 @@ export default defineComponent({
       if (!filterQuery.value) return tabledata.value || [];
       return filterData(tabledata.value || [], filterQuery.value);
     });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+    // Watch visibleRows to sync resultTotal with search filter
+    watch(visibleRows, (newVisibleRows) => {
+      resultTotal.value = newVisibleRows.length;
+    }, { immediate: true });
 
     return {
       t,

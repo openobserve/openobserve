@@ -1,12 +1,9 @@
 <template>
   <div
-    :class="
-      store.state.theme === 'dark'
-        ? 'dark-theme-history-page'
-        : 'light-theme-history-page'
-    "
+  class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs"
   >
-    <div class="flex tw-justify-between tw-items-center tw-h-[71px]">
+   <div class="">
+    <div class="flex tw-justify-between tw-items-center tw-h-[68px] card-container tw-mb-[0.625rem]">
       <div class="flex items-center q-py-sm q-pl-md">
         <div
           data-test="search-history-alert-back-btn"
@@ -69,8 +66,8 @@
         </div>
       </div>
     </div>
-
-    <div class="">
+   <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+      <div class=" tw-h-[calc(100vh-128px)] card-container">
         <q-table
           ref="qTable"
           dense
@@ -79,11 +76,10 @@
           :pagination.sync="pagination"
           row-key="trace_id"
           :rows-per-page-options="[]"
-          class="custom-table o2-quasar-table-header-sticky"
-          :class="store.state.theme == 'dark' ? ' o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-header-sticky-light'"
+          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           :sort-method="sortMethod"
           :wrap-cells="wrapText"
-          :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh - 118px); overflow-y: auto;' : ''"
+          :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh - 128px); overflow-y: auto;' : 'height: 0px'"
         >
           <template v-slot:body="props">
             <q-tr
@@ -247,6 +243,8 @@
         >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
+    </div>
+    </div>
     </div>
   </div>
 

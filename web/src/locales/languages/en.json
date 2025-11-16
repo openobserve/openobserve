@@ -18,6 +18,7 @@
     "condition": "Condition",
     "operator": "Operator",
     "value": "Value",
+    "filters": "Filters",
     "selectFilter": "Select Filter",
     "browser": "Browser",
     "attachments": "Attachments",
@@ -83,7 +84,8 @@
     "favourite": "Favorite",
     "refresh": "Refresh",
     "contactUs": "Contact Us",
-    "addFolder": "Add Folder"
+    "addFolder": "Add Folder",
+    "status": "Status"
   },
   "search": {
     "resetFields": "Reset selected table fields",
@@ -108,6 +110,7 @@
     "showQueryLabel": "Editors",
     "showFieldLabel": "Fields",
     "showHistogramLabel": "Histogram",
+    "showPatternsLabel": "Patterns",
     "sqlModeLabel": "SQL Mode",
     "quickModeLabel": "Quick Mode",
     "toggleFunctionLabel": "Function",
@@ -173,7 +176,32 @@
     "downloadCSV": "CSV",
     "downloadJSON": "JSON",
     "fileType": "File Type",
-    "showOnlyInterestingFields": "Interesting Fields"
+    "showOnlyInterestingFields": "Interesting Fields",
+    "explainQuery": "Explain Query",
+    "explainTooltip": "Show query execution plan",
+    "queryPlan": "Query Plan",
+    "analyze": "Analyze",
+    "analyzeTooltip": "Run query with execution metrics",
+    "analyzeResults": "Analyze Results",
+    "explainResults": "Explain Results",
+    "executionMetrics": "Execution Metrics",
+    "executionPlan": "Execution Plan",
+    "verbose": "Verbose",
+    "loadingPlan": "Loading query plan...",
+    "runningAnalyze": "Running analyze...",
+    "noPlanFound": "No query plan found",
+    "noAnalyzePlanFound": "No analyze plan found",
+    "errorFetchingPlan": "Error fetching query plan",
+    "errorRunningAnalyze": "Error running analyze",
+    "noLogicalPlan": "No logical plan available",
+    "noLogicalPlanAnalyze": "EXPLAIN ANALYZE only shows physical execution plan with metrics",
+    "noPhysicalPlan": "No physical plan available",
+    "executionSummary": "Execution Summary",
+    "logicalPlan": "Logical Plan",
+    "physicalPlan": "Physical Plan",
+    "totalTime": "Total Time",
+    "totalRows": "Total Rows",
+    "peakMemory": "Peak Memory"
   },
   "menu": {
     "home": "Home",
@@ -504,7 +532,7 @@
     "extendedEndDate": "End Date",
     "regexPatterns": "SDR",
     "envQuickModeMsg": "Environment quick mode field",
-    "sdr":"Sensitive Data Redaction"
+    "sdr": "Sensitive Data Redaction"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -530,7 +558,9 @@
     "edit": "Edit",
     "delete": "Delete",
     "view": "View",
-    "delay": "Delay"
+    "delay": "Delay",
+    "history": "Pipeline History",
+    "searchHistory": "Enter Pipeline Name"
   },
   "function": {
     "header": "Functions",
@@ -570,7 +600,7 @@
     "streamRouting": "Stream Routing",
     "testFunction": "Test Function",
     "errorDetails": "Error",
-    "function_definition":"Function Definition"
+    "function_definition": "Function Definition"
   },
   "confirmDialog": {
     "cancel": "Cancel",
@@ -1087,6 +1117,8 @@
     "email": "Email",
     "action": "Action",
     "all": "All",
+    "history": "Alert History",
+    "searcHistory": "Enter Alert Name",
     "deduplication": {
       "title": "Alert Deduplication",
       "subtitle": "Prevent duplicate alerts by configuring fingerprint-based deduplication.",
@@ -1108,6 +1140,51 @@
       "sendStrategyAll": "All",
       "groupWaitTime": "Group Wait Time (seconds)",
       "groupWaitTimeTooltip": "Time to wait and collect similar alerts before sending a grouped notification. Allows batching of alerts that occur in quick succession."
+    },
+    "noHistory": "No alert history found",
+    "totalEvaluations": "Total Evaluations",
+    "firingCount": "Firing Count",
+    "currentState": "Current State",
+    "lastEvaluation": "Last Evaluation",
+    "alertHistory": "Alert History",
+    "noHistoryData": "No alert history data available",
+    "avgEvaluationTime": "Avg Evaluation Time",
+    "successRate": "Success Rate",
+    "loadMore": "Load More",
+    "failedToFetchHistory": "Failed to fetch alert history",
+    "insights": {
+      "title": "Alert Insights",
+      "badge": "Interactive Analysis",
+      "tabs": {
+        "overview": "Overview",
+        "frequency": "Frequency & Dedup",
+        "correlation": "Errors & Storms Detection",
+        "quality": "Alert Quality"
+      },
+      "filters": {
+        "failedOnly": "Failed Only",
+        "failedOnlyTooltip": "Show only failed alert executions",
+        "silenced": "Silenced",
+        "silencedTooltip": "Show only silenced alerts",
+        "clearAll": "Clear All"
+      },
+      "tip": {
+        "title": "Tip:",
+        "message": "Right-click on charts to create filters. Zoom on timeline to filter by time range. Use toggles to filter by status."
+      },
+      "actions": {
+        "actionsFor": "Actions for:",
+        "configureDedup": "Configure Dedup",
+        "configureDedupTooltip": "Configure deduplication for this alert",
+        "editAlert": "Edit Alert",
+        "editAlertTooltip": "Edit alert configuration",
+        "viewHistory": "View History",
+        "viewHistoryTooltip": "View execution history for this alert"
+      },
+      "loading": {
+        "dashboardConfig": "Loading dashboard configuration...",
+        "refreshing": "Refreshing dashboard..."
+      }
     }
   },
   "alert_templates": {
@@ -1222,7 +1299,7 @@
     "allUsersAllowedMessage": "All users with email addresses ending in {domain} will be allowed to login.",
     "emailPlaceholder": "e.g. user{domain}",
     "addEmail": "Add Email",
-    "saveChanges": "Save Changes",
+    "saveChanges": "Save",
     "invalidDomain": "Please enter a valid domain name",
     "invalidEmail": "Please enter a valid email address for this domain",
     "domainAlreadyExists": "This domain has already been added",
@@ -1236,7 +1313,8 @@
     "domainNeedsEmails": "Domain '{domain}' must have at least one email address when not allowing all users",
     "domainSettingsSaved": "Domain settings saved successfully",
     "errorSavingDomainSettings": "Error saving domain settings",
-    "noDomainMessage": "No domains configured. Add domains above to restrict access."
+    "noDomainMessage": "No domains configured. Add domains above to restrict access.",
+    "license": "License"
   },
   "reports": {
     "header": "Reports",
@@ -1274,7 +1352,7 @@
     "status": "Status",
     "cancelQuery": "Cancel Query",
     "queryRange": "Query Range",
-    "refreshQuery": "Refresh Query",
+    "refreshQuery": "Refresh",
     "queryType": "Query Type",
     "numOfQueries": "Number of Queries",
     "totalDuration": "Total Exec. Duration",
@@ -1374,7 +1452,7 @@
     "searchRegion": "Search Region"
   },
   "regex_patterns": {
-    "title":"Sensitive Data Redaction",
+    "title": "Sensitive Data Redaction",
     "header": "Regex Patterns",
     "create_pattern": "Add Pattern",
     "search": "Search Pattern",
@@ -1387,14 +1465,30 @@
     "edit": "Edit",
     "delete": "Delete",
     "create_regex_pattern": "Create Pattern",
-    "create_close":"Create and Close",
-    "cancel":"Cancel",
+    "create_close": "Create and Close",
+    "cancel": "Cancel",
     "edit_regex_pattern": "Edit Pattern",
     "update_close": "Update and Close",
     "description": "Description",
     "create_regex_pattern_field": "Redact / Drop using Regex",
     "import": "Import",
     "import_title": "Import Pattern",
-    "bottom_header": "Pattern(s)"
+    "bottom_header": "Pattern(s)",
+    "filter_by_tag": "Filter by Tag",
+    "refresh": "Refresh",
+    "loading_patterns": "Loading patterns...",
+    "try_again": "Try Again",
+    "showing_patterns": "Showing {count} pattern(s)",
+    "preview": "Preview",
+    "no_patterns_found": "No patterns found",
+    "no_description": "No description available",
+    "tags": "Tags",
+    "rarity": "Rarity",
+    "valid_examples": "Valid Examples",
+    "close": "Close",
+    "import_this_pattern": "Import This Pattern",
+    "patterns_loaded": "Loaded {count} pattern(s)",
+    "failed_to_load": "Failed to load patterns",
+    "no_patterns_selected": "Please select at least one pattern"
   }
 }

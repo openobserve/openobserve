@@ -23,7 +23,7 @@ use config::{
     get_config,
     meta::{
         search::{ScanStats, StorageType},
-        stream::{FileKey, StreamParams, StreamPartition},
+        stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition},
     },
     utils::{
         async_file::{create_wal_dir_datetime_filter, scan_files_filtered},
@@ -31,7 +31,7 @@ use config::{
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
-        time::HOUR_MICRO_SECS,
+        time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
     },
 };
 use datafusion::{
@@ -40,7 +40,10 @@ use datafusion::{
 };
 use futures::StreamExt;
 use hashbrown::HashMap;
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    errors::{Error, ErrorCodes},
+    schema::unwrap_partition_time_level,
+};
 use ingester::WAL_PARQUET_METADATA;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
@@ -78,11 +81,14 @@ pub async fn search_parquet(
         infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
             .await
             .unwrap_or_default();
+    let partition_time_level =
+        unwrap_partition_time_level(stream_settings.partition_time_level, query.stream_type);
     let files = get_file_list(
         query.clone(),
         &stream_settings.partition_keys,
         query.time_range,
         search_partition_keys,
+        partition_time_level,
         snapshot_time,
     )
     .await?;
@@ -558,15 +564,15 @@ async fn get_file_list(
     partition_keys: &[StreamPartition],
     time_range: Option<(i64, i64)>,
     search_partition_keys: &[(String, String)],
+    partition_time_level: PartitionTimeLevel,
     snapshot_time: Option<i64>,
 ) -> Result<Vec<FileKey>, Error> {
     let wal_dir = match Path::new(&get_config().common.data_wal_dir).canonicalize() {
         Ok(path) => {
             let mut path = path.to_str().unwrap().to_string();
             // Hack for windows
-            if path.starts_with("\\\\?\\") {
-                path = path[4..].to_string();
-                path = path.replace('\\', "/");
+            if let Some(stripped) = path.strip_prefix("\\\\?\\") {
+                path = stripped.to_string().replace('\\', "/");
             }
             path
         }
@@ -581,8 +587,15 @@ async fn get_file_list(
         wal_dir, query.org_id, query.stream_type, query.stream_name
     );
     let files = if let Some((start_time, end_time)) = query.time_range.and_then(|(s, e)| {
-        let s = s - s % HOUR_MICRO_SECS;
-        let e = e - e % HOUR_MICRO_SECS;
+        let (s, e) = if partition_time_level == PartitionTimeLevel::Daily {
+            let s = s - s % DAY_MICRO_SECS;
+            let e = e - e % DAY_MICRO_SECS;
+            (s, e)
+        } else {
+            let s = s - s % HOUR_MICRO_SECS;
+            let e = e - e % HOUR_MICRO_SECS;
+            (s, e)
+        };
         DateTime::from_timestamp_micros(s).zip(DateTime::from_timestamp_micros(e))
     }) {
         let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();

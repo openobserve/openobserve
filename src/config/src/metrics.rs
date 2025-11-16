@@ -251,6 +251,23 @@ pub static INGEST_WAL_LOCK_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// pattern extraction timing metrics (enterprise feature)
+pub static PATTERN_EXTRACTION_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "pattern_extraction_time_seconds",
+            "Pattern extraction time in seconds",
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["organization", "phase"], // phase: read_parquet, extraction, ingestion, total
+    )
+    .expect("Metric created")
+});
+
 // querier memory cache stats
 pub static QUERY_MEMORY_CACHE_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -815,6 +832,24 @@ pub static NODE_MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static NODE_DISK_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_disk_total", "Total disk space")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static NODE_DISK_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_disk_usage", "Disk usage")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
 pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("node_tcp_connections", "TCP connections")
@@ -1168,6 +1203,9 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(INGEST_WAL_LOCK_TIME.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(PATTERN_EXTRACTION_TIME.clone()))
+        .expect("Metric registered");
 
     // querier stats
     registry
@@ -1329,6 +1367,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_MEMORY_USAGE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_DISK_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_DISK_USAGE.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_TCP_CONNECTIONS.clone()))

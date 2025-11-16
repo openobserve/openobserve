@@ -38,7 +38,7 @@ use crate::{
         ("Authorization" = [])
     ),
     request_body(
-        content = TimedAnnotationReq,
+        content = inline(TimedAnnotationReq),
         description = "Timed annotation request payload",
         content_type = "application/json",
     ),
@@ -157,7 +157,7 @@ pub async fn get_annotations(
         ("Authorization" = [])
     ),
     request_body(
-        content = TimedAnnotationDelete,
+        content = inline(TimedAnnotationDelete),
         description = "Timed annotation delete request payload",
         content_type = "application/json",
     ),
@@ -210,7 +210,7 @@ pub async fn delete_annotations(
         ("Authorization" = [])
     ),
     request_body(
-        content = TimedAnnotation,
+        content = inline(TimedAnnotation),
         description = "Timed annotation update request payload",
         content_type = "application/json",
     ),
@@ -267,7 +267,7 @@ pub async fn update_annotations(
         ("Authorization" = [])
     ),
     request_body(
-        content = Vec<String>,
+        content = inline(Vec<String>),
         description = "IDs of dashboard panels from which to remove the timed annotation",
         content_type = "application/json",
     ),

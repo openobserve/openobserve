@@ -20,7 +20,7 @@ use config::{
     meta::{
         self_reporting::{
             ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
-            usage::{ERROR_STREAM, TRIGGERS_USAGE_STREAM, TriggerData},
+            usage::{ERROR_STREAM, TRIGGERS_STREAM, TriggerData},
         },
         stream::{StreamParams, StreamType},
     },
@@ -40,9 +40,16 @@ pub(super) static ERROR_QUEUE: Lazy<Arc<ReportingQueue>> =
 
 fn initialize_usage_queue() -> ReportingQueue {
     let cfg = get_config();
+
+    // max usage reporting interval can be 10 mins, because we
+    // need relatively recent data for usage calculations
+    #[cfg(feature = "enterprise")]
+    let usage_publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
+    #[cfg(not(feature = "enterprise"))]
+    let usage_publish_interval = cfg.common.usage_publish_interval;
+
     let timeout = time::Duration::from_secs(
-        cfg.common
-            .usage_publish_interval
+        usage_publish_interval
             .try_into()
             .expect("Env ZO_USAGE_PUBLISH_INTERVAL invalid format. Should be set as integer"),
     );
@@ -68,9 +75,16 @@ fn initialize_usage_queue() -> ReportingQueue {
 
 fn initialize_error_queue() -> ReportingQueue {
     let cfg = get_config();
+
+    // max usage reporting interval can be 10 mins, because we
+    // need relatively recent data for usage calculations
+    #[cfg(feature = "enterprise")]
+    let usage_publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
+    #[cfg(not(feature = "enterprise"))]
+    let usage_publish_interval = cfg.common.usage_publish_interval;
+
     let timeout = time::Duration::from_secs(
-        cfg.common
-            .usage_publish_interval
+        usage_publish_interval
             .try_into()
             .expect("Env ZO_USAGE_PUBLISH_INTERVAL invalid format. Should be set as integer"),
     );
@@ -173,23 +187,39 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     }
 
     if !triggers.is_empty() {
-        let mut additional_reporting_orgs = if !cfg.common.additional_reporting_orgs.is_empty() {
-            cfg.common.additional_reporting_orgs.split(",").collect()
-        } else {
-            Vec::new()
-        };
-        additional_reporting_orgs.push(META_ORG_ID);
+        let mut additional_reporting_orgs: Vec<String> =
+            if !cfg.common.additional_reporting_orgs.is_empty() {
+                cfg.common
+                    .additional_reporting_orgs
+                    .split(",")
+                    .map(|s| s.to_string())
+                    .collect()
+            } else {
+                Vec::new()
+            };
+        additional_reporting_orgs.push(META_ORG_ID.to_string());
+
+        // If configured, automatically add each trigger's own org
+        if cfg.common.usage_report_to_own_org {
+            for trigger_json in &triggers {
+                if let Ok(trigger) = json::from_value::<TriggerData>(trigger_json.clone()) {
+                    additional_reporting_orgs.push(trigger.org.clone());
+                }
+            }
+        }
+
+        additional_reporting_orgs.sort();
         additional_reporting_orgs.dedup();
 
         let mut enqueued_on_failure = false;
 
-        for org in additional_reporting_orgs {
-            let trigger_stream = StreamParams::new(org, TRIGGERS_USAGE_STREAM, StreamType::Logs);
+        for org in &additional_reporting_orgs {
+            let trigger_stream = StreamParams::new(org, TRIGGERS_STREAM, StreamType::Logs);
 
             if super::ingestion::ingest_reporting_data(triggers.clone(), trigger_stream)
                 .await
                 .is_err()
-                && &cfg.common.usage_reporting_mode != "both"
+                && &cfg.common.usage_reporting_mode != "dual"
                 && !enqueued_on_failure
             {
                 // Only enqueue once on first failure , this brings risk that it may be duplicated

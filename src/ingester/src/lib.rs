@@ -41,8 +41,8 @@ use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
 pub use wal::collect_wal_parquet_metrics;
 pub use writer::{
-    Writer, check_memory_circuit_breaker, check_memtable_size, flush_all, get_writer,
-    read_from_memtable,
+    Writer, check_disk_circuit_breaker, check_memory_circuit_breaker, check_memtable_size,
+    flush_all, get_writer, read_from_memtable,
 };
 
 use crate::errors::OpenDirSnafu;
@@ -75,6 +75,36 @@ pub enum WriterSignal {
     Produce,
     Rotate,
     Close,
+}
+
+/// Pre-processed write batch ready for IO operations
+///
+/// This structure contains all data pre-processed and ready for direct IO,
+/// moving CPU-intensive work (JSON to Arrow conversion) out of the consume loop.
+pub struct ProcessedBatch {
+    /// Original entries for metadata
+    pub entries: Vec<Entry>,
+    /// Serialized bytes for WAL writing
+    pub bytes_entries: Vec<Vec<u8>>,
+    /// Arrow RecordBatch entries for Memtable writing
+    pub batch_entries: Vec<Arc<entry::RecordBatchEntry>>,
+    /// Total JSON size for rotation check
+    pub entries_json_size: usize,
+    /// Total Arrow size for rotation check
+    pub entries_arrow_size: usize,
+}
+
+impl ProcessedBatch {
+    /// Create an empty ProcessedBatch for control signals (Rotate, Close)
+    pub fn empty() -> Self {
+        Self {
+            entries: Vec::new(),
+            bytes_entries: Vec::new(),
+            batch_entries: Vec::new(),
+            entries_json_size: 0,
+            entries_arrow_size: 0,
+        }
+    }
 }
 
 pub async fn init() -> errors::Result<()> {

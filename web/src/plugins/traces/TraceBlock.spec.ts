@@ -217,57 +217,6 @@ describe("TraceBlock", () => {
     expect(timeElement.exists()).toBe(true);
   });
 
-  describe("Theme support", () => {
-    it("should apply light theme by default", () => {
-      const container = wrapper.find(".trace-container");
-      expect(container.classes()).not.toContain("dark");
-      
-      const header = wrapper.find(".flex.justify-between");
-      expect(header.classes()).toContain("bg-indigo-1");
-    });
-
-    it("should apply dark theme when store theme is dark", async () => {
-      const darkStore = createStore({
-        state: {
-          theme: "dark",
-          API_ENDPOINT: "http://localhost:8080",
-          zoConfig: {
-            timestamp_column: "@timestamp",
-          },
-          selectedOrganization: {
-            identifier: "test-org",
-          },
-          timezone: "UTC",
-        },
-      });
-
-      const darkWrapper = mount(TraceBlock, {
-        props: {
-          item: mockItem,
-          index: 0,
-        },
-        global: {
-          plugins: [i18n, router],
-          provide: {
-            store: darkStore,
-          },
-          mocks: {
-            useTraces: () => ({
-              searchObj: mockSearchObj,
-            }),
-          },
-        },
-      });
-
-      const container = darkWrapper.find(".trace-container");
-      expect(container.classes()).toContain("dark");
-      
-      const header = darkWrapper.find(".flex.justify-between");
-      expect(header.classes()).toContain("bg-grey-9");
-
-      darkWrapper.unmount();
-    });
-  });
 
   describe("Duration formatting", () => {
     it("should format duration in milliseconds", async () => {

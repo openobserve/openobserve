@@ -17,8 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit">
     <div v-if="!showImportTemplate && !showTemplateEditor" >
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
-      :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
       >
         <div class="q-table__title tw-font-[600]" data-test="alert-templates-list-title">
             {{ t("alert_templates.header") }}
@@ -30,15 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               class="q-ml-auto no-border o2-search-input"
               :placeholder="t('template.search')"
-              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
           <q-btn
-            class="o2-secondary-button q-ml-md tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            class="o2-secondary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`dashboard.import`)"
@@ -47,8 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             data-test="template-list-add-btn"
-            class="o2-primary-button q-ml-md tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            class="o2-primary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`alert_templates.add`)"
@@ -65,11 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 100%"
         :rows-per-page-options="[0]"
         :pagination="pagination"
-        class="o2-quasar-table o2-quasar-table-header-sticky"
+        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
         :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;' 
+            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
             : 'width: 100%'"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
       >
         <template #no-data>
           <NoData />
@@ -77,7 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
-              icon="download"
               title="Export Template"
               class="q-ml-xs"
               padding="sm"
@@ -85,33 +79,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
+              icon="download"
               @click.stop="exportTemplate(props.row)"
               data-test="destination-export"
-            ></q-btn>
+            >
+            </q-btn>
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-update-template`"
-              icon="edit"
               class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
               round
               flat
+              icon="edit"
               :title="t('alert_templates.edit')"
               @click="editTemplate(props.row)"
-            ></q-btn>
+            >
+            </q-btn>
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-delete-template`"
-              :icon="outlinedDelete"
               class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
               round
               flat
+              :icon="outlinedDelete"
               :title="t('alert_templates.delete')"
               @click="conformDeleteDestination(props.row)"
-            ></q-btn>
+            >
+            </q-btn>
           </q-td>
         </template>
         <template #bottom="scope">
@@ -434,6 +432,11 @@ const visibleRows = computed(() => {
   if (!filterQuery.value) return templates.value || [];
   return filterData(templates.value || [], filterQuery.value);
 });
-const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+// Watch visibleRows to sync resultTotal with search filter
+watch(visibleRows, (newVisibleRows) => {
+  resultTotal.value = newVisibleRows.length;
+}, { immediate: true });
 </script>
 <style lang=""></style>

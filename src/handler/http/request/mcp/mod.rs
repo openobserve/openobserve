@@ -18,7 +18,7 @@ use actix_web::{HttpResponse, get, post, web};
 use {
     actix_web::HttpRequest,
     futures_util::StreamExt,
-    o2_enterprise::enterprise::mcp::{
+    o2_enterprise::enterprise::ai::mcp::{
         MCPRequest, OAuthServerMetadata, handle_mcp_request, handle_mcp_request_stream,
     },
 };
@@ -43,7 +43,7 @@ fn mcp_only_in_enterprise() -> actix_web::Result<HttpResponse> {
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = MCPRequest, description = "MCP request payload", content_type = "application/json"),
+    request_body(content = inline(MCPRequest), description = "MCP request payload", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json"),
         (status = 500, description = "Internal Server Error"),
@@ -96,7 +96,10 @@ pub async fn handle_mcp_post(
         // Return single JSON response (fallback for simpler clients)
         let response = handle_mcp_request(mcp_request, auth_token)
             .await
-            .map_err(|e| actix_web::error::ErrorInternalServerError(format!("MCP error: {e}")))?;
+            .map_err(|e| {
+                log::error!("MCP handle_mcp_request error: {e}");
+                actix_web::error::ErrorInternalServerError(format!("MCP error: {e}"))
+            })?;
 
         Ok(HttpResponse::Ok()
             .content_type("application/json")
@@ -116,7 +119,7 @@ pub async fn handle_mcp_post(
     params(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
-    request_body(content = MCPRequest, description = "MCP request payload", content_type = "application/json"),
+    request_body(content = inline(MCPRequest), description = "MCP request payload", content_type = "application/json"),
     responses(
         (status = 200, description = "Success (Streaming)", content_type = "application/json"),
         (status = 500, description = "Internal Server Error"),

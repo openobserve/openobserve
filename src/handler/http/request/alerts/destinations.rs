@@ -53,7 +53,7 @@ impl From<DestinationError> for HttpResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
       ),
-    request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
+    request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),  
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -99,7 +99,7 @@ pub async fn save_destination(
         ("org_id" = String, Path, description = "Organization name"),
         ("destination_name" = String, Path, description = "Destination name"),
       ),
-    request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
+    request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),  
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -141,7 +141,7 @@ pub async fn update_destination(
         ("destination_name" = String, Path, description = "Destination name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Destination),
+        (status = 200, description = "Success",  content_type = "application/json", body = inline(Destination)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()), 
     ),
     extensions(
@@ -175,7 +175,7 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
         ("module" = Option<String>, Query, description = "Destination module filter, none, alert, or pipeline"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Destination>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Destination>)),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(

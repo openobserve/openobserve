@@ -13,39 +13,64 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::error::{DataFusionError, Result};
+use std::time::Duration;
+
+use datafusion::error::Result;
 
 use crate::service::promql::{
     common::calculate_trend,
-    value::{InstantValue, Sample, Value},
+    functions::RangeFunc,
+    value::{EvalContext, Sample, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#holt_winters
-pub(crate) fn holt_winters(data: Value, scaling_factor: f64, trend_factor: f64) -> Result<Value> {
-    let data = match data {
-        Value::Matrix(v) => v,
-        Value::None => return Ok(Value::None),
-        v => {
-            return Err(DataFusionError::Plan(format!(
-                "holt_winters: matrix argument expected got {}",
-                v.get_type()
-            )));
-        }
-    };
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn holt_winters(
+    data: Value,
+    scaling_factor: f64,
+    trend_factor: f64,
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] holt_winters() started",
+        eval_ctx.trace_id
+    );
+    let result = super::eval_range(
+        data,
+        HoltWintersFunc::new(scaling_factor, trend_factor),
+        eval_ctx,
+    );
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] holt_winters() execution took: {:?}",
+        eval_ctx.trace_id,
+        start.elapsed()
+    );
+    result
+}
 
-    let mut rate_values = Vec::with_capacity(data.len());
-    for mut metric in data {
-        let labels = std::mem::take(&mut metric.labels);
-        let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
-        if let Some(value) = holt_winters_calculation(&metric.samples, scaling_factor, trend_factor)
-        {
-            rate_values.push(InstantValue {
-                labels,
-                sample: Sample::new(eval_ts, value),
-            });
+pub struct HoltWintersFunc {
+    scaling_factor: f64,
+    trend_factor: f64,
+}
+
+impl HoltWintersFunc {
+    pub fn new(scaling_factor: f64, trend_factor: f64) -> Self {
+        HoltWintersFunc {
+            scaling_factor,
+            trend_factor,
         }
     }
-    Ok(Value::Vector(rate_values))
+}
+
+impl RangeFunc for HoltWintersFunc {
+    fn name(&self) -> &'static str {
+        "holt_winters"
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        holt_winters_calculation(samples, self.scaling_factor, self.trend_factor)
+    }
 }
 
 pub fn holt_winters_calculation(
@@ -85,6 +110,16 @@ mod tests {
     use super::*;
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
 
+    // Test helper
+    fn holt_winters_test_helper(
+        data: Value,
+        scaling_factor: f64,
+        trend_factor: f64,
+    ) -> Result<Value> {
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
+        holt_winters(data, scaling_factor, trend_factor, &eval_ctx)
+    }
+
     #[test]
     fn test_holt_winters_function() {
         // Create a range value with sample data
@@ -99,24 +134,24 @@ mod tests {
             samples,
             exemplars: None,
             time_window: Some(TimeWindow {
-                eval_ts: 3000,
                 range: Duration::from_secs(2),
                 offset: Duration::ZERO,
             }),
         };
 
         let matrix = Value::Matrix(vec![range_value]);
-        let result = holt_winters(matrix, 0.5, 0.3).unwrap();
+        let result = holt_winters_test_helper(matrix, 0.5, 0.3).unwrap();
 
-        // Should return a vector with holt-winters forecast
+        // Should return a matrix with holt-winters forecast
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 1);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert_eq!(m[0].samples.len(), 1);
                 // Should return a forecasted value
-                assert!(v[0].sample.value.is_finite());
-                assert_eq!(v[0].sample.timestamp, 3000);
+                assert!(m[0].samples[0].value.is_finite());
+                assert_eq!(m[0].samples[0].timestamp, 3000);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }

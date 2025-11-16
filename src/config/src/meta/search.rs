@@ -70,6 +70,8 @@ pub struct Request {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default = "default_use_cache")]
     pub use_cache: bool,
+    #[serde(default)]
+    pub clear_cache: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub local_mode: Option<bool>,
 }
@@ -237,6 +239,8 @@ pub struct Response {
     pub converted_histogram_query: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_histogram_eligible: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query_index: Option<usize>,
 }
 
 /// Iterator for Streaming response of search `Response`
@@ -404,6 +408,7 @@ impl Response {
             order_by_metadata: Vec::new(),
             converted_histogram_query: None,
             is_histogram_eligible: None,
+            query_index: None,
         }
     }
 
@@ -648,6 +653,7 @@ impl SearchHistoryRequest {
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
             use_cache: default_use_cache(),
+            clear_cache: false,
             local_mode: None,
         };
         Ok(search_req)
@@ -970,6 +976,16 @@ impl TryFrom<&str> for SearchEventType {
     }
 }
 
+impl SearchEventType {
+    /// Background tasks include: Alerts, Reports, and DerivedStream.
+    pub fn is_background(&self) -> bool {
+        matches!(
+            self,
+            Self::Alerts | Self::Reports | Self::DerivedStream | Self::SearchJob
+        )
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct ValuesEventContext {
@@ -1238,6 +1254,7 @@ impl MultiStreamRequest {
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
                 use_cache: default_use_cache(),
+                clear_cache: false,
                 local_mode: None,
             });
         }
@@ -1274,6 +1291,8 @@ pub struct ValuesRequest {
     pub timeout: Option<i64>,
     #[serde(default)]
     pub use_cache: bool,
+    #[serde(default)]
+    pub clear_cache: bool,
     pub stream_name: String,
     pub stream_type: StreamType,
     pub sql: String,
@@ -1738,6 +1757,23 @@ mod tests {
     }
 
     #[test]
+    fn test_search_event_type_is_background() {
+        // Background tasks
+        assert!(SearchEventType::Alerts.is_background());
+        assert!(SearchEventType::Reports.is_background());
+        assert!(SearchEventType::DerivedStream.is_background());
+        assert!(SearchEventType::SearchJob.is_background());
+
+        // Non-background tasks
+        assert!(!SearchEventType::UI.is_background());
+        assert!(!SearchEventType::Dashboards.is_background());
+        assert!(!SearchEventType::Values.is_background());
+        assert!(!SearchEventType::Other.is_background());
+        assert!(!SearchEventType::RUM.is_background());
+        assert!(!SearchEventType::Download.is_background());
+    }
+
+    #[test]
     fn test_search_event_context_builder_methods() {
         let alert_ctx = SearchEventContext::with_alert(Some("alert123".to_string()));
         assert_eq!(alert_ctx.alert_key, Some("alert123".to_string()));
@@ -2030,6 +2066,7 @@ mod tests {
             stream_name: "test_stream".to_string(),
             stream_type: StreamType::Logs,
             sql: "SELECT * FROM test".to_string(),
+            clear_cache: false,
         };
 
         assert_eq!(request.fields.len(), 2);
@@ -2403,6 +2440,9 @@ pub enum StreamResponses {
         message: String,
         error_detail: Option<String>,
     },
+    PatternExtractionResult {
+        patterns: json::Value,
+    },
     Done,
     Cancelled,
 }
@@ -2570,6 +2610,17 @@ impl StreamResponses {
             StreamResponses::Error { .. } => {
                 let data = serde_json::to_string(self).unwrap_or_default();
                 let bytes = format_event("error", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::PatternExtractionResult { patterns } => {
+                let data = serde_json::to_string(patterns).unwrap_or_else(|_| {
+                    log::error!("Failed to serialize pattern extraction result: {patterns:?}");
+                    String::new()
+                });
+                let bytes = format_event("pattern_extraction_result", &data);
                 StreamResponseChunks {
                     chunks_iter: None,
                     single_chunk: Some(Ok(bytes)),

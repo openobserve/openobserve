@@ -14,25 +14,71 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use datafusion::error::Result;
+use hashbrown::HashMap;
 use promql_parser::parser::LabelModifier;
-use rayon::prelude::*;
 
-use crate::service::promql::value::{InstantValue, Sample, Value};
+use crate::service::promql::{
+    aggregations::{Accumulate, AggFunc},
+    value::{EvalContext, Sample, Value},
+};
 
-pub fn count(timestamp: i64, param: &Option<LabelModifier>, data: Value) -> Result<Value> {
-    let score_values = super::eval_arithmetic(param, data, "count", |_prev, _val| 0.0)?;
-    if score_values.is_none() {
-        return Ok(Value::None);
+/// Aggregates Matrix input for range queries
+pub fn count(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    let (input_size, timestamps_count) = match &data {
+        Value::Matrix(m) => (m.len(), eval_ctx.timestamps().len()),
+        _ => (0, 0),
+    };
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] count() started with {input_size} series and {timestamps_count} timestamps",
+        eval_ctx.trace_id,
+    );
+
+    let result = super::eval_aggregate(param, data, Count, eval_ctx);
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] count() execution took: {:?}",
+        eval_ctx.trace_id,
+        start.elapsed()
+    );
+    result
+}
+
+pub struct Count;
+
+impl AggFunc for Count {
+    fn name(&self) -> &'static str {
+        "count"
     }
-    let values = score_values
-        .unwrap()
-        .into_par_iter()
-        .map(|(_, mut v)| InstantValue {
-            labels: std::mem::take(&mut v.labels),
-            sample: Sample::new(timestamp, v.num as _),
-        })
-        .collect();
-    Ok(Value::Vector(values))
+
+    fn build(&self) -> Box<dyn super::Accumulate> {
+        Box::new(CountAccumulate::new())
+    }
+}
+
+pub struct CountAccumulate {
+    count: HashMap<i64, usize>,
+}
+
+impl CountAccumulate {
+    fn new() -> Self {
+        CountAccumulate {
+            count: HashMap::new(),
+        }
+    }
+}
+
+impl Accumulate for CountAccumulate {
+    fn accumulate(&mut self, sample: &Sample) {
+        let entry = self.count.entry(sample.timestamp).or_insert(0);
+        *entry += 1;
+    }
+
+    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+        self.count
+            .into_iter()
+            .map(|(timestamp, count)| Sample::new(timestamp, count as f64))
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -40,13 +86,13 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::service::promql::value::{InstantValue, Label, Sample, Value};
+    use crate::service::promql::value::{Label, RangeValue, Sample, Value};
 
     #[test]
-    fn test_count_function() {
+    fn test_count_range_function() {
         let timestamp = 1640995200; // 2022-01-01 00:00:00 UTC
 
-        // Create test data with multiple samples
+        // Create test data with multiple samples as Matrix (range query format)
         let labels1 = vec![
             Arc::new(Label::new("instance", "server1")),
             Arc::new(Label::new("job", "node_exporter")),
@@ -57,34 +103,43 @@ mod tests {
             Arc::new(Label::new("job", "node_exporter")),
         ];
 
-        let data = Value::Vector(vec![
-            InstantValue {
+        let data = Value::Matrix(vec![
+            RangeValue {
                 labels: labels1.clone(),
-                sample: Sample::new(timestamp, 10.5),
+                samples: vec![Sample::new(timestamp, 10.5)],
+                exemplars: None,
+                time_window: None,
             },
-            InstantValue {
+            RangeValue {
                 labels: labels1.clone(),
-                sample: Sample::new(timestamp, 15.3),
+                samples: vec![Sample::new(timestamp, 15.3)],
+                exemplars: None,
+                time_window: None,
             },
-            InstantValue {
+            RangeValue {
                 labels: labels2.clone(),
-                sample: Sample::new(timestamp, 8.2),
+                samples: vec![Sample::new(timestamp, 8.2)],
+                exemplars: None,
+                time_window: None,
             },
         ]);
 
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+
         // Test count without label grouping - all samples should be counted together
-        let result = count(timestamp, &None, data.clone()).unwrap();
+        let result = count(&None, data.clone(), &eval_ctx).unwrap();
 
         match result {
-            Value::Vector(values) => {
-                assert_eq!(values.len(), 1);
+            Value::Matrix(matrix) => {
+                assert_eq!(matrix.len(), 1);
+                let series = &matrix[0];
                 // All samples are grouped together when no label modifier is provided
-                assert_eq!(values[0].sample.value, 3.0); // Count of 3 samples
-                assert_eq!(values[0].sample.timestamp, timestamp);
+                assert_eq!(series.samples[0].value, 3.0); // Count of 3 samples
+                assert_eq!(series.samples[0].timestamp, timestamp);
                 // Should have empty labels since all samples are grouped together
-                assert!(values[0].labels.is_empty());
+                assert!(series.labels.is_empty());
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }

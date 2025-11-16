@@ -26,6 +26,7 @@ bitvec.workspace = true
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
+chrono-tz.workspace = true
 cityhasher.workspace = true
 chromiumoxide.workspace = true
 cron.workspace = true
@@ -39,6 +40,8 @@ get_if_addrs.workspace = true
 gxhash = { version = "~3.4.1", optional = true }
 hashbrown.workspace = true
 hex.workspace = true
+itoa = "1.0"
+ryu = "1.0"
 indexmap.workspace = true
 itertools.workspace = true
 lettre.workspace = true

@@ -17,12 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="col column full-height" style="overflow: hidden !important; padding: 0 !important; margin: 0 !important; height: 100%;">
-    <div
-      class="search-list full-height full-width"
-      ref="searchListContainer"
-    >
-      <div class="row tw-min-h-[28px]">
+  <div
+    class="col column full-height"
+    style="
+      overflow: hidden !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      height: 100%;
+    "
+  >
+    <div class="search-list full-height full-width" ref="searchListContainer">
+      <div class="row tw-min-h-[28px] tw-pt-[0.375rem]">
         <div
           class="col-7 text-left q-pl-lg bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
@@ -32,10 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div
-          v-else
-          class="col-7 text-left q-pl-lg warning flex items-center"
-        >
+        <div v-else class="col-7 text-left q-pl-lg warning flex items-center">
           {{ noOfRecordsTitle }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
             <q-spinner-hourglass
@@ -48,7 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="center left"
               max-width="300px"
             >
-              <span class="search-loading-text">Fetching the search events</span>
+              <span class="search-loading-text"
+                >Fetching the search events</span
+              >
             </q-tooltip>
           </span>
           <div
@@ -65,7 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- {{ searchObj.data.histogram.errorMsg }} -->
-            <q-icon name="info" color="warning" size="sm"> </q-icon>
+            <q-icon name="info"
+color="warning" size="sm"> </q-icon>
             <q-tooltip position="top" class="tw-text-sm tw-font-semi-bold">
               {{ searchObj.data.histogram.errorMsg }}
             </q-tooltip>
@@ -74,7 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="col-5 text-right q-pr-sm q-gutter-xs pagination-block">
           <q-pagination
-            v-if="searchObj.meta.resultGrid.showPagination"
+            v-if="
+              searchObj.meta.resultGrid.showPagination &&
+              searchObj.meta.logsVisualizeToggle === 'logs'
+            "
             :disable="searchObj.loading == true"
             v-model="pageNumberInput"
             :key="
@@ -85,8 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :max="
               Math.max(
                 1,
-                (searchObj.communicationMethod === 'ws' ||
-                searchObj.communicationMethod === 'streaming' ||
+                (searchObj.communicationMethod === 'streaming' ||
                 searchObj.meta.jobId != ''
                   ? searchObj.data.queryResults?.pagination?.length
                   : searchObj.data.queryResults?.partitionDetail?.paginations
@@ -110,7 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-result-pagination"
           />
           <q-select
-            v-if="searchObj.meta.resultGrid.showPagination"
+            v-if="
+              searchObj.meta.resultGrid.showPagination &&
+              searchObj.meta.logsVisualizeToggle === 'logs'
+            "
             data-test="logs-search-result-records-per-page"
             v-model="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
@@ -125,7 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         :class="[
           'histogram-container',
-          searchObj.meta.showHistogram ? 'histogram-container--visible' : 'histogram-container--hidden'
+          searchObj.meta.showHistogram
+            ? 'histogram-container--visible'
+            : 'histogram-container--hidden',
         ]"
         v-if="
           searchObj.data?.histogram?.errorMsg == '' &&
@@ -154,7 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <h3 class="text-center">
             <span class="histogram-empty__message">
-              <q-icon name="warning" color="warning" size="xs"></q-icon> No data
+              <q-icon name="warning"
+color="warning" size="xs"></q-icon> No data
               found for histogram.</span
             >
           </h3>
@@ -167,14 +180,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <h3 class="text-center">
-            <span class="histogram-empty__message" style="color: transparent">.</span>
+            <span class="histogram-empty__message"
+style="color: transparent"
+              >.</span
+            >
           </h3>
         </div>
 
-        <div
-          class="q-pb-sm histogram-loader"
-          v-if="histogramLoader"
-        >
+        <div class="q-pb-sm histogram-loader" v-if="histogramLoader">
           <q-spinner-hourglass
             color="primary"
             size="25px"
@@ -183,6 +196,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
+        :class="[
+          'histogram-container',
+          searchObj.meta.showHistogram
+            ? 'histogram-container--visible'
+            : 'histogram-container--hidden',
+        ]"
         v-else-if="
           searchObj.data.histogram?.errorMsg != '' &&
           searchObj.meta.showHistogram &&
@@ -196,12 +215,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.histogram.errorCode != -1
           "
         >
-          <q-icon name="warning" color="warning" size="xs"></q-icon> Error while
+          <q-icon name="warning"
+color="warning" size="xs"></q-icon> Error while
           fetching histogram data.
           <q-btn
             @click="toggleErrorDetails"
             size="sm"
             data-test="logs-page-histogram-error-details-btn"
+            class="o2-secondary-button"
             >{{ t("search.histogramErrorBtnLabel") }}</q-btn
           ><br />
           <span v-if="disableMoreErrorDetails">
@@ -221,43 +242,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </h6>
       </div>
-      <tenstack-table
-        ref="searchTableRef"
-        :columns="getColumns || []"
-        :rows="searchObj.data.queryResults?.hits || []"
-        :wrap="searchObj.meta.toggleSourceWrap"
-        :width="getTableWidth"
-        :err-msg="searchObj.data.missingStreamMessage"
-        :loading="searchObj.loading"
-        :functionErrorMsg="searchObj?.data?.functionError"
-        :expandedRows="expandedLogs"
-        :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
-        :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
-        :highlight-query="
-          searchObj.meta.sqlMode
-            ? searchObj.data.query.toLowerCase().split('where')[1]
-            : searchObj.data.query.toLowerCase()
-        "
-        :default-columns="!searchObj.data.stream.selectedFields.length"
-        class="col-12"
+
+      <!-- Logs View -->
+      <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
+        <tenstack-table
+          ref="searchTableRef"
+          :columns="getColumns || []"
+          :rows="searchObj.data.queryResults?.hits || []"
+          :wrap="searchObj.meta.toggleSourceWrap"
+          :width="getTableWidth"
+          :err-msg="searchObj.data.missingStreamMessage"
+          :loading="searchObj.loading"
+          :functionErrorMsg="searchObj?.data?.functionError"
+          :expandedRows="expandedLogs"
+          :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
+          :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
+          :highlight-query="
+            searchObj.meta.sqlMode
+              ? searchObj.data.query.toLowerCase().split('where')[1]
+              : searchObj.data.query.toLowerCase()
+          "
+          :default-columns="!searchObj.data.stream.selectedFields.length"
+          class="col-12 tw-mt-[0.375rem]"
+          :class="[
+            !searchObj.meta.showHistogram ||
+            (searchObj.meta.showHistogram &&
+              searchObj.data.histogram.errorCode == -1)
+              ? 'table-container--without-histogram'
+              : 'table-container--with-histogram',
+          ]"
+          @update:columnSizes="handleColumnSizesUpdate"
+          @update:columnOrder="handleColumnOrderUpdate"
+          @copy="copyLogToClipboard"
+          @add-field-to-table="addFieldToTable"
+          @add-search-term="addSearchTerm"
+          @close-column="closeColumn"
+          @click:data-row="openLogDetails"
+          @expand-row="expandLog"
+          @send-to-ai-chat="sendToAiChat"
+          @view-trace="redirectToTraces"
+        />
+      </template>
+
+      <!-- Patterns View -->
+      <div
+        v-if="searchObj.meta.logsVisualizeToggle === 'patterns'"
+        class="tw-flex tw-flex-col"
         :class="[
           !searchObj.meta.showHistogram ||
           (searchObj.meta.showHistogram &&
             searchObj.data.histogram.errorCode == -1)
             ? 'table-container--without-histogram'
-            : 'table-container--with-histogram'
+            : 'table-container--with-histogram',
         ]"
-        @update:columnSizes="handleColumnSizesUpdate"
-        @update:columnOrder="handleColumnOrderUpdate"
-        @copy="copyLogToClipboard"
-        @add-field-to-table="addFieldToTable"
-        @add-search-term="addSearchTerm"
-        @close-column="closeColumn"
-        @click:data-row="openLogDetails"
-        @expand-row="expandLog"
-        @send-to-ai-chat="sendToAiChat"
-        @view-trace="redirectToTraces"
-      />
+      >
+        <!-- Statistics Bar -->
+        <PatternStatistics
+          v-if="patternsState?.patterns?.statistics"
+          :statistics="patternsState?.patterns?.statistics"
+          :scanSize="patternsState.scanSize"
+          @update:scanSize="patternsState.scanSize = $event"
+        />
+
+        <!-- Patterns List -->
+        <PatternList
+          :patterns="patternsState?.patterns?.patterns || []"
+          :loading="searchObj.loading"
+          :totalLogsAnalyzed="
+            patternsState?.patterns?.statistics?.total_logs_analyzed
+          "
+          @open-details="openPatternDetails"
+          @add-to-search="addPatternToSearch"
+        />
+      </div>
 
       <q-dialog
         data-test="logs-search-result-detail-dialog"
@@ -305,6 +362,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @closeTable="closeTable"
         />
       </q-dialog>
+
+      <!-- Pattern Details Drawer -->
+      <PatternDetailsDialog
+        v-model="showPatternDetails"
+        :selectedPattern="selectedPattern"
+        :totalPatterns="patternsState?.patterns?.patterns?.length || 0"
+        @navigate="navigatePatternDetail"
+      />
     </div>
   </div>
 </template>
@@ -318,25 +383,27 @@ import {
   onUpdated,
   defineAsyncComponent,
   watch,
+  nextTick,
 } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
-import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
-import {useSearchStream} from "@/composables/useLogs/useSearchStream";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import usePatterns from "@/composables/useLogs/usePatterns";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
-import TenstackTable from "./TenstackTable.vue";
 import { useSearchAround } from "@/composables/useLogs/searchAround";
 import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { searchState } from "@/composables/useLogs/searchState";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -347,6 +414,17 @@ export default defineComponent({
     ),
     SanitizedHtmlRenderer,
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
+    EqualIcon,
+    NotEqualIcon,
+    PatternStatistics: defineAsyncComponent(
+      () => import("./patterns/PatternStatistics.vue"),
+    ),
+    PatternList: defineAsyncComponent(
+      () => import("./patterns/PatternList.vue"),
+    ),
+    PatternDetailsDialog: defineAsyncComponent(
+      () => import("./patterns/PatternDetailsDialog.vue"),
+    ),
   },
   emits: [
     "update:scroll",
@@ -384,7 +462,6 @@ export default defineComponent({
       // If selected fields are empty, then we are setting colOrder to empty array as we
       // don't change the order of default columns
       // If you store the colOrder it will create issue when you save the view and load it again
-
       if (!this.searchObj.data.stream.selectedFields.length) {
         this.searchObj.data.resultGrid.colOrder[
           this.searchObj.data.stream.selectedStream
@@ -394,12 +471,12 @@ export default defineComponent({
           this.searchObj.data.stream.selectedStream
         ] = [...newColOrder];
 
-        if(newColOrder.length > 0){
+        if (newColOrder.length > 0) {
           this.searchObj.organizationIdentifier =
             this.store.state.selectedOrganization.identifier;
           let selectedFields = this.reorderSelectedFields();
 
-          this.searchObj.data.stream.selectedFields = selectedFields;
+          this.searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (this.store?.state?.zoConfig?.timestamp_column || '_timestamp'));
           this.updatedLocalLogFilterField();
         }
       }
@@ -431,10 +508,7 @@ export default defineComponent({
       } else if (actionType == "recordsPerPage") {
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
-        if (
-          this.searchObj.communicationMethod === "ws" ||
-          this.searchObj.communicationMethod === "streaming"
-        ) {
+        if (this.searchObj.communicationMethod === "streaming") {
           if (this.searchObj.meta.jobId == "") {
             this.refreshPagination();
           } else {
@@ -458,7 +532,6 @@ export default defineComponent({
           this.searchObj.data.queryResults.pagination = [];
         }
         const maxPages =
-          this.searchObj.communicationMethod === "ws" ||
           this.searchObj.communicationMethod === "streaming" ||
           this.searchObj.meta.jobId != ""
             ? this.searchObj.data.queryResults.pagination.length
@@ -493,7 +566,7 @@ export default defineComponent({
 
       selectedFields.splice(SFIndex, 1);
 
-      this.searchObj.data.stream.selectedFields = selectedFields;
+      this.searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (this.store?.state?.zoConfig?.timestamp_column || '_timestamp'));
 
       this.searchObj.organizationIdentifier =
         this.store.state.selectedOrganization.identifier;
@@ -527,21 +600,79 @@ export default defineComponent({
     const router = useRouter();
     const { searchAroundData } = useSearchAround();
     const { refreshPagination } = useSearchStream();
-    const { refreshPartitionPagination, refreshJobPagination } = usePagination();
+    const { refreshPartitionPagination, refreshJobPagination } =
+      usePagination();
     const { updatedLocalLogFilterField } = logsUtils();
     const { extractFTSFields, filterHitsColumns } = useStreamFields();
 
-    const {
-      reorderSelectedFields,
-      getFilterExpressionByFieldType,
-    } = useLogs();
+    const { reorderSelectedFields, getFilterExpressionByFieldType } = useLogs();
 
     const { searchObj } = searchState();
 
+    // Use separate patterns state (completely isolated from logs)
+    const { patternsState } = usePatterns();
+
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
+    const selectedPattern = ref(null);
+    const showPatternDetails = ref(false);
 
     const searchTableRef: any = ref(null);
+
+    const patternsColumns = [
+      {
+        accessorKey: "pattern_id",
+        header: "#",
+        id: "index",
+        size: 60,
+        cell: (info: any) => info.row.index + 1,
+        meta: {
+          closable: false,
+          showWrap: false,
+        },
+      },
+      {
+        accessorKey: "template",
+        header: "Pattern Template",
+        id: "template",
+        cell: (info: any) => info.getValue(),
+        size: 500,
+        meta: {
+          closable: false,
+          showWrap: true,
+        },
+      },
+      {
+        accessorKey: "frequency",
+        header: "Count",
+        id: "frequency",
+        size: 100,
+        cell: (info: any) =>
+          `${info.getValue()} (${info.row.original.percentage.toFixed(1)}%)`,
+        meta: {
+          closable: false,
+          showWrap: false,
+        },
+      },
+      {
+        accessorKey: "examples",
+        header: "Example Log",
+        id: "example",
+        size: 400,
+        cell: (info: any) => {
+          const examples = info.getValue();
+          if (examples && examples.length > 0) {
+            const msg = examples[0].log_message;
+            return msg.length > 200 ? msg.substring(0, 200) + "..." : msg;
+          }
+          return "";
+        },
+        meta: {
+          closable: false,
+          showWrap: false,
+        },
+      },
+    ];
 
     const plotChart: any = ref({});
 
@@ -552,6 +683,10 @@ export default defineComponent({
     onUpdated(() => {
       pageNumberInput.value = searchObj.data.resultGrid.currentPage;
     });
+
+    // Patterns are kept in memory when switching views and only cleared on explicit search
+    // This allows users to toggle between logs/patterns/visualize without losing pattern data
+
     const columnSizes = ref({});
 
     const reDrawChart = () => {
@@ -578,6 +713,102 @@ export default defineComponent({
     const openLogDetails = (props: any, index: number) => {
       searchObj.meta.showDetailTab = true;
       searchObj.meta.resultGrid.navigation.currentRowIndex = index;
+    };
+
+    const openPatternDetails = (pattern: any, index: number) => {
+      selectedPattern.value = { pattern, index };
+      showPatternDetails.value = true;
+    };
+
+    const navigatePatternDetail = (next: boolean, prev: boolean) => {
+      if (!selectedPattern.value) return;
+
+      const currentIndex = (selectedPattern.value as any).index;
+      const totalPatterns = patternsState.value.patterns?.patterns?.length || 0;
+
+      let newIndex = currentIndex;
+      if (next && currentIndex < totalPatterns - 1) {
+        newIndex = currentIndex + 1;
+      } else if (prev && currentIndex > 0) {
+        newIndex = currentIndex - 1;
+      }
+
+      if (newIndex !== currentIndex && patternsState.value.patterns?.patterns) {
+        const newPattern = patternsState.value.patterns.patterns[newIndex];
+        selectedPattern.value = { pattern: newPattern, index: newIndex };
+      }
+    };
+
+    // const sanitizeForMatchAll = (text: string): string => {
+    //   // Remove special characters that Tantivy's match_all doesn't handle well
+    //   // Keep only alphanumeric characters and spaces
+    //   // Replace multiple spaces with single space
+    //   return text
+    //     .replace(/[^\w\s]/g, ' ') // Replace special chars with space
+    //     .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
+    //     .trim();
+    // };
+
+    const extractConstantsFromPattern = (template: string): string[] => {
+      // Extract longest non-variable strings from pattern template
+      // Pattern template has format like: "INFO action <*> at 14:47.1755283"
+      // We want continuous strings between <*> that are longer than 10 chars
+      const constants: string[] = [];
+      const parts = template.split("<*>");
+
+      for (const part of parts) {
+        const trimmed = part.trim();
+        // For now, use the string as-is without sanitization
+        // const sanitized = sanitizeForMatchAll(trimmed);
+        // Only include strings longer than 10 characters
+        if (trimmed.length > 10) {
+          constants.push(trimmed);
+        }
+      }
+
+      return constants;
+    };
+
+    const addPatternToSearch = (
+      pattern: any,
+      action: "include" | "exclude",
+    ) => {
+      // Extract constants from pattern template
+      const constants = extractConstantsFromPattern(pattern.template);
+
+      if (constants.length === 0) {
+        $q.notify({
+          type: "warning",
+          message: "No strings longer than 10 characters found in pattern",
+          timeout: 2000,
+        });
+        return;
+      }
+
+      // Build multiple match_all() clauses, one for each constant
+      // Each match_all takes a single string
+      const matchAllClauses = constants.map((constant) => {
+        // Escape backslashes first, then single quotes in the constant
+        const escapedConstant = constant
+          .replace(/\\/g, "\\\\")
+          .replace(/'/g, "\\'");
+        return `match_all('${escapedConstant}')`;
+      });
+
+      // Combine with AND
+      let filterExpression = matchAllClauses.join(" AND ");
+
+      // For exclude action, wrap the entire expression in NOT (...)
+      if (action === "exclude") {
+        if (matchAllClauses.length > 1) {
+          filterExpression = `NOT (${filterExpression})`;
+        } else {
+          filterExpression = `NOT ${filterExpression}`;
+        }
+      }
+
+      // Set the filter to be added to the query
+      searchObj.data.stream.addToFilter = filterExpression;
     };
 
     const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
@@ -628,7 +859,7 @@ export default defineComponent({
           searchObj.data.stream.selectedFields.filter(
             (v: any) => v !== fieldName,
           );
-      } else {
+      } else if(fieldName !== (store?.state?.zoConfig?.timestamp_column || '_timestamp')) {
         searchObj.data.stream.selectedFields.push(fieldName);
       }
       searchObj.organizationIdentifier =
@@ -738,13 +969,26 @@ export default defineComponent({
         plotChart.value = {};
         searchObj.meta.resetPlotChart = false;
       }
-    });    
-    
+    });
+
+    // Debug watcher for patterns state
+    watch(
+      () => patternsState.value.patterns,
+      (newPatterns) => {
+        // console.log("[SearchResult] Patterns state changed:", {
+        //   hasPatterns: !!newPatterns,
+        //   patternCount: newPatterns?.patterns?.length || 0,
+        //   statistics: newPatterns?.statistics,
+        // });
+      },
+      { deep: true },
+    );
+
     const selectedStreamFullTextSearchKeys = computed(() => {
       const defaultFTSKeys = store?.state?.zoConfig?.default_fts_keys || [];
-      const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields.filter(
-        (field: string) => field.ftsKey
-      ).map((field: any) => field.name);
+      const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields
+        .filter((field: string) => field.ftsKey)
+        .map((field: any) => field.name);
       //merge default FTS keys with selected stream FTS keys
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
     });
@@ -754,6 +998,7 @@ export default defineComponent({
       store,
       plotChart,
       searchObj,
+      patternsState,
       updatedLocalLogFilterField,
       byString,
       searchTableRef,
@@ -795,7 +1040,14 @@ export default defineComponent({
       getSocketPaginations,
       resetPlotChart,
       columnSizes,
-      selectedStreamFullTextSearchKeys
+      selectedStreamFullTextSearchKeys,
+      patternsColumns,
+      selectedPattern,
+      showPatternDetails,
+      openPatternDetails,
+      navigatePatternDetail,
+      addPatternToSearch,
+      extractConstantsFromPattern,
     };
   },
   computed: {
@@ -833,6 +1085,5 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-@import '@/styles/logs/search-result.scss';
+@import "@/styles/logs/search-result.scss";
 </style>
-

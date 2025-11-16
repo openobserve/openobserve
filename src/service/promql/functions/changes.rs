@@ -13,23 +13,53 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use datafusion::error::Result;
 
-use crate::service::promql::value::{RangeValue, Value};
+use crate::service::promql::{
+    functions::RangeFunc,
+    value::{EvalContext, Sample, Value},
+};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#changes
-pub(crate) fn changes(data: Value) -> Result<Value> {
-    super::eval_idelta(data, "changes", exec, false)
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn changes(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] changes() started",
+        eval_ctx.trace_id
+    );
+    let result = super::eval_range(data, ChangesFunc::new(), eval_ctx);
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] changes() execution took: {:?}",
+        eval_ctx.trace_id,
+        start.elapsed()
+    );
+    result
 }
 
-fn exec(data: RangeValue) -> Option<f64> {
-    let changes = data
-        .samples
-        .iter()
-        .zip(data.samples.iter().skip(1))
-        .map(|(current, next)| (!current.value.eq(&next.value) as u32) as f64)
-        .sum();
-    Some(changes)
+pub struct ChangesFunc;
+
+impl ChangesFunc {
+    pub fn new() -> Self {
+        ChangesFunc {}
+    }
+}
+
+impl RangeFunc for ChangesFunc {
+    fn name(&self) -> &'static str {
+        "changes"
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        let changes = samples
+            .iter()
+            .zip(samples.iter().skip(1))
+            .map(|(current, next)| (!current.value.eq(&next.value) as u32) as f64)
+            .sum();
+        Some(changes)
+    }
 }
 
 #[cfg(test)]
@@ -38,6 +68,11 @@ mod tests {
 
     use super::*;
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+    // Test helper
+    fn changes_test_helper(data: Value) -> Result<Value> {
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
+        changes(data, &eval_ctx)
+    }
 
     #[test]
     fn test_changes_function() {
@@ -54,21 +89,21 @@ mod tests {
             samples,
             exemplars: None,
             time_window: Some(TimeWindow {
-                eval_ts: 4000,
                 range: Duration::from_secs(3),
                 offset: Duration::ZERO,
             }),
         };
 
         let matrix = Value::Matrix(vec![range_value]);
-        let result = changes(matrix).unwrap();
+        let result = changes_test_helper(matrix).unwrap();
 
-        // Should return a vector with number of changes
+        // Should return a matrix with number of changes
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 1);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert!(!m[0].samples.is_empty());
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }
