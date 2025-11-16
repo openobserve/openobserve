@@ -48,12 +48,24 @@ export default defineComponent({
       type: Object,
       default: () => ({}),
     },
+    tabId: {
+      type: String,
+      default: undefined,
+    },
+    panelId: {
+      type: String,
+      default: undefined,
+    },
   },
   setup(props): any {
     const store = useStore();
 
     const processedContent = computed(() => {
-      return processVariableContent(props.markdownContent, props.variablesData);
+      const context = {
+        tabId: props.tabId,
+        panelId: props.panelId,
+      };
+      return processVariableContent(props.markdownContent, props.variablesData, context);
     });
 
     return {

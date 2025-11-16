@@ -243,6 +243,7 @@ export const addPanel = async (
   panelData: any,
   folderId: any,
   tabId: any,
+  variablesToUpdate?: { variableNames: string[], newPanelId: string },
 ) => {
   try {
     // get the object of panel data
@@ -250,6 +251,21 @@ export const addPanel = async (
     // call the update dashboard function
 
     const currentDashboard = await getDashboard(store, dashboardId, folderId);
+
+    // Update variables if needed (for variables created from Add Panel that use "current_panel")
+    if (variablesToUpdate && variablesToUpdate.variableNames.length > 0) {
+      currentDashboard.variables?.list?.forEach((variable: any) => {
+        if (variablesToUpdate.variableNames.includes(variable.name)) {
+          // Check if variable has "current_panel" in panels array
+          if (variable.panels?.includes("current_panel")) {
+            // Replace "current_panel" with the actual panel ID
+            variable.panels = variable.panels.map((id: string) =>
+              id === "current_panel" ? variablesToUpdate.newPanelId : id,
+            );
+          }
+        }
+      });
+    }
 
     // find tab from tabId
     const tab = getTabDataFromTabId(currentDashboard, tabId);
