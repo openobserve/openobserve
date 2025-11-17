@@ -46,7 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           readonly
           data-test="dashboard-variable-constant-selector"
           @update:model-value="onVariablesValueUpdated(index)"
-         borderless hide-bottom-space></q-input>
+          borderless
+          hide-bottom-space
+        ></q-input>
       </div>
       <div v-else-if="item.type == 'textbox'">
         <q-input
@@ -59,7 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           data-test="dashboard-variable-textbox-selector"
           @update:model-value="onVariablesValueUpdated(index)"
-         borderless hide-bottom-space></q-input>
+          borderless
+          hide-bottom-space
+        ></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
         <VariableCustomValueSelector
@@ -368,11 +372,6 @@ export default defineComponent({
           response.content.percent === 100) ||
         response.type === "end"
       ) {
-        // If variable was never partially loaded (no data received), trigger partial loading
-        // This ensures child variables get loaded even when parent has no data
-        if (!variableObject.isVariablePartialLoaded) {
-          finalizePartialVariableLoading(variableObject, true);
-        }
         finalizeVariableLoading(variableObject, true);
         emitVariablesData();
         return;
@@ -1194,6 +1193,48 @@ export default defineComponent({
 
           const parentVariables =
             variablesDependencyGraph[name].parentVariables;
+
+          // Check if any parent has no data (empty options)
+          const hasParentWithNoData = parentVariables.some(
+            (parentName: string) => {
+              const parentVariable = variablesData.values.find(
+                (v: any) => v.name === parentName,
+              );
+
+              return (
+                parentVariable &&
+                (parentVariable.value === null ||
+                  parentVariable.value === undefined ||
+                  (Array.isArray(parentVariable.value) &&
+                    parentVariable.value.length === 0))
+              );
+            },
+          );
+
+          // If any parent has no data, skip API and set child value to null
+          if (hasParentWithNoData) {
+            variableLog(
+              variableObject.name,
+              `Parent variable has no data, skipping API call and resetting child value`,
+            );
+
+            // Reset the child variable value
+            resetVariableState(variableObject);
+            const nullValue = variableObject.multiSelect ? [] : null;
+            variableObject.value = nullValue;
+            variableObject.options = [];
+            variableObject.isLoading = false;
+            variableObject.isVariablePartialLoaded = true;
+            variableObject.isVariableLoadingPending = false;
+
+            // Update old variables data to reflect the reset
+            oldVariablesData[variableObject.name] = variableObject.value;
+
+            emitVariablesData();
+            resolve(true);
+            return;
+          }
+
           const areParentsReady = parentVariables.every(
             (parentName: string) => {
               const parentVariable = variablesData.values.find(
@@ -1205,11 +1246,13 @@ export default defineComponent({
                 `Parent variable readiness with parent ${JSON.stringify(parentVariable)}`,
               );
 
-              // Parent is ready if it's loaded, even if value is null/empty
-              // The query builder will replace null/empty with SELECT_ALL_VALUE
               const isReady =
                 parentVariable &&
-                parentVariable.isVariablePartialLoaded;
+                parentVariable.isVariablePartialLoaded &&
+                parentVariable.value !== null &&
+                parentVariable.value !== undefined &&
+                (!Array.isArray(parentVariable.value) ||
+                  parentVariable.value.length > 0);
 
               if (!isReady && parentVariable) {
                 // Reset this variable since parent is not ready
@@ -1237,45 +1280,6 @@ export default defineComponent({
             variableObject.isVariablePartialLoaded = false;
             variableObject.isVariableLoadingPending = true;
             resolve(false);
-            return;
-          }
-
-          // Check if any parent has null/empty value
-          const hasNullParent = parentVariables.some((parentName: string) => {
-            const parentVariable = variablesData.values.find(
-              (v: any) => v.name === parentName,
-            );
-            return (
-              parentVariable &&
-              (parentVariable.value === null ||
-                parentVariable.value === undefined ||
-                (Array.isArray(parentVariable.value) &&
-                  parentVariable.value.length === 0))
-            );
-          });
-
-          // If parent has null/empty value, skip API call and set child to null
-          if (hasNullParent) {
-            variableLog(
-              variableObject.name,
-              `Parent has null/empty value, skipping API call and setting value to null`,
-            );
-            // Set value to null/empty array based on multiSelect
-            const nullValue = variableObject.multiSelect ? [] : null;
-            variableObject.value = nullValue;
-            variableObject.options = [];
-            variableObject.isLoading = false;
-            variableObject.isVariablePartialLoaded = true;
-            variableObject.isVariableLoadingPending = false;
-
-            // Update oldVariablesData to track this null state
-            oldVariablesData[variableObject.name] = nullValue;
-
-            emitVariablesData();
-
-            // Trigger child variables to load
-            await finalizePartialVariableLoading(variableObject, true);
-            resolve(true);
             return;
           }
         }
@@ -1417,7 +1421,6 @@ export default defineComponent({
         : dummyQuery;
 
       // Replace variable placeholders with actual values
-      // For values API, we keep null/empty as-is 
       for (const variable of variablesData.values) {
         if (variable.isVariablePartialLoaded) {
           // Replace array values
@@ -1675,7 +1678,7 @@ export default defineComponent({
             `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
           );
           for (const childVariable of childVariableObjects) {
-              await loadSingleVariableDataByName(childVariable, false);
+            await loadSingleVariableDataByName(childVariable, false);
           }
         }
       } catch (error) {
