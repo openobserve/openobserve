@@ -634,9 +634,10 @@ mod meta_table_alerts {
         pub ignore_case: bool,
     }
 
-    #[derive(Deserialize, Serialize, Clone)]
+    #[derive(Deserialize, Serialize, Clone, Default)]
     pub enum Operator {
         #[serde(rename = "=")]
+        #[default]
         EqualTo,
         #[serde(rename = "!=")]
         NotEqualTo,
@@ -650,12 +651,6 @@ mod meta_table_alerts {
         LessThanEquals,
         Contains,
         NotContains,
-    }
-
-    impl Default for Operator {
-        fn default() -> Self {
-            Self::EqualTo
-        }
     }
 
     #[derive(Deserialize, Serialize, Clone)]

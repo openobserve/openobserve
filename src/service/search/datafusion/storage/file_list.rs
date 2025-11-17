@@ -15,20 +15,19 @@
 
 use chrono::{TimeZone, Utc};
 use config::meta::{bitvec::BitVec, stream::FileKey};
-use hashbrown::HashMap;
 use object_store::ObjectMeta;
 use once_cell::sync::Lazy;
-use parking_lot::RwLock;
+use scc::HashMap;
 
 use super::{ACCOUNT_SEPARATOR, TRACE_ID_SEPARATOR};
 
-type SegmentData = HashMap<String, BitVec>;
+type SegmentData = hashbrown::HashMap<String, BitVec>;
 
-static FILES: Lazy<RwLock<HashMap<String, Vec<ObjectMeta>>>> = Lazy::new(Default::default);
-static SEGMENTS: Lazy<RwLock<HashMap<String, SegmentData>>> = Lazy::new(Default::default);
+static FILES: Lazy<HashMap<String, Vec<ObjectMeta>>> = Lazy::new(Default::default);
+static SEGMENTS: Lazy<HashMap<String, SegmentData>> = Lazy::new(Default::default);
 
 pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
-    let data = match FILES.read().get(trace_id) {
+    let data = match FILES.read_sync(trace_id, |_, v| v.clone()) {
         Some(data) => data.clone(),
         None => return Err(anyhow::anyhow!("trace_id not found: {}", trace_id)),
     };
@@ -38,7 +37,7 @@ pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
 pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
     let key = format!("{trace_id}/schema={schema_key}");
     let mut values = Vec::with_capacity(files.len());
-    let mut segment_data = HashMap::new();
+    let mut segment_data = hashbrown::HashMap::new();
     for file in files {
         let modified = Utc.timestamp_nanos(file.meta.max_ts * 1000);
         let file_name = if file.account.is_empty() {
@@ -60,39 +59,25 @@ pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
             segment_data.insert(file.key.clone(), bin_data.clone());
         }
     }
-    FILES.write().insert(key.clone(), values);
-    SEGMENTS.write().insert(key, segment_data);
+    let _ = FILES.insert_async(key.clone(), values).await;
+    let _ = SEGMENTS.insert_async(key, segment_data).await;
 }
 
 pub fn clear(trace_id: &str) {
     // Remove all files for the given trace_id
-    let r = FILES.read();
-    let keys = r
-        .keys()
-        .filter(|x| x.starts_with(trace_id))
-        .cloned()
-        .collect::<Vec<_>>();
-    drop(r);
-    let mut w = FILES.write();
-    for key in keys.iter() {
-        w.remove(key);
-    }
-    w.shrink_to_fit();
-    drop(w);
-
-    // Remove all segment data for the given trace_id
-    // here we can reuse the keys, because they are the same
-    let mut w = SEGMENTS.write();
-    for key in keys.iter() {
-        w.remove(key);
-    }
-    w.shrink_to_fit();
-    drop(w);
+    FILES.retain_sync(|k, _| {
+        if k.starts_with(trace_id) {
+            SEGMENTS.remove_sync(k);
+            false
+        } else {
+            true
+        }
+    });
 }
 
 pub fn get_segment_ids(file_key: &str) -> Option<BitVec> {
     let (trace_id, filename) = file_key.split_once("/$$/")?;
-    let r = SEGMENTS.read();
-    let data = r.get(trace_id)?;
-    data.get(filename).cloned()
+    SEGMENTS
+        .get_sync(trace_id)
+        .and_then(|entry| entry.get().get(filename).cloned())
 }

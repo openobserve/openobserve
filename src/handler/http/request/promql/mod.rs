@@ -1017,15 +1017,19 @@ fn validate_metadata_params(
             }
         },
     };
-    let start = if start.is_none() || start.as_ref().unwrap().is_empty() {
+    let start = if let Some(start) = start
+        && !start.is_empty()
+    {
+        parse_str_to_timestamp_micros(&start).map_err(|e| e.to_string())?
+    } else {
         0
-    } else {
-        parse_str_to_timestamp_micros(&start.unwrap()).map_err(|e| e.to_string())?
     };
-    let end = if end.is_none() || end.as_ref().unwrap().is_empty() {
-        now_micros()
+    let end = if let Some(end) = end
+        && !end.is_empty()
+    {
+        parse_str_to_timestamp_micros(&end).map_err(|e| e.to_string())?
     } else {
-        parse_str_to_timestamp_micros(&end.unwrap()).map_err(|e| e.to_string())?
+        now_micros()
     };
     Ok((selector, start, end))
 }

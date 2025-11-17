@@ -596,9 +596,10 @@ pub struct Condition {
     pub ignore_case: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum Operator {
     #[serde(rename = "=")]
+    #[default]
     EqualTo,
     #[serde(rename = "!=")]
     NotEqualTo,
@@ -616,12 +617,6 @@ pub enum Operator {
     #[serde(rename = "not_contains")]
     #[serde(alias = "NotContains")]
     NotContains,
-}
-
-impl Default for Operator {
-    fn default() -> Self {
-        Self::EqualTo
-    }
 }
 
 impl std::fmt::Display for Operator {

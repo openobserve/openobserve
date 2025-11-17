@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #![feature(btree_cursors)]
-#![feature(btree_extract_if)]
 #![feature(variant_count)]
 
 #[cfg(feature = "enterprise")]

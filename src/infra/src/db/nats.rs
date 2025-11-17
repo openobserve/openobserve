@@ -289,8 +289,8 @@ impl super::Db for NatsDb {
         start_dt: Option<i64>,
     ) -> Result<()> {
         let local_key = key.to_string();
-        let key = if start_dt.is_some() {
-            format!("{}/{}", key, start_dt.unwrap())
+        let key = if let Some(start_dt) = start_dt {
+            format!("{}/{}", key, start_dt)
         } else {
             key.to_string()
         };
@@ -378,8 +378,8 @@ impl super::Db for NatsDb {
         } else {
             with_prefix
         };
-        let new_key = if start_dt.is_some() {
-            format!("{}/{}", new_key, start_dt.unwrap())
+        let new_key = if let Some(start_dt) = start_dt {
+            format!("{}/{}", new_key, start_dt)
         } else {
             new_key.to_string()
         };
