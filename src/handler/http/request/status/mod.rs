@@ -540,7 +540,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
-pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error> {
     use config::meta::user::UserRole;
 
     use crate::common::meta::user::AuthTokens;
