@@ -68,7 +68,7 @@ pub fn is_draining() -> bool {
     IS_INGESTER_DRAINING.load(Ordering::Acquire)
 }
 
-static WAL_DIR_DEFAULT_PREFIX: &str = "logs";
+pub static WAL_DIR_DEFAULT_PREFIX: &str = "logs";
 
 // writer signal
 pub enum WriterSignal {
