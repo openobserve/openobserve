@@ -59,7 +59,6 @@
               @click="removeColumnName"
               icon="close"
               :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
-              class="el-border"
             />
           </div>
           <div style="height: 100%">
@@ -118,7 +117,6 @@
                     <q-select
                       dense
                       borderless
-                      hide-bottom-space
                       v-model="condition.values"
                       :options="sortedFilteredListOptions"
                       :label="t('common.selectFilter')"
@@ -399,5 +397,13 @@ export default defineComponent({
   min-height: 23px !important;
   height: 23px !important;
   padding: 0px 0px 0px 0px !important;
+}
+
+:deep(.q-panel) {
+  overflow: visible !important;
+}
+
+:deep(.o2-custom-select-dashboard .q-field__bottom) {
+  padding-top: 8px !important;
 }
 </style>
