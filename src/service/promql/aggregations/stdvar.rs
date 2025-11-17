@@ -23,15 +23,10 @@ use crate::service::promql::{
     value::{EvalContext, Sample, Value},
 };
 
-/// Aggregates Matrix input for range queries
 pub fn stdvar(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
-    let (input_size, timestamps_count) = match &data {
-        Value::Matrix(m) => (m.len(), eval_ctx.timestamps().len()),
-        _ => (0, 0),
-    };
     log::info!(
-        "[trace_id: {}] [PromQL Timing] stdvar() started with {input_size} series and {timestamps_count} timestamps",
+        "[trace_id: {}] [PromQL Timing] stdvar() started",
         eval_ctx.trace_id,
     );
 
