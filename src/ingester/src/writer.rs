@@ -469,7 +469,7 @@ impl Writer {
         // Clear the heavy data field after conversion to avoid memory duplication
         // The JSON data is already in bytes_entries and Arrow format in batch_entries
         for entry in entries.iter_mut() {
-            entry.data.clear();
+            let _ = std::mem::take(&mut entry.data);
         }
 
         let _start_preprocess_batch_duration = _start_preprocess_batch.elapsed();
@@ -544,7 +544,7 @@ impl Writer {
         }
 
         let _start_consume_processed_duration = _start_consume_processed.elapsed();
-        if _start_consume_processed_duration.as_millis() > 100 {
+        if _start_consume_processed_duration.as_millis() > 500 {
             log::warn!("_start_consume_processed_duration: {_start_consume_processed_duration:?}");
         }
 
