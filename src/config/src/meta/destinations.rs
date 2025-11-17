@@ -148,21 +148,21 @@ impl HTTPOutputFormat {
         match self {
             Self::JSON => serde_json::to_vec(data).unwrap(),
             Self::NDJSON => data
-                .into_iter()
+                .iter()
                 .map(|x| x.as_ref().to_string())
                 .collect::<Vec<_>>()
                 .join("\n")
                 .into_bytes(),
             Self::NestedEvent => data
-                .into_iter()
+                .iter()
                 .map(|v| serde_json::json!({"event":v.as_ref()}).to_string())
                 .collect::<Vec<_>>()
                 .join("\n")
                 .into_bytes(),
             Self::ESBulk { index } => {
-                let expected_count = data.into_iter().count();
+                let expected_count = data.len();
                 let mut ret = Vec::with_capacity(expected_count * 2);
-                data.into_iter().for_each(|v| {
+                data.iter().for_each(|v| {
                     ret.push(serde_json::json!({ "index": { "_index": index } }).to_string());
                     ret.push(v.as_ref().to_string());
                 });
