@@ -31,7 +31,6 @@ use datafusion::{
         datatypes::{DataType, Schema},
     },
     error::{DataFusionError, Result},
-    functions_aggregate::min_max::max,
     physical_plan::{
         Partitioning, execute_stream_partitioned, expressions::Column, repartition::RepartitionExec,
     },
@@ -57,6 +56,8 @@ use crate::service::promql::{
     aggregations, binaries, functions, micros, rewrite::remove_filter_all, value::*,
 };
 type TokioResult = tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Sample>>, HashSet<i64>)>>;
+type TokioExemplarsResult =
+    tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Arc<Exemplar>>>, HashSet<i64>)>>;
 
 pub struct Engine {
     trace_id: String,
@@ -632,7 +633,7 @@ impl Engine {
             let query_exemplars = self.ctx.query_exemplars;
             let trace_id = self.trace_id.to_string();
             let task = tokio::time::timeout(Duration::from_secs(self.ctx.timeout), async move {
-                selector_load_data_from_datafusion_v2(
+                selector_load_data_from_datafusion(
                     &trace_id,
                     ctx,
                     schema,
@@ -1115,7 +1116,6 @@ impl Engine {
 }
 
 #[allow(clippy::too_many_arguments)]
-#[allow(dead_code)]
 async fn selector_load_data_from_datafusion(
     trace_id: &str,
     ctx: SessionContext,
@@ -1126,6 +1126,7 @@ async fn selector_load_data_from_datafusion(
     label_selector: &Option<HashSet<String>>,
     query_exemplars: bool,
 ) -> Result<HashMap<u64, RangeValue>> {
+    let start_time = std::time::Instant::now();
     let table_name = selector.name.as_ref().unwrap();
     let mut df_group = match ctx.table(table_name).await {
         Ok(v) => v.filter(
@@ -1172,456 +1173,13 @@ async fn selector_load_data_from_datafusion(
     let label_cols = label_cols.into_iter().map(col).collect::<Vec<_>>();
 
     // get hash & timestamp
-    let start_time = std::time::Instant::now();
-    let sub_batch = df_group
-        .clone()
-        .aggregate(
-            vec![col(HASH_LABEL)],
-            vec![max(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
-        )?
-        .collect()
-        .await?;
-
-    let hash_field_type = schema.field_with_name(HASH_LABEL).unwrap().data_type();
-    let (timestamp_values, hash_value_set): (HashSet<i64>, HashSet<u64>) =
-        if hash_field_type == &DataType::UInt64 {
-            sub_batch
-                .iter()
-                .flat_map(|batch| {
-                    let ts = batch
-                        .column_by_name(TIMESTAMP_COL_NAME)
-                        .unwrap()
-                        .as_any()
-                        .downcast_ref::<Int64Array>()
-                        .unwrap();
-                    let hash = batch
-                        .column_by_name(HASH_LABEL)
-                        .unwrap()
-                        .as_any()
-                        .downcast_ref::<UInt64Array>()
-                        .unwrap();
-                    ts.iter()
-                        .zip(hash.iter())
-                        .map(|(t, h)| (t.unwrap_or_default(), h.unwrap_or_default()))
-                })
-                .unzip()
-        } else {
-            sub_batch
-                .iter()
-                .flat_map(|batch| {
-                    let ts = batch
-                        .column_by_name(TIMESTAMP_COL_NAME)
-                        .unwrap()
-                        .as_any()
-                        .downcast_ref::<Int64Array>()
-                        .unwrap();
-                    let hash = batch
-                        .column_by_name(HASH_LABEL)
-                        .unwrap()
-                        .as_any()
-                        .downcast_ref::<StringArray>()
-                        .unwrap();
-                    ts.iter()
-                        .zip(hash.iter())
-                        .map(|(t, h)| (t.unwrap_or_default(), gxhash::new().sum64(h.unwrap_or(""))))
-                })
-                .unzip()
-        };
-    let timestamp_values = timestamp_values.into_iter().map(lit).collect::<Vec<_>>();
-
-    log::info!(
-        "[trace_id: {trace_id}] load hashing took: {:?}",
-        start_time.elapsed()
-    );
-
-    // get series
-    let series = df_group
-        .clone()
-        .filter(col(TIMESTAMP_COL_NAME).in_list(timestamp_values, false))?
-        .select(label_cols)?
-        .collect()
-        .await?;
-
-    let mut metrics: HashMap<u64, RangeValue> = HashMap::with_capacity(hash_value_set.len());
-    let mut labels = Vec::new();
-    for batch in series {
-        let columns = batch.columns();
-        let schema = batch.schema();
-        let fields = schema.fields();
-        let cols = fields
-            .iter()
-            .zip(columns)
-            .filter_map(|(field, col)| {
-                if field.name() == HASH_LABEL {
-                    None
-                } else {
-                    col.as_any()
-                        .downcast_ref::<StringArray>()
-                        .map(|col| (field.name(), col))
-                }
-            })
-            .collect::<Vec<(_, _)>>();
-        if hash_field_type == &DataType::UInt64 {
-            let hash_values = batch
-                .column_by_name(HASH_LABEL)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<UInt64Array>()
-                .unwrap();
-            for i in 0..batch.num_rows() {
-                let hash = hash_values.value(i);
-                if !hash_value_set.contains(&hash) {
-                    continue;
-                }
-                if metrics.contains_key(&hash) {
-                    continue;
-                }
-                labels.clear(); // reset and reuse the same vector
-                for (name, value) in cols.iter() {
-                    if value.is_null(i) {
-                        continue;
-                    }
-                    labels.push(Arc::new(Label {
-                        name: name.to_string(),
-                        value: value.value(i).to_string(),
-                    }));
-                }
-                metrics.insert(hash, RangeValue::new(labels.clone(), Vec::new()));
-            }
-        } else {
-            let hash_values = batch
-                .column_by_name(HASH_LABEL)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .unwrap();
-            for i in 0..batch.num_rows() {
-                let hash: u64 = gxhash::new().sum64(hash_values.value(i));
-                if !hash_value_set.contains(&hash) {
-                    continue;
-                }
-                if metrics.contains_key(&hash) {
-                    continue;
-                }
-                labels.clear(); // reset and reuse the same vector
-                for (name, value) in cols.iter() {
-                    if value.is_null(i) {
-                        continue;
-                    }
-                    labels.push(Arc::new(Label {
-                        name: name.to_string(),
-                        value: value.value(i).to_string(),
-                    }));
-                }
-                metrics.insert(hash, RangeValue::new(labels.clone(), Vec::new()));
-            }
-        }
-    }
-
-    log::info!(
-        "[trace_id: {trace_id}] load hashing and series took: {:?}",
-        start_time.elapsed()
-    );
-
-    // get values
-    if query_exemplars {
-        load_exemplars_from_datafusion(trace_id, hash_field_type, &mut metrics, df_group).await?;
-    } else {
-        load_samples_from_datafusion(trace_id, hash_field_type, &mut metrics, df_group).await?;
-    }
-
-    log::info!(
-        "[trace_id: {trace_id}] load data took: {:?}",
-        start_time.elapsed()
-    );
-
-    Ok(metrics)
-}
-
-#[allow(dead_code)]
-async fn load_samples_from_datafusion(
-    trace_id: &str,
-    hash_field_type: &DataType,
-    metrics: &mut HashMap<u64, RangeValue>,
-    df: DataFrame,
-) -> Result<()> {
-    let start_time = std::time::Instant::now();
-    let ctx = Arc::new(df.task_ctx());
-    let target_partitions = ctx.session_config().target_partitions();
-    let plan = df
-        .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?
-        .create_physical_plan()
-        .await?;
-    let schema = plan.schema();
-    let plan = Arc::new(RepartitionExec::try_new(
-        plan,
-        Partitioning::Hash(
-            vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
-            target_partitions,
-        ),
-    )?);
-    let streams = execute_stream_partitioned(plan, ctx)?;
-
-    let mut tasks = Vec::new();
-    for mut stream in streams {
-        let hash_field_type = hash_field_type.clone();
-        let mut series: HashMap<u64, Vec<Sample>> =
-            HashMap::with_capacity(metrics.len() * 2 / target_partitions);
-        let task: tokio::task::JoinHandle<Result<HashMap<u64, Vec<Sample>>>> =
-            tokio::task::spawn(async move {
-                loop {
-                    match stream.try_next().await {
-                        Ok(Some(batch)) => {
-                            let time_values = batch
-                                .column_by_name(TIMESTAMP_COL_NAME)
-                                .unwrap()
-                                .as_any()
-                                .downcast_ref::<Int64Array>()
-                                .unwrap();
-                            let value_values = batch
-                                .column_by_name(VALUE_LABEL)
-                                .unwrap()
-                                .as_any()
-                                .downcast_ref::<Float64Array>()
-                                .unwrap();
-                            if hash_field_type == DataType::UInt64 {
-                                let hash_values = batch
-                                    .column_by_name(HASH_LABEL)
-                                    .unwrap()
-                                    .as_any()
-                                    .downcast_ref::<UInt64Array>()
-                                    .unwrap();
-                                for i in 0..batch.num_rows() {
-                                    let hash: u64 = hash_values.value(i);
-                                    let entry = series.entry(hash).or_default();
-                                    entry.push(Sample::new(
-                                        time_values.value(i),
-                                        value_values.value(i),
-                                    ));
-                                }
-                            } else {
-                                let hash_values = batch
-                                    .column_by_name(HASH_LABEL)
-                                    .unwrap()
-                                    .as_any()
-                                    .downcast_ref::<StringArray>()
-                                    .unwrap();
-                                for i in 0..batch.num_rows() {
-                                    let hash: u64 = gxhash::new().sum64(hash_values.value(i));
-                                    let entry = series.entry(hash).or_default();
-                                    entry.push(Sample::new(
-                                        time_values.value(i),
-                                        value_values.value(i),
-                                    ));
-                                }
-                            }
-                        }
-                        Ok(None) => break,
-                        Err(e) => {
-                            log::error!("load samples from datafusion execute stream Error: {e}");
-                            return Err(e);
-                        }
-                    }
-                }
-                Ok(series)
-            });
-        tasks.push(task);
-    }
-
-    // collect results
-    for task in tasks {
-        let m = task
-            .await
-            .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        for (hash, samples) in m {
-            if let Some(range_val) = metrics.get_mut(&hash) {
-                range_val.samples = samples;
-            }
-        }
-    }
-
-    log::info!(
-        "[trace_id: {trace_id}] load samples from datafusion took: {:?}",
-        start_time.elapsed()
-    );
-
-    Ok(())
-}
-
-#[allow(dead_code)]
-async fn load_exemplars_from_datafusion(
-    trace_id: &str,
-    hash_field_type: &DataType,
-    metrics: &mut HashMap<u64, RangeValue>,
-    df: DataFrame,
-) -> Result<()> {
-    let start_time = std::time::Instant::now();
-    let ctx = Arc::new(df.task_ctx());
-    let target_partitions = ctx.session_config().target_partitions();
-    let plan = df
-        .filter(col(EXEMPLARS_LABEL).is_not_null())?
-        .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
-        .create_physical_plan()
-        .await?;
-    let schema = plan.schema();
-    let plan = Arc::new(RepartitionExec::try_new(
-        plan,
-        Partitioning::Hash(
-            vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
-            target_partitions,
-        ),
-    )?);
-    let streams = execute_stream_partitioned(plan, ctx)?;
-
-    let mut tasks = Vec::new();
-    for mut stream in streams {
-        let hash_field_type = hash_field_type.clone();
-        let mut series: HashMap<u64, Vec<Arc<Exemplar>>> =
-            HashMap::with_capacity(metrics.len() * 2 / target_partitions);
-        let task: tokio::task::JoinHandle<Result<HashMap<u64, Vec<Arc<Exemplar>>>>> =
-            tokio::task::spawn(async move {
-                loop {
-                    match stream.try_next().await {
-                        Ok(Some(batch)) => {
-                            let exemplars_values = batch
-                                .column_by_name(EXEMPLARS_LABEL)
-                                .unwrap()
-                                .as_any()
-                                .downcast_ref::<StringArray>()
-                                .unwrap();
-                            if hash_field_type == DataType::UInt64 {
-                                let hash_values = batch
-                                    .column_by_name(HASH_LABEL)
-                                    .unwrap()
-                                    .as_any()
-                                    .downcast_ref::<UInt64Array>()
-                                    .unwrap();
-                                for i in 0..batch.num_rows() {
-                                    let hash: u64 = hash_values.value(i);
-                                    let exemplar = exemplars_values.value(i);
-                                    if let Ok(exemplars) =
-                                        json::from_str::<Vec<json::Value>>(exemplar)
-                                    {
-                                        let entry = series.entry(hash).or_default();
-                                        for exemplar in exemplars {
-                                            if let Some(exemplar) = exemplar.as_object() {
-                                                entry.push(Arc::new(Exemplar::from(exemplar)));
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                let hash_values = batch
-                                    .column_by_name(HASH_LABEL)
-                                    .unwrap()
-                                    .as_any()
-                                    .downcast_ref::<StringArray>()
-                                    .unwrap();
-                                for i in 0..batch.num_rows() {
-                                    let hash: u64 = gxhash::new().sum64(hash_values.value(i));
-                                    let exemplar = exemplars_values.value(i);
-                                    if let Ok(exemplars) =
-                                        json::from_str::<Vec<json::Value>>(exemplar)
-                                    {
-                                        let entry = series.entry(hash).or_default();
-                                        for exemplar in exemplars {
-                                            if let Some(exemplar) = exemplar.as_object() {
-                                                entry.push(Arc::new(Exemplar::from(exemplar)));
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Ok(None) => break,
-                        Err(e) => {
-                            log::error!("load exemplars from datafusion execute stream Error: {e}");
-                            return Err(e);
-                        }
-                    }
-                }
-                Ok(series)
-            });
-        tasks.push(task);
-    }
-
-    // collect results
-    for task in tasks {
-        let m = task
-            .await
-            .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        for (hash, exemplars) in m {
-            if let Some(range_val) = metrics.get_mut(&hash) {
-                if range_val.exemplars.is_none() {
-                    range_val.exemplars = Some(vec![]);
-                }
-                range_val.exemplars = Some(exemplars);
-            }
-        }
-    }
-
-    log::info!(
-        "[trace_id: {trace_id}] load exemplars from datafusion took: {:?}",
-        start_time.elapsed()
-    );
-
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn selector_load_data_from_datafusion_v2(
-    trace_id: &str,
-    ctx: SessionContext,
-    schema: Arc<Schema>,
-    selector: VectorSelector,
-    start: i64,
-    end: i64,
-    label_selector: &Option<HashSet<String>>,
-    _query_exemplars: bool,
-) -> Result<HashMap<u64, RangeValue>> {
-    let start_time = std::time::Instant::now();
-    let table_name = selector.name.as_ref().unwrap();
-    let mut df_group = match ctx.table(table_name).await {
-        Ok(v) => v.filter(
-            col(TIMESTAMP_COL_NAME)
-                .gt(lit(start))
-                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
-        )?,
-        Err(_) => {
-            return Ok(HashMap::default());
-        }
-    };
-
-    df_group = apply_matchers(df_group, &schema, &selector.matchers)?;
-
-    match apply_label_selector(df_group, &schema, label_selector) {
-        Some(dataframe) => df_group = dataframe,
-        None => return Ok(HashMap::default()),
-    }
-
-    // get label columns
-    let mut label_cols = df_group
-        .schema()
-        .fields()
-        .iter()
-        .filter_map(|field| {
-            let name = field.name();
-            if name == TIMESTAMP_COL_NAME || name == VALUE_LABEL || name == EXEMPLARS_LABEL {
-                None
-            } else {
-                Some(name)
-            }
-        })
-        .collect::<Vec<_>>();
-    // sort labels to have a consistent order
-    label_cols.sort();
-    let label_cols = label_cols.into_iter().map(col).collect::<Vec<_>>();
-
-    // get hash & timestamp
     let start1 = std::time::Instant::now();
     let hash_field_type = schema.field_with_name(HASH_LABEL).unwrap().data_type();
-    let (mut metrics, timestamp_set) =
-        load_samples_from_datafusion_v2(hash_field_type, df_group.clone()).await?;
+    let (mut metrics, timestamp_set) = if query_exemplars {
+        load_exemplars_from_datafusion(hash_field_type, df_group.clone()).await?
+    } else {
+        load_samples_from_datafusion(hash_field_type, df_group.clone()).await?
+    };
 
     log::info!(
         "[trace_id: {trace_id}] load hashing and sample took: {:?}, metrics count: {}, timestamp count: {}",
@@ -1729,11 +1287,10 @@ async fn selector_load_data_from_datafusion_v2(
     Ok(metrics)
 }
 
-async fn load_samples_from_datafusion_v2(
+async fn load_samples_from_datafusion(
     hash_field_type: &DataType,
     df: DataFrame,
 ) -> Result<(HashMap<u64, RangeValue>, HashSet<i64>)> {
-    let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
     let ctx = Arc::new(df.task_ctx());
     let target_partitions = ctx.session_config().target_partitions();
     let plan = df
@@ -1819,6 +1376,7 @@ async fn load_samples_from_datafusion_v2(
 
     // collect results
     let mut all_unique_timestamps: HashSet<i64> = HashSet::new();
+    let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
     for task in tasks {
         let (m, timestamps) = task
             .await
@@ -1840,6 +1398,124 @@ async fn load_samples_from_datafusion_v2(
     Ok((metrics, all_unique_timestamps))
 }
 
+async fn load_exemplars_from_datafusion(
+    hash_field_type: &DataType,
+    df: DataFrame,
+) -> Result<(HashMap<u64, RangeValue>, HashSet<i64>)> {
+    let ctx = Arc::new(df.task_ctx());
+    let target_partitions = ctx.session_config().target_partitions();
+    let plan = df
+        .filter(col(EXEMPLARS_LABEL).is_not_null())?
+        .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
+        .create_physical_plan()
+        .await?;
+    let schema = plan.schema();
+    let plan = Arc::new(RepartitionExec::try_new(
+        plan,
+        Partitioning::Hash(
+            vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
+            target_partitions,
+        ),
+    )?);
+    let streams = execute_stream_partitioned(plan, ctx)?;
+
+    let mut tasks = Vec::new();
+    for mut stream in streams {
+        let hash_field_type = hash_field_type.clone();
+        let mut series: HashMap<u64, Vec<Arc<Exemplar>>> = HashMap::new();
+        let task: TokioExemplarsResult = tokio::task::spawn(async move {
+            loop {
+                match stream.try_next().await {
+                    Ok(Some(batch)) => {
+                        let exemplars_values = batch
+                            .column_by_name(EXEMPLARS_LABEL)
+                            .unwrap()
+                            .as_any()
+                            .downcast_ref::<StringArray>()
+                            .unwrap();
+                        if hash_field_type == DataType::UInt64 {
+                            let hash_values = batch
+                                .column_by_name(HASH_LABEL)
+                                .unwrap()
+                                .as_any()
+                                .downcast_ref::<UInt64Array>()
+                                .unwrap();
+                            for i in 0..batch.num_rows() {
+                                let hash: u64 = hash_values.value(i);
+                                let exemplar = exemplars_values.value(i);
+                                if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar)
+                                {
+                                    let entry = series.entry(hash).or_default();
+                                    for exemplar in exemplars {
+                                        if let Some(exemplar) = exemplar.as_object() {
+                                            entry.push(Arc::new(Exemplar::from(exemplar)));
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            let hash_values = batch
+                                .column_by_name(HASH_LABEL)
+                                .unwrap()
+                                .as_any()
+                                .downcast_ref::<StringArray>()
+                                .unwrap();
+                            for i in 0..batch.num_rows() {
+                                let hash: u64 = gxhash::new().sum64(hash_values.value(i));
+                                let exemplar = exemplars_values.value(i);
+                                if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar)
+                                {
+                                    let entry = series.entry(hash).or_default();
+                                    for exemplar in exemplars {
+                                        if let Some(exemplar) = exemplar.as_object() {
+                                            entry.push(Arc::new(Exemplar::from(exemplar)));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(e) => {
+                        log::error!("load exemplars from datafusion execute stream Error: {e}");
+                        return Err(e);
+                    }
+                }
+            }
+            let mut unique_timestamps: HashSet<i64> = HashSet::new();
+            for (_, samples) in &series {
+                if let Some(min_timestamp) = samples.iter().map(|s| s.timestamp).max() {
+                    unique_timestamps.insert(min_timestamp);
+                }
+            }
+            Ok((series, unique_timestamps))
+        });
+        tasks.push(task);
+    }
+
+    // collect results
+    let mut all_unique_timestamps: HashSet<i64> = HashSet::new();
+    let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
+    for task in tasks {
+        let (m, timestamps) = task
+            .await
+            .map_err(|e| DataFusionError::Execution(e.to_string()))??;
+        all_unique_timestamps.extend(timestamps);
+        for (hash, exemplars) in m {
+            metrics.insert(
+                hash,
+                RangeValue {
+                    labels: vec![],
+                    samples: vec![],
+                    exemplars: Some(exemplars),
+                    time_window: None,
+                },
+            );
+        }
+    }
+
+    Ok((metrics, all_unique_timestamps))
+}
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;

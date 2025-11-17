@@ -63,7 +63,6 @@ use {
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
     },
-    actix_web::HttpRequest,
 };
 
 use crate::{
