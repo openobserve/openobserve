@@ -153,7 +153,7 @@
                 <q-input
                   v-if="fields.args[argIndex]?.type === 'number'"
                   type="number"
-                  v-model="fields.args[argIndex].value"
+                  v-model.number="fields.args[argIndex].value"
                   placeholder="Enter number"
                   :required="isRequired(fields.functionName, argIndex)"
                   class="tw-w-52"
