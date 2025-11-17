@@ -190,7 +190,7 @@ async fn check_has_pending_files() -> bool {
     }
 
     // Also check if there are files being processed
-    let processing_count = PROCESSING_FILES.read().await.len();
+    let processing_count = PROCESSING_FILES.len();
     if processing_count > 0 {
         log::info!("[INGESTER:JOB] Still processing {} files", processing_count);
         return true;
