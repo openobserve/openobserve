@@ -243,11 +243,47 @@ jobs:
 
       - name: Check if this is a rerun
         id: check_rerun
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "::notice::GitHub run attempt: ${{ github.run_attempt }}"
           if [ "${{ github.run_attempt }}" -gt "1" ]; then
-            echo "is_rerun=true" >> $GITHUB_OUTPUT
-            echo "::notice::This is a rerun (attempt ${{ github.run_attempt }}). Will attempt to run only failed tests."
+            # Check if this is "re-run all" or "re-run failed only"
+            # Strategy: Check if ALL matrix jobs from attempt 1 have a new run_attempt value
+            # "Re-run all" → all jobs show run_attempt = current attempt
+            # "Re-run failed" → some jobs still show run_attempt = previous attempt (not re-executed)
+
+            echo "::group::Detecting rerun type (all jobs vs failed only)"
+
+            CURRENT_ATTEMPT=${{ github.run_attempt }}
+            JOB_NAME="e2e / ${{ matrix.testfolder }}"
+
+            # Get all jobs from the run (including old executions from previous attempts)
+            ALL_JOBS_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=all&per_page=100")
+
+            # Count unique matrix job names that have run_attempt = current attempt
+            CURRENT_ATTEMPT_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | .name] | unique | length")
+
+            # Count total unique matrix job names (from attempt 1)
+            TOTAL_MATRIX_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == 1) | .name] | unique | length")
+
+            echo "::notice::Total unique matrix job names: $TOTAL_MATRIX_JOBS"
+            echo "::notice::Jobs running in current attempt $CURRENT_ATTEMPT: $CURRENT_ATTEMPT_JOBS"
+
+            # If all matrix jobs are running in current attempt, it's "re-run all"
+            if [ "$CURRENT_ATTEMPT_JOBS" -eq "$TOTAL_MATRIX_JOBS" ]; then
+              echo "::notice::✅ DETECTED: Re-run ALL jobs (all $TOTAL_MATRIX_JOBS matrix jobs have run_attempt=$CURRENT_ATTEMPT)"
+              echo "is_rerun=false" >> $GITHUB_OUTPUT
+              echo "::notice::Will run ALL tests in this matrix job (no optimization)"
+            else
+              echo "::notice::✅ DETECTED: Re-run FAILED jobs only ($CURRENT_ATTEMPT_JOBS out of $TOTAL_MATRIX_JOBS jobs)"
+              echo "is_rerun=true" >> $GITHUB_OUTPUT
+              echo "::notice::Will attempt to run only failed tests (optimized rerun)"
+            fi
+
+            echo "::endgroup::"
           else
             echo "is_rerun=false" >> $GITHUB_OUTPUT
             echo "::notice::This is the first run. Will run all tests in matrix."
@@ -528,8 +564,47 @@ jobs:
           merge-multiple: true
 
       - name: Merge Reports
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           cd tests/ui-testing
+
+          # Check if directory exists and contains reports
+          if [ ! -d "all-blob-reports" ] || [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
+            echo "::warning::No blob reports found to merge."
+
+            # Investigate: Check if all test jobs succeeded (meaning they skipped intentionally)
+            # vs test jobs failed (meaning blob reporter might have failed)
+            echo "::group::Investigating why no blob reports exist"
+
+            JOBS_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/jobs")
+
+            # Count test matrix jobs by conclusion
+            SUCCEEDED=$(echo "$JOBS_RESPONSE" | jq -r '[.jobs[] | select(.name | startswith("e2e /")) | select(.conclusion == "success")] | length')
+            FAILED=$(echo "$JOBS_RESPONSE" | jq -r '[.jobs[] | select(.name | startswith("e2e /")) | select(.conclusion == "failure")] | length')
+            TOTAL=$(echo "$JOBS_RESPONSE" | jq -r '[.jobs[] | select(.name | startswith("e2e /"))] | length')
+
+            echo "::notice::Test job results: $SUCCEEDED succeeded, $FAILED failed, $TOTAL total"
+
+            if [ "$SUCCEEDED" -gt 0 ] && [ "$FAILED" -eq 0 ]; then
+              echo "::notice::✅ All test jobs succeeded - they likely skipped because tests already passed"
+              echo "::notice::This is VALID behavior for optimized reruns"
+              echo "::notice::Creating empty report structure for downstream jobs"
+              mkdir -p playwright-results/html-report
+              echo '{"config":{},"suites":[],"errors":[]}' > playwright-results/report.json
+              echo "<html><body><h1>No tests executed - all shards skipped</h1><p>All test shards exited early because tests had already passed in a previous attempt.</p></body></html>" > playwright-results/html-report/index.html
+              echo "::endgroup::"
+              exit 0
+            else
+              echo "::error::❌ Some/all test jobs failed but no blob reports were found"
+              echo "::error::This indicates a problem with test execution or blob reporter"
+              echo "::error::Failed jobs: $FAILED, Succeeded jobs: $SUCCEEDED"
+              echo "::endgroup::"
+              exit 1
+            fi
+          fi
 
           # Unset CI to use non-CI reporter config (html + json instead of blob)
           unset CI
