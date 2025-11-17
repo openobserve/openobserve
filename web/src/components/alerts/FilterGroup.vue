@@ -31,6 +31,7 @@
             @add-group="emit('add-group', $event)"
             @remove-group="emit('remove-group', $event)"
             :stream-fields="props.streamFields"
+            :condition-input-width="props.conditionInputWidth"
             @input:update="(name, field) => inputUpdate(name, field)"
           />
           <div
@@ -45,6 +46,7 @@
                 :index="index"
                 :label="group.label"
                 :depth="depth"
+                :input-width="props.conditionInputWidth"
             />
             <div class="tw-mb-1" v-if="!(index === 0 && depth === 0)">
                 <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
@@ -92,7 +94,7 @@
   </template>
   
   <script setup lang="ts">
-    import { computed, ref } from 'vue';
+    import { computed, ref, watch } from 'vue';
     import FilterCondition from './FilterCondition.vue';
     import { useStore } from 'vuex';
     import { getUUID } from '@/utils/zincutils';
@@ -101,7 +103,7 @@
     group: {
         type: Object,
         default: () => {
-          
+
         },
         required: true,
     },
@@ -114,7 +116,12 @@
         type: Number,
         default: 0,
         required: true,
-    },    
+    },
+    conditionInputWidth: {
+        type: String,
+        default: '',
+        required: false,
+    },
     });
   
   const emit = defineEmits<{
@@ -131,6 +138,12 @@
   const store = useStore();
 
   const label = ref(props.group.label);
+
+  // Watch for prop changes to keep groups in sync with parent
+  watch(() => props.group, (newGroup) => {
+    groups.value = newGroup;
+    label.value = newGroup.label;
+  }, { deep: true });
 
   const tabOptions = computed(() => [
     {

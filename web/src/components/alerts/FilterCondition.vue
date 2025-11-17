@@ -22,9 +22,11 @@
             hide-bottom-space
             :input-debounce="400"
             :placeholder="t('alerts.column')"
+            class="tw-mb-2"
             @filter="filterColumns"
             behavior="menu"
             :rules="[(val: any) => !!val || 'Field is required!']"
+            :class="inputWidth ? inputWidth : ''"
             @update:model-value="emits('input:update', 'conditions', condition)"
           >
           <q-tooltip v-if="condition.column && store.state.isAiChatEnabled">
@@ -45,7 +47,7 @@
             dense
             hide-bottom-space
             :rules="[(val: any) => !!val || 'Field is required!']"
-            :class="store.state.isAiChatEnabled ? 'tw-w-[70px]' : 'xl:tw-min-w-[200px] lg:tw-min-w-[90px] lg:tw-w-fit'"
+            :class="inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw-w-[70px]' : computedInputWidth)"
             @update:model-value="emits('input:update', 'conditions', condition)"
           >
           <q-tooltip v-if="condition.operator && store.state.isAiChatEnabled">
@@ -67,9 +69,8 @@
             dense
             hide-bottom-space
             :rules="[(val: any) => !!val || 'Field is required!']"
-            :class="store.state.isAiChatEnabled ? 'tw-w-[110px]' : 'xl:tw-min-w-[200px] lg:tw-w-fit lg:tw-min-w-[80px]'"
+            :class="inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw-w-[110px]' : computedValueWidth)"
             @update:model-value="emits('input:update', 'conditions', condition)"
-
           >
           <q-tooltip v-if="condition.value && store.state.isAiChatEnabled">
             {{ condition.value }}
@@ -105,6 +106,11 @@
         type: Number,
         default: 0,
         required: true,
+    },
+    inputWidth: {
+        type: String,
+        default: '',
+        required: false,
     },
     });
 
@@ -148,6 +154,16 @@ const computedLabel = computed(() => {
   return props.label;
 });
 
+const computedInputWidth = computed(() => {
+  // If custom width is provided, use it; otherwise use default responsive width
+  return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'xl:tw-min-w-[200px] lg:tw-min-w-[90px] lg:tw-w-fit');
+});
+
+const computedValueWidth = computed(() => {
+  // If custom width is provided, use it; otherwise use default responsive width
+  return props.inputWidth || (store.state.isAiChatEnabled ? 'tw-w-[110px]' : 'xl:tw-min-w-[200px] lg:tw-w-fit lg:tw-min-w-[80px]');
+});
+
 
 const filterColumns = (val: string, update: Function) => {
   if (val === "") {
@@ -164,6 +180,6 @@ const filterColumns = (val: string, update: Function) => {
 };
   </script>
 
-  <style > 
+  <style >
 </style>
   
