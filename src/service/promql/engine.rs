@@ -1236,7 +1236,6 @@ async fn selector_load_data_from_datafusion(
                 if hash_label_set.contains(&hash) {
                     continue;
                 }
-                let hash = hash_values.value(i);
                 labels.clear(); // reset and reuse the same vector
                 for (name, value) in cols.iter() {
                     if value.is_null(i) {
@@ -1274,7 +1273,10 @@ async fn selector_load_data_from_datafusion(
                         value: value.value(i).to_string(),
                     }));
                 }
-                metrics.insert(hash, RangeValue::new(labels.clone(), Vec::new()));
+                hash_label_set.insert(hash);
+                if let Some(range_val) = metrics.get_mut(&hash) {
+                    range_val.labels = labels.clone();
+                }
             }
         }
     }
