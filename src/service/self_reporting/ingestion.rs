@@ -180,26 +180,29 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
 
     if usage_reporting_mode != "remote" {
         let report_data = report_data
-            .iter()
-            .map(|usage| json::to_value(usage).unwrap())
+            .into_iter()
+            .map(|usage| json::to_value(usage).unwrap_or_default())
             .collect::<Vec<_>>();
         // report usage data
         let usage_stream = StreamParams::new(META_ORG_ID, USAGE_STREAM, StreamType::Logs);
-        if ingest_reporting_data(report_data, usage_stream)
-            .await
-            .is_err()
-            && usage_reporting_mode != "both"
-        {
-            // on error in ingesting usage data, push back the data
-            for usage_data in curr_usages {
-                if let Err(e) = super::queues::USAGE_QUEUE
-                    .enqueue(ReportingData::Usage(Box::new(usage_data)))
-                    .await
-                {
-                    log::error!(
-                        "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
-                    );
-                }
+        if let Err(e) = ingest_reporting_data(report_data, usage_stream).await {
+            log::error!(
+                "[SELF-REPORTING] Error in ingesting usage data to internal ingestion: {e}"
+            );
+            if cfg.common.usage_reporting_mode != "both" {
+                // on error in ingesting usage data, push back the data
+                tokio::spawn(async move {
+                    for usage_data in curr_usages {
+                        if let Err(e) = super::queues::USAGE_QUEUE
+                            .enqueue(ReportingData::Usage(Box::new(usage_data)))
+                            .await
+                        {
+                            log::error!(
+                                "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                            );
+                        }
+                    }
+                });
             }
         }
     }
