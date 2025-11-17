@@ -91,14 +91,23 @@
      </div>
         </div>
     </div>
+    <confirm-dialog
+      v-model="confirmDialog.show"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :warning-message="confirmDialog.warningMessage"
+      @update:ok="confirmDialog.okCallback"
+      @update:cancel="confirmDialog.show = false"
+    />
   </template>
-  
+
   <script setup lang="ts">
     import { computed, ref, watch } from 'vue';
     import FilterCondition from './FilterCondition.vue';
     import { useStore } from 'vuex';
     import { getUUID } from '@/utils/zincutils';
     import AppTabs from '../common/AppTabs.vue';
+    import ConfirmDialog from '@/components/ConfirmDialog.vue';
     const props = defineProps({
     group: {
         type: Object,
@@ -138,6 +147,14 @@
   const store = useStore();
 
   const label = ref(props.group.label);
+
+  const confirmDialog = ref({
+    show: false,
+    title: '',
+    message: '',
+    warningMessage: '',
+    okCallback: () => {},
+  });
 
   // Watch for prop changes to keep groups in sync with parent
   watch(() => props.group, (newGroup) => {
@@ -197,6 +214,34 @@
   };
 
   const removeCondition = (id: string) => {
+    // First, check what will happen after removing this condition
+    const itemsAfterRemoval = groups.value.items.filter((item: any) => item.id !== id);
+    const hasConditionsAfterRemoval = itemsAfterRemoval.some((item: any) => !isGroup(item));
+
+    // Count sub-groups that will be deleted
+    const subGroupCount = itemsAfterRemoval.filter((item: any) => isGroup(item)).length;
+
+    // If removing this condition will cause the group to be deleted (no conditions left)
+    // and there are sub-groups, show confirmation dialog
+    if (!hasConditionsAfterRemoval && subGroupCount > 0) {
+      confirmDialog.value = {
+        show: true,
+        title: 'Delete Condition',
+        message: 'Deleting this condition will remove the entire condition group.',
+        warningMessage: `This will also delete ${subGroupCount} sub-group${subGroupCount > 1 ? 's' : ''} nested under this group. This action cannot be undone.`,
+        okCallback: () => {
+          // User confirmed, proceed with deletion
+          performRemoveCondition(id);
+          confirmDialog.value.show = false;
+        },
+      };
+    } else {
+      // Safe to delete without confirmation
+      performRemoveCondition(id);
+    }
+  };
+
+  const performRemoveCondition = (id: string) => {
     groups.value.items = groups.value.items.filter((item: any) => item.id !== id);
 
     // Check if there are any conditions left (not sub-groups)
@@ -277,6 +322,7 @@ defineExpose({
   addGroup,
   toggleLabel,
   removeCondition,
+  performRemoveCondition,
   inputUpdate,
   hexToHSL,
   hslToCSS,
@@ -284,7 +330,8 @@ defineExpose({
   computedOpacity,
   groups,
   label,
-  isOpen
+  isOpen,
+  confirmDialog
 });
 
   </script>
