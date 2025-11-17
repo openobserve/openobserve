@@ -390,9 +390,8 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -418,9 +417,8 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -462,9 +460,8 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -492,9 +489,8 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -537,9 +533,8 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -567,9 +562,8 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -610,9 +604,8 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -640,9 +633,8 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -683,9 +675,8 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -714,9 +705,8 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -762,9 +752,8 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -790,9 +779,8 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -835,9 +823,8 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -866,9 +853,8 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -914,9 +900,8 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -943,9 +928,8 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -989,9 +973,8 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -1011,9 +994,8 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            None,
         );
 
         println!("partitions: {partitions:#?}");
@@ -1045,17 +1027,14 @@ mod enterprise_tests {
         let generator = PartitionGenerator::new(min_step, mini_partition_duration_secs, false);
         let step = 300000000; // 5 minutes
 
-        let interval = 3600000000;
-
         let partitions = generator.generate_partitions(
             start_time,
             end_time,
             step,
             OrderBy::Desc,
             true,
-            true,
-            interval,
             false,
+            None,
         );
 
         let mut expected_partitions = vec![
@@ -1073,9 +1052,8 @@ mod enterprise_tests {
             step,
             OrderBy::Asc,
             true,
-            true,
-            interval,
             false,
+            None,
         );
         expected_partitions.reverse();
         assert_eq!(partitions_asc, expected_partitions);
@@ -1094,17 +1072,14 @@ mod enterprise_tests {
         let generator = PartitionGenerator::new(min_step, mini_partition_duration_secs, false);
         let step = 300000000; // 5 minutes
 
-        let interval = 3600000000;
-
         let partitions = generator.generate_partitions(
             start_time,
             end_time,
             step,
             OrderBy::Desc,
             true,
-            true,
-            interval,
             false,
+            None,
         );
 
         // Verify no empty partitions exist
