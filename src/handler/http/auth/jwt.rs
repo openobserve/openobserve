@@ -141,7 +141,8 @@ pub async fn process_token(
         }
 
         // Assign users custom roles in RBAC
-        if openfga_cfg.map_group_to_role {
+        // Only use custom role mapping if we have custom roles to assign
+        if openfga_cfg.map_group_to_role && !custom_roles.is_empty() {
             map_group_to_custom_role(&user_email, &name, custom_roles, res.0.user_role).await;
             return Ok(None);
         }
@@ -448,16 +449,33 @@ async fn map_group_to_custom_role(
             })
             .collect();
 
-        // Create only custom organizations (not default org)
-        for org_name in custom_orgs.keys() {
-            let _ = organization::check_and_create_org(org_name).await;
+        // If custom_orgs is empty, create default org; otherwise create only custom organizations
+        if custom_orgs.is_empty() {
+            let _ = organization::check_and_create_org(&dex_cfg.default_org).await;
+        } else {
+            for org_name in custom_orgs.keys() {
+                let _ = organization::check_and_create_org(org_name).await;
+            }
         }
 
         if openfga_cfg.enabled {
-            // Only add user to custom orgs, NOT default org
-            // Custom orgs take precedence over default org
-            for org_name in custom_orgs.keys() {
-                get_add_user_to_org_tuples(org_name, user_email, &role.to_string(), &mut tuples);
+            // Add user to custom orgs if they exist, otherwise to default org
+            if custom_orgs.is_empty() {
+                get_add_user_to_org_tuples(
+                    &dex_cfg.default_org,
+                    user_email,
+                    &role.to_string(),
+                    &mut tuples,
+                );
+            } else {
+                for org_name in custom_orgs.keys() {
+                    get_add_user_to_org_tuples(
+                        org_name,
+                        user_email,
+                        &role.to_string(),
+                        &mut tuples,
+                    );
+                }
             }
 
             // this check added to avoid service accounts from logging in
@@ -496,18 +514,29 @@ async fn map_group_to_custom_role(
             }
         }
 
-        // Build organizations list from custom roles ONLY
-        // User has default role in DB for all custom orgs (not default org)
+        // Build organizations list
+        // If custom orgs exist, use them with default role in DB
+        // Otherwise, use default org with default role
         let mut organizations = Vec::new();
 
-        // Add each custom org to organizations list with default role
-        for org_name in custom_orgs.keys() {
+        if custom_orgs.is_empty() {
+            // No custom orgs, add default org
             organizations.push(UserOrg {
                 role: role.clone(),
-                name: org_name.clone(),
+                name: dex_cfg.default_org.clone(),
                 token: Default::default(),
                 rum_token: Default::default(),
             });
+        } else {
+            // Add each custom org to organizations list with default role
+            for org_name in custom_orgs.keys() {
+                organizations.push(UserOrg {
+                    role: role.clone(),
+                    name: org_name.clone(),
+                    token: Default::default(),
+                    rum_token: Default::default(),
+                });
+            }
         }
 
         let updated_db_user = DBUser {
