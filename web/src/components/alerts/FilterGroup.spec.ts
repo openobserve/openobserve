@@ -1890,6 +1890,101 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
     });
   });
 
+  describe('disableFirstCondition Prop', () => {
+    it('should have false as default for disableFirstCondition', () => {
+      const wrapper = mount(FilterGroup, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.props('disableFirstCondition')).toBe(true);
+    });
+
+    it('should accept disableFirstCondition prop as true', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          disableFirstCondition: true
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.props('disableFirstCondition')).toBe(true);
+    });
+
+    it('should show delete button for first condition when disableFirstCondition is false', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          disableFirstCondition: false
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // With disableFirstCondition=false, delete button should be visible
+      const deleteButtons = wrapper.findAll('[data-test="alert-conditions-delete-condition-btn"]');
+      expect(deleteButtons.length).toBeGreaterThan(0);
+    });
+
+    it('should hide delete button for first condition of root group when disableFirstCondition is true', () => {
+      const multiItemProps = {
+        ...defaultProps,
+        disableFirstCondition: true,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'item-1', column: 'field1', operator: '=', value: 'test1' },
+            { id: 'item-2', column: 'field2', operator: '=', value: 'test2' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: multiItemProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // First condition should not have delete button
+      // Second condition should have delete button
+      const deleteButtons = wrapper.findAll('[data-test="alert-conditions-delete-condition-btn"]');
+      // Should have 1 delete button (for the second condition only)
+      expect(deleteButtons.length).toBe(1);
+    });
+  });
+
   describe('Edge Cases', () => {
     it('should handle empty streamFields', () => {
       const emptyFieldsProps = {
