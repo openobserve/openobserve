@@ -177,16 +177,19 @@ pub(crate) fn eval_aggregate<F>(
 where
     F: AggFunc,
 {
-    let start = std::time::Instant::now();
     let func_name = func.name();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) started",
-        eval_ctx.trace_id,
-    );
+    let trace_id = &eval_ctx.trace_id;
+    log::info!("[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) started");
 
     // Handle Matrix input for range queries
     let matrix = match data {
-        Value::Matrix(m) => m,
+        Value::Matrix(m) => {
+            log::info!(
+                "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) started with {} series",
+                m.len()
+            );
+            m
+        }
         Value::None => return Ok(Value::None),
         _ => {
             return Err(DataFusionError::Plan(format!(
@@ -202,33 +205,14 @@ where
     // Use the eval timestamps from the context to ensure consistent alignment
     let eval_timestamps = eval_ctx.timestamps();
     let eval_timestamps: hashbrown::HashSet<i64> = eval_timestamps.iter().cloned().collect();
-
-    if eval_timestamps.is_empty() {
-        return Ok(Value::None);
-    }
-
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) processing {} time points",
-        eval_ctx.trace_id,
+        "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) processing {} time points",
         eval_timestamps.len()
     );
 
-    // For each eval timestamp, aggregate across all series
-    // Parallelize processing using query_thread_num
-    let cfg = config::get_config();
-    let thread_num = cfg.limit.query_thread_num;
-    let chunk_size = (eval_timestamps.len() / thread_num).max(1);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) using {} threads with chunk_size {}",
-        eval_ctx.trace_id,
-        thread_num,
-        chunk_size
-    );
-
-    let start1 = std::time::Instant::now();
-
     // Step 1: Compute label hash for each series once based on param
     // This avoids recomputing the hash for every timestamp
+    let start1 = std::time::Instant::now();
     let series_label_hashes: Vec<(u64, Labels)> = matrix
         .iter()
         .map(|rv| {
@@ -247,34 +231,30 @@ where
         .collect();
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) computed label hashes in {:?}",
-        eval_ctx.trace_id,
+        "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) computed label hashes in {:?}",
         start1.elapsed()
     );
 
-    let start2 = std::time::Instant::now();
-
     // Step 2: Group series indices by their label hash
     // Build index: label_hash -> Vec<series_idx>
+    let start2 = std::time::Instant::now();
     let mut groups: HashMap<u64, Vec<usize>> = HashMap::new();
     for (series_idx, (hash, _)) in series_label_hashes.iter().enumerate() {
         groups.entry(*hash).or_default().push(series_idx);
     }
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) built {} groups in {:?}",
-        eval_ctx.trace_id,
+        "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) built {} groups in {:?}",
         groups.len(),
         start2.elapsed()
     );
 
-    let start3 = std::time::Instant::now();
-
     // Step 3: Process each group in parallel
     // For each group, aggregate all samples across timestamps
-    let results: Vec<(u64, Labels, Vec<Sample>)> = groups
+    let start3 = std::time::Instant::now();
+    let results: Vec<RangeValue> = groups
         .par_iter()
-        .map(|(hash, series_indices)| {
+        .map(|(_, series_indices)| {
             // Get the labels for this group (from the first series in the group)
             let labels = series_label_hashes[series_indices[0]].1.clone();
 
@@ -295,54 +275,22 @@ where
             // Sort by timestamp to maintain order
             samples.sort_by_key(|s| s.timestamp);
 
-            (*hash, labels, samples)
+            RangeValue {
+                labels,
+                samples,
+                exemplars: None,
+                time_window: None,
+            }
         })
         .collect();
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) parallel aggregation took: {:?}",
-        eval_ctx.trace_id,
-        start3.elapsed()
+        "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) parallel aggregation took: {:?}, produced {} series",
+        start3.elapsed(),
+        results.len()
     );
 
-    let start4 = std::time::Instant::now();
-
-    // Step 4: Convert results to final format
-    let mut result_by_labels: HashMap<u64, (Labels, Vec<Sample>)> =
-        HashMap::with_capacity(results.len());
-    for (hash, labels, samples) in results {
-        if !samples.is_empty() {
-            result_by_labels.insert(hash, (labels, samples));
-        }
-    }
-
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) final conversion took: {:?}",
-        eval_ctx.trace_id,
-        start4.elapsed()
-    );
-
-    if result_by_labels.is_empty() {
-        return Ok(Value::None);
-    }
-
-    let result_matrix: Vec<RangeValue> = result_by_labels
-        .into_values()
-        .map(|(labels, samples)| RangeValue {
-            labels,
-            samples,
-            exemplars: None,
-            time_window: None,
-        })
-        .collect();
-
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) completed in {:?}, produced {} series",
-        eval_ctx.trace_id,
-        start.elapsed(),
-        result_matrix.len()
-    );
-    Ok(Value::Matrix(result_matrix))
+    Ok(Value::Matrix(results))
 }
 
 #[cfg(test)]

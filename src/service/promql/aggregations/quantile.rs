@@ -22,16 +22,11 @@ use crate::service::promql::{
     value::{EvalContext, RangeValue, Sample, Value},
 };
 
-/// Aggregates Matrix input for range queries
 /// Note: quantile aggregates all series into a single result (no label grouping)
 pub fn quantile(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
-    let (input_size, timestamps_count) = match &data {
-        Value::Matrix(m) => (m.len(), eval_ctx.timestamps().len()),
-        _ => (0, 0),
-    };
     log::info!(
-        "[trace_id: {}] [PromQL Timing] quantile_range({qtile}) started with {input_size} series and {timestamps_count} timestamps",
+        "[trace_id: {}] [PromQL Timing] quantile_range({qtile}) started",
         eval_ctx.trace_id,
     );
 
