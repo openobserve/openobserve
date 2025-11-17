@@ -683,8 +683,6 @@ pub async fn search_partition(
 
     #[cfg(not(feature = "enterprise"))]
     let is_streaming_aggregate = false;
-    #[cfg(not(feature = "enterprise"))]
-    let streaming_interval_micros = 0;
 
     // if need streaming output and is simple query, we shouldn't skip file list
     if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
@@ -1054,15 +1052,9 @@ pub async fn search_partition(
                         "[trace_id {trace_id}] [streaming_id: {streaming_id}] Failed to discover cache: {e}, proceeding without cache optimization"
                     );
                     // Create empty discovery result to proceed without cache
-                    o2_enterprise::enterprise::search::cache::streaming_agg::CacheDiscoveryResult::new(
-                        vec![],
-                        vec![
-                            o2_enterprise::enterprise::search::cache::streaming_agg::TimeRange::new(
-                                query.start_time,
-                                query.end_time,
-                            ),
-                        ],
-                        0.0,
+                    o2_enterprise::enterprise::search::cache::streaming_agg::CacheDiscoveryResult::empty(
+                        query.start_time,
+                        query.end_time,
                     )
                 }
             };
