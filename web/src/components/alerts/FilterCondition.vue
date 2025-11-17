@@ -66,7 +66,6 @@
             borderless
             dense
             hide-bottom-space
-            emit-value
             :rules="[(val: any) => !!val || 'Field is required!']"
             :class="store.state.isAiChatEnabled ? 'tw-w-[110px]' : 'xl:tw-min-w-[200px] lg:tw-w-fit lg:tw-min-w-[80px]'"
             @update:model-value="emits('input:update', 'conditions', condition)"
