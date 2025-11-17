@@ -34,7 +34,6 @@ use config::{
         schema_ext::SchemaExt,
     },
 };
-use hashbrown::HashSet;
 use infra::{
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
@@ -44,10 +43,8 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
-use tokio::{
-    fs::remove_file,
-    sync::{Mutex, RwLock},
-};
+use scc::HashSet;
+use tokio::{fs::remove_file, sync::Mutex};
 
 use crate::{
     common::infra::wal,
@@ -59,13 +56,13 @@ use crate::{
     },
 };
 
-static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+static PROCESSING_FILES: Lazy<HashSet<String>> = Lazy::new(HashSet::new);
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // add the pending delete files to processing set
     let pending_delete_files = db::file_list::local::get_pending_delete().await;
     for file in pending_delete_files {
-        PROCESSING_FILES.write().await.insert(file);
+        let _ = PROCESSING_FILES.insert_async(file).await;
     }
 
     // start worker threads
@@ -193,7 +190,7 @@ async fn check_has_pending_files() -> bool {
     }
 
     // Also check if there are files being processed
-    let processing_count = PROCESSING_FILES.read().await.len();
+    let processing_count = PROCESSING_FILES.len();
     if processing_count > 0 {
         log::info!("[INGESTER:JOB] Still processing {} files", processing_count);
         return true;
@@ -211,7 +208,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
     let pending_delete_files = db::file_list::local::get_pending_delete().await;
     let files_num = pending_delete_files.len();
     for file_key in pending_delete_files {
-        if wal::lock_files_exists(&file_key) {
+        if wal::lock_files_exists(&file_key).await {
             continue;
         }
         log::warn!("[INGESTER:JOB] the file was released, delete it: {file_key}");
@@ -226,7 +223,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
             log::error!("[INGESTER:JOB] Failed to remove parquet file: {file_key}, {e}");
         }
         // need release the file
-        PROCESSING_FILES.write().await.remove(&file_key);
+        PROCESSING_FILES.remove_async(&file_key).await;
         // delete from pending delete list
         if let Err(e) = db::file_list::local::remove_pending_delete(&file_key).await {
             log::error!("[INGESTER:JOB] Failed to remove pending delete file: {file_key}, {e}");
@@ -338,7 +335,7 @@ async fn prepare_files(
             file.to_str().unwrap().replace('\\', "/")
         };
         // check if the file is processing
-        if PROCESSING_FILES.read().await.contains(&file_key) {
+        if PROCESSING_FILES.contains_async(&file_key).await {
             continue;
         }
 
@@ -374,7 +371,7 @@ async fn prepare_files(
             false,
         ));
         // mark the file as processing
-        PROCESSING_FILES.write().await.insert(file_key);
+        let _ = PROCESSING_FILES.insert_async(file_key).await;
     }
 
     Ok(partition_files_with_size)
@@ -414,7 +411,7 @@ async fn move_files(
                 );
             }
             // remove the file from processing set
-            PROCESSING_FILES.write().await.remove(&file.key);
+            PROCESSING_FILES.remove_async(&file.key).await;
         }
         return Ok(());
     }
@@ -432,7 +429,7 @@ async fn move_files(
             );
             // need release all the files
             for file in files.iter() {
-                PROCESSING_FILES.write().await.remove(&file.key);
+                PROCESSING_FILES.remove_async(&file.key).await;
             }
             return Err(e.into());
         }
@@ -460,7 +457,7 @@ async fn move_files(
                 );
             }
             // remove the file from processing set
-            PROCESSING_FILES.write().await.remove(&file.key);
+            PROCESSING_FILES.remove_async(&file.key).await;
         }
         return Ok(());
     }
@@ -502,7 +499,7 @@ async fn move_files(
                     );
                 }
                 // remove the file from processing set
-                PROCESSING_FILES.write().await.remove(&file.key);
+                PROCESSING_FILES.remove_async(&file.key).await;
             }
             return Ok(());
         }
@@ -552,7 +549,7 @@ async fn move_files(
         if !has_expired_files {
             // need release all the files
             for file in files_with_size.iter() {
-                PROCESSING_FILES.write().await.remove(&file.key);
+                PROCESSING_FILES.remove_async(&file.key).await;
             }
             return Ok(());
         }
@@ -604,14 +601,14 @@ async fn move_files(
             );
             // need release all the files
             for file in files_with_size.iter() {
-                PROCESSING_FILES.write().await.remove(&file.key);
+                PROCESSING_FILES.remove_async(&file.key).await;
             }
             return Ok(());
         };
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {
-            let can_delete = if wal::lock_files_exists(&file.key) {
+            let can_delete = if wal::lock_files_exists(&file.key).await {
                 log::warn!(
                     "[INGESTER:JOB:{thread_id}] the file is in use, set to pending delete list: {}",
                     file.key
@@ -661,7 +658,7 @@ async fn move_files(
                     }
                     Ok(_) => {
                         // remove the file from processing set
-                        PROCESSING_FILES.write().await.remove(&file.key);
+                        PROCESSING_FILES.remove_async(&file.key).await;
                         // deleted successfully then update metrics
                         metrics::INGEST_WAL_USED_BYTES
                             .with_label_values(&[org_id.as_str(), stream_type.as_str()])
@@ -807,7 +804,7 @@ async fn merge_files(
 
     // we shouldn't use the latest schema, because there are too many fields, we need read schema
     // from files only get the fields what we need
-    let mut shared_fields = HashSet::new();
+    let mut shared_fields = hashbrown::HashSet::new();
     for file in new_file_list.iter() {
         let file_schema = read_schema_from_file(&(&wal_dir.join(&file.key)).into()).await?;
         shared_fields.extend(file_schema.fields().iter().cloned());
@@ -943,7 +940,7 @@ async fn merge_files(
         .fields()
         .iter()
         .map(|f| f.name())
-        .collect::<HashSet<_>>();
+        .collect::<hashbrown::HashSet<_>>();
     let need_index = full_text_search_fields
         .iter()
         .chain(index_fields.iter())
