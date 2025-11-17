@@ -7,8 +7,7 @@
         backgroundColor: computedStyleMap
     }"
     >  
-        <div class="  tw-w-fit condition-tabs el-border"
-        >
+        <div class="tw-w-fit condition-tabs el-border">
           <AppTabs
             data-test="scheduled-alert-tabs"
             :tabs="tabOptions"
@@ -70,7 +69,7 @@
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="12px" style="border-radius: 50%;  border: 1px solid;" name="add" />
             <span class="text-bold">Condition</span>
-            <q-tooltip>
+            <q-tooltip :delay="300">
               Add a new condition to this group
             </q-tooltip>
         </q-btn>
@@ -88,10 +87,10 @@
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="12px" style="border-radius: 50%;  border: 1px solid;" name="add" />
             <span class="text-bold">Condition Group</span>
-            <q-tooltip v-if="depth < 2">
+            <q-tooltip v-if="depth < 2" :delay="300">
               Add a nested condition group (max depth: 2)
             </q-tooltip>
-            <q-tooltip v-else>
+            <q-tooltip v-else :delay="300">
               Maximum nesting depth reached
             </q-tooltip>
         </q-btn>
@@ -107,7 +106,7 @@
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="12px" name="swap_vert" />
             <span class="text-bold">Reorder</span>
-            <q-tooltip>
+            <q-tooltip :delay="300">
               Reorder items: Conditions first, then Groups
             </q-tooltip>
         </q-btn>
@@ -189,10 +188,14 @@
     {
       label: "OR",
       value: "or",
+      disabled: hasOnlyOneCondition.value,
+      tooltipLabel: hasOnlyOneCondition.value ? "Add at least one more condition to enable AND/OR toggle" : undefined,
     },
     {
       label: "AND",
       value: "and",
+      disabled: hasOnlyOneCondition.value,
+      tooltipLabel: hasOnlyOneCondition.value ? "Add at least one more condition to enable AND/OR toggle" : undefined,
     },
   ]);
 
@@ -356,6 +359,15 @@ const computedOpacity = computed(() => {
   return props.depth + 10;
 });
 
+// Check if group has only one condition and no sub-groups (to disable AND/OR toggle)
+const hasOnlyOneCondition = computed(() => {
+  const conditions = groups.value.items.filter((item: any) => !isGroup(item));
+  const subGroups = groups.value.items.filter((item: any) => isGroup(item));
+
+  // Disable only if there's exactly 1 condition AND no sub-groups
+  return conditions.length === 1 && subGroups.length === 0;
+});
+
 // Expose functions for testing
 defineExpose({
   isGroup,
@@ -370,6 +382,7 @@ defineExpose({
   hslToCSS,
   computedStyleMap,
   computedOpacity,
+  hasOnlyOneCondition,
   groups,
   label,
   isOpen,
@@ -378,7 +391,8 @@ defineExpose({
 
   </script>
 
-  <style lang="scss">   
+  <style lang="scss">
+
     .condition-container {
         overflow-x: auto;
         max-width: 900px;

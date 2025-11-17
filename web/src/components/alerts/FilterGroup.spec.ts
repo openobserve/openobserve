@@ -1695,6 +1695,162 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
     });
   });
 
+  describe('Disable AND/OR Toggle for Single Condition', () => {
+    it('should return true when group has only one condition and no sub-groups', () => {
+      const singleConditionProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: singleConditionProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.hasOnlyOneCondition).toBe(true);
+    });
+
+    it('should return false when group has multiple conditions', () => {
+      const multipleConditionsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
+            { id: 'condition-2', column: 'field2', operator: '=', value: 'test2' }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: multipleConditionsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.hasOnlyOneCondition).toBe(false);
+    });
+
+    it('should return false when group has one condition and sub-groups (toggle is useful)', () => {
+      const oneConditionWithGroupsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+            {
+              groupId: 'sub-group',
+              label: 'or',
+              items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: oneConditionWithGroupsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Should be false because AND/OR toggle is useful when combining condition with sub-group
+      expect(wrapper.vm.hasOnlyOneCondition).toBe(false);
+    });
+
+    it('should return false when group has no conditions (only sub-groups)', () => {
+      const onlySubGroupsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested-1', column: 'field1', operator: '=', value: 'test1' }]
+            },
+            {
+              groupId: 'sub-group-2',
+              label: 'and',
+              items: [{ id: 'nested-2', column: 'field2', operator: '=', value: 'test2' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: onlySubGroupsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.hasOnlyOneCondition).toBe(false);
+    });
+
+    it('should return true when group has empty items array', () => {
+      const emptyItemsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: []
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: emptyItemsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.hasOnlyOneCondition).toBe(false);
+    });
+  });
+
   describe('conditionInputWidth Prop', () => {
     it('should accept conditionInputWidth prop', () => {
       const wrapper = mount(FilterGroup, {
