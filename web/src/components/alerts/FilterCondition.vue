@@ -2,7 +2,7 @@
     <div class=" tw-flex tw-items-start tw-gap-2 tw-flex-no-wrap ">
       <div class="tw-text-sm tw-w-[20px] tw-mr-2 tw-mt-2">
         {{
-        index == 0 && depth == 0 ? 'if' : computedLabel
+        index == 0 ? 'if' : computedLabel
            }}
       </div>
         <div
