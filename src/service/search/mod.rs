@@ -991,10 +991,7 @@ pub async fn search_partition(
 
     #[cfg(feature = "enterprise")]
     // check if we need to use streaming_output
-    let (streaming_id, streaming_interval_micros) = if req.streaming_output
-        && is_streaming_aggregate
-        && !skip_get_file_list
-    {
+    let streaming_id = if req.streaming_output && is_streaming_aggregate && !skip_get_file_list {
         let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
             // TODO: cache don't not support multiple stream names
             Ok(v) => (v[0].clone(), v.join(",")),
@@ -1032,7 +1029,7 @@ pub async fn search_partition(
             // so we set is_streaming_aggregate to false and return None
             is_streaming_aggregate = false;
             // skip_get_file_list = true;
-            (None, 0)
+            None
         } else {
             let streaming_id = ider::uuid();
             let hashed_query = get_aggregation_cache_key_from_request(req);
@@ -1105,13 +1102,10 @@ pub async fn search_partition(
             log::info!(
                 "[trace_id {trace_id}] [streaming_id: {streaming_id}] init streaming_agg cache: cache_file_path: {cache_file_path}"
             );
-            (
-                Some(streaming_id),
-                cache_interval.get_interval_microseconds(),
-            )
+            Some(streaming_id)
         }
     } else {
-        (None, 0)
+        None
     };
     #[cfg(feature = "enterprise")]
     let streaming_aggs = is_streaming_aggregate && req.streaming_output && streaming_id.is_some();
@@ -1122,57 +1116,38 @@ pub async fn search_partition(
         resp.streaming_id = streaming_id.clone();
     }
 
-    // Generate partitions
+    // Get cache strategy for streaming aggregates (enterprise only)
     #[cfg(feature = "enterprise")]
-    let partitions = if streaming_aggs && streaming_id.is_some() {
-        // Use cache-aware partition strategy if available
+    let stremaing_aggs_cache_strategy = if streaming_aggs && streaming_id.is_some() {
         let streaming_id_ref = streaming_id.as_ref().unwrap();
         match streaming_aggs_exec::get_partition_strategy(streaming_id_ref) {
             Some(strategy) => {
                 log::info!(
                     "[trace_id {trace_id}] [streaming_id: {streaming_id_ref}] Using cache-aware partition strategy"
                 );
-                strategy.to_time_partitions(sql_order_by)
+                Some(strategy)
             }
             None => {
                 log::warn!(
                     "[trace_id {trace_id}] [streaming_id: {streaming_id_ref}] No partition strategy found, using default generation"
                 );
-                generator.generate_partitions(
-                    req.start_time,
-                    req.end_time,
-                    step,
-                    sql_order_by,
-                    is_aggregate,
-                    is_streaming_aggregate,
-                    streaming_interval_micros,
-                    add_mini_partition,
-                )
+                None
             }
         }
     } else {
-        generator.generate_partitions(
-            req.start_time,
-            req.end_time,
-            step,
-            sql_order_by,
-            is_aggregate,
-            is_streaming_aggregate,
-            streaming_interval_micros,
-            add_mini_partition,
-        )
+        None
     };
 
-    #[cfg(not(feature = "enterprise"))]
+    // Generate partitions
     let partitions = generator.generate_partitions(
         req.start_time,
         req.end_time,
         step,
         sql_order_by,
         is_aggregate,
-        is_streaming_aggregate,
-        streaming_interval_micros,
         add_mini_partition,
+        #[cfg(feature = "enterprise")]
+        stremaing_aggs_cache_strategy,
     );
 
     if sql_order_by == OrderBy::Asc {
