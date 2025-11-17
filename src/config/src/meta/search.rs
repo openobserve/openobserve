@@ -976,6 +976,16 @@ impl TryFrom<&str> for SearchEventType {
     }
 }
 
+impl SearchEventType {
+    /// Background tasks include: Alerts, Reports, and DerivedStream.
+    pub fn is_background(&self) -> bool {
+        matches!(
+            self,
+            Self::Alerts | Self::Reports | Self::DerivedStream | Self::SearchJob
+        )
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct ValuesEventContext {
@@ -1744,6 +1754,23 @@ mod tests {
         assert_eq!(SearchEventType::RUM.to_string(), "rum");
         assert_eq!(SearchEventType::DerivedStream.to_string(), "derived_stream");
         assert_eq!(SearchEventType::SearchJob.to_string(), "search_job");
+    }
+
+    #[test]
+    fn test_search_event_type_is_background() {
+        // Background tasks
+        assert!(SearchEventType::Alerts.is_background());
+        assert!(SearchEventType::Reports.is_background());
+        assert!(SearchEventType::DerivedStream.is_background());
+        assert!(SearchEventType::SearchJob.is_background());
+
+        // Non-background tasks
+        assert!(!SearchEventType::UI.is_background());
+        assert!(!SearchEventType::Dashboards.is_background());
+        assert!(!SearchEventType::Values.is_background());
+        assert!(!SearchEventType::Other.is_background());
+        assert!(!SearchEventType::RUM.is_background());
+        assert!(!SearchEventType::Download.is_background());
     }
 
     #[test]
