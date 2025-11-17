@@ -67,10 +67,9 @@ use {
             TaskStatus, WorkGroup,
             cache::{
                 CardinalityLevel,
-                discovery::discover_cache_for_query,
-                partition_optimizer::generate_optimal_partitions,
                 streaming_agg::{
-                    create_aggregation_cache_file_path, generate_aggregation_cache_interval,
+                    create_aggregation_cache_file_path, discover_cache_for_query,
+                    generate_aggregation_cache_interval, generate_optimal_partitions,
                     get_aggregation_cache_key_from_request,
                 },
             },
@@ -1058,10 +1057,10 @@ pub async fn search_partition(
                         "[trace_id {trace_id}] [streaming_id: {streaming_id}] Failed to discover cache: {e}, proceeding without cache optimization"
                     );
                     // Create empty discovery result to proceed without cache
-                    o2_enterprise::enterprise::search::cache::discovery::CacheDiscoveryResult::new(
+                    o2_enterprise::enterprise::search::cache::streaming_agg::CacheDiscoveryResult::new(
                         vec![],
                         vec![
-                            o2_enterprise::enterprise::search::cache::discovery::TimeRange::new(
+                            o2_enterprise::enterprise::search::cache::streaming_agg::TimeRange::new(
                                 query.start_time,
                                 query.end_time,
                             ),
