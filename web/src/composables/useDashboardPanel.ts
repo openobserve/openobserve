@@ -342,7 +342,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   async function loadStreamFields(streamName: string) {
     try {
-      if (!streamName) return;
+      if (!streamName) return { name: streamName, schema: [], settings: {} };
 
       // Create a new request and store it in the cache
       return await getStream(
@@ -354,36 +354,62 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       );
     } catch (e: any) {
       console.error("Error while loading stream fields", e);
+      return { name: streamName, schema: [], settings: {} };
     }
   }
 
+  // Track if updateGroupedFields is currently running to prevent race conditions
+  let isUpdatingGroupedFields = false;
+  let pendingUpdateGroupedFields = false;
+
   // Helper function to update grouped fields
   const updateGroupedFields = async () => {
-    const currentStream =
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.stream;
-    if (!currentStream) return;
+    // If already updating, mark that we need to run again after completion
+    if (isUpdatingGroupedFields) {
+      pendingUpdateGroupedFields = true;
+      return;
+    }
 
-    // Collect streams (main + joins)
-    const joinsStreams = [
-      { stream: currentStream },
-      ...(dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].joins?.filter((stream: any) => stream?.stream) ?? []),
-    ];
+    isUpdatingGroupedFields = true;
+    pendingUpdateGroupedFields = false;
 
-    // Fetch stream fields
-    const groupedFields = await Promise.all(
-      joinsStreams.map(async (stream: any) => {
-        return {
-          ...(await loadStreamFields(stream?.stream)),
-          stream_alias: stream?.streamAlias,
-        };
-      }),
-    );
+    try {
+      const currentStream =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream;
+      if (!currentStream) return;
 
-    dashboardPanelData.meta.streamFields.groupedFields = groupedFields;
+      // Collect streams (main + joins)
+      const joinsStreams = [
+        { stream: currentStream, streamAlias: undefined },
+        ...(dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].joins?.filter((stream: any) => stream?.stream) ?? []),
+      ];
+
+      // Fetch stream fields
+      const groupedFields = await Promise.all(
+        joinsStreams.map(async (stream: any) => {
+          const streamData = await loadStreamFields(stream?.stream);
+          return {
+            ...streamData,
+            stream_alias: stream?.streamAlias,
+          };
+        }),
+      );
+
+      // Filter out any invalid entries (streams with no name)
+      dashboardPanelData.meta.streamFields.groupedFields = groupedFields.filter(
+        (field: any) => field?.name
+      );
+    } finally {
+      isUpdatingGroupedFields = false;
+      // If there was a pending update request, run it now
+      if (pendingUpdateGroupedFields) {
+        updateGroupedFields();
+      }
+    }
   };
 
   const getAllSelectedStreams = () => {
