@@ -63,7 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Light Mode Theme -->
               <div
                 class="theme-color-chip"
-                @click="openColorPicker('light')"
+                @click="handleThemeChipClick('light')"
+                data-test="theme-light-chip"
               >
                 <div class="color-circle" :style="{ backgroundColor: customLightColor }">
                   <q-icon name="palette" size="14px" color="white" class="palette-icon" />
@@ -75,7 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Dark Mode Theme -->
               <div
                 class="theme-color-chip"
-                @click="openColorPicker('dark')"
+                @click="handleThemeChipClick('dark')"
+                data-test="theme-dark-chip"
               >
                 <div class="color-circle" :style="{ backgroundColor: customDarkColor }">
                   <q-icon name="palette" size="14px" color="white" class="palette-icon" />
@@ -631,6 +633,21 @@ export default defineComponent({
     // ========== Theme Management Functions ==========
 
     /**
+     * Handle theme chip click - switches theme mode and opens color picker
+     * This provides a unified interaction: click to switch mode, then customize color
+     * @param mode - 'light' or 'dark' theme mode to switch to
+     */
+    const handleThemeChipClick = (mode: "light" | "dark") => {
+      // First, switch the theme mode if it's different from current
+      if (store.state.theme !== mode) {
+        toggleThemeMode(mode);
+      }
+
+      // Then open the color picker for customization
+      openColorPicker(mode);
+    };
+
+    /**
      * Open color picker dialog for light or dark mode
      * @param mode - 'light' or 'dark' theme mode to edit
      */
@@ -701,6 +718,32 @@ export default defineComponent({
         message: "Theme colors reset to defaults and applied.",
         timeout: 2000,
       });
+    };
+
+    /**
+     * Toggle between light and dark theme modes
+     * Updates the store, Quasar dark mode, and applies the corresponding theme color
+     * @param mode - 'light' or 'dark' theme mode to switch to
+     */
+    const toggleThemeMode = (mode: "light" | "dark") => {
+      // Update theme mode in store
+      store.dispatch("appTheme", mode);
+
+      // Update Quasar's dark mode - this is critical for proper theme application
+      q.dark.set(mode === "dark");
+
+      // Persist theme preference to localStorage
+      localStorage.setItem("theme", mode);
+
+      // Get the color for the new mode
+      const color = mode === "light" ? customLightColor.value : customDarkColor.value;
+
+      // Check if the color is a default color
+      const isDefault = (mode === "light" && color === DEFAULT_LIGHT_COLOR) ||
+                       (mode === "dark" && color === DEFAULT_DARK_COLOR);
+
+      // Apply the theme color for the new mode
+      applyThemeColors(color, mode, isDefault);
     };
 
     const updateCustomText = () => {
@@ -803,7 +846,7 @@ export default defineComponent({
       customDarkColor,
       showColorPicker,
       tempColor,
-      openColorPicker,
+      handleThemeChipClick,
       onColorPickerClose,
       updateCustomColor,
       resetThemeColors,
