@@ -263,9 +263,22 @@ jobs:
               -H "Accept: application/vnd.github.v3+json" \
               "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=all&per_page=100")
 
-            # Count unique matrix job names that ACTUALLY STARTED in current attempt
-            # Filter by run_attempt AND started_at != null (means job actually executed)
-            CURRENT_ATTEMPT_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | select(.started_at != null) | .name] | unique | length")
+            # Debug: Output all job data for current attempt to understand GitHub's behavior
+            echo "::notice::DEBUG: Analyzing all jobs in attempt $CURRENT_ATTEMPT"
+            echo "$ALL_JOBS_RESPONSE" | jq -r ".jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | {name: .name, run_attempt: .run_attempt, status: .status, conclusion: .conclusion, started_at: .started_at}" | head -50
+
+            # Strategy: Check if job is CURRENTLY running (status != completed)
+            # OR just started in this attempt (has recent started_at timestamp)
+            # Jobs from "re-run failed" will be either running or recently started
+            # Jobs from previous attempts that succeeded won't show up with run_attempt=current in "re-run failed"
+
+            # Actually, let me check the raw count from GitHub's /attempts endpoint instead
+            ATTEMPT_JOBS_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/$CURRENT_ATTEMPT/jobs")
+
+            # Count jobs that are ACTUALLY part of this attempt execution
+            CURRENT_ATTEMPT_JOBS=$(echo "$ATTEMPT_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\"))] | length")
 
             # Count total unique matrix job names (from attempt 1)
             TOTAL_MATRIX_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == 1) | .name] | unique | length")
