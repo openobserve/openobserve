@@ -108,6 +108,7 @@ export const DEFAULT_LOGS_CONFIG = {
     showFields: true,
     showQuery: true,
     showHistogram: true,
+    showPatterns: false,
     showDetailTab: false,
     showTransformEditor: false, // by default function / actions editor should be hidden
     searchApplied: false,
@@ -145,6 +146,7 @@ export const DEFAULT_LOGS_CONFIG = {
     toggleFunction: false, // DEPRECATED use showTransformEditor instead
     isActionsEnabled: false,
     resetPlotChart: false,
+    clearCache: false,
   },
   data: {
     query: "" as any,
@@ -207,6 +209,11 @@ export const DEFAULT_LOGS_CONFIG = {
       errorMsg: "",
       errorCode: 0,
       errorDetail: "",
+    } as any,
+    patterns: {
+      data: [] as any[],
+      config: {} as any,
+      statistics: {} as any,
     } as any,
     editorValue: "" as any,
     datetime: {

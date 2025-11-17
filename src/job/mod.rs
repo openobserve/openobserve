@@ -52,6 +52,28 @@ pub use file_downloader::{download_from_node, queue_download};
 pub use file_list_dump::FILE_LIST_SCHEMA;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
+#[cfg(feature = "enterprise")]
+async fn enforce_usage_stream_retention() {
+    use config::{
+        META_ORG_ID,
+        meta::{self_reporting::usage::USAGE_STREAM, stream::StreamType},
+    };
+    if let Some(mut s) =
+        infra::schema::get_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs).await
+        && s.data_retention < 32
+    {
+        s.data_retention = 32;
+        crate::service::stream::save_stream_settings(
+            META_ORG_ID,
+            USAGE_STREAM,
+            StreamType::Logs,
+            s,
+        )
+        .await
+        .unwrap(); //unwrap is intentional, we should panic if this fails
+    }
+}
+
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
@@ -152,6 +174,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     tokio::task::spawn(promql_self_consume::run());
+
+    #[cfg(feature = "enterprise")]
+    {
+        tokio::task::spawn(async move {
+            loop {
+                enforce_usage_stream_retention().await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(10 * 60)).await;
+            }
+        });
+    }
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -263,7 +296,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_querier() && get_enterprise_config().ai.enabled {
         tokio::task::spawn(async move {
-            o2_enterprise::enterprise::ai::prompt::prompts::load_system_prompt()
+            o2_enterprise::enterprise::ai::agent::prompt::prompts::load_system_prompt()
                 .await
                 .expect("load system prompt failed");
         });
@@ -333,6 +366,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
 /// Additional jobs that init processes should be deferred until the gRPC service
 /// starts in the main thread
 pub async fn init_deferred() -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::license::start_license_check(
+            crate::service::self_reporting::search::get_usage,
+            LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),
+        )
+        .await;
+        tokio::task::spawn(async move { db::license::watch().await });
+    }
+
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
         return Ok(());
     }

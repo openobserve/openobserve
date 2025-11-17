@@ -5,7 +5,7 @@ import ImportTemplate from './ImportTemplate.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { createRouter, createWebHistory } from 'vue-router';
-import { nextTick } from 'vue';
+import { nextTick, ref } from 'vue';
 
 // Mock external dependencies
 vi.mock('@/services/alert_templates', () => ({
@@ -125,6 +125,29 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
         mocks: {
           $store: mockStore,
         },
+        stubs: {
+          BaseImport: {
+            template: '<div><slot name="output-content"></slot></div>',
+            props: ['title', 'testPrefix', 'isImporting', 'editorHeights'],
+            emits: ['back', 'cancel', 'import'],
+            setup(_props: any, { expose }: any) {
+              const jsonArrayOfObj = ref([]);
+              const jsonStr = ref("");
+              const isImporting = ref(false);
+              const updateJsonArray = (arr: any[]) => {
+                jsonArrayOfObj.value = arr;
+                jsonStr.value = JSON.stringify(arr, null, 2);
+              };
+              expose({
+                jsonArrayOfObj,
+                jsonStr,
+                isImporting,
+                updateJsonArray,
+              });
+              return { jsonArrayOfObj, jsonStr, isImporting, updateJsonArray };
+            },
+          },
+        },
       },
     });
   });
@@ -167,17 +190,14 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
 
   describe('2. Data Properties and Computed Values', () => {
     it('should initialize reactive data properties correctly', () => {
-      expect(wrapper.vm.jsonStr).toBe('');
+      // jsonStr and jsonArrayOfObj are now managed by BaseImport (stubbed)
       expect(wrapper.vm.templateErrorsToDisplay).toEqual([]);
       expect(wrapper.vm.tempalteCreators).toEqual([]);
-      expect(wrapper.vm.activeTab).toBe('import_json_file');
-      expect(wrapper.vm.jsonArrayOfObj).toEqual([{}]);
+      // activeTab and jsonArrayOfObj are managed by BaseImport stub
+      expect(wrapper.vm.baseImportRef).toBeDefined();
     });
 
-    it('should have correct destination types and methods', () => {
-      expect(wrapper.vm.destinationTypes).toEqual(['http', 'email']);
-      expect(wrapper.vm.destinationMethods).toEqual(['post', 'get', 'put']);
-    });
+    // REMOVED: destinationTypes and destinationMethods are not used in ImportTemplate
 
     it('should compute formatted templates correctly', () => {
       const formatted = wrapper.vm.getFormattedTemplates;
@@ -203,97 +223,39 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
 
   describe('3. Update Functions', () => {
     beforeEach(() => {
-      wrapper.vm.jsonArrayOfObj = [{ name: 'test' }];
+      // Initialize BaseImport ref with jsonArrayOfObj
+      wrapper.vm.baseImportRef.jsonArrayOfObj = [{ name: 'test' }];
     });
 
     it('should update template type correctly', () => {
       wrapper.vm.updateTemplateType('email', 0);
-      expect(wrapper.vm.userSelectedTemplateTypes[0]).toBe('email');
-      expect(wrapper.vm.jsonArrayOfObj[0].type).toBe('email');
-      expect(wrapper.vm.jsonStr).toContain('email');
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].type).toBe('email');
+      expect(wrapper.vm.baseImportRef.jsonStr).toContain('email');
     });
 
     it('should update template name correctly', () => {
       wrapper.vm.updateTemplateName('new-template', 0);
-      expect(wrapper.vm.userSelectedTemplateNames[0]).toBe('new-template');
-      expect(wrapper.vm.jsonArrayOfObj[0].name).toBe('new-template');
-      expect(wrapper.vm.jsonStr).toContain('new-template');
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].name).toBe('new-template');
+      expect(wrapper.vm.baseImportRef.jsonStr).toContain('new-template');
     });
 
     it('should update template body correctly', () => {
       const testBody = '{"message": "test body"}';
       wrapper.vm.updateTemplateBody(testBody, 0);
-      expect(wrapper.vm.userSelectedTemplateBodies[0]).toBe(testBody);
-      expect(wrapper.vm.jsonArrayOfObj[0].body).toBe(testBody);
-      expect(wrapper.vm.jsonStr).toContain('"body": "{\\"message\\": \\"test body\\"}"');
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].body).toBe(testBody);
+      expect(wrapper.vm.baseImportRef.jsonStr).toContain('"body": "{\\"message\\": \\"test body\\"}"');
     });
 
     it('should update template title correctly', () => {
       wrapper.vm.updateTemplateTitle('Test Title', 0);
-      expect(wrapper.vm.userSelectedTemplateTitles[0]).toBe('Test Title');
-      expect(wrapper.vm.jsonArrayOfObj[0].title).toBe('Test Title');
-      expect(wrapper.vm.jsonStr).toContain('Test Title');
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].title).toBe('Test Title');
+      expect(wrapper.vm.baseImportRef.jsonStr).toContain('Test Title');
     });
 
-    it('should update destination URL correctly', () => {
-      wrapper.vm.updateDestinationUrl('https://example.com');
-      expect(wrapper.vm.jsonArrayOfObj.url).toBe('https://example.com');
-      // Since URL is added as a property to the array object, it won't be in the JSON string
-      // Instead, verify the property exists on the array object
-      expect(wrapper.vm.jsonArrayOfObj).toHaveProperty('url', 'https://example.com');
-    });
+    // REMOVED: updateDestinationUrl is not relevant to ImportTemplate
   });
 
-  describe('4. File Reading Functions', () => {
-    it('should read file content successfully', async () => {
-      const mockFile = new File(['{"test": "content"}'], 'test.json', {
-        type: 'application/json',
-      });
-
-      // Mock FileReader
-      const mockFileReader = {
-        readAsText: vi.fn(),
-        result: '{"test": "content"}',
-        onload: null as any,
-        onerror: null as any,
-      };
-
-      global.FileReader = vi.fn(() => mockFileReader) as any;
-
-      const contentPromise = wrapper.vm.readFileContent(mockFile);
-
-      // Simulate file read completion
-      setTimeout(() => {
-        mockFileReader.onload({ target: { result: '{"test": "content"}' } });
-      }, 0);
-
-      const content = await contentPromise;
-      expect(content).toBe('{"test": "content"}');
-    });
-
-    it('should handle file reading errors', async () => {
-      const mockFile = new File(['invalid content'], 'test.json', {
-        type: 'application/json',
-      });
-
-      const mockFileReader = {
-        readAsText: vi.fn(),
-        onload: null as any,
-        onerror: null as any,
-      };
-
-      global.FileReader = vi.fn(() => mockFileReader) as any;
-
-      const contentPromise = wrapper.vm.readFileContent(mockFile);
-
-      // Simulate file read error
-      setTimeout(() => {
-        mockFileReader.onerror(new Error('File read error'));
-      }, 0);
-
-      await expect(contentPromise).rejects.toThrow();
-    });
-  });
+  // REMOVED: File Reading Functions - File reading is now handled by BaseImport component
 
   describe('5. Helper Functions', () => {
     describe('checkTemplatesInList', () => {
@@ -510,19 +472,7 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
   });
 
   describe('7. Tab and Navigation Functions', () => {
-    it('should update active tab and reset form', () => {
-      wrapper.vm.jsonStr = 'test content';
-      wrapper.vm.url = 'https://example.com';
-      wrapper.vm.jsonFiles = ['file1'];
-      wrapper.vm.jsonArrayOfObj = [{ test: 'data' }];
-
-      wrapper.vm.updateActiveTab();
-
-      expect(wrapper.vm.jsonStr).toBe('');
-      expect(wrapper.vm.url).toBe('');
-      expect(wrapper.vm.jsonFiles).toBe(null);
-      expect(wrapper.vm.jsonArrayOfObj).toEqual([{}]);
-    });
+    // REMOVED: updateActiveTab - Tab management is now handled by BaseImport component
 
     it('should navigate back to templates page', () => {
       wrapper.vm.arrowBackFn();
@@ -543,10 +493,7 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
 
     describe('importJson', () => {
       it('should handle empty JSON string', async () => {
-        wrapper.vm.jsonStr = '';
-        wrapper.vm.url = '';
-
-        await wrapper.vm.importJson();
+        await wrapper.vm.importJson({ jsonStr: '', jsonArray: [] });
 
         expect(mockNotify).toHaveBeenCalledWith({
           message: 'JSON string is empty',
@@ -557,9 +504,7 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
       });
 
       it('should handle invalid JSON', async () => {
-        wrapper.vm.jsonStr = 'invalid json';
-
-        await wrapper.vm.importJson();
+        await wrapper.vm.importJson({ jsonStr: 'invalid json', jsonArray: [] });
 
         expect(mockNotify).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -576,15 +521,16 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
           type: 'http',
           body: '{"message": "test"}',
         }];
-        wrapper.vm.jsonStr = JSON.stringify(validJson);
 
         // Mock successful creation
         const templateService = await import('@/services/alert_templates');
+        vi.mocked(templateService.default.create).mockClear();
         vi.mocked(templateService.default.create).mockResolvedValueOnce(true);
 
-        await wrapper.vm.importJson();
+        await wrapper.vm.importJson({ jsonStr: JSON.stringify(validJson), jsonArray: validJson });
 
-        expect(wrapper.vm.jsonArrayOfObj).toEqual(validJson);
+        // jsonArrayOfObj is managed by BaseImport stub, check the processing worked
+        expect(templateService.default.create).toHaveBeenCalled();
       });
 
       it('should convert single object to array', async () => {
@@ -593,30 +539,33 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
           type: 'http',
           body: '{"message": "test"}',
         };
-        wrapper.vm.jsonStr = JSON.stringify(singleObject);
 
         // Mock successful creation
         const templateService = await import('@/services/alert_templates');
+        vi.mocked(templateService.default.create).mockClear();
         vi.mocked(templateService.default.create).mockResolvedValueOnce(true);
 
-        await wrapper.vm.importJson();
+        await wrapper.vm.importJson({ jsonStr: JSON.stringify(singleObject), jsonArray: [singleObject] });
 
-        expect(wrapper.vm.jsonArrayOfObj).toEqual([singleObject]);
+        // Verify the template was processed
+        expect(templateService.default.create).toHaveBeenCalled();
       });
 
       it('should show success message and redirect on successful import', async () => {
+        vi.useFakeTimers();
+
         const validJson = [{
           name: 'test-template',
           type: 'http',
           body: '{"message": "test"}',
         }];
-        wrapper.vm.jsonStr = JSON.stringify(validJson);
 
         // Mock successful creation
         const templateService = await import('@/services/alert_templates');
+        vi.mocked(templateService.default.create).mockClear();
         vi.mocked(templateService.default.create).mockResolvedValueOnce(true);
 
-        await wrapper.vm.importJson();
+        await wrapper.vm.importJson({ jsonStr: JSON.stringify(validJson), jsonArray: validJson });
 
         expect(mockNotify).toHaveBeenCalledWith({
           message: 'Successfully imported template(s)',
@@ -625,12 +574,17 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
           timeout: 2000,
         });
 
+        // Fast-forward timers to execute setTimeout
+        vi.runAllTimers();
+
         expect(mockRouterPush).toHaveBeenCalledWith({
           name: 'alertTemplates',
           query: {
             org_identifier: 'test-org',
           },
         });
+
+        vi.useRealTimers();
       });
     });
 
@@ -722,6 +676,7 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
 
         // Mock failed creation
         const templateService = await import('@/services/alert_templates');
+        vi.mocked(templateService.default.create).mockClear();
         vi.mocked(templateService.default.create).mockRejectedValueOnce(error);
 
         const result = await wrapper.vm.createTemplate(templateInput, 1);
@@ -740,6 +695,7 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
 
         // Mock failed creation without response
         const templateService = await import('@/services/alert_templates');
+        vi.mocked(templateService.default.create).mockClear();
         vi.mocked(templateService.default.create).mockRejectedValueOnce(new Error('Unknown error'));
 
         const result = await wrapper.vm.createTemplate(templateInput, 1);
@@ -777,45 +733,20 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
     });
   });
 
-  describe('9. Event Handlers', () => {
-    it('should handle form submission', () => {
-      const mockEvent = { preventDefault: vi.fn() };
-      wrapper.vm.onSubmit(mockEvent);
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-    });
-  });
-
-  describe('10. Watchers and Reactive Behavior', () => {
+  describe('9. Watchers and Reactive Behavior', () => {
     it('should have userSelectedTemplates watcher', async () => {
-      // Test the watcher by updating userSelectedTemplates
-      wrapper.vm.userSelectedTemplates = 'test-template';
+      // This functionality is now managed within the component's update functions
+      // Testing the actual update functions instead
+      wrapper.vm.baseImportRef.jsonArrayOfObj = [{}];
+      wrapper.vm.updateTemplateName('test-template', 0);
       await nextTick();
 
-      expect(wrapper.vm.jsonArrayOfObj.template).toBe('test-template');
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].name).toBe('test-template');
     });
 
-    it('should handle jsonFiles watcher', () => {
-      // Test that the watcher exists by checking if jsonFiles is reactive
-      expect(wrapper.vm.jsonFiles).toBe(null);
-      wrapper.vm.jsonFiles = [];
-      expect(Array.isArray(wrapper.vm.jsonFiles)).toBe(true);
-    });
-
-    it('should have url watcher', () => {
-      // Test that the watcher exists by checking if url is reactive
-      expect(wrapper.vm.url).toBe('');
-      wrapper.vm.url = 'https://example.com';
-      expect(wrapper.vm.url).toBe('https://example.com');
-    });
-
-    it('should have tabs configuration', () => {
-      expect(wrapper.vm.tabs).toHaveLength(2);
-      expect(wrapper.vm.tabs[0].value).toBe('import_json_file');
-      expect(wrapper.vm.tabs[1].value).toBe('import_json_url');
-    });
   });
 
-  describe('11. Edge Cases and Error Handling', () => {
+  describe('10. Edge Cases and Error Handling', () => {
     it('should handle whitespace-only template names', async () => {
       const invalidInput = {
         name: '   ',

@@ -571,9 +571,8 @@ async fn get_file_list(
         Ok(path) => {
             let mut path = path.to_str().unwrap().to_string();
             // Hack for windows
-            if path.starts_with("\\\\?\\") {
-                path = path[4..].to_string();
-                path = path.replace('\\', "/");
+            if let Some(stripped) = path.strip_prefix("\\\\?\\") {
+                path = stripped.to_string().replace('\\', "/");
             }
             path
         }

@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] aboutPage q-pt-xs">
-    <div class="card-container tw-px-4 tw-py-4 tw-h-[calc(100vh-48px)]">
-      <div class="tw-w-full">
+    <div class="card-container tw-h-[calc(100vh-50px)] tw-overflow-auto">
+      <div class="q-px-sm q-py-sm tw-h-full">
         <!-- Hero Section -->
         <div class="hero-section">
           <div class="tw-flex tw-flex-col md:tw-flex-row tw-items-center tw-justify-between tw-gap-8">
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
           <!-- Open Source Libraries -->
           <div class=" feature-card">
-            <div class="tw-mb-4" style="min-height: 120px;">
+            <div class="tw-mb-4">
               <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
                   <q-icon name="code" size="24px" />
@@ -165,26 +165,145 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+
+        <!-- Enterprise License Details Section -->
+        <div v-if="config.isEnterprise == 'true'" class="tw-mt-4">
+          <div class="feature-card">
+            <div class="tw-flex tw-items-center tw-justify-between tw-mb-4">
+              <div class="tw-flex tw-items-center tw-gap-3">
+                <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
+                  <q-icon name="workspace_premium" size="24px" />
+                </div>
+                <h3 class="feature-title">Enterprise License Details</h3>
+              </div>
+              <q-btn
+                no-caps
+                label="Manage License"
+                @click="navigateToLicense"
+                size="sm"
+                class="o2-primary-button"
+              />
+            </div>
+
+            <div v-if="loadingLicense" class="tw-text-center tw-py-8">
+              <q-spinner size="40px" color="primary" />
+              <div class="tw-mt-3 tw-text-sm tw-opacity-70">Loading license information...</div>
+            </div>
+
+            <div v-else-if="!licenseData || !licenseData.license" class="tw-py-4">
+              <div class="tw-flex tw-items-start tw-gap-3 tw-p-4 tw-rounded tw-bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw-bg-yellow-400' : 'tw-bg-yellow-500'">
+                <q-icon name="warning" size="24px" class="tw-text-yellow-500" />
+                <div>
+                  <div class="tw-font-semibold tw-mb-1">No License Installed</div>
+                  <p class="tw-text-sm tw-mb-2 tw-opacity-80">
+                    No enterprise license is currently installed. Contact your administrator or request a new license.
+                  </p>
+                  <div v-if="licenseData && licenseData.installation_id" class="tw-text-xs tw-opacity-70 tw-mb-2">
+                    Installation ID: <code class="tw-px-2 tw-py-1 tw-rounded tw-bg-black tw-bg-opacity-10">{{ licenseData.installation_id }}</code>
+                  </div>
+                  <q-btn
+                    color="primary"
+                    no-caps
+                    label="Get License"
+                    @click="navigateToLicense"
+                    size="sm"
+                    unelevated
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div v-else>
+              <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+                <div>
+                  <q-markup-table flat bordered dense class="compact-table">
+                    <tbody>
+                      <tr>
+                        <td class="tw-font-semibold">License ID</td>
+                        <td>{{ licenseData.license.license_id }}</td>
+                      </tr>
+                      <tr>
+                        <td class="tw-font-semibold">Status</td>
+                        <td>
+                          <q-badge :color="licenseData.license.active ? 'green' : 'red'">
+                            {{ licenseData.license.active ? 'Active' : 'Inactive' }}
+                          </q-badge>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="tw-font-semibold">Created At</td>
+                        <td>{{ formatLicenseDate(licenseData.license.created_at) }}</td>
+                      </tr>
+                      <tr>
+                        <td class="tw-font-semibold">Expires At</td>
+                        <td>{{ formatLicenseDate(licenseData.license.expires_at) }}</td>
+                      </tr>
+                    </tbody>
+                  </q-markup-table>
+                </div>
+
+                <div>
+                  <q-markup-table flat bordered dense class="compact-table">
+                    <thead>
+                      <tr>
+                        <th colspan="2" class="tw-text-center tw-font-semibold">Usage Limits</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td class="tw-font-semibold">Ingestion Type</td>
+                        <td>{{ licenseData.license.limits?.Ingestion?.typ || 'PerDayCount' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="tw-font-semibold">Ingestion Limit</td>
+                        <td>{{ licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '100 GB / day' }}</td>
+                      </tr>
+                      <tr v-if="licenseData.ingestion_used !== undefined">
+                        <td class="tw-font-semibold">Today's Usage</td>
+                        <td>
+                          <span :class="licenseData.ingestion_used > 90 ? 'tw-text-red-500 tw-font-bold' : licenseData.ingestion_used > 70 ? 'tw-text-orange-500' : ''">
+                            {{ licenseData.ingestion_used }}%
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </q-markup-table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Feature Comparison Table -->
+        <div class="tw-mt-6 tw-mb-[20px]" v-if="config.isCloud === 'false'">
+          <FeatureComparisonTable />
+        </div>
       </div>
     </div>
   </q-page>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "../utils/zincutils";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import config from "@/aws-exports";
+import licenseServer from "@/services/license_server";
+import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
 
 export default defineComponent({
   name: "PageAbout",
   components: {
+    FeatureComparisonTable,
   },
   setup() {
     const store = useStore();
+    const router = useRouter();
     const pageData = ref("Page Data");
     const { t } = useI18n();
+    const licenseData = ref<any>(null);
+    const loadingLicense = ref(false);
 
     const formatDate = (dateString: string) => {
       const date = new Date(dateString);
@@ -195,6 +314,68 @@ export default defineComponent({
       });
     };
 
+    const formatLicenseDate = (timestamp: number) => {
+      return new Date(timestamp / 1000).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    };
+
+    const loadLicenseData = async () => {
+      try {
+        loadingLicense.value = true;
+        const response = await licenseServer.get_license();
+        licenseData.value = response.data;
+      } catch (error) {
+        console.error("Error loading license data:", error);
+        licenseData.value = null;
+      } finally {
+        loadingLicense.value = false;
+      }
+    };
+
+    const navigateToLicense = () => {
+      // Get meta org identifier
+      const metaOrgIdentifier = store.state.zoConfig.meta_org;
+
+      // Find the meta org from the organizations list
+      const metaOrg = store.state.organizations?.find(
+        (org: any) => org.identifier === metaOrgIdentifier
+      );
+
+      if (metaOrg) {
+        // Create the org option object so that it will be used to switch to meta org
+        const metaOrgOption = {
+          label: metaOrg.name,
+          id: metaOrg.id,
+          identifier: metaOrg.identifier,
+          user_email: store.state.userInfo.email,
+          ingest_threshold: metaOrg.ingest_threshold,
+          search_threshold: metaOrg.search_threshold,
+        };
+
+        // Set the selected organization using dispatch
+        store.dispatch("setSelectedOrganization", metaOrgOption);
+
+        // Navigate to license page with the meta org identifier
+        router.push({
+          name: 'license',
+          query: { org_identifier: metaOrgIdentifier }
+        });
+      } else {
+        // Fallback: just navigate to license page with meta org identifier
+        router.push({
+          name: 'license',
+          query: { org_identifier: metaOrgIdentifier }
+        });
+      }
+    };
+
+    onMounted(() => {
+      loadLicenseData();
+    });
+
     return {
       t,
       store,
@@ -202,6 +383,10 @@ export default defineComponent({
       pageData,
       getImageURL,
       formatDate,
+      licenseData,
+      loadingLicense,
+      formatLicenseDate,
+      navigateToLicense,
     };
   },
 });
@@ -211,7 +396,7 @@ export default defineComponent({
 .aboutPage {
   // Hero Section
   .hero-section {
-    padding: 2rem;
+    padding: 0.1rem;
     margin-bottom: 1rem;
 
     .logo {
@@ -443,6 +628,14 @@ export default defineComponent({
       &:hover {
         border-bottom-color: var(--q-primary);
       }
+    }
+  }
+
+  // Compact table styles
+  .compact-table {
+    td, th {
+      padding: 8px 12px !important;
+      line-height: 1.2;
     }
   }
 

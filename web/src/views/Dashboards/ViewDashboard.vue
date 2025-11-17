@@ -122,7 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               @trigger="refreshData"
-              class="dashboard-icons hideOnPrintMode"
+              class="dashboard-icons hideOnPrintMode q-ml-sm"
+              style="padding-left: 0px; padding-right: 0px;"
               size="sm"
             />
             <q-btn
@@ -261,6 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :folderId="route.query.folder"
         :reportId="reportId"
         :currentTimeObj="currentTimeObjPerPanel"
+        :shouldRefreshWithoutCacheObj="shouldRefreshWithoutCachePerPanel"
         :dashboardName="currentDashboardData.data?.title"
         :folderName="folderNameFromFolderId"
         :selectedDateForViewPanel="selectedDate"
@@ -862,6 +864,19 @@ export default defineComponent({
       if (!arePanelsLoading.value) {
         // Generate new run ID for whole dashboard refresh
         generateNewDashboardRunId();
+
+        // Set shouldRefreshWithoutCache to false for all panels
+        const allPanelIds = [];
+        currentDashboardData.data.tabs?.forEach((tab: any) => {
+          tab.panels?.forEach((panel: any) => {
+            if(panel.id){
+              allPanelIds.push(panel?.id);
+              shouldRefreshWithoutCachePerPanel.value[panel.id] = false;
+            }
+          });
+        });
+
+        // Refresh the dashboard
         dateTimePicker.value.refresh();
       }
     };
@@ -1148,10 +1163,17 @@ export default defineComponent({
     });
 
     const currentTimeObjPerPanel = ref({});
+    const shouldRefreshWithoutCachePerPanel = ref({});
 
-    const refreshPanelRequest = (panelId) => {
+    const refreshPanelRequest = (panelId, shouldRefreshWithoutCache) => {
       // Set the panel ID to be refreshed
       panelIdToBeRefreshed.value = panelId;
+
+      // Store the shouldRefreshWithoutCache value for this panel
+      shouldRefreshWithoutCachePerPanel.value = {
+        ...shouldRefreshWithoutCachePerPanel.value,
+        [panelId]: shouldRefreshWithoutCache || false,
+      };
 
       // when the date changes from the picker, update the current time object for the dashboard
       if (selectedDate.value && dateTimePicker.value) {
@@ -1224,6 +1246,7 @@ export default defineComponent({
       selectedDate,
       currentTimeObj,
       currentTimeObjPerPanel,
+      shouldRefreshWithoutCachePerPanel,
       refreshInterval,
       // ----------------
       refreshData,
@@ -1307,6 +1330,7 @@ export default defineComponent({
 }
 .stickyHeader.fullscreenHeader {
   top: 0px;
+  z-index: 5100 !important;
 }
 
 .fullscreen {
@@ -1315,7 +1339,7 @@ export default defineComponent({
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
-  z-index: 99999 !important;
+  z-index: 5000 !important;
   margin: 0 !important;
   padding: 0 !important;
   background-color: var(--q-color-page-background, #ffffff) !important;
@@ -1382,5 +1406,55 @@ export default defineComponent({
   &:hover {
     background-color: var(--o2-hover-accent) !important;
   }
+}
+
+/* Outline state borders */
+.refresh-btn-group .apply-btn-refresh.q-btn--outline::before {
+  border-right: none !important;
+}
+
+.refresh-btn-group .apply-btn-dropdown.q-btn--outline::before {
+  border-left: 1px solid $border-color !important;
+}
+
+/* Flat state borders (when loading/cancel) - using pseudo-elements to avoid layout shifts */
+.refresh-btn-group .apply-btn-refresh.q-btn--flat::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid $border-color !important;
+  border-right: none !important;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.refresh-btn-group .apply-btn-dropdown.q-btn--flat::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid $border-color !important;
+  border-left: 1px solid $border-color !important;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.apply-btn-refresh {
+  border-top-left-radius: 4px !important;
+  border-bottom-left-radius: 4px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.apply-btn-dropdown {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-top-right-radius: 4px !important;
+  border-bottom-right-radius: 4px !important;
 }
 </style>

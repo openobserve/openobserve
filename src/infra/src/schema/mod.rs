@@ -388,6 +388,13 @@ pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>)
     }
 }
 
+pub fn get_stream_setting_log_patterns_enabled(settings: &Option<StreamSettings>) -> bool {
+    settings
+        .as_ref()
+        .map(|s| s.enable_log_patterns_extraction)
+        .unwrap_or(false)
+}
+
 pub fn get_stream_setting_index_updated_at(
     settings: &Option<StreamSettings>,
     created_at: Option<i64>,

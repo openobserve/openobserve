@@ -47,6 +47,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </q-input>
                 <q-btn
+                    data-test="pipeline-list-history-btn"
+                    class="q-ml-sm o2-secondary-button tw-h-[36px]"
+                    :class="
+                        store.state.theme === 'dark'
+                        ? 'o2-secondary-button-dark'
+                        : 'o2-secondary-button-light'
+                    "
+                    no-caps
+                    flat
+                    :label="t(`pipeline.history`)"
+                    @click="goToPipelineHistory"
+                    icon="history"
+                />
+                <q-btn
                   data-test="pipeline-list-import-pipeline-btn"
                   class="q-ml-sm o2-secondary-button tw-h-[36px]"
                   padding="sm lg"
@@ -66,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
         </div>
       </div>
-        
+
       <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
         <div class="card-container tw-h-[calc(100vh-127px)]">
           <q-table
@@ -81,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selection="multiple"
             v-model:selected="selectedPipelines"
             :style="hasVisibleRows
-                ? 'width: 100%; height: calc(100vh - 127px)' 
+                ? 'width: 100%; height: calc(100vh - 127px)'
                 : 'width: 100%'"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           >
@@ -194,6 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         round
                         flat
+                        color="negative"
                          icon="error"
                         @click.stop="showErrorDialog(props.row)"
                       >
@@ -607,7 +622,7 @@ const updateActiveTab = () => {
   resultTotal.value = filteredPipelines.value.length;
   columns.value = getColumnsForActiveTab(activeTab.value);
 };
-//this is the function to check whether the pipeline is enabled or not 
+//this is the function to check whether the pipeline is enabled or not
 //becuase if it is not enabled then we need to show the dialog to resume the pipeline from where it paused / start from now
 //else we need to toggle the pipeline state
 const togglePipeline = (row: any) => {
@@ -1042,6 +1057,11 @@ const visibleRows = computed(() => {
 
 const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
+// Watch visibleRows to sync resultTotal with search filter
+watch(visibleRows, (newVisibleRows) => {
+  resultTotal.value = newVisibleRows.length;
+}, { immediate: true });
+
 const showErrorDialog = (pipeline: any) => {
   errorDialog.value.show = true;
   errorDialog.value.data = pipeline;
@@ -1050,6 +1070,12 @@ const showErrorDialog = (pipeline: any) => {
 const closeErrorDialog = () => {
   errorDialog.value.show = false;
   errorDialog.value.data = null;
+};
+
+const goToPipelineHistory = () => {
+  router.push({
+    name: "pipelineHistory",
+  });
 };
 
 const bulkTogglePipelines = async (action: "pause" | "resume") => {
@@ -1171,7 +1197,6 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
 }
 
 .pipeline-error-indicator {
-  color: #ef4444 !important;
   cursor: pointer !important;
 
   &:hover {

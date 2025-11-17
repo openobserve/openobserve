@@ -617,11 +617,11 @@ describe("QueryTypeSelector", () => {
     it("should use dark theme styling when theme is dark", () => {
       mockStore.state.theme = "dark";
       wrapper = createWrapper();
-      
+
       const autoButton = wrapper.find('[data-test="dashboard-auto"]');
       const style = autoButton.attributes("style");
-      // Check for either hex or rgba format of the same color
-      expect(style).toMatch(/(background-color: #bfbebef5|background-color: rgba?\(191, 190, 190)/);
+      // In dark theme, the button uses transparent background
+      expect(style).toContain("background-color: transparent");
     });
   });
 

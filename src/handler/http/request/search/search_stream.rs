@@ -38,6 +38,8 @@ use tokio::sync::mpsc;
 use tracing::Span;
 
 #[cfg(feature = "enterprise")]
+use crate::common::utils::http::get_extract_patterns_from_request;
+#[cfg(feature = "enterprise")]
 use crate::{
     common::meta::search::AuditContext,
     handler::http::request::search::utils::check_stream_permissions,
@@ -49,10 +51,11 @@ use crate::{
         utils::{
             auth::UserEmail,
             http::{
-                get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
-                get_is_ui_histogram_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request,
+                get_clear_cache_from_request, get_fallback_order_by_col_from_request,
+                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
+                get_or_create_trace_id, get_search_event_context_from_request,
+                get_search_type_from_request, get_stream_type_from_request,
+                get_use_cache_from_request,
             },
         },
     },
@@ -67,6 +70,7 @@ use crate::{
         setup_tracing_with_trace_id,
     },
 };
+
 /// Search HTTP2 streaming endpoint
 
 #[utoipa::path(
@@ -144,6 +148,10 @@ pub async fn search_http2_stream(
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
     let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
+    #[cfg(feature = "enterprise")]
+    let extract_patterns = get_extract_patterns_from_request(&query);
+    #[cfg(not(feature = "enterprise"))]
+    let extract_patterns = false;
 
     // Parse the search request
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
@@ -221,6 +229,15 @@ pub async fn search_http2_stream(
             return http_response;
         }
     };
+    #[cfg(feature = "enterprise")]
+    for stream in stream_names.iter() {
+        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
+                e.to_string(),
+            ));
+        }
+    }
 
     let mut sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
         Ok(sql) => sql,
@@ -315,7 +332,8 @@ pub async fn search_http2_stream(
     }
 
     // Set use_cache from query params
-    req.use_cache = get_use_cache_from_request(&query);
+    req.clear_cache = get_clear_cache_from_request(&query);
+    req.use_cache = get_use_cache_from_request(&query) && !req.clear_cache;
 
     // Set search type if not set
     if req.search_type.is_none() {
@@ -426,6 +444,7 @@ pub async fn search_http2_stream(
         fallback_order_by_col,
         audit_ctx,
         is_multi_stream_search,
+        extract_patterns,
     ));
 
     // Return streaming response
@@ -617,6 +636,18 @@ pub async fn values_http2_stream(
         stream_type = values_req.stream_type;
     }
 
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) =
+            crate::service::search::check_search_allowed(&org_id, Some(&values_req.stream_name))
+        {
+            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
+                e.to_string(),
+            ));
+        }
+    }
+
     // Get use_cache from query params
     values_req.use_cache = get_use_cache_from_request(&query);
 
@@ -733,6 +764,9 @@ pub async fn values_http2_stream(
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
 
+    // Pattern extraction is not supported for values endpoint
+    let extract_patterns = false;
+
     // Spawn the search task to process the request
     actix_web::rt::spawn(process_search_stream_request(
         org_id.clone(),
@@ -748,6 +782,7 @@ pub async fn values_http2_stream(
         None,
         audit_ctx,
         false,
+        extract_patterns,
     ));
 
     // Return streaming response

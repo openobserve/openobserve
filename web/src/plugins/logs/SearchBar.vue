@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="search"
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm btn-height-32"
+                class="button button-left tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm btn-height-32"
               >
                 <q-tooltip>
                   {{ t("common.search") }}
@@ -46,12 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <q-btn
                 data-test="logs-visualize-toggle"
-                :class="
-                  searchObj.meta.logsVisualizeToggle === 'visualize'
-                    ? 'selected'
-                    : ''
-                "
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm btn-height-32"
+                :class="[
+                  searchObj.meta.logsVisualizeToggle === 'visualize' ? 'selected' : '',
+                  config.isEnterprise == 'true' ? 'button button-center tw-rounded-none' : 'button button-right !tw-rounded-l-none',
+                  'tw-flex tw-justify-center tw-items-center no-border no-outline q-px-sm btn-height-32'
+                ]"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disable="isVisualizeDisabled"
                 no-caps
@@ -63,6 +62,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-tooltip>
                 <q-tooltip v-else>
                   {{ t("search.visualize") }}
+                </q-tooltip>
+              </q-btn>
+            </div>
+            <div v-if="config.isEnterprise == 'true'">
+              <q-btn
+                data-test="logs-patterns-toggle"
+                :class="
+                  searchObj.meta.logsVisualizeToggle === 'patterns'
+                    ? 'selected'
+                    : ''
+                "
+                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm btn-height-32"
+                @click="onLogsVisualizeToggleUpdate('patterns')"
+                no-caps
+                size="sm"
+                icon="pattern"
+              >
+                <q-tooltip>
+                  {{ t("search.showPatternsLabel") }}
                 </q-tooltip>
               </q-btn>
             </div>
@@ -106,8 +124,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="sqlIcon" alt="SQL Mode"
-class="toolbar-icon" />
+            <img :src="sqlIcon"
+alt="SQL Mode" class="toolbar-icon" />
             <q-tooltip v-if="isSqlModeDisabled">
               {{ t("search.sqlModeDisabledForVisualization") }}
             </q-tooltip>
@@ -165,6 +183,7 @@ class="toolbar-icon" />
             icon="save"
             icon-right="saved_search"
             class="saved-views-dropdown no-border"
+            content-class="saved-views-dropdown-menu"
           >
             <q-list
               :style="
@@ -203,15 +222,15 @@ class="toolbar-icon" />
                           data-test="log-search-saved-view-field-search-input"
                           v-model="searchObj.data.savedViewFilterFields"
                           data-cy="index-field-search-input"
-                          filled
                           borderless
                           dense
                           clearable
                           debounce="1"
+                          class="tw-mx-2 tw-my-2"
                           :placeholder="t('search.searchSavedView')"
                         >
                           <template #prepend>
-                            <q-icon name="search" />
+                            <q-icon name="search"  />
                           </template>
                         </q-input>
                       </div>
@@ -238,10 +257,10 @@ class="toolbar-icon" />
                       </q-tr>
                     </template>
                     <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list"
-no-hover>
+                      <q-td :props="props"
+class="field_list" no-hover>
                         <q-item
-                          class="q-pa-sm saved-view-item"
+                          class="q-pa-xs saved-view-item"
                           clickable
                           v-close-popup
                         >
@@ -252,7 +271,7 @@ no-hover>
                           >
                             <q-item-label
                               class="ellipsis"
-                              style="max-width: 188px"
+                              style="max-width: 140px"
                               >{{ props.row.view_name }}</q-item-label
                             >
                           </q-item-section>
@@ -348,7 +367,7 @@ no-hover>
                     <template v-slot:body-cell-view_name="props">
                       <q-td :props="props" class="field_list q-pa-xs">
                         <q-item
-                          class="q-pa-sm saved-view-item"
+                          class="q-pa-xs saved-view-item"
                           clickable
                           v-close-popup
                         >
@@ -358,7 +377,7 @@ no-hover>
                           >
                             <q-item-label
                               class="ellipsis"
-                              style="max-width: 185px"
+                              style="max-width: 90px"
                               >{{ props.row.view_name }}</q-item-label
                             >
                           </q-item-section>
@@ -626,8 +645,8 @@ no-hover>
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="quickModeIcon" alt="Quick Mode"
-class="toolbar-icon" />
+            <img :src="quickModeIcon"
+alt="Quick Mode" class="toolbar-icon" />
             <q-tooltip>
               {{ t("search.quickModeLabel") }}
             </q-tooltip>
@@ -952,38 +971,96 @@ class="q-pr-sm q-pt-xs" />
               </q-btn-dropdown>
             </q-btn-group>
             <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'">
-              <q-btn
+              <div v-if="config.isEnterprise == 'true'" class="tw-flex">
+                <q-btn
                 v-if="
-                  config.isEnterprise == 'true' &&
-                  visualizeSearchRequestTraceIds.length
+                  visualizeSearchRequestTraceIds.length > 0
                 "
                 data-test="logs-search-bar-visualize-cancel-btn"
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button tw-w-[90px] element-box-shadow"
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
+                :class="
+                  config.isEnterprise == 'true'
+                    ? 'search-button-enterprise-border-radius'
+                    : 'search-button-normal-border-radius'
+                "
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
               <q-btn
-                v-else
-                data-test="logs-search-bar-visualize-refresh-btn"
-                dense
+                  v-else
+                  data-test="logs-search-bar-visualize-refresh-btn"
+                  dense
+                  flat
+                  :title="t('search.runQuery')"
+                  class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                  :class="
+                    config.isEnterprise == 'true'
+                      ? 'search-button-enterprise-border-radius'
+                      : 'search-button-normal-border-radius'
+                  "
+                  no-caps
+                  @click="handleRunQueryFn"
+                  >{{ t("search.runQuery") }}</q-btn
+                >
+              <q-separator class="tw-h-[29px] tw-w-[1px]" />
+              <q-btn-dropdown
                 flat
-                :title="t('search.runQuery')"
-                class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
-                no-caps
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-primary-button-dark'
-                    : 'o2-primary-button-light'
-                "
-                @click="handleRunQueryFn"
-                :disable="disable"
-                >{{ t("search.runQuery") }}</q-btn
+                class="tw-h-[29px] search-button-dropdown"
+                :class="[
+                  config.isEnterprise == 'true' &&
+                  visualizeSearchRequestTraceIds.length
+                    ? 'o2-color-cancel'
+                    : 'o2-color-primary',
+                  config.isEnterprise == 'true'
+                    ? 'search-button-dropdown-enterprise-border-radius'
+                    : 'search-button-normal-border-radius',
+                ]"
+                unelevated
+                dense
               >
+                <q-btn
+                  data-test="logs-search-bar-refresh-btn"
+                  data-cy="search-bar-visuzlie-hard-refresh-button"
+                  dense
+                  flat
+                  no-caps
+                  :title="'Refresh Cache & Run Query'"
+                  class="q-pa-sm search-button-dropdown tw-text-[12px]"
+                  v-close-popup
+                  @click="handleRunQueryFn(true)"
+                  :disable="
+                    config.isEnterprise == 'true' &&
+                    !!visualizeSearchRequestTraceIds.length
+                  "
+                >
+                  <q-icon name="refresh" class="q-mr-xs" />
+                  Refresh Cache & Run Query</q-btn
+                >
+              </q-btn-dropdown>
+              </div>
+              <div v-else class="tw-flex">
+                <q-btn
+                  data-test="logs-search-bar-visualize-refresh-btn"
+                  dense
+                  flat
+                  :title="t('search.runQuery')"
+                  class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                  :class="
+                    config.isEnterprise == 'true'
+                      ? 'search-button-enterprise-border-radius'
+                      : 'search-button-normal-border-radius'
+                  "
+                  no-caps
+                  @click="handleRunQueryFn"
+                  :disable="disable"
+                  >{{ t("search.runQuery") }}</q-btn
+                >
+              </div>
             </div>
-            <div v-else>
+            <div v-else class="tw-flex">
               <q-btn
                 v-if="
                   config.isEnterprise == 'true' &&
@@ -995,9 +1072,9 @@ class="q-pr-sm q-pt-xs" />
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button tw-w-[90px] element-box-shadow"
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -1006,16 +1083,10 @@ class="q-pr-sm q-pt-xs" />
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                flat
                 :title="t('search.runQuery')"
-                class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
-                style="font-size: 11px"
+                class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 no-caps
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-primary-button-dark'
-                    : 'o2-primary-button-light'
-                "
                 @click="handleRunQueryFn"
                 :disable="
                   searchObj.loading == true ||
@@ -1023,6 +1094,35 @@ class="q-pr-sm q-pt-xs" />
                 "
                 >{{ t("search.runQuery") }}</q-btn
               >
+               <q-separator  class="tw-h-[29px] tw-w-[1px]" />
+              <q-btn-dropdown v-if="config.isEnterprise == 'true'" flat class="tw-h-[29px]"
+                :class="[
+                config.isEnterprise == 'true' &&
+                    (!!searchObj.data.searchRequestTraceIds.length ||
+                      !!searchObj.data.searchWebSocketTraceIds.length) &&
+                    (searchObj.loading == true ||
+                      searchObj.loadingHistogram == true) ? 'o2-color-cancel' : 'o2-color-primary',
+                config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-normal-border-radius'
+                ]"
+               unelevated dense >
+                    <q-btn
+                      data-test="logs-search-bar-refresh-btn"
+                      data-cy="search-bar-refresh-button"
+                      dense
+                      flat
+                      no-caps
+                      :title="'Refresh Cache & Run Query'"
+                      class="q-pa-sm tw-text-[12px] "
+                      v-close-popup
+                      @click="handleRunQueryFn(true)"
+                      :disable="
+                        searchObj.loading == true ||
+                        searchObj.loadingHistogram == true
+                      "
+                      >
+                      <q-icon name="refresh" class="q-mr-xs" />
+                      Refresh Cache & Run Query</q-btn>
+              </q-btn-dropdown>
             </div>
           </div>
         </div>
@@ -1042,7 +1142,8 @@ class="q-pr-sm q-pt-xs" />
         >
           <template #before>
             <div
-              class="col tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mx-[0.375rem] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-full"
+              class="col tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-full"
+              :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw-ml-[0.375rem]' : 'tw-mx-[0.375rem]'"
             >
               <code-query-editor
                 v-if="router.currentRoute.value.name === 'logs'"
@@ -1467,8 +1568,8 @@ class="q-pr-sm q-pt-xs" />
           <div>
             <div class="text-left q-mb-xs">
               No of Records:
-              <q-icon name="info" size="17px"
-class="q-ml-xs cursor-pointer">
+              <q-icon name="info"
+size="17px" class="q-ml-xs cursor-pointer">
                 <q-tooltip
                   anchor="center right"
                   self="center left"
@@ -1504,8 +1605,8 @@ class="q-ml-xs cursor-pointer">
             style="opacity: 0.8"
             class="text-left mapping-warning-msg q-mt-md"
           >
-            <q-icon name="warning" color="red"
-class="q-mr-sm" />
+            <q-icon name="warning"
+color="red" class="q-mr-sm" />
             <span>Histogram will be disabled for the schedule job</span>
           </div>
         </q-card-section>
@@ -1605,6 +1706,7 @@ import {
   queryIndexSplit,
   timestampToTimezoneDate,
   b64EncodeUnicode,
+  buildDateTimeObject,
 } from "@/utils/zincutils";
 
 import savedviewsService from "@/services/saved_views";
@@ -1673,6 +1775,7 @@ export default defineComponent({
     "handleRunQueryFn",
     "onAutoIntervalTrigger",
     "showSearchHistory",
+    "extractPatterns",
   ],
   methods: {
     searchData() {
@@ -1816,10 +1919,15 @@ export default defineComponent({
     } = useSearchBar();
     const { loadStreamLists, extractFields } = useStreamFields();
 
-    const { refreshData, handleRunQuery, getJobData, routeToSearchSchedule } =
-      useLogs();
+    const {
+      refreshData,
+      handleRunQuery,
+      getJobData,
+      routeToSearchSchedule,
+      getHistogramTitle,
+    } = useLogs();
 
-    const { isStreamExists, isStreamFetched, getStreams } = useStreams();
+    const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams();
     const queryEditorRef = ref(null);
 
     const formData: any = ref(defaultValue());
@@ -2380,39 +2488,58 @@ export default defineComponent({
     };
 
     const downloadLogs = async (data, format) => {
-      let filename = "logs-data";
-      let dataobj;
-      if (format === "csv") {
-        filename += ".csv";
-        dataobj = await json2csv(data);
-      } else {
-        filename += ".json";
-        dataobj = JSON.stringify(data, null, 2);
-      }
-      if (dataobj.length === 0) {
+      //here we are using a package json2csv which converts json to csv data
+      //why package because we faced one issue where user has , in some of the fields so
+      //it is treating it as seperate fields
+      //eg: {body:"hey this is the email body , with some info in it "}
+      //after converting it will treat hey this is the email body this as the body and remaining will be the next column
+      //to solve this issue we are using json2csv package
+      try {
+        let filename = "logs-data";
+        let dataobj;
+        const options = {
+          emptyFieldValue: "",
+        };
+
+        if (format === "csv") {
+          filename += ".csv";
+          dataobj = await json2csv(data, options);
+        } else {
+          filename += ".json";
+          dataobj = JSON.stringify(data, null, 2);
+        }
+        if (dataobj.length === 0) {
+          $q.notify({
+            type: "negative",
+            message: "No data available to download.",
+          });
+          return;
+        }
+        if (format === "csv") {
+          dataobj = new Blob([dataobj], { type: "text/csv" });
+        } else {
+          dataobj = new Blob([dataobj], { type: "application/json" });
+        }
+        const file = new File([dataobj], filename, {
+          type: format === "csv" ? "text/csv" : "application/json",
+        });
+        const url = URL.createObjectURL(file);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showDownloadMenu.value = false;
+      } catch (error) {
+        showDownloadMenu.value = false;
         $q.notify({
           type: "negative",
-          message: "No data available to download.",
+          message: "Error downloading logs",
+          timeout: 2000,
         });
-        return;
       }
-      if (format === "csv") {
-        dataobj = new Blob([dataobj], { type: "text/csv" });
-      } else {
-        dataobj = new Blob([dataobj], { type: "application/json" });
-      }
-      const file = new File([dataobj], filename, {
-        type: format === "csv" ? "text/csv" : "application/json",
-      });
-      const url = URL.createObjectURL(file);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      showDownloadMenu.value = false;
     };
 
     onMounted(async () => {
@@ -2837,6 +2964,7 @@ export default defineComponent({
               extractedObj.data.savedViews = searchObj.data.savedViews;
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
+              //here we are merging deep to the searchObj with the extractedObj
               mergeDeep(searchObj, extractedObj);
               searchObj.shouldIgnoreWatcher = true;
 
@@ -2871,6 +2999,98 @@ export default defineComponent({
                 );
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
+              }
+
+
+              //here we are getting data so we need to check here
+              //before we set the time to the dateTimeRef.value we need to check if the startTime and endTime difference is greater than maxQueryRange in hours
+              //solution will be we will do endTime - startTime and convert that difference into hours and check with both global and stream level maxQueryRange and if it is less than or equal to that we will keep that as it is
+              //if that exceeds the maxQueryRange we will convert that to relative type (because we cannot assume the start and end date) or we can do that by converting present time - maxQueryRange
+
+              // Validate and adjust time range based on maxQueryRange
+              //before we check all this we need to get the current selected stream max query range and also global max query range
+              //we need to compare so if max query range of stream is there we will use that otherwise we will use the global max query if both are not present
+              //we will skip this below process
+
+              // Get max query range for all selected streams and take the minimum
+              // Preference: stream max query range > global max query range
+              const globalMaxQueryRange = store.state.zoConfig.max_query_range || 0;
+              let effectiveMaxQueryRange = -1;
+
+              if (selectedStreams && selectedStreams.length > 0) {
+                // Fetch all stream data in parallel
+                const streamDataPromises = selectedStreams.map((streamName) =>
+                  getStream(streamName, searchObj.data.stream.streamType, false)
+                );
+
+                try {
+                  const streamDataList = await Promise.all(streamDataPromises);
+
+                  // Extract max_query_range from each stream's settings
+                  const streamMaxQueryRanges = streamDataList
+                    .map((streamData) => streamData?.settings?.max_query_range || 0)
+                    .filter((range) => range > 0); // Only consider positive values
+
+                  // If we have stream-specific max query ranges, find the minimum (stream takes preference)
+                  if (streamMaxQueryRanges.length > 0) {
+                    effectiveMaxQueryRange = Math.min(...streamMaxQueryRanges);
+                  } else if (globalMaxQueryRange > 0) {
+                    // No stream-specific ranges, fall back to global max query range
+                    effectiveMaxQueryRange = globalMaxQueryRange;
+                  }
+                } catch (error) {
+                  // On error, fall back to global max query range
+                  effectiveMaxQueryRange = globalMaxQueryRange > 0 ? globalMaxQueryRange : -1;
+                }
+              } else if (globalMaxQueryRange > 0) {
+                // No selected streams, use global max query range
+                effectiveMaxQueryRange = globalMaxQueryRange;
+              }
+
+              // Validate and adjust time range if effective max query range exists
+              if (
+                effectiveMaxQueryRange > 0 &&
+                searchObj.data.datetime?.startTime &&
+                searchObj.data.datetime?.endTime
+              ) {
+                // Calculate time difference in hours
+                const startTimeMicros = parseInt(searchObj.data.datetime.startTime);
+                const endTimeMicros = parseInt(searchObj.data.datetime.endTime);
+                const timeDiffInHours = (endTimeMicros - startTimeMicros) / (60 * 60 * 1000000);
+
+                // Check if time difference exceeds effective max query range
+                if (timeDiffInHours > effectiveMaxQueryRange) {
+                  // Adjust to current time - maxQueryRange
+                  const currentTimeMicros = Date.now() * 1000; // Convert milliseconds to microseconds
+                  const maxQueryRangeMicros = effectiveMaxQueryRange * 60 * 60 * 1000000;
+
+                  const adjustedStartTime = currentTimeMicros - maxQueryRangeMicros;
+                  const adjustedEndTime = currentTimeMicros;
+
+                  // Get the current datetime type
+                  const currentType = searchObj.data.datetime.type || "relative";
+
+                  // Build the complete datetime object with all required fields
+                  const updatedDateTime = buildDateTimeObject(
+                    adjustedStartTime,
+                    adjustedEndTime,
+                    currentType
+                  );
+
+                  // Update searchObj.data.datetime with all fields
+                  searchObj.data.datetime.startTime = adjustedStartTime;
+                  searchObj.data.datetime.endTime = adjustedEndTime;
+
+                  if (currentType === "relative") {
+                    // For relative type, update relativeTimePeriod
+                    searchObj.data.datetime.relativeTimePeriod = updatedDateTime.relativeTimePeriod;
+                  } else if (currentType === "absolute") {
+                    // For absolute type, update selectedDate and selectedTime
+                    searchObj.data.datetime.selectedDate = updatedDateTime.selectedDate;
+                    searchObj.data.datetime.selectedTime = updatedDateTime.selectedTime;
+                    searchObj.data.datetime.relativeTimePeriod = null;
+                  }
+                }
               }
 
               dateTimeRef.value.setSavedDate(searchObj.data.datetime);
@@ -3010,6 +3230,8 @@ export default defineComponent({
               try {
                 searchObj.loading = true;
                 searchObj.meta.refreshHistogram = true;
+                // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
+                searchObj.communicationMethod = "streaming";
                 await extractFields();
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
@@ -3030,7 +3252,7 @@ export default defineComponent({
               searchObj.data.stream.selectedFields =
                 extractedObj.data.resultGrid.colOrder[
                   searchObj.data.stream.selectedStream
-                ];
+                ].filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || '_timestamp'));
             } else {
               searchObj.data.stream.selectedFields =
                 extractedObj.data.stream.selectedFields;
@@ -3632,11 +3854,11 @@ export default defineComponent({
 
     const handleHistogramMode = () => {};
 
-    const handleRunQueryFn = () => {
-      if (searchObj.meta.logsVisualizeToggle == "visualize") {
-        emit("handleRunQueryFn");
+    const handleRunQueryFn = (clear_cache = false) => {
+      if (searchObj.meta.logsVisualizeToggle == "visualize" || searchObj.meta.logsVisualizeToggle == "patterns") {
+        emit("handleRunQueryFn", typeof clear_cache === 'boolean' ? clear_cache : false);
       } else {
-        handleRunQuery();
+        handleRunQuery(typeof clear_cache === 'boolean' ? clear_cache : false);
       }
     };
 
@@ -3660,6 +3882,7 @@ export default defineComponent({
       ) {
         // cancel all the visualize queries
         cancelVisualizeQueries();
+
         if (
           searchObj.meta.logsVisualizeDirtyFlag === true ||
           !Object.hasOwn(searchObj.data?.queryResults, "hits") ||
@@ -3673,6 +3896,35 @@ export default defineComponent({
           getQueryData();
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }
+      } else if (
+        value == "logs" &&
+        searchObj.meta.logsVisualizeToggle == "patterns"
+      ) {
+        // Switching from patterns to logs - check if we need to fetch logs
+        const hasLogs =
+          searchObj.data?.queryResults?.hits &&
+          searchObj.data.queryResults.hits.length > 0;
+
+        // console.log("[SearchBar] Switching patterns → logs, hasLogs:", hasLogs);
+
+        if (!hasLogs) {
+          // No logs data - fetch them
+          // console.log("[SearchBar] Fetching logs data");
+          searchObj.loading = true;
+          searchObj.meta.refreshHistogram = true;
+          getQueryData();
+        } else {
+          // Logs exist - just switch the view
+          // console.log("[SearchBar] Reusing existing logs data");
+        }
+      } else if (
+        value == "patterns" &&
+        (searchObj.meta.logsVisualizeToggle == "logs" ||
+          searchObj.meta.logsVisualizeToggle == "visualize")
+      ) {
+        // Switching to patterns mode - this will be handled by a separate watcher in Index.vue
+        emit("extractPatterns");
+        // console.log("[SearchBar] Switching to patterns mode");
       } else if (
         value == "visualize" &&
         searchObj.meta.logsVisualizeToggle == "logs"
@@ -3723,6 +3975,16 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle = value;
       updateUrlQueryParams();
 
+      if (searchObj.meta.logsVisualizeToggle === "logs") {
+        const hasLogs =
+          searchObj.data?.queryResults?.hits &&
+          searchObj.data.queryResults.hits.length > 0;
+
+        if (hasLogs) {
+          searchObj.data.histogram.chartParams.title = getHistogramTitle(false);
+        }
+      }
+
       // dispatch resize event
       window.dispatchEvent(new Event("resize"));
     };
@@ -3760,7 +4022,7 @@ export default defineComponent({
           searchObj.data.transformType === "function" && isFocused.value
             ? isDarkMode
               ? "var(--o2-card-bg)"
-              : "var(--o2-card-bg)" // Dark mode: grey, Light mode: yellow (or any color)
+              : "white" // Dark mode: grey, Light mode: yellow (or any color)
             : "",
         borderBottom:
           searchObj.data.transformType === "function" && isFocused.value
@@ -4461,4 +4723,35 @@ export default defineComponent({
 .q-dark .group-menu-btn {
   border: 0.0625rem solid var(--o2-border-color) !important;
 }
+.o2-run-query-button{
+  font-size: 11px;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  padding: 0px 12px !important;
+  width: 92px !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  /* subtle default glow */
+  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
+}
+.o2-color-primary{
+    background-color: var(--o2-primary-btn-bg);
+    color: var(--o2-primary-btn-text);
+    &:hover {
+    opacity: 0.9;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
+  }
+}
+ .search-button-enterprise-border-radius{
+      border-radius: 0.375rem 0px 0px 0.375rem !important;
+  }
+  .search-button-normal-border-radius{
+      border-radius: 0.375rem;
+  }
+  .search-button-dropdown-enterprise-border-radius{
+          border-radius: 0px 0.375rem 0.375rem  0px !important;
+  }
+  .o2-color-cancel{
+    background-color:#f67a7a;
+    color: var(--o2-primary-btn-text);
+  }
 </style>

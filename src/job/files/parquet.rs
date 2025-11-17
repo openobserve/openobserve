@@ -93,14 +93,24 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     // prepare files
+    let mut drain_backoff_ms = 50u64; // Start with 50ms backoff
     loop {
-        if cluster::is_offline() {
-            break;
+        // Check if we're in draining mode - if so, skip sleep and process immediately
+        let is_draining = ingester::is_draining();
+
+        if !is_draining {
+            // Normal operation: sleep between scans
+            if cluster::is_offline() {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(
+                get_config().limit.file_push_interval,
+            ))
+            .await;
+        } else {
+            log::info!("[INGESTER:JOB] Draining mode active, processing files immediately");
         }
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().limit.file_push_interval,
-        ))
-        .await;
+
         // check pending delete files
         if let Err(e) = scan_pending_delete_files().await {
             log::error!("[INGESTER:JOB] Error scan pending delete files: {e}");
@@ -109,9 +119,87 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if let Err(e) = scan_wal_files(tx.clone()).await {
             log::error!("[INGESTER:JOB] Error prepare parquet files: {e}");
         }
+
+        // If draining and no more files to process, we can exit
+        if is_draining {
+            // Check if there are any remaining files to process
+            let has_pending_files = check_has_pending_files().await;
+            if !has_pending_files {
+                log::info!("[INGESTER:JOB] Draining complete, all files uploaded to S3");
+                break;
+            } else {
+                // Backoff to avoid tight loop while draining
+                tokio::time::sleep(tokio::time::Duration::from_millis(drain_backoff_ms)).await;
+                // Exponential backoff up to 1 second
+                drain_backoff_ms = (drain_backoff_ms * 2).min(1000);
+            }
+        }
     }
     log::info!("[INGESTER:JOB] job::files::parquet is stopped");
     Ok(())
+}
+
+/// Recursively check a directory for parquet files
+fn has_parquet_files_in_dir(
+    dir: &Path,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send + '_>> {
+    Box::pin(async move {
+        match tokio::fs::read_dir(dir).await {
+            Ok(mut entries) => {
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    if let Ok(metadata) = entry.metadata().await {
+                        if metadata.is_file() {
+                            if let Some(ext) = entry.path().extension()
+                                && ext == "parquet"
+                            {
+                                return true;
+                            }
+                        } else if metadata.is_dir() {
+                            // Recursively check subdirectories
+                            if has_parquet_files_in_dir(&entry.path()).await {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            Err(_) => {
+                // Directory doesn't exist or can't be read
+                return false;
+            }
+        }
+        false
+    })
+}
+
+/// Check if there are any pending parquet files to upload or files being processed
+async fn check_has_pending_files() -> bool {
+    let cfg = get_config();
+    let wal_dir = match Path::new(&cfg.common.data_wal_dir).canonicalize() {
+        Ok(p) => p,
+        Err(e) => {
+            log::warn!(
+                "[INGESTER:JOB] Unable to canonicalize WAL dir '{}': {e}",
+                cfg.common.data_wal_dir
+            );
+            return false;
+        }
+    };
+    let pattern = wal_dir.join("files/");
+
+    // Check if there are any parquet files in the WAL directory
+    if has_parquet_files_in_dir(&pattern).await {
+        return true;
+    }
+
+    // Also check if there are files being processed
+    let processing_count = PROCESSING_FILES.read().await.len();
+    if processing_count > 0 {
+        log::info!("[INGESTER:JOB] Still processing {} files", processing_count);
+        return true;
+    }
+
+    false
 }
 
 // check if the file is still in pending delete
@@ -686,6 +774,9 @@ async fn merge_files(
 
     // get latest version of schema
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
+    #[cfg(feature = "enterprise")]
+    let log_patterns_enabled =
+        infra::schema::get_stream_setting_log_patterns_enabled(&stream_settings);
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
@@ -702,6 +793,7 @@ async fn merge_files(
     let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
         let latest_schema = generate_schema_for_defined_schema_fields(
+            stream_type,
             &latest_schema,
             &defined_schema_fields,
             need_original,
@@ -797,6 +889,37 @@ async fn merge_files(
         start.elapsed().as_millis(),
     );
 
+    // Enterprise: Extract patterns from merged parquet (ingester nodes only)
+    #[cfg(feature = "enterprise")]
+    {
+        use config::cluster::LOCAL_NODE;
+        if LOCAL_NODE.is_ingester() && stream_type == StreamType::Logs && log_patterns_enabled {
+            let buf_clone = buf.clone();
+            let org_id_clone = org_id.clone();
+            let stream_name_clone = stream_name.clone();
+            let fts_fields = full_text_search_fields.clone();
+
+            // Spawn pattern extraction task (don't block file movement)
+            tokio::spawn(async move {
+                if let Err(e) = extract_patterns_from_parquet(
+                    &org_id_clone,
+                    &stream_name_clone,
+                    &buf_clone,
+                    &fts_fields,
+                )
+                .await
+                {
+                    log::error!(
+                        "[PatternExtraction] Failed to extract patterns for {}/{}: {}",
+                        org_id_clone,
+                        stream_name_clone,
+                        e
+                    );
+                }
+            });
+        }
+    }
+
     // upload file
     let buf = Bytes::from(buf);
     if cfg.cache_latest_files.enabled
@@ -858,4 +981,143 @@ fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
     let stream_name = columns[3].to_string();
     let prefix_date = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
     (org_id, stream_type, stream_name, prefix_date)
+}
+
+#[cfg(feature = "enterprise")]
+async fn extract_patterns_from_parquet(
+    org_id: &str,
+    stream_name: &str,
+    parquet_data: &[u8],
+    fts_fields: &[String],
+) -> Result<(), anyhow::Error> {
+    use config::utils::json;
+
+    let start = std::time::Instant::now();
+
+    // Read parquet data and extract log messages
+    let parquet_bytes = Bytes::from(parquet_data.to_vec());
+    let (_schema, mut reader) = get_recordbatch_reader_from_bytes(&parquet_bytes).await?;
+    let mut log_messages = Vec::new();
+    let read_start = std::time::Instant::now();
+
+    // ParquetRecordBatchStream is a Stream, use .next().await
+    use futures::StreamExt;
+    while let Some(batch_result) = reader.next().await {
+        let batch = batch_result?;
+
+        // Try to find FTS fields in the batch
+        for fts_field in fts_fields {
+            if let Some(column) = batch.column_by_name(fts_field) {
+                // Extract string values from the column
+                use arrow::array::Array;
+                if let Some(string_array) =
+                    column.as_any().downcast_ref::<arrow::array::StringArray>()
+                {
+                    for i in 0..string_array.len() {
+                        if !string_array.is_null(i) {
+                            log_messages.push((
+                                0i64, // timestamp not needed for pattern extraction
+                                {
+                                    let mut map = json::Map::new();
+                                    map.insert(
+                                        fts_field.clone(),
+                                        json::Value::String(string_array.value(i).to_string()),
+                                    );
+                                    map
+                                },
+                            ));
+                        }
+                    }
+                    break; // Found FTS field, no need to check others
+                }
+            }
+        }
+    }
+
+    let read_duration = read_start.elapsed();
+
+    if log_messages.is_empty() {
+        log::debug!(
+            "[PatternExtraction] No log messages found in parquet for {}/{}",
+            org_id,
+            stream_name
+        );
+        return Ok(());
+    }
+
+    log::info!(
+        "[PatternExtraction] Read {} log messages from parquet in {:?} for {}/{}",
+        log_messages.len(),
+        read_duration,
+        org_id,
+        stream_name
+    );
+
+    // Record parquet read time metric
+    metrics::PATTERN_EXTRACTION_TIME
+        .with_label_values(&[org_id, "read_parquet"])
+        .observe(read_duration.as_secs_f64());
+
+    // Extract patterns directly using XDrain (no in-memory accumulation needed)
+    let extraction_start = std::time::Instant::now();
+    let patterns = o2_enterprise::enterprise::log_patterns::extract_patterns_from_logs(
+        &log_messages,
+        fts_fields,
+    )
+    .map_err(|e| anyhow::anyhow!("Pattern extraction failed: {}", e))?;
+    let extraction_duration = extraction_start.elapsed();
+
+    if patterns.is_empty() {
+        log::debug!(
+            "[PatternExtraction] No patterns found for {}/{}",
+            org_id,
+            stream_name
+        );
+        return Ok(());
+    }
+
+    log::info!(
+        "[PatternExtraction] Extracted {} patterns from {} logs in {:?} for {}/{}",
+        patterns.len(),
+        log_messages.len(),
+        extraction_duration,
+        org_id,
+        stream_name
+    );
+
+    // Record pattern extraction time metric
+    metrics::PATTERN_EXTRACTION_TIME
+        .with_label_values(&[org_id, "extraction"])
+        .observe(extraction_duration.as_secs_f64());
+
+    // Ingest patterns immediately
+    let ingest_start = std::time::Instant::now();
+    crate::service::logs::patterns::ingest_patterns(org_id, stream_name, patterns)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to ingest patterns: {}", e))?;
+    let ingest_duration = ingest_start.elapsed();
+
+    let total_duration = start.elapsed();
+
+    log::info!(
+        "[PatternExtraction] Completed in {:?} (read: {:?}, extract: {:?}, ingest: {:?}) for {}/{}",
+        total_duration,
+        read_duration,
+        extraction_duration,
+        ingest_duration,
+        org_id,
+        stream_name
+    );
+
+    // Record ingestion time metric
+    metrics::PATTERN_EXTRACTION_TIME
+        .with_label_values(&[org_id, "ingestion"])
+        .observe(ingest_duration.as_secs_f64());
+
+    // Record total pattern extraction time metric
+    metrics::PATTERN_EXTRACTION_TIME
+        .with_label_values(&[org_id, "total"])
+        .observe(total_duration.as_secs_f64());
+
+    Ok(())
 }

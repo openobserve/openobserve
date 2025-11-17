@@ -117,7 +117,7 @@ opentelemetry-otlp.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
 prometheus.workspace = true
-promql-parser = "0.6"
+promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-parser", branch = "openobserve" }
 prost.workspace = true
 prost-wkt-types.workspace = true
 proto.workspace = true
@@ -251,6 +251,7 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
     "_fetcher-rusttls-tokio",
 ], default-features = false, rev = "6f2392f78ae851e2acf33df8e9764cc299d837db" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+chrono-tz = "0.10"
 cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
@@ -390,11 +391,7 @@ urlencoding = "2.1"
 utoipa = { version = "5", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 uuid = { version = "1.18.1", features = ["v7"] }
-vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "2003d617c7befdc7aa7f73a37263d272cd4a3718" }
-vrl = { version = "0.27.0", git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = [
-    "value",
-    "compiler",
-    "test",
-] }
+vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "v0.49.0-24092025" }
+vrl = { version = "0.26.0", features = ["value", "compiler", "test"] }
 zip = "6.0.0"
 zstd = "0.13"

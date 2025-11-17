@@ -233,12 +233,12 @@ name="warning" class="q-mr-xs" />
               minWidth: '100%',
             }"
             :data-index="virtualRow.index"
-            :ref="(node: any) => rowVirtualizer.measureElement(node)"
-            class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b tw-cursor-pointer"
+            :data-expanded="
+              formattedRows?.[virtualRow.index]?.original?.isExpandedRow
+            "
+            :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
+            class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b tw-cursor-pointer hover:tw-bg-[var(--o2-hover-gray)]"
             :class="[
-              store.state.theme === 'dark'
-                ? 'w-border-gray-800  hover:tw-bg-zinc-800'
-                : 'w-border-gray-100 hover:tw-bg-zinc-200',
               defaultColumns &&
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
@@ -714,11 +714,17 @@ const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
-    estimateSize: () => 20,
-    overscan: 80,
+    estimateSize: () => 24,
+    overscan: 20,
     measureElement:
       typeof window !== "undefined" && !isFirefox.value
-        ? (element: any) => element?.getBoundingClientRect().height
+        ? (element: any) => {
+            if (element.dataset.expanded == "true" || props.wrap) {
+              return element?.getBoundingClientRect().height;
+            } else {
+              return 24;
+            }
+          }
         : undefined,
   };
 });

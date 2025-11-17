@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @handleRunQueryFn="handleRunQueryFn"
               @on-auto-interval-trigger="onAutoIntervalTrigger"
               @showSearchHistory="showSearchHistoryfn"
+              @extractPatterns="extractPatternsForCurrentQuery"
             />
           </div>
         </template>
@@ -49,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection full-width"
-            v-show="searchObj.meta.logsVisualizeToggle == 'logs'"
+            v-show="searchObj.meta.logsVisualizeToggle != 'visualize'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -207,6 +208,7 @@ size="md" /> Select
                     </div>
                     <div
                       v-else-if="
+                        searchObj.meta.logsVisualizeToggle === 'logs' &&
                         searchObj.data.queryResults.hasOwnProperty('hits') &&
                         searchObj.data.queryResults.hits.length == 0 &&
                         searchObj.loading == false &&
@@ -248,6 +250,24 @@ size="md" />
                       >
                         <q-icon name="info" color="primary"
 size="md" />
+                        {{ t("search.applySearch") }}
+                      </h6>
+                    </div>
+                    <div
+                      v-else-if="
+                        searchObj.meta.logsVisualizeToggle === 'patterns' &&
+                        patternsState?.patterns?.patterns?.length == 0 &&
+                        searchObj.meta.searchApplied == false &&
+                        searchObj.loading == false
+                      "
+                      class="row tw-justify-center"
+                    >
+                      <h6
+                        data-test="logs-search-error-message"
+                        class="text-center q-ma-none col-10 tw-pt-[2rem]"
+                      >
+                        <q-icon name="info" color="primary"
+    size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
                     </div>
@@ -298,6 +318,7 @@ size="md" />
               :errorData="visualizeErrorData"
               :searchResponse="searchResponseForVisualization"
               :is_ui_histogram="shouldUseHistogramQuery"
+              :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
             ></VisualizeLogsQuery>
           </div>
         </template>
@@ -420,6 +441,7 @@ import queryService from "@/services/search";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import usePatterns from "@/composables/useLogs/usePatterns";
 import {
   getVisualizationConfig,
   encodeVisualizationConfig,
@@ -609,6 +631,7 @@ export default defineComponent({
       clearSearchObj,
       processHttpHistogramResults,
       loadVisualizeData,
+      loadPatternsData,
     } = useLogs();
 
     const {
@@ -630,12 +653,15 @@ export default defineComponent({
       addTraceId,
     } = logsUtils();
     const {
+      getHistogramData,
       buildWebSocketPayload,
       buildSearch,
       initializeSearchConnection,
-      getHistogramData,
-    } =
-      useSearchStream();
+    } = useSearchStream();
+
+    // Initialize patterns composable (completely separate from logs)
+    const { extractPatterns, patternsState } = usePatterns();
+
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
@@ -880,6 +906,68 @@ export default defineComponent({
       }
     };
 
+    /**
+     * Common method to extract patterns
+     * Handles validation, loading states, and error handling
+     */
+    const extractPatternsForCurrentQuery = async (clear_cache = false) => {
+      console.log("[Index] Extracting patterns for current query");
+      searchObj.meta.resultGrid.showPagination = false;
+      searchObj.loading = true;
+
+      try {
+        const queryReq = buildSearch(false, false);
+        if (!queryReq) {
+          console.log("[Index] No query request available");
+          searchObj.loading = false;
+          return;
+        }
+
+        // Override the size with the pattern scan size from UI
+        queryReq.query.size = patternsState.value.scanSize;
+
+        const streamName = searchObj.data.stream.selectedStream[0];
+        if (!streamName) {
+          console.log("[Index] No stream selected");
+          searchObj.loading = false;
+          showErrorNotification("Please select a stream to extract patterns");
+          return;
+        }
+
+        await extractPatterns(
+          searchObj.organizationIdentifier,
+          streamName,
+          queryReq,
+        );
+        searchObj.loading = false;
+
+        // Set clear_cache flag before calling getQueryData
+        searchObj.meta.clearCache = clear_cache;
+        searchObj.meta.refreshHistogram = true;
+        await getQueryData();
+        refreshHistogramChart();
+        console.log("[Index] Patterns extracted successfully");
+      } catch (error) {
+        console.error("[Index] Error extracting patterns:", error);
+        searchObj.loading = false;
+        showErrorNotification("Error extracting patterns. Please try again.");
+      }
+    };
+
+    // // Watch for patterns mode switch - completely separate from logs flow
+    // watch(
+    //   () => searchObj.meta.logsVisualizeToggle,
+    //   async (newMode, oldMode) => {
+    //     if (newMode === "patterns") {
+    //       console.log("[Index] Switched to patterns mode - fetching patterns");
+    //       await extractPatternsForCurrentQuery();
+    //     } else if (oldMode === "patterns") {
+    //       console.log("[Index] Switched from patterns to", newMode);
+    //       // No need to clear patterns - they can be cached
+    //     }
+    //   },
+    // );
+
     // Main method for handling before mount logic
     async function handleBeforeMount() {
       if (
@@ -889,11 +977,8 @@ export default defineComponent({
           router.currentRoute.value.query.logs_visualize_toggle;
       }
 
-      if (!isLogsTab()) {
-        await setupLogsTab();
-      } else {
-        await setupLogsTab();
-      }
+      // Always setup logs tab on mount
+      await setupLogsTab();
     }
 
     // Helper function to check if the current tab is "logs"
@@ -954,7 +1039,11 @@ export default defineComponent({
           }
 
           if (isLogsTab()) {
+            searchObj.loading = true;
             loadLogsData();
+          } else if (searchObj.meta.logsVisualizeToggle === "patterns") {
+            await loadPatternsData();
+            await extractPatternsForCurrentQuery();
           } else {
             loadVisualizeData();
             searchObj.loading = false;
@@ -1145,16 +1234,8 @@ export default defineComponent({
           //   currentQuery.toLowerCase().indexOf("select ") == 0;
           if (!hasSelect) {
             if (currentQuery != "") {
-              currentQuery = currentQuery.split("|");
-              if (currentQuery.length > 1) {
-                selectFields = "," + currentQuery[0].trim();
-                if (currentQuery[1].trim() != "") {
-                  whereClause = "WHERE " + currentQuery[1].trim();
-                }
-              } else if (currentQuery[0].trim() != "") {
-                if (currentQuery[0].trim() != "") {
-                  whereClause = "WHERE " + currentQuery[0].trim();
-                }
+              if (currentQuery.trim() != "") {
+                  whereClause = "WHERE " + currentQuery;
               }
             }
 
@@ -1470,6 +1551,7 @@ export default defineComponent({
     const searchResponseForVisualization = ref({});
 
     const shouldUseHistogramQuery = ref(false);
+    const shouldRefreshWithoutCache = ref(false);
 
     // Flag to prevent unnecessary chart type changes during URL restoration
     const isRestoringFromUrl = ref(false);
@@ -1838,8 +1920,10 @@ export default defineComponent({
       { deep: true },
     );
 
-    const handleRunQueryFn = async () => {
+    const handleRunQueryFn = async (clear_cache = false) => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
+        // Set the shouldRefreshWithoutCache flag
+        shouldRefreshWithoutCache.value = clear_cache;
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
           let logsPageQuery = "";
@@ -1924,6 +2008,11 @@ export default defineComponent({
 
         // Sync visualization config to URL parameters
         updateUrlQueryParams(dashboardPanelData);
+      }
+
+      if (searchObj.meta.logsVisualizeToggle == "patterns") {
+        // Extract patterns when user clicks run query in patterns mode
+        await extractPatternsForCurrentQuery(clear_cache);
       }
     };
 
@@ -2404,8 +2493,11 @@ export default defineComponent({
       processHttpHistogramResults,
       searchResponseForVisualization,
       shouldUseHistogramQuery,
+      shouldRefreshWithoutCache,
       clearSchemaCache,
       getHistogramData,
+      extractPatternsForCurrentQuery,
+      patternsState,
     };
   },
   computed: {

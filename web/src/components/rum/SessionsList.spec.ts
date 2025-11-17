@@ -223,7 +223,7 @@ describe("SessionsList Component", () => {
       expect(actionColumn).toBeDefined();
       expect(actionColumn.type).toBe("action");
       expect(actionColumn.icon).toBe("play_circle_filled");
-      expect(actionColumn.style).toEqual({ width: "56px" });
+      expect(actionColumn.style).toEqual({ width: "3.5rem" });
     });
 
     it("should have timestamp column with correct properties", () => {

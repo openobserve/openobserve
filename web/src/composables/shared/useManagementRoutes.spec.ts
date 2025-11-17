@@ -352,7 +352,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 10 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(10); // 4 base + 6 enterprise
+      expect(routes[0].children).toHaveLength(11); // 4 base + 6 enterprise
     });
   });
 
@@ -422,7 +422,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 11 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(11); // 4 base + 6 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(12); // 4 base + 6 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {

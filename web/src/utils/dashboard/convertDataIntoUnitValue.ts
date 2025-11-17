@@ -1,6 +1,7 @@
 import { date } from "quasar";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { getColorPalette } from "./colorPalette";
+import { fromZonedTime } from "date-fns-tz";
 
 const units: any = {
   bytes: [
@@ -1422,4 +1423,19 @@ export const getContrastColor = (
     // In light theme, prefer black text unless background is very dark
     return luminance > 0.5 ? "#000000" : "#FFFFFF";
   }
+};
+
+// Function to convert chart timestamp (timezone-adjusted) back to UTC
+export const getUTCTimestampFromZonedTimestamp = (
+  timestampMs: number,
+  currentTimeZone: string,
+) => {
+  if (!timestampMs) return null;
+
+  // Use fromZonedTime to convert from currentTimeZone back to UTC
+  const zonedDate = new Date(timestampMs);
+  const utcDate = fromZonedTime(zonedDate, currentTimeZone);
+  const utcMs = utcDate.getTime();
+
+  return Math.trunc(utcMs * 1000); // milliseconds to microseconds
 };

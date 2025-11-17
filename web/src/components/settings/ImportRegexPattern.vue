@@ -13,190 +13,38 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
-<!-- 
-TODO IMPORTANT:
-PICKTHIS UP after recent changes are merged
- -->
 <template>
-   <div class="o2-custom-bg" style="height: calc(100vh - 50px);">
-    <div class="card-container tw-mb-[0.625rem] ">
-    <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]">
-      <div class="col">
-        <div class="flex">
-          <q-btn
-            no-caps
-            padding="xs"
-            outline
-            @click="arrowBackFn"
-            icon="arrow_back_ios_new"
-            data-test="regex-pattern-import-back-btn"
-          />
-          <div class="text-h6 q-ml-md">
-            {{ t("regex_patterns.import_title") }}
-          </div>
+  <base-import
+    v-if="activeTab !== 'import_built_in_patterns'"
+    ref="baseImportRef"
+    title="Import Regex Pattern"
+    test-prefix="regex-pattern"
+    :is-importing="isImporting"
+    container-class="o2-custom-bg"
+    container-style="height: calc(100vh - 50px);"
+    :editor-heights="{
+      urlEditor: 'calc(100vh - 286px)',
+      fileEditor: 'calc(100vh - 306px)',
+      outputContainer: 'calc(100vh - 128px)',
+      errorReport: 'calc(100vh - 128px)',
+    }"
+    :tabs="allTabs"
+    @back="arrowBackFn"
+    @cancel="arrowBackFn"
+    @import="importJson"
+    @update:active-tab="handleTabChange"
+  >
+    <template #output-content>
+      <div class="tw-w-full" style="min-width: 400px;">
+        <div
+          v-if="regexPatternErrorsToDisplay.length > 0"
+          class="text-center text-h6 tw-py-2"
+        >
+          Error Validations
         </div>
-      </div>
-      <div class="flex justify-center">
-        <q-btn
-          v-close-popup
-          class="q-mr-md o2-secondary-button tw-h-[36px]"
-          :label="t('function.cancel')"
-          no-caps
-          flat
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          @click="arrowBackFn"
-          data-test="regex-pattern-import-cancel-btn"
-        />
-        <q-btn
-          class="o2-primary-button no-border tw-h-[36px]"
-          :label="t('dashboard.import')"
-          type="submit"
-          no-caps
-          flat
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-primary-button-dark'
-              : 'o2-primary-button-light'
-          "
-          @click="importJson"
-          data-test="regex-pattern-import-json-btn"
-        />
-      </div>
-    </div>
-  </div>
-  <div class="flex">
-
-    <div class="flex" style="width: calc(100vw - 1px)">
-      <q-splitter
-        class="logs-search-splitter"
-        no-scroll
-        v-model="splitterModel"
-        :style="{
-          width: '100%',
-          height: '100%',
-        }"
-      >
-        <template #before>
-           <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
-          <div class="app-tabs-container tw-h-[36px] tw-w-fit">
-          <app-tabs
-              data-test="regex-pattern-import-tabs"
-              class="tabs-selection-container"
-              :tabs="tabs"
-              v-model:active-tab="activeTab"
-              @update:active-tab="updateActiveTab"
-          />
-          </div>
-          </div>
-            <div
-              v-if="activeTab == 'import_json_url'"
-              class="editor-container-url card-container tw-py-1"
-            >
-              <q-form class="q-mt-sm tw-pb-2" @submit="onSubmit">
-                <div style="width: 100%" class="q-mb-md">
-                  <q-input
-                    v-model="url"
-                    :label="t('dashboard.addURL')"
-                    color="input-border"
-                    bg-color="input-bg"
-                    class="tw-mx-2"
-                    stack-label
-                    borderless
-                    label-slot
-                    data-test="regex-pattern-import-url-input"
-                  />
-                </div>
-                <query-editor
-                  data-test="regex-pattern-import-sql-editor"
-                  ref="queryEditorRef"
-                  editor-id="regex-pattern-import-query-editor"
-                  class="monaco-editor tw-mx-2"
-                  :debounceTime="300"
-                  v-model:query="jsonStr"
-                  language="json"
-                  :class="
-                    jsonStr == '' && queryEditorPlaceholderFlag
-                      ? 'empty-query'
-                      : ''
-                  "
-                  @focus="queryEditorPlaceholderFlag = false"
-                  @blur="queryEditorPlaceholderFlag = true"
-                />
-
-                <div></div>
-              </q-form>
-            </div>
-            <div
-              v-if="activeTab == 'import_json_file'"
-              class="editor-container-json card-container tw-py-1 "
-            >
-              <q-form class="q-mt-sm tw-pb-2" @submit="onSubmit">
-                <div style="width: 100%" class="q-mb-md">
-                  <q-file
-                    v-model="jsonFiles"
-                    filled
-                    bottom-slots
-                    :label="t('dashboard.dropFileMsg')"
-                    accept=".json"
-                    multiple
-                    data-test="regex-pattern-import-file-input"
-                    class="tw-mx-2"
-                  >
-                    <template v-slot:prepend>
-                      <q-icon name="cloud_upload" @click.stop.prevent />
-                    </template>
-                    <template v-slot:append>
-                      <q-icon
-                        name="close"
-                        @click.stop.prevent="jsonFiles = null"
-                        class="cursor-pointer"
-                        data-test="regex-pattern-import-file-close-btn"
-                      />
-                    </template>
-                    <template v-slot:hint> .json files only </template>
-                  </q-file>
-                </div>
-                <query-editor
-                  data-test="regex-pattern-import-sql-editor"
-                  ref="queryEditorRef"
-                  editor-id="regex-pattern-import-query-editor"
-                  class="monaco-editor tw-mx-2"
-                  :debounceTime="300"
-                  v-model:query="jsonStr"
-                  language="json"
-                  :class="
-                    jsonStr == '' && queryEditorPlaceholderFlag
-                      ? 'empty-query'
-                      : ''
-                  "
-                  @focus="queryEditorPlaceholderFlag = false"
-                  @blur="queryEditorPlaceholderFlag = true"
-                />
-
-                <div></div>
-              </q-form>
-            </div>
-        </template>
-
-        <template #after>
-          <div
-            data-test="regex-pattern-import-output-editor"
-            style=" height: 100%"
-            class="card-container tw-h-full"
-          >
-            <div
-              v-if="regexPatternErrorsToDisplay.length > 0"
-                class="text-center text-h6 tw-py-2"
-            >
-              Error Validations
-            </div>
-            <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
-            <q-separator class="q-mx-md q-mt-md" />
-            <div class="error-report-container">
+        <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
+        <q-separator class="q-mx-md q-mt-md" />
+        <div class="error-report-container">
               <!-- Regex Pattern Errors Section -->
               <div
                 class="error-section"
@@ -312,11 +160,84 @@ PICKTHIS UP after recent changes are merged
               </div>
             </div>
           </div>
-        </template>
-      </q-splitter>
+    </template>
+  </base-import>
+
+  <!-- Built-in Patterns Tab (full width, no custom import button handling) -->
+  <div
+    v-if="activeTab === 'import_built_in_patterns'"
+    class="o2-custom-bg"
+    style="height: calc(100vh - 50px);"
+  >
+    <div class="card-container tw-mb-[0.625rem]">
+      <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]">
+        <div class="col">
+          <div class="flex">
+            <q-btn
+              no-caps
+              padding="xs"
+              outline
+              @click="arrowBackFn"
+              icon="arrow_back_ios_new"
+              data-test="regex-pattern-import-back-btn"
+            />
+            <div class="text-h6 q-ml-md">
+              {{ t("regex_patterns.import_title") }}
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-center">
+          <q-btn
+            v-close-popup
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
+            :label="t('function.cancel')"
+            no-caps
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
+            @click="arrowBackFn"
+            data-test="regex-pattern-import-cancel-btn"
+          />
+          <q-btn
+            class="o2-primary-button no-border tw-h-[36px]"
+            :label="t('dashboard.import')"
+            type="submit"
+            no-caps
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
+            @click="handleImportClick"
+            data-test="regex-pattern-import-json-btn"
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="editor-container-built-in">
+      <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
+        <div class="app-tabs-container tw-h-[36px] tw-w-fit">
+          <app-tabs
+            data-test="regex-pattern-import-tabs"
+            class="tabs-selection-container"
+            :tabs="allTabs"
+            v-model:active-tab="activeTab"
+            @update:active-tab="updateActiveTab"
+          />
+        </div>
+      </div>
+      <built-in-patterns-tab
+        ref="builtInPatternsTabRef"
+        @import-patterns="handleBuiltInPatternsImport"
+        data-test="built-in-patterns-tab"
+      />
     </div>
   </div>
-</div>
 </template>
 
 <script lang="ts">
@@ -336,6 +257,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
 import AppTabs from "../common/AppTabs.vue";
+import BaseImport from "../common/BaseImport.vue";
 import axios from "axios";
 
 import regexPatternsService from "@/services/regex_pattern";
@@ -353,123 +275,36 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-
-    const jsonStr: any = ref("");
     const q = useQuasar();
+    const baseImportRef = ref<any>(null);
 
     const regexPatternErrorsToDisplay = ref<any[]>([]);
-
-    const queryEditorPlaceholderFlag = ref(true);
-    const jsonFiles = ref(null);
-    const url = ref("");
-    const jsonArrayOfObj = ref<any[]>([{}]);
-    const activeTab = ref("import_json_file");
-    const splitterModel = ref(60);
     const userSelectedRegexPatternName = ref([]);
     const userSelectedRegexPattern = ref([]);
     const regexPatternCreators = ref<any[]>([]);
+    const builtInPatternsTabRef = ref<any>(null);
+    const activeTab = ref("import_built_in_patterns");
+    const isImporting = ref(false);
 
     // Create a Set for O(1) lookups
     const existingPatternNames = ref(new Set());
 
-    onMounted(() => {
-      existingPatternNames.value = new Set(props.regexPatterns);
-    });
-
-    const updateRegexPatternName = (
-      regexPatternName: string,
-      index: number,
-    ) => {
-      jsonArrayOfObj.value[index].name = regexPatternName;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    };
-    const updateRegexPattern = (regexPattern: any, index: number) => {
-      jsonArrayOfObj.value[index].pattern = regexPattern;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    };
-
-    watch(jsonFiles, async (newVal: any, oldVal: any) => {
-      if (newVal && newVal.length > 0) {
-        let combinedJson: any[] = [];
-
-        for (const file of newVal) {
-          try {
-            const result: any = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onload = (e: any) => {
-                try {
-                  const parsedJson = JSON.parse(e.target.result);
-                  // Convert to array if it's a single object
-                  const jsonArray = Array.isArray(parsedJson)
-                    ? parsedJson
-                    : [parsedJson];
-                  resolve(jsonArray);
-                } catch (error) {
-                  q.notify({
-                    message: `Error parsing JSON from file ${file.name}`,
-                    color: "negative",
-                    position: "bottom",
-                    timeout: 2000,
-                  });
-                  resolve([]);
-                }
-              };
-              reader.readAsText(file);
-            });
-
-            combinedJson = [...combinedJson, ...result];
-          } catch (error) {
-            console.error("Error reading file:", error);
-          }
+    // Use computed to directly reference BaseImport's jsonArrayOfObj
+    const jsonArrayOfObj = computed({
+      get: () => baseImportRef.value?.jsonArrayOfObj || [],
+      set: (val) => {
+        if (baseImportRef.value) {
+          baseImportRef.value.jsonArrayOfObj = val;
         }
-
-        // Update the refs with combined JSON data
-        jsonArrayOfObj.value = combinedJson;
-        jsonStr.value = JSON.stringify(combinedJson, null, 2);
-      }
-    });
-    watch(url, async (newVal, oldVal) => {
-      try {
-        if (newVal) {
-          const response = await axios.get(newVal);
-
-          // Check if the response body is valid JSON
-          try {
-            if (
-              response.headers["content-type"].includes("application/json") ||
-              response.headers["content-type"].includes("text/plain")
-            ) {
-              jsonStr.value = JSON.stringify(response.data, null, 2);
-              jsonArrayOfObj.value = response.data;
-            } else {
-              q.notify({
-                message: "Invalid JSON format in the URL",
-                color: "negative",
-                position: "bottom",
-                timeout: 2000,
-              });
-            }
-          } catch (parseError) {
-            // If parsing fails, display an error message
-            q.notify({
-              message: "Invalid JSON format",
-              color: "negative",
-              position: "bottom",
-              timeout: 2000,
-            });
-          }
-        }
-      } catch (error) {
-        q.notify({
-          message: "Error fetching data",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
       }
     });
 
-    const tabs = reactive([
+    // All tabs including the built-in patterns tab
+    const allTabs = ref([
+      {
+        label: "Built-in Patterns",
+        value: "import_built_in_patterns",
+      },
       {
         label: "File Upload / JSON",
         value: "import_json_file",
@@ -480,25 +315,54 @@ export default defineComponent({
       },
     ]);
 
-    const updateActiveTab = () => {
-      jsonStr.value = "";
-      jsonFiles.value = null;
-      url.value = "";
-      jsonArrayOfObj.value = [{}];
+    onMounted(() => {
+      existingPatternNames.value = new Set(props.regexPatterns);
+    });
+
+    const updateRegexPatternName = (
+      regexPatternName: string,
+      index: number,
+    ) => {
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].name = regexPatternName;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
-    const importJson = async () => {
+    const updateRegexPattern = (regexPattern: any, index: number) => {
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].pattern = regexPattern;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
+    };
+
+    const handleTabChange = (newTab: string) => {
+      activeTab.value = newTab;
+    };
+
+    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
       regexPatternErrorsToDisplay.value = [];
+      regexPatternCreators.value = [];
 
       try {
-        if ((!jsonStr.value || jsonStr.value.trim() === "") && !url.value) {
+        if (!jsonString || jsonString.trim() === "") {
           throw new Error("JSON string is empty");
-        } else {
-          const parsedJson = JSON.parse(jsonStr.value);
-          jsonArrayOfObj.value = Array.isArray(parsedJson)
-            ? parsedJson
-            : [parsedJson];
         }
+
+        const parsedJson = JSON.parse(jsonString);
+        jsonArrayOfObj.value = Array.isArray(parsedJson)
+          ? parsedJson
+          : [parsedJson];
       } catch (e: any) {
         q.notify({
           message: e.message || "Invalid JSON format",
@@ -509,54 +373,56 @@ export default defineComponent({
         return;
       }
 
-      let hasErrors = false;
       let successCount = 0;
       const totalCount = jsonArrayOfObj.value.length;
-      for (let index = 0; index < jsonArrayOfObj.value.length; index++) {
-        const jsonObj = jsonArrayOfObj.value[index];
+      isImporting.value = true;
+
+      for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
         const success = await processJsonObject(jsonObj, index + 1);
-        if (!success) {
-          hasErrors = true;
-        } else {
+        if (success) {
           successCount++;
         }
       }
 
-      // Only redirect and show success message if ALL regex patterns were imported successfully
       if (successCount === totalCount) {
         q.notify({
-          message: `Successfully imported regex-pattern(s)`,
+          message: `Successfully imported ${successCount} pattern(s)`,
           color: "positive",
           position: "bottom",
           timeout: 2000,
         });
-        emit("update:list");
 
-        router.push({
-          name: "regexPatterns",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        emit("cancel:hideform");
+        setTimeout(() => {
+          emit("update:list");
+          router.push({
+            name: "regexPatterns",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          });
+          emit("cancel:hideform");
+        }, 400);
+      }
+
+      isImporting.value = false;
+
+      if (baseImportRef.value) {
+        baseImportRef.value.isImporting = false;
       }
     };
 
     const processJsonObject = async (jsonObj: any, index: number) => {
       try {
-        const isValidRegexPattern = await validateRegexPatternInputs(
+        const validationResult = await validateRegexPatternInputs(
           jsonObj,
           index,
         );
-        if (!isValidRegexPattern) {
-          return false;
+        if (!validationResult) {
+          return false;  // Validation error
         }
 
         if (regexPatternErrorsToDisplay.value.length === 0) {
-          const hasCreatedRegexPattern = await createRegexPattern(
-            jsonObj,
-            index,
-          );
+          const hasCreatedRegexPattern = await createRegexPattern(jsonObj, index);
           return hasCreatedRegexPattern;
         }
         return false;
@@ -572,51 +438,25 @@ export default defineComponent({
     };
 
     const validateRegexPatternInputs = async (jsonObj: any, index: number) => {
-      if (
-        !jsonObj.name ||
-        !jsonObj.name.trim() ||
-        typeof jsonObj.name !== "string"
-      ) {
-        regexPatternErrorsToDisplay.value.push([
-          {
-            field: "regex_pattern_name",
-            message: `Regex pattern - ${index}: name is required`,
-          },
-        ]);
+      if(!jsonObj.name || !jsonObj.name.trim() || typeof jsonObj.name !== 'string'){
+        regexPatternErrorsToDisplay.value.push([{
+          field: 'regex_pattern_name',
+          message: `Regex pattern - ${index}: name is required`
+        }]);
         return false;
       }
-      // Check if name already exists - O(1) lookup
-      if (existingPatternNames.value.has(jsonObj.name.trim())) {
-        regexPatternErrorsToDisplay.value.push([
-          {
-            field: "regex_pattern_name",
-            message: `Regex pattern - ${index}: with this name already exists`,
-          },
-        ]);
-
+      // Note: Duplicate pattern names are allowed.
+      // Primary key is UUID-based (id), so multiple patterns can have the same name.
+      // The backend will handle duplicates by appending a suffix automatically.
+      if(!jsonObj.pattern || !jsonObj.pattern.trim() || typeof jsonObj.pattern !== 'string'){
+        regexPatternErrorsToDisplay.value.push([{
+          field: 'regex_pattern',
+          message: `Regex pattern - ${index}: is required`
+        }]);
         return false;
       }
-      if (
-        !jsonObj.pattern ||
-        !jsonObj.pattern.trim() ||
-        typeof jsonObj.pattern !== "string"
-      ) {
-        regexPatternErrorsToDisplay.value.push([
-          {
-            field: "regex_pattern",
-            message: `Regex pattern - ${index}: is required`,
-          },
-        ]);
-        return false;
-      }
-      if (
-        typeof jsonObj.description !== "string" &&
-        jsonObj.description !== null &&
-        jsonObj.description !== undefined
-      ) {
-        regexPatternErrorsToDisplay.value.push([
-          `Regex pattern - ${index}: description must be a string or should be empty`,
-        ]);
+      if(typeof jsonObj.description !== 'string' && jsonObj.description !== null && jsonObj.description !== undefined){
+        regexPatternErrorsToDisplay.value.push([`Regex pattern - ${index}: description must be a string or should be empty`]);
         return false;
       }
       return true;
@@ -624,26 +464,43 @@ export default defineComponent({
 
     const createRegexPattern = async (jsonObj: any, index: number) => {
       try {
-        const payload = {
-          name: jsonObj.name,
-          pattern: jsonObj.pattern,
-          description: jsonObj.description,
-        };
-        await regexPatternsService.create(
-          store.state.selectedOrganization.identifier,
-          payload,
-        );
-        regexPatternCreators.value.push({
-          success: true,
-          message: `Regex pattern - ${index}: "${jsonObj.name}" created successfully \nNote: please remove the created regex pattern object ${jsonObj.name} from the json file`,
-        });
-        return true;
+          const payload = {
+              name: jsonObj.name,
+              pattern: jsonObj.pattern,
+              description: jsonObj.description,
+          }
+          await regexPatternsService.create(store.state.selectedOrganization.identifier, payload);
+          regexPatternCreators.value.push({
+              success: true,
+              message: `Regex pattern - ${index}: "${jsonObj.name}" created successfully \nNote: please remove the created regex pattern object ${jsonObj.name} from the json file`,
+          });
+          return true;
       } catch (error: any) {
-        regexPatternCreators.value.push({
-          success: false,
-          message: `Regex pattern - ${index}: "${jsonObj.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
-        });
-        return false;
+          const errorMessage = error?.response?.data?.message || "Unknown Error";
+
+          // Check if it's a duplicate pattern error
+          if (errorMessage.includes("already exists")) {
+            q.notify({
+              message: `Pattern "${jsonObj.name}" already exists. Please use a different name.`,
+              color: "negative",
+              position: "bottom",
+              timeout: 4000,
+            });
+          } else {
+            // Show generic error notification for other errors
+            q.notify({
+              message: `Failed to import pattern "${jsonObj.name}": ${errorMessage}`,
+              color: "negative",
+              position: "bottom",
+              timeout: 4000,
+            });
+          }
+
+          regexPatternCreators.value.push({
+              success: false,
+              message: `Regex pattern - ${index}: "${jsonObj.name}" creation failed --> \n Reason: ${errorMessage}`,
+          });
+          return false;
       }
     };
 
@@ -661,24 +518,51 @@ export default defineComponent({
       e.preventDefault();
     };
 
+    const updateActiveTab = () => {
+      // This is called when switching between built-in patterns and other tabs
+      if (activeTab.value !== 'import_built_in_patterns' && baseImportRef.value) {
+        baseImportRef.value.jsonStr = "";
+        baseImportRef.value.jsonFiles = null;
+        baseImportRef.value.url = "";
+        baseImportRef.value.jsonArrayOfObj = [{}];
+      }
+    };
+
+    const handleBuiltInPatternsImport = async (patternsToImport: any[]) => {
+      // For built-in patterns, we don't use BaseImport so we call importJson directly
+      // with manually constructed payload
+      const payload = {
+        jsonStr: JSON.stringify(patternsToImport, null, 2),
+        jsonArray: patternsToImport
+      };
+      await importJson(payload);
+    };
+
+    const handleImportClick = async () => {
+      if (activeTab.value === 'import_built_in_patterns') {
+        // For built-in patterns tab, trigger import from the child component
+        if (builtInPatternsTabRef.value) {
+          builtInPatternsTabRef.value.importSelectedPatterns();
+        }
+      } else {
+        // For other tabs (file/url), BaseImport handles the import button click
+        // This shouldn't be called as BaseImport has its own import button
+      }
+    };
+
     return {
       store,
       t,
-      jsonStr,
       importJson,
-      onSubmit,
       router,
       q,
+      baseImportRef,
       regexPatternErrorsToDisplay,
-      queryEditorPlaceholderFlag,
-      splitterModel,
-      tabs,
       activeTab,
+      allTabs,
       jsonArrayOfObj,
-      jsonFiles,
       updateActiveTab,
       arrowBackFn,
-      url,
       userSelectedRegexPatternName,
       regexPatternCreators,
       updateRegexPatternName,
@@ -688,20 +572,44 @@ export default defineComponent({
       processJsonObject,
       validateRegexPatternInputs,
       createRegexPattern,
+      handleBuiltInPatternsImport,
+      handleImportClick,
+      builtInPatternsTabRef,
+      isImporting,
+      handleTabChange,
     };
   },
   components: {
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    BaseImport,
     AppTabs,
+    BuiltInPatternsTab: defineAsyncComponent(
+      () => import("@/components/settings/BuiltInPatternsTab.vue"),
+    ),
   },
 });
 </script>
 
 <style scoped lang="scss">
+.empty-query .monaco-editor-background {
+  background-image: url("../../assets/images/common/query-editor.png");
+  background-repeat: no-repeat;
+  background-size: 115px;
+}
+
+.empty-function .monaco-editor-background {
+  background-image: url("../../assets/images/common/vrl-function.png");
+  background-repeat: no-repeat;
+  background-size: 170px;
+}
 .editor-container {
   height: calc(70vh - 20px) !important;
+}
+.editor-container-built-in {
+  width: 100%;
+  height: calc(100vh - 128px); /* Account for header, tabs, and padding */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .editor-container-url {
   .monaco-editor {

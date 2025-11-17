@@ -102,22 +102,23 @@ describe("ErrorTag Component", () => {
 
   describe("Tag Value Display", () => {
     it("should display the tag value", () => {
-      const valueElement = wrapper.find(".tag-bg");
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
       expect(valueElement.exists()).toBe(true);
       expect(valueElement.text()).toBe("web-application");
     });
 
     it("should have correct value styling", () => {
-      const valueElement = wrapper.find(".tag-bg");
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
       expect(valueElement.classes()).toContain("q-px-md");
-      expect(valueElement.classes()).toContain("tag-bg");
+      expect(valueElement.classes()).toContain("tw-break-all");
     });
 
     it("should handle word breaking", () => {
-      const valueElement = wrapper.find(".tag-bg");
-      expect(valueElement.attributes("style")).toContain(
-        "word-break: break-all",
-      );
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
+      expect(valueElement.classes()).toContain("tw-break-all");
     });
   });
 
@@ -143,7 +144,8 @@ describe("ErrorTag Component", () => {
       await wrapper.setProps({ tag: customTag });
 
       const keyElement = wrapper.find(".tag-block .q-px-md:first-child");
-      const valueElement = wrapper.find(".tag-bg");
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
 
       expect(keyElement.text()).toBe("error_type");
       expect(valueElement.text()).toBe("TypeError");
@@ -158,11 +160,10 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: longTag });
 
-      const valueElement = wrapper.find(".tag-bg");
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
       expect(valueElement.text()).toBe(longTag.value);
-      expect(valueElement.attributes("style")).toContain(
-        "word-break: break-all",
-      );
+      expect(valueElement.classes()).toContain("tw-break-all");
     });
 
     it("should handle special characters", async () => {
@@ -174,7 +175,8 @@ describe("ErrorTag Component", () => {
       await wrapper.setProps({ tag: specialTag });
 
       const keyElement = wrapper.find(".tag-block .q-px-md:first-child");
-      const valueElement = wrapper.find(".tag-bg");
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
 
       expect(keyElement.text()).toBe("user@email");
       expect(valueElement.text()).toBe("test@example.com");
@@ -186,7 +188,8 @@ describe("ErrorTag Component", () => {
       const container = wrapper.find(".tag-block");
       const keyElement = container.find(".q-px-md:first-child");
       const separator = container.find('[data-test="separator"]');
-      const valueElement = container.find(".tag-bg");
+      const valueElements = container.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
 
       expect(container.exists()).toBe(true);
       expect(keyElement.exists()).toBe(true);
@@ -201,7 +204,7 @@ describe("ErrorTag Component", () => {
       expect(children).toHaveLength(3);
       expect(children[0].classList.contains("q-px-md")).toBe(true);
       expect(children[1].getAttribute("data-test")).toBe("separator");
-      expect(children[2].classList.contains("tag-bg")).toBe(true);
+      expect(children[2].classList.contains("q-px-md")).toBe(true);
     });
   });
 
@@ -212,8 +215,9 @@ describe("ErrorTag Component", () => {
     });
 
     it("should apply background color to value section", () => {
-      const valueElement = wrapper.find(".tag-bg");
-      expect(valueElement.classes()).toContain("tag-bg");
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
+      expect(valueElement.classes()).toContain("tw-bg-[var(--o2-table-header-bg)]");
     });
 
     it("should apply correct spacing classes", () => {
@@ -222,7 +226,8 @@ describe("ErrorTag Component", () => {
       expect(container.classes()).toContain("q-mt-sm");
 
       const keyElement = wrapper.find(".tag-block .q-px-md:first-child");
-      const valueElement = wrapper.find(".tag-bg");
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
 
       expect(keyElement.classes()).toContain("q-px-md");
       expect(valueElement.classes()).toContain("q-px-md");
@@ -269,7 +274,8 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: emptyValueTag });
 
-      const valueElement = wrapper.find(".tag-bg");
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
       expect(valueElement.text()).toBe("");
     });
 
@@ -281,7 +287,8 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: nullTag });
 
-      const valueElement = wrapper.find(".tag-bg");
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
       expect(valueElement.text()).toBe("");
     });
 
@@ -293,7 +300,8 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: undefinedTag });
 
-      const valueElement = wrapper.find(".tag-bg");
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
       expect(valueElement.text()).toBe("");
     });
 
@@ -305,7 +313,8 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: numericTag });
 
-      const valueElement = wrapper.find(".tag-bg");
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
       expect(valueElement.text()).toBe("42");
     });
 
@@ -317,7 +326,8 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: booleanTag });
 
-      const valueElement = wrapper.find(".tag-bg");
+      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElement = valueElements[1]; // Second q-px-md is the value
       expect(valueElement.text()).toBe("true");
     });
   });

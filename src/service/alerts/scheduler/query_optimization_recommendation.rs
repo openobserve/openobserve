@@ -80,15 +80,15 @@ impl QueryRecommendationEngine for QueryOptimizerContext {
                 stream_name: "query_recommendations".to_string(),
                 data: Some(IngestionData {
                     data: serde_json::to_vec_pretty(&recommendations).map_err(|e| {
-                        anyhow::anyhow!("Recommendation serialization failed. Error={:?}", e)
+                        anyhow::anyhow!("Recommendation serialization failed. Error={e:?}")
                     })?,
                 }),
                 ingestion_type: Some(IngestionType::Json as i32),
                 metadata: None,
             };
-            Ok(ingestion_service::ingest(request)
+            ingestion_service::ingest(request)
                 .await
-                .map_err(|e| anyhow::anyhow!("Ingestion failed. Error={:?}", e))?)
+                .map_err(|e| anyhow::anyhow!("Ingestion failed. Error={e:?}"))
         })
     }
 }

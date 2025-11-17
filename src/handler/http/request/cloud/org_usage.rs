@@ -35,7 +35,7 @@ use crate::{handler::http::models::billings::GetOrgUsageResponseBody, service::o
         ("usage_date" = String, Path, description = "Organization usage query range"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = GetOrgUsageResponseBody),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(GetOrgUsageResponseBody)),
         (status = 404, description = "Organization usage not found", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),

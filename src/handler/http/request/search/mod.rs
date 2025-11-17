@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, get, post, web};
+use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
 use arrow_schema::Schema;
 use chrono::Utc;
 use config::{
@@ -36,9 +36,9 @@ use hashbrown::HashMap;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::check_stream_permissions;
-#[cfg(feature = "cloud")]
-use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
+#[cfg(feature = "cloud")]
+use crate::service::organization::is_org_in_free_trial_period;
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
@@ -48,11 +48,11 @@ use crate::{
             auth::UserEmail,
             functions,
             http::{
-                get_dashboard_info_from_request, get_enable_align_histogram_from_request,
-                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request, get_work_group,
+                get_clear_cache_from_request, get_dashboard_info_from_request,
+                get_enable_align_histogram_from_request, get_is_multi_stream_search_from_request,
+                get_is_ui_histogram_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
             },
             stream::get_settings_max_query_range,
         },
@@ -175,7 +175,7 @@ async fn can_use_distinct_stream(
         ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
         ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
     ),
-    request_body(content = Request, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = inline(Request), description = "Search query", content_type = "application/json", example = json!({
         "query": {
             "sql": "select * from k8s ",
             "start_time": 1675182660872049i64,
@@ -271,7 +271,8 @@ pub async fn search(
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
         req.query.sql = sql;
     };
-    req.use_cache = get_use_cache_from_request(&query);
+    req.clear_cache = get_clear_cache_from_request(&query);
+    req.use_cache = get_use_cache_from_request(&query) && !req.clear_cache;
 
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {
@@ -280,6 +281,20 @@ pub async fn search(
             return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
         }
     };
+
+    #[cfg(feature = "enterprise")]
+    for stream in stream_names.iter() {
+        {
+            if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+                return Ok(
+                    HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                        StatusCode::TOO_MANY_REQUESTS,
+                        e.to_string(),
+                    )),
+                );
+            }
+        }
+    }
 
     // Handle histogram data for UI
     let mut converted_histogram_query: Option<String> = None;
@@ -343,8 +358,6 @@ pub async fn search(
 
     #[cfg(feature = "enterprise")]
     {
-        use actix_http::StatusCode;
-
         use crate::common::meta;
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
@@ -511,6 +524,19 @@ pub async fn around_v1(
     let start = std::time::Instant::now();
 
     let (org_id, stream_name) = path.into_inner();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
+    }
+
     let http_span = if get_config().common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
@@ -622,6 +648,19 @@ pub async fn around_v2(
     let start = std::time::Instant::now();
 
     let (org_id, stream_name) = path.into_inner();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
+    }
+
     let http_span = if get_config().common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
@@ -714,6 +753,18 @@ pub async fn values(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            );
+        }
+    }
 
     let user_id = &user_email.user_id;
     let http_span = if config::get_config().common.tracing_search_enabled {
@@ -918,6 +969,7 @@ pub async fn build_search_request_per_field(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: req.use_cache,
+        clear_cache: req.clear_cache,
         local_mode: None,
     };
 
@@ -1129,6 +1181,7 @@ async fn values_v1(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: default_use_cache(),
+        clear_cache: get_clear_cache_from_request(query),
         local_mode: None,
     };
 
@@ -1322,7 +1375,7 @@ async fn values_v1(
         ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = config::meta::search::SearchPartitionRequest, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = inline(config::meta::search::SearchPartitionRequest), description = "Search query", content_type = "application/json", example = json!({
         "sql": "select * from k8s ",
         "start_time": 1675182660872049i64,
         "end_time": 1675185660872049i64
@@ -1395,6 +1448,26 @@ pub async fn search_partition(
         return Ok(MetaHttpResponse::bad_request(e));
     }
 
+    #[cfg(feature = "enterprise")]
+    {
+        let stream_names = match resolve_stream_names(&req.sql) {
+            Ok(v) => v.clone(),
+            Err(e) => {
+                return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
+            }
+        };
+        for stream in stream_names.iter() {
+            if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+                return Ok(
+                    HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                        StatusCode::TOO_MANY_REQUESTS,
+                        e.to_string(),
+                    )),
+                );
+            }
+        }
+    }
+
     let search_res = SearchService::search_partition(
         &trace_id,
         &org_id,
@@ -1456,7 +1529,7 @@ pub async fn search_partition(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
     request_body(
-        content = config::meta::search::SearchHistoryRequest,
+        content = inline(config::meta::search::SearchHistoryRequest),
         description = "Search history request parameters",
         content_type = "application/json",
         example = json!({
@@ -1652,7 +1725,7 @@ pub async fn search_history(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = config::meta::search::Request, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = inline(config::meta::search::Request), description = "Search query", content_type = "application/json", example = json!({
         "query": {
             "sql": "select k8s_namespace_name as ns, histogram(_timestamp) from k8s group by k8s_namespace_name, histogram(_timestamp)",
             "start_time": 1675182660872049i64,
@@ -1761,8 +1834,6 @@ pub async fn result_schema(
 
     #[cfg(feature = "enterprise")]
     {
-        use actix_http::StatusCode;
-
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
@@ -1821,20 +1892,16 @@ pub async fn result_schema(
             Ok(v) => v,
             Err(e) => {
                 log::error!("Error parsing sql: {e}");
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    actix_web::http::StatusCode::BAD_REQUEST,
-                    e,
-                )));
+                return Ok(HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
             }
         };
 
     let res_schema = match get_result_schema(sql, is_streaming, use_cache).await {
         Ok(v) => v,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::BAD_REQUEST,
-                e,
-            )));
+            return Ok(HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
         }
     };
 

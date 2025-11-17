@@ -50,7 +50,7 @@ use crate::{
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = OrganizationSettingPayload, description = "Organization settings", content_type = "application/json"),
+    request_body(content = inline(OrganizationSettingPayload), description = "Organization settings", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -116,6 +116,16 @@ async fn create(
     if let Some(enable_streaming_search) = settings.enable_streaming_search {
         field_found = true;
         data.enable_streaming_search = enable_streaming_search;
+    }
+
+    if let Some(light_mode_theme_color) = settings.light_mode_theme_color {
+        field_found = true;
+        data.light_mode_theme_color = Some(light_mode_theme_color);
+    }
+
+    if let Some(dark_mode_theme_color) = settings.dark_mode_theme_color {
+        field_found = true;
+        data.dark_mode_theme_color = Some(dark_mode_theme_color);
     }
 
     if !field_found {

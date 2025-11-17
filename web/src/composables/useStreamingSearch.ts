@@ -51,7 +51,7 @@ const streamConnections = ref<Record<string, ReadableStreamDefaultReader<Uint8Ar
 const abortControllers = ref<Record<string, AbortController>>({});
 const errorOccurred = ref(false);
 
-type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end';
+type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end' | 'pattern_extraction_result';
 
 const useHttpStreaming = () => {
   const onData = (traceId: string, type: StreamResponseType | 'end', response: any) => {
@@ -117,6 +117,7 @@ const useHttpStreaming = () => {
       pageType: string;
       searchType: string;
       meta: any;
+      clear_cache?: boolean;
     },
     handlers: {
       data: (data: any, response: any) => void;
@@ -167,6 +168,7 @@ const useHttpStreaming = () => {
       pageType: string;
       searchType: string;
       meta: any;
+      clear_cache?: boolean;
     },
     handlers: {
       data: (data: any, response: any) => void;
@@ -175,7 +177,7 @@ const useHttpStreaming = () => {
       reset: (data: any, response: any) => void;
     }
   ) => {
-    const { traceId, org_id, type, queryReq, searchType, pageType, meta } = data;
+    const { traceId, org_id, type, queryReq, searchType, pageType, meta, clear_cache } = data;
     const abortController = new AbortController();
 
     // Store the abort controller for this trace
@@ -211,6 +213,8 @@ const useHttpStreaming = () => {
         url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
       if (meta?.fallback_order_by_col)
         url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
+      if (clear_cache)
+        url += `&clear_cache=${clear_cache}`;
       if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
     } else if (type === "values") {
       const fieldsString = meta?.fields.join(",");
@@ -259,6 +263,9 @@ const useHttpStreaming = () => {
               break;
             case 'search_response_hits':
               onData(eventTraceId, 'search_response_hits', data);
+              break;
+            case 'pattern_extraction_result':
+              onData(eventTraceId, 'pattern_extraction_result', data);
               break;
             case 'progress':
               onData(eventTraceId, 'progress', data);
@@ -494,9 +501,17 @@ const useHttpStreaming = () => {
     }
   }
 
+  const convertToPatternResult = (type: string, data: any) => {
+    return {
+      type: "pattern_extraction_result",
+      content: data,
+    }
+  }
+
   const wsMapper = {
     'search_response_metadata': convertToWsResponse,
     'search_response_hits': convertToWsResponse,
+    'pattern_extraction_result': convertToPatternResult,
     'progress': convertToWsEventProgress,
     'error': convertToWsError,
     'end': convertToWsEnd,

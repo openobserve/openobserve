@@ -103,7 +103,7 @@ impl From<AlertError> for HttpResponse {
         ("org_id" = String, Path, description = "Organization name"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if alert folder is not the default folder)"),
       ),
-    request_body(content = CreateAlertRequestBody, description = "Alert data", content_type = "application/json"),
+    request_body(content = inline(CreateAlertRequestBody), description = "Alert data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -158,7 +158,7 @@ pub async fn create_alert(
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = GetAlertResponseBody),
+        (status = 200, description = "Success",  content_type = "application/json", body = inline(GetAlertResponseBody)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -171,7 +171,7 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::get_by_id(client, &org_id, alert_id).await {
-        Ok(alert) => {
+        Ok((_, alert)) => {
             let key = alert.get_unique_key();
             let scheduled_job = scheduler::get(&org_id, TriggerModule::Alert, &key)
                 .await
@@ -199,7 +199,7 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = GetAlertResponseBody),
+        (status = 200, description = "Success",  content_type = "application/json", body = inline(GetAlertResponseBody)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -212,7 +212,7 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::get_by_id(client, &org_id, alert_id).await {
-        Ok(alert) => {
+        Ok((_, alert)) => {
             let key = alert.get_unique_key();
             let scheduled_job = scheduler::get(&org_id, TriggerModule::Alert, &key)
                 .await
@@ -239,7 +239,7 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         ("alert_id" = String, Path, description = "Alert ID"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
       ),
-    request_body(content = UpdateAlertRequestBody, description = "Alert data", content_type = "application/json"),
+    request_body(content = inline(UpdateAlertRequestBody), description = "Alert data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -317,7 +317,7 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         ListAlertsQuery,
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ListAlertsResponseBody),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(ListAlertsResponseBody)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
@@ -426,7 +426,7 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
         ("org_id" = String, Path, description = "Organization name"),
         EnableAlertQuery,
     ),
-    request_body(content = AlertBulkEnableRequest, description = "Alert id list", content_type = "application/json"),
+    request_body(content = inline(AlertBulkEnableRequest), description = "Alert id list", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
@@ -535,7 +535,7 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         ("org_id" = String, Path, description = "Organization name"),
         ("folder" = Option<String>, Query, description = "From Folder ID (Required if RBAC enabled)"),
     ),
-    request_body(content = MoveAlertsRequestBody, description = "Identifies alerts and the destination folder", content_type = "application/json"),
+    request_body(content = inline(MoveAlertsRequestBody), description = "Identifies alerts and the destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),

@@ -79,6 +79,7 @@ pub async fn handle_triggers(
 /// Returns the skipped timestamps and the final timestamp to evaluate the alert.
 /// `tz_offset` is in minutes
 /// Frequency is in seconds
+#[allow(clippy::too_many_arguments)]
 fn get_skipped_timestamps(
     supposed_to_run_at: i64,
     cron: &str,
@@ -87,6 +88,7 @@ fn get_skipped_timestamps(
     delay: i64,
     align_time: bool,
     now: i64,
+    timezone_str: Option<&str>,
 ) -> (Vec<i64>, i64) {
     let mut skipped_timestamps = Vec::new();
     let mut next_run_at;
@@ -117,6 +119,7 @@ fn get_skipped_timestamps(
                 supposed_to_run_at + second_micros(frequency),
                 tz_offset,
                 Some(frequency),
+                timezone_str,
             )
         } else {
             supposed_to_run_at + second_micros(frequency)
@@ -303,6 +306,37 @@ async fn handle_alert_triggers(
     // Set the is_realtime field according to the alert
     new_trigger.is_realtime = alert.is_real_time;
 
+    // [ENTERPRISE] Initialize RCA batch tracking for this scheduler run
+    // #[cfg(feature = "enterprise")]
+    // let rca_enabled =
+    //     o2_enterprise::enterprise::ai::rca::integration::is_rca_enabled_for_org(&new_trigger.
+    // org); #[cfg(not(feature = "enterprise"))]
+    let _rca_enabled = false;
+
+    // Helper closure to mark alert completion and process batch if needed
+    // #[cfg(feature = "enterprise")]
+    // let mark_rca_completion = || async {
+    //     if rca_enabled {
+    //         let is_batch_complete =
+    //             o2_enterprise::enterprise::ai::rca::mark_alert_completed(trace_id);
+    //         if is_batch_complete {
+    //             log::info!(
+    //                 "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} complete, processing
+    // incidents",                 trace_id
+    //             );
+    //             if let Err(e) =
+    // o2_enterprise::enterprise::ai::rca::integration::process_batch_and_create_incidents(
+    //                 trace_id
+    //             ).await {
+    //                 log::error!(
+    //                     "[SCHEDULER trace_id {scheduler_trace_id}] Error creating incidents from
+    // batch {}: {}",                     trace_id, e
+    //                 );
+    //             }
+    //         }
+    //     }
+    // };
+
     #[cfg(feature = "cloud")]
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
@@ -403,6 +437,7 @@ async fn handle_alert_triggers(
             delay,
             alert.trigger_condition.align_time,
             now,
+            alert.trigger_condition.timezone.as_deref(),
         );
         final_end_time = skipped_timestamps_end_timestamp.1;
         let skipped_timestamps = skipped_timestamps_end_timestamp.0;
@@ -557,6 +592,11 @@ async fn handle_alert_triggers(
             .await?;
         }
         publish_triggers_usage(trigger_data_stream).await;
+
+        // [ENTERPRISE] Mark completion even on failure
+        // #[cfg(feature = "enterprise")]
+        // mark_rca_completion().await;
+
         return Err(err);
     }
 
@@ -655,6 +695,32 @@ async fn handle_alert_triggers(
             data
         };
 
+        // [ENTERPRISE] Collect alert events for batched incident creation
+        // #[cfg(feature = "enterprise")]
+        // if rca_enabled && !data.is_empty() {
+        //     // Collect each deduplicated result row as an alert event
+        //     // Use parent trace_id for cross-alert correlation (not scheduler_trace_id)
+        //     for row in &data {
+        //         if let Err(e) =
+        // o2_enterprise::enterprise::ai::rca::integration::collect_alert_event(
+        // trace_id, // Use parent trace_id for cross-alert batch             &alert,
+        //             row,
+        //             triggered_at,
+        //         ) {
+        //             log::error!(
+        //                 "[SCHEDULER trace_id {scheduler_trace_id}] Error collecting alert event
+        // for RCA: {}",                 e
+        //             );
+        //             // Don't fail alert evaluation if RCA collection fails
+        //         }
+        //     }
+        //     log::debug!(
+        //         "[SCHEDULER trace_id {scheduler_trace_id}] Collected {} alert events for RCA
+        // batch {}",         data.len(),
+        //         trace_id
+        //     );
+        // }
+
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
         // use the main start_time (now - period) and end_time (now) for the alert evaluation.
@@ -679,7 +745,7 @@ async fn handle_alert_triggers(
                 &data,
                 trigger_results.end_time,
                 Some(start_time),
-                final_end_time,
+                triggered_at,
             )
             .await
         {
@@ -786,6 +852,10 @@ async fn handle_alert_triggers(
     );
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream).await;
+
+    // [ENTERPRISE] Mark alert completed and process batch if this was the last alert
+    // #[cfg(feature = "enterprise")]
+    // mark_rca_completion().await;
 
     Ok(())
 }
@@ -1049,6 +1119,11 @@ async fn handle_report_triggers(
             new_trigger.next_run_at,
             report.tz_offset,
             Some(frequency_seconds),
+            if report.timezone.is_empty() {
+                None
+            } else {
+                Some(&report.timezone)
+            },
         );
     }
 
@@ -1387,11 +1462,18 @@ async fn handle_derived_stream_triggers(
             supposed_to_be_run_at,
             derived_stream.tz_offset,
             Some(derived_stream.trigger_condition.period * 60),
+            derived_stream.trigger_condition.timezone.as_deref(), /* Derived streams don't have
+                                                                   * timezone string yet */
         )
     } else {
         // For cron frequency, we don't need to align the end time as it is already aligned (the
         // cron crate takes care of it)
-        TriggerCondition::align_time(supposed_to_be_run_at, derived_stream.tz_offset, None)
+        TriggerCondition::align_time(
+            supposed_to_be_run_at,
+            derived_stream.tz_offset,
+            None,
+            derived_stream.trigger_condition.timezone.as_deref(),
+        )
     };
 
     let (mut start, mut end) = if derived_stream.start_at.is_some() && trigger.data.is_empty() {
@@ -1452,11 +1534,18 @@ async fn handle_derived_stream_triggers(
             end,
             derived_stream.tz_offset,
             Some(derived_stream.trigger_condition.period * 60),
+            derived_stream.trigger_condition.timezone.as_deref(), /* Derived streams don't have
+                                                                   * timezone string yet */
         )
     } else {
         // For cron frequency, we don't need to align the end time as it is already aligned (the
         // cron crate takes care of it)
-        TriggerCondition::align_time(end, derived_stream.tz_offset, None)
+        TriggerCondition::align_time(
+            end,
+            derived_stream.tz_offset,
+            None,
+            derived_stream.trigger_condition.timezone.as_deref(),
+        )
     };
 
     let mut trigger_data_stream = TriggerData {
@@ -1979,6 +2068,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have skipped timestamps for 5:00, 5:05, 5:10
@@ -2008,6 +2098,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have skipped timestamps for 5:00, 5:05, 5:10
@@ -2037,6 +2128,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // When align_time is true and there are skipped timestamps,
@@ -2066,6 +2158,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should still work with timezone offset
@@ -2092,6 +2185,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have no skipped timestamps when delay is 0
@@ -2118,6 +2212,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have many skipped timestamps (60 minutes worth)
@@ -2146,6 +2241,7 @@ mod tests {
                 delay,
                 align_time,
                 now,
+                None,
             )
         });
 
@@ -2171,6 +2267,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         assert!(skipped_timestamps.is_empty());
@@ -2196,6 +2293,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have some skipped timestamps

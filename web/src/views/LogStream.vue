@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="app-tabs-container tw-h-[36px] q-mr-sm">
                       <app-tabs
                       class="tabs-selection-container"
-                      :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
                       :tabs="streamTabs"
                       v-model:active-tab="streamActiveTab"
                       @update:active-tab="filterLogStreamByTab"

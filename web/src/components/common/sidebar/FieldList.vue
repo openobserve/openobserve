@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column index-menu">
-    <div class="index-table">
+  <div class="column index-menu default-index-menu">
+    <div class="index-table logs-index-menu">
       <q-table
         data-test="log-search-index-list-fields-table"
         :visible-columns="['name']"
@@ -65,13 +65,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 switch-toggle-side
                 :label="props.row.name"
-                expand-icon-class="field-expansion-icon"
+                expand-icon-class="field-expansion-icon !tw-text-[1rem] tw-text-[var(--o2-icon-color)]"
                 expand-icon="
                      expand_more
                   "
                 @before-show="
                   (event: any) => openFilterCreator(event, props.row)
                 "
+                class="hover:tw-bg-[var(--o2-hover-accent)] tw-rounded-[0.25rem]"
               >
                 <template v-slot:header>
                   <div
@@ -143,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item tag="label" class="q-pr-none">
                             <div
                               class="flex row wrap justify-between"
-                              style="width: calc(100% - 46px)"
+                              style="width: calc(100% - 40px)"
                             >
                               <div
                                 :title="value.key"
@@ -170,8 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               "
                             >
                               <q-btn
-                                class="q-mr-xs"
-                                size="6px"
+                                class="q-mr-xs !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                                size="5px"
                                 title="Include Term"
                                 round
                                 @click="
@@ -180,13 +181,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   )
                                 "
                               >
-                                <q-icon>
+                                <q-icon class="!tw-h-[0.5rem] !tw-w-[0.5rem]">
                                   <EqualIcon></EqualIcon>
                                 </q-icon>
                               </q-btn>
                               <q-btn
-                                class="q-mr-xs"
-                                size="6px"
+                                class="q-mr-xs !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                                size="5px"
                                 title="Include Term"
                                 round
                                 @click="
@@ -195,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   )
                                 "
                               >
-                                <q-icon>
+                                <q-icon class="!tw-h-[0.5rem] !tw-w-[0.5rem]">
                                   <NotEqualIcon></NotEqualIcon>
                                 </q-icon>
                               </q-btn>
@@ -236,15 +237,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="log-search-index-list-field-search-input"
             v-model="filterFieldValue"
             data-cy="index-field-search-input"
-            filled
             borderless
             dense
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
+            class="o2-search-input tw-min-w-full "
           >
             <template #prepend>
-              <q-icon name="search" />
+              <q-icon name="search" class="o2-search-input-icon" />
             </template>
           </q-input>
         </template>
@@ -411,7 +412,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-field-table {
-  height: calc(100vh - 200px) !important;
+  height: calc(100vh - 212px) !important;
 }
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
@@ -620,8 +621,8 @@ export default defineComponent({
       }
       .field-expansion-icon {
         img {
-          width: 12px;
-          height: 12px;
+          width: 10px;
+          height: 10px;
         }
       }
     }

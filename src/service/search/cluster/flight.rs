@@ -456,9 +456,8 @@ pub async fn run_datafusion(
                     .build()
             )
         );
-        let mut scan_stats = visit.scan_stats;
         // Update scan stats to include aggregation cache ratio
-        scan_stats.aggs_cache_ratio = aggs_cache_ratio;
+        visit.scan_stats.aggs_cache_ratio = aggs_cache_ratio;
         ret.map(|data| {
             check_query_default_limit_exceeded(
                 data.iter().fold(0, |acc, batch| acc + batch.num_rows()),
@@ -563,9 +562,20 @@ pub async fn check_work_group(
     let user_id = user_id.as_deref();
 
     // 1. get work group
-    let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
-        o2_enterprise::enterprise::search::work_group::predict(nodes, file_id_list_vec),
-    );
+    // Check if this is a background task (alerts, reports, derived streams)
+    let is_background_task = req
+        .search_event_type
+        .as_ref()
+        .and_then(|st| config::meta::search::SearchEventType::try_from(st.as_str()).ok())
+        .map(|st| st.is_background())
+        .unwrap_or(false);
+
+    let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> =
+        Some(o2_enterprise::enterprise::search::work_group::predict(
+            nodes,
+            file_id_list_vec,
+            is_background_task,
+        ));
 
     SEARCH_SERVER
         .add_work_group(trace_id, work_group.clone())
@@ -592,7 +602,7 @@ pub async fn check_work_group(
     super::work_group_checking(trace_id, start, req, &work_group, &locker, None).await?;
 
     // 4. check user concurrency
-    if user_id.is_some() {
+    if user_id.is_some() && !is_background_task {
         super::work_group_checking(trace_id, start, req, &work_group, &locker, user_id).await?;
     }
 

@@ -15,518 +15,377 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="o2-custom-bg" style="height: calc(100vh - 50px);">
-    <div class="card-container tw-mb-[0.625rem] ">
-      <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]">
-        <div class="col">
-          <div class="flex">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              @click="arrowBackFn"
-              icon="arrow_back_ios_new"
-              data-test="destination-import-back-btn"
-            />
-            <div class="text-h6 q-ml-md">Import Destination</div>
-          </div>
+  <base-import
+    ref="baseImportRef"
+    title="Import Destination"
+    test-prefix="destination"
+    :is-importing="isDestinationImporting"
+    container-class="o2-custom-bg"
+    container-style="height: calc(100vh - 50px);"
+    :editor-heights="{
+      urlEditor: 'calc(100vh - 286px)',
+      fileEditor: 'calc(100vh - 306px)',
+      outputContainer: 'calc(100vh - 128px)',
+      errorReport: 'calc(100vh - 128px)',
+    }"
+    @back="arrowBackFn"
+    @cancel="router.back()"
+    @import="importJson"
+  >
+    <!-- Output Section with Destination-specific Error Display -->
+    <template #output-content>
+      <div class="tw-w-full" style="min-width: 400px;">
+        <div
+          v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
+          class="text-center text-h6 tw-py-2"
+        >
+          {{ destinationErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
-        <div class="flex justify-center">
-          <q-btn
-            v-close-popup
-            class="q-mr-md o2-secondary-button tw-h-[36px]"
-            :label="t('function.cancel')"
-            no-caps
-            flat
-            @click="router.back()"
-            data-test="destination-import-cancel-btn"
-          />
-          <q-btn
-            class="o2-primary-button no-border tw-h-[36px]"
-            :label="t('dashboard.import')"
-            type="submit"
-            no-caps
-            flat
-            @click="importJson"
-            data-test="destination-import-json-btn"
-          />
+        <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
+        <q-separator class="q-mx-md q-mt-md" />
+        <div class="error-report-container">
+          <!-- Destination Errors Section -->
+          <div
+            class="error-section"
+            v-if="destinationErrorsToDisplay.length > 0"
+          >
+            <div class="error-list">
+              <!-- Iterate through the outer array -->
+              <div
+                v-for="(errorGroup, index) in destinationErrorsToDisplay"
+                :key="index"
+              >
+                <!-- Iterate through each inner array (the individual error message) -->
+                <div
+                  v-for="(errorMessage, errorIndex) in errorGroup"
+                  :key="errorIndex"
+                  class="error-item"
+                  :data-test="`destination-import-error-${index}-${errorIndex}`"
+                >
+                  <!-- Destination Name Error -->
+                  <span
+                    data-test="destination-import-name-error"
+                    class="text-red"
+                    v-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'destination_name'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div style="width: 300px">
+                      <q-input
+                        data-test="destination-import-name-input"
+                        :model-value="userSelectedDestinationName[index] || ''"
+                        @update:model-value="(val) => {
+                          userSelectedDestinationName[index] = val;
+                          updateDestinationName(val, index);
+                        }"
+                        :label="'Destination Name *'"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="showLabelOnTop"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        tabindex="0"
+                      />
+                    </div>
+                  </span>
+
+                  <!-- URL Error -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'url'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div style="width: 300px">
+                      <q-input
+                        data-test="destination-import-url-input"
+                        :model-value="userSelectedDestinationUrl[index] || ''"
+                        @update:model-value="(val) => {
+                          userSelectedDestinationUrl[index] = val;
+                          updateDestinationUrl(val, index);
+                        }"
+                        :label="'Destination URL *'"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="showLabelOnTop"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        tabindex="0"
+                      />
+                    </div>
+                  </span>
+
+                  <!-- Type Error -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'type'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div style="width: 300px">
+                      <q-select
+                        data-test="destination-import-type-input"
+                        :model-value="userSelectedDestinationType[index] || ''"
+                        @update:model-value="(val) => {
+                          userSelectedDestinationType[index] = val;
+                          updateDestinationType(val, index);
+                        }"
+                        :options="destinationTypes"
+                        :label="'Destination Type *'"
+                        :popup-content-style="{
+                          textTransform: 'lowercase',
+                        }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        filled
+                        stack-label
+                        dense
+                        use-input
+                        hide-selected
+                        fill-input
+                        :input-debounce="400"
+                        behavior="menu"
+                      />
+                    </div>
+                  </span>
+
+                  <!-- Method Error -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'method'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div style="width: 300px">
+                      <q-select
+                        data-test="destination-import-method-input"
+                        :model-value="userSelectedDestinationMethod[index] || ''"
+                        @update:model-value="(val) => {
+                          userSelectedDestinationMethod[index] = val;
+                          updateDestinationMethod(val, index);
+                        }"
+                        :options="destinationMethods"
+                        :label="'Destination Method *'"
+                        :popup-content-style="{
+                          textTransform: 'lowercase',
+                        }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        filled
+                        stack-label
+                        dense
+                        use-input
+                        hide-selected
+                        fill-input
+                        :input-debounce="400"
+                        behavior="menu"
+                      />
+                    </div>
+                  </span>
+
+                  <!-- Template Name Error -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'template_name'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div>
+                      <q-select
+                        data-test="destination-import-template-input"
+                        :model-value="userSelectedTemplates[index] || ''"
+                        @update:model-value="(val) => {
+                          userSelectedTemplates[index] = val;
+                          updateDestinationTemplate(val, index);
+                        }"
+                        :options="filteredTemplates"
+                        label="Templates *"
+                        :popup-content-style="{
+                          textTransform: 'lowercase',
+                        }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        filled
+                        stack-label
+                        dense
+                        use-input
+                        input-debounce="400"
+                        behavior="menu"
+                        hide-selected
+                        fill-input
+                        @filter="filterTemplates"
+                        :rules="[(val) => !!val || 'Field is required!']"
+                        style="width: 300px"
+                      >
+                      </q-select>
+                    </div>
+                  </span>
+
+                  <!-- Email Input Error -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'email_input'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div style="width: 300px">
+                      <q-input
+                        data-test="destination-import-emails-input"
+                        :model-value="userSelectedEmails[index] || ''"
+                        @update:model-value="(val) => {
+                          userSelectedEmails[index] = val;
+                          updateDestinationEmails(val, index);
+                        }"
+                        :label="'Emails (comma separated) *'"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="showLabelOnTop"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        tabindex="0"
+                      />
+                    </div>
+                  </span>
+
+                  <!-- Action ID Error -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'action_id'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div>
+                      <q-select
+                        data-test="destination-import-action-input"
+                        :model-value="userSelectedActionId[index] || ''"
+                        @update:model-value="(val) => {
+                          userSelectedActionId[index] = val;
+                          updateDestinationAction(val, index);
+                        }"
+                        :options="filteredActions"
+                        label="Actions *"
+                        :popup-content-style="{
+                          textTransform: 'lowercase',
+                        }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-py-sm showLabelOnTop no-case"
+                        filled
+                        stack-label
+                        dense
+                        use-input
+                        emit-value
+                        map-options
+                        input-debounce="400"
+                        behavior="menu"
+                        hide-selected
+                        fill-input
+                        @filter="filterActions"
+                        :rules="[(val) => !!val || 'Field is required!']"
+                        style="width: 300px"
+                      >
+                      </q-select>
+                    </div>
+                  </span>
+
+                  <!-- Skip TLS Verify Error -->
+                  <span
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'skip_tls_verify'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div style="width: 300px">
+                      <q-toggle
+                        data-test="destination-import-skip-tls-verify-input"
+                        :model-value="
+                          userSelectedSkipTlsVerify[index] ?? false
+                        "
+                        :label="t('alert_destinations.skip_tls_verify')"
+                        class="q-mt-sm"
+                        @update:model-value="
+                          updateSkipTlsVerify($event, index)
+                        "
+                      />
+                    </div>
+                  </span>
+
+                  <span class="text-red" v-else>{{ errorMessage }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Destination Creation Success Messages -->
+          <div class="error-section" v-if="destinationCreators.length > 0">
+            <div
+              class="section-title text-primary"
+              data-test="destination-import-creation-title"
+            >
+              Destination Creation
+            </div>
+            <div
+              class="error-list"
+              v-for="(val, index) in destinationCreators"
+              :key="index"
+              :data-test="`destination-import-creation-${index}`"
+            >
+              <div
+                :class="{
+                  'error-item text-bold': true,
+                  'text-green ': val.success,
+                  'text-red': !val.success,
+                }"
+                :data-test="`destination-import-creation-${index}-message`"
+              >
+                <pre>{{ val.message }}</pre>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-  </div>
-  <div class="flex">
-
-    <div class="flex" style="width: calc(100vw - 1px)">
-      <q-splitter
-        class="logs-search-splitter"
-        no-scroll
-        v-model="splitterModel"
-        :style="{
-          width: '100%',
-          height: '100%',
-        }"
-      >
-        <template #before>
-          <div class="tw-w-full tw-h-full ">
-            <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
-              <div class="app-tabs-container tw-h-[36px] tw-w-fit">
-              <app-tabs
-                data-test="destination-import-tabs"
-                class="tabs-selection-container"
-                :tabs="tabs"
-                v-model:active-tab="activeTab"
-                @update:active-tab="updateActiveTab"
-              />
-            </div>
-            </div>
-            <div
-              v-if="activeTab == 'import_json_url'"
-              class="editor-container-url card-container tw-py-1 "
-            >
-              <q-form class="q-mt-md tw-pb-2" @submit="onSubmit">
-                <div style="width: 100%" class="q-mb-md tw-px-2">
-                  <q-input
-                    v-model="url"
-                    :label="t('dashboard.addURL')"
-                    color="input-border"
-                    bg-color="input-bg"
-                    stack-label
-                    filled
-                    label-slot
-                    data-test="destination-import-url-input"
-                  />
-                </div>
-                <query-editor
-                  data-test="destination-import-sql-editor"
-                  ref="queryEditorRef"
-                  editor-id="destination-import-query-editor"
-                  class="monaco-editor tw-mx-2"
-                  :debounceTime="300"
-                  v-model:query="jsonStr"
-                  language="json"
-                  :class="
-                    jsonStr == '' && queryEditorPlaceholderFlag
-                      ? 'empty-query'
-                      : ''
-                  "
-                  @focus="queryEditorPlaceholderFlag = false"
-                  @blur="queryEditorPlaceholderFlag = true"
-                />
-
-                <div></div>
-              </q-form>
-            </div>
-            <div
-              v-if="activeTab == 'import_json_file'"
-              class="editor-container-json card-container tw-py-1 "
-            >
-              <q-form class="q-mt-md tw-pb-2" @submit="onSubmit">
-                <div style="width: 100%" class="q-mb-md tw-px-2">
-                  <q-file
-                    v-model="jsonFiles"
-                    bottom-slots
-                    :label="t('dashboard.dropFileMsg')"
-                    accept=".json"
-                    multiple
-                    data-test="destination-import-file-input"
-                  >
-                    <template v-slot:prepend>
-                      <q-icon name="cloud_upload" @click.stop.prevent />
-                    </template>
-                    <template v-slot:append>
-                      <q-icon
-                        name="close"
-                        @click.stop.prevent="jsonFiles = null"
-                        class="cursor-pointer"
-                        data-test="destination-import-file-close-btn"
-                      />
-                    </template>
-                    <template v-slot:hint> .json files only </template>
-                  </q-file>
-                </div>
-                <query-editor
-                  data-test="destination-import-sql-editor"
-                  ref="queryEditorRef"
-                  editor-id="destination-import-query-editor"
-                  class="monaco-editor tw-mx-2"
-                  :debounceTime="300"
-                  v-model:query="jsonStr"
-                  language="json"
-                  :class="
-                    jsonStr == '' && queryEditorPlaceholderFlag
-                      ? 'empty-query'
-                      : ''
-                  "
-                  @focus="queryEditorPlaceholderFlag = false"
-                  @blur="queryEditorPlaceholderFlag = true"
-                />
-
-                <div></div>
-              </q-form>
-            </div>
-          </div>
-        </template>
-
-        <template #after>
-          <div
-            data-test="destination-import-output-editor"
-            style="width: calc(100% - 10px); height: 100%"
-             class="card-container tw-ml-[0.625rem] tw-h-full"
-          >
-            <div
-              v-if="destinationErrorsToDisplay.length > 0"
-              class="text-center text-h6 tw-py-2"
-            >
-              Error Validations
-            </div>
-            <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
-            <q-separator class="q-mx-md q-mt-md" />
-            <div class="error-report-container">
-              <!-- Destination Errors Section -->
-              <div
-                class="error-section"
-                v-if="destinationErrorsToDisplay.length > 0"
-              >
-                <div class="error-list">
-                  <!-- Iterate through the outer array -->
-                  <div
-                    v-for="(errorGroup, index) in destinationErrorsToDisplay"
-                    :key="index"
-                  >
-                    <!-- Iterate through each inner array (the individual error message) -->
-                    <div
-                      v-for="(errorMessage, errorIndex) in errorGroup"
-                      :key="errorIndex"
-                      class="error-item"
-                      :data-test="`destination-import-error-${index}-${errorIndex}`"
-                    >
-                      <span
-                        data-test="destination-import-name-error"
-                        class="text-red"
-                        v-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'destination_name'
-                        "
-                      >
-                        {{ errorMessage.message }}
-
-                        <div style="width: 300px">
-                          <q-input
-                            data-test="destination-import-name-input"
-                            v-model="userSelectedDestinationName[index]"
-                            :label="'Destination Name *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateDestinationName(
-                                userSelectedDestinationName[index],
-                                index,
-                              )
-                            "
-                          />
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'url'
-                        "
-                      >
-                        {{ errorMessage.message }}
-
-                        <div style="width: 300px">
-                          <q-input
-                            data-test="destination-import-url-input"
-                            v-model="userSelectedDestinationUrl[index]"
-                            :label="'Destination URL *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateDestinationUrl(
-                                userSelectedDestinationUrl[index],
-                                index,
-                              )
-                            "
-                          />
-                        </div>
-                      </span>
-                      <!-- Check if the errorMessage is an object, if so, display the 'message' property -->
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'type'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-select
-                            data-test="destination-import-type-input"
-                            v-model="userSelectedDestinationType[index]"
-                            :options="destinationTypes"
-                            :label="'Destination Type *'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
-                            :input-debounce="400"
-                            @update:model-value="
-                              updateDestinationType(
-                                userSelectedDestinationType[index],
-                                index,
-                              )
-                            "
-                            behavior="menu"
-                          />
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'method'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-select
-                            data-test="destination-import-method-input"
-                            v-model="userSelectedDestinationMethod[index]"
-                            :options="destinationMethods"
-                            :label="'Destination Method *'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
-                            :input-debounce="400"
-                            @update:model-value="
-                              updateDestinationMethod(
-                                userSelectedDestinationMethod[index],
-                                index,
-                              )
-                            "
-                            behavior="menu"
-                          />
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'template_name'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <q-select
-                            data-test="destination-import-template-input"
-                            v-model="userSelectedTemplates[index]"
-                            :options="filteredTemplates"
-                            label="Templates *"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            input-debounce="400"
-                            behavior="menu"
-                            hide-selected
-                            fill-input
-                            @filter="filterTemplates"
-                            :rules="[(val) => !!val || 'Field is required!']"
-                            style="width: 300px"
-                            @update:model-value="
-                              updateDestinationTemplate($event, index)
-                            "
-                          >
-                          </q-select>
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'email_input'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-input
-                            data-test="destination-import-emails-input"
-                            v-model="userSelectedEmails[index]"
-                            :label="'Emails (comma separated) *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateDestinationEmails(
-                                userSelectedEmails[index],
-                                index,
-                              )
-                            "
-                          />
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'action_id'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <q-select
-                            data-test="destination-import-action-input"
-                            v-model="userSelectedActionId[index]"
-                            :options="filteredActions"
-                            label="Actions *"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            emit-value
-                            map-options
-                            input-debounce="400"
-                            behavior="menu"
-                            hide-selected
-                            fill-input
-                            @filter="filterActions"
-                            :rules="[(val) => !!val || 'Field is required!']"
-                            style="width: 300px"
-                            @update:model-value="
-                              updateDestinationAction($event, index)
-                            "
-                          >
-                          </q-select>
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'skip_tls_verify'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-toggle
-                            data-test="destination-import-skip-tls-verify-input"
-                            :model-value="
-                              userSelectedSkipTlsVerify[index] ?? false
-                            "
-                            :label="t('alert_destinations.skip_tls_verify')"
-                            class="q-mt-sm"
-                            @update:model-value="
-                              updateSkipTlsVerify($event, index)
-                            "
-                          />
-                        </div>
-                      </span>
-                      <span class="text-red" v-else>{{ errorMessage }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="error-section" v-if="destinationCreators.length > 0">
-                <div
-                  class="section-title text-primary"
-                  data-test="destination-import-creation-title"
-                >
-                  Destination Creation
-                </div>
-                <div
-                  class="error-list"
-                  v-for="(val, index) in destinationCreators"
-                  :key="index"
-                  :data-test="`destination-import-creation-${index}`"
-                >
-                  <div
-                    :class="{
-                      'error-item text-bold': true,
-                      'text-green ': val.success,
-                      'text-red': !val.success,
-                    }"
-                    :data-test="`destination-import-creation-${index}-message`"
-                  >
-                    <pre>{{ val.message }}</pre>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-      </q-splitter>
-    </div>
-  </div>
-  </div>
+    </template>
+  </base-import>
 </template>
 
 <script lang="ts">
 import {
   defineComponent,
   ref,
-  onMounted,
-  reactive,
   computed,
-  watch,
-  defineAsyncComponent,
+  onMounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-
 import { useQuasar } from "quasar";
-
 import destinationService from "@/services/alert_destination";
-
-import AppTabs from "../common/AppTabs.vue";
-import axios from "axios";
+import BaseImport from "../common/BaseImport.vue";
 import useActions from "@/composables/useActions";
 
 export default defineComponent({
@@ -555,43 +414,46 @@ export default defineComponent({
       message: string;
       success: boolean;
     }[];
-
     type destinationErrors = (ErrorMessage | string)[][];
+
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-
-    const jsonStr: any = ref("");
     const q = useQuasar();
+    const { isActionsEnabled } = useActions();
 
+    const baseImportRef = ref<any>(null);
     const destinationErrorsToDisplay = ref<destinationErrors>([]);
+    const destinationCreators = ref<destinationCreator>([]);
+    const isDestinationImporting = ref(false);
 
-    const userSelectedTemplates = ref<string[]>([]);
     const destinationTypes = ["http", "email"];
     const destinationMethods = ["post", "get", "put"];
 
-    const destinationCreators = ref<destinationCreator>([]);
-    const queryEditorPlaceholderFlag = ref(true);
-    const userSelectedDestinationType = ref([]);
-    const userSelectedDestinationMethod = ref([]);
-    const jsonFiles = ref(null);
-    const userSelectedDestinationName = ref([]);
-    const userSelectedDestinationUrl = ref([]);
-    const url = ref("");
-    const jsonArrayOfObj = ref<any[]>([{}]);
-    const activeTab = ref("import_json_file");
-    const splitterModel = ref(60);
-    const filteredTemplates = ref<string[]>([]);
-    const filteredActions = ref<string[]>([]);
-
+    const userSelectedTemplates = ref<string[]>([]);
+    const userSelectedDestinationType = ref<any[]>([]);
+    const userSelectedDestinationMethod = ref<any[]>([]);
+    const userSelectedDestinationName = ref<any[]>([]);
+    const userSelectedDestinationUrl = ref<any[]>([]);
+    const userSelectedEmails = ref<any[]>([]);
+    const userSelectedActionId = ref<any[]>([]);
     const userSelectedSkipTlsVerify = ref<boolean[]>([]);
+    const filteredTemplates = ref<string[]>([]);
+    const filteredActions = ref<any[]>([]);
 
-    const { isActionsEnabled } = useActions();
+    // Use computed to directly reference BaseImport's jsonArrayOfObj
+    const jsonArrayOfObj = computed({
+      get: () => baseImportRef.value?.jsonArrayOfObj || [],
+      set: (val) => {
+        if (baseImportRef.value) {
+          baseImportRef.value.jsonArrayOfObj = val;
+        }
+      }
+    });
 
     const getFormattedTemplates = computed(() => {
       return props.templates
         .filter((template: any) => {
-          // Get the current destination type
           const currentDestinationType =
             jsonArrayOfObj.value[destinationErrorsToDisplay.value.length - 1]
               ?.type;
@@ -606,49 +468,131 @@ export default defineComponent({
         .map((template: any) => template.name);
     });
 
-    const userSelectedEmails = ref([]);
+    const userSelectedActionOptions = ref([]);
 
-    const userSelectedActionId = ref([]);
+    onMounted(async () => {
+      try {
+        const actionsData = await store.dispatch("getActions", {
+          org_identifier: store.state.selectedOrganization.identifier,
+        });
+        // Filter to only show service-type actions
+        userSelectedActionOptions.value = actionsData.list
+          .filter((action: any) => action.execution_details_type === "service")
+          .map((action: any) => ({
+            label: action.name,
+            value: action.id,
+          }));
+        filteredActions.value = userSelectedActionOptions.value;
+      } catch (error) {
+        console.error("Error fetching actions:", error);
+      }
+    });
+
+    const getServiceActions = () => {
+      return (
+        store.state.organizationData.actions.filter(
+          (action: any) => action.execution_details_type === "service",
+        ) || []
+      );
+    };
 
     const updateDestinationType = (type: any, index: number) => {
-      jsonArrayOfObj.value[index].type = type;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].type = type;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
+
     const updateDestinationMethod = (method: any, index: number) => {
-      jsonArrayOfObj.value[index].method = method;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].method = method;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const updateDestinationName = (destinationName: string, index: number) => {
-      jsonArrayOfObj.value[index].name = destinationName;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].name = destinationName;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
+
     const updateDestinationUrl = (url: any, index: number) => {
-      jsonArrayOfObj.value[index].url = url;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].url = url;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const updateDestinationTemplate = (template: string, index: number) => {
-      jsonArrayOfObj.value[index].template = template;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].template = template;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const updateDestinationAction = (id: string, index: number) => {
-      jsonArrayOfObj.value[index].action_id = id;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].action_id = id;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const updateDestinationEmails = (emails: string, index: number) => {
-      // Split comma-separated emails and trim whitespace
-      const emailArray = emails.split(",").map((email) => email.trim());
-      jsonArrayOfObj.value[index].emails = emailArray;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].emails = emails
+          .split(",")
+          .map((email) => email.trim());
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const updateSkipTlsVerify = (value: boolean, index: number) => {
       userSelectedSkipTlsVerify.value[index] = value;
-      jsonArrayOfObj.value[index].skip_tls_verify = value;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].skip_tls_verify = value;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const filterTemplates = (val: string, update: Function) => {
@@ -662,7 +606,7 @@ export default defineComponent({
       update(() => {
         const needle = val.toLowerCase();
         filteredTemplates.value = getFormattedTemplates.value.filter(
-          (template: string) => template.toLowerCase().includes(needle),
+          (v: string) => v.toLowerCase().indexOf(needle) > -1,
         );
       });
     };
@@ -670,153 +614,32 @@ export default defineComponent({
     const filterActions = (val: string, update: Function) => {
       if (val === "") {
         update(() => {
-          filteredActions.value = store.state.organizationData.actions
-            .filter(
-              (action: any) => action.execution_details_type === "service",
-            )
-            .map((action: any) => ({
-              label: action.name,
-              value: action.id,
-            }));
+          filteredActions.value = userSelectedActionOptions.value;
         });
         return;
       }
 
       update(() => {
         const needle = val.toLowerCase();
-        getServiceActions()
-          .map((action: any) => ({
-            label: action.name,
-            value: action.id,
-          }))
-          .filter(
-            (action: { name: string; id: string }) =>
-              action.name.toLowerCase().includes(needle) ||
-              action.id.toLowerCase().includes(needle),
-          );
+        filteredActions.value = userSelectedActionOptions.value.filter(
+          (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
+        );
       });
     };
 
-    const getServiceActions = () => {
-      return (
-        store.state.organizationData.actions.filter(
-          (action: any) => action.execution_details_type === "service",
-        ) || []
-      );
-    };
-
-    watch(jsonFiles, async (newVal: any, oldVal: any) => {
-      if (newVal && newVal.length > 0) {
-        let combinedJson: any[] = [];
-
-        for (const file of newVal) {
-          try {
-            const result: any = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onload = (e: any) => {
-                try {
-                  const parsedJson = JSON.parse(e.target.result);
-                  // Convert to array if it's a single object
-                  const jsonArray = Array.isArray(parsedJson)
-                    ? parsedJson
-                    : [parsedJson];
-                  resolve(jsonArray);
-                } catch (error) {
-                  q.notify({
-                    message: `Error parsing JSON from file ${file.name}`,
-                    color: "negative",
-                    position: "bottom",
-                    timeout: 2000,
-                  });
-                  resolve([]);
-                }
-              };
-              reader.readAsText(file);
-            });
-
-            combinedJson = [...combinedJson, ...result];
-          } catch (error) {
-            console.error("Error reading file:", error);
-          }
-        }
-
-        // Update the refs with combined JSON data
-        jsonArrayOfObj.value = combinedJson;
-        jsonStr.value = JSON.stringify(combinedJson, null, 2);
-      }
-    });
-    watch(url, async (newVal, oldVal) => {
-      try {
-        if (newVal) {
-          const response = await axios.get(newVal);
-
-          // Check if the response body is valid JSON
-          try {
-            if (
-              response.headers["content-type"].includes("application/json") ||
-              response.headers["content-type"].includes("text/plain")
-            ) {
-              jsonStr.value = JSON.stringify(response.data, null, 2);
-              jsonArrayOfObj.value = response.data;
-            } else {
-              q.notify({
-                message: "Invalid JSON format in the URL",
-                color: "negative",
-                position: "bottom",
-                timeout: 2000,
-              });
-            }
-          } catch (parseError) {
-            // If parsing fails, display an error message
-            q.notify({
-              message: "Invalid JSON format",
-              color: "negative",
-              position: "bottom",
-              timeout: 2000,
-            });
-          }
-        }
-      } catch (error) {
-        q.notify({
-          message: "Error fetching data",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
-      }
-    });
-
-    const tabs = reactive([
-      {
-        label: "File Upload / JSON",
-        value: "import_json_file",
-      },
-      {
-        label: "URL Import",
-        value: "import_json_url",
-      },
-    ]);
-
-    const updateActiveTab = () => {
-      jsonStr.value = "";
-      jsonFiles.value = null;
-      url.value = "";
-      jsonArrayOfObj.value = [{}];
-    };
-
-    const importJson = async () => {
+    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
       destinationErrorsToDisplay.value = [];
       destinationCreators.value = [];
 
       try {
-        if ((!jsonStr.value || jsonStr.value.trim() === "") && !url.value) {
+        if (!jsonString || jsonString.trim() === "") {
           throw new Error("JSON string is empty");
-        } else {
-          const parsedJson = JSON.parse(jsonStr.value);
-          jsonArrayOfObj.value = Array.isArray(parsedJson)
-            ? parsedJson
-            : [parsedJson];
         }
+
+        const parsedJson = JSON.parse(jsonString);
+        jsonArrayOfObj.value = Array.isArray(parsedJson)
+          ? parsedJson
+          : [parsedJson];
       } catch (e: any) {
         q.notify({
           message: e.message || "Invalid JSON format",
@@ -827,19 +650,17 @@ export default defineComponent({
         return;
       }
 
-      let hasErrors = false;
       let successCount = 0;
       const totalCount = jsonArrayOfObj.value.length;
+      isDestinationImporting.value = true;
+
       for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
         const success = await processJsonObject(jsonObj, index + 1);
-        if (!success) {
-          hasErrors = true;
-        } else {
+        if (success) {
           successCount++;
         }
       }
 
-      // Only redirect and show success message if ALL destinations were imported successfully
       if (successCount === totalCount) {
         q.notify({
           message: `Successfully imported destination(s)`,
@@ -847,12 +668,21 @@ export default defineComponent({
           position: "bottom",
           timeout: 2000,
         });
-        router.push({
-          name: "alertDestinations",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
+
+        setTimeout(() => {
+          router.push({
+            name: "alertDestinations",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          });
+        }, 400);
+      }
+
+      isDestinationImporting.value = false;
+
+      if (baseImportRef.value) {
+        baseImportRef.value.isImporting = false;
       }
     };
 
@@ -860,7 +690,6 @@ export default defineComponent({
       try {
         const isValidDestination = await validateDestinationInputs(
           jsonObj,
-          0,
           index,
         );
         if (!isValidDestination) {
@@ -883,70 +712,52 @@ export default defineComponent({
       }
     };
 
-    const validateDestinationInputs = async (
-      input: any,
-      destinationIndex: number = 1,
-      index: any,
-    ) => {
+    const validateDestinationInputs = async (input: any, index: number) => {
       let destinationErrors: (string | { message: string; field: string })[] =
         [];
 
-      // Check if 'url' is required for webhook and should not exist for email
-      if (!input.hasOwnProperty("type") && !input.url) {
-        destinationErrors.push(
-          `Destination - ${index} 'url' is required for webhook`,
-        );
-      }
-
-      if (input.type === "email" && input.url) {
-        destinationErrors.push(
-          `Destination - ${index} 'url' should not be provided for email`,
-        );
-      }
-      if (checkDestinationInList(props.destinations, input.name)) {
+      // Validate name
+      if (
+        !input.name ||
+        typeof input.name !== "string" ||
+        input.name.trim() === ""
+      ) {
         destinationErrors.push({
-          message: `Destination - ${index} "${input.name}" already exists`,
+          message: `Destination - ${index}: The "name" field is required and should be a valid string.`,
+          field: "destination_name",
+        });
+      } else if (
+        props.destinations.some(
+          (destination: any) => destination.name === input.name,
+        )
+      ) {
+        destinationErrors.push({
+          message: `Destination - ${index}: "${input.name}" already exists`,
           field: "destination_name",
         });
       }
+
+      // Validate type
       if (
-        input.type == "http" &&
-        (typeof input.url != "string" || input.url == "")
+        !input.type ||
+        (input.type !== "email" &&
+         input.type !== "http" &&
+         input.type !== "action")
       ) {
         destinationErrors.push({
-          message: `Destination - ${index} 'URL' should not be empty for type 'http'`,
-          field: "url",
-        });
-      }
-      if (
-        input.type == "http" &&
-        (!input.method ||
-          (input.method !== "post" &&
-            input.method !== "get" &&
-            input.method !== "put"))
-      ) {
-        destinationErrors.push({
-          message: `Destination - ${index} 'method' is required and should be either 'post', 'get', or 'put'`,
-          field: "method",
+          message: `Destination - ${index}: The "type" field must be either "email", "http", or "action"`,
+          field: "type",
         });
       }
 
-      // Update template validation to consider type-specific templates
-      const availableTemplates = props.templates
-        .filter((template: any) => {
-          if (input.type === "email" && template.type === "email") return true;
-          else if (input.type !== "email") return true;
-          return false;
-        })
-        .map((template: any) => template.name);
-
-      if (!availableTemplates.includes(input.template)) {
-        destinationErrors.push({
-          message: `Destination - ${index} template "${input.template}" does not exist for type "${input.type}"`,
-          field: "template_name",
-        });
+      // Check if action type is supported when actions are not enabled
+      if (input.type === "action" && !isActionsEnabled.value) {
+        destinationErrors.push(
+          `Destination - ${index}: 'action' type is not supported.`,
+        );
       }
 
+      // Validate action_id exists when type is action
       const availableActions = getServiceActions().map(
         (action: any) => action.id,
       );
@@ -957,112 +768,132 @@ export default defineComponent({
         !availableActions.includes(input.action_id)
       ) {
         destinationErrors.push({
-          message: `Destination - ${index} action "${input.action_id}" does not exist for type "${input.type}"`,
+          message: `Destination - ${index}: action "${input.action_id}" does not exist for type "${input.type}"`,
           field: "action_id",
         });
       }
 
-      // Check type for email and it should be present only for email
-      if (
-        input.type != "email" &&
-        input.type != "http" &&
-        input.type !== "action"
-      ) {
-        destinationErrors.push({
-          message: `Destination - ${index} 'type' should be email, http or action`,
-          field: "type",
-        });
-      }
+      // Validate URL for http type
+      if (input.type === "http") {
+        if (!input.url || typeof input.url !== "string" || input.url.trim() === "") {
+          destinationErrors.push({
+            message: `Destination - ${index}: The "url" field is required for http type destinations.`,
+            field: "url",
+          });
+        }
 
-      // Check if 'method' is required for both webhook and email
+        if (
+          !input.method ||
+          !["post", "get", "put"].includes(input.method.toLowerCase())
+        ) {
+          destinationErrors.push({
+            message: `Destination - ${index}: The "method" field must be one of "post", "get", or "put"`,
+            field: "method",
+          });
+        }
 
-      // Check if 'skip_tls_verify' is required for both webhook and email, and it should be a boolean
-      if (
-        input.type == "http" &&
-        (input.skip_tls_verify === undefined ||
-          typeof input.skip_tls_verify !== "boolean")
-      ) {
-        destinationErrors.push({
-          message: `Destination - ${index} 'skip_tls_verify' is required and should be a boolean value`,
-          field: "skip_tls_verify",
-        });
-      }
+        if (!input.template || typeof input.template !== "string") {
+          destinationErrors.push({
+            message: `Destination - ${index}: The "template" field is required for http type destinations.`,
+            field: "template_name",
+          });
+        }
 
-      if (input.type == "http" && input.headers != undefined) {
-        if (typeof input.headers !== "object") {
-          destinationErrors.push(
-            `Destination - ${index} 'headers' should be an object for webhook`,
-          );
+        // Validate skip_tls_verify is required and must be boolean
+        if (
+          input.skip_tls_verify === undefined ||
+          typeof input.skip_tls_verify !== "boolean"
+        ) {
+          destinationErrors.push({
+            message: `Destination - ${index}: The "skip_tls_verify" field is required and should be a boolean value`,
+            field: "skip_tls_verify",
+          });
+        }
+
+        // Validate headers should be an object if present
+        if (input.headers !== undefined) {
+          if (typeof input.headers !== "object" || Array.isArray(input.headers)) {
+            destinationErrors.push(
+              `Destination - ${index}: 'headers' should be an object for http type`,
+            );
+          }
         }
       }
 
-      if (
-        input.type === "email" &&
-        input.hasOwnProperty("headers") &&
-        Object.keys(input.headers).length !== 0
-      ) {
-        destinationErrors.push(
-          `Destination - ${index} 'headers' should not be provided for email`,
-        );
-      }
-
-      // Check if 'name' is required for both webhook and email
-      if (!input.name || typeof input.name !== "string") {
-        destinationErrors.push({
-          message: `Destination - ${index} 'name' is required and should be a string`,
-          field: "destination_name",
-        });
-      }
-
-      if (input.type === "action" && !isActionsEnabled.value) {
-        destinationErrors.push(
-          `Destination - ${index} 'action' type is not supported.`,
-        );
-      }
-
-      // 'emails' should be required for email type and should be an array of strings
+      // Validate email type
       if (input.type === "email") {
+        // Validate URL should not be present for email type
+        if (input.url) {
+          destinationErrors.push(
+            `Destination - ${index}: 'url' should not be provided for email type`,
+          );
+        }
+
+        // Validate headers should not be present for email type
         if (
-          !Array.isArray(input.emails) ||
-          input.emails.some((email: any) => typeof email !== "string") ||
-          input.emails.length === 0
+          input.hasOwnProperty("headers") &&
+          Object.keys(input.headers).length !== 0
         ) {
+          destinationErrors.push(
+            `Destination - ${index}: 'headers' should not be provided for email type`,
+          );
+        }
+
+        // Validate emails array with stricter validation
+        if (!input.emails || !Array.isArray(input.emails) || input.emails.length === 0) {
           destinationErrors.push({
-            message: `Destination - ${index} 'emails' should be an array of strings for email type`,
+            message: `Destination - ${index}: The "emails" field is required and should be an array for email type destinations.`,
             field: "email_input",
+          });
+        } else if (input.emails.some((email: any) => typeof email !== "string")) {
+          destinationErrors.push({
+            message: `Destination - ${index}: 'emails' should be an array of strings for email type`,
+            field: "email_input",
+          });
+        }
+
+        if (!input.template || typeof input.template !== "string") {
+          destinationErrors.push({
+            message: `Destination - ${index}: The "template" field is required for email type destinations.`,
+            field: "template_name",
           });
         }
       }
 
-      // Check if 'template' is required for both webhook and email
-      if (!input.template || typeof input.template !== "string") {
-        destinationErrors.push(
-          `Destination - ${index} 'template' is required and should be a string`,
-        );
+      // Validate template exists in available templates
+      if (input.template) {
+        const availableTemplates = props.templates
+          .filter((template: any) => {
+            if (input.type === "email" && template.type === "email") return true;
+            else if (input.type !== "email") return true;
+            return false;
+          })
+          .map((template: any) => template.name);
+
+        if (!availableTemplates.includes(input.template)) {
+          destinationErrors.push({
+            message: `Destination - ${index}: template "${input.template}" does not exist for type "${input.type}"`,
+            field: "template_name",
+          });
+        }
       }
 
-      // Log all destination errors at the end if any exist
+      // Validate action_id if actions are enabled
+      if (isActionsEnabled.value) {
+        if (input.action_id && typeof input.action_id !== "string") {
+          destinationErrors.push({
+            message: `Destination - ${index}: The "action_id" field must be a valid string.`,
+            field: "action_id",
+          });
+        }
+      }
+
       if (destinationErrors.length > 0) {
         destinationErrorsToDisplay.value.push(destinationErrors);
         return false;
       }
 
-      // If all validations pass
       return true;
-    };
-
-    const checkDestinationInList = (
-      destinations: any,
-      destinationName: any,
-    ) => {
-      const destinationsList = destinations.map(
-        (destination: any) => destination.name,
-      );
-      return destinationsList.includes(destinationName);
-    };
-    const checkTemplatesInList = (templates: any, templateName: any) => {
-      const templatesList = templates.map((template: any) => template.name);
-      return templatesList.includes(templateName);
     };
 
     const createDestination = async (input: any, index: number) => {
@@ -1074,11 +905,10 @@ export default defineComponent({
         });
 
         destinationCreators.value.push({
-          message: `Destination - ${index}: "${input.name}" created successfully \nNote: please remove the created desination object ${input.name} from the json file`,
+          message: `Destination - ${index}: "${input.name}" created successfully \nNote: please remove the created destination object ${input.name} from the json file `,
           success: true,
         });
 
-        // Emit update after each successful creation
         emit("update:destinations");
 
         return true;
@@ -1090,6 +920,7 @@ export default defineComponent({
         return false;
       }
     };
+
     const arrowBackFn = () => {
       router.push({
         name: "alertDestinations",
@@ -1099,125 +930,75 @@ export default defineComponent({
       });
     };
 
-    const onSubmit = (e: any) => {
-      e.preventDefault();
-    };
-
     return {
-      store,
       t,
-      jsonStr,
       importJson,
-      onSubmit,
       router,
       q,
+      baseImportRef,
       destinationErrorsToDisplay,
       destinationCreators,
-      queryEditorPlaceholderFlag,
-      splitterModel,
-      tabs,
-      activeTab,
-      userSelectedTemplates,
-      getFormattedTemplates,
       jsonArrayOfObj,
+      destinationTypes,
+      destinationMethods,
       userSelectedDestinationType,
       userSelectedDestinationMethod,
+      userSelectedDestinationName,
+      userSelectedDestinationUrl,
+      userSelectedTemplates,
+      userSelectedEmails,
+      userSelectedActionId,
+      userSelectedSkipTlsVerify,
+      filteredTemplates,
+      filteredActions,
       updateDestinationType,
       updateDestinationMethod,
       updateDestinationName,
       updateDestinationUrl,
-      jsonFiles,
-      updateActiveTab,
-      arrowBackFn,
-      userSelectedDestinationName,
-      userSelectedDestinationUrl,
-      destinationTypes,
-      destinationMethods,
-      url,
       updateDestinationTemplate,
-      userSelectedEmails,
-      updateDestinationEmails,
-      filterTemplates,
-      filteredTemplates,
-      userSelectedSkipTlsVerify,
-      updateSkipTlsVerify,
-      userSelectedActionId,
-      filterActions,
-      filteredActions,
       updateDestinationAction,
+      updateDestinationEmails,
+      updateSkipTlsVerify,
+      filterTemplates,
+      filterActions,
+      getServiceActions,
+      arrowBackFn,
+      isDestinationImporting,
+      store,
+      getFormattedTemplates,
       // Exposed validation and helper functions for testing
       validateDestinationInputs,
-      checkDestinationInList,
-      checkTemplatesInList,
       createDestination,
       processJsonObject,
-      getServiceActions,
     };
   },
   components: {
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
-    AppTabs,
+    BaseImport,
   },
 });
 </script>
 
 <style scoped lang="scss">
-.empty-query .monaco-editor-background {
-  background-image: url("../../assets/images/common/query-editor.png");
-  background-repeat: no-repeat;
-  background-size: 115px;
-}
-
-.empty-function .monaco-editor-background {
-  background-image: url("../../assets/images/common/vrl-function.png");
-  background-repeat: no-repeat;
-  background-size: 170px;
-}
-.editor-container {
-  height: calc(70vh - 20px) !important;
-}
-.editor-container-url {
-  .monaco-editor {
-    height: calc(100vh - 276px) !important; /* Total editor height */
-    overflow: auto; /* Allows scrolling if content overflows */
-    resize: none; /* Remove resize behavior */
-  }
-}
-.editor-container-json {
-  .monaco-editor {
-    height: calc(100vh - 315px) !important; /* Total editor height */
-    overflow: auto; /* Allows scrolling if content overflows */
-    resize: none; /* Remove resize behavior */
-  }
-}
-.monaco-editor {
-  height: calc(100vh - 14px) !important; /* Total editor height */
-  overflow: auto; /* Allows scrolling if content overflows */
-  resize: none; /* Remove resize behavior */
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  padding-top: 0.3rem;
-
-}
 .error-report-container {
-  height: calc(70vh - 8px) !important; /* Total editor height */
-  overflow: auto; /* Allows scrolling if content overflows */
+  height: calc(60vh - 8px) !important;
+  overflow: auto;
   resize: none;
-}
-.error-container {
-  display: flex;
-  overflow-y: auto;
-
-  flex-direction: column;
-  border: 1px solid #ccc;
-  height: calc(100% - 100px) !important; /* Total container height */
+  width: 100%;
+  min-width: 400px;
 }
 
 .error-section {
   padding: 10px;
   margin-bottom: 10px;
+
+  pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    font-family: inherit;
+    margin: 0;
+  }
 }
 
 .section-title {
@@ -1226,54 +1007,11 @@ export default defineComponent({
   text-transform: uppercase;
 }
 
-.error-list {
-}
-
 .error-item {
   padding: 5px 0px;
   font-size: 14px;
-}
-.report-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #464646;
-  }
-
-  :deep(.rum-tab) {
-    &:hover {
-      background: #464646;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-.report-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 </style>
