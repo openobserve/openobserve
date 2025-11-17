@@ -692,7 +692,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- hide on dashboard toggle -->
-          <div>
+          <div class="q-mt-md">
             <q-toggle
               v-model="variableData.hideOnDashboard"
               :label="t('dashboard.hideOnDashboard')"
