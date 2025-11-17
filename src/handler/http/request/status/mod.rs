@@ -939,7 +939,7 @@ async fn enable_node(
         log::info!("[NODE] Disabling node, initiating graceful drain");
 
         // release all the searching files
-        crate::common::infra::wal::clean_lock_files();
+        crate::common::infra::wal::clean_lock_files().await;
 
         // If this is an ingester node, set draining mode and flush
         if LOCAL_NODE.is_ingester() {
@@ -972,7 +972,7 @@ async fn flush_node() -> Result<HttpResponse, Error> {
     };
 
     // release all the searching files
-    crate::common::infra::wal::clean_lock_files();
+    crate::common::infra::wal::clean_lock_files().await;
 
     match ingester::flush_all().await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),

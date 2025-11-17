@@ -936,12 +936,12 @@ GROUP BY stream
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        let sql = if stream_type.is_some() && stream_name.is_some() {
+        let sql = if let Some(stream_type) = stream_type
+            && let Some(stream_name) = stream_name
+        {
             format!(
                 "SELECT * FROM stream_stats WHERE stream = '{}/{}/{}';",
-                org_id,
-                stream_type.unwrap(),
-                stream_name.unwrap()
+                org_id, stream_type, stream_name
             )
         } else {
             format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
