@@ -230,8 +230,13 @@
   };
   
   // Toggle AND/OR
-  const toggleLabel = () => {
-    groups.value.label = groups.value.label === 'and' ? 'or' : 'and';
+  const toggleLabel = (newLabel?: string) => {
+    // If newLabel is provided, use it; otherwise toggle
+    if (newLabel) {
+      groups.value.label = newLabel;
+    } else {
+      groups.value.label = groups.value.label === 'and' ? 'or' : 'and';
+    }
     emit('add-group', groups.value); // optional, sync with parent
     emit('input:update', 'conditions', groups.value);
   };
