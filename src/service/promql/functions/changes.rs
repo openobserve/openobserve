@@ -23,20 +23,8 @@ use crate::service::promql::{
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#changes
-/// Enhanced version that processes all timestamps at once for range queries
 pub(crate) fn changes(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] changes() started",
-        eval_ctx.trace_id
-    );
-    let result = super::eval_range(data, ChangesFunc::new(), eval_ctx);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] changes() execution took: {:?}",
-        eval_ctx.trace_id,
-        start.elapsed()
-    );
-    result
+    super::eval_range(data, ChangesFunc::new(), eval_ctx)
 }
 
 pub struct ChangesFunc;
