@@ -263,8 +263,9 @@ jobs:
               -H "Accept: application/vnd.github.v3+json" \
               "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=all&per_page=100")
 
-            # Count unique matrix job names that have run_attempt = current attempt
-            CURRENT_ATTEMPT_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | .name] | unique | length")
+            # Count unique matrix job names that ACTUALLY STARTED in current attempt
+            # Filter by run_attempt AND started_at != null (means job actually executed)
+            CURRENT_ATTEMPT_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | select(.started_at != null) | .name] | unique | length")
 
             # Count total unique matrix job names (from attempt 1)
             TOTAL_MATRIX_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == 1) | .name] | unique | length")
