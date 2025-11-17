@@ -185,11 +185,16 @@
 
   const removeCondition = (id: string) => {
     groups.value.items = groups.value.items.filter((item: any) => item.id !== id);
-    if (groups.value.items.length == 0) {
-         emit('remove-group', props.group.groupId); // ask parent to remove this group
-  } else {
-    emit('add-group', groups.value); // update as usual
-  }
+
+    // Check if there are any conditions left (not sub-groups)
+    const hasConditions = groups.value.items.some((item: any) => !isGroup(item));
+
+    if (!hasConditions) {
+      // No conditions left, remove this entire group (including all sub-groups)
+      emit('remove-group', props.group.groupId);
+    } else {
+      emit('add-group', groups.value); // update as usual
+    }
   };
 
   const inputUpdate = (name: string, field: any) => {
