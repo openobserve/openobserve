@@ -188,7 +188,8 @@ const useValuesWebSocket = () => {
     };
 
     const res = initializeStreamingConnection(streamingPayload, {
-      name: name,
+      name: fieldObj.field,
+      stream: queryReq.stream_name,
       dashboardPanelData: dashboardPanelData,
     });
 
