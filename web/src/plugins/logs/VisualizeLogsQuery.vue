@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'chevron_left'
                   : 'chevron_right'
               "
+              :class="dashboardPanelData.layout.showFieldList ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
               dense
               round
               style="top: 14px; z-index: 100"
@@ -357,6 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'chevron_left'
                   : 'chevron_right'
               "
+              :class="dashboardPanelData.layout.showFieldList ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
               dense
               round
               style="top: 14px; z-index: 100"
