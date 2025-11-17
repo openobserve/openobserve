@@ -140,13 +140,29 @@ pub async fn process_token(
             }
         }
 
+        // Deduplicate source_orgs by org name to avoid duplicate key errors
+        // when user has multiple LDAP groups mapping to same org
+        if !source_orgs.is_empty() {
+            let mut seen_orgs = std::collections::HashSet::new();
+            source_orgs.retain(|org| seen_orgs.insert(org.name.clone()));
+        }
+
         // Assign users custom roles in RBAC
         // Only use custom role mapping if we have custom roles to assign
+        log::info!(
+            "Config check: map_group_to_role={}, custom_roles.len()={}, source_orgs.len()={}",
+            openfga_cfg.map_group_to_role,
+            custom_roles.len(),
+            source_orgs.len()
+        );
+
         if openfga_cfg.map_group_to_role && !custom_roles.is_empty() {
+            log::info!("Calling map_group_to_custom_role");
             map_group_to_custom_role(&user_email, &name, custom_roles, res.0.user_role).await;
             return Ok(None);
         }
 
+        log::info!("Using standard user creation flow");
         // Check if the user exists in the database
         let db_user = db::user::get_user_by_email(&user_email).await;
 
@@ -387,9 +403,12 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
         custom_role = Some(dn.to_owned());
         org = &dex_cfg.default_org;
     } else {
+        // Try to parse as LDAP DN format first
+        let mut found_ldap_format = false;
         for part in dn.split(',') {
             let parts: Vec<&str> = part.split('=').collect();
             if parts.len() == 2 {
+                found_ldap_format = true;
                 if parts[0].eq(&dex_cfg.group_attribute) && org.is_empty() {
                     org = parts[1];
                 }
@@ -398,6 +417,11 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
                 }
             }
         }
+
+        // If not LDAP format (e.g., GitHub/OAuth simple strings), use the whole string as org name
+        if !found_ldap_format && org.is_empty() {
+            org = dn;
+        }
     }
     let role = if role.is_empty() {
         UserRole::from_str(&dex_cfg.default_role).unwrap()
@@ -405,6 +429,7 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
         UserRole::from_str(role).unwrap()
     };
 
+    // Only fall back to default org if org is still empty (shouldn't happen with the above logic)
     if org.is_empty() {
         org = &dex_cfg.default_org;
     }
@@ -439,42 +464,56 @@ async fn map_group_to_custom_role(
         };
 
         // Extract unique orgs from custom roles BEFORE moving custom_roles (format: "org/role")
-        let custom_orgs: std::collections::HashMap<String, String> = custom_roles
-            .iter()
-            .filter_map(|r| {
-                let mut parts = r.split('/');
-                let org = parts.next()?;
-                let role = parts.next()?;
-                Some((org.to_string(), role.to_string()))
-            })
-            .collect();
+        // Check if custom claim parsing was used by looking for roles with custom orgs
+        // If custom claim parsing is disabled, custom_roles come from LDAP groups and should use
+        // default org
+        let use_custom_orgs = openfga_cfg.custom_claim_parsing_enabled;
 
-        // If custom_orgs is empty, create default org; otherwise create only custom organizations
-        if custom_orgs.is_empty() {
-            let _ = organization::check_and_create_org(&dex_cfg.default_org).await;
+        let custom_orgs: std::collections::HashMap<String, String> = if use_custom_orgs {
+            custom_roles
+                .iter()
+                .filter_map(|r| {
+                    let mut parts = r.split('/');
+                    let org = parts.next()?;
+                    let role = parts.next()?;
+                    Some((org.to_string(), role.to_string()))
+                })
+                .collect()
         } else {
+            // LDAP groups: use default org with all roles
+            std::collections::HashMap::new()
+        };
+
+        // Always create default org; additionally create custom orgs if needed
+        let _ = organization::check_and_create_org(&dex_cfg.default_org).await;
+        if use_custom_orgs && !custom_orgs.is_empty() {
             for org_name in custom_orgs.keys() {
-                let _ = organization::check_and_create_org(org_name).await;
+                if org_name != &dex_cfg.default_org {
+                    let _ = organization::check_and_create_org(org_name).await;
+                }
             }
         }
 
         if openfga_cfg.enabled {
-            // Add user to custom orgs if they exist, otherwise to default org
-            if custom_orgs.is_empty() {
-                get_add_user_to_org_tuples(
-                    &dex_cfg.default_org,
-                    user_email,
-                    &role.to_string(),
-                    &mut tuples,
-                );
-            } else {
+            // Always add user to default org
+            get_add_user_to_org_tuples(
+                &dex_cfg.default_org,
+                user_email,
+                &role.to_string(),
+                &mut tuples,
+            );
+
+            // If custom claim parsing enabled, also add to custom orgs
+            if use_custom_orgs && !custom_orgs.is_empty() {
                 for org_name in custom_orgs.keys() {
-                    get_add_user_to_org_tuples(
-                        org_name,
-                        user_email,
-                        &role.to_string(),
-                        &mut tuples,
-                    );
+                    if org_name != &dex_cfg.default_org {
+                        get_add_user_to_org_tuples(
+                            org_name,
+                            user_email,
+                            &role.to_string(),
+                            &mut tuples,
+                        );
+                    }
                 }
             }
 
@@ -493,42 +532,46 @@ async fn map_group_to_custom_role(
             // Now we'll collect only the role assignment tuples
             tuples.clear();
 
-            // Group custom roles by organization and add tuples for each org
-            let mut roles_by_org: std::collections::HashMap<String, Vec<String>> =
-                std::collections::HashMap::new();
-            for (org_name, role_name) in &custom_orgs {
-                roles_by_org
-                    .entry(org_name.clone())
-                    .or_default()
-                    .push(format!("{org_name}/{role_name}"));
-            }
+            // Group custom roles by organization
+            if use_custom_orgs && !custom_orgs.is_empty() {
+                // Custom claim parsing: roles are assigned to their respective orgs
+                let mut roles_by_org: std::collections::HashMap<String, Vec<String>> =
+                    std::collections::HashMap::new();
+                for (org_name, role_name) in &custom_orgs {
+                    roles_by_org
+                        .entry(org_name.clone())
+                        .or_default()
+                        .push(format!("{org_name}/{role_name}"));
+                }
 
-            for (org_name, org_roles) in roles_by_org {
+                for (org_name, org_roles) in roles_by_org {
+                    check_and_get_crole_tuple_for_new_user(
+                        user_email,
+                        &org_name,
+                        org_roles,
+                        &mut tuples,
+                    )
+                    .await;
+                }
+            } else {
+                // LDAP groups: all roles belong to default org
                 check_and_get_crole_tuple_for_new_user(
                     user_email,
-                    &org_name,
-                    org_roles,
+                    &dex_cfg.default_org,
+                    custom_roles.clone(),
                     &mut tuples,
                 )
                 .await;
             }
         }
 
-        // Build organizations list
-        // If custom orgs exist, use them with default role in DB
-        // Otherwise, use default org with default role
+        // Build organizations list for DB
+        // - If custom claim parsing enabled and custom orgs exist: add to those orgs
+        // - Otherwise: add to default org only
         let mut organizations = Vec::new();
 
-        if custom_orgs.is_empty() {
-            // No custom orgs, add default org
-            organizations.push(UserOrg {
-                role: role.clone(),
-                name: dex_cfg.default_org.clone(),
-                token: Default::default(),
-                rum_token: Default::default(),
-            });
-        } else {
-            // Add each custom org to organizations list with default role
+        if use_custom_orgs && !custom_orgs.is_empty() {
+            // Custom claim parsing: add user to custom orgs
             for org_name in custom_orgs.keys() {
                 organizations.push(UserOrg {
                     role: role.clone(),
@@ -537,6 +580,14 @@ async fn map_group_to_custom_role(
                     rum_token: Default::default(),
                 });
             }
+        } else {
+            // LDAP groups or no custom orgs: add to default org
+            organizations.push(UserOrg {
+                role: role.clone(),
+                name: dex_cfg.default_org.clone(),
+                token: Default::default(),
+                rum_token: Default::default(),
+            });
         }
 
         let updated_db_user = DBUser {
