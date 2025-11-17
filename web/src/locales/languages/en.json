@@ -18,6 +18,7 @@
     "condition": "Condition",
     "operator": "Operator",
     "value": "Value",
+    "filters": "Filters",
     "selectFilter": "Select Filter",
     "browser": "Browser",
     "attachments": "Attachments",
@@ -109,6 +110,7 @@
     "showQueryLabel": "Editors",
     "showFieldLabel": "Fields",
     "showHistogramLabel": "Histogram",
+    "showPatternsLabel": "Patterns",
     "sqlModeLabel": "SQL Mode",
     "quickModeLabel": "Quick Mode",
     "toggleFunctionLabel": "Function",
@@ -1139,7 +1141,51 @@
       "groupWaitTime": "Group Wait Time (seconds)",
       "groupWaitTimeTooltip": "Time to wait and collect similar alerts before sending a grouped notification. Allows batching of alerts that occur in quick succession."
     },
-    "noHistory": "No alert history found"
+    "noHistory": "No alert history found",
+    "totalEvaluations": "Total Evaluations",
+    "firingCount": "Firing Count",
+    "currentState": "Current State",
+    "lastEvaluation": "Last Evaluation",
+    "alertHistory": "Alert History",
+    "noHistoryData": "No alert history data available",
+    "avgEvaluationTime": "Avg Evaluation Time",
+    "successRate": "Success Rate",
+    "loadMore": "Load More",
+    "failedToFetchHistory": "Failed to fetch alert history",
+    "insights": {
+      "title": "Alert Insights",
+      "badge": "Interactive Analysis",
+      "tabs": {
+        "overview": "Overview",
+        "frequency": "Frequency & Dedup",
+        "correlation": "Errors & Storms Detection",
+        "quality": "Alert Quality"
+      },
+      "filters": {
+        "failedOnly": "Failed Only",
+        "failedOnlyTooltip": "Show only failed alert executions",
+        "silenced": "Silenced",
+        "silencedTooltip": "Show only silenced alerts",
+        "clearAll": "Clear All"
+      },
+      "tip": {
+        "title": "Tip:",
+        "message": "Right-click on charts to create filters. Zoom on timeline to filter by time range. Use toggles to filter by status."
+      },
+      "actions": {
+        "actionsFor": "Actions for:",
+        "configureDedup": "Configure Dedup",
+        "configureDedupTooltip": "Configure deduplication for this alert",
+        "editAlert": "Edit Alert",
+        "editAlertTooltip": "Edit alert configuration",
+        "viewHistory": "View History",
+        "viewHistoryTooltip": "View execution history for this alert"
+      },
+      "loading": {
+        "dashboardConfig": "Loading dashboard configuration...",
+        "refreshing": "Refreshing dashboard..."
+      }
+    }
   },
   "alert_templates": {
     "header": "Templates",
@@ -1267,7 +1313,8 @@
     "domainNeedsEmails": "Domain '{domain}' must have at least one email address when not allowing all users",
     "domainSettingsSaved": "Domain settings saved successfully",
     "errorSavingDomainSettings": "Error saving domain settings",
-    "noDomainMessage": "No domains configured. Add domains above to restrict access."
+    "noDomainMessage": "No domains configured. Add domains above to restrict access.",
+    "license": "License"
   },
   "reports": {
     "header": "Reports",
@@ -1426,6 +1473,22 @@
     "create_regex_pattern_field": "Redact / Drop using Regex",
     "import": "Import",
     "import_title": "Import Pattern",
-    "bottom_header": "Pattern(s)"
+    "bottom_header": "Pattern(s)",
+    "filter_by_tag": "Filter by Tag",
+    "refresh": "Refresh",
+    "loading_patterns": "Loading patterns...",
+    "try_again": "Try Again",
+    "showing_patterns": "Showing {count} pattern(s)",
+    "preview": "Preview",
+    "no_patterns_found": "No patterns found",
+    "no_description": "No description available",
+    "tags": "Tags",
+    "rarity": "Rarity",
+    "valid_examples": "Valid Examples",
+    "close": "Close",
+    "import_this_pattern": "Import This Pattern",
+    "patterns_loaded": "Loaded {count} pattern(s)",
+    "failed_to_load": "Failed to load patterns",
+    "no_patterns_selected": "Please select at least one pattern"
   }
 }

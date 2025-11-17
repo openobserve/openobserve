@@ -15,493 +15,388 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-w-full tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs">
-    <div class="card-container">
-      <div class="flex tw-py-3 tw-px-4 items-center no-wrap tw-h-[68px]">
-        <div class="col">
-          <div class="flex">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              @click="router.back()"
-              icon="arrow_back_ios_new"
-              data-test="alert-import-back-btn"
-            />
-            <div class="tw-font-[600] tw-text-[20px] q-ml-md">Import Alert</div>
-          </div>
-        </div>
-        <div class="flex justify-center">
-          <q-btn
-            v-close-popup
-            class="q-mr-md o2-secondary-button tw-h-[36px]"
-            :label="t('function.cancel')"
-            no-caps
-            flat
-            @click="router.back()"
-            data-test="alert-import-cancel-btn"
+  <base-import
+    ref="baseImportRef"
+    title="Import Alert"
+    test-prefix="alert"
+    :is-importing="isAlertImporting"
+    :editor-heights="{
+      urlEditor: 'calc(100vh - 286px)',
+      fileEditor: 'calc(100vh - 308px)',
+      outputContainer: 'calc(100vh - 130px)',
+      errorReport: 'calc(100vh - 192px)',
+    }"
+    @back="router.back()"
+    @cancel="router.back()"
+    @import="importJson"
+  >
+    <!-- Custom URL Input Section with Folder Dropdown -->
+    <template #url-input-section="{ url, updateUrl }">
+      <div class="flex tw-mt-[0.725rem] tw-h-[64px]">
+        <div style="width: calc(69%)" class="q-pr-sm">
+          <q-input
+            data-test="alert-import-url-input"
+            :model-value="url"
+            @update:model-value="updateUrl"
+            :placeholder="t('dashboard.addURL')"
+            borderless
+            style="padding: 10px 0px;"
           />
-          <q-btn
-            class="o2-primary-button no-border tw-h-[36px]"
-            :label="t('dashboard.import')"
-            type="submit"
-            padding="sm xl"
-            no-caps
-            @click="importJson"
-            :loading="isAlertImporting"
-            :disable="isAlertImporting"
-            data-test="alert-import-json-btn"
+        </div>
+
+        <div
+          style="width: calc(30%);position: relative; bottom: 21px;"
+          data-test="alert-folder-dropdown"
+        >
+          <SelectFolderDropDown
+            :type="'alerts'"
+            @folder-selected="updateActiveFolderId"
+            :activeFolderId="activeFolderId"
           />
         </div>
       </div>
-    </div>
-  </div>
-  <div class="flex tw-mx-2">
+    </template>
 
-    <div class="flex">
-      <q-splitter
-        class="logs-search-splitter"
-        no-scroll
-        v-model="splitterModel"
-        style="width: calc(100vw - 100px);"
+    <!-- Custom File Input Section with Folder Dropdown -->
+    <template #file-input-section="{ jsonFiles, updateFiles }">
+      <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
+        <div style="width: calc(69%)" class="q-pr-sm">
+          <q-file
+            data-test="alert-import-json-file-input"
+            :model-value="jsonFiles"
+            @update:model-value="updateFiles"
+            filled
+            bottom-slots
+            :label="t('dashboard.dropFileMsg')"
+            accept=".json"
+            multiple
+          >
+            <template v-slot:prepend>
+              <q-icon name="cloud_upload" @click.stop.prevent />
+            </template>
+            <template v-slot:append>
+              <q-icon
+                name="close"
+                @click.stop.prevent="updateFiles(null)"
+                class="cursor-pointer"
+              />
+            </template>
+            <template v-slot:hint> .json files only </template>
+          </q-file>
+        </div>
+        <div style="width: calc(30%); position: relative; bottom: 21px;">
+          <SelectFolderDropDown
+            :type="'alerts'"
+            @folder-selected="updateActiveFolderId"
+            :activeFolderId="activeFolderId"
+          />
+        </div>
+      </div>
+    </template>
+
+    <!-- Output Section with Alert-specific Error Display -->
+    <template #output-content>
+      <div
+        v-if="alertErrorsToDisplay.length > 0"
+        class="text-center text-h6 tw-py-2"
       >
-      
-        <template #before>
-              <div class="tw-w-full tw-h-full ">
-          <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
-                   <div class="app-tabs-container tw-h-[36px] tw-w-fit">
-            <app-tabs
-              data-test="alert-import-tabs"
-              class="tabs-selection-container"
-              :tabs="tabs"
-              v-model:active-tab="activeTab"
-              @update:active-tab="updateActiveTab"
-            />
-            </div>
-           </div>
-          <div
-            v-if="activeTab == 'import_json_url'"
-            class="editor-container-url card-container tw-py-1"
-          >
-            <q-form class="tw-mx-2 tw-pb-2" @submit="onSubmit">
-              <div class="flex tw-mt-[0.725rem] tw-h-[64px]">
-                <div style="width: calc(69%)" class="q-pr-sm">
-                  <q-input
-                    data-test="alert-import-url-input"
-                    v-model="url"
-                    :label="t('dashboard.addURL')"
-                    stack-label
-                    borderless
-                    label-slot
-                    style="padding: 10px 0px;"
-                  />
-                </div>
-
-                <div
-                  style="width: calc(30%); position: relative; top:10px;"
-                  data-test="alert-folder-dropdown"
+        Error Validations
+      </div>
+      <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
+      <q-separator class="q-mx-md q-mt-md" />
+      <div class="error-report-container" style="height: calc(100vh - 192px) !important; overflow: auto; resize: none;">
+        <!-- Alert Errors Section -->
+        <div class="error-section" v-if="alertErrorsToDisplay.length > 0">
+          <div class="error-list">
+            <!-- Iterate through the outer array -->
+            <div
+              v-for="(errorGroup, index) in alertErrorsToDisplay"
+              :key="index"
+              :data-test="`alert-import-error-${index}`"
+            >
+              <!-- Iterate through each inner array (the individual error message) -->
+              <div
+                v-for="(errorMessage, errorIndex) in errorGroup"
+                :key="errorIndex"
+                class="error-item"
+                :data-test="`alert-import-error-${index}-${errorIndex}`"
+              >
+                <span
+                  class="text-red"
+                  v-if="
+                    typeof errorMessage === 'object' &&
+                    errorMessage.field == 'alert_name'
+                  "
                 >
-                  <SelectFolderDropDown
-                    :type="'alerts'"
-                    @folder-selected="updateActiveFolderId"
-                    :activeFolderId="activeFolderId"
-                  />
-                </div>
-              </div>
-              <query-editor
-                data-test="alert-import-sql-editor"
-                ref="queryEditorRef"
-                editor-id="alert-import-query-editor"
-                class="monaco-editor tw-mx-2"
-                :debounceTime="300"
-                v-model:query="jsonStr"
-                language="json"
-                :class="
-                  jsonStr == '' && queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="queryEditorPlaceholderFlag = true"
-              />
+                  {{ errorMessage.message }}
 
-              <div></div>
-            </q-form>
-          </div>
-          <div
-            v-if="activeTab == 'import_json_file'"
-            class="editor-container-json card-container tw-py-1"
-          >
-            <q-form class="tw-mx-2 q-mt-md tw-pb-2" @submit="onSubmit">
-              <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
-                <div style="width: calc(69%)" class="q-pr-sm">
-                  <q-file
-                    data-test="alert-import-json-file-input"
-                    v-model="jsonFiles"
-                    filled
-                    bottom-slots
-                    :label="t('dashboard.dropFileMsg')"
-                    accept=".json"
-                    multiple
-                  >
-                    <template v-slot:prepend>
-                      <q-icon name="cloud_upload" @click.stop.prevent />
-                    </template>
-                    <template v-slot:append>
-                      <q-icon
-                        name="close"
-                        @click.stop.prevent="jsonFiles = null"
-                        class="cursor-pointer"
-                      />
-                    </template>
-                    <template v-slot:hint> .json files only </template>
-                  </q-file>
-                </div>
-                <div style="width: calc(30%); position: relative;">
-                  <SelectFolderDropDown
-                    :type="'alerts'"
-                    @folder-selected="updateActiveFolderId"
-                    :activeFolderId="activeFolderId"
-                  />
-                </div>
-              </div>
-              <query-editor
-                data-test="alert-import-sql-editor"
-                ref="queryEditorRef"
-                editor-id="alert-import-query-editor"
-                class="monaco-editor tw-mx-2"
-                :debounceTime="300"
-                v-model:query="jsonStr"
-                language="json"
-                :class="
-                  jsonStr == '' && queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="queryEditorPlaceholderFlag = true"
-              />
+                  <div style="width: 300px">
+                    <q-input
+                      data-test="alert-import-name-input"
+                      :model-value="userSelectedAlertName[index] || ''"
+                      :label="t('alerts.name') + ' *'"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="showLabelOnTop"
+                      stack-label
+                      outlined
+                      filled
+                      dense
+                      tabindex="0"
+                      @update:model-value="(val) => {
+                        userSelectedAlertName[index] = val;
+                        updateAlertName(val, index);
+                      }"
+                    />
+                  </div>
+                </span>
+                <!-- Check if the errorMessage is an object, if so, display the 'message' property -->
+                <span
+                  class="text-red"
+                  v-else-if="
+                    typeof errorMessage === 'object' &&
+                    errorMessage.field == 'stream_name'
+                  "
+                >
+                  {{ errorMessage.message }}
+                  <div style="width: 300px">
+                    <q-select
+                      data-test="alert-import-stream-name-input"
+                      :model-value="userSelectedStreamName[index] || ''"
+                      :options="streamList"
+                      :label="t('alerts.stream_name') + ' *'"
+                      :popup-content-style="{
+                        textTransform: 'lowercase',
+                      }"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="q-py-sm showLabelOnTop no-case"
+                      filled
+                      stack-label
+                      dense
+                      use-input
+                      hide-selected
+                      fill-input
+                      :input-debounce="400"
+                      @update:model-value="(val) => {
+                        userSelectedStreamName[index] = val;
+                        updateStreamFields(val, index);
+                      }"
+                      behavior="menu"
+                    />
+                  </div>
+                </span>
+                <span
+                  class="text-red"
+                  v-else-if="
+                    typeof errorMessage === 'object' &&
+                    errorMessage.field == 'destination_name'
+                  "
+                >
+                  {{ errorMessage.message }}
+                  <div>
+                    <q-select
+                      data-test="alert-import-destination-name-input"
+                      :model-value="userSelectedDestinations[index] || []"
+                      :options="filteredDestinations"
+                      @filter="filterDestinations"
+                      label="Destinations *"
+                      :popup-content-style="{
+                        textTransform: 'lowercase',
+                      }"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="q-py-sm showLabelOnTop no-case"
+                      filled
+                      stack-label
+                      dense
+                      use-input
+                      multiple
+                      :input-debounce="400"
+                      behavior="menu"
+                      :rules="[
+                        (val: any) => !!val || 'Field is required!',
+                      ]"
+                      style="width: 300px"
+                      @update:model-value="(val) => {
+                        userSelectedDestinations[index] = val;
+                        updateUserSelectedDestinations(val, index);
+                      }"
+                    >
+                      <template v-slot:option="scope">
+                        <q-item
+                          v-bind="scope.itemProps"
+                          :data-test="`add-alert-destination-${scope.opt}-select-item`"
+                        >
+                          <q-item-section side>
+                            <q-checkbox
+                              data-test="alert-import-destination-checkbox"
+                              :model-value="
+                                userSelectedDestinations[index]?.includes(
+                                  scope.opt,
+                                ) ?? false
+                              "
+                              dense
+                              @update:model-value="
+                                toggleDestination(scope.opt, index)
+                              "
+                            />
+                          </q-item-section>
+                          <q-item-section>
+                            <q-item-label
+                              data-test="alert-import-destination-label"
+                              >{{ scope.opt }}</q-item-label
+                            >
+                          </q-item-section>
+                        </q-item>
+                      </template>
+                    </q-select>
+                  </div>
+                </span>
+                <span
+                  class="text-red"
+                  v-else-if="
+                    typeof errorMessage === 'object' &&
+                    errorMessage.field == 'stream_type'
+                  "
+                >
+                  {{ errorMessage.message }}
+                  <div>
+                    <q-select
+                      data-test="alert-import-stream-type-input"
+                      :model-value="userSelectedStreamType[index] || ''"
+                      :options="streamTypes"
+                      :label="t('alerts.streamType') + ' *'"
+                      :popup-content-style="{
+                        textTransform: 'lowercase',
+                      }"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="q-py-sm showLabelOnTop no-case"
+                      stack-label
+                      outlined
+                      filled
+                      dense
+                      @update:model-value="(val) => {
+                        userSelectedStreamType[index] = val;
+                        updateStreams(val, index);
+                      }"
+                      :rules="[
+                        (val: any) => !!val || 'Field is required!',
+                      ]"
+                      style="width: 300px"
+                    />
+                  </div>
+                </span>
+                <span
+                  class="text-red"
+                  v-else-if="
+                    typeof errorMessage === 'object' &&
+                    errorMessage.field == 'timezone'
+                  "
+                >
+                  {{ errorMessage.message }}
+                  <div>
+                    <q-select
+                      data-test="alert-import-timezone-input"
+                      :model-value="userSelectedTimezone[index] || ''"
+                      :options="filteredTimezone"
+                      :label="'Timezone *'"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="q-py-sm showLabelOnTop no-case"
+                      stack-label
+                      outlined
+                      filled
+                      dense
+                      @update:model-value="(val) => {
+                        userSelectedTimezone[index] = val;
+                        updateTimezone(val, index);
+                      }"
+                      @filter="timezoneFilterFn"
+                      use-input
+                      hide-selected
+                      fill-input
+                      :input-debounce="400"
+                      behavior="menu"
+                      :rules="[
+                        (val: any) => !!val || 'Field is required!',
+                      ]"
+                      style="width: 300px"
+                    />
+                  </div>
+                </span>
+                <span
+                  class="text-red"
+                  v-else-if="
+                    typeof errorMessage === 'object' &&
+                    errorMessage.field == 'org_id'
+                  "
+                >
+                  {{ errorMessage.message }}
+                  <div style="width: 300px">
+                    <q-select
+                      data-test="alert-import-org-id-input"
+                      :model-value="userSelectedOrgId[index] || null"
+                      :options="organizationDataList"
+                      :label="'Organization Id'"
+                      :popup-content-style="{
+                        textTransform: 'lowercase',
+                      }"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="q-py-sm showLabelOnTop no-case"
+                      filled
+                      stack-label
+                      dense
+                      use-input
+                      hide-selected
+                      fill-input
+                      :input-debounce="400"
+                      @update:model-value="(val) => {
+                        userSelectedOrgId[index] = val;
+                        updateOrgId(val?.value || val, index);
+                      }"
+                      behavior="menu"
+                    >
+                    </q-select>
+                  </div>
+                </span>
 
-              <div></div>
-            </q-form>
+                <span v-else>{{ errorMessage }}</span>
+              </div>
+            </div>
           </div>
         </div>
-        </template>
-        <template #after>
+
+        <div class="error-section" v-if="alertCreators.length > 0">
           <div
-            data-test="alert-import-output-editor"
-            class="card-container tw-mb-[0.625rem] tw-h-[calc(100vh-130px)]"
+            class="section-title text-primary"
+            data-test="alert-import-creation-title"
+          >
+            Alert Creation
+          </div>
+          <div
+            class="error-list"
+            v-for="(val, index) in alertCreators"
+            :key="index"
+            :data-test="`alert-import-creation-${index}`"
           >
             <div
-              v-if="alertErrorsToDisplay.length > 0"
-              class="text-center text-h6"
+              :class="{
+                'error-item text-bold': true,
+                'text-green ': val.success,
+                'text-red': !val.success,
+              }"
+              :data-test="`alert-import-creation-${index}-message`"
             >
-              Error Validations
-            </div>
-            <div v-else class="text-center text-h6 tw-py-2 ">Output Messages</div>
-            <q-separator class="q-mx-md q-mt-md" />
-            <div class="error-report-container">
-              <!-- Alert Errors Section -->
-              <div class="error-section" v-if="alertErrorsToDisplay.length > 0">
-                <div class="error-list">
-                  <!-- Iterate through the outer array -->
-                  <div
-                    v-for="(errorGroup, index) in alertErrorsToDisplay"
-                    :key="index"
-                    :data-test="`alert-import-error-${index}`"
-                  >
-                    <!-- Iterate through each inner array (the individual error message) -->
-                    <div
-                      v-for="(errorMessage, errorIndex) in errorGroup"
-                      :key="errorIndex"
-                      class="error-item"
-                      :data-test="`alert-import-error-${index}-${errorIndex}`"
-                    >
-                      <span
-                        class="text-red"
-                        v-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'alert_name'
-                        "
-                      >
-                        {{ errorMessage.message }}
-
-                        <div style="width: 300px">
-                          <q-input
-                            data-test="alert-import-name-input"
-                            v-model="userSelectedAlertName[index]"
-                            :label="t('alerts.name') + ' *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateAlertName(
-                                userSelectedAlertName[index],
-                                index,
-                              )
-                            "
-                          />
-                        </div>
-                      </span>
-                      <!-- Check if the errorMessage is an object, if so, display the 'message' property -->
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'stream_name'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-select
-                            data-test="alert-import-stream-name-input"
-                            v-model="userSelectedStreamName[index]"
-                            :options="streamList"
-                            :label="t('alerts.stream_name') + ' *'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
-                            :input-debounce="400"
-                            @update:model-value="
-                              updateStreamFields(
-                                userSelectedStreamName[index],
-                                index,
-                              )
-                            "
-                            behavior="menu"
-                          />
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'destination_name'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <q-select
-                            data-test="alert-import-destination-name-input"
-                            v-model="userSelectedDestinations[index]"
-                            :options="filteredDestinations"
-                            @filter="filterDestinations"
-                            label="Destinations *"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            multiple
-                            :input-debounce="400"
-                            behavior="menu"
-                            :rules="[
-                              (val: any) => !!val || 'Field is required!',
-                            ]"
-                            style="width: 300px"
-                            @update:model-value="
-                              updateUserSelectedDestinations(
-                                userSelectedDestinations[index],
-                                index,
-                              )
-                            "
-                          >
-                            <template v-slot:option="scope">
-                              <q-item
-                                v-bind="scope.itemProps"
-                                :data-test="`add-alert-destination-${scope.opt}-select-item`"
-                              >
-                                <q-item-section side>
-                                  <q-checkbox
-                                    data-test="alert-import-destination-checkbox"
-                                    :model-value="
-                                      userSelectedDestinations[index]?.includes(
-                                        scope.opt,
-                                      ) ?? false
-                                    "
-                                    dense
-                                    @update:model-value="
-                                      toggleDestination(scope.opt, index)
-                                    "
-                                  />
-                                </q-item-section>
-                                <q-item-section>
-                                  <q-item-label
-                                    data-test="alert-import-destination-label"
-                                    >{{ scope.opt }}</q-item-label
-                                  >
-                                </q-item-section>
-                              </q-item>
-                            </template>
-                          </q-select>
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'stream_type'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <q-select
-                            data-test="alert-import-stream-type-input"
-                            v-model="userSelectedStreamType[index]"
-                            :options="streamTypes"
-                            :label="t('alerts.streamType') + ' *'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            @update:model-value="
-                              updateStreams(
-                                userSelectedStreamType[index],
-                                index,
-                              )
-                            "
-                            :rules="[
-                              (val: any) => !!val || 'Field is required!',
-                            ]"
-                            style="width: 300px"
-                          />
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'timezone'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <q-select
-                            data-test="alert-import-timezone-input"
-                            v-model="userSelectedTimezone[index]"
-                            :options="filteredTimezone"
-                            :label="'Timezone *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            @update:model-value="
-                              updateTimezone(userSelectedTimezone[index], index)
-                            "
-                            @filter="timezoneFilterFn"
-                            use-input
-                            hide-selected
-                            fill-input
-                            :input-debounce="400"
-                            behavior="menu"
-                            :rules="[
-                              (val: any) => !!val || 'Field is required!',
-                            ]"
-                            style="width: 300px"
-                          />
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'org_id'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-select
-                            data-test="alert-import-org-id-input"
-                            v-model="userSelectedOrgId[index]"
-                            :options="organizationDataList"
-                            :label="'Organization Id'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
-                            :input-debounce="400"
-                            @update:model-value="
-                              updateOrgId(userSelectedOrgId[index].value, index)
-                            "
-                            behavior="menu"
-                          >
-                          </q-select>
-                        </div>
-                      </span>
-
-                      <span v-else>{{ errorMessage }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="error-section" v-if="alertCreators.length > 0">
-                <div
-                  class="section-title text-primary"
-                  data-test="alert-import-creation-title"
-                >
-                  Alert Creation
-                </div>
-                <div
-                  class="error-list"
-                  v-for="(val, index) in alertCreators"
-                  :key="index"
-                  :data-test="`alert-import-creation-${index}`"
-                >
-                  <div
-                    :class="{
-                      'error-item text-bold': true,
-                      'text-green ': val.success,
-                      'text-red': !val.success,
-                    }"
-                    :data-test="`alert-import-creation-${index}-message`"
-                  >
-                    <pre>{{ val.message }}</pre>
-                  </div>
-                </div>
-              </div>
+              <pre>{{ val.message }}</pre>
             </div>
           </div>
-        </template>
-      </q-splitter>
-    </div>
-  </div>
+        </div>
+      </div>
+    </template>
+  </base-import>
 </template>
 
 <script lang="ts">
@@ -509,31 +404,23 @@ import {
   defineComponent,
   ref,
   onMounted,
-  reactive,
   computed,
-  watch,
-  defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useRouter, useRoute } from "vue-router";
-import axios from "axios";
-import router from "@/router";
+import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import alertsService from "../../services/alerts";
-
 import useStreams from "@/composables/useStreams";
-import templateService from "@/services/alert_templates";
-import destinationService from "@/services/alert_destination";
-
-import AppTabs from "../common/AppTabs.vue";
-import { error } from "console";
-
+import BaseImport from "../common/BaseImport.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
-import store from "@/test/unit/helpers/store";
 
 export default defineComponent({
   name: "ImportAlert",
+  components: {
+    BaseImport,
+    SelectFolderDropDown,
+  },
   props: {
     destinations: {
       type: Array,
@@ -563,34 +450,34 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const route = useRoute();
 
-    const jsonStr: any = ref("");
     const q = useQuasar();
     const { getStreams } = useStreams();
 
-    const templateErrorsToDisplay = ref([]);
-
-    const destinationErrorsToDisplay = ref([]);
-
+    const baseImportRef = ref<any>(null);
     const alertErrorsToDisplay = ref<AlertErrors>([]);
+    const templateErrorsToDisplay = ref<any>([]);
+    const destinationErrorsToDisplay = ref<any>([]);
     const userSelectedDestinations = ref<string[][]>([]);
     const userSelectedAlertName = ref<string[]>([]);
 
-    const tempalteCreators = ref([]);
-    const destinationCreators = ref([]);
     const alertCreators = ref<alertCreator>([]);
-    const queryEditorPlaceholderFlag = ref(true);
+    const destinationCreators = ref<any>([]);
     const streamList = ref<any>([]);
+    const streams = ref<any>({});
     const userSelectedStreamName = ref<string[]>([]);
     const userSelectedStreamType = ref<string[]>([]);
-    const jsonFiles = ref(null);
-    const url = ref("");
-    const jsonArrayOfObj: any = ref([{}]);
-    const streams = ref<any>({});
-    const activeTab = ref("import_json_file");
-    const splitterModel = ref(60);
     const filteredDestinations = ref<string[]>([]);
+
+    // Use computed to directly reference BaseImport's jsonArrayOfObj
+    const jsonArrayOfObj = computed({
+      get: () => baseImportRef.value?.jsonArrayOfObj || [],
+      set: (val) => {
+        if (baseImportRef.value) {
+          baseImportRef.value.jsonArrayOfObj = val;
+        }
+      }
+    });
     const streamTypes = ["logs", "metrics", "traces"];
     const selectedFolderId = ref<any>(
       router.currentRoute.value.query.folder || "default",
@@ -640,117 +527,39 @@ export default defineComponent({
       destinations: string[],
       index: number,
     ) => {
-      jsonArrayOfObj.value[index].destinations = destinations;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].destinations = destinations;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const updateStreamFields = (stream_name: string, index: number) => {
-      jsonArrayOfObj.value[index].stream_name = stream_name;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].stream_name = stream_name;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const updateAlertName = (alertName: string, index: number) => {
-      jsonArrayOfObj.value[index].name = alertName;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    };
-
-    watch(jsonFiles, async (newVal: any, oldVal: any) => {
-      if (newVal && newVal.length > 0) {
-        let combinedJson: any[] = [];
-
-        for (const file of newVal) {
-          try {
-            const result: any = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onload = (e: any) => {
-                try {
-                  const parsedJson = JSON.parse(e.target.result);
-                  // Convert to array if it's a single object
-                  const jsonArray = Array.isArray(parsedJson)
-                    ? parsedJson
-                    : [parsedJson];
-                  resolve(jsonArray);
-                } catch (error) {
-                  q.notify({
-                    message: `Error parsing JSON from file ${file.name}`,
-                    color: "negative",
-                    position: "bottom",
-                    timeout: 2000,
-                  });
-                  resolve([]);
-                }
-              };
-              reader.readAsText(file);
-            });
-
-            combinedJson = [...combinedJson, ...result];
-          } catch (error) {
-            console.error("Error reading file:", error);
-          }
-        }
-
-        // Update the refs with combined JSON data
-        jsonArrayOfObj.value = combinedJson;
-        jsonStr.value = JSON.stringify(combinedJson, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].name = alertName;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
       }
-    });
-    watch(url, async (newVal, oldVal) => {
-      try {
-        if (newVal) {
-          const response = await axios.get(newVal);
-
-          // Check if the response body is valid JSON
-          try {
-            if (
-              response.headers["content-type"].includes("application/json") ||
-              response.headers["content-type"].includes("text/plain")
-            ) {
-              jsonStr.value = JSON.stringify(response.data, null, 2);
-              jsonArrayOfObj.value = response.data;
-            } else {
-              q.notify({
-                message: "Invalid JSON format in the URL",
-                color: "negative",
-                position: "bottom",
-                timeout: 2000,
-              });
-            }
-          } catch (parseError) {
-            // If parsing fails, display an error message
-            q.notify({
-              message: "Invalid JSON format",
-              color: "negative",
-              position: "bottom",
-              timeout: 2000,
-            });
-          }
-        }
-      } catch (error) {
-        q.notify({
-          message: "Error fetching data",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
-      }
-    });
-
-    const tabs = reactive([
-      {
-        label: "File Upload / JSON",
-        value: "import_json_file",
-      },
-      {
-        label: "URL Import",
-        value: "import_json_url",
-      },
-    ]);
-
-    const updateActiveTab = () => {
-      jsonStr.value = "";
-      jsonFiles.value = null;
-      url.value = "";
-      jsonArrayOfObj.value = [{}];
     };
 
     onMounted(() => {
@@ -760,24 +569,24 @@ export default defineComponent({
       getActiveFolderAlerts(activeFolderId.value as string);
     });
 
-    const importJson = async () => {
+    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
       alertErrorsToDisplay.value = [];
       templateErrorsToDisplay.value = [];
       destinationErrorsToDisplay.value = [];
-      destinationCreators.value = [];
       alertCreators.value = [];
+      destinationCreators.value = [];
 
       try {
-        // Check if jsonStr.value is empty or null
-        if ((!jsonStr.value || jsonStr.value.trim() === "") && !url.value) {
+        // Check if jsonStr is empty or null
+        if (!jsonString || jsonString.trim() === "") {
           throw new Error("JSON string is empty");
-        } else {
-          const parsedJson = JSON.parse(jsonStr.value);
-          // Convert single object to array if needed
-          jsonArrayOfObj.value = Array.isArray(parsedJson)
-            ? parsedJson
-            : [parsedJson];
         }
+
+        const parsedJson = JSON.parse(jsonString);
+        // Convert single object to array if needed
+        jsonArrayOfObj.value = Array.isArray(parsedJson)
+          ? parsedJson
+          : [parsedJson];
       } catch (e: any) {
         q.notify({
           message: e.message || "Invalid JSON format",
@@ -789,16 +598,16 @@ export default defineComponent({
       }
 
       let allAlertsCreated = true;
-      // made the isAlertImporting to true to disable the import button
-      // and also added a spinner to the import button
       isAlertImporting.value = true;
-      // Now we can always process as an array
+
+      // Process each object in the array
       for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
         const success = await processJsonObject(jsonObj, index + 1);
         if (!success) {
           allAlertsCreated = false;
         }
       }
+
       if (allAlertsCreated) {
         q.notify({
           message: "Alert(s) imported successfully",
@@ -806,17 +615,26 @@ export default defineComponent({
           position: "bottom",
           timeout: 2000,
         });
-        router.push({
-          name: "alertList",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            folder: selectedFolderId.value,
-          },
-        });
+
+        // Delay navigation to allow Monaco editor to complete all debounced operations
+        // Monaco has a 300ms debounce, so we wait 400ms to be safe
+        setTimeout(() => {
+          router.push({
+            name: "alertList",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: selectedFolderId.value,
+            },
+          });
+        }, 400);
       }
-      //if the alerts created successfully or not make the isAlertImporting to false
-      //it will only enable the import button after the alerts are created successfully
+
       isAlertImporting.value = false;
+
+      // Reset BaseImport's importing flag
+      if (baseImportRef.value) {
+        baseImportRef.value.isImporting = false;
+      }
     };
 
     const processJsonObject = async (jsonObj: any, index: number) => {
@@ -830,7 +648,6 @@ export default defineComponent({
           return await createAlert(jsonObj, index, selectedFolderId.value);
         }
       } catch (e: any) {
-        console.log(e,'e')
         q.notify({
           message: "Error importing Alert(s) please check the JSON",
           color: "negative",
@@ -887,12 +704,11 @@ export default defineComponent({
           (stream: any) => stream.name,
         );
       } catch (e) {
-        alertErrors.push();
         const err: any = {
           message: `Alert - ${index}: Error fetching stream list. Please try again.`,
           field: "stream_list",
         };
-        alertErrorsToDisplay.value.push(err);
+        alertErrors.push(err);
       }
 
       // 4. Validate 'stream_name' field
@@ -952,11 +768,9 @@ export default defineComponent({
         };
 
         // Handle both array format and nested format
-        //because old alerts are having direct array which is and by default 
-        //new alerts are having nested conditions with and/or and can have multiple conditions
         if (Array.isArray(input.query_condition.conditions)) {
           // Old format - array of conditions
-          input.query_condition.conditions.forEach((condition) => {
+          input.query_condition.conditions.forEach((condition:any) => {
             if (!condition.column || !condition.operator || !condition.value) {
               alertErrors.push(
                 `Alert - ${index}: Each query condition must have 'column', 'operator', and 'value'.`,
@@ -965,61 +779,6 @@ export default defineComponent({
           });
         } else {
           // New format - nested conditions with and/or
-          //the new format looks like this
-            //             {
-            //     "or": [
-            //         {
-            //             "column": "_timestamp",
-            //             "operator": "<=",
-            //             "value": "100",
-            //             "ignore_case": false
-            //         },
-            //         {
-            //             "column": "job",
-            //             "operator": "not_contains",
-            //             "value": "12",
-            //             "ignore_case": true
-            //         },
-            //         {
-            //             "or": [
-            //                 {
-            //                     "column": "job",
-            //                     "operator": "contains",
-            //                     "value": "1222",
-            //                     "ignore_case": true
-            //                 },
-            //                 {
-            //                     "column": "level",
-            //                     "operator": "not_contains",
-            //                     "value": "dsff",
-            //                     "ignore_case": true
-            //                 },
-            //                 {
-            //                     "or": [
-            //                         {
-            //                             "column": "job",
-            //                             "operator": "=",
-            //                             "value": "111",
-            //                             "ignore_case": true
-            //                         },
-            //                         {
-            //                             "column": "level",
-            //                             "operator": "contains",
-            //                             "value": "1222",
-            //                             "ignore_case": true
-            //                         }
-            //                     ]
-            //                 },
-            //                 {
-            //                     "column": "log",
-            //                     "operator": "!=",
-            //                     "value": "33",
-            //                     "ignore_case": true
-            //                 }
-            //             ]
-            //         }
-            //     ]
-            // }  
           validateCondition(input.query_condition.conditions);
         }
       }
@@ -1195,8 +954,7 @@ export default defineComponent({
         }
       });
 
-      //this condition is added to avoid the error when the updated_at is not a number
-      //with the new alert api the updated_at is a nummer
+      // This condition is added to avoid the error when the updated_at is not a number
       if (typeof input.updated_at !== "number") {
         input.updated_at = null;
       }
@@ -1220,10 +978,6 @@ export default defineComponent({
       return destinationsList.includes(destinationName);
     };
 
-    const checkAlertsInList = (alerts: any, alertName: any) => {
-      return alerts.includes(alertName);
-    };
-
     const createAlert = async (input: any, index: any, folderId: any) => {
       if (!input.hasOwnProperty("context_attributes")) {
         input.context_attributes = {};
@@ -1235,9 +989,7 @@ export default defineComponent({
         input.trigger_condition.tolerance_in_secs = null;
       }
       input.folder_id = folderId;
-      //assigning the owner from the alert payload because the current logged in user will be the owner of the alert
       input.owner = store.state.userInfo.email;
-      //assigning the last_edited_by from the alert payload because the current logged in user will be the last_edited_by of the alert
       input.last_edited_by = store.state.userInfo.email;
 
       try {
@@ -1266,12 +1018,16 @@ export default defineComponent({
       }
     };
 
-    const onSubmit = (e: any) => {
-      e.preventDefault();
-    };
     const updateStreams = async (streamType: string, index: number) => {
-      jsonArrayOfObj.value[index].stream_type = streamType;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].stream_type = streamType;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
 
       try {
         const streamResponse: any = await getStreams(streamType, false);
@@ -1282,6 +1038,7 @@ export default defineComponent({
         console.error("Error fetching streams:", error);
       }
     };
+
     const filterDestinations = (val: string, update: Function) => {
       if (val === "") {
         update(() => {
@@ -1316,8 +1073,18 @@ export default defineComponent({
     };
 
     const updateTimezone = (timezone: string, index: number) => {
-      jsonArrayOfObj.value[index].trigger_condition.timezone = timezone;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        if (!baseImportRef.value.jsonArrayOfObj[index].trigger_condition) {
+          baseImportRef.value.jsonArrayOfObj[index].trigger_condition = {};
+        }
+        baseImportRef.value.jsonArrayOfObj[index].trigger_condition.timezone = timezone;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
     };
 
     const timezoneFilterFn = (val: string, update: Function) => {
@@ -1335,6 +1102,7 @@ export default defineComponent({
         );
       });
     };
+
     const updateActiveFolderId = (newVal: any) => {
       selectedFolderId.value = newVal.value;
       getActiveFolderAlerts(selectedFolderId.value);
@@ -1361,43 +1129,53 @@ export default defineComponent({
       activeFolderAlerts.value =
         store.state.organizationData.allAlertsListByNames[folderId];
     };
+
     const updateOrgId = (orgId: string, index: number) => {
-      jsonArrayOfObj.value[index].org_id = orgId;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      if (baseImportRef.value?.jsonArrayOfObj[index]) {
+        baseImportRef.value.jsonArrayOfObj[index].org_id = orgId;
+        // Directly update jsonStr without triggering editor re-render
+        baseImportRef.value.jsonStr = JSON.stringify(
+          baseImportRef.value.jsonArrayOfObj,
+          null,
+          2
+        );
+      }
+    };
+
+    // Additional helper functions for testing
+    const checkAlertsInList = (alerts: string[], alertName: string) => {
+      return alerts.includes(alertName);
+    };
+
+    const onSubmit = (event: any) => {
+      if (event?.preventDefault) {
+        event.preventDefault();
+      }
     };
 
     return {
       t,
-      jsonStr,
       importJson,
-      onSubmit,
       router,
       q,
+      baseImportRef,
+      alertErrorsToDisplay,
       templateErrorsToDisplay,
       destinationErrorsToDisplay,
-      alertErrorsToDisplay,
-      tempalteCreators,
-      destinationCreators,
       alertCreators,
-      queryEditorPlaceholderFlag,
-      splitterModel,
-      tabs,
-      activeTab,
+      destinationCreators,
       userSelectedDestinations,
       getFormattedDestinations,
       jsonArrayOfObj,
       streamList,
+      streams,
       userSelectedStreamName,
       updateStreamFields,
       updateAlertName,
-      jsonFiles,
-      updateActiveTab,
-      url,
       userSelectedAlertName,
       streamTypes,
       userSelectedStreamType,
       updateStreams,
-      streams,
       filterDestinations,
       filteredDestinations,
       updateUserSelectedDestinations,
@@ -1420,77 +1198,18 @@ export default defineComponent({
       validateAlertInputs,
       checkDestinationInList,
       checkAlertsInList,
+      createAlert,
+      onSubmit,
     };
-  },
-  components: {
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
-    AppTabs,
-    SelectFolderDropDown,
   },
 });
 </script>
 
 <style scoped lang="scss">
-.empty-query .monaco-editor-background {
-  background-image: url("../../assets/images/common/query-editor.png");
-  background-repeat: no-repeat;
-  background-size: 115px;
-}
-
-.alert-folder-dropdown {
-  :deep(.q-field--labeled.showLabelOnTop) {
-    padding-top: 10px; /* Example override */
-  }
-}
-
-.empty-function .monaco-editor-background {
-  background-image: url("../../assets/images/common/vrl-function.png");
-  background-repeat: no-repeat;
-  background-size: 170px;
-}
-.editor-container {
-  height: calc(75vh - 20px) !important;
-}
-.editor-container-url {
-  .monaco-editor {
-    height: calc(100vh - 286px) !important; /* Total editor height */
-    overflow: auto; /* Allows scrolling if content overflows */
-    resize: none; /* Remove resize behavior */
-    padding-top: 12px;
-  }
-}
-
-.editor-container-json {
-  .monaco-editor {
-    height: calc(100vh - 314px) !important; /* Total editor height */
-    overflow: auto; /* Allows scrolling if content overflows */
-    resize: none; /* Remove resize behavior */
-    padding-top: 12px;
-  }
-}
-
-.monaco-editor {
-  height: calc(100vh - 14px) !important; /* Total editor height */
-  overflow: auto; /* Allows scrolling if content overflows */
-  resize: none; /* Remove resize behavior */
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-}
-
 .error-report-container {
-  height: calc(100vh - 192px) !important; /* Total editor height */
-  overflow: auto; /* Allows scrolling if content overflows */
+  height: calc(100vh - 192px) !important;
+  overflow: auto;
   resize: none;
-}
-
-.error-container {
-  display: flex;
-  overflow-y: auto;
-  flex-direction: column;
-  border: 1px solid #ccc;
-  height: calc(100% - 80px) !important; /* Total container height */
 }
 
 .error-section {
@@ -1504,54 +1223,8 @@ export default defineComponent({
   text-transform: uppercase;
 }
 
-.error-list {
-}
-
 .error-item {
   padding: 5px 0px;
   font-size: 14px;
-}
-.report-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #464646;
-  }
-
-  :deep(.rum-tab) {
-    &:hover {
-      background: #464646;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-.report-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
 }
 </style>

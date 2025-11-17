@@ -199,7 +199,7 @@ async fn search_in_cluster(
     };
 
     // make cluster request
-    let mut tasks = Vec::new();
+    let mut tasks = Vec::with_capacity(nodes.len());
     let mut worker_start = start;
     for node in nodes.iter() {
         let node = node.clone();
@@ -245,9 +245,8 @@ async fn search_in_cluster(
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "[trace_id {trace_id}] promql->search->grpc: node: {}, search err: {:?}",
+                            "[trace_id {trace_id}] promql->search->grpc: node: {}, search err: {err:?}",
                             &node.get_grpc_addr(),
-                            err
                         );
                         let err = ErrorCodes::from_json(err.message())
                             .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
@@ -257,9 +256,8 @@ async fn search_in_cluster(
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, files: {}, scan_size: {} mb, took: {} ms",
+                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {req_need_wal}, files: {}, scan_size: {} mb, took: {} ms",
                     &node.get_grpc_addr(),
-                    req_need_wal,
                     scan_stats.files,
                     scan_stats.original_size,
                     response.took,
@@ -271,7 +269,7 @@ async fn search_in_cluster(
         tasks.push(task);
     }
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(tasks.len());
     let task_results = match try_join_all(tasks).await {
         Ok(res) => res,
         Err(err) => {

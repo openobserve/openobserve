@@ -222,8 +222,8 @@
               v-model="selectedModel"
               :options="availableModels"
               dense
-              :borderless="true"
-              class="tw-w-24 model-selector"
+              flat
+              borderless
               style="max-width: 100px; height: 36px;"
             >
               <template v-slot:selected-item="scope">
@@ -1234,11 +1234,11 @@ export default defineComponent({
     };
 
     const likeCodeBlock = (message: any) => {
-      console.log('likeCodeBlock', message);
+      // console.log('likeCodeBlock', message);
     };
 
     const dislikeCodeBlock = (message: any) => {
-      console.log('dislikeCodeBlock', message);
+      // console.log('dislikeCodeBlock', message);
     };
     const o2AiTitleLogo = computed(() => {
       return store.state.theme == 'dark' ? getImageURL('images/common/o2_ai_logo_dark.svg') : getImageURL('images/common/o2_ai_logo.svg')

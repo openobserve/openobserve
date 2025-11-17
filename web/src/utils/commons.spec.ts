@@ -1070,8 +1070,9 @@ describe("Commons Utility Functions", () => {
       expect(mockDashboard.tabs[0].panels).toHaveLength(2);
       expect(mockDashboard.tabs[0].panels[1].id).toBe("panel-2");
       // Panel should be repositioned
+      // maxY = max(all panel y values) = 0, then maxY += 20 → 20
       expect(mockDashboard.tabs[0].panels[1].layout.i).toBe(2);
-      expect(mockDashboard.tabs[0].panels[1].layout.y).toBe(10);
+      expect(mockDashboard.tabs[0].panels[1].layout.y).toBe(20);
     });
   });
 
@@ -1157,8 +1158,9 @@ describe("Commons Utility Functions", () => {
       expect(mockDashboard.tabs[1].panels).toHaveLength(2); // Panel added to target tab
       expect(mockDashboard.tabs[1].panels[1].id).toBe("panel-1");
       // Panel should be repositioned
+      // maxY = max(all panel y values) = 0, then y = maxY + 20 → 20
       expect(mockDashboard.tabs[1].panels[1].layout.i).toBe(2);
-      expect(mockDashboard.tabs[1].panels[1].layout.y).toBe(10);
+      expect(mockDashboard.tabs[1].panels[1].layout.y).toBe(20);
     });
   });
 

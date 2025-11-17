@@ -329,9 +329,9 @@ pub async fn json(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
     ),
-    request_body(content = KinesisFHRequest, description = "Ingest data (json array)", content_type = "application/json"),
+    request_body(content = inline(KinesisFHRequest), description = "Ingest data (json array)", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = KinesisFHIngestionResponse, example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f","timestamp": 1578090903599_i64})),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(KinesisFHIngestionResponse), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f","timestamp": 1578090903599_i64})),
         (status = 500, description = "Failure", content_type = "application/json", body = (), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "error processing request"})),
     )
 )]
@@ -584,8 +584,8 @@ pub async fn otlp_logs_write(
     ),
     request_body(content = String, description = "Ingest data (hec)"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HecResponse, example = json!({"text":"Success","code": 200})),
-        (status = 200, description = "Failure", content_type = "application/json", body = HecResponse, example = json!({"text":"Invalid data format","code": 400})),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"Success","code": 200})),
+        (status = 200, description = "Failure", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"Invalid data format","code": 400})),
     )
 )]
 #[post("/{org_id}/_hec")]

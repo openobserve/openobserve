@@ -284,6 +284,18 @@ const useLogs = () => {
     }
   };
 
+  const loadPatternsData = async () => {
+    try {
+      resetFunctions();
+      await getStreamList();
+      await getFunctions();
+      if (isActionsEnabled.value) await getActions();
+      await extractFields();
+    } catch (e: any) {
+      searchObj.loading = false;
+    }
+  };
+
   const loadJobData = async () => {
     try {
       resetFunctions();
@@ -298,12 +310,13 @@ const useLogs = () => {
     }
   };
 
-  const handleRunQuery = async () => {
+  const handleRunQuery = async (clear_cache = false) => {
     try {
       searchObj.loading = true;
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
+      searchObj.meta.clearCache = clear_cache;
       if (
         Object.hasOwn(router.currentRoute.value.query, "type") &&
         router.currentRoute.value.query.type == "search_history_re_apply"
@@ -477,16 +490,17 @@ const useLogs = () => {
   };
 
   const reorderSelectedFields = () => {
-    const selectedFields = [...searchObj.data.stream.selectedFields];
+    const selectedFields = [...searchObj.data.stream.selectedFields].filter(
+      (_field) =>
+        _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+    );
 
-    let colOrder =
-      searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream];
-
-    if (!selectedFields.includes(store.state.zoConfig.timestamp_column)) {
-      colOrder = colOrder.filter(
-        (v: any) => v !== store.state.zoConfig.timestamp_column,
-      );
-    }
+    let colOrder = searchObj.data.resultGrid.colOrder[
+      searchObj.data.stream.selectedStream
+    ].filter(
+      (_field) =>
+        _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+    );
 
     if (JSON.stringify(selectedFields) !== JSON.stringify(colOrder)) {
       reorderArrayByReference(selectedFields, colOrder);
@@ -731,6 +745,8 @@ const useLogs = () => {
     $q,
     clearSearchObj,
     loadVisualizeData,
+    loadPatternsData,
+    getHistogramTitle,
   };
 };
 

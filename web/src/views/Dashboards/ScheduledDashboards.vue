@@ -54,12 +54,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="tw-flex tw-items-center">
-            <app-tabs
-              class="q-mr-md"
-              :tabs="reportTypeTabs"
-              v-model:active-tab="activeTab"
-              @update:active-tab="filterReports"
-            />
+            <div class="app-tabs-container tw-h-[36px] q-mr-sm">
+              <app-tabs
+                class="tabs-selection-container"
+                :tabs="reportTypeTabs"
+                v-model:active-tab="activeTab"
+                @update:active-tab="filterReports"
+              />
+            </div>
 
             <q-input
               data-test="alert-list-search-input"
@@ -84,11 +86,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div class="q-ml-sm">
-              <q-btn
+              <q-icon
+                name="cancel"
+                class="cursor-pointer"
+                size="20px"
                 v-close-popup="true"
-                round
-                flat
-                :icon="'img:' + getImageURL('images/common/close_icon.svg')"
               />
             </div>
           </div>
@@ -425,6 +427,10 @@ const getTimeRangeValue = (dateTime: any) => {
   :deep(.q-table__top) {
     padding-left: 0;
     padding-right: 0;
+  }
+
+  :deep(thead tr) {
+    background-color: var(--o2-table-header-bg) !important;
   }
 
   :deep(.rum-tabs) {

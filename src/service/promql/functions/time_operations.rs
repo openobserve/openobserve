@@ -16,10 +16,10 @@
 use chrono::{Datelike, NaiveDate, Timelike};
 use config::utils::time::parse_i64_to_timestamp_micros;
 use datafusion::error::{DataFusionError, Result};
-use rayon::prelude::*;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use strum::EnumIter;
 
-use crate::service::promql::value::{InstantValue, Sample, Value};
+use crate::service::promql::value::{LabelsExt, RangeValue, Sample, Value};
 
 #[derive(Debug, EnumIter)]
 pub enum TimeOperationType {
@@ -96,27 +96,71 @@ pub(crate) fn days_in_month(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::DaysInMonth)
 }
 
-fn exec(data: Value, op: &TimeOperationType) -> Result<Value> {
-    let instant_values = match data {
-        Value::Vector(v) => v,
-        _ => {
-            return Err(DataFusionError::NotImplemented(format!(
-                "Invalid input for minute value: {data:?}",
-            )));
-        }
-    };
+pub(crate) fn timestamp(data: Value) -> Result<Value> {
+    match data {
+        Value::Matrix(matrix) => {
+            let out: Vec<RangeValue> = matrix
+                .into_par_iter()
+                .map(|mut range_value| {
+                    // Convert timestamp from microseconds to seconds for all samples
+                    let samples: Vec<Sample> = range_value
+                        .samples
+                        .into_iter()
+                        .map(|sample| {
+                            Sample::new(sample.timestamp, (sample.timestamp / 1_000_000) as f64)
+                        })
+                        .collect();
 
-    let out = instant_values
-        .into_par_iter()
-        .map(|mut instant| {
-            let ts = op.get_component_from_ts(instant.sample.value as i64);
-            InstantValue {
-                labels: std::mem::take(&mut instant.labels),
-                sample: Sample::new(instant.sample.timestamp, ts as f64),
-            }
-        })
-        .collect();
-    Ok(Value::Vector(out))
+                    RangeValue {
+                        labels: std::mem::take(&mut range_value.labels).without_metric_name(),
+                        samples,
+                        exemplars: range_value.exemplars,
+                        time_window: range_value.time_window,
+                    }
+                })
+                .collect();
+            Ok(Value::Matrix(out))
+        }
+        Value::None => Ok(Value::None),
+        _ => Err(DataFusionError::Plan(format!(
+            "Invalid input for timestamp, expected matrix but got: {:?}",
+            data.get_type()
+        ))),
+    }
+}
+
+fn exec(data: Value, op: &TimeOperationType) -> Result<Value> {
+    match data {
+        Value::Matrix(matrix) => {
+            let out: Vec<RangeValue> = matrix
+                .into_par_iter()
+                .map(|mut range_value| {
+                    // Apply the time operation to all samples in this range
+                    let samples: Vec<Sample> = range_value
+                        .samples
+                        .into_iter()
+                        .map(|sample| {
+                            let ts = op.get_component_from_ts(sample.value as i64);
+                            Sample::new(sample.timestamp, ts as f64)
+                        })
+                        .collect();
+
+                    RangeValue {
+                        labels: std::mem::take(&mut range_value.labels).without_metric_name(),
+                        samples,
+                        exemplars: range_value.exemplars,
+                        time_window: range_value.time_window,
+                    }
+                })
+                .collect();
+            Ok(Value::Matrix(out))
+        }
+        Value::None => Ok(Value::None),
+        _ => Err(DataFusionError::Plan(format!(
+            "Invalid input for time operation, expected matrix but got: {:?}",
+            data.get_type()
+        ))),
+    }
 }
 
 #[cfg(test)]

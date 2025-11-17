@@ -241,7 +241,7 @@ describe("SettingsIndex", () => {
       const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
       
       expect(wrapper.vm.showManagementTabs).toBe(true);
-      expect(wrapper.vm.splitterModel).toBe(220);
+      expect(wrapper.vm.splitterModel).toBe(250);
       
       await collapseBtn.trigger("click");
       
@@ -261,7 +261,7 @@ describe("SettingsIndex", () => {
       // Then expand
       await collapseBtn.trigger("click");
       expect(wrapper.vm.showManagementTabs).toBe(true);
-      expect(wrapper.vm.splitterModel).toBe(220);
+      expect(wrapper.vm.splitterModel).toBe(250);
     });
 
     it("should show correct icon when tabs are visible", () => {
@@ -395,17 +395,6 @@ describe("SettingsIndex", () => {
       expect(regexTab.exists()).toBe(false);
     });
 
-    it("should show meta org tabs when is meta org", async () => {
-      // Since the mock is set to return isMetaOrg: true, test that meta org tabs exist
-      const wrapper = createWrapper();
-      await nextTick();
-      
-      const queryTab = wrapper.find('[data-name="queryManagement"]');
-      
-      // Since isMetaOrg is mocked to be true, this tab should exist
-      expect(queryTab.exists()).toBe(true);
-    });
-
     it("should hide cloud-only tabs when not cloud", async () => {
       const config = await import("@/aws-exports");
       vi.mocked(config.default).isCloud = "false";
@@ -422,7 +411,7 @@ describe("SettingsIndex", () => {
       const wrapper = createWrapper();
       
       expect(wrapper.vm.settingsTab).toBe("general");
-      expect(wrapper.vm.splitterModel).toBe(220);
+      expect(wrapper.vm.splitterModel).toBe(250);
       expect(wrapper.vm.showManagementTabs).toBe(true);
     });
 

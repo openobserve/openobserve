@@ -23,7 +23,14 @@ mod stream;
 mod wal;
 mod writer;
 
-use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
+use std::{
+    fs::create_dir_all,
+    path::PathBuf,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use arrow_schema::Schema;
 use config::RwAHashMap;
@@ -34,8 +41,8 @@ use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
 pub use wal::collect_wal_parquet_metrics;
 pub use writer::{
-    Writer, check_memory_circuit_breaker, check_memtable_size, flush_all, get_writer,
-    read_from_memtable,
+    Writer, check_disk_circuit_breaker, check_memory_circuit_breaker, check_memtable_size,
+    flush_all, get_writer, read_from_memtable,
 };
 
 use crate::errors::OpenDirSnafu;
@@ -45,6 +52,22 @@ pub(crate) type ReadRecordBatchEntry = (Arc<Schema>, Vec<Arc<entry::RecordBatchE
 pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::FileMeta>> =
     Lazy::new(Default::default);
 
+/// Global flag to indicate if the ingester is draining for shutdown
+/// When set to true, the file upload job will prioritize uploading
+/// all pending files to S3
+static IS_INGESTER_DRAINING: AtomicBool = AtomicBool::new(false);
+
+/// Set the ingester to draining mode (for graceful shutdown)
+pub fn set_draining(draining: bool) {
+    IS_INGESTER_DRAINING.store(draining, Ordering::Release);
+    log::info!("[INGESTER] Draining mode set to: {draining}");
+}
+
+/// Check if the ingester is in draining mode
+pub fn is_draining() -> bool {
+    IS_INGESTER_DRAINING.load(Ordering::Acquire)
+}
+
 pub static WAL_DIR_DEFAULT_PREFIX: &str = "logs";
 
 // writer signal
@@ -52,6 +75,36 @@ pub enum WriterSignal {
     Produce,
     Rotate,
     Close,
+}
+
+/// Pre-processed write batch ready for IO operations
+///
+/// This structure contains all data pre-processed and ready for direct IO,
+/// moving CPU-intensive work (JSON to Arrow conversion) out of the consume loop.
+pub struct ProcessedBatch {
+    /// Original entries for metadata
+    pub entries: Vec<Entry>,
+    /// Serialized bytes for WAL writing
+    pub bytes_entries: Vec<Vec<u8>>,
+    /// Arrow RecordBatch entries for Memtable writing
+    pub batch_entries: Vec<Arc<entry::RecordBatchEntry>>,
+    /// Total JSON size for rotation check
+    pub entries_json_size: usize,
+    /// Total Arrow size for rotation check
+    pub entries_arrow_size: usize,
+}
+
+impl ProcessedBatch {
+    /// Create an empty ProcessedBatch for control signals (Rotate, Close)
+    pub fn empty() -> Self {
+        Self {
+            entries: Vec::new(),
+            bytes_entries: Vec::new(),
+            batch_entries: Vec::new(),
+            entries_json_size: 0,
+            entries_arrow_size: 0,
+        }
+    }
 }
 
 pub async fn init() -> errors::Result<()> {

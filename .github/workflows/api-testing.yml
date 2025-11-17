@@ -4,17 +4,21 @@ on:
   push:
     branches:
       - "main"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
   pull_request:
     branches:
       - "*"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   COLUMNS: 150
@@ -23,6 +27,9 @@ env:
   ZO_BASE_URL: http://localhost:5080/
   ZO_BASE_URL_SC: http://localhost:5080/
   WS_ZO_BASE_URL: ws://localhost:5080/
+  ZO_USAGE_REPORTING_ENABLED: true
+  ZO_USAGE_PUBLISH_INTERVAL: 5
+  ZO_ALERT_SCHEDULE_INTERVAL: 3
   ZO_SMTP_ENABLED: true
   ZO_CREATE_ORG_THROUGH_INGESTION: true
 
@@ -124,36 +131,52 @@ jobs:
           SERVER_PID_FALSE=$!
           echo "OpenObserve PID for UTF8_VIEW=false: $SERVER_PID_FALSE"
           sleep 15
-          
+
           # Run regression tests with UTF8_VIEW=false
           rye run pytest tests/test_subquery_join_match.py --force-sugar -v
-          
+
           # Kill the server
           kill $SERVER_PID_FALSE || true
           sleep 5
-          
+
           echo "=== Running regression tests with ZO_UTF8_VIEW_ENABLED=true ==="
           ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true target/debug/openobserve > o2_utf8_true.log 2>&1 &
           SERVER_PID_TRUE=$!
           echo "OpenObserve PID for UTF8_VIEW=true: $SERVER_PID_TRUE"
           sleep 15
-          
+
           # Run regression tests with UTF8_VIEW=true
           rye run pytest tests/test_subquery_join_match.py --force-sugar -v
-          
+
           # Kill the server
           kill $SERVER_PID_TRUE || true
           sleep 5
-          
+
           echo "=== Running all other API tests with default settings ==="
           target/debug/openobserve > o2_default.log 2>&1 &
           SERVER_PID_DEFAULT=$!
           echo "OpenObserve PID for other tests: $SERVER_PID_DEFAULT"
           sleep 15
-          
+
           # Run all other tests (excluding regression tests)
           rye run pytest --ignore=tests/test_subquery_join_match.py --force-sugar
-          
+
           # Kill the server
           kill $SERVER_PID_DEFAULT || true
         working-directory: tests/api-testing/
+
+  api_tests_summary:
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs: [api_integration_tests]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.api_integration_tests.result }}" == "success" ] || [ "${{ needs.api_integration_tests.result }}" == "skipped" ]; then
+            echo "API tests passed or skipped"
+            exit 0
+          else
+            echo "API tests failed"
+            exit 1
+          fi

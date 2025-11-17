@@ -46,7 +46,9 @@ use {
 use super::request::*;
 use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
-    handler::http::request::search::search_inspector,
+    handler::http::{
+        request::search::search_inspector, router::middlewares::blocked_orgs_middleware,
+    },
 };
 
 pub mod middlewares;
@@ -266,6 +268,7 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .service(status::cache_status)
             .service(status::enable_node)
             .service(status::flush_node)
+            .service(status::drain_status)
             .service(status::list_node)
             .service(status::node_metrics)
             .service(status::consistent_hash)
@@ -370,6 +373,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
 
     #[allow(deprecated)]
     let service = web::scope("/api")
+        .wrap(middleware::from_fn(blocked_orgs_middleware))
         .wrap(middleware::from_fn(audit_middleware))
         .wrap(HttpAuthentication::with_fn(
             super::auth::validator::oo_validator,
@@ -607,16 +611,20 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ai::prompt::get_prompt)
         .service(ai::prompt::update_prompt)
         .service(ai::prompt::rollback_prompt)
-        .service(re_pattern::get)
+        .service(re_pattern::get_built_in_patterns)
+        .service(re_pattern::test)
         .service(re_pattern::list)
         .service(re_pattern::save)
+        .service(re_pattern::get)
         .service(re_pattern::update)
         .service(re_pattern::delete)
-        .service(re_pattern::test)
         .service(domain_management::get_domain_management_config)
         .service(domain_management::set_domain_management_config)
+        .service(license::get_license_info)
+        .service(license::store_license)
         .service(traces::get_service_graph_metrics)
-        .service(traces::get_store_stats);
+        .service(traces::get_store_stats)
+        .service(patterns::extract_patterns);
 
     #[cfg(feature = "cloud")]
     let service = service

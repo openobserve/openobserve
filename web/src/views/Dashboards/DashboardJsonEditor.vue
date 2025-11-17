@@ -10,11 +10,11 @@
         </div>
       </div>
       <div class="col-auto">
-        <q-btn
+        <q-icon
           v-close-popup
-          round
-          flat
-          :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+          name="cancel"
+          class="cursor-pointer tw-mr-3"
+          size="20px"
           data-test="json-editor-close"
         />
       </div>

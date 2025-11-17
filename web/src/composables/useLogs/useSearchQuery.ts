@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { searchState } from "@/composables/useLogs/searchState";
+import { patternsState } from "@/composables/useLogs/usePatterns";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -78,6 +79,9 @@ export const useSearchQuery = () => {
       if (!notificationMsg.value) {
         notificationMsg.value = "Search query is empty or invalid.";
       }
+      else{
+        searchObj.data.errorMsg = notificationMsg.value;
+      }
       return null;
     }
 
@@ -138,8 +142,14 @@ export const useSearchQuery = () => {
     queryReq.query.from =
       (searchObj.data.resultGrid.currentPage - 1) *
       searchObj.meta.resultGrid.rowsPerPage;
-    queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
+
+    // Use configurable scan size when patterns mode is enabled to get data for pattern extraction
+    queryReq.query.size =
+      searchObj.meta.logsVisualizeToggle === "patterns"
+      ? patternsState.value.scanSize
+      : searchObj.meta.resultGrid.rowsPerPage;
+  
     const parsedSQL: any = fnParsedSQL();
 
     searchObj.meta.resultGrid.showPagination = true;
@@ -147,11 +157,19 @@ export const useSearchQuery = () => {
     if (searchObj.meta.sqlMode == true) {
       // if query has aggregation or groupby then we need to set size to -1 to get all records
       // issue #5432
-      if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+      // BUT: Don't override size when patterns mode is enabled - we need the configured scan size for pattern extraction
+      if (
+        (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) &&
+        searchObj.meta.logsVisualizeToggle !== "patterns"
+      ) {
         queryReq.query.size = -1;
       }
 
-      if (isLimitQuery(parsedSQL)) {
+      // Don't apply LIMIT from SQL when patterns mode is enabled - we need the configured scan size for pattern extraction
+      if (
+        isLimitQuery(parsedSQL) &&
+        searchObj.meta.logsVisualizeToggle !== "patterns"
+      ) {
         queryReq.query.size = parsedSQL.limit.value[0].value;
         searchObj.meta.resultGrid.showPagination = false;
 
@@ -311,9 +329,10 @@ export const useSearchQuery = () => {
     const parsedSQL: any = fnParsedSQL();
 
     if (parsedSQL != undefined) {
+
       if (Array.isArray(parsedSQL) && parsedSQL.length == 0) {
         notificationMsg.value =
-          "SQL query is missing or invalid. Please submit a valid SQL statement.";
+          "SQL query is missing or invalid.";
         return null;
       }
 

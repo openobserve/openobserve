@@ -50,10 +50,17 @@ pub async fn token_validator(
     };
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
-    // Check if this is an MCP endpoint request
-    let is_mcp_request = path_columns.get(1).map(|s| *s == "mcp").unwrap_or(false);
+    // Check if this is an MCP endpoint request or has the MCP header
+    let is_mcp_endpoint = path_columns.get(1).map(|s| *s == "mcp").unwrap_or(false);
+    let has_mcp_header = req
+        .headers()
+        .get("x-o2-mcp")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v == "true")
+        .unwrap_or_default();
+    let is_mcp_request = is_mcp_endpoint || has_mcp_header;
 
-    // For MCP endpoints with dynamic clients, skip audience validation
+    // For MCP requests with dynamic clients, skip audience validation
     let login_flow = !is_mcp_request;
 
     match jwt::verify_decode_token(
@@ -116,7 +123,13 @@ pub async fn token_validator(
                                 };
                             users::get_user(Some(org_id), user_id).await
                         }
-                        None => users::get_user(None, user_id).await,
+                        None => {
+                            if path_columns.len() == 1 && path_columns[0] == "license" {
+                                users::get_user(Some("_meta"), user_id).await
+                            } else {
+                                users::get_user(None, user_id).await
+                            }
+                        }
                     }
                 };
                 match user {

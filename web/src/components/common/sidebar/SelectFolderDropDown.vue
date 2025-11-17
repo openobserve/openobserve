@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn
         class="q-mb-md add-folder-btn"
         :data-test="`${type}-folder-move-new-add`"
-        style="width: 40px;"
+        style="width: 40px;position: relative; top: 32px;"
         :style="computedStyle"
         no-caps
         dense
@@ -140,7 +140,7 @@ import { getFoldersListByType } from "@/utils/commons";
 
       const computedStyle = computed (() => {
         const baseStyle = props.style ? props.style : 'height: 35px';
-        return `${baseStyle}; margin-top: 13px`;
+        return `${baseStyle}; margin-top: 23px`;
       });
 
       onActivated(async () => {

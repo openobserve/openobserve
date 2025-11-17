@@ -27,6 +27,7 @@ pub struct ServiceGraphQuery {
     pub start_time: Option<i64>,
     pub end_time: Option<i64>,
     pub filter: Option<String>,
+    pub stream_name: Option<String>,
 }
 
 /// GetServiceGraphMetrics
@@ -37,15 +38,16 @@ pub struct ServiceGraphQuery {
     tag = "Traces",
     operation_id = "GetServiceGraphMetrics",
     summary = "Get service graph metrics",
-    description = "Retrieves Prometheus-formatted metrics for the service graph. Returns metrics filtered by organization to ensure multi-tenant isolation. Service graph metrics provide insights into service-to-service communication patterns, request rates, and latencies.",
+    description = "Retrieves Prometheus-formatted metrics for the service graph. Returns metrics filtered by organization and optionally by stream name to ensure multi-tenant isolation. Service graph metrics provide insights into service-to-service communication patterns, request rates, and latencies.",
     security(
         ("Authorization" = [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = Option<String>, Query, description = "Optional stream name to filter service graph metrics"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "text/plain; version=0.0.4", body = String, example = json!("# HELP traces_service_graph_request_total Total number of requests between services\n# TYPE traces_service_graph_request_total counter\ntraces_service_graph_request_total{client=\"service-a\",org_id=\"default\",server=\"service-b\"} 42\n")),
+        (status = 200, description = "Success", content_type = "text/plain; version=0.0.4", body = String, example = json!("# HELP traces_service_graph_request_total Total number of requests between services\n# TYPE traces_service_graph_request_total counter\ntraces_service_graph_request_total{client=\"service-a\",org_id=\"default\",server=\"service-b\",stream_name=\"default\"} 42\n")),
         (status = 403, description = "Forbidden - Enterprise feature", content_type = "application/json", body = String),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
@@ -57,25 +59,40 @@ pub struct ServiceGraphQuery {
 #[cfg(feature = "enterprise")]
 pub async fn get_service_graph_metrics(
     org_id: web::Path<String>,
+    query: web::Query<ServiceGraphQuery>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let metric_families = prometheus::gather();
     let encoder = TextEncoder::new();
     let mut buffer = vec![];
 
-    // Filter metrics to only include those matching the requested org_id
+    // Filter metrics to only include those matching the requested org_id and optional stream_name
     let filtered_families: Vec<_> = metric_families
         .into_iter()
         .filter_map(|mut family| {
-            // Filter out metrics that don't belong to this org
+            // Filter out metrics that don't belong to this org/stream
             let filtered_metrics: Vec<_> = family
                 .take_metric()
                 .into_iter()
                 .filter(|metric| {
+                    let labels = metric.get_label();
+
                     // Check if metric has org_id label matching the requested org
-                    metric
-                        .get_label()
+                    let org_matches = labels
                         .iter()
-                        .any(|label| label.name() == "org_id" && label.value() == org_id.as_str())
+                        .any(|label| label.name() == "org_id" && label.value() == org_id.as_str());
+
+                    if !org_matches {
+                        return false;
+                    }
+
+                    // If stream_name filter is provided, also check stream_name label
+                    if let Some(ref stream_name) = query.stream_name {
+                        labels.iter().any(|label| {
+                            label.name() == "stream_name" && label.value() == stream_name.as_str()
+                        })
+                    } else {
+                        true
+                    }
                 })
                 .collect();
 

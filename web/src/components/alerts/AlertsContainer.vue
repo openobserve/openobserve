@@ -1,6 +1,5 @@
 <template>
     <div
-      :class="store.state.theme === 'dark' ? 'dark-mode-container' : 'light-mode-container'"
     >
       <div class="tw-flex tw-justify-between cursor-pointer" @click="expanded = !expanded">
         <div class="tw-flex tw-items-start tw-justify-between full-width ">
@@ -121,26 +120,6 @@
   .light-mode-icon{
     background-color: #f2f1f1;
     color: #555555;
-  }
-  .light-mode-container{
-    border: 1px solid #E6E6E6;
-    border-top-left-radius: 4px;
-    border-top-right-radius: 4px;
-    background-color: #FCFCFC;
-
-    & > .cursor-pointer:hover {
-      background-color: #F5F5F5;
-    }
-  }
-  .dark-mode-container{
-    border: 1px solid #343434;
-    border-top-left-radius: 4px;
-    border-top-right-radius: 4px;
-    background-color: #2A2A2A;
-
-    & > .cursor-pointer:hover {
-      background-color: #333333;
-    }
   }
   </style>
   

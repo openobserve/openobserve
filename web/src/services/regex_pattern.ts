@@ -65,6 +65,22 @@ const regexPatterns = {
       payload.policy = policy;
     }
     return http().post(`/api/${org_identifier}/re_patterns/test`, payload);
+  },
+  getBuiltInPatterns: (
+    org_identifier: string,
+    params?: {
+      search?: string;
+      tags?: string[];
+    }
+  ) => {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.tags) params.tags.forEach(tag => queryParams.append('tags', tag));
+
+    const queryString = queryParams.toString();
+    const url = `/api/${org_identifier}/re_patterns/built-in${queryString ? '?' + queryString : ''}`;
+
+    return http().get(url);
   }
 };
 

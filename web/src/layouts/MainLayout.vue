@@ -109,6 +109,35 @@ class="warning" />{{
           >
         </div>
         <div class="header-menu">
+                  <q-btn
+          v-if="
+            config.isEnterprise == 'true' &&
+            store.state.zoConfig.ingestion_quota_used >= 85
+          "
+          round
+          flat
+          dense
+          :ripple="false"
+          data-test="ingestion-quota-warning-icon"
+        >
+          <div class="row items-center no-wrap">
+            <q-icon
+              name="warning"
+              size="24px"
+              class="header-icon"
+              :style="{
+                color:
+                  store.state.zoConfig.ingestion_quota_used >= 95
+                    ? 'red'
+                    : 'orange',
+              }"
+            ></q-icon>
+          </div>
+          <q-tooltip anchor="top middle" self="bottom middle">
+            Warning: {{ store.state.zoConfig.ingestion_quota_used }}% of
+            ingestion limit used
+          </q-tooltip>
+        </q-btn>
           <q-btn
             v-if="
               config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
@@ -149,83 +178,89 @@ class="warning" />{{
                 self="top middle"
                 class="organization-menu-o2"
               >
-                <q-table
-                  data-test="organization-menu-table"
-                  :rows="filteredOrganizations"
-                  :row-key="(row) => 'org_' + row.identifier"
-                  :columns="[{ name: 'label', field: 'label', align: 'left' }]"
-                  :visible-columns="['label']"
-                  hide-header
-                  :pagination="{ rowsPerPage }"
-                  :rows-per-page-options="[]"
-                  class="org-table"
-                  style="width: 470px"
-                >
-                  <template #top>
-                    <div class="full-width">
-                      <q-input
-                        data-test="organization-search-input"
-                        v-model="searchQuery"
-                        data-cy="index-field-search-input"
-                        borderless
-                        dense
-                        clearable
-                        debounce="1"
-                        autofocus
-                        :placeholder="'Search Organization'"
-                      >
-                        <template #prepend>
-                          <q-icon name="search" />
-                        </template>
-                      </q-input>
-                    </div>
-                  </template>
-
-                  <template v-slot:body-cell-label="props">
-                    <q-td
-                      :props="props"
-                      class="org-list-item-cell"
-                      @click="
-                        selectedOrg = props.row;
-                        updateOrganization();
-                      "
-                    >
-                      <div
-                        class="org-menu-item"
-                        v-close-popup
-                        data-test="organization-menu-item-label-item-label"
-                        :class="{
-                          'org-menu-item--active':
-                            props.row.identifier === userClickedOrg?.identifier,
-                        }"
-                      >
-                        {{
-                          props.row.label.length > 30
-                            ? props.row.label.substring(0, 30) +
-                              "... | " +
-                              props.row.identifier
-                            : props.row.label + " | " + props.row.identifier
-                        }}
-                        <q-tooltip
-                          v-if="props.row.label.length > 30"
-                          anchor="bottom middle"
-                          self="top start"
+              <q-list data-test="organization-menu-list" style="width: 100%">
+                <q-item data-test="organization-menu-item" style="padding: 0">
+                  <q-item-section data-test="organization-menu-item-section" class="column" style="padding: 0px">
+                  <q-table
+                    data-test="organization-menu-table"
+                    :rows="filteredOrganizations"
+                    :row-key="(row) => 'org_' + row.identifier"
+                    :columns="[{ name: 'label', field: 'label', align: 'left' }]"
+                    :visible-columns="['label']"
+                    hide-header
+                    :pagination="{ rowsPerPage }"
+                    :rows-per-page-options="[]"
+                    class="org-table"
+                    style="width: 470px"
+                  >
+                    <template #top>
+                      <div class="full-width">
+                        <q-input
+                          data-test="organization-search-input"
+                          v-model="searchQuery"
+                          data-cy="index-field-search-input"
+                          borderless
+                          dense
+                          clearable
+                          debounce="1"
+                          autofocus
+                          :placeholder="'Search Organization'"
                         >
-                          {{ props.row.label }}
-                        </q-tooltip>
+                          <template #prepend>
+                            <q-icon name="search" />
+                          </template>
+                        </q-input>
                       </div>
-                    </q-td>
-                  </template>
+                    </template>
 
-                  <template v-slot:no-data>
-                    <div
-                      data-test="organization-menu-no-data"
-                      class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center"
-                    >
-                      No organizations found
-                    </div>
-                  </template>
-                </q-table>
+                    <template v-slot:body-cell-label="props">
+                      <q-td
+                        :props="props"
+                        class="org-list-item-cell"
+                        @click="
+                          selectedOrg = props.row;
+                          updateOrganization();
+                        "
+                      >
+                        <div
+                          class="org-menu-item"
+                          v-close-popup
+                          data-test="organization-menu-item-label-item-label"
+                          :class="{
+                            'org-menu-item--active':
+                              props.row.identifier === userClickedOrg?.identifier,
+                          }"
+                        >
+                          {{
+                            props.row.label.length > 30
+                              ? props.row.label.substring(0, 30) +
+                                "... | " +
+                                props.row.identifier
+                              : props.row.label + " | " + props.row.identifier
+                          }}
+                          <q-tooltip
+                            v-if="props.row.label.length > 30"
+                            anchor="bottom middle"
+                            self="top start"
+                          >
+                            {{ props.row.label }}
+                          </q-tooltip>
+                        </div>
+                      </q-td>
+                    </template>
+
+                    <template v-slot:no-data>
+                      <div
+                        data-test="organization-menu-no-data"
+                        class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center"
+                      >
+                        No organizations found
+                      </div>
+                    </template>
+                  </q-table>
+              </q-item-section>
+            </q-item>
+           </q-list>
               </q-menu>
             </q-btn>
           </div>
@@ -437,6 +472,21 @@ class="padding-none" />
                 </q-item>
                 <q-separator />
                 <q-item
+                  data-test="menu-link-predefined-themes-item"
+                  v-ripple="true"
+                  v-close-popup="true"
+                  clickable
+                  @click="openPredefinedThemes"
+                >
+                  <q-item-section avatar>
+                    <q-icon size="xs" name="color_lens" class="padding-none" />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label>Manage Theme</q-item-label>
+                  </q-item-section>
+                </q-item>
+                <q-separator />
+                <q-item
                   data-test="menu-link-logout-item"
                   v-ripple="true"
                   v-close-popup="true"
@@ -516,6 +566,7 @@ class="padding-none" />
 full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
+    <PredefinedThemes />
   </q-layout>
 </template>
 
@@ -576,6 +627,8 @@ import configService from "@/services/config";
 import streamService from "@/services/stream";
 import billings from "@/services/billings";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
+import PredefinedThemes from "../components/PredefinedThemes.vue";
+import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
 import {
   outlinedHome,
@@ -593,7 +646,6 @@ import {
   outlinedDescription,
   outlinedCode,
   outlinedDevices,
-  outlinedBubbleChart,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -636,6 +688,7 @@ export default defineComponent({
     SlackIcon,
     ManagementIcon,
     ThemeSwitcher,
+    PredefinedThemes,
     O2AIChat,
     GetStarted,
   },
@@ -685,6 +738,7 @@ export default defineComponent({
 
     const { getStreams, resetStreams } = useStreams();
     const { closeSocket } = useSearchWebSocket();
+    const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
 
     const isMonacoEditorLoaded = ref(false);
     const showGetStarted = ref(
@@ -771,12 +825,6 @@ export default defineComponent({
           icon: outlinedAccountTree,
           link: "/traces",
           name: "traces",
-        },
-        {
-          title: "Service Graph",
-          icon: outlinedBubbleChart,
-          link: "/service-graph",
-          name: "serviceGraph",
         },
         {
           title: t("menu.rum"),
@@ -1265,6 +1313,8 @@ export default defineComponent({
           streaming_aggregation_enabled:
             orgSettings?.data?.data?.streaming_aggregation_enabled ?? false,
           free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? "",
+          light_mode_theme_color: orgSettings?.data?.data?.light_mode_theme_color,
+          dark_mode_theme_color: orgSettings?.data?.data?.dark_mode_theme_color,
         });
 
         if (
@@ -1396,6 +1446,10 @@ export default defineComponent({
         aiChatInputContext.value = value;
       });
     };
+
+    const openPredefinedThemes = () => {
+      toggleThemes();
+    };
     //this is the used to set the selected org to the user clicked org because all the operations are happening on the selected org
     //to make sync with the user clicked org
     //we dont need search query after selectedOrg has been changed so resetting it
@@ -1453,6 +1507,8 @@ export default defineComponent({
       updateActionsMenu,
       getConfig,
       setRumUser,
+      openPredefinedThemes,
+      isPredefinedThemesOpen,
     };
   },
   computed: {
@@ -1644,6 +1700,10 @@ export default defineComponent({
         width: 1.3rem;
       }
 
+      .q-item__label{
+        padding-bottom: 4px;
+      }
+
       &.q-router-link--active {
         .q-icon img {
           filter: brightness(100);
@@ -1654,8 +1714,13 @@ export default defineComponent({
 
           // Light mode: make text blue for readability
           body.body--light & {
-            color: var(--o2-menu-color) !important;
+            color: #19191e !important;
           }
+          // Dark mode: make text blue for readability
+          body.body--dark & {
+            color: #ffffff !important;
+          }
+
         }
         color: var(--o2-menu-color);
 
@@ -1664,9 +1729,20 @@ export default defineComponent({
           color: var(--o2-menu-color) !important;
 
           .q-icon {
-            color: var(--o2-menu-color) !important;
+            color: #19191e !important;
           }
         }
+
+        // Dark mode: make item text blue
+        body.body--dark & {
+          color: var(--o2-menu-color) !important;
+
+          .q-icon {
+            color: #ffffff !important;
+          }
+        }
+
+        
       }
 
       &__label {
@@ -1902,7 +1978,43 @@ body.ai-chat-open {
   transform: rotate(180deg);
 }
 
+.theme-btn-active {
+  background: color-mix(
+    in srgb,
+    var(--o2-theme-color) 15%,
+    transparent 85%
+  ) !important;
+
+  .header-icon {
+    opacity: 1 !important;
+    color: var(--o2-theme-color) !important;
+  }
+}
+
 .organization-menu-o2 {
+  // Disable hover for organization menu dropdown
+  // Disable table row hover
+  .q-tr:hover,
+  tr:hover,
+  tbody tr:hover,
+  tbody .q-tr:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+
+  td:hover,
+  .q-td:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+
+  // Disable default q-item hover
+  .q-item:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: inherit !important;
+  }
+
   .org-table {
     // Disable global table row hover
     tbody .q-tr:hover {
@@ -1964,13 +2076,10 @@ body.ai-chat-open {
       white-space: nowrap;
       font-size: 13px;
 
-      // Hover effect only on the div
+      // Enable hover only for individual org menu items
       &:hover {
-        background: color-mix(
-          in srgb,
-          var(--o2-theme-color) 5%,
-          var(--o2-theme-mode) 90%
-        ) !important;
+        background-color: var(--o2-hover-accent) !important;
+        border-radius: 4px;
       }
 
       // Active/selected state

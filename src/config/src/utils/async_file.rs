@@ -313,7 +313,18 @@ where
     .await
     .into_iter()
     .map(Result::ok)
-    .filter_map(|path| path.and_then(|pbuf| pbuf.to_str().map(String::from)))
+    .filter_map(|path| {
+        path.and_then(|pbuf| {
+            pbuf.to_str().map(|path| {
+                // Hack for windows
+                if let Some(stripped) = path.strip_prefix("\\\\?\\") {
+                    stripped.to_string().replace('\\', "/")
+                } else {
+                    path.to_string()
+                }
+            })
+        })
+    })
     .collect();
 
     Ok(files)

@@ -265,6 +265,22 @@ $menu-gradient-start: rgba(89, 155, 174, 0.04);
 $menu-gradient-end: rgba(89, 155, 174, 0.08);
 $menu-border-color: rgba(89, 155, 174, 0.6);
 
+// JSON Syntax Highlighting Colors - Light Mode
+$json-key-light: #B71C1C;           // Red color for keys
+$json-string-light: #047857;        // Softer green for strings
+$json-number-light: #2563EB;        // Royal blue for numbers
+$json-boolean-light: #6D28D9;       // Soft purple for booleans
+$json-null-light: #6B7280;          // Medium gray for null
+$json-object-light: #4B5563;        // Neutral gray for objects
+
+// JSON Syntax Highlighting Colors - Dark Mode
+$json-key-dark: #f67a7aff;          // Lighter red for dark mode
+$json-string-dark: #6EE7B7;         // Soft mint green
+$json-number-dark: #60A5FA;         // Light blue for numbers
+$json-boolean-dark: #A5B4FC;        // Lavender
+$json-null-dark: #9CA3AF;           // Medium gray
+$json-object-dark: #D1D5DB;         // Light gray
+
 // Semantic Colors - Light Mode
 :root {
   --o2-theme-mode: #{$theme-mode};
@@ -296,16 +312,23 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
   --o2-focus-ring: #{$o2-iris-1200};        // Focus state indicator
   --o2-hover-shadow: #dddddd;
 
+  --o2-hover-gray: color-mix(in srgb, #{$theme-color} 2%, rgb(244, 244, 244));
+
+  --o2-bg-gray: color-mix(in srgb, #{$theme-color} 10%, rgb(237, 237, 237));
+
+
   --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
   --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
   --o2-scrollbar-thumb-bg: color-mix(in srgb, #{$primary} 20%, white);
   --o2-scrollbar-thumb-hover-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
   --o2-scrollbar-thumb-active-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
 
-  --o2-theme-color: #{$theme-color};
+  --o2-theme-color: #3F7994;
+  --o2-dark-theme-color: #112027;
 
-  --o2-body-primary-bg: #{$body-primary-bg};
-  --o2-body-secondary-bg: #{$body-secondary-bg};
+  /* These can be customized dynamically via theme customizer */
+  --o2-body-primary-bg: rgba(89, 155, 174, 0.01);
+  --o2-body-secondary-bg: rgba(89, 155, 174, 0.4);
 
   --o2-primary-btn-bg: color-mix(in srgb, var(--o2-theme-color) 100%, white);
   --o2-primary-btn-text: #{$o2-gray-100};
@@ -320,21 +343,37 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
   --o2-border-color: rgba(0, 0, 0, 0.12);
   --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
 
-  --o2-menu-gradient-start: #{$menu-gradient-start};
-  --o2-menu-gradient-end: #{$menu-gradient-end};
-  --o2-menu-border-color: #{$menu-border-color};
-  --o2-menu-color: #{$theme-color};
+  --o2-menu-gradient-start: rgba(89, 175, 199, 0.3);
+  --o2-menu-gradient-end: rgba(48, 193, 233, 0.3);
+  --o2-menu-border-color: rgba(89, 155, 174, 0.6);
+  --o2-menu-color: #3F7994;
+
 
   --o2-table-header-bg: color-mix(in srgb, #{$theme-color} 20%, white);
+
+  --o2-table-actions-bg: white;
 
   --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, white);
   --o2-tab-text-color: #{$o2-gray-1400};
 
   --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, white);
 
-  --o2-actions-column-shawdow: #{$actions-column-box-shawdow};
+  --o2-actions-column-shawdow: rgba(0, 0, 0, 0.1);
 
-  --q-primary: #{$theme-color};
+  --q-primary: var(--o2-theme-color);
+
+  --o2-icon-color: #808080;
+
+  --o2-icon-color-dark: #5e5e5e;
+
+  // JSON Syntax Highlighting
+  --o2-json-key: #{$json-key-light};
+  --o2-json-string: #{$json-string-light};
+  --o2-json-number: #{$json-number-light};
+  --o2-json-boolean: #{$json-boolean-light};
+  --o2-json-null: #{$json-null-light};
+  --o2-json-object: #{$json-object-light};
+
 }
 
 // Semantic Colors - Dark Mode
@@ -363,10 +402,13 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
   // Interactive Elements
   --o2-primary-color: #{$o2-dark-iris-1000};  // Primary actions
   --o2-primary-foreground: #{$o2-dark-gray-100}; // Text on primary
-  --o2-hover-accent: color-mix(in srgb, #{$theme-color} 25%, rgb(0, 0, 0));   // Hover accents
+  --o2-hover-accent: color-mix(in srgb, #{$theme-color} 20%, rgb(39, 39, 39));   // Hover accents
   --o2-destructive-foreground: #{$o2-dark-gray-100}; // Destructive text
   --o2-focus-ring: #{$o2-dark-iris-600};      // Focus indicators
   --o2-hover-shadow: rgba(0, 0, 0, 0.6);
+  --o2-hover-gray: color-mix(in srgb, #{$theme-color} 8%, rgb(38, 38, 38));
+
+  --o2-bg-gray: color-mix(in srgb, #{$theme-color} 5%, rgb(42, 42, 42));
 
   --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
   --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
@@ -374,36 +416,50 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
   --o2-scrollbar-thumb-hover-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
   --o2-scrollbar-thumb-active-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
 
-  --o2-theme-color: #{$dark-theme-color};
+  --o2-theme-color: #112027;
+  --o2-dark-theme-color: #3F7994;
 
-  --o2-body-primary-bg: #{$dark-body-primary-bg};
-  --o2-body-secondary-bg: #{$dark-body-secondary-bg};
+  --o2-body-primary-bg: rgba(14, 19, 29, 0.01);
+  --o2-body-secondary-bg: rgba(14, 19, 29, 0.4);
 
-  --o2-primary-btn-bg: #{$theme-color};
+  --o2-primary-btn-bg: var(--o2-dark-theme-color);
   --o2-primary-btn-text: #{$o2-gray-100};
-  --q-primary: #{$theme-color};
+  --q-primary: var(--o2-theme-color);
 
-  --o2-toggle-track-bg: #{$theme-color};
-  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
+  --o2-toggle-track-bg: var(--o2-dark-theme-color);
+  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-dark-theme-color) 30%, rgb(100, 100, 100));
 
   --o2-card-bg: #1f2223;
 
-  --o2-header-menu-bg: color-mix(in srgb, var(--o2-theme-color) 90%, white);
+  --o2-header-menu-bg: color-mix(in srgb, #19191e 90%, white);
 
 
   --o2-border-color: rgba(255, 255, 255, 0.40);
   --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
 
-  --o2-menu-gradient-start: #{$dark-menu-gradient-start};
-  --o2-menu-gradient-end: #{$theme-color};
-  --o2-menu-border-color: #{$theme-color};
-  --o2-menu-color: #{$o2-gray-100};
+  --o2-menu-gradient-start: rgba(89, 155, 174, 0.3);
+  --o2-menu-gradient-end: rgba(48, 193, 233, 0.3);
+  --o2-menu-border-color: #3F7994;
+  --o2-menu-color: #FFFFFF;
 
   --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
+
+    --o2-table-actions-bg: #1f2223;
+
 
   --o2-tab-bg: color-mix(in srgb, white 20%, var(--o2-theme-color));
   --o2-tab-text-color: #{$o2-gray-100};
 
-  --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, #{$dark-theme-color});
-  --o2-actions-column-shawdow: #{$actions-column-box-shawdow-dark};
+  --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, #112027);
+  --o2-actions-column-shawdow: rgba(125, 125, 125, 0.694);
+
+    --q-primary: var(--o2-dark-theme-color);
+
+  // JSON Syntax Highlighting
+  --o2-json-key: #{$json-key-dark};
+  --o2-json-string: #{$json-string-dark};
+  --o2-json-number: #{$json-number-dark};
+  --o2-json-boolean: #{$json-boolean-dark};
+  --o2-json-null: #{$json-null-dark};
+  --o2-json-object: #{$json-object-dark};
 }
