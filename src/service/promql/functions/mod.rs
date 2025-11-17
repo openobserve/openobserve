@@ -211,24 +211,19 @@ pub trait RangeFunc: Sync {
     fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64>;
 }
 
-/// Enhanced version that processes all timestamps at once for range queries
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
 where
     F: RangeFunc,
 {
     let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_range({}) started",
-        eval_ctx.trace_id,
-        func.name()
-    );
+    let trace_id = &eval_ctx.trace_id;
+    let func_name = func.name();
+    log::info!("[trace_id: {trace_id}] [PromQL Timing] eval_range({func_name}) started");
 
     let data = match data {
         Value::Matrix(v) => {
             log::info!(
-                "[trace_id: {}] [PromQL Timing] eval_range({}) processing {} series",
-                eval_ctx.trace_id,
-                func.name(),
+                "[trace_id: {trace_id}] [PromQL Timing] eval_range({func_name}) processing {} series",
                 v.len()
             );
             v
@@ -236,8 +231,7 @@ where
         Value::None => return Ok(Value::None),
         v => {
             return Err(DataFusionError::Plan(format!(
-                "{}: matrix argument expected but got {}",
-                func.name(),
+                "{func_name}: matrix argument expected but got {}",
                 v.get_type()
             )));
         }
@@ -245,96 +239,64 @@ where
 
     // Always use range query path - compute all timestamps at once
     let timestamps = eval_ctx.timestamps();
-    let mut range_values = Vec::with_capacity(data.len());
-
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_range({}) processing {} time points in range query mode",
-        eval_ctx.trace_id,
-        func.name(),
+        "[trace_id: {trace_id}] [PromQL Timing] eval_range({func_name}) processing {} time points",
         timestamps.len()
     );
 
-    let cfg = config::get_config();
-    let thread_num = cfg.limit.query_thread_num;
-    let chunk_size = (data.len() / thread_num).max(1);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_range({}) using {} threads with chunk_size {}",
-        eval_ctx.trace_id,
-        func.name(),
-        thread_num,
-        chunk_size
-    );
-
-    let parallel_start = std::time::Instant::now();
-    let results: Vec<Option<RangeValue>> = data
+    let results: Vec<RangeValue> = data
         .into_par_iter()
-        .chunks(chunk_size)
-        .flat_map(|chunk| {
-            chunk
-                .into_iter()
-                .map(|mut metric| {
-                    let mut labels = std::mem::take(&mut metric.labels);
-                    if !KEEP_METRIC_NAME_FUNC.contains(func.name()) {
-                        labels = labels.without_metric_name();
-                    }
-                    let time_window = metric.time_window.as_ref().unwrap();
-                    let range = time_window.range;
-                    let range_micros = micros(range);
-                    let mut result_samples = Vec::with_capacity(timestamps.len());
+        .flat_map(|mut metric| {
+            let mut labels = std::mem::take(&mut metric.labels);
+            if !KEEP_METRIC_NAME_FUNC.contains(func.name()) {
+                labels = labels.without_metric_name();
+            }
+            let time_window = metric.time_window.as_ref().unwrap();
+            let range = time_window.range;
+            let range_micros = micros(range);
+            let mut result_samples = Vec::with_capacity(timestamps.len());
 
-                    // For each eval timestamp, compute the function value
-                    for &eval_ts in &timestamps {
-                        // Find samples in the window [eval_ts - range, eval_ts]
-                        let window_start = eval_ts - range_micros;
-                        let window_end = eval_ts;
+            // For each eval timestamp, compute the function value
+            for &eval_ts in &timestamps {
+                // Find samples in the window [eval_ts - range, eval_ts]
+                let window_start = eval_ts - range_micros;
+                let window_end = eval_ts;
 
-                        // Extract samples within this window using binary search
-                        let start_index = metric
-                            .samples
-                            .partition_point(|s| s.timestamp < window_start);
-                        let end_index = metric
-                            .samples
-                            .partition_point(|s| s.timestamp <= window_end);
-                        let window_samples = &metric.samples[start_index..end_index];
+                // Extract samples within this window using binary search
+                let start_index = metric
+                    .samples
+                    .partition_point(|s| s.timestamp < window_start);
+                let end_index = metric
+                    .samples
+                    .partition_point(|s| s.timestamp <= window_end);
+                let window_samples = &metric.samples[start_index..end_index];
 
-                        if window_samples.is_empty() {
-                            continue;
-                        }
+                if window_samples.is_empty() {
+                    continue;
+                }
 
-                        if let Some(value) = func.exec(window_samples, eval_ts, &range) {
-                            result_samples.push(Sample::new(eval_ts, value));
-                        }
-                    }
+                if let Some(value) = func.exec(window_samples, eval_ts, &range) {
+                    result_samples.push(Sample::new(eval_ts, value));
+                }
+            }
 
-                    if !result_samples.is_empty() {
-                        Some(RangeValue {
-                            labels,
-                            samples: result_samples,
-                            exemplars: None,
-                            time_window: metric.time_window,
-                        })
-                    } else {
-                        None
-                    }
+            if !result_samples.is_empty() {
+                Some(RangeValue {
+                    labels,
+                    samples: result_samples,
+                    exemplars: None,
+                    time_window: metric.time_window,
                 })
-                .collect::<Vec<_>>()
+            } else {
+                None
+            }
         })
         .collect();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_range({}) parallel processing took: {:?}",
-        eval_ctx.trace_id,
-        func.name(),
-        parallel_start.elapsed()
-    );
-
-    range_values.extend(results.into_iter().flatten());
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_range({}) completed in {:?}, produced {} series",
-        eval_ctx.trace_id,
-        func.name(),
+        "[trace_id: {trace_id}] [PromQL Timing] eval_range({func_name}) completed in {:?}, produced {} series",
         start.elapsed(),
-        range_values.len()
+        results.len()
     );
-    Ok(Value::Matrix(range_values))
+    Ok(Value::Matrix(results))
 }
