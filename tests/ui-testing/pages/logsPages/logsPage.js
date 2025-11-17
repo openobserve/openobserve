@@ -2474,6 +2474,11 @@ export class LogsPage {
         return this.page.locator(this.kubernetesFieldsSelector);
     }
 
+    async getKubernetesFieldsCount() {
+        const kubernetesFields = this.page.locator(this.kubernetesFieldsSelector);
+        return await kubernetesFields.count();
+    }
+
     async getSpecificFieldLocator(fieldName) {
         return this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
     }
