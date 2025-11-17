@@ -113,7 +113,6 @@
             v-model="getHavingCondition().operator"
             :options="havingOperators"
             borderless
-            class="o2-custom-select-dashboard"
             style="width: 60px;"
           />
 
