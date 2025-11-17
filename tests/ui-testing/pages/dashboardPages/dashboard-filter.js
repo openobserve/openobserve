@@ -2,45 +2,6 @@ export default class DashboardFilter {
   constructor(page) {
     this.page = page;
   }
-
-  /**
-   * Helper method to click an autocomplete suggestion with retry logic
-   * to handle DOM detachment issues
-   */
-  async clickAutocompleteSuggestion(suggestionLocator, maxRetries = 3) {
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        // Wait for element to be visible and attached
-        await suggestionLocator.waitFor({
-          state: "visible",
-          timeout: 10000
-        });
-
-        // Wait for element to be stable (not animating)
-        await suggestionLocator.evaluate(() => {
-          return new Promise((resolve) => {
-            // Wait for element to be fully attached and stable
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => resolve());
-            });
-          });
-        });
-
-        await suggestionLocator.click({ timeout: 5000 });
-        return; // Success
-      } catch (error) {
-        if ((error.message.includes('detached') || error.message.includes('not found')) && i < maxRetries - 1) {
-          // Element was detached or not found, wait for it to reappear
-          continue;
-        }
-        // Either not a detachment error, or max retries reached
-        throw error;
-      }
-    }
-
-    throw new Error('Failed to click autocomplete suggestion after retries');
-  }
-
   // Add filter condition
 
   async addFilterCondition(
@@ -109,15 +70,17 @@ export default class DashboardFilter {
           : this.page.locator('[data-test="common-auto-complete"]').last();
 
       await valueInput.waitFor({ state: "visible", timeout: 10000 });
+      // await expect(valueInput).toBeVisible({ timeout: 10000 });
       await valueInput.click();
       await valueInput.fill(value);
 
-      // Use helper method to click with retry logic (handles waiting for suggestions)
       const suggestion = this.page
         .locator('[data-test="common-auto-complete-option"]')
         .first();
+      // await expect(suggestion).toBeVisible({ timeout: 10000 });
+      await suggestion.waitFor({ state: "visible", timeout: 10000 });
 
-      await this.clickAutocompleteSuggestion(suggestion);
+      await suggestion.click();
     } else if (operator && (newFieldName || initialFieldName)) {
       const selectedField = newFieldName || initialFieldName;
       const expectedError = `Filter: ${selectedField}: Condition value required`;
@@ -233,12 +196,13 @@ export default class DashboardFilter {
       await valueInput.click();
       await valueInput.fill(value);
 
-      // Use helper method to click with retry logic (handles waiting for suggestions)
       const suggestion = this.page
         .locator('[data-test="common-auto-complete-option"]')
         .first();
 
-      await this.clickAutocompleteSuggestion(suggestion);
+      // Wait until suggestion is visible
+      await suggestion.waitFor({ state: "visible", timeout: 5000 });
+      await suggestion.click();
     } else if (operator && newFieldName) {
       const expectedError = `Filter: ${newFieldName}: Condition value required`;
       const errorMessage = this.page
@@ -323,12 +287,13 @@ export default class DashboardFilter {
       await valueInput.click();
       await valueInput.fill(value);
 
-      // Use helper method to click with retry logic (handles waiting for suggestions)
+      // Wait for autocomplete suggestion
       const suggestion = this.page
         .locator('[data-test="common-auto-complete-option"]')
         .first();
 
-      await this.clickAutocompleteSuggestion(suggestion);
+      await suggestion.waitFor({ state: "visible", timeout: 5000 });
+      await suggestion.click();
     }
 
     // Step 7: Update the field name (appears in portal, use page scope)
