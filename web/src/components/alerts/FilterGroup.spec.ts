@@ -1188,6 +1188,361 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
   });
 
 
+  describe('Confirmation Dialog for Condition Deletion', () => {
+    it('should show confirmation dialog when removing last condition with sub-groups', async () => {
+      const propsWithSubGroup = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [
+                { id: 'nested-condition', column: 'field2', operator: '=', value: 'test2' }
+              ]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: propsWithSubGroup,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Remove the only condition
+      wrapper.vm.removeCondition('only-condition');
+      await nextTick();
+
+      // Should show confirmation dialog
+      expect(wrapper.vm.confirmDialog.show).toBe(true);
+      expect(wrapper.vm.confirmDialog.title).toBe('Delete Condition');
+      expect(wrapper.vm.confirmDialog.warningMessage).toContain('1 sub-group');
+    });
+
+    it('should show correct warning for multiple sub-groups', async () => {
+      const propsWithMultipleSubGroups = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested-1', column: 'field2', operator: '=', value: 'test2' }]
+            },
+            {
+              groupId: 'sub-group-2',
+              label: 'and',
+              items: [{ id: 'nested-2', column: 'field3', operator: '=', value: 'test3' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: propsWithMultipleSubGroups,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.removeCondition('only-condition');
+      await nextTick();
+
+      expect(wrapper.vm.confirmDialog.show).toBe(true);
+      expect(wrapper.vm.confirmDialog.warningMessage).toContain('2 sub-groups');
+    });
+
+    it('should not show dialog when removing condition without sub-groups', () => {
+      const propsWithoutSubGroups = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
+            { id: 'condition-2', column: 'field2', operator: '=', value: 'test2' }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: propsWithoutSubGroups,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.removeCondition('condition-1');
+
+      // Should not show dialog
+      expect(wrapper.vm.confirmDialog.show).toBe(false);
+    });
+
+    it('should call performRemoveCondition when user confirms', async () => {
+      const propsWithSubGroup = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: propsWithSubGroup,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.removeCondition('only-condition');
+      await nextTick();
+
+      // Confirm deletion
+      wrapper.vm.confirmDialog.okCallback();
+      await nextTick();
+
+      // Should emit remove-group
+      expect(wrapper.emitted('remove-group')).toBeTruthy();
+      expect(wrapper.vm.confirmDialog.show).toBe(false);
+    });
+  });
+
+  describe('performRemoveCondition Function', () => {
+    it('should remove condition and emit remove-group when no conditions left', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          group: {
+            groupId: 'test-group',
+            label: 'and',
+            items: [
+              { id: 'only-item', column: 'field1', operator: '=', value: 'test' }
+            ]
+          }
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.performRemoveCondition('only-item');
+
+      expect(wrapper.emitted('remove-group')).toBeTruthy();
+      expect(wrapper.emitted('remove-group')?.[0][0]).toBe('test-group');
+    });
+
+    it('should remove condition but keep group when conditions remain', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          group: {
+            groupId: 'test-group',
+            label: 'and',
+            items: [
+              { id: 'item-1', column: 'field1', operator: '=', value: 'test1' },
+              { id: 'item-2', column: 'field2', operator: '=', value: 'test2' }
+            ]
+          }
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.performRemoveCondition('item-1');
+
+      expect(wrapper.emitted('add-group')).toBeTruthy();
+      expect(wrapper.emitted('remove-group')).toBeFalsy();
+      expect(wrapper.vm.groups.items).toHaveLength(1);
+    });
+
+    it('should emit remove-group when only sub-groups remain after removing condition', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          group: {
+            groupId: 'test-group',
+            label: 'and',
+            items: [
+              { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+              {
+                groupId: 'sub-group',
+                label: 'or',
+                items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }]
+              }
+            ]
+          }
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.performRemoveCondition('only-condition');
+
+      expect(wrapper.emitted('remove-group')).toBeTruthy();
+    });
+  });
+
+  describe('Props Watch Functionality', () => {
+    it('should update groups when prop changes', async () => {
+      const wrapper = mount(FilterGroup, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      const newGroup = {
+        groupId: 'new-group',
+        label: 'or',
+        items: [
+          { id: 'new-item', column: 'newfield', operator: '!=', value: 'newtest' }
+        ]
+      };
+
+      await wrapper.setProps({ group: newGroup });
+      await nextTick();
+
+      expect(wrapper.vm.groups.groupId).toBe('new-group');
+      expect(wrapper.vm.label).toBe('or');
+    });
+
+    it('should update label when prop group label changes', async () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          group: { ...defaultProps.group, label: 'and' }
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Wait for initial mount to settle
+      await nextTick();
+      expect(wrapper.vm.label).toBe('and');
+
+      // Now change the label
+      await wrapper.setProps({
+        group: { ...defaultProps.group, label: 'or' }
+      });
+      await nextTick();
+
+      expect(wrapper.vm.label).toBe('or');
+    });
+  });
+
+  describe('conditionInputWidth Prop', () => {
+    it('should accept conditionInputWidth prop', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          conditionInputWidth: 'tw-w-[100px]'
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.props('conditionInputWidth')).toBe('tw-w-[100px]');
+    });
+
+    it('should have empty string as default for conditionInputWidth', () => {
+      const wrapper = mount(FilterGroup, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.props('conditionInputWidth')).toBe('');
+    });
+  });
+
   describe('Edge Cases', () => {
     it('should handle empty streamFields', () => {
       const emptyFieldsProps = {
