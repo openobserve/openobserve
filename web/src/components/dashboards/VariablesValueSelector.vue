@@ -1239,6 +1239,45 @@ export default defineComponent({
             resolve(false);
             return;
           }
+
+          // Check if any parent has null/empty value
+          const hasNullParent = parentVariables.some((parentName: string) => {
+            const parentVariable = variablesData.values.find(
+              (v: any) => v.name === parentName,
+            );
+            return (
+              parentVariable &&
+              (parentVariable.value === null ||
+                parentVariable.value === undefined ||
+                (Array.isArray(parentVariable.value) &&
+                  parentVariable.value.length === 0))
+            );
+          });
+
+          // If parent has null/empty value, skip API call and set child to null
+          if (hasNullParent) {
+            variableLog(
+              variableObject.name,
+              `Parent has null/empty value, skipping API call and setting value to null`,
+            );
+            // Set value to null/empty array based on multiSelect
+            const nullValue = variableObject.multiSelect ? [] : null;
+            variableObject.value = nullValue;
+            variableObject.options = [];
+            variableObject.isLoading = false;
+            variableObject.isVariablePartialLoaded = true;
+            variableObject.isVariableLoadingPending = false;
+
+            // Update oldVariablesData to track this null state
+            oldVariablesData[variableObject.name] = nullValue;
+
+            emitVariablesData();
+
+            // Trigger child variables to load
+            await finalizePartialVariableLoading(variableObject, true);
+            resolve(true);
+            return;
+          }
         }
 
         // Set loading state
