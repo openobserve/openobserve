@@ -229,6 +229,15 @@ pub async fn search_http2_stream(
             return http_response;
         }
     };
+    #[cfg(feature = "enterprise")]
+    for stream in stream_names.iter() {
+        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
+                e.to_string(),
+            ));
+        }
+    }
 
     let mut sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
         Ok(sql) => sql,
@@ -625,6 +634,18 @@ pub async fn values_http2_stream(
     // check stream type from request
     if values_req.stream_type != stream_type {
         stream_type = values_req.stream_type;
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) =
+            crate::service::search::check_search_allowed(&org_id, Some(&values_req.stream_name))
+        {
+            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
+                e.to_string(),
+            ));
+        }
     }
 
     // Get use_cache from query params

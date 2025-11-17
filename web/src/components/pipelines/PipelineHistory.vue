@@ -19,12 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw-w-full tw-h-full tw-pr-[0.625rem]">
       <div class="card-container tw-mb-[0.625rem]">
         <div
-          class="flex justify-between full-width tw-px-4 items-center tw-border-b-[1px]"
-          :class="
-            store.state.theme === 'dark'
-              ? 'tw-border-gray-500'
-              : 'tw-border-gray-200'
-          "
+          class="flex justify-between full-width tw-h-[68px] tw-px-2 tw-py-3"
         >
           <div class="flex items-center">
             <q-btn
@@ -67,8 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               fill-input
               input-debounce="0"
               :options="filteredPipelineOptions"
+              option-label="label"
+              option-value="value"
               @filter="filterPipelineOptions"
-              @input-value="setSearchQuery"
               @update:model-value="onPipelineSelected"
               :placeholder="
                 t(`pipeline.searchHistory`) || 'Select or search pipeline...'
@@ -125,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="tw-w-full tw-h-full tw-pr-[0.625rem]">
-      <div class="pipeline-history-table card-container tw-h-[calc(100vh-105px)]">
+      <div class="pipeline-history-table card-container tw-h-[calc(100vh-127px)]">
         <q-table
           data-test="pipeline-history-table"
           ref="qTable"
@@ -135,9 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:pagination="pagination"
           :rows-per-page-options="rowsPerPageOptions"
           @request="onRequest"
+          :loading="loading"
           binary-state-sort
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          style="width: 100%; height: calc(100vh - 105px)"
+          style="width: 100%; height: calc(100vh - 127px)"
         >
           <template #no-data>
             <div class="tw-h-[100vh] full-width">
@@ -211,63 +208,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </template>
 
-          <!-- <template #body-cell-error="props">
+          <template #body-cell-is_partial="props">
             <q-td :props="props">
               <q-icon
-                v-if="props.row.error"
-                name="error"
-                color="negative"
-                size="sm"
-                class="cursor-pointer"
-                @click="showErrorDialog(props.row.error)"
-              >
-                <q-tooltip>Click to view error</q-tooltip>
-              </q-icon>
-            </q-td>
-          </template> -->
-
-          <template #body-cell-actions="props">
-            <q-td :props="props">
-              <q-btn
-                icon="visibility"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                @click="showDetailsDialog(props.row)"
-                data-test="pipeline-history-view-details"
-              >
-                <q-tooltip>View Details</q-tooltip>
-              </q-btn>
-
-              <q-btn
-                v-if="props.row.error"
-                :data-test="`pipeline-list-${props.row.name}-error-indicator`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                color="negative"
-                icon="error"
-                @click.stop="showErrorDialog(props.row)"
+                v-if="props.row.is_partial !== null && props.row.is_partial !== undefined"
+                :name="props.row.is_partial ? 'warning' : 'check_circle'"
+                :color="props.row.is_partial ? 'warning' : 'positive'"
+                size="xs"
               >
                 <q-tooltip>
-                  Last error: {{ new Date(props.row.timestamp / 1000).toLocaleString() }}
+                  {{ props.row.is_partial ? "Partial Results" : "Complete Results" }}
                 </q-tooltip>
-              </q-btn>
+              </q-icon>
+              <span v-else>-</span>
+            </q-td>
+          </template>
+
+          <template #body-cell-delay_in_secs="props">
+            <q-td :props="props">
+              {{ props.row.delay_in_secs !== null && props.row.delay_in_secs !== undefined ? props.row.delay_in_secs + 's' : '-' }}
+            </q-td>
+          </template>
+
+          <template #body-cell-evaluation_took_in_secs="props">
+            <q-td :props="props">
+              {{ props.row.evaluation_took_in_secs !== null && props.row.evaluation_took_in_secs !== undefined ? props.row.evaluation_took_in_secs.toFixed(2) + 's' : '-' }}
+            </q-td>
+          </template>
+
+          <template #body-cell-query_took="props">
+            <q-td :props="props">
+              {{ props.row.query_took !== null && props.row.query_took !== undefined ? (props.row.query_took / 1000).toFixed(2) + 'ms' : '-' }}
             </q-td>
           </template>
 
           <template #bottom="scope">
-            <QTablePagination
-              :scope="scope"
-              :position="'bottom'"
-              :resultTotal="pagination.rowsNumber"
-              :perPageOptions="rowsPerPageOptions"
-              @update:changeRecordPerPage="changePagination"
-            />
+                <div class="bottom-btn tw-h-[48px] tw-w-full tw-flex tw-items-center">
+                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[120px] tw-mr-md">
+                      {{ pagination.rowsNumber }} {{ t('pipeline.header') }}
+                    </div>
+                    <QTablePagination
+                      :scope="scope"
+                      :position="'bottom'"
+                      :resultTotal="pagination.rowsNumber"
+                      :perPageOptions="rowsPerPageOptions"
+                      @update:changeRecordPerPage="changePagination"
+                    />
+                  </div>
           </template>
         </q-table>
       </div>
@@ -387,7 +374,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="
                 selectedRow.evaluation_took_in_secs ||
                 selectedRow.query_took ||
-                selectedRow.retries > 0
+                selectedRow.retries > 0 ||
+                selectedRow.delay_in_secs ||
+                selectedRow.is_partial !== null && selectedRow.is_partial !== undefined
               "
             >
               <q-separator class="q-my-sm" />
@@ -412,6 +401,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div v-if="selectedRow.retries > 0" class="col-4">
                     <div class="text-caption text-grey-7 q-mb-xs">Retries</div>
                     <div class="text-body2">{{ selectedRow.retries }}</div>
+                  </div>
+                  <div v-if="selectedRow.delay_in_secs" class="col-4">
+                    <div class="text-caption text-grey-7 q-mb-xs">
+                      Delay
+                    </div>
+                    <div class="text-body2">
+                      {{ selectedRow.delay_in_secs }}s
+                    </div>
+                  </div>
+                  <div v-if="selectedRow.is_partial !== null && selectedRow.is_partial !== undefined" class="col-4">
+                    <div class="text-caption text-grey-7 q-mb-xs">
+                      Result Status
+                    </div>
+                    <div class="text-body2">
+                      <q-icon
+                        :name="selectedRow.is_partial ? 'warning' : 'check_circle'"
+                        :color="selectedRow.is_partial ? 'warning' : 'positive'"
+                        size="xs"
+                        class="q-mr-xs"
+                      />
+                      {{ selectedRow.is_partial ? 'Partial' : 'Complete' }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -566,15 +577,15 @@ const $q = useQuasar();
 const loading = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
-const selectedPipeline = ref<string | null>(null);
+const selectedPipeline = ref<any>(null);
 const allPipelines = ref<any[]>([]);
-const filteredPipelineOptions = ref<string[]>([]);
+const filteredPipelineOptions = ref<any[]>([]);
 const pagination = ref({
   page: 1,
   rowsPerPage: 20,
   rowsNumber: 0,
-  sortBy: null,
-  descending: false,
+  sortBy: "timestamp",
+  descending: true,
 });
 
 const rowsPerPageOptions = [
@@ -617,14 +628,14 @@ const columns = ref([
     label: "Pipeline Name",
     field: "pipeline_name",
     align: "left",
-    sortable: false,
+    sortable: true,
   },
   {
     name: "is_realtime",
     label: "Type",
     field: "is_realtime",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 37px;",
   },
   {
@@ -632,7 +643,7 @@ const columns = ref([
     label: "Is Silenced",
     field: "is_silenced",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 37px;",
   },
   {
@@ -640,7 +651,7 @@ const columns = ref([
     label: "Timestamp",
     field: "timestamp",
     align: "left",
-    sortable: false,
+    sortable: true,
     style: "width: 160px;",
   },
   {
@@ -648,7 +659,7 @@ const columns = ref([
     label: "Start Time",
     field: "start_time",
     align: "left",
-    sortable: false,
+    sortable: true,
     style: "width: 160px;",
   },
   {
@@ -656,7 +667,7 @@ const columns = ref([
     label: "End Time",
     field: "end_time",
     align: "left",
-    sortable: false,
+    sortable: true,
     style: "width: 160px;",
   },
   {
@@ -664,7 +675,7 @@ const columns = ref([
     label: "Duration",
     field: (row: any) => row.end_time - row.start_time,
     align: "right",
-    sortable: false,
+    sortable: true,
     style: "width: 50px;",
   },
   {
@@ -672,7 +683,7 @@ const columns = ref([
     label: "Status",
     field: "status",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 150px;",
   },
   {
@@ -680,23 +691,40 @@ const columns = ref([
     label: "Retries",
     field: "retries",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 50px;",
   },
-  // {
-  //   name: "error",
-  //   label: "Errors",
-  //   field: "error",
-  //   align: "center",
-  //   sortable: false,
-  // },
   {
-    name: "actions",
-    label: "Actions",
-    field: "actions",
+    name: "is_partial",
+    label: "Partial",
+    field: "is_partial",
     align: "center",
     sortable: false,
-    style: "width: 50px;",
+    style: "width: 60px;",
+  },
+  {
+    name: "delay_in_secs",
+    label: "Delay (s)",
+    field: "delay_in_secs",
+    align: "right",
+    sortable: true,
+    style: "width: 80px;",
+  },
+  {
+    name: "evaluation_took_in_secs",
+    label: "Eval Time (s)",
+    field: "evaluation_took_in_secs",
+    align: "right",
+    sortable: true,
+    style: "width: 100px;",
+  },
+  {
+    name: "query_took",
+    label: "Query Time (ms)",
+    field: "query_took",
+    align: "right",
+    sortable: true,
+    style: "width: 110px;",
   },
 ]);
 
@@ -715,10 +743,13 @@ const fetchPipelinesList = async () => {
     const res = await pipelinesService.getPipelines(org);
 
     if (res.data && res.data.list) {
-      // Extract pipeline names and sort them
+      // Store complete pipeline objects and sort by name
       allPipelines.value = res.data.list
-        .map((pipeline: any) => pipeline.name)
-        .sort();
+        .map((pipeline: any) => ({
+          label: pipeline.name,
+          value: pipeline.pipeline_id,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
       filteredPipelineOptions.value = [...allPipelines.value];
     }
   } catch (error: any) {
@@ -731,18 +762,15 @@ const filterPipelineOptions = (val: string, update: any) => {
   update(() => {
     const needle = val.toLowerCase();
     filteredPipelineOptions.value = allPipelines.value.filter((v) =>
-      v.toLowerCase().includes(needle),
+      v.label.toLowerCase().includes(needle),
     );
   });
 };
 
-const setSearchQuery = (val: string) => {
-  searchQuery.value = val;
-};
-
-const onPipelineSelected = (val: string | null) => {
-  if (val) {
-    searchQuery.value = val;
+const onPipelineSelected = (val: any) => {
+  if (val && val.value) {
+    // Store the pipeline ID for the API call
+    searchQuery.value = val.value;
   }
 };
 
@@ -777,8 +805,16 @@ const fetchPipelineHistory = async () => {
 
     // Add pipeline_name filter if search query is provided
     if (searchQuery.value && searchQuery.value.trim()) {
-      params.pipeline_name = searchQuery.value.trim();
+      params.pipeline_id = searchQuery.value.trim();
     }
+
+    // Add sorting parameters
+    if (pagination.value.sortBy) {
+      params.sort_by = pagination.value.sortBy;
+      params.sort_order = pagination.value.descending ? "desc" : "asc";
+    }
+
+    console.log("Fetching pipeline history with params:", params);
 
     const url = `/api/${org}/pipelines/history`;
     const response = await http().get(url, { params });
@@ -952,6 +988,19 @@ const changePagination = (val: { label: string; value: any }) => {
 
     td {
       vertical-align: middle;
+    }
+
+    // Align all sorting chevrons to the right
+    th.sortable {
+      .q-table__sort-icon {
+        margin-left: auto;
+        margin-right: 0;
+      }
+    }
+
+    // Ensure header content and icon are in a flex container
+    .q-table th .q-table__sort-icon {
+      order: 2;
     }
   }
 }

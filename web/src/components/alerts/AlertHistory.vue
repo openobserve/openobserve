@@ -22,12 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pt-[0.325rem]">
       <div class="card-container tw-mb-[0.625rem]">
         <div
-          class="flex justify-between full-width tw-px-4 items-center tw-border-b-[1px]"
-          :class="
-            store.state.theme === 'dark'
-              ? 'tw-border-gray-500'
-              : 'tw-border-gray-200'
-          "
+          class="flex justify-between full-width tw-h-[68px] tw-px-2 tw-py-3"
         >
           <div class="flex items-center">
             <q-btn
@@ -66,12 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               borderless
               use-input
-              hide-selected
-              fill-input
               input-debounce="0"
               :options="filteredAlertOptions"
+              option-label="label"
+              option-value="value"
               @filter="filterAlertOptions"
-              @input-value="setSearchQuery"
               @update:model-value="onAlertSelected"
               :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
               data-test="alert-history-search-select"
@@ -126,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="tw-w-full tw-h-full tw-px-[0.625rem]">
-      <div class="alert-history-table card-container tw-h-[calc(100vh-105px)]">
+      <div class="alert-history-table card-container tw-h-[calc(100vh-130px)]">
         <q-table
           data-test="alert-history-table"
           ref="qTable"
@@ -136,9 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:pagination="pagination"
           :rows-per-page-options="rowsPerPageOptions"
           @request="onRequest"
+          :loading="loading"
           binary-state-sort
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          style="width: 100%; height: calc(100vh - 105px)"
+          style="width: 100%; height: calc(100vh - 130px)"
         >
           <template #no-data>
             <div class="tw-h-[100vh] full-width">
@@ -259,13 +254,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="scope">
-            <QTablePagination
-              :scope="scope"
-              :position="'bottom'"
-              :resultTotal="pagination.rowsNumber"
-              :perPageOptions="rowsPerPageOptions"
-              @update:changeRecordPerPage="changePagination"
-            />
+            <div class="bottom-btn tw-h-[48px] tw-w-full tw-flex tw-items-center">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[120px] tw-mr-md">
+                  {{ pagination.rowsNumber }} {{ t('pipeline.header') }}
+                </div>
+              <QTablePagination
+                :scope="scope"
+                :position="'bottom'"
+                :resultTotal="pagination.rowsNumber"
+                :perPageOptions="rowsPerPageOptions"
+                @update:changeRecordPerPage="changePagination"
+              />
+              </div>
           </template>
           
         </q-table>
@@ -562,15 +562,15 @@ const $q = useQuasar();
 const loading = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
-const selectedAlert = ref<string | null>(null);
+const selectedAlert = ref<any>(null);
 const allAlerts = ref<any[]>([]);
-const filteredAlertOptions = ref<string[]>([]);
+const filteredAlertOptions = ref<any[]>([]);
 const pagination = ref({
   page: 1,
   rowsPerPage: 20,
   rowsNumber: 0,
-  sortBy: null,
-  descending: false,
+  sortBy: "timestamp",
+  descending: true,
 });
 
 const rowsPerPageOptions = [
@@ -613,14 +613,14 @@ const columns = ref([
     label: "Alert Name",
     field: "alert_name",
     align: "left",
-    sortable: false,
+    sortable: true,
   },
   {
     name: "is_realtime",
     label: "Type",
     field: "is_realtime",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 37px;",
   },
   {
@@ -628,7 +628,7 @@ const columns = ref([
     label: "Is Silenced",
     field: "is_silenced",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 37px;",
   },
   {
@@ -636,7 +636,7 @@ const columns = ref([
     label: "Timestamp",
     field: "timestamp",
     align: "left",
-    sortable: false,
+    sortable: true,
     style: "width: 160px;",
   },
   {
@@ -644,7 +644,7 @@ const columns = ref([
     label: "Start Time",
     field: "start_time",
     align: "left",
-    sortable: false,
+    sortable: true,
     style: "width: 160px;",
   },
   {
@@ -652,7 +652,7 @@ const columns = ref([
     label: "End Time",
     field: "end_time",
     align: "left",
-    sortable: false,
+    sortable: true,
     style: "width: 160px;",
   },
   {
@@ -660,7 +660,7 @@ const columns = ref([
     label: "Duration",
     field: (row: any) => row.end_time - row.start_time,
     align: "right",
-    sortable: false,
+    sortable: true,
     style: "width: 50px;",
   },
   {
@@ -668,7 +668,7 @@ const columns = ref([
     label: "Status",
     field: "status",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 150px;",
   },
   {
@@ -676,7 +676,7 @@ const columns = ref([
     label: "Retries",
     field: "retries",
     align: "center",
-    sortable: false,
+    sortable: true,
     style: "width: 50px;",
   },
   // {
@@ -720,8 +720,13 @@ const fetchAlertsList = async () => {
     );
 
     if (res.data && res.data.list) {
-      // Extract alert names and sort them
-      allAlerts.value = res.data.list.map((alert: any) => alert.name).sort();
+      // Store complete alert objects and sort by name
+      allAlerts.value = res.data.list
+        .map((alert: any) => ({
+          label: alert.name,
+          value: alert.alert_id,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
       filteredAlertOptions.value = [...allAlerts.value];
     }
   } catch (error: any) {
@@ -734,18 +739,19 @@ const filterAlertOptions = (val: string, update: any) => {
   update(() => {
     const needle = val.toLowerCase();
     filteredAlertOptions.value = allAlerts.value.filter((v) =>
-      v.toLowerCase().includes(needle),
+      v.label.toLowerCase().includes(needle),
     );
   });
 };
 
-const setSearchQuery = (val: string) => {
-  searchQuery.value = val;
-};
-
-const onAlertSelected = (val: string | null) => {
+const onAlertSelected = (val: any) => {
   if (val) {
-    searchQuery.value = val;
+    // Extract the alert_id from the selected object
+    if (typeof val === 'object' && val.value) {
+      searchQuery.value = val.value;
+    } else if (typeof val === 'string') {
+      searchQuery.value = val;
+    }
   }
 };
 
@@ -780,8 +786,16 @@ const fetchAlertHistory = async () => {
 
     // Add alert_name filter if search query is provided
     if (searchQuery.value && searchQuery.value.trim()) {
-      query.alert_name = searchQuery.value.trim();
+      query.alert_id = searchQuery.value.trim();
     }
+
+    // Add sorting parameters
+    if (pagination.value.sortBy) {
+      query.sort_by = pagination.value.sortBy;
+      query.sort_order = pagination.value.descending ? "desc" : "asc";
+    }
+
+    console.log("Fetching alert history with query:", query);
 
     const response = await alertsService.getHistory(org, query);
     if (response.data) {

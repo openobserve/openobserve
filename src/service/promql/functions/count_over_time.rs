@@ -13,19 +13,50 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use datafusion::error::Result;
 
-use crate::service::promql::value::{RangeValue, Value};
+use crate::service::promql::{
+    functions::RangeFunc,
+    value::{EvalContext, Sample, Value},
+};
 
-pub(crate) fn count_over_time(data: Value) -> Result<Value> {
-    super::eval_idelta(data, "count_over_time", exec, false)
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn count_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] count_over_time() started",
+        eval_ctx.trace_id
+    );
+    let result = super::eval_range(data, CountOverTimeFunc::new(), eval_ctx);
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] count_over_time() execution took: {:?}",
+        eval_ctx.trace_id,
+        start.elapsed()
+    );
+    result
 }
 
-fn exec(data: RangeValue) -> Option<f64> {
-    if data.samples.is_empty() {
-        return None;
+pub struct CountOverTimeFunc;
+
+impl CountOverTimeFunc {
+    pub fn new() -> Self {
+        CountOverTimeFunc {}
     }
-    Some(data.samples.len() as f64)
+}
+
+impl RangeFunc for CountOverTimeFunc {
+    fn name(&self) -> &'static str {
+        "count_over_time"
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        if samples.is_empty() {
+            return None;
+        }
+        Some(samples.len() as f64)
+    }
 }
 
 #[cfg(test)]
@@ -34,6 +65,11 @@ mod tests {
 
     use super::*;
     use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+    // Test helper
+    fn count_over_time_test_helper(data: Value) -> Result<Value> {
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
+        count_over_time(data, &eval_ctx)
+    }
 
     #[test]
     fn test_count_over_time_function() {
@@ -49,24 +85,24 @@ mod tests {
             samples,
             exemplars: None,
             time_window: Some(TimeWindow {
-                eval_ts: 3000,
                 range: Duration::from_secs(2),
                 offset: Duration::ZERO,
             }),
         };
 
         let matrix = Value::Matrix(vec![range_value]);
-        let result = count_over_time(matrix).unwrap();
+        let result = count_over_time_test_helper(matrix).unwrap();
 
-        // Should return a vector with count of samples
+        // Should return a matrix with count of samples
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 1);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert_eq!(m[0].samples.len(), 1);
                 // Should count 3 samples
-                assert!((v[0].sample.value - 3.0).abs() < 0.001);
-                assert_eq!(v[0].sample.timestamp, 3000);
+                assert!((m[0].samples[0].value - 3.0).abs() < 0.001);
+                assert_eq!(m[0].samples[0].timestamp, 3000);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }

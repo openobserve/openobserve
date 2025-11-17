@@ -1112,23 +1112,24 @@ class APICleanup {
         testLogger.info('Starting complete cascade cleanup', { prefix });
 
         try {
-            // Step 1: Fetch all destinations and filter by prefix
+            // Step 1: Fetch all destinations and filter by prefix (including newdest_ and sanitydest-)
             const { destinations, templateToDestinations } = await this.fetchDestinationsWithTemplateMapping();
-            const matchingDestinations = destinations.filter(d => d.name.startsWith(prefix));
+            const matchingDestinations = destinations.filter(d =>
+                d.name.startsWith(prefix) ||
+                d.name.startsWith('newdest_') ||
+                d.name.startsWith('sanitydest-')
+            );
 
             testLogger.info('Found destinations to process', { total: matchingDestinations.length });
-
-            if (matchingDestinations.length === 0) {
-                testLogger.info('No destinations found matching prefix - cleanup not needed', { prefix });
-                return;
-            }
 
             const failedDestinations = [];
             const deletedDestinations = [];
             const linkedTemplates = new Set();
 
-            // Step 2: Attempt to delete each destination
-            for (const destination of matchingDestinations) {
+            // Only process destinations if we found any matching the prefix
+            if (matchingDestinations.length > 0) {
+                // Step 2: Attempt to delete each destination
+                for (const destination of matchingDestinations) {
                 // Track template for potential cleanup
                 if (destination.template) {
                     linkedTemplates.add(destination.template);
@@ -1282,26 +1283,69 @@ class APICleanup {
                 }
             }
 
-            // Step 9: Delete templates that were linked to deleted destinations
-            testLogger.info('Cleaning up linked templates', { templates: Array.from(linkedTemplates) });
+                // Step 9: Delete templates that were linked to deleted destinations
+                testLogger.info('Cleaning up linked templates', { templates: Array.from(linkedTemplates) });
 
-            for (const templateName of linkedTemplates) {
-                const templateDeleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates/${templateName}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': this.authHeader,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                const templateResult = await templateDeleteResult.json();
-                if (templateResult.code === 200) {
-                    testLogger.info('Deleted template', { name: templateName });
-                } else {
-                    testLogger.warn('Failed to delete template', {
-                        name: templateName,
-                        result: templateResult,
-                        note: 'Template may still be in use by other destinations'
+                for (const templateName of linkedTemplates) {
+                    const templateDeleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates/${templateName}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': this.authHeader,
+                            'Content-Type': 'application/json'
+                        }
                     });
+                    const templateResult = await templateDeleteResult.json();
+                    if (templateResult.code === 200) {
+                        testLogger.info('Deleted template', { name: templateName });
+                    } else {
+                        testLogger.warn('Failed to delete template', {
+                            name: templateName,
+                            result: templateResult,
+                            note: 'Template may still be in use by other destinations'
+                        });
+                    }
+                }
+            }
+
+            // Step 9b: Delete all auto_email_template_*, auto_webhook_template_*, sanitytemp-*, and newtemp_* templates
+            testLogger.info('Cleaning up auto_email, auto_webhook, sanitytemp, and newtemp templates');
+
+            const allTemplatesResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates?page_num=1&page_size=100000&sort_by=name&desc=false`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (allTemplatesResponse.ok) {
+                const allTemplates = await allTemplatesResponse.json();
+                const autoTemplates = allTemplates.filter(t =>
+                    t.name.startsWith('auto_email_template_') ||
+                    t.name.startsWith('auto_webhook_template_') ||
+                    t.name.startsWith('sanitytemp-') ||
+                    t.name.startsWith('newtemp_')
+                );
+
+                testLogger.info('Found templates to delete', { count: autoTemplates.length });
+
+                for (const template of autoTemplates) {
+                    const templateDeleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates/${template.name}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': this.authHeader,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    const templateResult = await templateDeleteResult.json();
+                    if (templateResult.code === 200) {
+                        testLogger.info('Deleted auto template', { name: template.name });
+                    } else {
+                        testLogger.warn('Failed to delete auto template', {
+                            name: template.name,
+                            result: templateResult
+                        });
+                    }
                 }
             }
 

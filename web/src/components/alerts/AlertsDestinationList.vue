@@ -688,6 +688,12 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
+
+    // Watch visibleRows to sync resultTotal with search filter
+    watch(visibleRows, (newVisibleRows) => {
+      resultTotal.value = newVisibleRows.length;
+    }, { immediate: true });
+
     return {
       t,
       qTable,

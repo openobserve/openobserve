@@ -24,21 +24,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <h3 class="feature-title">Feature Comparison</h3>
       </div>
       <div class="feature-subtitle-wrapper">
-        <p class="feature-subtitle">
-          <span v-if="currentPlanName">
-            You are currently on the
-            <strong>{{ currentPlanName }}</strong> plan.
-          </span>
-          <span v-else>
-            Compare features across Open Source, Enterprise, and Cloud offerings
-          </span>
+        <p
+          v-if="store.state.zoConfig.build_type === 'opensource'"
+          class="edition-info"
+        >
+          You're currently using OpenObserve Open Source Edition. Upgrade to Enterprise Edition to unlock advanced features listed in the comparison table below.
+        </p>
+        <p
+          v-else-if="store.state.zoConfig.build_type === 'enterprise'"
+          class="edition-info"
+        >
+          You're using OpenObserve Enterprise Edition with access to all advanced features listed below.
+        </p>
+        <p
+          v-else
+          class="feature-subtitle"
+        >
+          Compare features across Open Source, Enterprise, and Cloud offerings
         </p>
         <p
           v-if="store.state.zoConfig.build_type === 'opensource'"
           class="enterprise-promotion"
         >
-          Try our <strong>Enterprise plan</strong> - free for up to 200GB/day
-          ingestion and search with advanced features like SSO, RBAC, and more!
+          <strong>Good news:</strong> OpenObserve Enterprise Edition is completely free for up to 200 GB/day (~6 TB/month) of data ingestion.
+        </p>
+        <p
+          v-else-if="store.state.zoConfig.build_type === 'enterprise'"
+          class="enterprise-promotion"
+        >
+          <strong>Your plan:</strong> Enterprise Edition is free for up to 200 GB/day (~6 TB/month) of data ingestion.
         </p>
       </div>
     </div>
@@ -284,6 +298,13 @@ export default defineComponent({
           font-weight: 600;
           opacity: 1;
         }
+      }
+
+      .edition-info {
+        font-size: 0.9375rem;
+        line-height: 1.8;
+        opacity: 0.9;
+        margin-bottom: 0;
       }
 
       .enterprise-promotion {

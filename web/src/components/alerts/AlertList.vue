@@ -88,6 +88,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
+            label="View History"
+            @click="goToAlertHistory"
+            data-test="alert-history-btn"
+            icon="history"
+          >
+            <q-tooltip>View alert execution history</q-tooltip>
+          </q-btn>
+          <q-btn
+            class="q-ml-sm o2-secondary-button tw-h-[36px]"
+            no-caps
+            flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
@@ -768,6 +779,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Alert History Drawer -->
       <AlertHistoryDrawer
         v-model="showHistoryDrawer"
+        :alert-id="selectedHistoryAlertId"
         :alert-name="selectedHistoryAlertName"
       />
     </template>
@@ -872,6 +884,7 @@ export default defineComponent({
 
     const showImportAlertDialog = ref(false);
     const showHistoryDrawer = ref(false);
+    const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
 
     const { getStreams } = useStreams();
@@ -1985,6 +1998,15 @@ export default defineComponent({
       });
     };
 
+    const goToAlertHistory = () => {
+      router.push({
+        name: "alertHistory",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     const exportAlert = async (row: any) => {
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id);
@@ -2532,6 +2554,7 @@ export default defineComponent({
       showImportAlertDialog,
       importAlert,
       goToAlertInsights,
+      goToAlertHistory,
       getTemplates,
       exportAlert,
       updateActiveFolderId,
@@ -2569,6 +2592,7 @@ export default defineComponent({
       tabs,
       filterAlertsByTab,
       showHistoryDrawer,
+      selectedHistoryAlertId,
       selectedHistoryAlertName,
       refreshImportedAlerts,
       folderIdToBeCloned,

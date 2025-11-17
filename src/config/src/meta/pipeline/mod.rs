@@ -128,7 +128,7 @@ impl Pipeline {
 
         for node in self.nodes.iter_mut() {
             // ck 4
-            if matches!(&node.data, NodeData::Condition(condition_params) if condition_params.conditions.is_empty())
+            if matches!(&node.data, NodeData::Condition(condition_params) if !condition_params.conditions.has_conditions())
             {
                 return Err(anyhow!("ConditionNode must have non-empty conditions"));
             } else if let NodeData::Stream(stream_params) = &mut node.data {

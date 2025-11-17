@@ -30,13 +30,15 @@ module.exports = defineConfig({
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry failed tests: 2 times on CI, 1 time locally */
-  retries: process.env.CI ? 5 : 0,
+  /* Retry failed tests: 3 times on CI, 0 times locally */
+  retries: process.env.CI ? 3 : 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 5 : 5,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI
-    ? [['blob']] // Use blob reporter in CI for merging across shards
+    ? [
+        ['blob', { outputDir: 'blob-report' }], // Use blob reporter in CI - JSON created during merge
+      ]
     : [
         ['html', { outputFolder: 'playwright-results/html-report', open: 'never' }], // HTML reporter
         ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for TestDino

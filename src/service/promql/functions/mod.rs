@@ -13,10 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{collections::HashSet, time::Duration};
+
 use datafusion::error::{DataFusionError, Result};
+use once_cell::sync::Lazy;
+use rayon::prelude::*;
 use strum::EnumString;
 
-use crate::service::promql::value::{InstantValue, LabelsExt, RangeValue, Sample, Value};
+use crate::service::promql::{
+    micros,
+    value::{EvalContext, LabelsExt, RangeValue, Sample, Value},
+};
 
 mod absent;
 mod absent_over_time;
@@ -136,37 +143,198 @@ pub(crate) enum Func {
     Year,
 }
 
-pub(crate) fn eval_idelta(
-    data: Value,
-    fn_name: &str,
-    fn_handler: fn(RangeValue) -> Option<f64>,
-    keep_name_label: bool,
-) -> Result<Value> {
+pub static KEEP_METRIC_NAME_FUNC: Lazy<HashSet<&str>> =
+    Lazy::new(|| HashSet::from_iter(["last_over_time"]));
+
+/// Trait for PromQL range vector functions.
+///
+/// This trait defines the interface for range functions that operate on time series data
+/// within a specified time window. Range functions (e.g., `rate()`, `increase()`,
+/// `avg_over_time()`) compute values based on samples within a sliding time window `[eval_ts -
+/// range, eval_ts]`.
+///
+/// Range functions are typically used with range vector selectors like `http_requests_total[5m]`,
+/// where `5m` specifies the lookback range from the evaluation timestamp.
+///
+/// # Evaluation Model
+///
+/// For each evaluation timestamp:
+/// 1. A time window is determined: `[eval_ts - range, eval_ts]`
+/// 2. Samples within this window are extracted from the time series
+/// 3. The `exec()` method processes these samples to compute a single value
+/// 4. The result becomes a sample at the evaluation timestamp
+///
+/// # Examples
+///
+/// ```ignore
+/// struct RateFunc;
+///
+/// impl RangeFunc for RateFunc {
+///     fn name(&self) -> &'static str {
+///         "rate"
+///     }
+///
+///     fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64> {
+///         if samples.len() < 2 {
+///             return None;
+///         }
+///         let first = samples.first().unwrap();
+///         let last = samples.last().unwrap();
+///         let time_delta = (last.timestamp - first.timestamp) as f64 / 1_000_000.0;
+///         Some((last.value - first.value) / time_delta)
+///     }
+/// }
+/// ```
+pub trait RangeFunc: Sync {
+    /// Returns the name of the range function (e.g., "rate", "avg_over_time", "increase").
+    fn name(&self) -> &'static str;
+
+    /// Executes the range function on samples within a time window.
+    ///
+    /// This method processes samples from a single time series that fall within the window
+    /// `[eval_ts - range, eval_ts]` and computes a single aggregated value.
+    ///
+    /// # Parameters
+    ///
+    /// * `samples` - Samples within the time window, sorted by timestamp in ascending order. May be
+    ///   empty if no samples exist in the window.
+    /// * `eval_ts` - The evaluation timestamp (in microseconds) for which to compute the result.
+    ///   This is the right endpoint of the time window.
+    /// * `range` - The duration of the lookback window. The window spans from `eval_ts - range` to
+    ///   `eval_ts`.
+    ///
+    /// # Returns
+    ///
+    /// * `Some(f64)` - The computed value for this time window
+    /// * `None` - If the function cannot produce a value (e.g., insufficient samples, invalid data,
+    ///   or the result should be omitted)
+    fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64>;
+}
+
+/// Enhanced version that processes all timestamps at once for range queries
+pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
+where
+    F: RangeFunc,
+{
+    let start = std::time::Instant::now();
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_range({}) started",
+        eval_ctx.trace_id,
+        func.name()
+    );
+
     let data = match data {
-        Value::Matrix(v) => v,
+        Value::Matrix(v) => {
+            log::info!(
+                "[trace_id: {}] [PromQL Timing] eval_range({}) processing {} series",
+                eval_ctx.trace_id,
+                func.name(),
+                v.len()
+            );
+            v
+        }
         Value::None => return Ok(Value::None),
         v => {
             return Err(DataFusionError::Plan(format!(
-                "{fn_name}: matrix argument expected but got {}",
+                "{}: matrix argument expected but got {}",
+                func.name(),
                 v.get_type()
             )));
         }
     };
 
-    let mut rate_values = Vec::with_capacity(data.len());
-    for mut metric in data {
-        let mut labels = std::mem::take(&mut metric.labels);
-        if !keep_name_label {
-            labels = labels.without_metric_name()
-        };
+    // Always use range query path - compute all timestamps at once
+    let timestamps = eval_ctx.timestamps();
+    let mut range_values = Vec::with_capacity(data.len());
 
-        let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
-        if let Some(value) = fn_handler(metric) {
-            rate_values.push(InstantValue {
-                labels,
-                sample: Sample::new(eval_ts, value),
-            });
-        }
-    }
-    Ok(Value::Vector(rate_values))
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_range({}) processing {} time points in range query mode",
+        eval_ctx.trace_id,
+        func.name(),
+        timestamps.len()
+    );
+
+    let cfg = config::get_config();
+    let thread_num = cfg.limit.query_thread_num;
+    let chunk_size = (data.len() / thread_num).max(1);
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_range({}) using {} threads with chunk_size {}",
+        eval_ctx.trace_id,
+        func.name(),
+        thread_num,
+        chunk_size
+    );
+
+    let parallel_start = std::time::Instant::now();
+    let results: Vec<Option<RangeValue>> = data
+        .into_par_iter()
+        .chunks(chunk_size)
+        .flat_map(|chunk| {
+            chunk
+                .into_iter()
+                .map(|mut metric| {
+                    let mut labels = std::mem::take(&mut metric.labels);
+                    if !KEEP_METRIC_NAME_FUNC.contains(func.name()) {
+                        labels = labels.without_metric_name();
+                    }
+                    let time_window = metric.time_window.as_ref().unwrap();
+                    let range = time_window.range;
+                    let range_micros = micros(range);
+                    let mut result_samples = Vec::with_capacity(timestamps.len());
+
+                    // For each eval timestamp, compute the function value
+                    for &eval_ts in &timestamps {
+                        // Find samples in the window [eval_ts - range, eval_ts]
+                        let window_start = eval_ts - range_micros;
+                        let window_end = eval_ts;
+
+                        // Extract samples within this window using binary search
+                        let start_index = metric
+                            .samples
+                            .partition_point(|s| s.timestamp < window_start);
+                        let end_index = metric
+                            .samples
+                            .partition_point(|s| s.timestamp <= window_end);
+                        let window_samples = &metric.samples[start_index..end_index];
+
+                        if window_samples.is_empty() {
+                            continue;
+                        }
+
+                        if let Some(value) = func.exec(window_samples, eval_ts, &range) {
+                            result_samples.push(Sample::new(eval_ts, value));
+                        }
+                    }
+
+                    if !result_samples.is_empty() {
+                        Some(RangeValue {
+                            labels,
+                            samples: result_samples,
+                            exemplars: None,
+                            time_window: metric.time_window,
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_range({}) parallel processing took: {:?}",
+        eval_ctx.trace_id,
+        func.name(),
+        parallel_start.elapsed()
+    );
+
+    range_values.extend(results.into_iter().flatten());
+
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_range({}) completed in {:?}, produced {} series",
+        eval_ctx.trace_id,
+        func.name(),
+        start.elapsed(),
+        range_values.len()
+    );
+    Ok(Value::Matrix(range_values))
 }

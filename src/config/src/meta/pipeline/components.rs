@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::meta::{
-    alerts::{QueryCondition, TriggerCondition},
-    stream::{RemoteStreamParams, RoutingCondition, StreamParams, StreamType},
+    alerts::{ConditionList, QueryCondition, TriggerCondition},
+    stream::{RemoteStreamParams, StreamParams, StreamType},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -167,7 +167,7 @@ pub struct FunctionParams {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct ConditionParams {
-    pub conditions: Vec<RoutingCondition>,
+    pub conditions: ConditionList,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -269,21 +269,60 @@ mod tests {
 
     #[test]
     fn test_condition_node_serialization() {
+        // Test new format with ConditionList
         let payload = json::json!({
-            "node_type": "condition",  // required
-            "conditions": [            // required
+            "node_type": "condition",
+            "conditions": {
+                "column": "body",
+                "operator": ">=",
+                "value": {
+                    "key": "value"
+                },
+                "ignore_case": false
+            }
+        });
+
+        let node_data = json::from_value::<NodeData>(payload);
+        assert!(node_data.is_ok());
+
+        // Test backward compatibility with legacy array format
+        let legacy_payload = json::json!({
+            "node_type": "condition",
+            "conditions": [
               {
                 "column": "body",
                 "operator": ">=",
                 "value": {
                     "key": "value"
                 },
-                "ignore_case": false    // optional
+                "ignore_case": false
               }
             ]
         });
 
-        let node_data = json::from_value::<NodeData>(payload);
-        assert!(node_data.is_ok());
+        let legacy_node_data = json::from_value::<NodeData>(legacy_payload);
+        assert!(legacy_node_data.is_ok());
+
+        // Test OR logic
+        let or_payload = json::json!({
+            "node_type": "condition",
+            "conditions": {
+                "or": [
+                    {
+                        "column": "level",
+                        "operator": "=",
+                        "value": "error"
+                    },
+                    {
+                        "column": "level",
+                        "operator": "=",
+                        "value": "critical"
+                    }
+                ]
+            }
+        });
+
+        let or_node_data = json::from_value::<NodeData>(or_payload);
+        assert!(or_node_data.is_ok());
     }
 }

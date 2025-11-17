@@ -15,14 +15,13 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use config::{FxIndexMap, meta::promql::NAME_LABEL, utils::sort::sort_float};
+use config::meta::promql::NAME_LABEL;
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::{Expr as PromExpr, LabelModifier};
+use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
-use crate::service::promql::{
-    Engine,
-    value::{InstantValue, Label, Labels, LabelsExt, Sample, Value},
+use crate::service::promql::value::{
+    EvalContext, Label, Labels, LabelsExt, RangeValue, Sample, Value,
 };
 
 mod avg;
@@ -51,32 +50,81 @@ pub(crate) use stdvar::stdvar;
 pub(crate) use sum::sum;
 pub(crate) use topk::topk;
 
-#[derive(Debug, Clone, Default)]
-pub(crate) struct ArithmeticItem {
-    pub(crate) labels: Labels,
-    pub(crate) value: f64,
-    pub(crate) num: usize,
+/// Trait for PromQL aggregation functions.
+///
+/// This trait defines the interface for aggregation functions (e.g., sum, avg, max, min, topk)
+/// used in PromQL query evaluation. Each aggregation function implements this trait to provide
+/// its name and create accumulator instances for processing time series data.
+///
+/// # Examples
+///
+/// ```ignore
+/// struct SumAgg;
+///
+/// impl AggFunc for SumAgg {
+///     fn name(&self) -> &'static str {
+///         "sum"
+///     }
+///
+///     fn build(&self) -> Box<dyn Accumulate> {
+///         Box::new(SumAccumulator::new())
+///     }
+/// }
+/// ```
+pub trait AggFunc: Sync {
+    /// Returns the name of the aggregation function (e.g., "sum", "avg", "max").
+    fn name(&self) -> &'static str;
+
+    /// Creates a new accumulator instance for this aggregation function.
+    ///
+    /// Each call to `build()` should return a fresh accumulator that can independently
+    /// collect and aggregate samples. This allows for parallel processing of multiple
+    /// label groups.
+    fn build(&self) -> Box<dyn Accumulate>;
 }
 
-#[derive(Debug, Clone, Default)]
-pub(crate) struct CountValuesItem {
-    pub(crate) labels: Labels,
-    pub(crate) count: u64,
-}
+/// Trait for accumulating and aggregating time series samples.
+///
+/// This trait defines the interface for accumulators that collect samples from one or more
+/// time series and compute aggregated results. Accumulators are created by [`AggFunc::build()`]
+/// and are used to process samples in a stateful manner.
+///
+/// The typical lifecycle is:
+/// 1. Create accumulator via `AggFunc::build()`
+/// 2. Call `accumulate()` for each sample to include in the aggregation
+/// 3. Call `evaluate()` to compute and return the final aggregated samples
+///
+/// # Examples
+///
+/// ```ignore
+/// let mut acc = sum_agg.build();
+/// for sample in samples {
+///     acc.accumulate(&sample);
+/// }
+/// let results = acc.evaluate();
+/// ```
+pub trait Accumulate: Sync {
+    /// Adds a sample to this accumulator.
+    ///
+    /// This method is called for each sample that should be included in the aggregation.
+    /// The accumulator maintains internal state to track the accumulated values across
+    /// all samples.
+    ///
+    /// # Parameters
+    ///
+    /// * `sample` - The sample to accumulate, containing a timestamp and value
+    fn accumulate(&mut self, sample: &Sample);
 
-#[derive(Debug, Clone, Default)]
-pub(crate) struct StatisticItems {
-    pub(crate) labels: Labels,
-    pub(crate) values: Vec<f64>,
-    pub(crate) current_count: i64,
-    pub(crate) current_mean: f64,
-    pub(crate) current_sum: f64,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct TopItem {
-    pub(crate) index: usize,
-    pub(crate) value: f64,
+    /// Computes and returns the final aggregated results.
+    ///
+    /// This method consumes the accumulator (takes ownership via `Box<Self>`) and produces
+    /// the final aggregated samples. The returned vector typically contains one sample per
+    /// unique timestamp that was accumulated.
+    ///
+    /// # Returns
+    ///
+    /// A vector of samples representing the aggregated results
+    fn evaluate(self: Box<Self>) -> Vec<Sample>;
 }
 
 pub fn labels_to_include(
@@ -95,315 +143,206 @@ pub fn labels_to_exclude(
     actual_labels
 }
 
-fn eval_arithmetic_processor(
-    score_values: &mut HashMap<u64, ArithmeticItem>,
-    f_handler: fn(total: f64, val: f64) -> f64,
-    sum_labels: &Labels,
-    value: f64,
-) {
-    let sum_hash = sum_labels.signature();
-    let entry = score_values
-        .entry(sum_hash)
-        .or_insert_with(|| ArithmeticItem {
-            labels: sum_labels.clone(),
-            ..Default::default()
-        });
-    entry.value = f_handler(entry.value, value);
-    entry.num += 1;
+/// Groups series indices by their label signatures based on the label modifier
+pub(crate) fn group_series_by_labels(
+    matrix: &[RangeValue],
+    modifier: &Option<LabelModifier>,
+) -> HashMap<u64, Vec<usize>> {
+    let mut groups: HashMap<u64, Vec<usize>> = HashMap::with_capacity(matrix.len());
+
+    for (idx, series) in matrix.iter().enumerate() {
+        let grouped_labels = match modifier {
+            Some(LabelModifier::Include(labels)) => {
+                labels_to_include(&labels.labels, series.labels.clone())
+            }
+            Some(LabelModifier::Exclude(labels)) => {
+                labels_to_exclude(&labels.labels, series.labels.clone())
+            }
+            None => Labels::default(),
+        };
+        let hash = grouped_labels.signature();
+        groups.entry(hash).or_default().push(idx);
+    }
+
+    groups
 }
 
-fn eval_count_values_processor(
-    score_values: &mut HashMap<u64, CountValuesItem>,
-    sum_labels: &Labels,
-) {
-    let sum_hash = sum_labels.signature();
-    let entry = score_values
-        .entry(sum_hash)
-        .or_insert_with(|| CountValuesItem {
-            labels: sum_labels.clone(),
-            ..Default::default()
-        });
-    entry.count += 1;
-}
-
-fn eval_std_dev_var_processor(
-    score_values: &mut HashMap<u64, StatisticItems>,
-    sum_labels: &Labels,
-    value: f64,
-) {
-    let sum_hash = sum_labels.signature();
-    let entry = score_values
-        .entry(sum_hash)
-        .or_insert_with(|| StatisticItems {
-            labels: sum_labels.clone(),
-            ..Default::default()
-        });
-    entry.values.push(value);
-    entry.current_count += 1;
-    entry.current_sum += value;
-    entry.current_mean = entry.current_sum / entry.current_count as f64;
-}
-
-pub(crate) fn eval_arithmetic(
+/// Processes Matrix input for range queries using the AggFunc trait pattern
+pub(crate) fn eval_aggregate<F>(
     param: &Option<LabelModifier>,
     data: Value,
-    f_name: &str,
-    f_handler: fn(total: f64, val: f64) -> f64,
-) -> Result<Option<HashMap<u64, ArithmeticItem>>> {
-    let data = match data {
-        Value::Vector(v) => v,
-        Value::None => return Ok(None),
-        _ => {
-            return Err(DataFusionError::Plan(format!(
-                "[{f_name}] function only accept vector values"
-            )));
-        }
-    };
+    func: F,
+    eval_ctx: &EvalContext,
+) -> Result<Value>
+where
+    F: AggFunc,
+{
+    let start = std::time::Instant::now();
+    let func_name = func.name();
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) started",
+        eval_ctx.trace_id,
+    );
 
-    let mut score_values = HashMap::default();
-    match param {
-        Some(v) => match v {
-            LabelModifier::Include(labels) => {
-                for item in data.into_iter() {
-                    let sum_labels = labels_to_include(&labels.labels, item.labels);
-                    eval_arithmetic_processor(
-                        &mut score_values,
-                        f_handler,
-                        &sum_labels,
-                        item.sample.value,
-                    );
-                }
-            }
-            LabelModifier::Exclude(labels) => {
-                for item in data.into_iter() {
-                    let sum_labels = labels_to_exclude(&labels.labels, item.labels);
-                    eval_arithmetic_processor(
-                        &mut score_values,
-                        f_handler,
-                        &sum_labels,
-                        item.sample.value,
-                    );
-                }
-            }
-        },
-        None => {
-            for item in data.into_iter() {
-                let sum_labels = Labels::default();
-                eval_arithmetic_processor(
-                    &mut score_values,
-                    f_handler,
-                    &sum_labels,
-                    item.sample.value,
-                );
-            }
-        }
-    }
-    Ok(Some(score_values))
-}
-
-pub async fn eval_top(
-    ctx: &mut Engine,
-    param: Box<PromExpr>,
-    data: Value,
-    modifier: &Option<LabelModifier>,
-    is_bottom: bool,
-) -> Result<Value> {
-    let fn_name = if is_bottom { "bottomk" } else { "topk" };
-
-    let param = ctx.exec_expr(&param).await?;
-    let n = match param {
-        Value::Float(v) => v as usize,
-        _ => {
-            return Err(DataFusionError::Plan(format!(
-                "[{fn_name}] param must be NumberLiteral"
-            )));
-        }
-    };
-
-    let data = match data {
-        Value::Vector(v) => v,
+    // Handle Matrix input for range queries
+    let matrix = match data {
+        Value::Matrix(m) => m,
         Value::None => return Ok(Value::None),
         _ => {
             return Err(DataFusionError::Plan(format!(
-                "[{fn_name}] function only accept vector values"
+                "[{func_name}] function only accept vector or matrix values"
             )));
         }
     };
 
-    let data_for_labels = data.clone();
-    let mut score_values: FxIndexMap<u64, Vec<TopItem>> = Default::default();
-    match modifier {
-        Some(v) => match v {
-            LabelModifier::Include(labels) => {
-                for (i, item) in data_for_labels.into_iter().enumerate() {
-                    let sum_labels = labels_to_include(&labels.labels, item.labels);
-                    if item.sample.value.is_nan() {
-                        continue;
-                    }
-                    let signature = sum_labels.signature();
-                    let value = score_values.entry(signature).or_default();
-                    value.push(TopItem {
-                        index: i,
-                        value: item.sample.value,
-                    });
-                }
-            }
-            LabelModifier::Exclude(labels) => {
-                for (i, item) in data_for_labels.into_iter().enumerate() {
-                    let sum_labels = labels_to_exclude(&labels.labels, item.labels);
-                    if item.sample.value.is_nan() {
-                        continue;
-                    }
-                    let signature = sum_labels.signature();
-                    let value = score_values.entry(signature).or_default();
-                    value.push(TopItem {
-                        index: i,
-                        value: item.sample.value,
-                    });
-                }
-            }
-        },
-        None => {
-            for (i, item) in data_for_labels.into_iter().enumerate() {
-                let sum_labels = Labels::default();
-                if item.sample.value.is_nan() {
-                    continue;
-                }
-                let signature = sum_labels.signature();
-                let value = score_values.entry(signature).or_default();
-                value.push(TopItem {
-                    index: i,
-                    value: item.sample.value,
-                });
-            }
-        }
+    if matrix.is_empty() {
+        return Ok(Value::None);
     }
 
-    let comparator = if is_bottom {
-        |a: &TopItem, b: &TopItem| sort_float(&a.value, &b.value)
-    } else {
-        |a: &TopItem, b: &TopItem| sort_float(&b.value, &a.value)
-    };
+    // Use the eval timestamps from the context to ensure consistent alignment
+    let eval_timestamps = eval_ctx.timestamps();
+    let eval_timestamps: hashbrown::HashSet<i64> = eval_timestamps.iter().cloned().collect();
 
-    let values = score_values
-        .into_values()
-        .flat_map(|mut items| {
-            items.sort_by(comparator);
-            items.into_iter().take(n).collect::<Vec<_>>()
+    if eval_timestamps.is_empty() {
+        return Ok(Value::None);
+    }
+
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) processing {} time points",
+        eval_ctx.trace_id,
+        eval_timestamps.len()
+    );
+
+    // For each eval timestamp, aggregate across all series
+    // Parallelize processing using query_thread_num
+    let cfg = config::get_config();
+    let thread_num = cfg.limit.query_thread_num;
+    let chunk_size = (eval_timestamps.len() / thread_num).max(1);
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) using {} threads with chunk_size {}",
+        eval_ctx.trace_id,
+        thread_num,
+        chunk_size
+    );
+
+    let start1 = std::time::Instant::now();
+
+    // Step 1: Compute label hash for each series once based on param
+    // This avoids recomputing the hash for every timestamp
+    let series_label_hashes: Vec<(u64, Labels)> = matrix
+        .iter()
+        .map(|rv| {
+            let grouped_labels = match param {
+                Some(LabelModifier::Include(labels)) => {
+                    labels_to_include(&labels.labels, rv.labels.clone())
+                }
+                Some(LabelModifier::Exclude(labels)) => {
+                    labels_to_exclude(&labels.labels, rv.labels.clone())
+                }
+                None => Labels::default(),
+            };
+            let hash = grouped_labels.signature();
+            (hash, grouped_labels)
         })
-        .map(|item| data[item.index].clone())
         .collect();
-    Ok(Value::Vector(values))
-}
 
-pub(crate) fn eval_std_dev_var(
-    param: &Option<LabelModifier>,
-    data: Value,
-    f_name: &str,
-) -> Result<Option<HashMap<u64, StatisticItems>>> {
-    let data = match data {
-        Value::Vector(v) => v,
-        Value::None => return Ok(None),
-        _ => {
-            return Err(DataFusionError::Plan(format!(
-                "[{f_name}] function only accepts vector values"
-            )));
-        }
-    };
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) computed label hashes in {:?}",
+        eval_ctx.trace_id,
+        start1.elapsed()
+    );
 
-    let mut score_values = HashMap::default();
-    match param {
-        Some(v) => match v {
-            LabelModifier::Include(labels) => {
-                for item in data.into_iter() {
-                    let sum_labels = labels_to_include(&labels.labels, item.labels);
-                    eval_std_dev_var_processor(&mut score_values, &sum_labels, item.sample.value);
-                }
-            }
-            LabelModifier::Exclude(labels) => {
-                for item in data.into_iter() {
-                    let sum_labels = labels_to_exclude(&labels.labels, item.labels);
-                    eval_std_dev_var_processor(&mut score_values, &sum_labels, item.sample.value);
-                }
-            }
-        },
-        None => {
-            for item in data.into_iter() {
-                let sum_labels = Labels::default();
-                eval_std_dev_var_processor(&mut score_values, &sum_labels, item.sample.value);
-            }
-        }
+    let start2 = std::time::Instant::now();
+
+    // Step 2: Group series indices by their label hash
+    // Build index: label_hash -> Vec<series_idx>
+    let mut groups: HashMap<u64, Vec<usize>> = HashMap::new();
+    for (series_idx, (hash, _)) in series_label_hashes.iter().enumerate() {
+        groups.entry(*hash).or_default().push(series_idx);
     }
-    Ok(Some(score_values))
-}
 
-pub(crate) fn eval_count_values(
-    param: &Option<LabelModifier>,
-    data: Value,
-    f_name: &str,
-    label_name: &str,
-) -> Result<Option<HashMap<u64, CountValuesItem>>> {
-    let data = match data {
-        Value::Vector(v) => v,
-        Value::None => return Ok(None),
-        _ => {
-            return Err(DataFusionError::Plan(format!(
-                "[{f_name}] function only accept vector values"
-            )));
-        }
-    };
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) built {} groups in {:?}",
+        eval_ctx.trace_id,
+        groups.len(),
+        start2.elapsed()
+    );
 
-    let mut score_values = HashMap::default();
-    match param {
-        Some(v) => match v {
-            LabelModifier::Include(labels) => {
-                let mut labels = labels.labels.clone();
-                labels.push(label_name.to_string());
-                for item in data.into_iter() {
-                    let sum_labels = labels_to_include(&labels, item.labels);
-                    eval_count_values_processor(&mut score_values, &sum_labels);
+    let start3 = std::time::Instant::now();
+
+    // Step 3: Process each group in parallel
+    // For each group, aggregate all samples across timestamps
+    let results: Vec<(u64, Labels, Vec<Sample>)> = groups
+        .par_iter()
+        .map(|(hash, series_indices)| {
+            // Get the labels for this group (from the first series in the group)
+            let labels = series_label_hashes[series_indices[0]].1.clone();
+
+            let mut acc = func.build();
+            // Aggregate samples from all series in this group
+            for &series_idx in series_indices {
+                for sample in &matrix[series_idx].samples {
+                    // Only include timestamps that are in eval_timestamps
+                    if eval_timestamps.contains(&sample.timestamp) {
+                        acc.accumulate(sample);
+                    }
                 }
             }
-            LabelModifier::Exclude(labels) => {
-                let mut labels = labels.labels.clone();
-                labels.push(label_name.to_string());
-                for item in data.into_iter() {
-                    let sum_labels = labels_to_exclude(&labels, item.labels);
-                    eval_count_values_processor(&mut score_values, &sum_labels);
-                }
-            }
-        },
-        None => {
-            for item in data.into_iter() {
-                let mut sum_labels = Labels::default();
-                sum_labels.set(label_name, item.sample.value.to_string().as_str());
-                eval_count_values_processor(&mut score_values, &sum_labels);
-            }
-        }
-    }
-    Ok(Some(score_values))
-}
 
-pub(crate) fn prepare_vector(timestamp: i64, value: f64) -> Result<Value> {
-    let values = vec![InstantValue {
-        labels: Labels::default(),
-        sample: Sample { timestamp, value },
-    }];
-    Ok(Value::Vector(values))
-}
+            // Evaluate the aggregated results
+            let mut samples = acc.evaluate();
 
-pub(crate) fn score_to_instant_value(
-    timestamp: i64,
-    score_values: Option<HashMap<u64, ArithmeticItem>>,
-) -> Vec<InstantValue> {
-    score_values
-        .unwrap()
-        .into_par_iter()
-        .map(|(_, mut v)| InstantValue {
-            labels: std::mem::take(&mut v.labels),
-            sample: Sample::new(timestamp, v.value),
+            // Sort by timestamp to maintain order
+            samples.sort_by_key(|s| s.timestamp);
+
+            (*hash, labels, samples)
         })
-        .collect()
+        .collect();
+
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) parallel aggregation took: {:?}",
+        eval_ctx.trace_id,
+        start3.elapsed()
+    );
+
+    let start4 = std::time::Instant::now();
+
+    // Step 4: Convert results to final format
+    let mut result_by_labels: HashMap<u64, (Labels, Vec<Sample>)> =
+        HashMap::with_capacity(results.len());
+    for (hash, labels, samples) in results {
+        if !samples.is_empty() {
+            result_by_labels.insert(hash, (labels, samples));
+        }
+    }
+
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) final conversion took: {:?}",
+        eval_ctx.trace_id,
+        start4.elapsed()
+    );
+
+    if result_by_labels.is_empty() {
+        return Ok(Value::None);
+    }
+
+    let result_matrix: Vec<RangeValue> = result_by_labels
+        .into_values()
+        .map(|(labels, samples)| RangeValue {
+            labels,
+            samples,
+            exemplars: None,
+            time_window: None,
+        })
+        .collect();
+
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) completed in {:?}, produced {} series",
+        eval_ctx.trace_id,
+        start.elapsed(),
+        result_matrix.len()
+    );
+    Ok(Value::Matrix(result_matrix))
 }
 
 #[cfg(test)]
@@ -417,28 +356,6 @@ mod tests {
             Arc::new(Label::new("job", "prometheus")),
             Arc::new(Label::new("__name__", "http_requests_total")),
         ]
-    }
-
-    fn create_test_vector() -> Value {
-        let labels1 = vec![
-            Arc::new(Label::new("instance", "localhost:9090")),
-            Arc::new(Label::new("job", "prometheus")),
-        ];
-        let labels2 = vec![
-            Arc::new(Label::new("instance", "localhost:9091")),
-            Arc::new(Label::new("job", "prometheus")),
-        ];
-
-        Value::Vector(vec![
-            InstantValue {
-                labels: labels1,
-                sample: Sample::new(1000000, 10.0),
-            },
-            InstantValue {
-                labels: labels2,
-                sample: Sample::new(1000000, 20.0),
-            },
-        ])
     }
 
     #[test]
@@ -463,146 +380,5 @@ mod tests {
 
         // Should not contain __name__ label (which is NAME_LABEL)
         assert!(!result.iter().any(|l| l.name == "__name__"));
-    }
-
-    #[test]
-    fn test_eval_arithmetic_processor() {
-        let mut score_values = HashMap::new();
-        let sum_labels = create_test_labels();
-        let f_handler = |total: f64, val: f64| total + val;
-
-        eval_arithmetic_processor(&mut score_values, f_handler, &sum_labels, 10.0);
-        eval_arithmetic_processor(&mut score_values, f_handler, &sum_labels, 20.0);
-
-        let signature = sum_labels.signature();
-        let item = score_values.get(&signature).unwrap();
-
-        assert_eq!(item.value, 30.0);
-        assert_eq!(item.num, 2);
-    }
-
-    #[test]
-    fn test_eval_count_values_processor() {
-        let mut score_values = HashMap::new();
-        let sum_labels = create_test_labels();
-
-        eval_count_values_processor(&mut score_values, &sum_labels);
-        eval_count_values_processor(&mut score_values, &sum_labels);
-
-        let signature = sum_labels.signature();
-        let item = score_values.get(&signature).unwrap();
-
-        assert_eq!(item.count, 2);
-    }
-
-    #[test]
-    fn test_eval_std_dev_var_processor() {
-        let mut score_values = HashMap::new();
-        let sum_labels = create_test_labels();
-
-        eval_std_dev_var_processor(&mut score_values, &sum_labels, 10.0);
-        eval_std_dev_var_processor(&mut score_values, &sum_labels, 20.0);
-
-        let signature = sum_labels.signature();
-        let item = score_values.get(&signature).unwrap();
-
-        assert_eq!(item.values, vec![10.0, 20.0]);
-        assert_eq!(item.current_count, 2);
-        assert_eq!(item.current_sum, 30.0);
-        assert_eq!(item.current_mean, 15.0);
-    }
-
-    #[test]
-    fn test_eval_arithmetic_with_exclude_labels() {
-        let data = create_test_vector();
-        let exclude_labels = LabelModifier::Exclude(promql_parser::label::Labels {
-            labels: vec!["instance".to_string()],
-        });
-
-        let result = eval_arithmetic(
-            &Some(exclude_labels),
-            data,
-            "test_function",
-            |total: f64, val: f64| total + val,
-        )
-        .unwrap()
-        .unwrap();
-
-        assert_eq!(result.len(), 1); // Only job label remains
-    }
-
-    #[test]
-    fn test_eval_std_dev_var_with_include_labels() {
-        let data = create_test_vector();
-        let include_labels = LabelModifier::Include(promql_parser::label::Labels {
-            labels: vec!["instance".to_string()],
-        });
-
-        let result = eval_std_dev_var(&Some(include_labels), data, "stddev")
-            .unwrap()
-            .unwrap();
-
-        assert_eq!(result.len(), 2); // Two different instance values
-    }
-
-    #[test]
-    fn test_eval_count_values_with_include_labels() {
-        let data = create_test_vector();
-        let include_labels = LabelModifier::Include(promql_parser::label::Labels {
-            labels: vec!["instance".to_string()],
-        });
-
-        let result = eval_count_values(&Some(include_labels), data, "count_values", "value_label")
-            .unwrap()
-            .unwrap();
-
-        assert_eq!(result.len(), 2); // Two different instance values
-    }
-
-    #[test]
-    fn test_eval_count_values_with_none_value() {
-        let result = eval_count_values(&None, Value::None, "count_values", "value_label").unwrap();
-
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_eval_count_values_with_invalid_value_type() {
-        let result = eval_count_values(&None, Value::Float(10.0), "count_values", "value_label");
-
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("function only accept vector values")
-        );
-    }
-
-    #[test]
-    fn test_prepare_vector() {
-        let timestamp = 1000000;
-        let value = 42.5;
-
-        let result = prepare_vector(timestamp, value).unwrap();
-
-        match result {
-            Value::Vector(values) => {
-                assert_eq!(values.len(), 1);
-                let instant_value = &values[0];
-                assert_eq!(instant_value.sample.timestamp, timestamp);
-                assert_eq!(instant_value.sample.value, value);
-                assert!(instant_value.labels.is_empty());
-            }
-            _ => panic!("Expected Vector result"),
-        }
-    }
-
-    #[test]
-    #[should_panic(expected = "called `Option::unwrap()` on a `None` value")]
-    fn test_score_to_instant_value_with_none() {
-        let timestamp = 1000000;
-
-        // This should panic due to unwrap() on None
-        score_to_instant_value(timestamp, None);
     }
 }
