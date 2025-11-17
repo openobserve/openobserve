@@ -46,7 +46,7 @@
                 :label="group.label"
                 :depth="depth"
             />
-            <div class="tw-mb-1">
+            <div class="tw-mb-1" v-if="!(index === 0 && depth === 0)">
                 <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
             </div>
                 </div>
