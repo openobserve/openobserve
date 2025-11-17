@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template v-slot:header="props">
-        <q-tr :props="props" class="thead-sticky !tw-bg-[var(--o2-hover-accent)]">
+        <q-tr :props="props" class="!tw-bg-[var(--o2-hover-accent)]">
           <!-- Add checkbox header when selection is enabled -->
           <q-th auto-width v-if="selection === 'multiple'">
             <q-checkbox
