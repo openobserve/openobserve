@@ -1156,12 +1156,10 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const addGroupButtons = wrapper.findAll('[data-test="alert-conditions-add-condition-btn"]');
-      const addGroupBtn = addGroupButtons[1]; // Second button is add group
-      
-      if (addGroupBtn) {
-        expect(addGroupBtn.attributes('disabled')).toBeDefined();
-      }
+      const addGroupBtn = wrapper.find('[data-test="alert-conditions-add-condition-group-btn"]');
+
+      expect(addGroupBtn.exists()).toBe(true);
+      expect(addGroupBtn.attributes('disabled')).toBeDefined();
     });
 
     it('should handle tab change for toggle label', async () => {
@@ -1501,6 +1499,199 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       await nextTick();
 
       expect(wrapper.vm.label).toBe('or');
+    });
+  });
+
+  describe('Reorder Items Functionality', () => {
+    it('should reorder items with conditions first and groups last', () => {
+      const mixedOrderProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested-1', column: 'field2', operator: '=', value: 'test2' }]
+            },
+            { id: 'condition-2', column: 'field3', operator: '!=', value: 'test3' },
+            {
+              groupId: 'sub-group-2',
+              label: 'and',
+              items: [{ id: 'nested-2', column: 'field4', operator: '>', value: 'test4' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: mixedOrderProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Before reorder: condition, group, condition, group
+      expect(wrapper.vm.groups.items[0].id).toBe('condition-1');
+      expect(wrapper.vm.groups.items[1].groupId).toBe('sub-group-1');
+      expect(wrapper.vm.groups.items[2].id).toBe('condition-2');
+      expect(wrapper.vm.groups.items[3].groupId).toBe('sub-group-2');
+
+      // Call reorder
+      wrapper.vm.reorderItems();
+
+      // After reorder: condition, condition, group, group
+      expect(wrapper.vm.groups.items[0].id).toBe('condition-1');
+      expect(wrapper.vm.groups.items[1].id).toBe('condition-2');
+      expect(wrapper.vm.groups.items[2].groupId).toBe('sub-group-1');
+      expect(wrapper.vm.groups.items[3].groupId).toBe('sub-group-2');
+    });
+
+    it('should emit events when reordering', () => {
+      const mixedOrderProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            {
+              groupId: 'sub-group',
+              label: 'or',
+              items: [{ id: 'nested', column: 'field1', operator: '=', value: 'test1' }]
+            },
+            { id: 'condition-1', column: 'field2', operator: '=', value: 'test2' }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: mixedOrderProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.reorderItems();
+
+      expect(wrapper.emitted('add-group')).toBeTruthy();
+      expect(wrapper.emitted('input:update')).toBeTruthy();
+      expect(wrapper.emitted('input:update')?.[0]).toEqual(['conditions', wrapper.vm.groups]);
+    });
+
+    it('should handle group with only conditions (no reordering needed)', () => {
+      const onlyConditionsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
+            { id: 'condition-2', column: 'field2', operator: '!=', value: 'test2' }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: onlyConditionsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.reorderItems();
+
+      // Order should remain the same
+      expect(wrapper.vm.groups.items[0].id).toBe('condition-1');
+      expect(wrapper.vm.groups.items[1].id).toBe('condition-2');
+    });
+
+    it('should handle group with only sub-groups (no reordering needed)', () => {
+      const onlyGroupsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested-1', column: 'field1', operator: '=', value: 'test1' }]
+            },
+            {
+              groupId: 'sub-group-2',
+              label: 'and',
+              items: [{ id: 'nested-2', column: 'field2', operator: '=', value: 'test2' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: onlyGroupsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.reorderItems();
+
+      // Order should remain the same
+      expect(wrapper.vm.groups.items[0].groupId).toBe('sub-group-1');
+      expect(wrapper.vm.groups.items[1].groupId).toBe('sub-group-2');
+    });
+
+    it('should handle empty items array', () => {
+      const emptyItemsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: []
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: emptyItemsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Should not throw error
+      expect(() => wrapper.vm.reorderItems()).not.toThrow();
+      expect(wrapper.vm.groups.items).toHaveLength(0);
     });
   });
 

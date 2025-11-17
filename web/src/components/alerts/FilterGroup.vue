@@ -65,28 +65,51 @@
             unelevated
             size="sm"
             flat
-            title="Add Condition"
             @click="addCondition(props.group.groupId)"
             color="primary"
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="12px" style="border-radius: 50%;  border: 1px solid;" name="add" />
             <span class="text-bold">Condition</span>
+            <q-tooltip>
+              Add a new condition to this group
+            </q-tooltip>
         </q-btn>
         <q-btn
-            data-test="alert-conditions-add-condition-btn"
+            data-test="alert-conditions-add-condition-group-btn"
             class="q-ml-xs flex justify-between items-center"
             :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
             padding="sm"
             unelevated
             size="sm"
             flat
-            title="Add Condition Group"
             @click="addGroup(props.group.groupId)"
             :disabled="depth >= 2"
             color="primary"
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="12px" style="border-radius: 50%;  border: 1px solid;" name="add" />
             <span class="text-bold">Condition Group</span>
+            <q-tooltip v-if="depth < 2">
+              Add a nested condition group (max depth: 2)
+            </q-tooltip>
+            <q-tooltip v-else>
+              Maximum nesting depth reached
+            </q-tooltip>
+        </q-btn>
+        <q-btn
+            data-test="alert-conditions-reorder-btn"
+            class="q-ml-xs flex justify-between items-center"
+            padding="sm"
+            unelevated
+            size="sm"
+            flat
+            @click="reorderItems()"
+            color="primary"
+            >
+            <q-icon color="primary" class="q-mr-xs text-bold" size="12px" name="swap_vert" />
+            <span class="text-bold">Reorder</span>
+            <q-tooltip>
+              Reorder items: Conditions first, then Groups
+            </q-tooltip>
         </q-btn>
      </div>
         </div>
@@ -259,6 +282,19 @@
     emit('input:update', name, field);
   };
 
+  const reorderItems = () => {
+    // Separate conditions and groups
+    const conditions = groups.value.items.filter((item: any) => !isGroup(item));
+    const subGroups = groups.value.items.filter((item: any) => isGroup(item));
+
+    // Reorder: conditions first, then groups
+    groups.value.items = [...conditions, ...subGroups];
+
+    // Emit update
+    emit('add-group', groups.value);
+    emit('input:update', 'conditions', groups.value);
+  };
+
 
 function hexToHSL(hex: string) {
   let r = 0, g = 0, b = 0;
@@ -324,6 +360,7 @@ defineExpose({
   removeCondition,
   performRemoveCondition,
   inputUpdate,
+  reorderItems,
   hexToHSL,
   hslToCSS,
   computedStyleMap,
