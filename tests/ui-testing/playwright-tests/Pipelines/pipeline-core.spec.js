@@ -382,4 +382,7 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.confirmDeletePipeline();
     await pageManager.pipelinesPage.verifyPipelineDeleted();
   });
+});test("TEMP: Intentional failure for testing rerun detection", async ({ page }) => {
+  // This test will always fail - used to test "re-run failed jobs" detection
+  expect(true).toBe(false);
 });
