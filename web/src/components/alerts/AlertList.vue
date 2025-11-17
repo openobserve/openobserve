@@ -607,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <pre class="tw-bg-gray-100 tw-p-3 tw-rounded tw-text-sm tw-overflow-x-auto" style="white-space: pre-wrap">{{
               selectedAlertDetails.conditions != "" && selectedAlertDetails.conditions != "--"
-                ? (selectedAlertDetails.type == 'sql' ? selectedAlertDetails.conditions : selectedAlertDetails.conditions.length != 2 ? `if ${selectedAlertDetails.conditions}` : 'No condition')
+                ? (selectedAlertDetails.type == 'sql' ? selectedAlertDetails.conditions : (selectedAlertDetails.conditions && selectedAlertDetails.conditions.length != 2) ? `if ${selectedAlertDetails.conditions}` : 'No condition')
                 : "No condition"
             }}</pre>
           </div>
