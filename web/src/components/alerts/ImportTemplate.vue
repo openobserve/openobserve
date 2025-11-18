@@ -232,6 +232,10 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import templateService from "@/services/alert_templates";
 import BaseImport from "../common/BaseImport.vue";
+import {
+  validateTemplateBody,
+  getTemplateValidationErrorMessage,
+} from "@/utils/templates/validation";
 
 export default defineComponent({
   name: "ImportTemplate",
@@ -409,11 +413,8 @@ export default defineComponent({
           return false;
         }
 
-        if (templateErrorsToDisplay.value.length === 0) {
-          const hasCreatedTemplate = await createTemplate(jsonObj, index);
-          return hasCreatedTemplate;
-        }
-        return false;
+        const hasCreatedTemplate = await createTemplate(jsonObj, index);
+        return hasCreatedTemplate;
       } catch (e: any) {
         q.notify({
           message: "Error importing Template please check the JSON",
@@ -466,11 +467,10 @@ export default defineComponent({
           field: "body",
         });
       } else {
-        try {
-          JSON.parse(input.body);
-        } catch (e) {
-          templateErrors.push({
-            message: `Template - ${index}: The "body" field should contain a valid JSON.`,
+        const result = validateTemplateBody(input.body);
+        if (!result.valid) {
+            templateErrors.push({
+            message: `Template - ${index}: The "body" field should contain valid JSON. Placeholders like {value} for numbers and "{name}" for strings are supported.`,
             field: "body",
           });
         }

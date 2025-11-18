@@ -377,7 +377,6 @@ export default defineComponent({
     const confirmBulkDelete = ref<boolean>(false);
     const selectedActionScripts = ref<any[]>([]);
     const splitterModel = ref(220);
-    const showForm = ref(false);
     const indexOptions = ref([]);
     const schemaList = ref([]);
     const streams: any = ref({});
@@ -548,53 +547,18 @@ export default defineComponent({
     const getAlertByName = (id: string) => {
       return alerts.value.find((alert) => alert.id === id);
     };
+
     if (!alerts.value.length) {
       getActionScripts();
     }
-    onBeforeMount(async () => {
-      // await getTemplates();
-      // getDestinations();
-    });
-    // onActivated(() => getDestinations());
+
     watch(
       () => router.currentRoute.value.query.action,
       (action) => {
         if (!action) showAddActionScriptDialog.value = false;
       },
     );
-    // const getDestinations = async () => {
-    //   destinationService
-    //     .list({
-    //       org_identifier: store.state.selectedOrganization.identifier,
-    //     })
-    //     .then((res) => {
-    //       destinations.value = res.data;
-    //     })
-    //     .catch(() =>
-    //       $q.notify({
-    //         type: "negative",
-    //         message: "Error while fetching destinations.",
-    //         timeout: 3000,
-    //       }),
-    //     );
-    // };
 
-    // const getTemplates = () => {
-    //   templateService
-    //     .list({
-    //       org_identifier: store.state.selectedOrganization.identifier,
-    //     })
-    //     .then((res) => {
-    //       templates.value = res.data;
-    //     })
-    //     .catch(() =>
-    //       $q.notify({
-    //         type: "negative",
-    //         message: "Error while fetching templates.",
-    //         timeout: 3000,
-    //       }),
-    //     );
-    // };
     const perPageOptions: any = [
       { label: "5", value: 5 },
       { label: "10", value: 10 },
@@ -613,9 +577,6 @@ export default defineComponent({
       pagination.value.rowsPerPage = val.value;
       qTable.value?.setPagination(pagination.value);
     };
-    const changeMaxRecordToReturn = (val: any) => {
-      maxRecordToReturn.value = val;
-    };
 
     const addAlert = () => {
       track("Button Click", {
@@ -625,107 +586,6 @@ export default defineComponent({
       showAddActionScriptDialog.value = true;
     };
 
-    const duplicateAlert = (row: any) => {
-      toBeCloneUUID.value = row.uuid;
-      toBeCloneAlertName.value = row.name;
-      toBeClonestreamName.value = "";
-      toBeClonestreamType.value = "";
-
-      showForm.value = true;
-    };
-    const submitForm = async () => {
-      const alertToBeCloned = alerts.value.find(
-        (alert) => alert.uuid === toBeCloneUUID.value,
-      ) as Alert;
-
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
-
-      if (!alertToBeCloned) {
-        $q.notify({
-          type: "negative",
-          message: "Alert not found",
-          timeout: 2000,
-        });
-        return;
-      }
-      if (!toBeClonestreamType.value) {
-        $q.notify({
-          type: "negative",
-          message: "Please select stream type ",
-          timeout: 2000,
-        });
-        return;
-      }
-      if (!toBeClonestreamName.value) {
-        $q.notify({
-          type: "negative",
-          message: "Please select stream name",
-          timeout: 2000,
-        });
-        return;
-      }
-      isSubmitting.value = true;
-
-      alertToBeCloned.name = toBeCloneAlertName.value;
-      alertToBeCloned.stream_name = toBeClonestreamName.value;
-      alertToBeCloned.stream_type = toBeClonestreamType.value;
-
-      try {
-        alertsService
-          .create(
-            store.state.selectedOrganization.identifier,
-            alertToBeCloned.stream_name,
-            alertToBeCloned.stream_type,
-            alertToBeCloned,
-          )
-          .then((res) => {
-            dismiss();
-            if (res.data.code == 200) {
-              $q.notify({
-                type: "positive",
-                message: "Alert Cloned Successfully",
-                timeout: 2000,
-              });
-              showForm.value = false;
-              getActionScripts();
-            } else {
-              $q.notify({
-                type: "negative",
-                message: res.data.message,
-                timeout: 2000,
-              });
-            }
-          })
-          .catch((e: any) => {
-            if (e.response?.status == 403) {
-              showForm.value = false;
-              isSubmitting.value = false;
-              return;
-            }
-            dismiss();
-            $q.notify({
-              type: "negative",
-              message: e.response.data.message,
-              timeout: 2000,
-            });
-          })
-          .finally(() => {
-            isSubmitting.value = false;
-          });
-      } catch (e: any) {
-        showForm.value = true;
-        isSubmitting.value = false;
-        $q.notify({
-          type: "negative",
-          message: e.data.message,
-          timeout: 2000,
-        });
-      }
-    };
     const showAddUpdateFn = (props: any) => {
       formData.value = alerts.value.find(
         (alert: any) => alert.uuid === props.row?.uuid,
@@ -780,6 +640,7 @@ export default defineComponent({
         },
       });
     };
+
     const deleteAlert = () => {
       actions
         .delete(
@@ -822,6 +683,7 @@ export default defineComponent({
         });
       }
     };
+
     const showDeleteDialogFn = (props: any) => {
       selectedDelete.value = props.row;
       confirmDelete.value = true;
@@ -986,19 +848,8 @@ export default defineComponent({
         for (var i = 0; i < rows.length; i++) {
           if (
             rows[i]["name"].toLowerCase().includes(terms) ||
-            (rows[i]["stream_name"] != null &&
-              rows[i]["stream_name"].toLowerCase().includes(terms)) ||
             (rows[i]["owner"] != null &&
               rows[i]["owner"].toLowerCase().includes(terms)) ||
-            (rows[i]["enabled"] != null &&
-              rows[i]["enabled"].toString().toLowerCase().includes(terms)) ||
-            (rows[i]["alert_type"] != null &&
-              rows[i]["alert_type"].toString().toLowerCase().includes(terms)) ||
-            (rows[i]["stream_type"] != null &&
-              rows[i]["stream_type"]
-                .toString()
-                .toLowerCase()
-                .includes(terms)) ||
             (rows[i]["description"] != null &&
               rows[i]["description"].toString().toLowerCase().includes(terms))
           ) {
@@ -1031,8 +882,6 @@ export default defineComponent({
       hideForm,
       confirmDelete,
       selectedDelete,
-      updateStreams,
-      updateStreamName,
       getActionScripts,
       pagination,
       resultTotal,
@@ -1044,26 +893,20 @@ export default defineComponent({
       isUpdated,
       showAddUpdateFn,
       showDeleteDialogFn,
-      duplicateAlert,
       changePagination,
       maxRecordToReturn,
       showAddActionScriptDialog,
-      showForm,
       toBeCloneAlertName,
       toBeCloneUUID,
       toBeClonestreamType,
       toBeClonestreamName,
       streamTypes,
-      filterColumns,
-      filterStreams,
       streamNames,
-      submitForm,
       schemaList,
       indexOptions,
       streams,
       isFetchingStreams,
       isSubmitting,
-      changeMaxRecordToReturn,
       outlinedDelete,
       filterQuery,
       filterData,
@@ -1078,13 +921,13 @@ export default defineComponent({
       actionsScriptRows,
       alertStateLoadingMap,
       templates,
-      routeTo,
       visibleRows,
       hasVisibleRows,
       confirmBulkDelete,
       selectedActionScripts,
       openBulkDeleteDialog,
       bulkDeleteActionScripts,
+      getAlertByName,
     };
   },
 });
