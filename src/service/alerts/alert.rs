@@ -1525,20 +1525,29 @@ async fn process_dest_template(
 
     if is_json_rows_context {
         // All row templates are JSON values, inject as JSON array
-        let all_json = rows_tpl_val.iter().all(|v| {
-            !v.is_string() || {
-                // Check if the string is actually a valid JSON
-                if let Value::String(s) = v {
-                    serde_json::from_str::<Value>(s).is_ok()
-                } else {
-                    true
+        // Parse any Value::String that contains JSON into actual JSON objects
+        let mut parsed_values = Vec::new();
+        let mut all_json = true;
+
+        for v in rows_tpl_val.iter() {
+            if let Value::String(s) = v {
+                // Try to parse the string as JSON
+                match serde_json::from_str::<Value>(s) {
+                    Ok(parsed) => parsed_values.push(parsed),
+                    Err(_) => {
+                        all_json = false;
+                        break;
+                    }
                 }
+            } else {
+                // Already a JSON value (object, array, etc.)
+                parsed_values.push(v.clone());
             }
-        });
+        }
 
         if all_json {
-            // Create JSON array representation
-            let json_array = Value::Array(rows_tpl_val.to_vec());
+            // Create JSON array representation with actual JSON objects
+            let json_array = Value::Array(parsed_values);
             let json_str = serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
             // Remove the outer brackets to get comma-separated values
             let json_inner = &json_str[1..json_str.len() - 1];
@@ -2521,5 +2530,53 @@ mod tests {
             result_limited,
             "Alert 1: User Alice logged in\\nAlert 2: User Bob logged out"
         );
+    }
+
+    #[test]
+    fn test_json_array_injection_with_string_values() {
+        // Test that Value::String containing JSON gets properly parsed and injected
+        // This simulates what happens when row_template_type is Json and the template
+        // produces JSON strings that need to be injected as actual JSON objects
+
+        let json_str1 = r#"{"level": "error", "job": "test"}"#;
+        let json_str2 = r#"{"level": "warn", "job": "test2"}"#;
+
+        // Simulate rows_tpl_val containing Value::String with JSON content
+        let rows_tpl_val = vec![
+            Value::String(json_str1.to_string()),
+            Value::String(json_str2.to_string()),
+        ];
+
+        // Parse them as the fix does
+        let mut parsed_values = Vec::new();
+        for v in rows_tpl_val.iter() {
+            if let Value::String(s) = v {
+                match serde_json::from_str::<Value>(s) {
+                    Ok(parsed) => parsed_values.push(parsed),
+                    Err(_) => {}
+                }
+            } else {
+                parsed_values.push(v.clone());
+            }
+        }
+
+        // Create the array and serialize
+        let json_array = Value::Array(parsed_values);
+        let json_str = serde_json::to_string(&json_array).unwrap();
+
+        // Verify it's a proper JSON array (not escaped strings)
+        let deserialized: Value = serde_json::from_str(&json_str).unwrap();
+        assert!(deserialized.is_array());
+
+        let arr = deserialized.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert!(arr[0].is_object());
+        assert!(arr[1].is_object());
+
+        // Verify the objects have the correct structure
+        assert_eq!(arr[0]["level"], "error");
+        assert_eq!(arr[0]["job"], "test");
+        assert_eq!(arr[1]["level"], "warn");
+        assert_eq!(arr[1]["job"], "test2");
     }
 }
