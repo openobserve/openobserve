@@ -134,6 +134,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
 
+            <!-- OpenObserve Organization and Stream fields -->
+            <div
+              v-if="formData.destination_type === 'openobserve'"
+              class="row q-col-gutter-sm q-mt-xs tw-ml-[0.1rem]"
+            >
+              <div class="col-6">
+                <q-input
+                  data-test="add-destination-openobserve-org-input"
+                  v-model="openobserveOrg"
+                  :label="'Organization *'"
+                  :placeholder="'e.g., default'"
+                  class="no-border showLabelOnTop"
+                  borderless
+                  dense
+                  flat
+                  stack-label
+                  :rules="[
+                    (val: any) =>
+                      !!val?.trim() ||
+                      'Organization is required for OpenObserve',
+                  ]"
+                  tabindex="0"
+                >
+                  <template #hint>
+                    <span class="text-caption">
+                      OpenObserve organization identifier
+                    </span>
+                  </template>
+                </q-input>
+              </div>
+              <div class="col-6">
+                <q-input
+                  data-test="add-destination-openobserve-stream-input"
+                  v-model="openobserveStream"
+                  :label="'Stream Name *'"
+                  :placeholder="'e.g., default'"
+                  class="no-border showLabelOnTop"
+                  borderless
+                  dense
+                  flat
+                  stack-label
+                  :rules="[
+                    (val: any) =>
+                      !!val?.trim() ||
+                      'Stream name is required for OpenObserve',
+                  ]"
+                  tabindex="0"
+                >
+                  <template #hint>
+                    <span class="text-caption"> OpenObserve stream name </span>
+                  </template>
+                </q-input>
+              </div>
+            </div>
+
             <!-- Endpoint Path field - shown for all destination types -->
             <q-input
               data-test="add-destination-url-endpoint-input"
@@ -712,7 +767,7 @@ const step = ref(1);
 const formData: Ref<DestinationData> = ref({
   name: "",
   url: "",
-  url_endpoint: "/api/{org}/{stream}/_json", // Default endpoint for OpenObserve
+  url_endpoint: "/api/default/default/_json", // Default endpoint for OpenObserve
   method: "post",
   skip_tls_verify: false,
   template: "",
@@ -726,6 +781,10 @@ const formData: Ref<DestinationData> = ref({
 =======
 >>>>>>> 6d32f61fe (fix: ui and BE changes)
 });
+
+// OpenObserve specific fields
+const openobserveOrg = ref("default");
+const openobserveStream = ref("default");
 
 // Helper function to get default headers for each destination type
 const getDefaultHeaders = (destinationType: string) => {
@@ -927,6 +986,21 @@ const populateFormForEdit = (destination: DestinationData) => {
     formData.value.metadata = { ...destination.metadata };
   } else {
     formData.value.metadata = {};
+  }
+
+  // Extract OpenObserve org and stream from endpoint if it's OpenObserve
+  if (
+    formData.value.destination_type === "openobserve" &&
+    formData.value.url_endpoint
+  ) {
+    // Parse endpoint like /api/{org}/{stream}/_json
+    const match = formData.value.url_endpoint.match(
+      /^\/api\/([^/]+)\/([^/]+)\/_json$/,
+    );
+    if (match) {
+      openobserveOrg.value = match[1] || "default";
+      openobserveStream.value = match[2] || "default";
+    }
   }
 
   // Move to step 2 since destination type is already selected
@@ -1233,6 +1307,13 @@ watch(
   { immediate: true },
 );
 
+// Watch OpenObserve org and stream to update endpoint dynamically
+watch([openobserveOrg, openobserveStream], ([org, stream]) => {
+  if (formData.value.destination_type === "openobserve") {
+    formData.value.url_endpoint = `/api/${org || "default"}/${stream || "default"}/_json`;
+  }
+});
+
 // Step validation
 const canProceedStep1 = computed(() => {
   return !!formData.value.destination_type;
@@ -1529,7 +1610,7 @@ const resetForm = () => {
   formData.value = {
     name: "",
     url: "",
-    url_endpoint: "",
+    url_endpoint: "/api/default/default/_json",
     method: "post",
     skip_tls_verify: false,
     template: "",
@@ -1545,6 +1626,9 @@ const resetForm = () => {
     stream_name: "default",
 >>>>>>> 4d5bed7e4 (fix: added default header details prefilled)
   };
+  // Reset OpenObserve specific fields
+  openobserveOrg.value = "default";
+  openobserveStream.value = "default";
   // Set default headers for OpenObserve
   apiHeaders.value = getDefaultHeaders(defaultDestinationType);
   step.value = 1;
