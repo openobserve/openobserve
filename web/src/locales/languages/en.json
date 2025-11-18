@@ -1238,7 +1238,7 @@
     "add": "Add",
     "cancel": "Cancel",
     "promqlLabel": "PromQL",
-    "runQuery": "Run Query",
+    "runQuery": "Run query",
     "holdMessage": "Hold on tight, fetching metrics.",
     "noStreamSelected": "No metrics selected.",
     "addToDashboard": "Add to Dashboard"
