@@ -379,7 +379,8 @@
     "confirmDeleteHead": "Delete Service Account",
     "confirmRefreshMsg": "Are you sure you want to refresh this service account token?",
     "confirmRefreshHead": "Refresh Service Token",
-    "downloadToken": "Download Token"
+    "downloadToken": "Download Token",
+    "token":"Token"
   },
   "iam": {
     "users": "Users",
@@ -1576,6 +1577,9 @@
     "cron": "Cron",
     "type": "Type",
     "run_pipeline":"Run Pipeline"
+  },
+  "alert_list":{
+    "alert_details":"Alert Details"
   }
 
 }
