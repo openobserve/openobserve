@@ -4,6 +4,7 @@ import { nextTick } from "vue";
 import DashboardFiltersOption from "./DashboardFiltersOption.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
+import { createRouter, createMemoryHistory } from "vue-router";
 
 // Mock external dependencies
 vi.mock("@/composables/useDashboardPanel", () => ({
@@ -55,6 +56,7 @@ describe("DashboardFiltersOption", () => {
   let wrapper: any;
   let store: any;
   let i18n: any;
+  let router: any;
 
   const mockDashboardData = {
     variables: {
@@ -91,12 +93,24 @@ describe("DashboardFiltersOption", () => {
       },
     });
 
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        {
+          path: "/",
+          component: { template: "<div></div>" },
+        },
+      ],
+    });
+
+    router.push({ path: "/", query: { tab: "tab1" } });
+
     wrapper = mount(DashboardFiltersOption, {
       props: {
         dashboardData: mockDashboardData,
       },
       global: {
-        plugins: [store, i18n],
+        plugins: [store, i18n, router],
         provide: {
           dashboardPanelDataPageKey: "dashboard",
         },
@@ -457,7 +471,7 @@ describe("DashboardFiltersOption", () => {
             },
           },
           global: {
-            plugins: [store, i18n],
+            plugins: [store, i18n, router],
             provide: {
               dashboardPanelDataPageKey: "dashboard",
             },
@@ -466,7 +480,7 @@ describe("DashboardFiltersOption", () => {
 
         const result = newWrapper.vm.dashboardVariablesFilterItems(0);
         expect(result).toEqual([]);
-        
+
         newWrapper.unmount();
       });
 
@@ -476,7 +490,7 @@ describe("DashboardFiltersOption", () => {
             dashboardData: null,
           },
           global: {
-            plugins: [store, i18n],
+            plugins: [store, i18n, router],
             provide: {
               dashboardPanelDataPageKey: "dashboard",
             },
@@ -521,7 +535,7 @@ describe("DashboardFiltersOption", () => {
           dashboardData: mockDashboardData,
         },
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, router],
           provide: {
             dashboardPanelDataPageKey: "dashboard",
           },
@@ -544,7 +558,7 @@ describe("DashboardFiltersOption", () => {
           dashboardData: mockDashboardData,
         },
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, router],
           provide: {
             dashboardPanelDataPageKey: "dashboard",
           },
@@ -567,7 +581,7 @@ describe("DashboardFiltersOption", () => {
           dashboardData: mockDashboardData,
         },
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, router],
           provide: {
             dashboardPanelDataPageKey: "dashboard",
           },
@@ -594,7 +608,7 @@ describe("DashboardFiltersOption", () => {
           dashboardData: mockDashboardData,
         },
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, router],
           provide: {
             dashboardPanelDataPageKey: "custom-page",
           },
@@ -611,7 +625,7 @@ describe("DashboardFiltersOption", () => {
           dashboardData: mockDashboardData,
         },
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, router],
         },
       });
 
@@ -706,7 +720,7 @@ describe("DashboardFiltersOption", () => {
           dashboardData: mockDashboardDataWithVariables,
         },
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, router],
           provide: {
             dashboardPanelDataPageKey: "dashboard",
           },
@@ -737,7 +751,7 @@ describe("DashboardFiltersOption", () => {
           },
         },
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, router],
           provide: {
             dashboardPanelDataPageKey: "dashboard",
           },
@@ -835,7 +849,7 @@ describe("DashboardFiltersOption", () => {
           dashboardData: mockDashboardData,
         },
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, router],
           provide: {
             dashboardPanelDataPageKey: undefined,
           },
