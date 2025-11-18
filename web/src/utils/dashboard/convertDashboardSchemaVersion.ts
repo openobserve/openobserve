@@ -348,7 +348,7 @@ export function convertDashboardSchemaVersion(data: any) {
       });
 
       // update the version
-      data.version = 7;
+      data.version = 8;
     }
   }
 
