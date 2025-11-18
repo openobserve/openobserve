@@ -1389,11 +1389,6 @@ export default defineComponent({
       field: any,
       isFieldExistInSQL: boolean,
     ) => {
-      // Only modify query if SQL mode is enabled
-      if (!searchObj.meta.sqlMode) {
-        return;
-      }
-
       //implement setQuery function using node-sql-parser
       //isFieldExistInSQL is used to check if the field is already present in the query or not.
       let parsedSQL = fnParsedSQL();
