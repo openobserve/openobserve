@@ -2078,4 +2078,280 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(wrapper.vm.isGroup(wrapper.vm.groups.items[1])).toBeFalsy();
     });
   });
+
+  describe('Preview Functionality', () => {
+    it('should generate preview string for simple conditions', () => {
+      const simpleProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'or',
+          items: [
+            { id: 'c1', column: 'field1', operator: '=', value: 'test1' },
+            { id: 'c2', column: 'field2', operator: '=', value: 'test2' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: simpleProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.previewString).toBe("(field1 = 'test1' OR field2 = 'test2')");
+    });
+
+    it('should generate preview string with AND operator', () => {
+      const andProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'and',
+          items: [
+            { id: 'c1', column: 'name', operator: '=', value: 'John' },
+            { id: 'c2', column: 'age', operator: '>', value: '30' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: andProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.previewString).toBe("(name = 'John' AND age > '30')");
+    });
+
+    it('should generate preview string with nested groups', () => {
+      const nestedProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'or',
+          items: [
+            { id: 'c1', column: 'field1', operator: '=', value: 'a' },
+            { id: 'c2', column: 'field2', operator: '=', value: 'b' },
+            {
+              groupId: 'nested',
+              label: 'and',
+              items: [
+                { id: 'c3', column: 'field3', operator: '=', value: 'c' },
+                { id: 'c4', column: 'field4', operator: '=', value: 'd' },
+              ]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: nestedProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.previewString).toBe("(field1 = 'a' OR field2 = 'b' OR (field3 = 'c' AND field4 = 'd'))");
+    });
+
+    it('should use placeholder for empty column names', () => {
+      const emptyColumnProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'or',
+          items: [
+            { id: 'c1', column: '', operator: '=', value: 'test' },
+            { id: 'c2', column: 'field2', operator: '=', value: 'test2' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: emptyColumnProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.previewString).toBe("(field = 'test' OR field2 = 'test2')");
+    });
+
+    it('should show preview section only at depth 0', async () => {
+      const rootProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'or',
+          items: [
+            { id: 'c1', column: 'field1', operator: '=', value: 'test' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: rootProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Should find preview section at depth 0
+      const previewSection = wrapper.find('.tw-mb-2.tw-p-2.tw-rounded.tw-border');
+      expect(previewSection.exists()).toBe(true);
+      expect(previewSection.text()).toContain('Preview');
+    });
+
+    it('should not show preview section at depth > 0', () => {
+      const nestedProps = {
+        ...defaultProps,
+        depth: 1,
+        group: {
+          groupId: 'nested',
+          label: 'or',
+          items: [
+            { id: 'c1', column: 'field1', operator: '=', value: 'test' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: nestedProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Should not find preview section at depth > 0
+      const previewSection = wrapper.find('.tw-mb-2.tw-p-2.tw-rounded.tw-border');
+      expect(previewSection.exists()).toBe(false);
+    });
+
+    it('should toggle preview visibility when clicking header', async () => {
+      const rootProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'or',
+          items: [
+            { id: 'c1', column: 'field1', operator: '=', value: 'test' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: rootProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.showPreview).toBe(true);
+
+      // Find and click the preview header
+      const previewHeader = wrapper.find('.tw-cursor-pointer');
+      await previewHeader.trigger('click');
+
+      expect(wrapper.vm.showPreview).toBe(false);
+
+      // Click again to show
+      await previewHeader.trigger('click');
+      expect(wrapper.vm.showPreview).toBe(true);
+    });
+
+    it('should handle deeply nested groups in preview', () => {
+      const deeplyNestedProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'and',
+          items: [
+            { id: 'c1', column: 'a', operator: '=', value: 'test' },
+            {
+              groupId: 'level1',
+              label: 'or',
+              items: [
+                { id: 'c2', column: 'b', operator: '=', value: 'test' },
+                {
+                  groupId: 'level2',
+                  label: 'and',
+                  items: [
+                    { id: 'c3', column: 'c', operator: '=', value: 'test' },
+                    { id: 'c4', column: 'd', operator: '=', value: 'test' },
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: deeplyNestedProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.previewString).toBe("(a = 'test' AND (b = 'test' OR (c = 'test' AND d = 'test')))");
+    });
+  });
 });

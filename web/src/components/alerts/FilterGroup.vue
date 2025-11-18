@@ -1,12 +1,35 @@
 <template>
-    <div :class="[`  tw-px-2 tw-mb-2 el-border tw-mt-6 el-border-radius `, 
+    <!-- Preview Section (only for root level) -->
+    <div v-if="depth === 0 && previewString"
+         class="tw-mb-2 tw-p-2 tw-rounded tw-border"
+         :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-gray-50 tw-border-gray-300'">
+      <div class="tw-flex tw-items-center tw-gap-1 tw-cursor-pointer tw-min-w-0" @click="showPreview = !showPreview">
+        <q-icon
+          :name="showPreview ? 'expand_more' : 'chevron_right'"
+          size="16px"
+          class="tw-flex-shrink-0"
+          :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'"
+        />
+        <span class="tw-font-medium tw-text-xs tw-flex-shrink-0"
+              :class="store.state.theme === 'dark' ? 'tw-text-gray-300' : 'tw-text-gray-700'">
+          Preview:
+        </span>
+        <span v-if="showPreview"
+              class="tw-text-[10px] tw-font-mono tw-truncate tw-leading-[1.3] tw-min-w-0 tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis"
+              :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">
+          {{ previewString }}
+        </span>
+      </div>
+    </div>
+
+    <div :class="[`  tw-px-2 tw-mb-2 el-border tw-mt-6 el-border-radius `,
         store.state.isAiChatEnabled ? `tw-w-full tw-ml-[${depth * 10}px]` : `xl:tw-w-fit tw-ml-[${depth * 20}px]`
     ]"
     :style="{
         opacity: computedOpacity,
         backgroundColor: computedStyleMap
     }"
-    >  
+    >
         <div class="tw-w-fit condition-tabs el-border">
           <AppTabs
             data-test="scheduled-alert-tabs"
@@ -16,7 +39,7 @@
             @update:active-tab="toggleLabel"
           />
       </div>
-  
+
       <!-- Group content -->
 
       <div v-if="isOpen" class="tw-overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
@@ -171,6 +194,7 @@
   
   const isOpen = ref(true);
   const groups = ref(props.group);
+  const showPreview = ref(true);
 
   const store = useStore();
 
@@ -364,6 +388,44 @@ const computedStyleMap = computed(() => {
 
 const computedOpacity = computed(() => {
   return props.depth + 10;
+});
+
+// Build preview string recursively
+const buildPreviewString = (group: any): string => {
+  if (!group || !group.items || group.items.length === 0) {
+    return '';
+  }
+
+  const parts: string[] = [];
+
+  group.items.forEach((item: any) => {
+    if (isGroup(item)) {
+      // Nested group - recursively build its preview
+      const nestedPreview = buildPreviewString(item);
+      if (nestedPreview) {
+        parts.push(`(${nestedPreview})`);
+      }
+    } else {
+      // Condition - show full condition: column operator value
+      const column = item.column || 'field';
+      const operator = item.operator || '=';
+      const value = item.value !== undefined && item.value !== null && item.value !== ''
+        ? `'${item.value}'`
+        : "''";
+      parts.push(`${column} ${operator} ${value}`);
+    }
+  });
+
+  // Join with the group's label (AND/OR)
+  const operator = (group.label || 'or').toUpperCase();
+  return parts.join(` ${operator} `);
+};
+
+// Computed preview string
+const previewString = computed(() => {
+  const preview = buildPreviewString(groups.value);
+  // Wrap the entire root expression in parentheses
+  return preview ? `(${preview})` : '';
 });
 
 // Check if group has only one condition and no sub-groups (to disable AND/OR toggle)

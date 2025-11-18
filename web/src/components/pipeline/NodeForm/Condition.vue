@@ -659,9 +659,9 @@ const validateSqlQuery = () => {
   padding-top: 16px;
 }
 .stream-routing-container {
-  min-width: 40vw;
+  min-width: 45vw;
   border-radius: 8px;
-  max-width: 55vw;
+  max-width: 47vw;
   /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
 }
 
