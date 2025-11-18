@@ -17,7 +17,7 @@ use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
 use config::{
-    meta::search::StreamResponses,
+    meta::search::{CardinalityLevel, StreamResponses, generate_aggregation_search_interval},
     utils::time::{now_micros, parse_milliseconds, parse_str_to_timestamp_micros},
 };
 use futures::StreamExt;
@@ -250,7 +250,7 @@ async fn query(
         use_cache: None,
     };
 
-    search(&trace_id, org_id, &req, user_email, timeout).await
+    search(&trace_id, org_id, req, user_email, timeout).await
 }
 
 /// prometheus range queries
@@ -590,9 +590,9 @@ async fn query_range(
     if let Some(use_streaming) = req.use_streaming
         && use_streaming
     {
-        search_streaming(&trace_id, org_id, &search_req, user_email, timeout).await
+        search_streaming(&trace_id, org_id, search_req, user_email, timeout).await
     } else {
-        search(&trace_id, org_id, &search_req, user_email, timeout).await
+        search(&trace_id, org_id, search_req, user_email, timeout).await
     }
 }
 
@@ -1123,11 +1123,11 @@ fn search_timeout(timeout: Option<String>) -> i64 {
 async fn search(
     trace_id: &str,
     org_id: &str,
-    req: &promql::MetricsQueryRequest,
+    req: promql::MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
 ) -> Result<HttpResponse, Error> {
-    match promql::search::search(trace_id, org_id, req, user_email, timeout).await {
+    match promql::search::search(trace_id, org_id, &req, user_email, timeout).await {
         Ok(data) if !req.query_exemplars => {
             Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(
                 promql::QueryResult {
@@ -1159,11 +1159,15 @@ async fn search(
 async fn search_streaming(
     trace_id: &str,
     org_id: &str,
-    req: &promql::MetricsQueryRequest,
+    req: promql::MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
 ) -> Result<HttpResponse, Error> {
-    let partitions = generate_search_partition(trace_id, org_id, req);
+    let partitions = generate_search_partition(req.start, req.end, req.step);
+    log::info!(
+        "[HTTP2_STREAM PromQL trace_id {trace_id}] Generated {} partitions for streaming search",
+        partitions.len()
+    );
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(
         partitions.len(),
     );
@@ -1172,8 +1176,11 @@ async fn search_streaming(
     let org_id = org_id.to_string();
     let user_email = user_email.to_string();
     actix_web::rt::spawn(async move {
-        for req in partitions {
-            let _resp = search(&req_trace_id, &org_id, &req, &user_email, timeout).await;
+        for (start, end) in partitions {
+            let mut req = req.clone();
+            req.start = start;
+            req.end = end;
+            let _resp = search(&req_trace_id, &org_id, req, &user_email, timeout).await;
             // TODO
             // Send a progress: 0 event as an indicator of search initiation
             if tx
@@ -1182,7 +1189,7 @@ async fn search_streaming(
                 .is_err()
             {
                 log::warn!(
-                    "[HTTP2_STREAM trace_id {req_trace_id}] Sender is closed, stop sending progress event to client",
+                    "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Sender is closed, stop sending progress event to client",
                 );
             }
         }
@@ -1194,7 +1201,9 @@ async fn search_streaming(
         let chunks_iter = match result {
             Ok(v) => v.to_chunks(),
             Err(err) => {
-                log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in search stream: {err}");
+                log::error!(
+                    "[HTTP2_STREAM PromQL trace_id {trace_id}] Error in search stream: {err}"
+                );
                 let err_res = match err {
                     infra::errors::Error::ErrorCode(ref code) => {
                         // if err code is cancelled return cancelled response
@@ -1234,10 +1243,22 @@ async fn search_streaming(
         .streaming(stream))
 }
 
-fn generate_search_partition(
-    _trace_id: &str,
-    _org_id: &str,
-    req: &promql::MetricsQueryRequest,
-) -> Vec<promql::MetricsQueryRequest> {
-    vec![req.clone()]
+fn generate_search_partition(start: i64, end: i64, step: i64) -> Vec<(i64, i64)> {
+    if start >= end {
+        return vec![(start, end)];
+    }
+    let interval = generate_aggregation_search_interval(start, end, CardinalityLevel::Low);
+    let partition_step = interval.get_interval_microseconds();
+    if partition_step <= step {
+        return vec![(start, end)];
+    }
+
+    let mut groups = Vec::new();
+    let mut group_start = start;
+    while group_start < end {
+        let group_end = std::cmp::min(group_start + partition_step, end);
+        groups.push((group_start, group_end));
+        group_start = group_end + step;
+    }
+    groups
 }
