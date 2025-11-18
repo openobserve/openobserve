@@ -700,6 +700,7 @@ import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOpti
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
+import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -1163,7 +1164,7 @@ export default defineComponent({
       ) {
         return field?.alias;
       }
-      return buildSQLQueryFromInput(
+      const label = buildSQLQueryFromInput(
         field,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -1173,6 +1174,7 @@ export default defineComponent({
             ].fields?.stream
           : "",
       );
+      return label?.length > MAX_FIELD_LABEL_CHARS ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..." : label;
     };
 
     const xLabel = computed(() => {

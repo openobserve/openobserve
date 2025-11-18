@@ -193,6 +193,7 @@ import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
+import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 
 export default defineComponent({
   name: "AddCondition",
@@ -312,7 +313,12 @@ export default defineComponent({
       //   return props.condition.column;
       // }
       const builtCondition = buildCondition(condition);
-      return builtCondition === "" ? condition.column.field : builtCondition;
+
+      return builtCondition === ""
+        ? condition.column.field
+        : builtCondition?.length > MAX_FIELD_LABEL_CHARS
+          ? builtCondition.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
+          : builtCondition;
     };
 
     const emitLogicalOperatorChange = (newOperator: string) => {
