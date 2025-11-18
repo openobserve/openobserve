@@ -16,7 +16,11 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
-use config::utils::time::{now_micros, parse_milliseconds, parse_str_to_timestamp_micros};
+use config::{
+    meta::search::StreamResponses,
+    utils::time::{now_micros, parse_milliseconds, parse_str_to_timestamp_micros},
+};
+use futures::StreamExt;
 use infra::errors;
 use promql_parser::parser;
 #[cfg(feature = "enterprise")]
@@ -27,7 +31,9 @@ use crate::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::{auth::UserEmail, http::get_or_create_trace_id},
     },
-    handler::http::extractors::Headers,
+    handler::http::{
+        extractors::Headers, request::search::error_utils::map_error_to_http_response,
+    },
     service::{metrics, promql},
 };
 
@@ -1157,31 +1163,81 @@ async fn search_streaming(
     user_email: &str,
     timeout: i64,
 ) -> Result<HttpResponse, Error> {
-    match promql::search::search(trace_id, org_id, req, user_email, timeout).await {
-        Ok(data) if !req.query_exemplars => {
-            Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(
-                promql::QueryResult {
-                    result_type: data.get_type().to_string(),
-                    result: data,
-                },
-                Some(trace_id.to_string()),
-            )))
+    let partitions = generate_search_partition(trace_id, org_id, req);
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(
+        partitions.len(),
+    );
+    // Spawn the search task in a separate task
+    let req_trace_id = trace_id.to_string();
+    let org_id = org_id.to_string();
+    let user_email = user_email.to_string();
+    actix_web::rt::spawn(async move {
+        for req in partitions {
+            let _resp = search(&req_trace_id, &org_id, &req, &user_email, timeout).await;
+            // TODO
+            // Send a progress: 0 event as an indicator of search initiation
+            if tx
+                .send(Ok(StreamResponses::Progress { percent: 0 }))
+                .await
+                .is_err()
+            {
+                log::warn!(
+                    "[HTTP2_STREAM trace_id {req_trace_id}] Sender is closed, stop sending progress event to client",
+                );
+            }
         }
-        Ok(data) => Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(
-            data,
-            Some(trace_id.to_string()),
-        ))),
-        Err(err) => {
-            let err = match err {
-                errors::Error::ErrorCode(code) => code.get_error_detail(),
-                _ => err.to_string(),
-            };
-            Ok(
-                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(
-                    err,
-                    Some(trace_id.to_string()),
-                )),
-            )
-        }
-    }
+    });
+
+    // Return streaming response
+    let trace_id = trace_id.to_string();
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
+        let chunks_iter = match result {
+            Ok(v) => v.to_chunks(),
+            Err(err) => {
+                log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in search stream: {err}");
+                let err_res = match err {
+                    infra::errors::Error::ErrorCode(ref code) => {
+                        // if err code is cancelled return cancelled response
+                        match code {
+                            infra::errors::ErrorCodes::SearchCancelQuery(_) => {
+                                StreamResponses::Cancelled
+                            }
+                            _ => {
+                                let message = code.get_message();
+                                let error_detail = code.get_error_detail();
+                                let http_response = map_error_to_http_response(&err, None);
+
+                                StreamResponses::Error {
+                                    code: http_response.status().into(),
+                                    message,
+                                    error_detail: Some(error_detail),
+                                }
+                            }
+                        }
+                    }
+                    _ => StreamResponses::Error {
+                        code: 500,
+                        message: err.to_string(),
+                        error_detail: None,
+                    },
+                };
+                err_res.to_chunks()
+            }
+        };
+
+        // Convert the iterator to a stream only once
+        futures::stream::iter(chunks_iter)
+    });
+
+    Ok(HttpResponse::Ok()
+        .content_type("text/event-stream")
+        .streaming(stream))
+}
+
+fn generate_search_partition(
+    _trace_id: &str,
+    _org_id: &str,
+    req: &promql::MetricsQueryRequest,
+) -> Vec<promql::MetricsQueryRequest> {
+    vec![req.clone()]
 }

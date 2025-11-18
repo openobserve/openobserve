@@ -18,7 +18,6 @@ use datafusion::error::{DataFusionError, Result};
 use crate::service::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 
 pub(crate) fn scalar(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    println!("scalar input: {:?}", data);
     match data {
         Value::Float(f) => Ok(Value::Float(f)),
         Value::Matrix(v) => Ok(Value::Matrix(v)),
