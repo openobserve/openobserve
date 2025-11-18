@@ -558,7 +558,7 @@ export default {
 .arg-type-select {
   :deep(.q-field__control) {
     background-color: transparent !important;
-    border: 1px solid var(--o2-primary-btn-bg) !important;
+    border: 1px solid var(--o2-border-color) !important;
     border-radius: 4px !important;
     align-items: center !important;
   }
