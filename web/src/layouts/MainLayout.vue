@@ -268,7 +268,12 @@ export default defineComponent({
       this.$router.push("/logout");
     },
     goToHome() {
-      this.$router.push("/");
+      this.$router.push({
+        path: "/",
+        query: {
+          org_identifier: this.store.state.selectedOrganization.identifier,
+        },
+      });
     },
     changeLanguage(item: { code: string; label: string; icon: string }) {
       setLanguage(item.code);
