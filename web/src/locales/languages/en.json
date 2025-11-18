@@ -1509,5 +1509,13 @@
     "patterns_loaded": "Loaded {count} pattern(s)",
     "failed_to_load": "Failed to load patterns",
     "no_patterns_selected": "Please select at least one pattern"
+  },
+  "search_history":{
+    "title":"Search History",
+    "get_history": "Get History",
+    "executed_at":"Executed At",
+    "sql_query":"SQL Query",
+    "results":"Results"
   }
+
 }
