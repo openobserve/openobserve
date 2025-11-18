@@ -189,8 +189,15 @@ pub async fn delete_role_bulk(
     let user_id = user_email.user_id;
 
     for name in &req.ids {
-        if let Some(res) =
-            check_resource_permissions(&org_id, &user_id, "roles", name, "DELETE").await
+        if let Some(res) = check_resource_permissions(
+            &org_id,
+            &user_id,
+            "roles",
+            &format!("{org_id}/{name}"),
+            "DELETE",
+            "",
+        )
+        .await
         {
             return Ok(res);
         }
@@ -1076,8 +1083,15 @@ pub async fn delete_group_bulk(
     let user_id = user_email.user_id;
 
     for name in &req.ids {
-        if let Some(res) =
-            check_resource_permissions(&org_id, &user_id, "groups", name, "DELETE").await
+        if let Some(res) = check_resource_permissions(
+            &org_id,
+            &user_id,
+            "groups",
+            &format!("{org_id}/{name}"),
+            "DELETE",
+            "",
+        )
+        .await
         {
             return Ok(res);
         }

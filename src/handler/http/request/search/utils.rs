@@ -73,6 +73,7 @@ pub async fn check_resource_permissions(
     resource_type: &str,
     resource_id: &str,
     method: &str,
+    parent_id: &str,
 ) -> Option<HttpResponse> {
     if !is_root_user(user_id) {
         let user: User = get_user(Some(org_id), user_id).await.unwrap();
@@ -91,7 +92,7 @@ pub async fn check_resource_permissions(
                 ),
                 org_id: org_id.to_string(),
                 bypass_check: false,
-                parent_id: "".to_string(),
+                parent_id: parent_id.to_string(),
             },
             user.role,
             user.is_external,

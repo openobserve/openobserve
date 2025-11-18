@@ -312,9 +312,15 @@ pub async fn delete_bulk(
 
     #[cfg(feature = "enterprise")]
     for email in &req.ids {
-        if let Some(res) =
-            check_resource_permissions(&org_id, &initiator_id, "service_accounts", email, "DELETE")
-                .await
+        if let Some(res) = check_resource_permissions(
+            &org_id,
+            &initiator_id,
+            "service_accounts",
+            email,
+            "DELETE",
+            "",
+        )
+        .await
         {
             return Ok(res);
         }

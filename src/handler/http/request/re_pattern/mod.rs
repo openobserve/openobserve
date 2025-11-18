@@ -412,7 +412,7 @@ pub async fn delete_bulk(
 
     for id in &req.ids {
         if let Some(res) =
-            check_resource_permissions(&org_id, &user_id, "re_patterns", id, "DELETE").await
+            check_resource_permissions(&org_id, &user_id, "re_patterns", id, "DELETE", "").await
         {
             return Ok(res);
         }

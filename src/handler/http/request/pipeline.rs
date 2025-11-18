@@ -289,7 +289,7 @@ async fn delete_pipeline_bulk(
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
         if let Some(res) =
-            check_resource_permissions(&org_id, &_user_id, "pipelines", id, "DELETE").await
+            check_resource_permissions(&org_id, &_user_id, "pipelines", id, "DELETE", "").await
         {
             return Ok(res);
         }
@@ -454,7 +454,7 @@ pub async fn enable_pipeline_bulk(
 
         for id in &req.ids {
             if let Some(res) =
-                check_resource_permissions(&org_id, &user_id, "pipelines", id, "PUT").await
+                check_resource_permissions(&org_id, &user_id, "pipelines", id, "PUT", "").await
             {
                 return Ok(res);
             }

@@ -335,6 +335,7 @@ import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
+import RePatternsService from "@/services/regex_pattern";
 import config from "@/aws-exports";
 import commonService from "@/services/common";
 
@@ -1366,6 +1367,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     action_scripts: getActionScripts,
     cipher_keys: getCipherKeys,
     afolder: getAlertFolders,
+    re_patterns: getRePatterns,
   };
 
   return new Promise(async (resolve, reject) => {
@@ -1729,6 +1731,18 @@ const getCipherKeys = async () => {
   );
 
   updateResourceEntities("cipher_keys", ["name"], [...data.data.keys]);
+
+  return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getRePatterns = async () => {
+  const data: any = await RePatternsService.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities("re_patterns", ["name"], [...data.data.patterns]);
 
   return new Promise((resolve, reject) => {
     resolve(true);

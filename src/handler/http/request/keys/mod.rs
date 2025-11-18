@@ -348,7 +348,7 @@ pub async fn delete_bulk(
     let user_id = &user_email.user_id;
     for key in &body.ids {
         if let Some(res) =
-            check_resource_permissions(&org_id, user_id, "cipher_keys", key, "DELETE").await
+            check_resource_permissions(&org_id, user_id, "cipher_keys", key, "DELETE", "").await
         {
             return Ok(res);
         }

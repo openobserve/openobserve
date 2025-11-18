@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put, web};
+use actix_web::{
+    HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put,
+    web::{self, Query},
+};
 use config::meta::dashboards::Dashboard;
 use hashbrown::HashMap;
 
@@ -349,17 +352,20 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
 #[delete("/{org_id}/dashboards/bulk")]
 async fn delete_dashboard_bulk(
     path: web::Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
     req: web::Json<DashboardBulkDeleteRequest>,
 ) -> impl Responder {
     let org_id = path.into_inner();
     let req = req.into_inner();
     let _user_id = user_email.user_id;
+    let folder_id = crate::common::utils::http::get_folder(&query);
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
         if let Some(res) =
-            check_resource_permissions(&org_id, &_user_id, "dashboards", id, "DELETE").await
+            check_resource_permissions(&org_id, &_user_id, "dashboards", id, "DELETE", &folder_id)
+                .await
         {
             return res;
         }

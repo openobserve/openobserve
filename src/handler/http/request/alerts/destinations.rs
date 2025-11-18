@@ -302,7 +302,7 @@ async fn delete_destination_bulk(
     #[cfg(feature = "enterprise")]
     for name in &req.ids {
         if let Some(res) =
-            check_resource_permissions(&org_id, &_user_id, "destinations", name, "DELETE").await
+            check_resource_permissions(&org_id, &_user_id, "destinations", name, "DELETE", "").await
         {
             return Ok(res);
         }

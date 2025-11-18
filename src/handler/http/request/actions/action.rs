@@ -149,9 +149,15 @@ pub async fn delete_action_bulk(
         let user_id = user_email.user_id;
 
         for id in &req.ids {
-            if let Some(res) =
-                check_resource_permissions(&org_id, &user_id, "actions", &id.to_string(), "DELETE")
-                    .await
+            if let Some(res) = check_resource_permissions(
+                &org_id,
+                &user_id,
+                "actions",
+                &id.to_string(),
+                "DELETE",
+                "",
+            )
+            .await
             {
                 return Ok(res);
             }

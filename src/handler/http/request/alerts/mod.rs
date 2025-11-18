@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, patch, post, put, web};
+use actix_web::{
+    HttpRequest, HttpResponse, delete, get,
+    http::StatusCode,
+    patch, post, put,
+    web::{self, Query},
+};
 use config::meta::{
     alerts::alert::Alert as MetaAlert,
     triggers::{Trigger, TriggerModule},
@@ -327,18 +332,26 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 #[delete("/v2/{org_id}/alerts/bulk")]
 async fn delete_alert_bulk(
     path: web::Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
     req: web::Json<AlertBulkDeleteRequest>,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     let req = req.into_inner();
     let _user_id = user_email.user_id;
+    let folder_id = crate::common::utils::http::get_folder(&query);
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if let Some(res) =
-            check_resource_permissions(&org_id, &_user_id, "alerts", &id.to_string(), "DELETE")
-                .await
+        if let Some(res) = check_resource_permissions(
+            &org_id,
+            &_user_id,
+            "alerts",
+            &id.to_string(),
+            "DELETE",
+            &folder_id,
+        )
+        .await
         {
             return res;
         }
@@ -522,7 +535,8 @@ async fn enable_alert_bulk(
 
         for id in &req.ids {
             if let Some(res) =
-                check_resource_permissions(&org_id, user_id, "alerts", &id.to_string(), "PUT").await
+                check_resource_permissions(&org_id, user_id, "alerts", &id.to_string(), "PUT", "")
+                    .await
             {
                 return res;
             }
