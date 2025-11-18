@@ -72,38 +72,71 @@ impl TokenStream for O2TokenStream<'_> {
     fn advance(&mut self) -> bool {
         self.token.text.clear();
         self.token.position = self.token.position.wrapping_add(1);
+
+        // First, check if we have buffered tokens from previous camel case split
         if self.get_buffer_token() {
             return true;
         }
+
+        // Scan for the next alphanumeric character (skipping punctuation/whitespace)
         while let Some((offset_from, c)) = self.chars.next() {
             if c.is_alphanumeric() {
+                // Non-ASCII alphanumeric characters are emitted individually
+                if !c.is_ascii() {
+                    self.token.text.push(c);
+                    self.token.offset_from = offset_from;
+                    self.token.offset_to = offset_from + c.len_utf8();
+                    return true;
+                }
+
+                // Find where this ASCII token ends
                 let (offset_to, stop_c) = self.search_token_end();
-                if self.text[offset_from..offset_to]
-                    .chars()
-                    .any(char::is_uppercase)
-                {
-                    // handle camel case
-                    self.buffer
-                        .extend(split_camel_case(&self.text[offset_from..offset_to]));
-                    self.buffer_offset = offset_from;
-                    if !stop_c.is_ascii() {
-                        self.buffer
-                            .push(&self.text[offset_to..offset_to + stop_c.len_utf8()]);
-                    }
-                    if self.get_buffer_token() {
+                let token_text = &self.text[offset_from..offset_to];
+
+                // Check if this token has uppercase letters after the first character (camel case)
+                // This excludes tokens like "Hello" or "INFO" that are just capitalized or all-caps
+                if token_text.len() > 1 && token_text.chars().skip(1).any(char::is_uppercase) {
+                    // Split "CamelCase" -> ["Camel", "Case"] and buffer them for later
+                    let splits = split_camel_case(token_text);
+
+                    // Only emit root separately if we have actual splits (len > 1)
+                    if splits.len() > 1 {
+                        self.buffer.extend(splits);
+                        self.buffer_offset = offset_from;
+
+                        // If the delimiter after this token is non-ASCII, buffer it as a separate
+                        // token
+                        if !stop_c.is_ascii() {
+                            self.buffer
+                                .push(&self.text[offset_to..offset_to + stop_c.len_utf8()]);
+                        }
+
+                        // Emit the root token first (the full "CamelCase" before splits)
+                        self.token.offset_from = offset_from;
+                        self.token.offset_to = offset_to;
+                        self.token.text.push_str(token_text);
                         return true;
                     }
-                } else if !stop_c.is_ascii() {
+                    // If splits.len() == 1, fall through to emit normally
+                }
+
+                if !stop_c.is_ascii() {
+                    // No camel case, but the delimiter is non-ASCII, so buffer it for next call
                     self.buffer
                         .push(&self.text[offset_to..offset_to + stop_c.len_utf8()]);
                     self.buffer_offset = offset_to;
                 }
+
+                // Emit the token we found
                 self.token.offset_from = offset_from;
                 self.token.offset_to = offset_to;
-                self.token.text.push_str(&self.text[offset_from..offset_to]);
+                self.token.text.push_str(token_text);
                 return true;
             }
+            // If c is not alphanumeric, continue looping (skip punctuation/whitespace)
         }
+
+        // No more tokens
         false
     }
 
@@ -199,7 +232,7 @@ mod tests {
         let tokens = token_stream_helper(
             "Hello, happy tax payer!민족어대사전中文的ErrorExceptionAndHTTPResponse",
         );
-        assert_eq!(tokens.len(), 18);
+        assert_eq!(tokens.len(), 19);
         assert_token(&tokens[0], 0, "Hello", 0, 5);
         assert_token(&tokens[1], 1, "happy", 7, 12);
         assert_token(&tokens[2], 2, "tax", 13, 16);
@@ -213,31 +246,186 @@ mod tests {
         assert_token(&tokens[10], 10, "中", 41, 44);
         assert_token(&tokens[11], 11, "文", 44, 47);
         assert_token(&tokens[12], 12, "的", 47, 50);
-        assert_token(&tokens[13], 13, "Error", 50, 55);
-        assert_token(&tokens[14], 14, "Exception", 55, 64);
-        assert_token(&tokens[15], 15, "And", 64, 67);
-        assert_token(&tokens[16], 16, "HTTP", 67, 71);
-        assert_token(&tokens[17], 17, "Response", 71, 79);
+        assert_token(&tokens[13], 13, "ErrorExceptionAndHTTPResponse", 50, 79); // Root token
+        assert_token(&tokens[14], 14, "Error", 50, 55);
+        assert_token(&tokens[15], 15, "Exception", 55, 64);
+        assert_token(&tokens[16], 16, "And", 64, 67);
+        assert_token(&tokens[17], 17, "HTTP", 67, 71);
+        assert_token(&tokens[18], 18, "Response", 71, 79);
     }
 
     #[test]
     fn test_o2_tokenizer_camel_case() {
         let tokens = token_stream_helper("CamelCase");
-        assert_eq!(tokens.len(), 2);
-        assert_token(&tokens[0], 0, "Camel", 0, 5);
-        assert_token(&tokens[1], 1, "Case", 5, 9);
+        assert_eq!(tokens.len(), 3);
+        assert_token(&tokens[0], 0, "CamelCase", 0, 9); // Root token first
+        assert_token(&tokens[1], 1, "Camel", 0, 5); // Then split tokens
+        assert_token(&tokens[2], 2, "Case", 5, 9);
     }
 
     #[test]
     fn test_o2_tokenizer_camel_case_with_base64() {
         let body = "2025-03-13 INFO Current Users : Ly8gQWRkIHRoaXMgaGVscGVyIGZ1bmN0aW9uIHRvIGRldGVjd+O2gQWRkIHRoaXMgaGVscGVyIGZ1bmN0aW9uIHRvIGRldGVjdCBiYXNlNjQtbGlrZSBzdHJpbmdzCmZuIGxvb2tzX2xpa2VfYmFzZTY0KHM6ICZzdHIpIC0xIGJvb2wgewogICAgLy8gQmFzZTY0IGNoYXJhY3RlcmlzdGljczoKICAgIC8vIDEuIExlbmd0aCBzaG91bGQgYmUgbXVsdGlwbGUgb2YgNCAoZXhjZXB0IGZvciBwYWRkZWQgc3RyaW5ncykKICAgIC8vIDIuIE9ubHkgY29udGFpbnMgW0EtWmEtejAtOSsvPV0KICAgIC8vIDMuIFNob3VsZCBiZSByZWFzb25hYmx5IGxvbmcgKHRvIGF2b2lkIGZhbHNlIHBvc2l0aXZlcykKICAgIGNvbnN0IE1JTl9CQVNFNjRfTEVOR1RIOiB1c2l6ZSA9IgPCBNSU5fQkFTRTY0X0xF==";
         let tokens = token_stream_helper(body);
-        assert_eq!(tokens.len(), 27);
+        assert_eq!(tokens.len(), 28);
         assert_token(&tokens[0], 0, "2025", 0, 4);
         assert_token(&tokens[1], 1, "03", 5, 7);
         assert_token(&tokens[2], 2, "13", 8, 10);
         assert_token(&tokens[3], 3, "INFO", 11, 15);
         assert_token(&tokens[4], 4, "Current", 16, 23);
         assert_token(&tokens[5], 5, "Users", 24, 29);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_all_caps() {
+        // All caps words should NOT be split
+        let tokens = token_stream_helper("HTTP API REST JSON XML");
+        assert_eq!(tokens.len(), 5);
+        assert_token(&tokens[0], 0, "HTTP", 0, 4);
+        assert_token(&tokens[1], 1, "API", 5, 8);
+        assert_token(&tokens[2], 2, "REST", 9, 13);
+        assert_token(&tokens[3], 3, "JSON", 14, 18);
+        assert_token(&tokens[4], 4, "XML", 19, 22);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_acronym_with_word() {
+        // "HTTPSConnection" should emit root + splits: "HTTPS", "Connection"
+        let tokens = token_stream_helper("HTTPSConnection");
+        assert_eq!(tokens.len(), 3);
+        assert_token(&tokens[0], 0, "HTTPSConnection", 0, 15); // Root token
+        assert_token(&tokens[1], 1, "HTTPS", 0, 5);
+        assert_token(&tokens[2], 2, "Connection", 5, 15);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_numbers_in_camel_case() {
+        // "base64String" has 'S', so it's camelCase: root + "base64", "String"
+        // "utf8Encode" has 'E', so it's camelCase: root + "utf8", "Encode"
+        let tokens = token_stream_helper("base64String utf8Encode");
+        assert_eq!(tokens.len(), 6);
+        assert_token(&tokens[0], 0, "base64String", 0, 12); // Root
+        assert_token(&tokens[1], 1, "base64", 0, 6);
+        assert_token(&tokens[2], 2, "String", 6, 12);
+        assert_token(&tokens[3], 3, "utf8Encode", 13, 23); // Root
+        assert_token(&tokens[4], 4, "utf8", 13, 17);
+        assert_token(&tokens[5], 5, "Encode", 17, 23);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_single_uppercase_first_char() {
+        // Single uppercase first character should NOT trigger camelCase
+        let tokens = token_stream_helper("Hello World Welcome");
+        assert_eq!(tokens.len(), 3);
+        assert_token(&tokens[0], 0, "Hello", 0, 5);
+        assert_token(&tokens[1], 1, "World", 6, 11);
+        assert_token(&tokens[2], 2, "Welcome", 12, 19);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_consecutive_uppercase() {
+        // "XMLHttpRequest" -> root + splits: "XML", "Http", "Request"
+        let tokens = token_stream_helper("XMLHttpRequest");
+        assert_eq!(tokens.len(), 4);
+        assert_token(&tokens[0], 0, "XMLHttpRequest", 0, 14); // Root
+        assert_token(&tokens[1], 1, "XML", 0, 3);
+        assert_token(&tokens[2], 2, "Http", 3, 7);
+        assert_token(&tokens[3], 3, "Request", 7, 14);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_mixed_scripts() {
+        // Mixed Latin, Chinese, Japanese, Korean - each CJK character is a separate token
+        let tokens = token_stream_helper("Hello世界こんにちは안녕하세요");
+        assert_eq!(tokens.len(), 13);
+        assert_token(&tokens[0], 0, "Hello", 0, 5);
+        assert_token(&tokens[1], 1, "世", 5, 8);
+        assert_token(&tokens[2], 2, "界", 8, 11);
+        assert_token(&tokens[3], 3, "こ", 11, 14);
+        assert_token(&tokens[4], 4, "ん", 14, 17);
+        assert_token(&tokens[5], 5, "に", 17, 20);
+        assert_token(&tokens[6], 6, "ち", 20, 23);
+        assert_token(&tokens[7], 7, "は", 23, 26);
+        assert_token(&tokens[8], 8, "안", 26, 29);
+        assert_token(&tokens[9], 9, "녕", 29, 32);
+        assert_token(&tokens[10], 10, "하", 32, 35);
+        assert_token(&tokens[11], 11, "세", 35, 38);
+        assert_token(&tokens[12], 12, "요", 38, 41);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_empty_and_punctuation() {
+        // Empty string should produce no tokens
+        let tokens = token_stream_helper("");
+        assert_eq!(tokens.len(), 0);
+
+        // Only punctuation should produce no tokens
+        let tokens = token_stream_helper("!@#$%^&*()");
+        assert_eq!(tokens.len(), 0);
+
+        // Only whitespace should produce no tokens
+        let tokens = token_stream_helper("   \t\n  ");
+        assert_eq!(tokens.len(), 0);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_multiple_camel_case_sequence() {
+        // Multiple camelCase words in sequence
+        let tokens = token_stream_helper("getUserName getEmailAddress");
+        assert_eq!(tokens.len(), 8);
+        // getUserName: root + get, User, Name
+        assert_token(&tokens[0], 0, "getUserName", 0, 11);
+        assert_token(&tokens[1], 1, "get", 0, 3);
+        assert_token(&tokens[2], 2, "User", 3, 7);
+        assert_token(&tokens[3], 3, "Name", 7, 11);
+        // getEmailAddress: root + get, Email, Address
+        assert_token(&tokens[4], 4, "getEmailAddress", 12, 27);
+        assert_token(&tokens[5], 5, "get", 12, 15);
+        assert_token(&tokens[6], 6, "Email", 15, 20);
+        assert_token(&tokens[7], 7, "Address", 20, 27);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_numbers_only() {
+        let tokens = token_stream_helper("123 456 789");
+        assert_eq!(tokens.len(), 3);
+        assert_token(&tokens[0], 0, "123", 0, 3);
+        assert_token(&tokens[1], 1, "456", 4, 7);
+        assert_token(&tokens[2], 2, "789", 8, 11);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_alphanumeric_mix() {
+        // Mix of letters and numbers without camelCase
+        let tokens = token_stream_helper("test123 data456abc");
+        assert_eq!(tokens.len(), 2);
+        assert_token(&tokens[0], 0, "test123", 0, 7);
+        assert_token(&tokens[1], 1, "data456abc", 8, 18);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_single_char_tokens() {
+        let tokens = token_stream_helper("a b c");
+        assert_eq!(tokens.len(), 3);
+        assert_token(&tokens[0], 0, "a", 0, 1);
+        assert_token(&tokens[1], 1, "b", 2, 3);
+        assert_token(&tokens[2], 2, "c", 4, 5);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_special_camel_cases() {
+        // "iPhone" should emit root + splits: "i", "Phone"
+        let tokens = token_stream_helper("iPhone");
+        assert_eq!(tokens.len(), 3);
+        assert_token(&tokens[0], 0, "iPhone", 0, 6); // Root
+        assert_token(&tokens[1], 1, "i", 0, 1);
+        assert_token(&tokens[2], 2, "Phone", 1, 6);
+
+        // "eBay" should emit root + splits: "e", "Bay"
+        let tokens = token_stream_helper("eBay");
+        assert_eq!(tokens.len(), 3);
+        assert_token(&tokens[0], 0, "eBay", 0, 4); // Root
+        assert_token(&tokens[1], 1, "e", 0, 1);
+        assert_token(&tokens[2], 2, "Bay", 1, 4);
     }
 }
