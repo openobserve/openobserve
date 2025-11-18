@@ -1297,7 +1297,8 @@ export default defineComponent({
 
         const response = await dashboardService.bulkDelete(
           store.state.selectedOrganization.identifier,
-          payload
+          payload,
+          activeFolderId.value
         );
 
         dismiss();

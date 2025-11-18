@@ -2421,7 +2421,8 @@ export default defineComponent({
 
       const response = await alertsService.bulkDelete(
         store.state.selectedOrganization.identifier,
-        payload
+        payload,
+        activeFolderId.value
       );
 
       dismiss();
