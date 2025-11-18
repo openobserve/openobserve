@@ -36,10 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               trigger
+              class="app-performance-auto-refresh-interval !tw-ml-[0.5rem] !tw-pl-0 !tw-overflow-hidden"
               @trigger="refreshData"
             />
             <q-btn
-              class="q-ml-sm"
+              class="q-ml-sm !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)] tw-h-[2rem] !tw-px-[0.325rem] hover:!tw-bg-[var(--o2-hover-accent)]"
               outline
               padding="xs"
               no-caps
@@ -59,10 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <router-view v-slot="{ Component }">
       <keep-alive>
-        <div
-          class="tw-pb-[0.625rem] tw-px-[0.625rem] tw-h-full tw-h-[calc(100%-146px)]"
-        >
-          <div class="card-container tw-py-[0.625rem] tw-h-full">
+        <div class="tw-pb-[0.375rem] tw-px-[0.625rem] !tw-h-[calc(100%-101px)]">
+          <div
+            class="card-container tw-py-[0.625rem] tw-h-full tw-overflow-hidden"
+          >
             <component
               :is="Component"
               :date-time="currentTimeObj"
@@ -120,8 +121,8 @@ export default defineComponent({
         value: "overview",
         style: {
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         },
       },
       {
@@ -129,8 +130,8 @@ export default defineComponent({
         value: "web_vitals",
         style: {
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         },
       },
       {
@@ -138,8 +139,8 @@ export default defineComponent({
         value: "errors",
         style: {
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         },
       },
       {
@@ -147,8 +148,8 @@ export default defineComponent({
         value: "api",
         style: {
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         },
       },
     ];
@@ -416,7 +417,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .performance_title {
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 .q-table {
   &__top {
@@ -425,15 +426,40 @@ export default defineComponent({
   }
 }
 
-.rum-date-time-picker {
-  height: 30px;
+.performance-dashboard {
+  :deep(.card-container) {
+    box-shadow: none !important;
+    &:first-child {
+      padding: 0 !important;
+    }
+  }
+}
+
+:deep(.app-performance-auto-refresh-interval) {
+  .q-btn {
+    height: 1.9rem !important;
+    min-height: 1.9rem !important;
+    border-radius: 0.375rem !important;
+    padding: 0.125rem 0.25rem !important;
+
+    &:hover {
+      background-color: var(--o2-hover-accent);
+    }
+  }
 }
 </style>
 
 <style lang="scss">
 .performance-dashboard {
   min-height: auto !important;
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 12.5rem);
   overflow-y: auto;
+
+  .card-container {
+    box-shadow: none !important;
+    &:only-child {
+      padding: 0 !important;
+    }
+  }
 }
 </style>

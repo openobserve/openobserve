@@ -936,12 +936,12 @@ GROUP BY stream
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        let sql = if stream_type.is_some() && stream_name.is_some() {
+        let sql = if let Some(stream_type) = stream_type
+            && let Some(stream_name) = stream_name
+        {
             format!(
                 "SELECT * FROM stream_stats WHERE stream = '{}/{}/{}';",
-                org_id,
-                stream_type.unwrap(),
-                stream_name.unwrap()
+                org_id, stream_type, stream_name
             )
         } else {
             format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
@@ -1937,12 +1937,13 @@ CREATE TABLE IF NOT EXISTS stream_stats
     .await?;
 
     // create column created_at and updated_at for version >= 0.14.7
+    // Nov 11 2025, just a value, anything large than past is fine
     let column = "created_at";
-    let data_type = "BIGINT default 0 not null";
+    let data_type = "BIGINT default 1762819200000000 not null";
     add_column("file_list", column, data_type).await?;
     add_column("file_list_history", column, data_type).await?;
     let column = "updated_at";
-    let data_type = "BIGINT default 0 not null";
+    let data_type = "BIGINT default 1762819200000000 not null";
     add_column("file_list", column, data_type).await?;
     add_column("file_list_history", column, data_type).await?;
 

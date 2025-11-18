@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
   
             <!-- additional setup starts here -->
-             <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
+             <div class="tw-px-[0.625rem] tw-w-full tw-h-full">
                    <div
               class="flex justify-start items-center q-pb-sm flex-wrap card-container"
             >

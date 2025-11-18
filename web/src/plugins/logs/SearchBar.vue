@@ -2751,6 +2751,7 @@ export default defineComponent({
         });
       }
 
+      searchObj.meta.showTransformEditor = true;
       searchObj.config.fnSplitterModel = 60;
       fnEditorRef?.value?.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
@@ -3228,10 +3229,11 @@ export default defineComponent({
             });
             setTimeout(async () => {
               try {
+                searchObj.loadingHistogram = false;
                 searchObj.loading = true;
                 searchObj.meta.refreshHistogram = true;
                 // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
-                searchObj.communicationMethod = "streaming";
+                searchObj.communicationMethod = "streaming";                
                 await extractFields();
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
@@ -3411,6 +3413,14 @@ export default defineComponent({
         delete savedSearchObj.data.savedViews;
         delete savedSearchObj.data.transforms;
 
+
+        // Turn off all loaders before saving view
+        savedSearchObj.loading = false;
+        savedSearchObj.loadingHistogram = false;
+        savedSearchObj.loadingCounter = false;
+        savedSearchObj.loadingStream = false;
+        savedSearchObj.loadingSavedView = false;
+        
         savedSearchObj.data.timezone = store.state.timezone;
 
         if (savedSearchObj.data.parsedQuery) {

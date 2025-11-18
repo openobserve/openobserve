@@ -436,7 +436,7 @@ const fetchAlerts = async () => {
       "name",
       false,
       "",
-      "default",//store.state.selectedOrganization.identifier,
+      store.state.selectedOrganization.identifier,//store.state.selectedOrganization.identifier,
       "", // Empty folder to get all alerts
       ""
     );
