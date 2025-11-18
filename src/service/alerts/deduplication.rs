@@ -122,7 +122,7 @@ pub async fn find_matching_semantic_fingerprints(
     semantic_dimensions: &std::collections::HashMap<String, String>,
     time_window_minutes: i64,
 ) -> Result<Vec<alert_dedup_state::Model>, sea_orm::DbErr> {
-    use sea_orm::QuerySelect;
+    
 
     let cutoff_time = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros()
         - (time_window_minutes * 60 * 1_000_000);

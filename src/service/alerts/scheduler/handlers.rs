@@ -702,12 +702,11 @@ async fn handle_alert_triggers(
             match crate::service::alerts::org_config::get_correlation_config(&new_trigger.org).await
             {
                 Ok(Some(correlation_config)) if correlation_config.enabled => {
-                    // Get semantic groups from alert's deduplication config
-                    let semantic_groups = alert
-                        .deduplication
-                        .as_ref()
-                        .map(|d| d.semantic_field_groups.clone())
-                        .unwrap_or_default();
+                    // Get semantic groups from org-level deduplication config
+                    let semantic_groups = match crate::service::alerts::org_config::get_deduplication_config(&new_trigger.org).await {
+                        Ok(Some(dedup_config)) => dedup_config.semantic_field_groups.clone(),
+                        _ => vec![],
+                    };
 
                     // Correlate each result row into incidents
                     for row in &data {
