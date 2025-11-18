@@ -1210,8 +1210,8 @@ class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 t
                           > {{  tab == 'sql' ? 'Generate SQL' : 'Generate PromQL' }} </span>
                       </q-btn>
                       </div>
-                      <div class="tw-h-full tw-flex tw-justify-center tw-items-center o2-select-input  tw-w-full col"
-                      style="padding-top: 0"                       >
+                      <div class="tw-h-full tw-flex tw-justify-center tw-items-center o2-select-input tw-w-full col"
+                      style="padding-top: 0">
                         <q-select
                           v-model="selectedColumn"
                           :options="filteredFields"
@@ -1219,7 +1219,6 @@ class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 t
                           input-debounce="0"
                           behavior="menu"
                           use-input
-                          filled
                           borderless
                           dense
                           hide-selected
@@ -1229,8 +1228,6 @@ class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 t
                               (val: string, update: any) => filterFields(val, update)
                             "
                           @update:modelValue="onColumnSelect"
-                          class="mini-select "
-                          input-style="height: 12px; min-height: 8px; margin: 0px; width: 120px;  "
                           placeholder="Search for a field"
                           style="width: 150px;"
                     >
@@ -1363,7 +1360,6 @@ data-test="scheduled-alert-promql-editor"
                           input-debounce="0"
                           behavior="menu"
                           use-input
-                          filled
                           borderless
                           dense
                           hide-selected
@@ -1378,7 +1374,6 @@ data-test="scheduled-alert-promql-editor"
                           @clear="onFunctionClear"
                           style="width: 150px;"
                           placeholder="Saved functions"
-                          input-style="height: 12px; min-height: 8px; margin: 0px; width: 120px;  "
                                                 >
                           <template #no-option>
                         <q-item>
@@ -2882,12 +2877,25 @@ defineExpose({
 .light-mode-editor {
   border: 1px solid #e0e0e0 !important;
 }
-.o2-select-input {
-  .q-field{
-    .q-field__control{
-      min-height: 32px !important;
-      max-height: 32px !important;
-    }
+
+.o2-select-input{
+  min-height: 32px !important;
+  margin-top: 4px;
+
+  .q-field__control {
+    min-height: 32px !important;
+    max-height: 32px !important;
+    height: 32px !important;
   }
+
+  .q-field__native, .q-field__input {
+    padding-bottom: 0.25rem !important;
+  }
+
+  .q-field__append {
+    align-items: center;
+    height: 32px !important;
+  }
+
 }
 </style>
