@@ -147,6 +147,8 @@ pub struct RequestRangeQuery {
     pub timeout: Option<String>,
     /// Use cache.
     pub use_cache: Option<bool>,
+    /// Use streaming output.
+    pub use_streaming: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

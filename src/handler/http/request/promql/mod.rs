@@ -573,7 +573,7 @@ async fn query_range(
 
     let timeout = search_timeout(req.timeout);
 
-    let req = promql::MetricsQueryRequest {
+    let search_req = promql::MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
         start,
         end,
@@ -581,7 +581,13 @@ async fn query_range(
         query_exemplars,
         use_cache: req.use_cache,
     };
-    search(&trace_id, org_id, &req, user_email, timeout).await
+    if let Some(use_streaming) = req.use_streaming
+        && use_streaming
+    {
+        search_streaming(&trace_id, org_id, &search_req, user_email, timeout).await
+    } else {
+        search(&trace_id, org_id, &search_req, user_email, timeout).await
+    }
 }
 
 /// prometheus query metric metadata
@@ -1109,6 +1115,42 @@ fn search_timeout(timeout: Option<String>) -> i64 {
 }
 
 async fn search(
+    trace_id: &str,
+    org_id: &str,
+    req: &promql::MetricsQueryRequest,
+    user_email: &str,
+    timeout: i64,
+) -> Result<HttpResponse, Error> {
+    match promql::search::search(trace_id, org_id, req, user_email, timeout).await {
+        Ok(data) if !req.query_exemplars => {
+            Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(
+                promql::QueryResult {
+                    result_type: data.get_type().to_string(),
+                    result: data,
+                },
+                Some(trace_id.to_string()),
+            )))
+        }
+        Ok(data) => Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(
+            data,
+            Some(trace_id.to_string()),
+        ))),
+        Err(err) => {
+            let err = match err {
+                errors::Error::ErrorCode(code) => code.get_error_detail(),
+                _ => err.to_string(),
+            };
+            Ok(
+                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(
+                    err,
+                    Some(trace_id.to_string()),
+                )),
+            )
+        }
+    }
+}
+
+async fn search_streaming(
     trace_id: &str,
     org_id: &str,
     req: &promql::MetricsQueryRequest,

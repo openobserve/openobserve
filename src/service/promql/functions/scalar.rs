@@ -15,13 +15,27 @@
 
 use datafusion::error::{DataFusionError, Result};
 
-use crate::service::promql::value::{EvalContext, Value};
+use crate::service::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 
-pub(crate) fn scalar(data: Value, _eval_ctx: &EvalContext) -> Result<Value> {
+pub(crate) fn scalar(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     println!("scalar input: {:?}", data);
     match data {
         Value::Float(f) => Ok(Value::Float(f)),
         Value::Matrix(v) => Ok(Value::Matrix(v)),
+        Value::None => {
+            // Generate samples using timestamps from eval_ctx
+            let samples: Vec<Sample> = eval_ctx
+                .timestamps()
+                .iter()
+                .map(|&ts| Sample::new(ts, f64::NAN))
+                .collect();
+            Ok(Value::Matrix(vec![RangeValue {
+                labels: Labels::default(),
+                samples,
+                exemplars: None,
+                time_window: None,
+            }]))
+        }
         _ => Err(DataFusionError::Plan(
             "Unexpected input. Expected: \"vector(s scalar)\"".into(),
         )),
