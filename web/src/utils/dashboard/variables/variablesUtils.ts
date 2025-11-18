@@ -133,10 +133,98 @@ export const formatRateInterval = (interval: any) => {
   return formattedStr;
 };
 
+/**
+ * Resolves variables with scope precedence: panel > tab > global
+ * Extracted to avoid code duplication
+ */
+const resolveVariablesWithPrecedence = (
+  variablesData: any,
+  context?: { tabId?: string; panelId?: string },
+): Record<string, any> => {
+  const resolvedVariables: Record<string, any> = {};
+
+  if (!context || !variablesData?.values) {
+    return resolvedVariables;
+  }
+
+  // Group variables by name to handle multiple scopes
+  const variablesByName: Record<string, any[]> = {};
+  variablesData.values.forEach((variable: any) => {
+    if (variable.name) {
+      if (!variablesByName[variable.name]) {
+        variablesByName[variable.name] = [];
+      }
+      variablesByName[variable.name].push(variable);
+    }
+  });
+
+  // Resolve each variable with precedence: panel > tab > global
+  Object.keys(variablesByName).forEach((name) => {
+    const variables = variablesByName[name];
+    let effectiveValue = null;
+    let found = false;
+
+    // 1. Check panel-level first
+    if (context.panelId) {
+      const panelVar = variables.find((v: any) => v.scope === "panels");
+      if (panelVar && Array.isArray(panelVar.value)) {
+        const panelValue = panelVar.value.find(
+          (pv: any) => pv.panelId === context.panelId,
+        );
+        if (
+          panelValue &&
+          panelValue.value !== null &&
+          panelValue.value !== undefined
+        ) {
+          effectiveValue = panelValue.value;
+          found = true;
+        }
+      }
+    }
+
+    // 2. Check tab-level next
+    if (!found && context.tabId) {
+      const tabVar = variables.find((v: any) => v.scope === "tabs");
+      if (tabVar && Array.isArray(tabVar.value)) {
+        const tabValue = tabVar.value.find(
+          (tv: any) => tv.tabId === context.tabId,
+        );
+        if (
+          tabValue &&
+          tabValue.value !== null &&
+          tabValue.value !== undefined
+        ) {
+          effectiveValue = tabValue.value;
+          found = true;
+        }
+      }
+    }
+
+    // 3. Fall back to global
+    if (!found) {
+      const globalVar = variables.find(
+        (v: any) => v.scope === "global" || !v.scope,
+      );
+      if (
+        globalVar &&
+        globalVar.value !== null &&
+        globalVar.value !== undefined
+      ) {
+        effectiveValue = globalVar.value;
+        found = true;
+      }
+    }
+
+    resolvedVariables[name] = effectiveValue;
+  });
+
+  return resolvedVariables;
+};
+
 export const processVariableContent = (
   content: string,
   variablesData: any,
-  context?: { tabId?: string; panelId?: string }
+  context?: { tabId?: string; panelId?: string },
 ) => {
   let processedContent: string = content;
 
@@ -145,75 +233,20 @@ export const processVariableContent = (
   }
 
   // Build a map of resolved variable values with scope precedence
-  const resolvedVariables: Record<string, any> = {};
-
-  if (context) {
-    // Group variables by name to handle multiple scopes
-    const variablesByName: Record<string, any[]> = {};
-    variablesData.values.forEach((variable: any) => {
-      if (variable.name) {
-        if (!variablesByName[variable.name]) {
-          variablesByName[variable.name] = [];
-        }
-        variablesByName[variable.name].push(variable);
-      }
-    });
-
-    // Resolve each variable with precedence: panel > tab > global
-    Object.keys(variablesByName).forEach((name) => {
-      const variables = variablesByName[name];
-      let effectiveValue = null;
-      let found = false;
-
-      // 1. Check panel-level first
-      if (context.panelId) {
-        const panelVar = variables.find((v: any) => v.scope === 'panels');
-        if (panelVar && Array.isArray(panelVar.value)) {
-          const panelValue = panelVar.value.find(
-            (pv: any) => pv.panelId === context.panelId
-          );
-          if (panelValue && panelValue.value !== null && panelValue.value !== undefined) {
-            effectiveValue = panelValue.value;
-            found = true;
-          }
-        }
-      }
-
-      // 2. Check tab-level next
-      if (!found && context.tabId) {
-        const tabVar = variables.find((v: any) => v.scope === 'tabs');
-        if (tabVar && Array.isArray(tabVar.value)) {
-          const tabValue = tabVar.value.find(
-            (tv: any) => tv.tabId === context.tabId
-          );
-          if (tabValue && tabValue.value !== null && tabValue.value !== undefined) {
-            effectiveValue = tabValue.value;
-            found = true;
-          }
-        }
-      }
-
-      // 3. Fall back to global
-      if (!found) {
-        const globalVar = variables.find((v: any) => v.scope === 'global' || !v.scope);
-        if (globalVar && globalVar.value !== null && globalVar.value !== undefined) {
-          effectiveValue = globalVar.value;
-          found = true;
-        }
-      }
-
-      resolvedVariables[name] = effectiveValue;
-    });
-  }
+  const resolvedVariables = resolveVariablesWithPrecedence(
+    variablesData,
+    context,
+  );
 
   // Process each variable for replacement
   variablesData.values.forEach((variable: any) => {
     if (!variable.name) return;
 
     // Get effective value based on context or use direct value
-    let effectiveValue = context && resolvedVariables.hasOwnProperty(variable.name)
-      ? resolvedVariables[variable.name]
-      : variable.value;
+    let effectiveValue =
+      context && resolvedVariables.hasOwnProperty(variable.name)
+        ? resolvedVariables[variable.name]
+        : variable.value;
 
     const placeholders = [
       `\${${variable.name}}`,
