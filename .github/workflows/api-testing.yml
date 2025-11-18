@@ -72,7 +72,7 @@ jobs:
         if: steps.check_changes.outputs.has_changes == 'true'
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-07-20
+          toolchain: nightly-2025-11-11
 
       - name: Setup Rust Cache
         if: steps.check_changes.outputs.has_changes == 'true'
