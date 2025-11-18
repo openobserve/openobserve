@@ -1083,14 +1083,7 @@ impl Engine {
             Func::Rate => functions::rate(input, &self.eval_ctx)?,
             Func::Resets => functions::resets(input, &self.eval_ctx)?,
             Func::Round => functions::round(input)?,
-            Func::Scalar => match input {
-                Value::Float(_) => input,
-                _ => {
-                    return Err(DataFusionError::NotImplemented(format!(
-                        "Invalid scalar value: {input:?}"
-                    )));
-                }
-            },
+            Func::Scalar => functions::scalar(input, &self.eval_ctx)?,
             Func::Sgn => functions::sgn(input)?,
             Func::Sort => {
                 return Err(DataFusionError::NotImplemented(format!(
