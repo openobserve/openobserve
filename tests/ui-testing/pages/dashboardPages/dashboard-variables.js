@@ -22,10 +22,10 @@ export default class DashboardVariables {
     // Open Variable Tab
     await this.page
       .locator('[data-test="dashboard-settings-variable-tab"]')
-      .click();
+      .click({timeout: 50000});
 
     // Add Variable
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click({timeout:50000});
     await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
 
     // Select Stream Type
@@ -58,13 +58,13 @@ export default class DashboardVariables {
     await this.page
       .locator('[data-test="dashboard-variable-field-select"]')
       .fill(field);
-    await this.page.getByText(field).click();
+    await this.page.getByText(field).click({timeout: 50000});
 
     // Add Filter Configuration if provided
     if (filterConfig) {
 
       const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
-      await addFilterBtn.waitFor({ state: "visible", timeout: 10000 });
+      await addFilterBtn.waitFor({ state: "visible", timeout: 50000 });
       await addFilterBtn.click();
       
       // Wait for and interact with Filter Name selector

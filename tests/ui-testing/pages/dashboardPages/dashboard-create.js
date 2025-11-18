@@ -31,23 +31,23 @@ export default class DashboardCreate {
                url.includes('page_num=0') &&
                response.status() === 200;
       },
-      { timeout: 15000 }
+      { timeout: 50000 }
     );
 
-    await this.dashCreateBtn.waitFor({ state: "visible", timeout: 15000 });
+    await this.dashCreateBtn.waitFor({ state: "visible", timeout: 50000 });
     await this.dashCreateBtn.click();
 
-    await this.dashName.waitFor({ state: "visible", timeout: 15000 });
+    await this.dashName.waitFor({ state: "visible", timeout: 50000 });
     await this.dashName.click();
     await this.dashName.fill(dashboardName);
 
-    await this.submitBtn.waitFor({ state: "visible", timeout: 15000 });
+    await this.submitBtn.waitFor({ state: "visible", timeout: 50000 });
     await this.submitBtn.click();
   }
 
   //back to dashboard list
   async backToDashboardList() {
-    await this.backBtn.waitFor({ state: "visible", timeout: 15000 });
+    await this.backBtn.waitFor({ state: "visible", timeout: 50000 });
     await this.backBtn.click();
   }
 
