@@ -813,7 +813,6 @@ export default defineComponent({
   components: { DashboardHeader, CommonAutoComplete },
   emits: ["close", "save"],
   setup(props, { emit }) {
-    console.log("props----", props.dashboardVariablesList);
     // Store dashboard data
     const dashboardData = ref<any>({ tabs: [] });
 
