@@ -16,11 +16,179 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="q-px-md q-py-md domain_management">
+    <!-- Claim Parser Function Selection -->
+    <div class="q-mb-xl">
+      <div class="text-h6 text-bold q-mb-xs">
+        {{ t("settings.claimParserFunction") }}
+      </div>
+      <div class="text-body2 text-grey-7 q-mb-md">
+        {{ t("settings.claimParserFunctionDescription") }}
+      </div>
+
+      <div class="row q-gutter-md items-end">
+        <div class="col-auto claim-parser-select">
+          <q-select
+            v-model="claimParserFunction"
+            :options="functionOptions"
+            :label="t('settings.claimParserFunctionLabel')"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop"
+            stack-label
+            outlined
+            dense
+            :loading="loadingFunctions"
+            @filter="filterFunctions"
+            use-input
+            fill-input
+            hide-selected
+            input-debounce="300"
+            clearable
+          >
+            <template v-slot:hint>
+              {{ t("settings.claimParserFunctionHint") }}
+            </template>
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">
+                  {{ t("settings.noVrlFunctionsFound") }}
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
+        </div>
+        <div class="col-auto">
+          <q-btn
+            :label="t('common.save')"
+            color="primary"
+            class="text-bold text-capitalize no-border"
+            unelevated
+            @click="saveClaimParserFunction"
+            :loading="savingClaimParser"
+          />
+        </div>
+        <div class="col-auto">
+          <q-btn
+            flat
+            round
+            dense
+            icon="help_outline"
+            @click="showVrlInfo = true"
+          >
+            <q-tooltip>{{ t("settings.claimParserFunctionInfoTitle") }}</q-tooltip>
+          </q-btn>
+        </div>
+      </div>
+
+      <!-- Right Drawer for VRL Information -->
+      <q-drawer
+        v-model="showVrlInfo"
+        side="right"
+        bordered
+        :width="450"
+        overlay
+        elevated
+      >
+        <div class="q-pa-md">
+          <div class="row items-center q-mb-md">
+            <div class="col text-h6 text-bold">
+              {{ t("settings.claimParserFunctionInfoTitle") }}
+            </div>
+            <div class="col-auto">
+              <q-btn
+                flat
+                round
+                dense
+                icon="close"
+                @click="showVrlInfo = false"
+              />
+            </div>
+          </div>
+
+          <div class="text-body2">
+            <div class="q-mb-md q-pa-md info-box">
+              <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionInputTitle") }}</div>
+              <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
+            </div>
+
+            <div class="q-mb-md q-pa-md info-box">
+              <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
+              <div class="q-mb-sm">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
+              <div class="q-ml-md">
+                <div class="q-mb-xs">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
+                <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
+              </div>
+            </div>
+
+            <!-- Recent Errors Section -->
+            <div v-if="claimParserFunction" class="q-pa-md info-box error-section">
+              <div class="row items-center q-mb-sm">
+                <div class="col text-weight-medium">{{ t("settings.claimParserRecentErrors") }}</div>
+                <div class="col-auto">
+                  <q-btn
+                    flat
+                    dense
+                    size="sm"
+                    icon="refresh"
+                    @click="loadRecentErrors"
+                    :loading="loadingErrors"
+                  >
+                    <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+                  </q-btn>
+                </div>
+              </div>
+
+              <div v-if="loadingErrors" class="text-center q-py-md">
+                <q-spinner color="primary" size="sm" />
+              </div>
+
+              <div v-else-if="recentErrors.length === 0" class="text-grey-7 text-center q-py-sm">
+                {{ t("settings.noRecentErrors") }}
+              </div>
+
+              <div v-else class="error-list">
+                <div
+                  v-for="(error, index) in recentErrors.slice(0, 3)"
+                  :key="index"
+                  class="error-item q-pa-sm q-mb-xs"
+                >
+                  <div class="row items-start q-mb-xs">
+                    <q-icon name="error" color="negative" size="xs" class="q-mr-xs q-mt-xs" />
+                    <div class="col">
+                      <div class="text-caption text-weight-medium">{{ error.error_type }}</div>
+                      <div class="text-caption text-grey-7">{{ formatTimestamp(error._timestamp) }}</div>
+                    </div>
+                  </div>
+                  <div class="text-caption error-message">{{ error.error }}</div>
+                </div>
+
+                <!-- Show More Button -->
+                <div class="q-mt-sm text-center">
+                  <q-btn
+                    flat
+                    dense
+                    color="primary"
+                    :label="t('common.showMore')"
+                    icon-right="open_in_new"
+                    size="sm"
+                    @click="viewAllErrors"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </q-drawer>
+    </div>
+
+    <!-- Divider -->
+    <q-separator class="q-mb-xl" />
+
     <div class="text-h6 text-bold q-mb-xs">
-      {{ t("settings.ssoDomainRestrictions") }}
+      {{ t("settings.domainRestrictionsSubsection") }}
     </div>
     <div class="text-body2 text-grey-7 q-mb-lg">
-      {{ t("settings.ssoDomainRestrictionsDescription") }}
+      {{ t("settings.domainRestrictionsSubsectionDescription") }}
     </div>
 
     <!-- Domain Input Section -->
@@ -189,13 +357,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onActivated } from "vue";
+import { ref, reactive, onMounted, onActivated, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
-import { add } from "date-fns";
+import { add, formatDistanceToNow } from "date-fns";
+import jstransform from "@/services/jstransform";
+import organizations from "@/services/organizations";
+import searchService from "@/services/search";
 
 interface Domain {
   name: string;
@@ -213,11 +384,22 @@ const newDomain = ref("");
 const domains = reactive<Domain[]>([]);
 const saving = ref(false);
 
+// Claim parser function state
+const claimParserFunction = ref("");
+const functionOptions = ref<string[]>([]);
+const allFunctions = ref<string[]>([]);
+const loadingFunctions = ref(false);
+const savingClaimParser = ref(false);
+const showVrlInfo = ref(false);
+const recentErrors = ref<any[]>([]);
+const loadingErrors = ref(false);
+
 const emit = defineEmits(["cancel", "saved"]);
 
 onMounted(() => {
   if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
     loadDomainSettings();
+    loadFunctions();
   } else {
     router.replace({
       name: "general",
@@ -231,6 +413,7 @@ onMounted(() => {
 onActivated(() => {
   if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
     loadDomainSettings();
+    loadFunctions();
   } else {
     router.replace({
       name: "general",
@@ -244,7 +427,7 @@ onActivated(() => {
 const loadDomainSettings = async () => {
   try {
     const response = await domainManagement.getDomainRestrictions(store.state.zoConfig.meta_org);
-    
+
     if (response.data && response.data.domains) {
       const loadedDomains = response.data.domains
         .filter((domain: any) => domain && typeof domain === 'object' && domain.domain) // Filter out invalid entries
@@ -255,12 +438,18 @@ const loadDomainSettings = async () => {
         }));
       domains.splice(0, domains.length, ...loadedDomains);
     }
+
+    // Load claim parser function from organization settings
+    const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function;
+    if (storedFunction) {
+      claimParserFunction.value = storedFunction;
+    }
   } catch (error: any) {
     // If the API doesn't exist yet or returns an error, use example data
     console.warn("Domain restrictions API not available, using example data:", error);
-    
+
     const existingDomains = [];
-    
+
     domains.splice(0, domains.length, ...existingDomains);
   }
 };
@@ -422,6 +611,176 @@ const removeEmail = (domain: Domain, emailIndex: number) => {
   });
 };
 
+// Load VRL functions from _meta org
+const loadFunctions = async () => {
+  try {
+    loadingFunctions.value = true;
+    const response = await jstransform.list(1, 10000, "name", false, "", store.state.zoConfig.meta_org);
+
+    allFunctions.value = response.data.list.map((fn: any) => fn.name);
+    functionOptions.value = allFunctions.value;
+
+    // Set the current value from store if it exists
+    const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function;
+    if (storedFunction) {
+      claimParserFunction.value = storedFunction;
+    }
+  } catch (e: any) {
+    console.error("Error loading functions:", e);
+  } finally {
+    loadingFunctions.value = false;
+  }
+};
+
+// Filter functions for autocomplete
+const filterFunctions = (val: string, update: Function) => {
+  update(() => {
+    if (val === "") {
+      functionOptions.value = allFunctions.value;
+    } else {
+      const needle = val.toLowerCase();
+      functionOptions.value = allFunctions.value.filter(
+        (v) => v.toLowerCase().indexOf(needle) > -1
+      );
+    }
+  });
+};
+
+// Save claim parser function separately
+const saveClaimParserFunction = async () => {
+  savingClaimParser.value = true;
+
+  try {
+    const orgSettingsPayload: any = {
+      claim_parser_function: claimParserFunction.value || "",
+    };
+
+    await organizations.post_organization_settings(
+      store.state.zoConfig.meta_org,
+      orgSettingsPayload,
+    );
+
+    // Update store with new settings
+    const updatedSettings: any = {
+      ...store.state?.organizationData?.organizationSettings,
+      claim_parser_function: claimParserFunction.value || "",
+    };
+    store.dispatch("setOrganizationSettings", updatedSettings);
+
+    q.notify({
+      type: "positive",
+      message: t("settings.claimParserFunctionSaved"),
+      timeout: 3000,
+    });
+  } catch (error: any) {
+    q.notify({
+      type: "negative",
+      message: error?.message || t("settings.errorSavingClaimParserFunction"),
+      timeout: 3000,
+    });
+  } finally {
+    savingClaimParser.value = false;
+  }
+};
+
+// Build SQL query for claim parser errors
+const buildErrorsQuery = (functionName: string, limit?: number): string => {
+  const limitClause = limit ? ` LIMIT ${limit}` : '';
+  return `SELECT * FROM "errors" WHERE error_source='${functionName}' ORDER BY _timestamp DESC${limitClause}`;
+};
+
+// Load recent errors for the claim parser function
+const loadRecentErrors = async () => {
+  if (!claimParserFunction.value) {
+    recentErrors.value = [];
+    return;
+  }
+
+  loadingErrors.value = true;
+  try {
+    const now = new Date();
+    const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const query = {
+      query: {
+        sql: buildErrorsQuery(claimParserFunction.value, 10),
+        start_time: last24Hours.getTime() * 1000, // microseconds
+        end_time: now.getTime() * 1000,
+        from: 0,
+        size: 10,
+      },
+    };
+
+    const response = await searchService.search(
+      {
+        org_identifier: store.state.zoConfig.meta_org,
+        query: query,
+        page_type: "logs",
+      },
+      "ui"
+    );
+
+    if (response.data && response.data.hits) {
+      recentErrors.value = response.data.hits.map((hit: any) => hit);
+    } else {
+      recentErrors.value = [];
+    }
+  } catch (error: any) {
+    console.error("Error loading recent errors:", error);
+    recentErrors.value = [];
+  } finally {
+    loadingErrors.value = false;
+  }
+};
+
+// Format timestamp for display
+const formatTimestamp = (timestamp: number) => {
+  try {
+    const date = new Date(timestamp / 1000); // Convert microseconds to milliseconds
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch (e) {
+    return "Unknown time";
+  }
+};
+
+// Watch for drawer opening and load errors
+watch(showVrlInfo, (newVal) => {
+  if (newVal && claimParserFunction.value) {
+    loadRecentErrors();
+  }
+});
+
+// Navigate to logs page with error filters
+const viewAllErrors = () => {
+  const now = new Date();
+  const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  // Build the SQL query for the logs page using the reusable function
+  const sqlQuery = buildErrorsQuery(claimParserFunction.value);
+
+  // Base64 encode the query
+  const encodedQuery = btoa(sqlQuery);
+
+  // Navigate to logs page with pre-filled parameters
+  router.push({
+    path: "/logs",
+    query: {
+      org_identifier: store.state.zoConfig.meta_org,
+      stream: "errors",
+      stream_type: "logs",
+      from: last24Hours.getTime() * 1000, // microseconds
+      to: now.getTime() * 1000,
+      refresh: "0",
+      sql_mode: "true",
+      query: encodedQuery,
+      type: "logs",
+    },
+  });
+
+  // Close the drawer
+  showVrlInfo.value = false;
+};
+
 const saveChanges = async () => {
   saving.value = true;
   
@@ -476,12 +835,25 @@ const resetForm = () => {
 </script>
 
 <style scoped lang="scss">
+.claim-parser-select {
+  min-width: 400px;
+}
+
+.info-box {
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
 .domain-input {
   width: 300px;
 }
 
 .email-input {
   min-width: 250px;
+}
+
+.function-select {
+  max-width: 500px;
 }
 
 .domain-card {
@@ -506,7 +878,31 @@ const resetForm = () => {
   border: 1px solid #e0e0e0;
 }
 
+.error-section {
+  border-left: 3px solid #c10015;
+}
+
+.error-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.error-item {
+  background: #fff9f9;
+  border-radius: 4px;
+  border-left: 2px solid #ff9e9e;
+}
+
+.error-message {
+  color: #666;
+  word-break: break-word;
+}
+
 .body--dark {
+  .info-box {
+    background-color: #2a2a2a;
+  }
+
   .domain-card {
     border-color: #444;
     background: #1e1e1e;
@@ -520,6 +916,19 @@ const resetForm = () => {
   .email-item {
     background: #2a2a2a;
     border-color: #444;
+  }
+
+  .error-section {
+    border-left-color: #ff6b6b;
+  }
+
+  .error-item {
+    background: #2a1f1f;
+    border-left-color: #ff6b6b;
+  }
+
+  .error-message {
+    color: #ccc;
   }
 }
 </style>

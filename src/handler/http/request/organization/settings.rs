@@ -128,6 +128,18 @@ async fn create(
         data.dark_mode_theme_color = Some(dark_mode_theme_color);
     }
 
+    #[cfg(feature = "enterprise")]
+    if let Some(claim_parser_function) = settings.claim_parser_function {
+        field_found = true;
+        data.claim_parser_function = claim_parser_function;
+    }
+
+    #[cfg(feature = "enterprise")]
+    if let Some(claim_parser_function) = settings.claim_parser_function {
+        field_found = true;
+        data.claim_parser_function = claim_parser_function;
+    }
+
     if !field_found {
         return Ok(MetaHttpResponse::bad_request("No valid field found"));
     }
