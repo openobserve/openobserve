@@ -188,5 +188,4 @@ mod tests {
         // Verify it's marked as initialized
         assert!(INITIALIZED_ORGS.contains(test_org));
     }
-
 }
