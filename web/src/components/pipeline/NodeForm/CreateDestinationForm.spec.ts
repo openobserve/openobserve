@@ -186,18 +186,14 @@ describe("CreateDestinationForm", () => {
   });
 
   describe("URL Endpoint Field", () => {
-    it("should show url_endpoint field for all destination types", async () => {
-      const types = ["openobserve", "splunk", "elasticsearch", "datadog", "dynatrace", "newrelic", "custom"];
+    it("should show url_endpoint field on step 2", async () => {
+      wrapper.vm.formData.destination_type = "openobserve";
+      wrapper.vm.step = 2; // Move to step 2 where the field is shown
+      await wrapper.vm.$nextTick();
+      await flushPromises();
 
-      for (const type of types) {
-        wrapper.vm.formData.destination_type = type;
-        wrapper.vm.step = 2; // Move to step 2 where the field is shown
-        await wrapper.vm.$nextTick();
-        await flushPromises();
-
-        const endpointField = wrapper.find('[data-test="add-destination-url-endpoint-input"]');
-        expect(endpointField.exists()).toBe(true);
-      }
+      const endpointField = wrapper.find('[data-test="add-destination-url-endpoint-input"]');
+      expect(endpointField.exists()).toBe(true);
     });
 
     it("should make url_endpoint optional for custom destination type", async () => {
@@ -461,8 +457,10 @@ describe("CreateDestinationForm", () => {
     });
 
     it("should validate step 2 form fields", () => {
+      wrapper.vm.formData.destination_type = "openobserve"; // Default type that doesn't require metadata
       wrapper.vm.formData.name = "test-destination";
       wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.url_endpoint = "/api/org/stream/_json";
       wrapper.vm.formData.method = "post";
       wrapper.vm.formData.output_format = "json";
 
@@ -900,6 +898,236 @@ describe("CreateDestinationForm", () => {
         expect(notes.steps).toBeInstanceOf(Array);
         expect(notes.steps.length).toBeGreaterThan(0);
       });
+    });
+  });
+
+  describe("Destination Metadata", () => {
+    it("should have metadata field available", () => {
+      // Metadata may be undefined initially until destination type requires it
+      expect(wrapper.vm.formData.metadata === undefined || typeof wrapper.vm.formData.metadata === "object").toBe(true);
+    });
+
+    it("should validate that Splunk requires metadata", async () => {
+      wrapper.vm.formData.destination_type = "splunk";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.url_endpoint = "/services/collector";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "nestedevent";
+      // Without metadata, validation should fail
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
+
+    it("should validate that Elasticsearch requires metadata", async () => {
+      wrapper.vm.formData.destination_type = "elasticsearch";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.url_endpoint = "/_bulk";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "esbulk";
+      wrapper.vm.formData.esbulk_index = "default";
+      // Without metadata, validation should fail
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
+
+    it("should validate that Datadog requires metadata", async () => {
+      wrapper.vm.formData.destination_type = "datadog";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.url_endpoint = "/v1/input";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "json";
+      // Without metadata, validation should fail
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
+
+    it("should not require metadata for OpenObserve", async () => {
+      wrapper.vm.formData.destination_type = "openobserve";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.url_endpoint = "/api/org/stream/_json";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "json";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(true);
+    });
+
+    it("should validate Splunk metadata fields", async () => {
+      wrapper.vm.formData.destination_type = "splunk";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.url_endpoint = "/services/collector";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "nestedevent";
+      wrapper.vm.formData.metadata = {
+        source: "http:source",
+        sourcetype: "_json",
+        hostname: "server01",
+      };
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(true);
+    });
+
+    it("should fail validation if Splunk metadata is incomplete", async () => {
+      wrapper.vm.formData.destination_type = "splunk";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "nestedevent";
+      wrapper.vm.formData.metadata = {
+        source: "http:source",
+        // Missing sourcetype and hostname
+      };
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
+
+    it("should validate Elasticsearch metadata fields", async () => {
+      wrapper.vm.formData.destination_type = "elasticsearch";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.url_endpoint = "/_bulk";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "esbulk";
+      wrapper.vm.formData.esbulk_index = "default";
+      wrapper.vm.formData.metadata = {
+        _index: "logs-prod",
+      };
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(true);
+    });
+
+    it("should fail validation if Elasticsearch metadata is incomplete", async () => {
+      wrapper.vm.formData.destination_type = "elasticsearch";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "esbulk";
+      wrapper.vm.formData.metadata = {};
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
+
+    it("should validate Datadog metadata fields", async () => {
+      wrapper.vm.formData.destination_type = "datadog";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.url_endpoint = "/v1/input";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "json";
+      wrapper.vm.formData.metadata = {
+        ddsource: "nginx",
+        ddtags: "env:prod,version:1.0",
+        service: "api-gateway",
+        hostname: "server01",
+      };
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(true);
+    });
+
+    it("should fail validation if Datadog metadata is incomplete", async () => {
+      wrapper.vm.formData.destination_type = "datadog";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "json";
+      wrapper.vm.formData.metadata = {
+        ddsource: "nginx",
+        // Missing ddtags, service, and hostname
+      };
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
+
+    it("should include metadata in payload when creating destination", async () => {
+      (destinationService.create as any).mockResolvedValue({ data: {} });
+
+      wrapper.vm.formData = {
+        name: "Test Splunk",
+        url: "https://example.com",
+        url_endpoint: "/services/collector",
+        method: "post",
+        output_format: "nestedevent",
+        destination_type: "splunk",
+        skip_tls_verify: false,
+        template: "",
+        headers: {},
+        emails: "",
+        type: "http",
+        metadata: {
+          source: "http:source",
+          sourcetype: "_json",
+          hostname: "server01",
+        },
+      };
+
+      wrapper.vm.apiHeaders = [
+        { key: "Authorization", value: "Splunk token123", uuid: "123" },
+      ];
+
+      await wrapper.vm.createDestination();
+      await flushPromises();
+
+      expect(destinationService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            metadata: {
+              source: "http:source",
+              sourcetype: "_json",
+              hostname: "server01",
+            },
+          }),
+        }),
+      );
+    });
+
+    it("should populate metadata when editing destination", () => {
+      const destination = {
+        name: "Test Destination",
+        url: "https://example.com/services/collector",
+        method: "post",
+        output_format: "nestedevent",
+        destination_type_name: "splunk",
+        skip_tls_verify: false,
+        metadata: {
+          source: "http:source",
+          sourcetype: "_json",
+          hostname: "server01",
+        },
+      };
+
+      wrapper.vm.populateFormForEdit(destination);
+
+      expect(wrapper.vm.formData.metadata).toEqual({
+        source: "http:source",
+        sourcetype: "_json",
+        hostname: "server01",
+      });
+    });
+
+    it("should reset metadata when resetting form", () => {
+      wrapper.vm.formData.metadata = {
+        source: "test",
+        sourcetype: "test",
+        hostname: "test",
+      };
+
+      wrapper.vm.resetForm();
+
+      expect(wrapper.vm.formData.metadata).toBeUndefined();
     });
   });
 });

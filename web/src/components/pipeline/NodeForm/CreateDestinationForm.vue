@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="formData.destination_type === destType.value"
                 class="check-icon"
               >
+                <!-- eslint-disable-next-line vue/max-attributes-per-line -->
                 <q-icon name="check_circle" size="20px" color="positive" />
               </div>
             </div>
@@ -253,6 +254,186 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Index name where data will be written in Elasticsearch
               </template>
             </q-input>
+          </div>
+
+          <!-- Destination-specific Metadata Section -->
+          <div v-if="showMetadataFields" class="q-gutter-sm q-mt-md">
+            <div class="col-12 tw-text-[14px] tw-font-bold header-label">
+              Metadata Configuration
+            </div>
+
+            <!-- Splunk Metadata Fields -->
+            <template v-if="formData.destination_type === 'splunk'">
+              <q-input
+                data-test="add-destination-metadata-source-input"
+                v-model="formData.metadata!.source"
+                :label="'Source *'"
+                :placeholder="'Enter source (e.g., http:my_source)'"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[
+                  (val: any) =>
+                    !!val?.trim() || 'Source is required for Splunk',
+                ]"
+                tabindex="0"
+              >
+                <template v-slot:hint>
+                  Splunk source field for event metadata
+                </template>
+              </q-input>
+
+              <q-input
+                data-test="add-destination-metadata-sourcetype-input"
+                v-model="formData.metadata!.sourcetype"
+                :label="'Source Type *'"
+                :placeholder="'Enter source type (e.g., _json)'"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[
+                  (val: any) =>
+                    !!val?.trim() || 'Source type is required for Splunk',
+                ]"
+                tabindex="0"
+              >
+                <template v-slot:hint>
+                  Splunk sourcetype field for event metadata
+                </template>
+              </q-input>
+
+              <q-input
+                data-test="add-destination-metadata-hostname-input"
+                v-model="formData.metadata!.hostname"
+                :label="'Hostname *'"
+                :placeholder="'Enter hostname (e.g., server01)'"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[
+                  (val: any) =>
+                    !!val?.trim() || 'Hostname is required for Splunk',
+                ]"
+                tabindex="0"
+              >
+                <template v-slot:hint>
+                  Splunk host field for event metadata
+                </template>
+              </q-input>
+            </template>
+
+            <!-- Elasticsearch Metadata Fields -->
+            <template v-if="formData.destination_type === 'elasticsearch'">
+              <q-input
+                data-test="add-destination-metadata-index-input"
+                v-model="formData.metadata!._index"
+                :label="'Index *'"
+                :placeholder="'Enter index name (e.g., logs-prod)'"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[
+                  (val: any) =>
+                    !!val?.trim() || 'Index is required for Elasticsearch',
+                ]"
+                tabindex="0"
+              >
+                <template v-slot:hint>
+                  Elasticsearch index name for routing documents
+                </template>
+              </q-input>
+            </template>
+
+            <!-- Datadog Metadata Fields -->
+            <template v-if="formData.destination_type === 'datadog'">
+              <q-input
+                data-test="add-destination-metadata-ddsource-input"
+                v-model="formData.metadata!.ddsource"
+                :label="'DD Source *'"
+                :placeholder="'Enter source (e.g., nginx, java)'"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[
+                  (val: any) =>
+                    !!val?.trim() || 'DD Source is required for Datadog',
+                ]"
+                tabindex="0"
+              >
+                <template v-slot:hint>
+                  Source attribute for Datadog logs
+                </template>
+              </q-input>
+
+              <q-input
+                data-test="add-destination-metadata-ddtags-input"
+                v-model="formData.metadata!.ddtags"
+                :label="'DD Tags *'"
+                :placeholder="'Enter tags (e.g., env:prod,version:1.0)'"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[
+                  (val: any) =>
+                    !!val?.trim() || 'DD Tags are required for Datadog',
+                ]"
+                tabindex="0"
+              >
+                <template v-slot:hint>
+                  Comma-separated tags for Datadog logs
+                </template>
+              </q-input>
+
+              <q-input
+                data-test="add-destination-metadata-service-input"
+                v-model="formData.metadata!.service"
+                :label="'Service *'"
+                :placeholder="'Enter service name (e.g., api-gateway)'"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[
+                  (val: any) =>
+                    !!val?.trim() || 'Service is required for Datadog',
+                ]"
+                tabindex="0"
+              >
+                <template v-slot:hint> Service name for Datadog logs </template>
+              </q-input>
+
+              <q-input
+                data-test="add-destination-metadata-hostname-input"
+                v-model="formData.metadata!.hostname"
+                :label="'Hostname *'"
+                :placeholder="'Enter hostname (e.g., server01)'"
+                class="no-border showLabelOnTop"
+                borderless
+                dense
+                flat
+                stack-label
+                :rules="[
+                  (val: any) =>
+                    !!val?.trim() || 'Hostname is required for Datadog',
+                ]"
+                tabindex="0"
+              >
+                <template v-slot:hint> Hostname for Datadog logs </template>
+              </q-input>
+            </template>
           </div>
 
           <div class="q-gutter-sm">
@@ -715,6 +896,13 @@ const populateFormForEdit = (destination: DestinationData) => {
     );
   }
 
+  // Populate metadata object
+  if (destination.metadata && typeof destination.metadata === "object") {
+    formData.value.metadata = { ...destination.metadata };
+  } else {
+    formData.value.metadata = {};
+  }
+
   // Move to step 2 since destination type is already selected
   step.value = 2;
 };
@@ -1001,19 +1189,75 @@ const defaultUrlEndpoint = computed(() => {
   }
 });
 
+// Show metadata fields for specific destination types
+const showMetadataFields = computed(() => {
+  return ["splunk", "elasticsearch", "datadog"].includes(
+    formData.value.destination_type,
+  );
+});
+
+// Watch to ensure metadata is initialized when needed
+watch(
+  showMetadataFields,
+  (needsMetadata) => {
+    if (needsMetadata && !formData.value.metadata) {
+      formData.value.metadata = {};
+    }
+  },
+  { immediate: true },
+);
+
 // Step validation
 const canProceedStep1 = computed(() => {
   return !!formData.value.destination_type;
 });
 
 const canProceedStep2 = computed(() => {
-  return (
+  const basicValidation =
     formData.value.name &&
     isValidResourceName(formData.value.name) &&
     formData.value.url &&
     formData.value.method &&
-    formData.value.output_format
-  );
+    formData.value.output_format;
+
+  if (!basicValidation) return false;
+
+  // Validate url_endpoint for non-custom destination types
+  if (
+    formData.value.destination_type !== "custom" &&
+    !formData.value.url_endpoint?.trim()
+  ) {
+    return false;
+  }
+
+  // Validate destination-specific metadata
+  if (formData.value.destination_type === "splunk") {
+    return !!(
+      formData.value.metadata?.source?.trim() &&
+      formData.value.metadata?.sourcetype?.trim() &&
+      formData.value.metadata?.hostname?.trim()
+    );
+  }
+
+  if (formData.value.destination_type === "elasticsearch") {
+    // Validate both esbulk_index (for backward compatibility) and metadata._index
+    const hasEsbulkIndex =
+      formData.value.output_format === "esbulk" &&
+      formData.value.esbulk_index?.trim();
+    const hasMetadataIndex = !!formData.value.metadata?._index?.trim();
+    return hasEsbulkIndex && hasMetadataIndex;
+  }
+
+  if (formData.value.destination_type === "datadog") {
+    return !!(
+      formData.value.metadata?.ddsource?.trim() &&
+      formData.value.metadata?.ddtags?.trim() &&
+      formData.value.metadata?.service?.trim() &&
+      formData.value.metadata?.hostname?.trim()
+    );
+  }
+
+  return true;
 });
 
 // Navigation functions
@@ -1177,6 +1421,14 @@ const createDestination = () => {
     output_format: outputFormat,
     destination_type_name: formData.value.destination_type,
   };
+
+  // Add metadata as JSON object
+  if (
+    formData.value.metadata &&
+    Object.keys(formData.value.metadata).length > 0
+  ) {
+    payload.metadata = formData.value.metadata;
+  }
 
   // Check if we're in edit mode
   if (isEditMode.value) {

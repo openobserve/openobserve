@@ -92,6 +92,20 @@ export interface TemplateData extends Template {
 export interface Headers {
   [key: string]: string;
 }
+export interface DestinationMetadata {
+  // Splunk specific fields
+  source?: string;
+  sourcetype?: string;
+  hostname?: string;
+  // Elasticsearch specific fields
+  _index?: string;
+  // Datadog specific fields
+  ddsource?: string;
+  ddtags?: string;
+  service?: string;
+  // hostname is shared between Splunk and Datadog
+}
+
 export interface Destination {
   name: string;
   url?: string;
@@ -107,6 +121,7 @@ export interface Destination {
   destination_type?: string; // Frontend internal use
   destination_type_name?: string; // From backend
   esbulk_index?: string; // For esbulk format index name
+  metadata?: DestinationMetadata; // Destination-specific metadata as JSON object
 }
 
 export interface DestinationPayload {
