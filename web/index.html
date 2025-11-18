@@ -2,10 +2,40 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="/openobserve_favicon.ico" />
+    <link rel="icon" id="favicon" href="/openobserve_favicon_light.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenObserve</title>
     <base href="/" />
+    <script>
+      // Detect and set favicon based on system theme preference
+      (function() {
+        function setFavicon() {
+          const favicon = document.getElementById('favicon');
+          const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+          if (favicon) {
+            favicon.href = isDarkMode ? '/openobserve_favicon_dark.ico' : '/openobserve_favicon_light.ico';
+          }
+        }
+
+        // Set favicon on page load
+        setFavicon();
+
+        // Listen for theme changes
+        if (window.matchMedia) {
+          const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+          // Modern browsers
+          if (darkModeQuery.addEventListener) {
+            darkModeQuery.addEventListener('change', setFavicon);
+          }
+          // Fallback for older browsers
+          else if (darkModeQuery.addListener) {
+            darkModeQuery.addListener(setFavicon);
+          }
+        }
+      })();
+    </script>
   </head>
 
   <body>
