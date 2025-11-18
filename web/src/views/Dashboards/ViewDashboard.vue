@@ -669,12 +669,6 @@ export default defineComponent({
 
       const isChanged = !isEqual(normalizedCurrent, normalizedRefreshed);
 
-      console.log("[ViewDashboard] Comparing variables:", {
-        "current": normalizedCurrent,
-        "refreshed": normalizedRefreshed,
-        "isEqual": !isChanged,
-        "isChanged": isChanged,
-      });
 
       return isChanged;
     });
