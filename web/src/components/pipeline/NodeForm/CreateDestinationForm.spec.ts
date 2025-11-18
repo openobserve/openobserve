@@ -759,7 +759,7 @@ describe("CreateDestinationForm", () => {
         url: "https://example.com/api/test#section",
         method: "post",
         output_format: "json",
-        destination_type_name: "custom",
+        destination_type_name: "openobserve",
         skip_tls_verify: false,
       };
 
@@ -782,8 +782,40 @@ describe("CreateDestinationForm", () => {
       wrapper.vm.populateFormForEdit(destination);
 
       expect(wrapper.vm.formData.url).toBe("https://example.com");
-      // URL parsing gives "/" as pathname for URLs without explicit path
-      expect(wrapper.vm.formData.url_endpoint).toBe("/");
+      // URL without path should result in empty endpoint
+      expect(wrapper.vm.formData.url_endpoint).toBe("");
+    });
+
+    it("should split URL without protocol", () => {
+      const destination = {
+        name: "Test Destination",
+        url: "test.splunktest.com/services/collector",
+        method: "post",
+        output_format: "nestedevent",
+        destination_type_name: "splunk",
+        skip_tls_verify: false,
+      };
+
+      wrapper.vm.populateFormForEdit(destination);
+
+      expect(wrapper.vm.formData.url).toBe("https://test.splunktest.com");
+      expect(wrapper.vm.formData.url_endpoint).toBe("/services/collector");
+    });
+
+    it("should not split URL for custom destination type", () => {
+      const destination = {
+        name: "Test Destination",
+        url: "https://example.com/api/custom/endpoint",
+        method: "post",
+        output_format: "json",
+        destination_type_name: "custom",
+        skip_tls_verify: false,
+      };
+
+      wrapper.vm.populateFormForEdit(destination);
+
+      expect(wrapper.vm.formData.url).toBe("https://example.com/api/custom/endpoint");
+      expect(wrapper.vm.formData.url_endpoint).toBe("");
     });
 
     it("should handle invalid URL gracefully", () => {
@@ -792,7 +824,7 @@ describe("CreateDestinationForm", () => {
         url: "not-a-valid-url",
         method: "post",
         output_format: "json",
-        destination_type_name: "custom",
+        destination_type_name: "openobserve",
         skip_tls_verify: false,
       };
 

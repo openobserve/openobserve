@@ -149,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               stack-label
               bottom-slots
+              disable
               :rules="[
                 ...(formData.destination_type === 'custom'
                   ? []
@@ -566,11 +567,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex justify-start q-mb-md">
         <div v-if="step === 1">
           <q-btn
+            data-test="step1-cancel-btn"
+            class="o2-secondary-button tw-h-[36px] q-mr-sm"
+            :label="t('alerts.cancel')"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
+            no-caps
+            @click="$emit('cancel')"
+          />
+          <q-btn
             data-test="step1-continue-btn"
             @click="nextStep"
             :disable="!canProceedStep1"
             label="Continue"
-            class="no-border q-mr-sm o2-primary-button tw-h-[36px]"
+            class="no-border o2-primary-button tw-h-[36px]"
             :class="
               store.state.theme === 'dark'
                 ? 'o2-primary-button-dark'
@@ -706,7 +720,7 @@ const step = ref(1);
 const formData: Ref<DestinationData> = ref({
   name: "",
   url: "",
-  url_endpoint: "",
+  url_endpoint: "/api/{org}/{stream}/_json", // Default endpoint for OpenObserve
   method: "post",
   skip_tls_verify: false,
   template: "",
@@ -866,21 +880,41 @@ const populateFormForEdit = (destination: DestinationData) => {
   formData.value.destination_type =
     destType && destType.trim() !== "" ? destType : "openobserve";
 
-  // Split URL into hostname and endpoint for all destination types
+  // Split URL into hostname and endpoint for all destination types except custom
   const fullUrl = destination.url || "";
-  if (fullUrl) {
+  if (fullUrl && formData.value.destination_type !== "custom") {
     try {
-      const url = new URL(fullUrl);
+      // Add protocol if missing for URL parsing
+      const urlToParse = fullUrl.includes("://")
+        ? fullUrl
+        : `https://${fullUrl}`;
+      const url = new URL(urlToParse);
       // Base URL is protocol + hostname + port (if any)
       formData.value.url = url.origin;
       // URL endpoint is the path + search + hash
-      formData.value.url_endpoint = url.pathname + url.search + url.hash;
-    } catch {
-      // If URL parsing fails, keep the full URL in the url field
-      formData.value.url = fullUrl;
-      formData.value.url_endpoint = "";
+      const endpoint = url.pathname + url.search + url.hash;
+      // Only set endpoint if it's not just "/"
+      formData.value.url_endpoint = endpoint === "/" ? "" : endpoint;
+    } catch (error) {
+      // If URL parsing fails, try to split manually
+      console.warn(
+        "Failed to parse URL, attempting manual split:",
+        fullUrl,
+        error,
+      );
+      const firstSlashIndex = fullUrl.indexOf("/");
+      if (firstSlashIndex > 0) {
+        // Split at first slash
+        formData.value.url = fullUrl.substring(0, firstSlashIndex);
+        formData.value.url_endpoint = fullUrl.substring(firstSlashIndex);
+      } else {
+        // No slash found, keep full URL
+        formData.value.url = fullUrl;
+        formData.value.url_endpoint = "";
+      }
     }
   } else {
+    // For custom destination or empty URL, don't split
     formData.value.url = fullUrl;
     formData.value.url_endpoint = "";
   }
