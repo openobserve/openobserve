@@ -26,7 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.zoConfig.custom_logo_text != '') ||
         (config.isEnterprise == 'true' &&
           store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-          store.state.zoConfig.custom_logo_img != null)
+          store.state.zoConfig.custom_logo_img != null) ||
+        (config.isEnterprise == 'true' &&
+          store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
+          store.state.zoConfig.custom_logo_dark_img != null)
       "
     >
       <!-- Custom logo text -->
@@ -40,10 +43,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ store.state.zoConfig.custom_logo_text }}</span
       >
 
-      <!-- Custom logo image -->
+      <!-- Custom logo image - shows appropriate logo based on current theme -->
        <div class="tw-flex tw-items-center">
         <img
           v-if="
+            store.state.theme === 'dark' &&
+            store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
+            store.state.zoConfig?.custom_logo_dark_img != null
+          "
+          :src="
+            `data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img
+          "
+          style="max-width: 150px; max-height: 32px;"
+        />
+        <img
+          v-else-if="
             store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
             store.state.zoConfig?.custom_logo_img != null
           "
