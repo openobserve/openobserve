@@ -97,20 +97,20 @@
         @click="handleFullScreen"
       />
       <q-btn
-        data-test="add-function-cancel-btn"
-        class="tw-ml-[12px] o2-secondary-button no-border tw-h-[36px]"
-        flat
-        :label="t('function.cancel')"
-        no-caps
-        @click="emit('cancel')"
-      />
-      <q-btn
         data-test="add-function-test-btn"
         :label="t('function.testFunction')"
         class="tw-ml-[12px] o2-secondary-button no-border tw-h-[36px]"
         no-caps
         icon="play_arrow"
         @click="emit('test')"
+      />
+      <q-btn
+        data-test="add-function-cancel-btn"
+        class="tw-ml-[12px] o2-secondary-button no-border tw-h-[36px]"
+        flat
+        :label="t('function.cancel')"
+        no-caps
+        @click="emit('cancel')"
       />
       <q-btn
         data-test="add-function-save-btn"
