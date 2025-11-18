@@ -275,6 +275,11 @@ fn default_enable_streaming_search() -> bool {
     false
 }
 
+#[cfg(feature = "enterprise")]
+fn default_claim_parser_function() -> String {
+    "".to_string()
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -297,6 +302,9 @@ pub struct OrganizationSettingPayload {
     pub light_mode_theme_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dark_mode_theme_color: Option<String>,
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claim_parser_function: Option<String>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -325,6 +333,9 @@ pub struct OrganizationSetting {
     pub light_mode_theme_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dark_mode_theme_color: Option<String>,
+    #[cfg(feature = "enterprise")]
+    #[serde(default = "default_claim_parser_function")]
+    pub claim_parser_function: String,
 }
 
 impl Default for OrganizationSetting {
@@ -340,6 +351,8 @@ impl Default for OrganizationSetting {
             free_trial_expiry: None,
             light_mode_theme_color: None,
             dark_mode_theme_color: None,
+            #[cfg(feature = "enterprise")]
+            claim_parser_function: default_claim_parser_function(),
         }
     }
 }
