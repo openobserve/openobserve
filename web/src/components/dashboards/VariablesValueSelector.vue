@@ -647,13 +647,10 @@ export default defineComponent({
         return;
       }
 
-      console.log('[VariablesValueSelector] Initializing variables:', {
-        total: props.variablesConfig.list.length,
-        variables: props.variablesConfig.list.map((v: any) => ({
-          name: v.name,
-          _isCurrentLevel: v._isCurrentLevel
-        }))
-      });
+      variableLog(
+        "init",
+        `Initializing variables: total=${props.variablesConfig.list.length}, variables=${JSON.stringify(props.variablesConfig.list.map((v: any) => ({ name: v.name, _isCurrentLevel: v._isCurrentLevel })))}`,
+      );
 
       // make list of variables using variables config list
       // set initial variables values from props
@@ -776,12 +773,10 @@ export default defineComponent({
         variablesData.values,
       );
 
-      console.log('[VariablesValueSelector] Variables initialized:', {
-        total: variablesData.values.length,
-        currentLevel: variablesData.values.filter((v: any) => v._isCurrentLevel !== false).length,
-        parentOnly: variablesData.values.filter((v: any) => v._isCurrentLevel === false).length,
-        dependencyGraph: variablesDependencyGraph
-      });
+      variableLog(
+        "init",
+        `Variables initialized: total=${variablesData.values.length}, currentLevel=${variablesData.values.filter((v: any) => v._isCurrentLevel !== false).length}, parentOnly=${variablesData.values.filter((v: any) => v._isCurrentLevel === false).length}, dependencyGraph=${JSON.stringify(variablesDependencyGraph)}`,
+      );
     };
 
     const rejectAllPromises = () => {
@@ -830,8 +825,12 @@ export default defineComponent({
         }
 
         // Compare configs to see if they actually changed
-        const newConfigStr = JSON.stringify(newConfig?.list?.map((v: any) => v.name) || []);
-        const oldConfigStr = JSON.stringify(oldConfig?.list?.map((v: any) => v.name) || []);
+        const newConfigStr = JSON.stringify(
+          newConfig?.list?.map((v: any) => v.name) || [],
+        );
+        const oldConfigStr = JSON.stringify(
+          oldConfig?.list?.map((v: any) => v.name) || [],
+        );
 
         if (newConfigStr === oldConfigStr) {
           // Config hasn't really changed, skip reload
@@ -1736,7 +1735,7 @@ export default defineComponent({
 
           variableLog(
             variableObject.name,
-            `Loading ${childVariableObjects.length} child variables: ${childVariableObjects.map((v: any) => v.name).join(', ')}`,
+            `Loading ${childVariableObjects.length} child variables: ${childVariableObjects.map((v: any) => v.name).join(", ")}`,
           );
           variableLog(
             variableObject.name,
@@ -1840,36 +1839,34 @@ export default defineComponent({
             variable._isCurrentLevel === true ||
             variable._isCurrentLevel === undefined;
           const hasDeps =
-            variablesDependencyGraph[variable.name]?.parentVariables?.length > 0;
+            variablesDependencyGraph[variable.name]?.parentVariables?.length >
+            0;
           return shouldLoad && hasDeps;
-        }
+        },
       );
 
-      console.log('[VariablesValueSelector] loadAllVariablesData:', {
-        isInitialLoad,
-        totalVariables: variablesData.values.length,
-        independent: independentVariables.map((v: any) => v.name),
-        dependent: dependentVariables.map((v: any) => ({
-          name: v.name,
-          parents: variablesDependencyGraph[v.name]?.parentVariables || []
-        })),
-        allVariables: variablesData.values.map((v: any) => ({
-          name: v.name,
-          _isCurrentLevel: v._isCurrentLevel
-        }))
-      });
+      variableLog(
+        "loadAll",
+        `loadAllVariablesData: isInitialLoad=${isInitialLoad}, totalVariables=${variablesData.values.length}, independent=${JSON.stringify(independentVariables.map((v: any) => v.name))}, dependent=${JSON.stringify(dependentVariables.map((v: any) => ({ name: v.name, parents: variablesDependencyGraph[v.name]?.parentVariables || [] })))}, allVariables=${JSON.stringify(variablesData.values.map((v: any) => ({ name: v.name, _isCurrentLevel: v._isCurrentLevel })))}`,
+      );
 
       try {
         // Load all independent variables
-        console.log('[VariablesValueSelector] Loading independent variables:', independentVariables.map((v: any) => v.name));
+        variableLog(
+          "loadAll",
+          `Loading independent variables: ${JSON.stringify(independentVariables.map((v: any) => v.name))}`,
+        );
         await Promise.all(
           independentVariables.map((variable: any) =>
             loadSingleVariableDataByName(variable, isInitialLoad),
           ),
         );
-        console.log('[VariablesValueSelector] Independent variables loaded, child variables should load automatically');
+        variableLog(
+          "loadAll",
+          "Independent variables loaded, child variables should load automatically",
+        );
       } catch (error) {
-        console.error('[VariablesValueSelector] Error loading independent variables:', error);
+        variableLog("loadAll", `Error loading independent variables: ${error}`);
         await Promise.all(
           independentVariables.map((variable: any) =>
             finalizeVariableLoading(variable, false),
