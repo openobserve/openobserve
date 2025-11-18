@@ -510,18 +510,28 @@ mod tests {
     }
 
     #[test]
-    fn test_deduplication_config_default() {
+    fn test_per_alert_deduplication_config_default() {
         let config = DeduplicationConfig::default();
         assert!(!config.enabled);
-        assert!(config.semantic_field_groups.is_empty());
         assert!(config.fingerprint_fields.is_empty());
+        assert_eq!(config.time_window_minutes, None);
+        assert_eq!(config.grouping, None);
+    }
+
+    #[test]
+    fn test_organization_deduplication_config_default() {
+        let config = OrganizationDeduplicationConfig::default();
+        assert!(!config.enabled);
+        assert!(!config.cross_alert_dedup);
+        assert!(config.semantic_field_groups.is_empty());
         assert_eq!(config.time_window_minutes, None);
     }
 
     #[test]
-    fn test_deduplication_config_validation() {
-        let mut config = DeduplicationConfig {
+    fn test_organization_deduplication_config_validation() {
+        let mut config = OrganizationDeduplicationConfig {
             enabled: true,
+            cross_alert_dedup: false,
             semantic_field_groups: vec![
                 SemanticFieldGroup {
                     id: "service".to_string(),
@@ -536,7 +546,6 @@ mod tests {
                     normalize: true,
                 },
             ],
-            fingerprint_fields: vec!["service".to_string(), "host".to_string()],
             time_window_minutes: Some(10),
         };
 
@@ -557,24 +566,42 @@ mod tests {
         assert!(config.validate().is_err());
         config.semantic_field_groups.pop();
 
-        // Test overlapping field names - now allowed with warning
+        // Test overlapping field names - allowed with warning
         config.semantic_field_groups[1]
             .field_names
             .push("service".to_string());
         assert!(config.validate().is_ok()); // Should succeed, just warns
         config.semantic_field_groups[1].field_names.pop();
+    }
 
-        // Test invalid fingerprint field reference
-        config.fingerprint_fields.push("nonexistent".to_string());
+    #[test]
+    fn test_per_alert_deduplication_config_validation() {
+        let mut config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec!["hostname".to_string(), "service".to_string()],
+            time_window_minutes: Some(10),
+            grouping: None,
+        };
+
+        assert!(config.validate().is_ok());
+
+        // Test too many fingerprint fields
+        config.fingerprint_fields = (0..15).map(|i| format!("field{}", i)).collect();
+        assert!(config.validate().is_err());
+
+        // Test negative time window
+        config.fingerprint_fields = vec!["hostname".to_string()];
+        config.time_window_minutes = Some(-1);
         assert!(config.validate().is_err());
     }
 
     #[test]
-    fn test_deduplication_config_overlapping_field_names() {
+    fn test_organization_config_overlapping_field_names() {
         // Test that overlapping field names are allowed (with warning)
         // Precedence: first-defined group wins
-        let config = DeduplicationConfig {
+        let config = OrganizationDeduplicationConfig {
             enabled: true,
+            cross_alert_dedup: false,
             semantic_field_groups: vec![
                 SemanticFieldGroup {
                     id: "service-primary".to_string(),
@@ -589,7 +616,6 @@ mod tests {
                     normalize: true,
                 },
             ],
-            fingerprint_fields: vec!["service-primary".to_string()],
             time_window_minutes: Some(10),
         };
 
@@ -598,9 +624,10 @@ mod tests {
     }
 
     #[test]
-    fn test_deduplication_config_serialization() {
-        let config = DeduplicationConfig {
+    fn test_organization_deduplication_config_serialization() {
+        let config = OrganizationDeduplicationConfig {
             enabled: true,
+            cross_alert_dedup: true,
             semantic_field_groups: vec![
                 SemanticFieldGroup {
                     id: "service".to_string(),
@@ -615,8 +642,26 @@ mod tests {
                     normalize: true,
                 },
             ],
-            fingerprint_fields: vec!["service".to_string(), "host".to_string()],
             time_window_minutes: Some(10),
+        };
+
+        let json = serde_json::to_string_pretty(&config).unwrap();
+        let deserialized: OrganizationDeduplicationConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(config, deserialized);
+    }
+
+    #[test]
+    fn test_per_alert_deduplication_config_serialization() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec!["service".to_string(), "hostname".to_string()],
+            time_window_minutes: Some(10),
+            grouping: Some(GroupingConfig {
+                enabled: true,
+                max_group_size: 50,
+                send_strategy: SendStrategy::Summary,
+                group_wait_seconds: 60,
+            }),
         };
 
         let json = serde_json::to_string_pretty(&config).unwrap();
@@ -625,8 +670,25 @@ mod tests {
     }
 
     #[test]
-    fn test_deduplication_config_minimal_serialization() {
+    fn test_per_alert_config_minimal_serialization() {
         let config = DeduplicationConfig {
+            enabled: true,
+            ..Default::default()
+        };
+
+        let json = serde_json::to_value(&config).unwrap();
+        assert_eq!(json["enabled"], true);
+        // fingerprint_fields should be omitted when empty
+        assert!(json.get("fingerprint_fields").is_none());
+        // time_window_minutes should be omitted when None
+        assert!(json.get("time_window_minutes").is_none());
+        // grouping should be omitted when None
+        assert!(json.get("grouping").is_none());
+    }
+
+    #[test]
+    fn test_organization_config_minimal_serialization() {
+        let config = OrganizationDeduplicationConfig {
             enabled: true,
             ..Default::default()
         };
@@ -635,10 +697,10 @@ mod tests {
         assert_eq!(json["enabled"], true);
         // semantic_field_groups should be omitted when empty
         assert!(json.get("semantic_field_groups").is_none());
-        // fingerprint_fields should be omitted when empty
-        assert!(json.get("fingerprint_fields").is_none());
         // time_window_minutes should be omitted when None
         assert!(json.get("time_window_minutes").is_none());
+        // cross_alert_dedup should be false by default
+        assert_eq!(json.get("cross_alert_dedup").and_then(|v| v.as_bool()), Some(false));
     }
 
     #[test]
