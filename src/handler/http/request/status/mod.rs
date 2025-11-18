@@ -58,7 +58,7 @@ use {
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, Protocol, ResponseMeta},
         config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
-        settings::{get_logo, get_logo_text},
+        settings::{get_logo, get_logo_dark, get_logo_text},
     },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
@@ -122,6 +122,7 @@ struct ConfigResponse<'a> {
     custom_docs_url: String,
     rum: Rum,
     custom_logo_img: Option<String>,
+    custom_logo_dark_img: Option<String>,
     custom_hide_menus: String,
     custom_hide_self_logo: bool,
     meta_org: String,
@@ -284,6 +285,12 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let logo = None;
 
     #[cfg(feature = "enterprise")]
+    let logo_dark = get_logo_dark().await;
+
+    #[cfg(not(feature = "enterprise"))]
+    let logo_dark = None;
+
+    #[cfg(feature = "enterprise")]
     let custom_hide_menus = &o2cfg.common.custom_hide_menus;
     #[cfg(not(feature = "enterprise"))]
     let custom_hide_menus = "";
@@ -356,6 +363,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,
+        custom_logo_dark_img: logo_dark,
         custom_hide_menus: custom_hide_menus.to_string(),
         custom_hide_self_logo,
         rum: Rum {
