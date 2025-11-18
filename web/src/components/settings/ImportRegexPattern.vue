@@ -289,11 +289,25 @@ export default defineComponent({
     // Create a Set for O(1) lookups
     const existingPatternNames = ref(new Set());
 
-    // Use computed to directly reference BaseImport's jsonArrayOfObj
+    // Local ref for patterns being imported (used for built-in patterns tab)
+    const localJsonArrayOfObj = ref<any[]>([]);
+
+    // Use computed to reference BaseImport's jsonArrayOfObj or local one
     const jsonArrayOfObj = computed({
-      get: () => baseImportRef.value?.jsonArrayOfObj || [],
+      get: () => {
+        // For built-in patterns tab, use local ref
+        if (activeTab.value === 'import_built_in_patterns') {
+          return localJsonArrayOfObj.value;
+        }
+        // For other tabs, use BaseImport's ref
+        return baseImportRef.value?.jsonArrayOfObj || [];
+      },
       set: (val) => {
-        if (baseImportRef.value) {
+        // For built-in patterns tab, set local ref
+        if (activeTab.value === 'import_built_in_patterns') {
+          localJsonArrayOfObj.value = val;
+        } else if (baseImportRef.value) {
+          // For other tabs, set BaseImport's ref
           baseImportRef.value.jsonArrayOfObj = val;
         }
       }
