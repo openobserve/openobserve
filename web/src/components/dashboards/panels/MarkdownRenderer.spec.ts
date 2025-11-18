@@ -28,10 +28,10 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
-  processVariableContent: vi.fn((content, variables) => {
+  processVariableContent: vi.fn((content, variables, context) => {
     // Simple mock implementation that replaces {{variable}} patterns
     if (!content || typeof content !== 'string') return content;
-    
+
     let processedContent = content;
     for (const [key, value] of Object.entries(variables || {})) {
       const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
@@ -194,15 +194,16 @@ describe("MarkdownRenderer", () => {
   describe("Variable Processing", () => {
     it("should process variables in markdown content", async () => {
       const { processVariableContent } = await import("@/utils/dashboard/variables/variablesUtils");
-      
+
       wrapper = createWrapper({
         markdownContent: "# {{title}}\n\nWelcome {{userName}}!",
         variablesData: { title: "Dashboard", userName: "John" }
       });
-      
+
       expect(processVariableContent).toHaveBeenCalledWith(
         "# {{title}}\n\nWelcome {{userName}}!",
-        { title: "Dashboard", userName: "John" }
+        { title: "Dashboard", userName: "John" },
+        { panelId: undefined, tabId: undefined }
       );
     });
 
