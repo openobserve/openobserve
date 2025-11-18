@@ -335,7 +335,7 @@ pub struct FileListDeleted {
     pub flattened: bool,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Serialize, Debug, Default, Clone, PartialEq)]
 pub enum QueryPartitionStrategy {
     #[default]
     FileNum,
