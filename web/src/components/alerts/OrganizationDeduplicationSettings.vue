@@ -19,9 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw-mb-6">
       <div class="text-h6 tw-mb-2">Alert Correlation & Deduplication</div>
       <div class="text-body2 text-grey-7">
-        Configure default correlation and deduplication settings that apply to
-        all alerts in this organization. Individual alerts can override these
-        settings.
+        Configure organization-wide semantic field groups and default time windows.
+        Semantic groups define which field name variations represent the same dimension
+        (e.g., "host", "hostname", "node" all map to "host"). Each alert specifies which
+        fields to use for fingerprinting in its own configuration.
       </div>
     </div>
 
@@ -31,9 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw-mb-6">
       <SemanticFieldGroupsConfig
         v-model:semantic-field-groups="localSemanticGroups"
-        v-model:fingerprint-fields="localConfig.fingerprint_fields"
         @update:semantic-field-groups="handleSemanticGroupsUpdate"
-        @update:fingerprint-fields="handleFingerprintFieldsUpdate"
       />
     </div>
 
@@ -109,22 +108,19 @@ interface SemanticFieldGroup {
   normalize: boolean;
 }
 
-interface DeduplicationConfig {
+interface OrganizationDeduplicationConfig {
   enabled: boolean;
-  fingerprint_fields: string[];
-  time_window_minutes?: number;
   semantic_field_groups?: SemanticFieldGroup[];
+  time_window_minutes?: number;
 }
 
 interface Props {
   orgId: string;
-  config?: DeduplicationConfig | null;
-  availableFields?: string[];
+  config?: OrganizationDeduplicationConfig | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   config: null,
-  availableFields: () => [],
 });
 
 const emit = defineEmits<{
@@ -134,9 +130,8 @@ const emit = defineEmits<{
 
 const saving = ref(false);
 
-const localConfig = ref<DeduplicationConfig>({
+const localConfig = ref<OrganizationDeduplicationConfig>({
   enabled: true,
-  fingerprint_fields: props.config?.fingerprint_fields ?? [],
   time_window_minutes: props.config?.time_window_minutes ?? undefined,
   semantic_field_groups: props.config?.semantic_field_groups ?? [],
 });
@@ -147,10 +142,6 @@ const localSemanticGroups = ref<SemanticFieldGroup[]>(
 
 const handleSemanticGroupsUpdate = (groups: SemanticFieldGroup[]) => {
   localConfig.value.semantic_field_groups = groups;
-};
-
-const handleFingerprintFieldsUpdate = (fields: string[]) => {
-  localConfig.value.fingerprint_fields = fields;
 };
 
 const emitUpdate = () => {
@@ -192,7 +183,6 @@ watch(
     if (newVal) {
       localConfig.value = {
         enabled: true,
-        fingerprint_fields: newVal.fingerprint_fields ?? [],
         time_window_minutes: newVal.time_window_minutes ?? undefined,
         semantic_field_groups: newVal.semantic_field_groups ?? [],
       };

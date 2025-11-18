@@ -84,8 +84,8 @@ class="q-mb-sm" />
       </div>
     </div>
 
-    <!-- Fingerprint Fields Selection -->
-    <div v-if="localGroups.length > 0" class="fingerprint-section q-mt-lg">
+    <!-- Fingerprint Fields Selection (only for per-alert, not org-level) -->
+    <div v-if="localGroups.length > 0 && showFingerprintFields" class="fingerprint-section q-mt-lg">
       <div class="text-subtitle1 q-mb-sm">
         Deduplication Fields *
         <q-tooltip
@@ -132,11 +132,13 @@ interface SemanticGroup {
 interface Props {
   semanticFieldGroups?: SemanticGroup[];
   fingerprintFields?: string[];
+  showFingerprintFields?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   semanticFieldGroups: () => [],
   fingerprintFields: () => [],
+  showFingerprintFields: false,
 });
 
 const emit = defineEmits<{

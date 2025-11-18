@@ -17,7 +17,7 @@
 
 use actix_web::{HttpResponse, delete, get, post, web};
 #[cfg(feature = "enterprise")]
-use config::meta::alerts::deduplication::DeduplicationConfig;
+use config::meta::alerts::deduplication::OrganizationDeduplicationConfig;
 
 // ==================== ENTERPRISE IMPLEMENTATIONS ====================
 
@@ -32,7 +32,7 @@ use config::meta::alerts::deduplication::DeduplicationConfig;
         ("org_id" = String, Path, description = "Organization ID"),
     ),
     responses(
-        (status = 200, description = "Success", body = DeduplicationConfig),
+        (status = 200, description = "Success", body = OrganizationDeduplicationConfig),
         (status = 403, description = "Forbidden - Enterprise feature"),
         (status = 404, description = "Not found"),
         (status = 500, description = "Internal server error"),
@@ -89,7 +89,7 @@ pub async fn get_config(_org_id: web::Path<String>) -> Result<HttpResponse, acti
     params(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
-    request_body(content = DeduplicationConfig, description = "Deduplication configuration", content_type = "application/json"),
+    request_body(content = OrganizationDeduplicationConfig, description = "Deduplication configuration", content_type = "application/json"),
     responses(
         (status = 200, description = "Success"),
         (status = 400, description = "Bad request"),
@@ -100,7 +100,7 @@ pub async fn get_config(_org_id: web::Path<String>) -> Result<HttpResponse, acti
 #[post("/{org_id}/alerts/deduplication/config")]
 pub async fn set_config(
     org_id: web::Path<String>,
-    config: web::Json<DeduplicationConfig>,
+    config: web::Json<OrganizationDeduplicationConfig>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let org_id = org_id.into_inner();
     let config = config.into_inner();

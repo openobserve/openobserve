@@ -171,21 +171,18 @@ impl SemanticFieldGroup {
     }
 }
 
-/// Configuration for alert deduplication
+/// Organization-level deduplication configuration (Global settings)
 ///
-/// # Naming Convention
+/// This configuration is stored at the organization level and defines:
+/// - Whether deduplication is enabled globally
+/// - Semantic field groups that map field name variations to canonical dimensions
+/// - Default time window for deduplication
 ///
-/// This config uses `fingerprint_fields` (not `deduplication_dimensions`) to distinguish
-/// from `CorrelationConfig::correlation_dimensions`:
-/// - **fingerprint_fields**: Semantic group IDs used for *identifying* duplicate alert firings
-/// - **correlation_dimensions**: Semantic group IDs used for *matching* alerts to incidents
-///
-/// The term "fields" emphasizes we're building a unique fingerprint, while "dimensions"
-/// in correlation emphasizes the multi-dimensional matching space.
+/// Per-alert fingerprint fields are stored in the Alert.deduplication field.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]
-pub struct DeduplicationConfig {
-    /// Enable/disable deduplication
+pub struct OrganizationDeduplicationConfig {
+    /// Enable/disable deduplication globally for this organization
     #[serde(default)]
     pub enabled: bool,
 
@@ -193,30 +190,120 @@ pub struct DeduplicationConfig {
     ///
     /// Defines how field names from different data sources map to canonical dimensions.
     /// Example: `["host", "hostname", "server"]` all map to semantic group ID "host".
+    ///
+    /// These groups are used for reverse lookup: per-alert fingerprint_fields reference
+    /// these semantic group IDs, which then map to actual field names in alert results.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub semantic_field_groups: Vec<SemanticFieldGroup>,
 
-    /// Fingerprint fields - semantic group IDs to use for deduplication
-    ///
-    /// These define which dimensions to include when calculating alert fingerprints.
-    /// Alerts with the same fingerprint within the time window are considered duplicates.
-    ///
-    /// Example: `["service", "host"]` means alerts are unique per service+host combination.
-    ///
-    /// Note: Called "fields" (not "dimensions") to emphasize fingerprint construction.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub fingerprint_fields: Vec<String>,
-
-    /// Time window in minutes for deduplication
+    /// Default time window in minutes for deduplication
     ///
     /// Alerts with the same fingerprint within this window are suppressed.
     /// If None, defaults to 2x the alert evaluation frequency.
+    /// Can be overridden per-alert.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_window_minutes: Option<i64>,
 }
 
-impl DeduplicationConfig {
-    /// Validate the deduplication configuration
+/// Per-alert deduplication configuration (from main branch)
+///
+/// This is stored on each Alert and specifies which fields to use for fingerprinting.
+/// This matches the structure from the main branch exactly.
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
+#[serde(default)]
+pub struct DeduplicationConfig {
+    /// Enable/disable deduplication for this specific alert
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Fields from query results to use for fingerprinting
+    /// If empty, auto-detect based on query type:
+    /// - Custom: Fields from query conditions
+    /// - SQL: GROUP BY columns
+    /// - PromQL: All label dimensions
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fingerprint_fields: Vec<String>,
+
+    /// Time window in minutes for deduplication (overrides org default)
+    /// If None, uses org-level default or 2x alert frequency
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time_window_minutes: Option<i64>,
+
+    /// Optional alert grouping configuration
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grouping: Option<GroupingConfig>,
+}
+
+/// Configuration for alert grouping
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct GroupingConfig {
+    /// Enable alert grouping
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Maximum number of alerts in a single group
+    #[serde(default = "default_max_group_size")]
+    pub max_group_size: usize,
+
+    /// How to send grouped notifications
+    #[serde(default)]
+    pub send_strategy: SendStrategy,
+
+    /// Initial wait time before sending first notification (seconds)
+    #[serde(default = "default_group_wait")]
+    pub group_wait_seconds: i64,
+}
+
+impl Default for GroupingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_group_size: default_max_group_size(),
+            send_strategy: SendStrategy::default(),
+            group_wait_seconds: default_group_wait(),
+        }
+    }
+}
+
+/// Strategy for sending grouped alert notifications
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum SendStrategy {
+    /// Send only the first alert with a count of others
+    #[default]
+    #[serde(rename = "first_with_count")]
+    FirstWithCount,
+
+    /// Send an aggregated summary of all alerts
+    Summary,
+
+    /// Send all alerts in one notification
+    All,
+}
+
+impl std::str::FromStr for SendStrategy {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "first_with_count" => Ok(Self::FirstWithCount),
+            "summary" => Ok(Self::Summary),
+            "all" => Ok(Self::All),
+            _ => Ok(Self::default()),
+        }
+    }
+}
+
+fn default_max_group_size() -> usize {
+    100
+}
+
+fn default_group_wait() -> i64 {
+    30
+}
+
+impl OrganizationDeduplicationConfig {
+    /// Validate the organization-level deduplication configuration
     pub fn validate(&self) -> Result<(), String> {
         if !self.enabled {
             return Ok(());
@@ -224,7 +311,7 @@ impl DeduplicationConfig {
 
         // Validate semantic groups
         if self.semantic_field_groups.len() > 50 {
-            return Err("Maximum 50 semantic groups allowed per alert".to_string());
+            return Err("Maximum 50 semantic groups allowed per organization".to_string());
         }
 
         let mut seen_ids = std::collections::HashSet::new();
@@ -282,23 +369,47 @@ impl DeduplicationConfig {
             }
         }
 
-        // Validate fingerprint fields
-        if self.fingerprint_fields.is_empty() {
-            return Err(
-                "At least one fingerprint field required when deduplication is enabled".to_string(),
-            );
+        Ok(())
+    }
+
+    /// Get default configuration with common semantic groups
+    pub fn default_with_presets() -> Self {
+        Self {
+            enabled: false,
+            semantic_field_groups: SemanticFieldGroup::default_presets(),
+            time_window_minutes: None,
+        }
+    }
+}
+
+impl DeduplicationConfig {
+    /// Validate the per-alert deduplication configuration
+    pub fn validate(&self) -> Result<(), String> {
+        if !self.enabled {
+            return Ok(());
         }
 
+        // Fingerprint fields can be empty (will auto-detect)
         if self.fingerprint_fields.len() > 10 {
-            return Err("Maximum 10 fingerprint fields allowed".to_string());
+            return Err("Maximum 10 fingerprint fields allowed per alert".to_string());
         }
 
-        // Validate fingerprint fields reference existing semantic groups
-        for field_id in &self.fingerprint_fields {
-            if !seen_ids.contains(field_id) {
-                return Err(format!(
-                    "Fingerprint field '{field_id}' does not reference a defined semantic group"
-                ));
+        // Time window must be positive if set
+        if let Some(window) = self.time_window_minutes {
+            if window <= 0 {
+                return Err("Time window must be positive".to_string());
+            }
+        }
+
+        // Validate grouping config if present
+        if let Some(grouping) = &self.grouping {
+            if grouping.enabled {
+                if grouping.max_group_size == 0 {
+                    return Err("Max group size must be at least 1".to_string());
+                }
+                if grouping.group_wait_seconds < 0 {
+                    return Err("Group wait seconds must be non-negative".to_string());
+                }
             }
         }
 
