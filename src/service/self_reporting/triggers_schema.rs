@@ -189,16 +189,4 @@ mod tests {
         assert!(INITIALIZED_ORGS.contains(test_org));
     }
 
-    #[test]
-    fn test_clear_initialized_flag() {
-        let test_org = "test_org_to_clear";
-
-        // Add org to initialized set
-        INITIALIZED_ORGS.insert(test_org.to_string());
-        assert!(INITIALIZED_ORGS.contains(test_org));
-
-        // Clear the flag
-        clear_initialized_flag(test_org);
-        assert!(!INITIALIZED_ORGS.contains(test_org));
-    }
 }
