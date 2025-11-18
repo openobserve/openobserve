@@ -113,11 +113,6 @@ async fn create(
         data.enable_streaming_search = enable_streaming_search;
     }
 
-    if let Some(enable_streaming_search) = settings.enable_streaming_search {
-        field_found = true;
-        data.enable_streaming_search = enable_streaming_search;
-    }
-
     if let Some(light_mode_theme_color) = settings.light_mode_theme_color {
         field_found = true;
         data.light_mode_theme_color = Some(light_mode_theme_color);
@@ -126,12 +121,6 @@ async fn create(
     if let Some(dark_mode_theme_color) = settings.dark_mode_theme_color {
         field_found = true;
         data.dark_mode_theme_color = Some(dark_mode_theme_color);
-    }
-
-    #[cfg(feature = "enterprise")]
-    if let Some(claim_parser_function) = settings.claim_parser_function {
-        field_found = true;
-        data.claim_parser_function = claim_parser_function;
     }
 
     #[cfg(feature = "enterprise")]
