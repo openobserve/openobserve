@@ -90,11 +90,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     // prepare files
+    #[cfg(feature = "enterprise")]
     let mut drain_backoff_ms = 50u64; // Start with 50ms backoff
     loop {
+        #[cfg(feature = "enterprise")]
         // Check if we're in draining mode - if so, skip sleep and process immediately
-        let is_draining = ingester::is_draining();
+        let is_draining = o2_enterprise::enterprise::drain::is_draining();
 
+        #[cfg(feature = "enterprise")]
         if !is_draining {
             // Normal operation: sleep between scans
             if cluster::is_offline() {
@@ -108,6 +111,18 @@ pub async fn run() -> Result<(), anyhow::Error> {
             log::info!("[INGESTER:JOB] Draining mode active, processing files immediately");
         }
 
+        #[cfg(not(feature = "enterprise"))]
+        {
+            // Normal operation: sleep between scans
+            if cluster::is_offline() {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(
+                get_config().limit.file_push_interval,
+            ))
+            .await;
+        }
+
         // check pending delete files
         if let Err(e) = scan_pending_delete_files().await {
             log::error!("[INGESTER:JOB] Error scan pending delete files: {e}");
@@ -117,86 +132,31 @@ pub async fn run() -> Result<(), anyhow::Error> {
             log::error!("[INGESTER:JOB] Error prepare parquet files: {e}");
         }
 
-        // If draining and no more files to process, we can exit
-        if is_draining {
-            // Check if there are any remaining files to process
-            let has_pending_files = check_has_pending_files().await;
-            if !has_pending_files {
-                log::info!("[INGESTER:JOB] Draining complete, all files uploaded to S3");
-                break;
-            } else {
-                // Backoff to avoid tight loop while draining
-                tokio::time::sleep(tokio::time::Duration::from_millis(drain_backoff_ms)).await;
-                // Exponential backoff up to 1 second
-                drain_backoff_ms = (drain_backoff_ms * 2).min(1000);
+        #[cfg(feature = "enterprise")]
+        {
+            // If draining and no more files to process, we can exit
+            if is_draining {
+                // Check if there are any remaining files to process
+                let processing_count = PROCESSING_FILES.len();
+                let has_pending_files =
+                    o2_enterprise::enterprise::drain::parquet::check_has_pending_files(
+                        processing_count,
+                    )
+                    .await;
+                if !has_pending_files {
+                    log::info!("[INGESTER:JOB] Draining complete, all files uploaded to S3");
+                    break;
+                } else {
+                    // Backoff to avoid tight loop while draining
+                    tokio::time::sleep(tokio::time::Duration::from_millis(drain_backoff_ms)).await;
+                    // Exponential backoff up to 1 second
+                    drain_backoff_ms = (drain_backoff_ms * 2).min(1000);
+                }
             }
         }
     }
     log::info!("[INGESTER:JOB] job::files::parquet is stopped");
     Ok(())
-}
-
-/// Recursively check a directory for parquet files
-fn has_parquet_files_in_dir(
-    dir: &Path,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send + '_>> {
-    Box::pin(async move {
-        match tokio::fs::read_dir(dir).await {
-            Ok(mut entries) => {
-                while let Ok(Some(entry)) = entries.next_entry().await {
-                    if let Ok(metadata) = entry.metadata().await {
-                        if metadata.is_file() {
-                            if let Some(ext) = entry.path().extension()
-                                && ext == "parquet"
-                            {
-                                return true;
-                            }
-                        } else if metadata.is_dir() {
-                            // Recursively check subdirectories
-                            if has_parquet_files_in_dir(&entry.path()).await {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-            Err(_) => {
-                // Directory doesn't exist or can't be read
-                return false;
-            }
-        }
-        false
-    })
-}
-
-/// Check if there are any pending parquet files to upload or files being processed
-async fn check_has_pending_files() -> bool {
-    let cfg = get_config();
-    let wal_dir = match Path::new(&cfg.common.data_wal_dir).canonicalize() {
-        Ok(p) => p,
-        Err(e) => {
-            log::warn!(
-                "[INGESTER:JOB] Unable to canonicalize WAL dir '{}': {e}",
-                cfg.common.data_wal_dir
-            );
-            return false;
-        }
-    };
-    let pattern = wal_dir.join("files/");
-
-    // Check if there are any parquet files in the WAL directory
-    if has_parquet_files_in_dir(&pattern).await {
-        return true;
-    }
-
-    // Also check if there are files being processed
-    let processing_count = PROCESSING_FILES.len();
-    if processing_count > 0 {
-        log::info!("[INGESTER:JOB] Still processing {} files", processing_count);
-        return true;
-    }
-
-    false
 }
 
 // check if the file is still in pending delete
