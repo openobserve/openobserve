@@ -994,7 +994,7 @@ export default defineComponent({
     // Track variables created during this edit session (for cleanup on discard)
     const variablesCreatedInSession = ref<string[]>([]);
     const initialVariableNames = ref<string[]>([]);
-    
+
     // Track variables that use "current_panel" - these need special handling
     const variablesWithCurrentPanel = ref<string[]>([]);
 
@@ -1081,7 +1081,6 @@ export default defineComponent({
     // Filter variables for UI display: show only global + current tab + current panel
     // BUT also include parent variables that child variables depend on (even if they're at different levels)
     const filteredVariablesConfig = computed(() => {
-      console.log('[AddPanel] Computing filteredVariablesConfig', currentDashboardData.data);
       if (!currentDashboardData.data?.variables?.list) {
         return { list: [], showDynamicFilters: false };
       }
@@ -1091,7 +1090,7 @@ export default defineComponent({
       const allVars = currentDashboardData.data.variables.list;
 
       // Create a key to detect actual changes
-      const filterKey = `${currentPanelId}-${currentTabId}-${allVars.map((v: any) => v.name).join(',')}`;
+      const filterKey = `${currentPanelId}-${currentTabId}-${allVars.map((v: any) => v.name).join(",")}`;
 
       // If nothing changed, return cached result
       if (filterKey === previousFilterKey && cachedFilteredConfig.value) {
@@ -1159,21 +1158,24 @@ export default defineComponent({
 
       // Add parent variables to the filtered list (but mark them as not current level for UI)
       // Only include parent variables from: global scope OR current tab
-      const parentVars = allVars.filter((v: any) => {
-        if (!parentVarNames.has(v.name)) return false;
-        if (visibleVars.find((vv: any) => vv.name === v.name)) return false;
+      const parentVars = allVars
+        .filter((v: any) => {
+          if (!parentVarNames.has(v.name)) return false;
+          if (visibleVars.find((vv: any) => vv.name === v.name)) return false;
 
-        // Check if parent variable is at global scope or current tab
-        const scopeType = getScopeType(v);
-        if (scopeType === "global") return true;
-        if (scopeType === "tabs" && v.tabs && v.tabs.includes(currentTabId)) return true;
+          // Check if parent variable is at global scope or current tab
+          const scopeType = getScopeType(v);
+          if (scopeType === "global") return true;
+          if (scopeType === "tabs" && v.tabs && v.tabs.includes(currentTabId))
+            return true;
 
-        // Don't include parent variables from other tabs or other panels
-        return false;
-      }).map((v: any) => ({
-        ...v,
-        _isCurrentLevel: false, // Mark as parent-only variable (not for UI display)
-      }));
+          // Don't include parent variables from other tabs or other panels
+          return false;
+        })
+        .map((v: any) => ({
+          ...v,
+          _isCurrentLevel: false, // Mark as parent-only variable (not for UI display)
+        }));
 
       // Mark visible vars as current level
       const markedVisibleVars = visibleVars.map((v: any) => ({
@@ -1183,19 +1185,11 @@ export default defineComponent({
 
       const filteredVars = [...markedVisibleVars, ...parentVars];
 
-      console.log('[AddPanel] Filtered variables:', {
-        total: allVars.length,
-        visible: markedVisibleVars.length,
-        parents: parentVars.length,
-        filtered: filteredVars.length,
-        visibleNames: markedVisibleVars.map((v: any) => v.name),
-        parentNames: parentVars.map((v: any) => v.name)
-      });
-
       const result = {
         ...currentDashboardData.data.variables,
         list: filteredVars,
-        showDynamicFilters: currentDashboardData.data.variables?.showDynamicFilters || false,
+        showDynamicFilters:
+          currentDashboardData.data.variables?.showDynamicFilters || false,
       };
 
       cachedFilteredConfig.value = result;
@@ -1391,8 +1385,9 @@ export default defineComponent({
 
       // Capture initial variable names on first load (only once during mount)
       if (initialVariableNames.value.length === 0) {
-        initialVariableNames.value = 
-          currentDashboardData.data?.variables?.list?.map((v: any) => v.name) || [];
+        initialVariableNames.value =
+          currentDashboardData.data?.variables?.list?.map((v: any) => v.name) ||
+          [];
       }
 
       // check if route has time related query params
@@ -1685,11 +1680,10 @@ export default defineComponent({
     };
 
     const goBack = async () => {
-      
       // Clear tracking arrays
       variablesCreatedInSession.value = [];
       variablesWithCurrentPanel.value = [];
-      
+
       return router.push({
         path: "/dashboards/view",
         query: {
@@ -1814,16 +1808,11 @@ export default defineComponent({
       try {
         // console.time("savePanelChangesToDashboard");
         if (editMode.value) {
-          console.log('[AddPanel] Edit mode - variables created in session:', variablesCreatedInSession.value);
-          
           // If variables were created during edit session, we need to save them too
           if (variablesCreatedInSession.value.length > 0) {
-            console.log('[AddPanel] Saving variables along with panel update');
-            
             // Update variables with "current_panel" to use the actual panel ID
             const currentPanelId = route.query.panelId as string;
-            console.log('[AddPanel] Current panel ID:', currentPanelId);
-            
+
             variablesWithCurrentPanel.value.forEach((variableName) => {
               const variable = currentDashboardData.data?.variables?.list?.find(
                 (v: any) => v.name === variableName,
@@ -1831,34 +1820,26 @@ export default defineComponent({
               if (variable && variable.panels && currentPanelId) {
                 const index = variable.panels.indexOf("current_panel");
                 if (index !== -1) {
-                  console.log(`[AddPanel] Replacing current_panel with ${currentPanelId} for variable:`, variableName);
                   variable.panels[index] = currentPanelId;
                 }
               }
             });
-            
+
             // Update the panel data in currentDashboardData
             const tab = currentDashboardData.data.tabs.find(
-              (t: any) => t.tabId === (route.query.tab ?? currentDashboardData.data.tabs[0].tabId)
+              (t: any) =>
+                t.tabId ===
+                (route.query.tab ?? currentDashboardData.data.tabs[0].tabId),
             );
             if (tab) {
               const panelIndex = tab.panels.findIndex(
-                (p: any) => p.id === dashboardPanelData.data.id
+                (p: any) => p.id === dashboardPanelData.data.id,
               );
               if (panelIndex !== -1) {
-                console.log('[AddPanel] Updating panel in tab at index:', panelIndex);
                 tab.panels[panelIndex] = dashboardPanelData.data;
               }
             }
-            
-            console.log('[AddPanel] Dashboard data before save:', {
-              variablesCount: currentDashboardData.data?.variables?.list?.length,
-              variables: currentDashboardData.data?.variables?.list?.map((v: any) => ({
-                name: v.name,
-                panels: v.panels
-              }))
-            });
-            
+
             // Save the entire dashboard (including new variables and updated panel)
             const errorMessageOnSave = await updateDashboard(
               store,
@@ -1867,7 +1848,7 @@ export default defineComponent({
               currentDashboardData.data,
               route.query.folder ?? "default",
             );
-            
+
             if (errorMessageOnSave instanceof Error) {
               errorData.errors.push(
                 "Error saving panel configuration : " +
@@ -1875,10 +1856,7 @@ export default defineComponent({
               );
               return;
             }
-            
-            console.log('[AddPanel] Dashboard saved successfully with variables');
           } else {
-            console.log('[AddPanel] No new variables, just updating panel');
             // No new variables, just update the panel
             const errorMessageOnSave = await updatePanel(
               store,
@@ -1919,15 +1897,23 @@ export default defineComponent({
 
           // Add panel to currentDashboardData
           const tab = currentDashboardData.data.tabs.find(
-            (t: any) => t.tabId === (route.query.tab ?? currentDashboardData.data.tabs[0].tabId)
+            (t: any) =>
+              t.tabId ===
+              (route.query.tab ?? currentDashboardData.data.tabs[0].tabId),
           );
-          
+
           if (!tab.panels) {
             tab.panels = [];
           }
 
-          const maxI = Math.max(0, ...tab.panels.map((p: any) => p.layout?.i || 0));
-          const maxY = Math.max(0, ...tab.panels.map((p: any) => p.layout?.y || 0));
+          const maxI = Math.max(
+            0,
+            ...tab.panels.map((p: any) => p.layout?.i || 0),
+          );
+          const maxY = Math.max(
+            0,
+            ...tab.panels.map((p: any) => p.layout?.y || 0),
+          );
           const lastPanel = tab.panels.find((p: any) => p.layout?.y === maxY);
 
           const newLayoutObj = {
@@ -2501,37 +2487,35 @@ export default defineComponent({
      */
     const handleSaveVariable = async (variablePayload: any) => {
       const { variableData, isEdit, oldVariableName } = variablePayload;
-      
+
       isAddVariableOpen.value = false;
       selectedVariableToEdit.value = null;
-      
+
       // Update the in-memory dashboard data (dummy JSON) - do NOT make API call
       if (!currentDashboardData.data.variables) {
         currentDashboardData.data.variables = { list: [] };
       }
-      
-      console.log('[AddPanel] Current variables before save:', 
-        currentDashboardData.data.variables.list.map((v: any) => v.name));
-      
+
       if (isEdit && oldVariableName) {
         // Update existing variable in memory
-        const variableIndex = currentDashboardData.data.variables.list.findIndex(
-          (v: any) => v.name === oldVariableName,
-        );
+        const variableIndex =
+          currentDashboardData.data.variables.list.findIndex(
+            (v: any) => v.name === oldVariableName,
+          );
         if (variableIndex !== -1) {
-          currentDashboardData.data.variables.list[variableIndex] = { ...variableData };
-          console.log('[AddPanel] Updated variable:', variableData.name);
+          currentDashboardData.data.variables.list[variableIndex] = {
+            ...variableData,
+          };
         }
       } else {
         // Add new variable to memory
         currentDashboardData.data.variables.list.push({ ...variableData });
-        console.log('[AddPanel] Added new variable:', variableData.name);
-        
+
         // Track it for potential cleanup on discard
         if (!variablesCreatedInSession.value.includes(variableData.name)) {
           variablesCreatedInSession.value.push(variableData.name);
         }
-        
+
         // Check if this variable uses "current_panel" reference
         if (variableData.panels?.includes("current_panel")) {
           if (!variablesWithCurrentPanel.value.includes(variableData.name)) {
@@ -2539,21 +2523,15 @@ export default defineComponent({
           }
         }
       }
-      
-      console.log('[AddPanel] Variables after save:', 
-        currentDashboardData.data.variables.list.map((v: any) => v.name));
-      
+
       // Force reactivity by creating a new object reference
-      currentDashboardData.data = { 
+      currentDashboardData.data = {
         ...currentDashboardData.data,
         variables: {
           ...currentDashboardData.data.variables,
-          list: [...currentDashboardData.data.variables.list]
-        }
+          list: [...currentDashboardData.data.variables.list],
+        },
       };
-      
-      console.log('[AddPanel] Reactivity triggered, new variables list:', 
-        currentDashboardData.data.variables.list.map((v: any) => v.name));
     };
 
     return {
