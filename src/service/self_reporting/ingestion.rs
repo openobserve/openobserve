@@ -22,14 +22,13 @@ use config::{
         search::SearchEventType,
         self_reporting::{
             ReportingData,
-            usage::{self as usage, AggregatedData, GroupKey, USAGE_STREAM, UsageData, UsageEvent},
+            usage::{AggregatedData, GroupKey, USAGE_STREAM, UsageData, UsageEvent},
         },
         stream::{StreamParams, StreamType},
     },
     utils::json,
 };
 use hashbrown::{HashMap, hash_map::Entry};
-use infra;
 use proto::cluster_rpc;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
@@ -209,125 +208,6 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
     }
 }
 
-/// Ensures that the triggers stream has all required fields in its schema.
-/// This prevents schema divergence when ZO_USAGE_REPORT_TO_OWN_ORG is enabled.
-async fn ensure_triggers_stream_schema(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-) -> Result<()> {
-    // Only apply to triggers stream
-    if stream_name != usage::TRIGGERS_STREAM {
-        return Ok(());
-    }
-
-    // Get the current schema
-    let schema_result = infra::schema::get(org_id, stream_name, stream_type).await;
-
-    // If stream doesn't exist yet, it will be created during ingestion
-    // with the schema from the first document
-    if schema_result.is_err() {
-        log::debug!(
-            "[SELF-REPORTING] Stream {org_id}/{stream_name} doesn't exist yet, will be created on first ingestion"
-        );
-        return Ok(());
-    }
-
-    let schema = schema_result?;
-
-    // Define all TriggerData fields that should be indexed
-    let required_fields = vec![
-        "_timestamp",
-        "org",
-        "module",
-        "key",
-        "next_run_at",
-        "is_realtime",
-        "is_silenced",
-        "status",
-        "start_time",
-        "end_time",
-        "retries",
-        "skipped_alerts_count",
-        "error", // Critical field that's often missing
-        "success_response",
-        "is_partial",
-        "delay_in_secs",
-        "evaluation_took_in_secs",
-        "source_node",
-        "query_took",
-        "scheduler_trace_id",
-        "time_in_queue_ms",
-    ];
-
-    // Check which fields are missing from the schema
-    let existing_fields: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
-
-    let missing_fields: Vec<&str> = required_fields
-        .iter()
-        .filter(|&&field| !existing_fields.contains(&field.to_string()))
-        .copied()
-        .collect();
-
-    if missing_fields.is_empty() {
-        return Ok(());
-    }
-
-    log::info!(
-        "[SELF-REPORTING] Stream {org_id}/{stream_name} is missing {} fields: {:?}. Attempting to add them.",
-        missing_fields.len(),
-        missing_fields
-    );
-
-    // Get current stream settings
-    let settings_result = infra::schema::get_settings(org_id, stream_name, stream_type).await;
-
-    if settings_result.is_none() {
-        log::warn!(
-            "[SELF-REPORTING] Cannot update schema for {org_id}/{stream_name}: stream settings not found"
-        );
-        return Ok(()); // Don't fail ingestion
-    }
-
-    let mut settings = settings_result.unwrap();
-
-    // Add missing fields to defined_schema_fields to ensure they're included
-    let cfg = get_config();
-    if cfg.common.allow_user_defined_schemas {
-        for field in &missing_fields {
-            if !settings.defined_schema_fields.contains(&field.to_string()) {
-                settings.defined_schema_fields.push(field.to_string());
-            }
-        }
-        settings.defined_schema_fields.sort();
-        settings.defined_schema_fields.dedup();
-
-        // Save the updated settings
-        match service::stream::save_stream_settings(org_id, stream_name, stream_type, settings)
-            .await
-        {
-            Ok(_) => {
-                log::info!(
-                    "[SELF-REPORTING] Successfully added {} missing fields to {org_id}/{stream_name} schema",
-                    missing_fields.len()
-                );
-            }
-            Err(e) => {
-                log::error!(
-                    "[SELF-REPORTING] Failed to update schema for {org_id}/{stream_name}: {e}"
-                );
-                // Don't fail ingestion, just log the error
-            }
-        }
-    } else {
-        log::debug!(
-            "[SELF-REPORTING] User-defined schemas not enabled, schema will be auto-detected from incoming data"
-        );
-    }
-
-    Ok(())
-}
-
 pub(super) async fn ingest_reporting_data(
     reporting_data_json: Vec<json::Value>,
     stream_params: StreamParams,
@@ -335,20 +215,6 @@ pub(super) async fn ingest_reporting_data(
     if reporting_data_json.is_empty() {
         log::info!("[SELF-REPORTING] Returning as no errors reported");
         return Ok(());
-    }
-
-    // Ensure triggers stream has complete schema to prevent divergence
-    let stream_name_str: &str = stream_params.stream_name.as_ref();
-    if stream_name_str == usage::TRIGGERS_STREAM
-        && let Err(e) = ensure_triggers_stream_schema(
-            stream_params.org_id.as_ref(),
-            stream_name_str,
-            stream_params.stream_type,
-        )
-        .await
-    {
-        log::warn!("[SELF-REPORTING] Failed to ensure schema consistency for triggers stream: {e}");
-        // Continue with ingestion anyway
     }
 
     if LOCAL_NODE.is_ingester() {
