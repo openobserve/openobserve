@@ -387,7 +387,7 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
         });
         merged_metrics.insert(signature(&labels), labels);
     }
-    let mut merged_data = merged_data
+    let merged_data = merged_data
         .into_iter()
         .map(|(sig, samples)| {
             let mut samples = samples
@@ -398,16 +398,9 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
                 })
                 .collect::<Vec<_>>();
             samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            (
-                sig,
-                RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples),
-            )
+            RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
         })
         .collect::<Vec<_>>();
-    // sort by signature
-    merged_data.sort_by(|a, b| a.0.cmp(&b.0));
-    let merged_data = merged_data.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
-
     let mut value = Value::Matrix(merged_data);
     value.sort();
     value

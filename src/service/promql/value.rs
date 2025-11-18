@@ -140,7 +140,7 @@ impl LabelsExt for Labels {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, PartialOrd, Serialize)]
 pub struct Label {
     pub name: String,
     pub value: String,
@@ -789,9 +789,13 @@ impl Value {
             }
             Value::Matrix(v) => {
                 v.sort_by(|a, b| {
-                    let a = a.samples.iter().map(|x| x.value).sum::<f64>();
-                    let b = b.samples.iter().map(|x| x.value).sum::<f64>();
-                    sort_float(&b, &a)
+                    if a.labels > b.labels {
+                        std::cmp::Ordering::Greater
+                    } else if a.labels < b.labels {
+                        std::cmp::Ordering::Less
+                    } else {
+                        std::cmp::Ordering::Equal
+                    }
                 });
             }
             _ => {}
