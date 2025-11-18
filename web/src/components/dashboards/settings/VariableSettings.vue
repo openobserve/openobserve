@@ -311,7 +311,7 @@ export default defineComponent({
       const tab = dashboardVariableData.data.tabs?.find(
         (t: any) => t.tabId === tabId,
       );
-      return tab ? tab.name : tabId;
+      return tab ? tab.name : "Deleted Tab";
     };
 
     // Function to get panel name by ID
@@ -323,7 +323,7 @@ export default defineComponent({
           return `${tab.name} > ${panel.title || panel.id}`;
         }
       }
-      return panelId;
+      return "Deleted Panel";
     };
 
     const handleDragEnd = async () => {
