@@ -1074,7 +1074,8 @@ function generateHistogramData() {
 
 async function loadPageData() {
   searchObj.loadingStream = true;
-  searchObj.data.resultGrid.currentPage = 0;
+  if (!searchObj.data?.queryResults?.hits?.length)
+    searchObj.data.resultGrid.currentPage = 0;
 
   // resetSearchObj();
   searchObj.organizationIdentifier =

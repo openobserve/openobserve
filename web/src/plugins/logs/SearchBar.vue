@@ -2751,6 +2751,7 @@ export default defineComponent({
         });
       }
 
+      searchObj.meta.showTransformEditor = true;
       searchObj.config.fnSplitterModel = 60;
       fnEditorRef?.value?.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
