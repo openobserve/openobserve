@@ -400,17 +400,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-input
                 data-test="add-destination-metadata-service-input"
                 v-model="formData.metadata!.service"
-                :label="'Service *'"
+                :label="'Service'"
                 :placeholder="'Enter service name (e.g., api-gateway)'"
                 class="no-border showLabelOnTop"
                 borderless
                 dense
                 flat
                 stack-label
-                :rules="[
-                  (val: any) =>
-                    !!val?.trim() || 'Service is required for Datadog',
-                ]"
                 tabindex="0"
               >
                 <template v-slot:hint> Service name for Datadog logs </template>
@@ -419,17 +415,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-input
                 data-test="add-destination-metadata-hostname-input"
                 v-model="formData.metadata!.hostname"
-                :label="'Hostname *'"
+                :label="'Hostname'"
                 :placeholder="'Enter hostname (e.g., server01)'"
                 class="no-border showLabelOnTop"
                 borderless
                 dense
                 flat
                 stack-label
-                :rules="[
-                  (val: any) =>
-                    !!val?.trim() || 'Hostname is required for Datadog',
-                ]"
                 tabindex="0"
               >
                 <template v-slot:hint> Hostname for Datadog logs </template>
@@ -1285,9 +1277,7 @@ const canProceedStep2 = computed(() => {
   if (formData.value.destination_type === "datadog") {
     return !!(
       formData.value.metadata?.ddsource?.trim() &&
-      formData.value.metadata?.ddtags?.trim() &&
-      formData.value.metadata?.service?.trim() &&
-      formData.value.metadata?.hostname?.trim()
+      formData.value.metadata?.ddtags?.trim()
     );
   }
 
