@@ -23,16 +23,18 @@ const useActions = () => {
   const store = useStore();
 
   const isActionsEnabled = computed(() => {
-    return (config.isEnterprise == "true" || config.isCloud == "true") && store.state.zoConfig.actions_enabled;
+    return (
+      (config.isEnterprise == "true" || config.isCloud == "true") &&
+      store.state.zoConfig.actions_enabled
+    );
   });
-  
+
   const getAllActions = async () => {
     try {
       if (!isActionsEnabled.value) return Promise.resolve([]);
 
-      return await actionService.list(
-        store.state.selectedOrganization.identifier
-      )
+      return await actionService
+        .list(store.state.selectedOrganization.identifier)
         .then((res: any) => {
           store.dispatch("setActions", res.data);
           return;
