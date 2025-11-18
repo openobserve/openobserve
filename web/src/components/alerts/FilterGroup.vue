@@ -15,7 +15,7 @@
           Preview:
         </span>
         <span v-if="showPreview"
-              class="tw-text-[10px] tw-font-mono tw-truncate tw-leading-[1.3] tw-min-w-0 tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis"
+              class="tw-text-[10px] tw-font-mono tw-leading-[1.3] tw-min-w-0 tw-break-words"
               :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">
           {{ previewString }}
         </span>
