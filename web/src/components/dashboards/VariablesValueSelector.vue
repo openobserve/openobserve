@@ -113,7 +113,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import { defineComponent, reactive } from "vue";
-import streamService from "../../services/stream";
 import { useStore } from "vuex";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
@@ -306,7 +305,7 @@ export default defineComponent({
       }
     };
 
-    // onUnmounted want to cancel the values api call for all http2, and streaming
+    // onUnmounted - cancel all active streaming API calls
     onUnmounted(() => {
       // Cancel all active trace IDs for all variables
       Object.keys(traceIdMapper.value).forEach((field) => {
@@ -334,7 +333,7 @@ export default defineComponent({
           payload,
           {
             content: {
-              message: "WebSocket connection terminated unexpectedly",
+              message: "Streaming connection terminated unexpectedly",
               trace_id: payload.traceId,
               code: response.code,
               error_details: response.error_details,
@@ -353,22 +352,6 @@ export default defineComponent({
       variableObject.isVariableLoadingPending = false;
       resetVariableState(variableObject);
       removeTraceId(variableObject.name, request.traceId);
-    };
-
-    const handleSearchReset = (data: any) => {
-      const variableObject = variablesData.values.find(
-        (v: any) => v.query_data?.field === data.queryReq?.fields[0],
-      );
-
-      if (variableObject) {
-        variableObject.isLoading = true;
-        variableFirstResponseProcessed.value[variableObject.name] = false;
-
-        fetchFieldValuesWithWebsocket(
-          variableObject,
-          data.queryReq.query_context,
-        );
-      }
     };
 
     const handleSearchResponse = (
@@ -560,19 +543,7 @@ export default defineComponent({
       emitVariablesData();
     };
 
-    const initializeStreamingConnection = (
-      payload: any,
-      variableObject: any,
-    ): any => {
-      // Use HTTP2/streaming for all dashboard variable values
-      fetchQueryDataWithHttpStream(payload, {
-        data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
-        error: (p: any, r: any) => handleSearchError(p, r, variableObject),
-        complete: (p: any, r: any) => handleSearchClose(p, r, variableObject),
-        reset: handleSearchReset,
-      });
-    };
-    const fetchFieldValuesWithWebsocket = (
+    const fetchFieldValuesWithStreaming = (
       variableObject: any,
       queryContext: string,
     ) => {
@@ -592,7 +563,7 @@ export default defineComponent({
         return;
       }
 
-      // Set loading state before initiating WebSocket
+      // Set loading state before initiating streaming
       variableObject.isLoading = true;
       variableObject.isVariableLoadingPending = true;
 
@@ -621,7 +592,12 @@ export default defineComponent({
       };
       try {
         // Start new streaming connection
-        initializeStreamingConnection(wsPayload, variableObject);
+        fetchQueryDataWithHttpStream(wsPayload, {
+          data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
+          error: (p: any, r: any) => handleSearchError(p, r, variableObject),
+          complete: (p: any, r: any) => handleSearchClose(p, r, variableObject),
+          reset: handleSearchReset,
+        });
         addTraceId(variableObject.name, wsPayload.traceId);
       } catch (error) {
         variableObject.isLoading = false;
@@ -629,7 +605,23 @@ export default defineComponent({
       }
     };
 
-    // ------------- End WebSocket Implementation -------------
+    const handleSearchReset = (data: any) => {
+      const variableObject = variablesData.values.find(
+        (v: any) => v.query_data?.field === data.queryReq?.fields[0],
+      );
+
+      if (variableObject) {
+        variableObject.isLoading = true;
+        variableFirstResponseProcessed.value[variableObject.name] = false;
+
+        fetchFieldValuesWithStreaming(
+          variableObject,
+          data.queryReq.query_context,
+        );
+      }
+    };
+
+    // ------------- End HTTP2/Streaming Implementation -------------
 
     // reset variables data
     // it will executed once on mount
@@ -1404,7 +1396,7 @@ export default defineComponent({
       switch (variableObject.type) {
         case "query_values": {
           // for initial loading check if the value is already available,
-          // do not load the values
+          // if yes, just mark as loaded and trigger child loads but don't fetch again
           if (isInitialLoad && !searchText) {
             variableLog(
               variableObject.name,
@@ -1418,13 +1410,21 @@ export default defineComponent({
               (!Array.isArray(variableObject.value) ||
                 variableObject.value.length > 0)
             ) {
-              finalizePartialVariableLoading(
+              // IMPORTANT: Set partial loaded first to allow child variables to load
+              variableObject.isVariablePartialLoaded = true;
+              variableObject.isLoading = false;
+              variableObject.isVariableLoadingPending = false;
+
+              // Emit the data immediately so panels can receive the values
+              emitVariablesData();
+
+              // Then trigger child variable loading
+              await finalizePartialVariableLoading(
                 variableObject,
                 true,
                 isInitialLoad,
               );
-              finalizeVariableLoading(variableObject, true);
-              emitVariablesData();
+
               return true;
             }
           }
@@ -1437,7 +1437,7 @@ export default defineComponent({
 
             // Use HTTP2/streaming for all dashboard variable values
             // We don't need to wait for the response here as it will be handled by the streaming handlers
-            fetchFieldValuesWithWebsocket(variableObject, queryContext);
+            fetchFieldValuesWithStreaming(variableObject, queryContext);
             return true;
           } catch (error) {
             resetVariableState(variableObject);
@@ -1528,139 +1528,6 @@ export default defineComponent({
       return b64EncodeUnicode(queryContext);
     };
 
-    /**
-     * Extract REST API implementation to separate function.
-     * @param variableObject - The variable object containing query data.
-     * @param queryContext - The context for the query as a string.
-     * @returns The response from the stream service containing field values.
-     */
-    const fetchFieldValuesREST = async (
-      variableObject: any,
-      queryContext: string,
-    ) => {
-      const payload = {
-        org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
-        stream_name: variableObject.query_data.stream, // Name of the stream
-        start_time: new Date(
-          props.selectedTimeDate?.start_time?.toISOString(),
-        ).getTime(), // Start time in milliseconds
-        end_time: new Date(
-          props.selectedTimeDate?.end_time?.toISOString(),
-        ).getTime(), // End time in milliseconds
-        fields: [variableObject.query_data.field], // Fields to fetch
-        size: variableObject.query_data.max_record_size || 10, // Maximum number of records
-        type: variableObject.query_data.stream_type, // Type of the stream
-        query_context: queryContext, // Encoded query context
-        no_count: true, // Flag to omit count
-      };
-
-      // Fetch field values from the stream service
-      return await streamService.fieldValues(payload);
-    };
-
-    /**
-     * Updates the options for a variable based on the result of a query to fetch field values.
-     * @param variableObject - The variable object containing query data.
-     * @param hits - The result from the stream service containing field values.
-     */
-    const updateVariableOptions = (variableObject: any, hits: any[]) => {
-      const fieldHit = hits.find(
-        (field: any) => field.field === variableObject.query_data.field,
-      );
-
-      if (fieldHit) {
-        // Extract the values for the specified field from the result
-        const newOptions = fieldHit.values
-          .filter((value: any) => value.zo_sql_key || value.zo_sql_key === "")
-          .map((value: any) => ({
-            // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
-            label:
-              value.zo_sql_key !== "" ? value.zo_sql_key.toString() : "<blank>",
-            // Use the zo_sql_key as the value
-            value: value.zo_sql_key.toString(),
-          }));
-
-        // Efficiently add the selected value to options if not present
-        if (variableObject.multiSelect && Array.isArray(variableObject.value)) {
-          const val = variableObject.value[0];
-          if (
-            val !== undefined &&
-            val !== null &&
-            !newOptions.some((opt) => opt.value === val) &&
-            val !== SELECT_ALL_VALUE
-          ) {
-            newOptions.push({ label: val, value: val });
-          }
-        } else if (
-          !variableObject.multiSelect &&
-          variableObject.value !== null &&
-          variableObject.value !== undefined &&
-          !newOptions.some((opt) => opt.value === variableObject.value) &&
-          variableObject.value !== SELECT_ALL_VALUE
-        ) {
-          newOptions.push({
-            label: variableObject.value,
-            value: variableObject.value,
-          });
-        }
-
-        variableObject.options = newOptions;
-
-        // Set default value
-        if (oldVariablesData[variableObject.name] !== undefined) {
-          const oldValues = Array.isArray(oldVariablesData[variableObject.name])
-            ? oldVariablesData[variableObject.name]
-            : [oldVariablesData[variableObject.name]];
-
-          // Check if this is a child variable
-          const isChildVariable =
-            variablesDependencyGraph[variableObject.name]?.parentVariables
-              ?.length > 0;
-
-          if (isChildVariable) {
-            // For child variables, only keep old values that exist in new options
-            const validOldValues = oldValues.filter((value: string) =>
-              newOptions.some((opt: { value: string }) => opt.value === value),
-            );
-
-            if (validOldValues.length > 0) {
-              // If we have valid old values, use them
-              variableObject.value = variableObject.multiSelect
-                ? validOldValues
-                : validOldValues[0];
-            } else {
-              // If no valid old values, use first option
-              variableObject.value = variableObject.multiSelect
-                ? newOptions.length > 0
-                  ? [newOptions[0].value]
-                  : []
-                : newOptions.length > 0
-                  ? newOptions[0].value
-                  : null;
-            }
-          } else {
-            // For non-child variables, preserve old values as before
-            if (variableObject.type === "custom") {
-              handleCustomVariablesLogic(variableObject, oldValues);
-            } else {
-              handleQueryValuesLogic(variableObject, oldValues);
-            }
-          }
-        } else {
-          // Set default value to the first option if no old values are available
-          variableObject.value = variableObject.multiSelect
-            ? newOptions.length > 0
-              ? [newOptions[0].value]
-              : []
-            : newOptions.length > 0
-              ? newOptions[0].value
-              : null;
-        }
-      } else {
-        // Reset variable state if no field values are available
-        resetVariableState(variableObject);
-      }
-    };
 
     /**
      * Finalizes the variable loading process for a single variable.
@@ -2036,7 +1903,7 @@ export default defineComponent({
         currentlyExecutingPromises[variableName] = null;
       }
 
-      // 2. Cancel any ongoing WebSocket/Streaming operations
+      // 2. Cancel any ongoing streaming operations
       cancelTraceId(variableName);
 
       // 3. Reset loading states for the variable only if not in search mode
