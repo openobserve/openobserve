@@ -176,6 +176,7 @@ impl SemanticFieldGroup {
 /// This configuration is stored at the organization level and defines:
 /// - Whether deduplication is enabled globally
 /// - Semantic field groups that map field name variations to canonical dimensions
+/// - Cross-alert deduplication based on shared semantic dimensions
 /// - Default time window for deduplication
 ///
 /// Per-alert fingerprint fields are stored in the Alert.deduplication field.
@@ -191,10 +192,24 @@ pub struct OrganizationDeduplicationConfig {
     /// Defines how field names from different data sources map to canonical dimensions.
     /// Example: `["host", "hostname", "server"]` all map to semantic group ID "host".
     ///
-    /// These groups are used for reverse lookup: per-alert fingerprint_fields reference
-    /// these semantic group IDs, which then map to actual field names in alert results.
+    /// These groups are used for:
+    /// 1. Mapping per-alert fingerprint_fields to semantic dimensions
+    /// 2. Cross-alert deduplication (if enabled)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub semantic_field_groups: Vec<SemanticFieldGroup>,
+
+    /// Enable cross-alert deduplication based on shared semantic dimensions
+    ///
+    /// When true, alerts from DIFFERENT alert rules that share semantic dimensions
+    /// will be deduplicated if one already fired recently.
+    ///
+    /// Example:
+    /// - Alert A fires: {host: "srv01", service: "api"}
+    /// - Alert B fires 30s later: {host: "srv01", region: "us-east"}
+    /// - If cross_alert_dedup=true: Alert B suppressed (shares "host" dimension)
+    /// - If cross_alert_dedup=false: Both sent (per-alert dedup only)
+    #[serde(default)]
+    pub cross_alert_dedup: bool,
 
     /// Default time window in minutes for deduplication
     ///
@@ -377,8 +392,66 @@ impl OrganizationDeduplicationConfig {
         Self {
             enabled: false,
             semantic_field_groups: SemanticFieldGroup::default_presets(),
+            cross_alert_dedup: false,
             time_window_minutes: None,
         }
+    }
+
+    /// Map a field name to its semantic group ID
+    ///
+    /// Returns the first matching semantic group ID, or None if no match.
+    /// Used for reverse lookup: actual field name → semantic dimension.
+    pub fn get_semantic_group_id(&self, field_name: &str) -> Option<&str> {
+        for group in &self.semantic_field_groups {
+            if group.field_names.iter().any(|f| f == field_name) {
+                return Some(&group.id);
+            }
+        }
+        None
+    }
+
+    /// Extract semantic dimensions from a result row
+    ///
+    /// Maps actual field names to semantic group IDs and extracts their values.
+    /// Returns a map of semantic_group_id → value.
+    ///
+    /// Example:
+    /// - Input fields: ["hostname", "service_name"]
+    /// - Input row: {"hostname": "srv01", "service_name": "api", "other": "data"}
+    /// - Output: {"host": "srv01", "service": "api"}
+    pub fn extract_semantic_dimensions(
+        &self,
+        field_names: &[String],
+        result_row: &std::collections::HashMap<String, String>,
+    ) -> std::collections::HashMap<String, String> {
+        let mut dimensions = std::collections::HashMap::new();
+
+        for field_name in field_names {
+            if let Some(semantic_id) = self.get_semantic_group_id(field_name) {
+                if let Some(value) = result_row.get(field_name) {
+                    // Find the semantic group to check if normalization is needed
+                    if let Some(group) = self
+                        .semantic_field_groups
+                        .iter()
+                        .find(|g| g.id == semantic_id)
+                    {
+                        let normalized_value = if group.normalize {
+                            value.to_lowercase().trim().to_string()
+                        } else {
+                            value.clone()
+                        };
+                        dimensions.insert(semantic_id.to_string(), normalized_value);
+                    }
+                }
+            } else {
+                // Field not in semantic groups - use as-is
+                if let Some(value) = result_row.get(field_name) {
+                    dimensions.insert(field_name.clone(), value.clone());
+                }
+            }
+        }
+
+        dimensions
     }
 }
 
