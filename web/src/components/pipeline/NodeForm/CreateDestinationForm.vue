@@ -845,8 +845,13 @@ const getDefaultHeaders = (destinationType: string) => {
       break;
     case "newrelic":
       headers.push({
-        key: "Authorization",
-        value: "Api-Token <token>",
+        key: "Api-Key",
+        value: "<token>",
+        uuid: getUUID(),
+      });
+      headers.push({
+        key: "Content-Type",
+        value: "application/json",
         uuid: getUUID(),
       });
       break;
@@ -868,7 +873,7 @@ const apiHeaders: Ref<
   }[]
 > = ref(getDefaultHeaders("openobserve"));
 
-// Watch destination_type changes to set method, output_format, and headers appropriately
+// Watch destination_type changes to set method, output_format, headers, and endpoint appropriately
 watch(
   () => formData.value.destination_type,
   (newType) => {
@@ -880,10 +885,25 @@ watch(
 
         // Set output_format based on destination type
         if (newType === "splunk") {
-          formData.value.output_format = "ndjson";
+          formData.value.output_format = "nestedevent";
+        } else if (newType === "elasticsearch") {
+          formData.value.output_format = "esbulk";
+          // Set default index name if not already set
+          if (!formData.value.esbulk_index) {
+            formData.value.esbulk_index = "default";
+          }
         } else {
           formData.value.output_format = "json";
         }
+      }
+
+      // Set endpoint based on destination type
+      if (newType === "openobserve") {
+        // For OpenObserve, use org and stream values
+        formData.value.url_endpoint = `/api/${openobserveOrg.value || "default"}/${openobserveStream.value || "default"}/_json`;
+      } else {
+        // For other types, use the default endpoint
+        formData.value.url_endpoint = defaultUrlEndpoint.value;
       }
 
       // Set default headers for the destination type
@@ -891,6 +911,118 @@ watch(
     }
   },
 );
+
+// Function to populate form when editing an existing destination
+const populateFormForEdit = (destination: any) => {
+  formData.value.name = destination.name || "";
+  formData.value.method = destination.method || "post";
+  formData.value.skip_tls_verify = destination.skip_tls_verify || false;
+  formData.value.template = destination.template || "";
+
+  // Handle output_format
+  if (destination.output_format) {
+    if (
+      typeof destination.output_format === "object" &&
+      destination.output_format.esbulk
+    ) {
+      formData.value.output_format = "esbulk";
+      formData.value.esbulk_index =
+        destination.output_format.esbulk.index || "default";
+    } else if (typeof destination.output_format === "string") {
+      formData.value.output_format = destination.output_format;
+      formData.value.esbulk_index = "";
+    }
+  } else {
+    formData.value.output_format = "json";
+    formData.value.esbulk_index = "";
+  }
+
+  // Use destination_type_name from backend, fallback to destination_type or default
+  const destType =
+    destination.destination_type_name || destination.destination_type;
+  formData.value.destination_type =
+    destType && destType.trim() !== "" ? destType : "openobserve";
+
+  // Split URL into hostname and endpoint for all destination types except custom
+  const fullUrl = destination.url || "";
+  if (fullUrl && formData.value.destination_type !== "custom") {
+    try {
+      // Add protocol if missing for URL parsing, but only if it looks like a valid URL
+      const hasProtocol = fullUrl.includes("://");
+      const looksLikeUrl = fullUrl.includes(".") || fullUrl.includes(":");
+      const urlToParse = hasProtocol
+        ? fullUrl
+        : looksLikeUrl
+          ? `https://${fullUrl}`
+          : fullUrl;
+
+      const url = new URL(urlToParse);
+      // Base URL is protocol + hostname + port (if any) - always include protocol for consistency
+      formData.value.url = url.origin;
+      // URL endpoint is the path + search + hash
+      const endpoint = url.pathname + url.search + url.hash;
+      // Only set endpoint if it's not just "/"
+      formData.value.url_endpoint = endpoint === "/" ? "" : endpoint;
+    } catch (error) {
+      // If URL parsing fails, try to split manually
+      console.warn(
+        "Failed to parse URL, attempting manual split:",
+        fullUrl,
+        error,
+      );
+      const firstSlashIndex = fullUrl.indexOf("/");
+      if (firstSlashIndex > 0) {
+        // Split at first slash
+        formData.value.url = fullUrl.substring(0, firstSlashIndex);
+        formData.value.url_endpoint = fullUrl.substring(firstSlashIndex);
+      } else {
+        // No slash found, keep full URL as-is
+        formData.value.url = fullUrl;
+        formData.value.url_endpoint = "";
+      }
+    }
+  } else {
+    // For custom destination or empty URL, don't split
+    formData.value.url = fullUrl;
+    formData.value.url_endpoint = "";
+  }
+
+  // Populate headers
+  if (destination.headers && typeof destination.headers === "object") {
+    apiHeaders.value = Object.entries(destination.headers).map(
+      ([key, value]) => ({
+        key,
+        value: value as string,
+        uuid: getUUID(),
+      }),
+    );
+  }
+
+  // Populate metadata object
+  if (destination.metadata && typeof destination.metadata === "object") {
+    formData.value.metadata = { ...destination.metadata };
+  } else {
+    formData.value.metadata = {};
+  }
+
+  // Extract OpenObserve org and stream from endpoint if it's OpenObserve
+  if (
+    formData.value.destination_type === "openobserve" &&
+    formData.value.url_endpoint
+  ) {
+    // Parse endpoint like /api/{org}/{stream}/_json
+    const match = formData.value.url_endpoint.match(
+      /^\/api\/([^/]+)\/([^/]+)\/_json$/,
+    );
+    if (match) {
+      openobserveOrg.value = match[1] || "default";
+      openobserveStream.value = match[2] || "default";
+    }
+  }
+
+  // Move to step 2 since destination type is already selected
+  step.value = 2;
+};
 
 // Watch for destination prop changes to populate form in edit mode
 watch(
@@ -1260,7 +1392,7 @@ const resetForm = () => {
   formData.value = {
     name: "",
     url: "",
-    url_endpoint: "/api/default/default/_json",
+    url_endpoint: "",
     method: "post",
     skip_tls_verify: false,
     template: "",
@@ -1295,6 +1427,9 @@ defineExpose({
   canProceedStep1,
   canProceedStep2,
   connectionNotes,
+  populateFormForEdit,
+  openobserveOrg,
+  openobserveStream,
 });
 </script>
 

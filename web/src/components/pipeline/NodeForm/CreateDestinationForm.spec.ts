@@ -81,8 +81,8 @@ describe("CreateDestinationForm", () => {
       expect(wrapper.vm.apiHeaders[0].value).toBe("Basic <token>");
     });
 
-    it("should have empty url_endpoint by default", () => {
-      expect(wrapper.vm.formData.url_endpoint).toBe("");
+    it("should have OpenObserve default url_endpoint", () => {
+      expect(wrapper.vm.formData.url_endpoint).toBe("/api/default/default/_json");
     });
 
     it("should have POST as default method", () => {
