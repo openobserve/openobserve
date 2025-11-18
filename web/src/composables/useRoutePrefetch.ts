@@ -45,7 +45,7 @@ export default function useRoutePrefetch() {
     "/ingestion": () => import("@/views/Ingestion.vue"),
     "/iam": () => import("@/views/IdentityAccessManagement.vue"),
     "/reports": () => import("@/components/reports/ReportList.vue"),
-    "/actions": () => import("@/components/actionScripts/ActionScipts.vue"),
+    "/actions": () => import("@/components/actionScripts/ActionScripts.vue"),
     "/settings": () => import("@/components/settings/index.vue"),
   };
 
