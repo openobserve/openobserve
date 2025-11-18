@@ -1046,6 +1046,7 @@ style=" margin-left: 8px;">
           <FilterGroup :stream-fields="columns"
             :group="inputData "
             :depth="0"
+            :disable-first-condition="false"
             @add-condition="updateGroup"
             @add-group="updateGroup"
             @remove-group="removeConditionGroup"

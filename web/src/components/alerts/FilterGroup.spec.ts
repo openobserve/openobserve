@@ -1156,12 +1156,10 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const addGroupButtons = wrapper.findAll('[data-test="alert-conditions-add-condition-btn"]');
-      const addGroupBtn = addGroupButtons[1]; // Second button is add group
-      
-      if (addGroupBtn) {
-        expect(addGroupBtn.attributes('disabled')).toBeDefined();
-      }
+      const addGroupBtn = wrapper.find('[data-test="alert-conditions-add-condition-group-btn"]');
+
+      expect(addGroupBtn.exists()).toBe(true);
+      expect(addGroupBtn.attributes('disabled')).toBeDefined();
     });
 
     it('should handle tab change for toggle label', async () => {
@@ -1187,6 +1185,805 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
     });
   });
 
+
+  describe('Confirmation Dialog for Condition Deletion', () => {
+    it('should show confirmation dialog when removing last condition with sub-groups', async () => {
+      const propsWithSubGroup = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [
+                { id: 'nested-condition', column: 'field2', operator: '=', value: 'test2' }
+              ]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: propsWithSubGroup,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Remove the only condition
+      wrapper.vm.removeCondition('only-condition');
+      await nextTick();
+
+      // Should show confirmation dialog
+      expect(wrapper.vm.confirmDialog.show).toBe(true);
+      expect(wrapper.vm.confirmDialog.title).toBe('Delete Condition');
+      expect(wrapper.vm.confirmDialog.warningMessage).toContain('1 sub-group');
+    });
+
+    it('should show correct warning for multiple sub-groups', async () => {
+      const propsWithMultipleSubGroups = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested-1', column: 'field2', operator: '=', value: 'test2' }]
+            },
+            {
+              groupId: 'sub-group-2',
+              label: 'and',
+              items: [{ id: 'nested-2', column: 'field3', operator: '=', value: 'test3' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: propsWithMultipleSubGroups,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.removeCondition('only-condition');
+      await nextTick();
+
+      expect(wrapper.vm.confirmDialog.show).toBe(true);
+      expect(wrapper.vm.confirmDialog.warningMessage).toContain('2 sub-groups');
+    });
+
+    it('should not show dialog when removing condition without sub-groups', () => {
+      const propsWithoutSubGroups = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
+            { id: 'condition-2', column: 'field2', operator: '=', value: 'test2' }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: propsWithoutSubGroups,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.removeCondition('condition-1');
+
+      // Should not show dialog
+      expect(wrapper.vm.confirmDialog.show).toBe(false);
+    });
+
+    it('should call performRemoveCondition when user confirms', async () => {
+      const propsWithSubGroup = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: propsWithSubGroup,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.removeCondition('only-condition');
+      await nextTick();
+
+      // Confirm deletion
+      wrapper.vm.confirmDialog.okCallback();
+      await nextTick();
+
+      // Should emit remove-group
+      expect(wrapper.emitted('remove-group')).toBeTruthy();
+      expect(wrapper.vm.confirmDialog.show).toBe(false);
+    });
+  });
+
+  describe('performRemoveCondition Function', () => {
+    it('should remove condition and emit remove-group when no conditions left', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          group: {
+            groupId: 'test-group',
+            label: 'and',
+            items: [
+              { id: 'only-item', column: 'field1', operator: '=', value: 'test' }
+            ]
+          }
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.performRemoveCondition('only-item');
+
+      expect(wrapper.emitted('remove-group')).toBeTruthy();
+      expect(wrapper.emitted('remove-group')?.[0][0]).toBe('test-group');
+    });
+
+    it('should remove condition but keep group when conditions remain', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          group: {
+            groupId: 'test-group',
+            label: 'and',
+            items: [
+              { id: 'item-1', column: 'field1', operator: '=', value: 'test1' },
+              { id: 'item-2', column: 'field2', operator: '=', value: 'test2' }
+            ]
+          }
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.performRemoveCondition('item-1');
+
+      expect(wrapper.emitted('add-group')).toBeTruthy();
+      expect(wrapper.emitted('remove-group')).toBeFalsy();
+      expect(wrapper.vm.groups.items).toHaveLength(1);
+    });
+
+    it('should emit remove-group when only sub-groups remain after removing condition', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          group: {
+            groupId: 'test-group',
+            label: 'and',
+            items: [
+              { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+              {
+                groupId: 'sub-group',
+                label: 'or',
+                items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }]
+              }
+            ]
+          }
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.performRemoveCondition('only-condition');
+
+      expect(wrapper.emitted('remove-group')).toBeTruthy();
+    });
+  });
+
+  describe('Props Watch Functionality', () => {
+    it('should update groups when prop changes', async () => {
+      const wrapper = mount(FilterGroup, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      const newGroup = {
+        groupId: 'new-group',
+        label: 'or',
+        items: [
+          { id: 'new-item', column: 'newfield', operator: '!=', value: 'newtest' }
+        ]
+      };
+
+      await wrapper.setProps({ group: newGroup });
+      await nextTick();
+
+      expect(wrapper.vm.groups.groupId).toBe('new-group');
+      expect(wrapper.vm.label).toBe('or');
+    });
+
+    it('should update label when prop group label changes', async () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          group: { ...defaultProps.group, label: 'and' }
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Wait for initial mount to settle
+      await nextTick();
+      expect(wrapper.vm.label).toBe('and');
+
+      // Now change the label
+      await wrapper.setProps({
+        group: { ...defaultProps.group, label: 'or' }
+      });
+      await nextTick();
+
+      expect(wrapper.vm.label).toBe('or');
+    });
+  });
+
+  describe('Reorder Items Functionality', () => {
+    it('should reorder items with conditions first and groups last', () => {
+      const mixedOrderProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested-1', column: 'field2', operator: '=', value: 'test2' }]
+            },
+            { id: 'condition-2', column: 'field3', operator: '!=', value: 'test3' },
+            {
+              groupId: 'sub-group-2',
+              label: 'and',
+              items: [{ id: 'nested-2', column: 'field4', operator: '>', value: 'test4' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: mixedOrderProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Before reorder: condition, group, condition, group
+      expect(wrapper.vm.groups.items[0].id).toBe('condition-1');
+      expect(wrapper.vm.groups.items[1].groupId).toBe('sub-group-1');
+      expect(wrapper.vm.groups.items[2].id).toBe('condition-2');
+      expect(wrapper.vm.groups.items[3].groupId).toBe('sub-group-2');
+
+      // Call reorder
+      wrapper.vm.reorderItems();
+
+      // After reorder: condition, condition, group, group
+      expect(wrapper.vm.groups.items[0].id).toBe('condition-1');
+      expect(wrapper.vm.groups.items[1].id).toBe('condition-2');
+      expect(wrapper.vm.groups.items[2].groupId).toBe('sub-group-1');
+      expect(wrapper.vm.groups.items[3].groupId).toBe('sub-group-2');
+    });
+
+    it('should emit events when reordering', () => {
+      const mixedOrderProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            {
+              groupId: 'sub-group',
+              label: 'or',
+              items: [{ id: 'nested', column: 'field1', operator: '=', value: 'test1' }]
+            },
+            { id: 'condition-1', column: 'field2', operator: '=', value: 'test2' }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: mixedOrderProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.reorderItems();
+
+      expect(wrapper.emitted('add-group')).toBeTruthy();
+      expect(wrapper.emitted('input:update')).toBeTruthy();
+      expect(wrapper.emitted('input:update')?.[0]).toEqual(['conditions', wrapper.vm.groups]);
+    });
+
+    it('should handle group with only conditions (no reordering needed)', () => {
+      const onlyConditionsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
+            { id: 'condition-2', column: 'field2', operator: '!=', value: 'test2' }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: onlyConditionsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.reorderItems();
+
+      // Order should remain the same
+      expect(wrapper.vm.groups.items[0].id).toBe('condition-1');
+      expect(wrapper.vm.groups.items[1].id).toBe('condition-2');
+    });
+
+    it('should handle group with only sub-groups (no reordering needed)', () => {
+      const onlyGroupsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested-1', column: 'field1', operator: '=', value: 'test1' }]
+            },
+            {
+              groupId: 'sub-group-2',
+              label: 'and',
+              items: [{ id: 'nested-2', column: 'field2', operator: '=', value: 'test2' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: onlyGroupsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      wrapper.vm.reorderItems();
+
+      // Order should remain the same
+      expect(wrapper.vm.groups.items[0].groupId).toBe('sub-group-1');
+      expect(wrapper.vm.groups.items[1].groupId).toBe('sub-group-2');
+    });
+
+    it('should handle empty items array', () => {
+      const emptyItemsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: []
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: emptyItemsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Should not throw error
+      expect(() => wrapper.vm.reorderItems()).not.toThrow();
+      expect(wrapper.vm.groups.items).toHaveLength(0);
+    });
+  });
+
+  describe('Disable AND/OR Toggle for Single Condition', () => {
+    it('should return true when group has only one condition and no sub-groups', () => {
+      const singleConditionProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: singleConditionProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.hasOnlyOneCondition).toBe(true);
+    });
+
+    it('should return false when group has multiple conditions', () => {
+      const multipleConditionsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
+            { id: 'condition-2', column: 'field2', operator: '=', value: 'test2' }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: multipleConditionsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.hasOnlyOneCondition).toBe(false);
+    });
+
+    it('should return false when group has one condition and sub-groups (toggle is useful)', () => {
+      const oneConditionWithGroupsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
+            {
+              groupId: 'sub-group',
+              label: 'or',
+              items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: oneConditionWithGroupsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Should be false because AND/OR toggle is useful when combining condition with sub-group
+      expect(wrapper.vm.hasOnlyOneCondition).toBe(false);
+    });
+
+    it('should return false when group has no conditions (only sub-groups)', () => {
+      const onlySubGroupsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            {
+              groupId: 'sub-group-1',
+              label: 'or',
+              items: [{ id: 'nested-1', column: 'field1', operator: '=', value: 'test1' }]
+            },
+            {
+              groupId: 'sub-group-2',
+              label: 'and',
+              items: [{ id: 'nested-2', column: 'field2', operator: '=', value: 'test2' }]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: onlySubGroupsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.hasOnlyOneCondition).toBe(false);
+    });
+
+    it('should return true when group has empty items array', () => {
+      const emptyItemsProps = {
+        ...defaultProps,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: []
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: emptyItemsProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.hasOnlyOneCondition).toBe(false);
+    });
+  });
+
+  describe('conditionInputWidth Prop', () => {
+    it('should accept conditionInputWidth prop', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          conditionInputWidth: 'tw-w-[100px]'
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.props('conditionInputWidth')).toBe('tw-w-[100px]');
+    });
+
+    it('should have empty string as default for conditionInputWidth', () => {
+      const wrapper = mount(FilterGroup, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.props('conditionInputWidth')).toBe('');
+    });
+  });
+
+  describe('disableFirstCondition Prop', () => {
+    it('should have false as default for disableFirstCondition', () => {
+      const wrapper = mount(FilterGroup, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.props('disableFirstCondition')).toBe(true);
+    });
+
+    it('should accept disableFirstCondition prop as true', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          disableFirstCondition: true
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.props('disableFirstCondition')).toBe(true);
+    });
+
+    it('should show delete button for first condition when disableFirstCondition is false', () => {
+      const wrapper = mount(FilterGroup, {
+        props: {
+          ...defaultProps,
+          disableFirstCondition: false
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // With disableFirstCondition=false, delete button should be visible
+      const deleteButtons = wrapper.findAll('[data-test="alert-conditions-delete-condition-btn"]');
+      expect(deleteButtons.length).toBeGreaterThan(0);
+    });
+
+    it('should hide delete button for first condition of root group when disableFirstCondition is true', () => {
+      const multiItemProps = {
+        ...defaultProps,
+        disableFirstCondition: true,
+        group: {
+          groupId: 'test-group',
+          label: 'and',
+          items: [
+            { id: 'item-1', column: 'field1', operator: '=', value: 'test1' },
+            { id: 'item-2', column: 'field2', operator: '=', value: 'test2' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: multiItemProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // First condition should not have delete button
+      // Second condition should have delete button
+      const deleteButtons = wrapper.findAll('[data-test="alert-conditions-delete-condition-btn"]');
+      // Should have 1 delete button (for the second condition only)
+      expect(deleteButtons.length).toBe(1);
+    });
+  });
 
   describe('Edge Cases', () => {
     it('should handle empty streamFields', () => {
@@ -1279,6 +2076,282 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(wrapper.vm.groups.items).toHaveLength(2);
       expect(wrapper.vm.isGroup(wrapper.vm.groups.items[0])).toBe(true);
       expect(wrapper.vm.isGroup(wrapper.vm.groups.items[1])).toBeFalsy();
+    });
+  });
+
+  describe('Preview Functionality', () => {
+    it('should generate preview string for simple conditions', () => {
+      const simpleProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'or',
+          items: [
+            { id: 'c1', column: 'field1', operator: '=', value: 'test1' },
+            { id: 'c2', column: 'field2', operator: '=', value: 'test2' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: simpleProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.previewString).toBe("(field1 = 'test1' OR field2 = 'test2')");
+    });
+
+    it('should generate preview string with AND operator', () => {
+      const andProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'and',
+          items: [
+            { id: 'c1', column: 'name', operator: '=', value: 'John' },
+            { id: 'c2', column: 'age', operator: '>', value: '30' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: andProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.previewString).toBe("(name = 'John' AND age > '30')");
+    });
+
+    it('should generate preview string with nested groups', () => {
+      const nestedProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'or',
+          items: [
+            { id: 'c1', column: 'field1', operator: '=', value: 'a' },
+            { id: 'c2', column: 'field2', operator: '=', value: 'b' },
+            {
+              groupId: 'nested',
+              label: 'and',
+              items: [
+                { id: 'c3', column: 'field3', operator: '=', value: 'c' },
+                { id: 'c4', column: 'field4', operator: '=', value: 'd' },
+              ]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: nestedProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.previewString).toBe("(field1 = 'a' OR field2 = 'b' OR (field3 = 'c' AND field4 = 'd'))");
+    });
+
+    it('should use placeholder for empty column names', () => {
+      const emptyColumnProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'or',
+          items: [
+            { id: 'c1', column: '', operator: '=', value: 'test' },
+            { id: 'c2', column: 'field2', operator: '=', value: 'test2' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: emptyColumnProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.previewString).toBe("(field = 'test' OR field2 = 'test2')");
+    });
+
+    it('should show preview section only at depth 0', async () => {
+      const rootProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'or',
+          items: [
+            { id: 'c1', column: 'field1', operator: '=', value: 'test' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: rootProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Should find preview section at depth 0
+      const previewSection = wrapper.find('.tw-mb-2.tw-p-2.tw-rounded.tw-border');
+      expect(previewSection.exists()).toBe(true);
+      expect(previewSection.text()).toContain('Preview');
+    });
+
+    it('should not show preview section at depth > 0', () => {
+      const nestedProps = {
+        ...defaultProps,
+        depth: 1,
+        group: {
+          groupId: 'nested',
+          label: 'or',
+          items: [
+            { id: 'c1', column: 'field1', operator: '=', value: 'test' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: nestedProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      // Should not find preview section at depth > 0
+      const previewSection = wrapper.find('.tw-mb-2.tw-p-2.tw-rounded.tw-border');
+      expect(previewSection.exists()).toBe(false);
+    });
+
+    it('should toggle preview visibility when clicking header', async () => {
+      const rootProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'or',
+          items: [
+            { id: 'c1', column: 'field1', operator: '=', value: 'test' },
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: rootProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.showPreview).toBe(true);
+
+      // Find and click the preview header
+      const previewHeader = wrapper.find('.tw-cursor-pointer');
+      await previewHeader.trigger('click');
+
+      expect(wrapper.vm.showPreview).toBe(false);
+
+      // Click again to show
+      await previewHeader.trigger('click');
+      expect(wrapper.vm.showPreview).toBe(true);
+    });
+
+    it('should handle deeply nested groups in preview', () => {
+      const deeplyNestedProps = {
+        ...defaultProps,
+        depth: 0,
+        group: {
+          groupId: 'root',
+          label: 'and',
+          items: [
+            { id: 'c1', column: 'a', operator: '=', value: 'test' },
+            {
+              groupId: 'level1',
+              label: 'or',
+              items: [
+                { id: 'c2', column: 'b', operator: '=', value: 'test' },
+                {
+                  groupId: 'level2',
+                  label: 'and',
+                  items: [
+                    { id: 'c3', column: 'c', operator: '=', value: 'test' },
+                    { id: 'c4', column: 'd', operator: '=', value: 'test' },
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      };
+
+      const wrapper = mount(FilterGroup, {
+        props: deeplyNestedProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            'FilterCondition': true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.previewString).toBe("(a = 'test' AND (b = 'test' OR (c = 'test' AND d = 'test')))");
     });
   });
 });
