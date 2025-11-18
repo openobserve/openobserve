@@ -22,6 +22,18 @@ export default class DashboardCreate {
 
   //Create Dashboard
   async createDashboard(dashboardName) {
+    // Wait for the dashboards list API to complete loading before clicking
+    await this.page.waitForResponse(
+      response => {
+        const url = response.url();
+        return url.includes('/api/') &&
+               url.includes('/dashboards') &&
+               url.includes('page_num=0') &&
+               response.status() === 200;
+      },
+      { timeout: 15000 }
+    );
+
     await this.dashCreateBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.dashCreateBtn.click();
 
