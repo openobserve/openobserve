@@ -1556,6 +1556,26 @@
     "job_applied_success": "Search Job have been applied successfully",
     "fetch_failed": "Failed to fetch search history. Please try again later.",
     "logs": "Logs"
+  },
+  "pipeline_list": {
+    "sql_query": "SQL Query",
+    "export": "Export",
+    "pause": "Pause",
+    "resume": "Resume",
+    "last_error": "Last error",
+    "error_summary": "Error Summary",
+    "node_errors": "Node Errors",
+    "close": "Close",
+    "resume_pipeline_title": "Resume Pipeline Ingestion",
+    "tab_all": "All",
+    "tab_scheduled": "Scheduled",
+    "tab_realtime": "Real-Time",
+    "stream_type": "Stream Type",
+    "frequency": "Frequency",
+    "period": "Period",
+    "cron": "Cron",
+    "type": "Type",
+    "run_pipeline":"Run Pipeline"
   }
 
 }
