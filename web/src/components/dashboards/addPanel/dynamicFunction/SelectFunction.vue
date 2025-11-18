@@ -557,15 +557,38 @@ export default {
 <style lang="scss" scoped>
 .arg-type-select {
   :deep(.q-field__control) {
-    background-color: var(--o2-primary-btn-bg) !important;
+    background-color: transparent !important;
+    border: 1px solid var(--o2-primary-btn-bg) !important;
+    border-radius: 4px !important;
+    align-items: center !important;
+  }
+
+  :deep(.q-field__control):before,
+  :deep(.q-field__control):after {
+    display: none !important;
+  }
+
+  :deep(.q-field):before,
+  :deep(.q-field):after {
+    display: none !important;
+  }
+
+  :deep(.q-field__append) {
+    align-items: center !important;
+  }
+
+  :deep(.q-field__prepend) {
+    align-items: center !important;
   }
 
   :deep(.q-field__append .q-icon) {
-    color: white !important;
+    color: var(--o2-primary-btn-bg) !important;
+    font-size: 18px !important;
   }
 
   :deep(.q-field__prepend .q-icon) {
-    color: white !important;
+    color: var(--o2-primary-btn-bg) !important;
+    font-size: 18px !important;
   }
 }
 </style>
