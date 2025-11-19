@@ -506,7 +506,7 @@ impl Condition {
                 if value.is_empty() || value == "*" {
                     Box::new(AllQuery {})
                 } else {
-                    let mut tokens = o2_collect_tokens(value);
+                    let mut tokens = o2_collect_tokens(value).atomic_tokens;
                     let contains_search =
                         tokens.len() == 1 && value.starts_with("*") && value.ends_with("*");
                     let first_prefix = if value.starts_with("*") && !tokens.is_empty() {

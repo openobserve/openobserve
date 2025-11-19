@@ -73,6 +73,7 @@ pub fn fuzzy_match_expr_impl() -> ScalarFunctionImplementation {
                     (Some(haystack), Some(needle), Some(dis)) => Some({
                         let terms = o2_collect_tokens(haystack);
                         terms
+                            .atomic_tokens
                             .iter()
                             .any(|term| levenshtein(term, needle) as i64 <= dis)
                     }),
