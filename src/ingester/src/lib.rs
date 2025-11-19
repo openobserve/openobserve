@@ -23,14 +23,7 @@ mod stream;
 mod wal;
 mod writer;
 
-use std::{
-    fs::create_dir_all,
-    path::PathBuf,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-};
+use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::RwAHashMap;
@@ -51,22 +44,6 @@ pub(crate) type ReadRecordBatchEntry = (Arc<Schema>, Vec<Arc<entry::RecordBatchE
 
 pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::FileMeta>> =
     Lazy::new(Default::default);
-
-/// Global flag to indicate if the ingester is draining for shutdown
-/// When set to true, the file upload job will prioritize uploading
-/// all pending files to S3
-static IS_INGESTER_DRAINING: AtomicBool = AtomicBool::new(false);
-
-/// Set the ingester to draining mode (for graceful shutdown)
-pub fn set_draining(draining: bool) {
-    IS_INGESTER_DRAINING.store(draining, Ordering::Release);
-    log::info!("[INGESTER] Draining mode set to: {draining}");
-}
-
-/// Check if the ingester is in draining mode
-pub fn is_draining() -> bool {
-    IS_INGESTER_DRAINING.load(Ordering::Acquire)
-}
 
 pub static WAL_DIR_DEFAULT_PREFIX: &str = "logs";
 
