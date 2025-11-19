@@ -513,6 +513,63 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
 }
 
+fn hide_sensitive_fields(mut value: serde_json::Value) -> serde_json::Value {
+    if let Some(obj) = value.as_object_mut() {
+        for (key, val) in obj.iter_mut() {
+            let key_lower = key.to_lowercase();
+
+            // Simple rule: contains any of these sensitive keywords
+            let is_sensitive = key_lower.contains("password")
+                || key_lower.contains("secret")
+                || key_lower.contains("key")
+                || key_lower.contains("auth")
+                || key_lower.contains("token")
+                || key_lower.contains("credential");
+
+            if is_sensitive {
+                if let Some(s) = val.as_str() {
+                    *val = if s.is_empty() {
+                        serde_json::Value::String("[not set]".to_string())
+                    } else {
+                        serde_json::Value::String("[hidden]".to_string())
+                    };
+                }
+            } else if val.is_object() {
+                *val = hide_sensitive_fields(val.clone());
+            }
+        }
+    }
+    value
+}
+
+#[get("/runtime")]
+pub async fn config_runtime() -> Result<HttpResponse, Error> {
+    let cfg = get_config();
+    let mut config_value = serde_json::to_value(cfg.as_ref())
+        .map_err(|e| Error::other(format!("Failed to serialize config: {e}")))?;
+
+    config_value = hide_sensitive_fields(config_value);
+
+    let mut final_response = serde_json::Map::new();
+    final_response.insert(
+        "_metadata".to_string(),
+        json::json!({
+            "version": config::VERSION,
+            "commit_hash": config::COMMIT_HASH,
+            "build_date": config::BUILD_DATE,
+            "instance_id": get_instance_id(),
+        }),
+    );
+
+    if let Some(config_obj) = config_value.as_object() {
+        for (key, value) in config_obj {
+            final_response.insert(key.clone(), value.clone());
+        }
+    }
+
+    Ok(HttpResponse::Ok().json(final_response))
+}
+
 async fn get_stream_schema_status() -> (usize, usize, usize) {
     let mut stream_num = 0;
     let mut stream_schema_num = 0;
