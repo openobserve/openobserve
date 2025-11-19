@@ -1524,29 +1524,23 @@ async fn process_dest_template(
     let is_json_rows_context = check_json_context(&resp, "rows");
 
     if is_json_rows_context {
-        // All row templates are JSON values, inject as JSON array
-        // Parse any Value::String that contains JSON into actual JSON objects
-        let mut parsed_values = Vec::new();
+        // If the row template type is json, then all row_tpl_val elements are JSON values, inject
+        // as JSON array Otherwise, the row_tpl_val is a normal string, so inject as a
+        // single string joined with \n
         let mut all_json = true;
 
         for v in rows_tpl_val.iter() {
             if let Value::String(_) = v {
-                // NO need to parse as json as we should already get the value as json
-                // when the row template type is json.
                 all_json = false;
-            } else {
-                // Already a JSON value (object, array, etc.)
-                parsed_values.push(v.clone());
+                break;
             }
         }
 
         if all_json {
             // Create JSON array representation with actual JSON objects
-            let json_array = Value::Array(parsed_values);
+            let json_array = Value::Array(rows_tpl_val.to_vec());
             let json_str = serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
-            // Remove the outer brackets to get comma-separated values
-            let json_inner = format!("[{}]", &json_str[1..json_str.len() - 1]);
-            resp = resp.replace("\"{rows}\"", &json_inner);
+            resp = resp.replace("\"{rows}\"", &json_str);
         } else {
             // Fallback to string behavior
             process_variable_replace(
@@ -1584,29 +1578,21 @@ async fn process_dest_template(
 /// Checks if a variable is being used in a JSON context (i.e., as a direct value in JSON)
 /// For example, {"key": "{var}"} returns true, but {"key": "text {var} text"} returns false
 fn check_json_context(tpl: &str, var_name: &str) -> bool {
-    let pattern = format!("{{{var_name}}}");
-    if let Some(pos) = tpl.find(&pattern) {
-        // Check if it's the only content within quotes or brackets
-        // Look backwards for the opening quote or bracket
-        let before = &tpl[..pos].trim_end();
-        let after = &tpl[pos + pattern.len()..].trim_start();
+    let pattern_with_quotes = format!("\"{{{var_name}}}\"");
 
-        // Check if {rows} is directly after ":" and before "}" or ","
-        // This pattern matches: "key": "{rows}"
-        if before.ends_with(':') && (after.starts_with('}') || after.starts_with(',')) {
+    if let Some(pos) = tpl.find(&pattern_with_quotes) {
+        let before = &tpl[..pos];
+        let after = &tpl[pos + pattern_with_quotes.len()..];
+
+        // Pattern should be: "key": "{var_name}" followed by , or }
+        // Check for colon before (with optional whitespace)
+        let before_trimmed = before.trim_end();
+        let after_trimmed = after.trim_start();
+
+        if before_trimmed.ends_with(':')
+            && (after_trimmed.starts_with(',') || after_trimmed.starts_with('}'))
+        {
             return true;
-        }
-
-        // Also check if it's directly after ":" followed by whitespace or quote
-        if let Some(last_colon) = before.rfind(':') {
-            let between = before[last_colon + 1..].trim();
-            if between.is_empty() || between == "\"" {
-                // Check what comes after
-                let after_trimmed = after.trim_start_matches('"').trim_start();
-                if after_trimmed.starts_with('}') || after_trimmed.starts_with(',') {
-                    return true;
-                }
-            }
         }
     }
     false
@@ -2573,5 +2559,142 @@ mod tests {
         assert_eq!(arr[0]["job"], "test");
         assert_eq!(arr[1]["level"], "warn");
         assert_eq!(arr[1]["job"], "test2");
+    }
+
+    #[test]
+    fn test_check_json_context_valid_cases() {
+        // Basic case with closing brace: "key": "{rows}"
+        assert!(check_json_context(r#""data": "{rows}"}"#, "rows"));
+
+        // Basic case with comma: "key": "{rows}",
+        assert!(check_json_context(r#""data": "{rows}","#, "rows"));
+
+        // With comma and more fields after
+        assert!(check_json_context(
+            r#""data": "{rows}", "other": "value""#,
+            "rows"
+        ));
+
+        // With whitespace before colon
+        assert!(check_json_context(r#""data" : "{rows}"}"#, "rows"));
+
+        // With whitespace after colon
+        assert!(check_json_context(r#""data":  "{rows}"}"#, "rows"));
+
+        // With whitespace before comma
+        assert!(check_json_context(r#""data": "{rows}" ,"#, "rows"));
+
+        // With whitespace before closing brace
+        assert!(check_json_context(r#""data": "{rows}" }"#, "rows"));
+
+        // Nested in object
+        assert!(check_json_context(
+            r#"{"items": "{rows}", "count": 5}"#,
+            "rows"
+        ));
+
+        // Multiple levels of nesting
+        assert!(check_json_context(
+            r#"{"outer": {"inner": "{rows}"}}"#,
+            "rows"
+        ));
+
+        // Different variable names
+        assert!(check_json_context(r#""items": "{data}"}"#, "data"));
+        assert!(check_json_context(r#""result": "{result}"}"#, "result"));
+        assert!(check_json_context(r#""count": "{count}"}"#, "count"));
+    }
+
+    #[test]
+    fn test_check_json_context_invalid_cases() {
+        // Variable with text before it (string interpolation)
+        assert!(!check_json_context(r#""data": "prefix {rows}""#, "rows"));
+
+        // Variable with text after it (string interpolation)
+        assert!(!check_json_context(r#""data": "{rows} suffix""#, "rows"));
+
+        // Variable with text on both sides
+        assert!(!check_json_context(
+            r#""data": "prefix {rows} suffix""#,
+            "rows"
+        ));
+
+        // Missing quotes around variable
+        assert!(!check_json_context(r#""data": {rows}"#, "rows"));
+
+        // Not after a colon (not in value position)
+        assert!(!check_json_context(r#""{rows}": "value""#, "rows"));
+
+        // In middle of string with other content
+        assert!(!check_json_context(
+            r#""data": "Total: {rows} items""#,
+            "rows"
+        ));
+
+        // Not followed by comma or closing brace
+        assert!(!check_json_context(r#""data": "{rows}" "other""#, "rows"));
+
+        // Variable not present
+        assert!(!check_json_context(r#""data": "value""#, "rows"));
+
+        // Variable without quotes
+        assert!(!check_json_context(
+            r#""data": {rows}, "other": "value""#,
+            "rows"
+        ));
+
+        // Wrong variable name
+        assert!(!check_json_context(r#""data": "{other}""#, "rows"));
+    }
+
+    #[test]
+    fn test_check_json_context_edge_cases() {
+        // Empty template
+        assert!(!check_json_context("", "rows"));
+
+        // Only the variable
+        assert!(!check_json_context(r#""{rows}""#, "rows"));
+
+        // Variable at start without proper JSON context
+        assert!(!check_json_context(r#""{rows}", "other": "value""#, "rows"));
+
+        // Multiple occurrences - should match the first valid one
+        assert!(check_json_context(
+            r#""data": "{rows}", "backup": "old {rows} data""#,
+            "rows"
+        ));
+
+        // Tab characters instead of spaces
+        assert!(check_json_context("\"data\":\t\"{rows}\"\t,", "rows"));
+
+        // Newlines in template
+        assert!(check_json_context("\"data\": \"{rows}\"\n,", "rows"));
+
+        // Real-world webhook payload example
+        assert!(check_json_context(
+            r#"{"alert": "test", "rows": "{rows}", "count": 5}"#,
+            "rows"
+        ));
+
+        // Array context (should still work)
+        assert!(check_json_context(
+            r#"{"items": [{"data": "{rows}"}]}"#,
+            "rows"
+        ));
+    }
+
+    #[test]
+    fn test_check_json_context_special_characters() {
+        // Variable name with underscores
+        assert!(check_json_context(r#""data": "{row_data}"}"#, "row_data"));
+
+        // Variable name with numbers
+        assert!(check_json_context(r#""data": "{rows123}"}"#, "rows123"));
+
+        // Escaped quotes in surrounding JSON (valid JSON)
+        assert!(check_json_context(
+            r#""data": "{rows}", "msg": "test\"quote""#,
+            "rows"
+        ));
     }
 }
