@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               stack-label
               bottom-slots
-              disable
+              :disable="formData.destination_type !== 'custom'"
               :rules="[
                 ...(formData.destination_type === 'custom'
                   ? []
