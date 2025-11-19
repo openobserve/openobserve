@@ -350,11 +350,13 @@ const bulkDeleteUserRoles = async () => {
     selectedRoles.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
+    if(error.status != 403){
     q.notify({
       message: error?.message || "Error while deleting roles",
       color: "negative",
       position: "bottom",
     });
+  }
     confirmBulkDelete.value = false;
   }
 };
