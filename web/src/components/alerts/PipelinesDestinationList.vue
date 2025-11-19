@@ -139,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :destination="editingDestination"
         @cancel="toggleDestinationEditor"
         @created="handleDestinationCreated"
+        @updated="handleDestinationUpdated"
       />
     </div>
 
@@ -452,6 +453,18 @@ export default defineComponent({
         message: `Destination "${destinationName}" created successfully.`,
       });
     };
+
+    const handleDestinationUpdated = (destinationName: string) => {
+      // Close the editor and refresh the list
+      toggleDestinationEditor();
+      getDestinations();
+
+      q.notify({
+        type: "positive",
+        message: `Destination "${destinationName}" updated successfully.`,
+      });
+    };
+
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
@@ -527,6 +540,7 @@ export default defineComponent({
       templates,
       toggleDestinationEditor,
       handleDestinationCreated,
+      handleDestinationUpdated,
       getDestinations,
       deleteDestination,
       cancelDeleteDestination,

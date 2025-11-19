@@ -785,11 +785,6 @@ const getDefaultHeaders = (destinationType: string) => {
         uuid: getUUID(),
       });
       headers.push({
-        key: "Content-Encoding",
-        value: "gzip",
-        uuid: getUUID(),
-      });
-      headers.push({
         key: "Content-Type",
         value: "application/json",
         uuid: getUUID(),
