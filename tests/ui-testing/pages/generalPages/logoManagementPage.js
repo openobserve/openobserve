@@ -89,8 +89,8 @@ export
         await this.page.waitForSelector('[data-test="setting_ent_custom_logo_img_file_upload"]');
         await this.page.setInputFiles('input[data-test="setting_ent_custom_logo_img_file_upload"]', filePath);
         // Click the save button after logo upload
-        await this.page.waitForSelector('[data-test="settings_ent_logo_custom_text_save_btn"]');
-        await this.page.locator('[data-test="settings_ent_logo_custom_text_save_btn"]').click({ force: true });
+        await this.page.waitForSelector('[data-test="settings_ent_logo_custom_light_save_btn"]');
+        await this.page.locator('[data-test="settings_ent_logo_custom_light_save_btn"]').click({ force: true });
         await expect(this.page.getByText("Logo updated successfully")).toBeVisible({
             timeout: 30000,
         });
