@@ -325,21 +325,9 @@ jobs:
             echo "::notice::Using cache ID: $CACHE_ID"
             # Try to get last failed tests from TestDino
             # Redirect stderr to /dev/null to avoid capturing npm warnings
-            if LAST_FAILED_OUTPUT="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
-              # DEBUG: Show what TestDino returned before filtering
-              echo "::notice::DEBUG - Raw TestDino output (first 2000 chars):"
-              echo "$LAST_FAILED_OUTPUT" | head -c 2000
-              echo ""
-              echo "::notice::DEBUG - Last 500 chars:"
-              echo "$LAST_FAILED_OUTPUT" | tail -c 500
-              echo ""
-
-              # Filter out debug lines - extract only the line with actual test file path
-              # Real output looks like: "Pipelines/pipeline-core.spec.js -g test name"
-              # Debug output starts with "DEBUG:", "===", etc.
-              LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_OUTPUT" | grep -v "^DEBUG:" | grep -v "^===" | grep -v "^  -" | grep "\.spec\.js" | head -1 | xargs)"
-
-              echo "::notice::DEBUG - After filtering: '$LAST_FAILED_FLAGS'"
+            if LAST_FAILED_FLAGS="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
+              # Trim whitespace (original working logic - no filtering)
+              LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
 
               if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
                 echo "::notice::✅ Found failed tests from previous run."
