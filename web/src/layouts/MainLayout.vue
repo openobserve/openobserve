@@ -20,492 +20,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[store.state.printMode === true ? 'printMode' : '']"
   >
     <q-header>
-      <q-toolbar>
-        <div
-          class="flex relative-position q-mr-sm"
-          v-if="
-            (config.isEnterprise == 'true' &&
-              store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
-              store.state.zoConfig.custom_logo_text != '') ||
-            (config.isEnterprise == 'true' &&
-              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-              store.state.zoConfig.custom_logo_img != null)
-          "
-        >
-          <span
-            v-if="
-              store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
-              store.state.zoConfig?.custom_logo_text != ''
-            "
-            class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm"
-            @click="goToHome"
-            >{{ store.state.zoConfig.custom_logo_text }}</span
-          >
-          <img
-            v-if="
-              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-              store.state.zoConfig?.custom_logo_img != null
-            "
-            :src="
-              `data:image; base64, ` + store.state.zoConfig?.custom_logo_img
-            "
-            style="max-width: 150px; max-height: 31px"
-          />
-          <div
-            v-if="store.state.zoConfig.custom_hide_self_logo == false"
-            class="logo-container"
-          >
-            <img
-              class="openobserve-logo cursor-pointer"
-              :src="getImageURL(
-                store.state.theme === 'dark'
-                  ? 'images/common/openobserve_latest_dark_2.svg'
-                  : 'images/common/openobserve_latest_light_2.svg'
-              )"
-              @click="goToHome"
-              alt="OpenObserve"
-            />
-          </div>
-        </div>
-        <div v-else class="flex relative-position q-mr-sm logo-container">
-          <img
-            class="openobserve-logo cursor-pointer"
-            :src="getImageURL(
-              store.state.theme === 'dark'
-                ? 'images/common/openobserve_latest_dark_2.svg'
-                : 'images/common/openobserve_latest_light_2.svg'
-            )"
-            @click="goToHome"
-            alt="OpenObserve"
-          />
-        </div>
-
-        <q-toolbar-title></q-toolbar-title>
-        <div
-          class="headerMenu float-left"
-          v-if="store.state.organizationData.quotaThresholdMsg"
-        >
-          <div
-            type="warning"
-            icon="cloud"
-            class="warning-msg"
-            style="display: inline"
-          >
-            <q-icon name="warning" size="xs"
-class="warning" />{{
-              store.state.organizationData.quotaThresholdMsg
-            }}
-          </div>
-          <q-btn
-            color="secondary"
-            size="sm"
-            style="display: inline; padding: 5px 10px"
-            rounded
-            borderless
-            dense
-            class="q-ma-xs"
-            @click="router.replace('/billings/plans')"
-            >Upgrade to PRO Plan</q-btn
-          >
-        </div>
-        <div class="header-menu">
-                  <q-btn
-          v-if="
-            config.isEnterprise == 'true' &&
-            store.state.zoConfig.ingestion_quota_used >= 85
-          "
-          round
-          flat
-          dense
-          :ripple="false"
-          data-test="ingestion-quota-warning-icon"
-        >
-          <div class="row items-center no-wrap">
-            <q-icon
-              name="warning"
-              size="24px"
-              class="header-icon"
-              :style="{
-                color:
-                  store.state.zoConfig.ingestion_quota_used >= 95
-                    ? 'red'
-                    : 'orange',
-              }"
-            ></q-icon>
-          </div>
-          <q-tooltip anchor="top middle" self="bottom middle">
-            Warning: {{ store.state.zoConfig.ingestion_quota_used }}% of
-            ingestion limit used
-          </q-tooltip>
-        </q-btn>
-          <q-btn
-            v-if="
-              config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
-            "
-            :ripple="false"
-            @click="toggleAIChat"
-            data-test="menu-link-ai-item"
-            no-caps
-            :borderless="true"
-            flat
-            dense
-            class="o2-button ai-hover-btn q-px-sm q-py-sm"
-            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-            style="border-radius: 100%"
-            @mouseenter="isHovered = true"
-            @mouseleave="isHovered = false"
-          >
-            <div class="row items-center no-wrap tw-gap-2">
-              <img :src="getBtnLogo" class="header-icon ai-icon" />
-            </div>
-          </q-btn>
-          <div data-test="navbar-organizations-select" class="q-mx-sm row">
-            <q-btn
-              style="max-width: 250px"
-              dense
-              no-caps
-              flat
-              class="tw-text-ellipsis tw-overflow-hidden"
-            >
-              <div class="row items-center no-wrap full-width">
-                <div class="col tw-truncate">
-                  {{ userClickedOrg?.label || "" }}
-                </div>
-                <q-icon name="arrow_drop_down" class="q-ml-xs" />
-              </div>
-              <q-menu
-                anchor="bottom middle"
-                self="top middle"
-                class="organization-menu-o2"
-              >
-              <q-list data-test="organization-menu-list" style="width: 100%">
-                <q-item data-test="organization-menu-item" style="padding: 0">
-                  <q-item-section data-test="organization-menu-item-section" class="column" style="padding: 0px">
-                  <q-table
-                    data-test="organization-menu-table"
-                    :rows="filteredOrganizations"
-                    :row-key="(row) => 'org_' + row.identifier"
-                    :columns="[{ name: 'label', field: 'label', align: 'left' }]"
-                    :visible-columns="['label']"
-                    hide-header
-                    :pagination="{ rowsPerPage }"
-                    :rows-per-page-options="[]"
-                    class="org-table"
-                    style="width: 470px"
-                  >
-                    <template #top>
-                      <div class="full-width">
-                        <q-input
-                          data-test="organization-search-input"
-                          v-model="searchQuery"
-                          data-cy="index-field-search-input"
-                          borderless
-                          dense
-                          clearable
-                          debounce="1"
-                          autofocus
-                          :placeholder="'Search Organization'"
-                        >
-                          <template #prepend>
-                            <q-icon name="search" />
-                          </template>
-                        </q-input>
-                      </div>
-                    </template>
-
-                    <template v-slot:body-cell-label="props">
-                      <q-td
-                        :props="props"
-                        class="org-list-item-cell"
-                        @click="
-                          selectedOrg = props.row;
-                          updateOrganization();
-                        "
-                      >
-                        <div
-                          class="org-menu-item"
-                          v-close-popup
-                          data-test="organization-menu-item-label-item-label"
-                          :class="{
-                            'org-menu-item--active':
-                              props.row.identifier === userClickedOrg?.identifier,
-                          }"
-                        >
-                          {{
-                            props.row.label.length > 30
-                              ? props.row.label.substring(0, 30) +
-                                "... | " +
-                                props.row.identifier
-                              : props.row.label + " | " + props.row.identifier
-                          }}
-                          <q-tooltip
-                            v-if="props.row.label.length > 30"
-                            anchor="bottom middle"
-                            self="top start"
-                          >
-                            {{ props.row.label }}
-                          </q-tooltip>
-                        </div>
-                      </q-td>
-                    </template>
-
-                    <template v-slot:no-data>
-                      <div
-                        data-test="organization-menu-no-data"
-                        class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center"
-                      >
-                        No organizations found
-                      </div>
-                    </template>
-                  </q-table>
-              </q-item-section>
-            </q-item>
-           </q-list>
-              </q-menu>
-            </q-btn>
-          </div>
-
-          <ThemeSwitcher></ThemeSwitcher>
-
-          <q-btn
-            round
-            flat
-            dense
-            :ripple="false"
-            @click="openSlack"
-            data-test="menu-link-slack-item"
-          >
-            <div class="row items-center no-wrap">
-              <q-icon
-                ><component :is="slackIcon"
-size="32px" class="header-icon"
-              /></q-icon>
-            </div>
-            <q-tooltip anchor="top middle" self="bottom middle">
-              {{ t("menu.slack") }}
-            </q-tooltip>
-          </q-btn>
-          <q-btn
-            round
-            flat
-            dense
-            :ripple="false"
-            data-test="menu-link-help-item"
-          >
-            <div class="row items-center no-wrap">
-              <q-icon name="help_outline" class="header-icon"></q-icon>
-              <q-tooltip anchor="top middle" self="bottom middle">
-                {{ t("menu.help") }}
-              </q-tooltip>
-            </div>
-
-            <q-menu
-              fit
-              anchor="bottom right"
-              self="top right"
-              transition-show="jump-down"
-              transition-hide="jump-up"
-              class="header-menu-bar"
-            >
-              <q-list style="min-width: 250px">
-                <div
-                  v-if="
-                    config.isCloud !== 'true' &&
-                    !store.state.zoConfig?.custom_hide_menus
-                      ?.split(',')
-                      ?.includes('openapi')
-                  "
-                >
-                  <q-item clickable @click="navigateToOpenAPI(zoBackendUrl)">
-                    <q-item-section>
-                      <q-item-label>
-                        {{ t(`menu.openapi`) }}
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                  <q-separator />
-                </div>
-                <q-item clickable @click="navigateToDocs()">
-                  <q-item-section>
-                    <q-item-label>
-                      {{ t(`menu.docs`) }}
-                    </q-item-label>
-                  </q-item-section>
-                </q-item>
-                <q-separator />
-                <q-item to="/about" data-test="menu-link-about-item">
-                  <q-item-section>
-                    <q-item-label>
-                      {{ t(`menu.about`) }}
-                    </q-item-label>
-                  </q-item-section>
-                </q-item>
-              </q-list>
-            </q-menu>
-          </q-btn>
-
-          <q-btn
-            data-test="menu-link-settings-item"
-            round
-            flat
-            dense
-            :ripple="false"
-            @click="router.push({ name: 'settings' })"
-          >
-            <div class="row items-center no-wrap">
-              <q-icon :name="outlinedSettings" class="header-icon"></q-icon>
-            </div>
-            <q-tooltip anchor="top middle" self="bottom middle">
-              {{ t("menu.settings") }}
-            </q-tooltip>
-          </q-btn>
-
-          <q-btn
-            round
-            flat
-            dense
-            :ripple="false"
-            data-test="header-my-account-profile-icon"
-          >
-            <div class="row items-center no-wrap">
-              <q-icon
-                :name="user.picture ? user.picture : 'person'"
-                class="header-icon"
-              ></q-icon>
-              <q-tooltip anchor="top middle" self="bottom middle">
-                {{
-                  user.given_name
-                    ? user.given_name + " " + user.family_name
-                    : user.email
-                }}</q-tooltip
-              >
-            </div>
-
-            <q-menu
-              fit
-              anchor="bottom right"
-              self="top right"
-              transition-show="jump-down"
-              transition-hide="jump-up"
-              class="header-menu-bar"
-            >
-              <q-list style="min-width: 250px">
-                <q-item>
-                  <q-item-section avatar>
-                    <q-icon
-                      :name="user.picture ? user.picture : 'person'"
-                      size="xs"
-                    ></q-icon>
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>{{
-                      user.given_name
-                        ? user.given_name + " " + user.family_name
-                        : user.email
-                    }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-                <q-separator />
-                <q-item clickable>
-                  <q-item-section avatar>
-                    <q-icon size="xs" name="language"
-class="padding-none" />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label class="tw-max-w-[150px]">{{
-                      t("menu.language")
-                    }}</q-item-label>
-                  </q-item-section>
-                  <q-item-section></q-item-section>
-                  <q-item-section side>
-                    <div class="q-gutter-xs">
-                      <q-icon
-                        size="xs"
-                        :name="selectedLanguage.icon"
-                        class="padding-none"
-                      />
-                      <span
-                        class="cursor-pointer vertical-bottom q-mt-sm selected-lang-label"
-                        >{{ selectedLanguage.label }}</span
-                      >
-                    </div>
-                  </q-item-section>
-                  <q-item-section side style="padding-left: 0px">
-                    <q-icon
-                      class="icon-ley-arrow-right"
-                      name="keyboard_arrow_right"
-                    />
-                  </q-item-section>
-
-                  <q-menu
-                    auto-close
-                    anchor="top end"
-                    self="top start"
-                    data-test="language-dropdown-item"
-                    class="header-menu-bar"
-                  >
-                    <q-list>
-                      <q-item
-                        v-for="lang in langList"
-                        :key="lang.code"
-                        v-bind="lang"
-                        dense
-                        clickable
-                        @click="changeLanguage(lang)"
-                      >
-                        <q-item-section avatar>
-                          <q-icon
-                            size="xs"
-                            :name="lang.icon"
-                            class="padding-none"
-                          />
-                        </q-item-section>
-
-                        <q-item-section
-                          :data-test="`language-dropdown-item-${lang.code}`"
-                        >
-                          <q-item-label>{{ lang.label }}</q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </q-list>
-                  </q-menu>
-                </q-item>
-                <q-separator />
-                <q-item
-                  data-test="menu-link-predefined-themes-item"
-                  v-ripple="true"
-                  v-close-popup="true"
-                  clickable
-                  @click="openPredefinedThemes"
-                >
-                  <q-item-section avatar>
-                    <q-icon size="xs" name="color_lens" class="padding-none" />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>Manage Theme</q-item-label>
-                  </q-item-section>
-                </q-item>
-                <q-separator />
-                <q-item
-                  data-test="menu-link-logout-item"
-                  v-ripple="true"
-                  v-close-popup="true"
-                  clickable
-                  @click="signout"
-                >
-                  <q-item-section avatar>
-                    <q-icon size="xs" name="exit_to_app"
-class="padding-none" />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>{{ t("menu.signOut") }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </q-list>
-            </q-menu>
-          </q-btn>
-        </div>
-      </q-toolbar>
+      <!-- Header component containing logo, navigation, and user controls -->
+      <Header
+        :store="store"
+        :router="router"
+        :config="config"
+        :user="user"
+        :slack-icon="slackIcon"
+        :zo-backend-url="zoBackendUrl"
+        :lang-list="langList"
+        :selected-language="selectedLanguage"
+        :selected-org="selectedOrg"
+        :user-clicked-org="userClickedOrg"
+        :filtered-organizations="filteredOrganizations"
+        :search-query="searchQuery"
+        :rows-per-page="rowsPerPage"
+        :is-hovered="isHovered"
+        :get-btn-logo="getBtnLogo"
+        @update:selected-org="selectedOrg = $event"
+        @update:search-query="searchQuery = $event"
+        @update:is-hovered="isHovered = $event"
+        @update-organization="updateOrganization"
+        @go-to-home="goToHome"
+        @toggle-ai-chat="toggleAIChat"
+        @open-slack="openSlack"
+        @navigate-to-open-api="navigateToOpenAPI"
+        @navigate-to-docs="navigateToDocs"
+        @change-language="changeLanguage"
+        @open-predefined-themes="openPredefinedThemes"
+        @signout="signout"
+      />
     </q-header>
 
     <q-drawer
@@ -524,6 +68,7 @@ class="padding-none" />
           :link-name="nav.name"
           :animation-index="index"
           v-bind="{ ...nav, mini: miniMode }"
+          @mouseenter="handleMenuHover(nav.link)"
         />
       </q-list>
     </q-drawer>
@@ -591,6 +136,7 @@ import {
   useQuasar,
 } from "quasar";
 import MenuLink from "../components/MenuLink.vue";
+import Header from "../components/Header.vue";
 import { useI18n } from "vue-i18n";
 import {
   useLocalCurrentUser,
@@ -654,6 +200,7 @@ import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
+import useRoutePrefetch from "@/composables/useRoutePrefetch";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -667,6 +214,7 @@ export default defineComponent({
   mixins: [mainLayoutMixin],
   components: {
     "menu-link": MenuLink,
+    Header,
     "keep-alive": KeepAlive,
     "q-page": QPage,
     "q-page-container": QPageContainer,
@@ -720,7 +268,12 @@ export default defineComponent({
       this.$router.push("/logout");
     },
     goToHome() {
-      this.$router.push("/");
+      this.$router.push({
+        path: "/",
+        query: {
+          org_identifier: this.store.state.selectedOrganization.identifier,
+        },
+      });
     },
     changeLanguage(item: { code: string; label: string; icon: string }) {
       setLanguage(item.code);
@@ -739,6 +292,7 @@ export default defineComponent({
     const { getStreams, resetStreams } = useStreams();
     const { closeSocket } = useSearchWebSocket();
     const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
+    const { prefetchRoute } = useRoutePrefetch();
 
     const isMonacoEditorLoaded = ref(false);
     const showGetStarted = ref(
@@ -1451,6 +1005,15 @@ export default defineComponent({
     const openPredefinedThemes = () => {
       toggleThemes();
     };
+
+    /**
+     * Prefetch route module on menu hover
+     * @param routePath - The route path from the menu link
+     */
+    const handleMenuHover = (routePath: string) => {
+      prefetchRoute(routePath);
+    };
+
     //this is the used to set the selected org to the user clicked org because all the operations are happening on the selected org
     //to make sync with the user clicked org
     //we dont need search query after selectedOrg has been changed so resetting it
@@ -1510,6 +1073,7 @@ export default defineComponent({
       setRumUser,
       openPredefinedThemes,
       isPredefinedThemesOpen,
+      handleMenuHover,
     };
   },
   computed: {

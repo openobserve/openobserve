@@ -243,13 +243,47 @@ jobs:
 
       - name: Check if this is a rerun
         id: check_rerun
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "::notice::GitHub run attempt: ${{ github.run_attempt }}"
           if [ "${{ github.run_attempt }}" -gt "1" ]; then
+            # This is a rerun - always try TestDino optimization
             echo "is_rerun=true" >> $GITHUB_OUTPUT
             echo "::notice::This is a rerun (attempt ${{ github.run_attempt }}). Will attempt to run only failed tests."
+
+            # Additionally detect if this is "re-run all" vs "re-run failed" for better handling
+            echo "::group::Detecting rerun type (all jobs vs failed only)"
+
+            CURRENT_ATTEMPT=${{ github.run_attempt }}
+
+            # Get all jobs from the run
+            ALL_JOBS_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=all&per_page=100")
+
+            # Count jobs that are NOT completed (actually running in this attempt)
+            CURRENT_ATTEMPT_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | select(.status != \"completed\")] | length")
+
+            # Count total unique matrix job names (from attempt 1)
+            TOTAL_MATRIX_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == 1) | .name] | unique | length")
+
+            echo "::notice::Total unique matrix job names: $TOTAL_MATRIX_JOBS"
+            echo "::notice::Jobs running in current attempt $CURRENT_ATTEMPT: $CURRENT_ATTEMPT_JOBS"
+
+            # Store rerun type for potential use
+            if [ "$CURRENT_ATTEMPT_JOBS" -eq "$TOTAL_MATRIX_JOBS" ]; then
+              echo "::notice::✅ DETECTED: Re-run ALL jobs (all $TOTAL_MATRIX_JOBS matrix jobs running)"
+              echo "rerun_type=all" >> $GITHUB_OUTPUT
+            else
+              echo "::notice::✅ DETECTED: Re-run FAILED jobs only ($CURRENT_ATTEMPT_JOBS out of $TOTAL_MATRIX_JOBS jobs)"
+              echo "rerun_type=failed" >> $GITHUB_OUTPUT
+            fi
+
+            echo "::endgroup::"
           else
             echo "is_rerun=false" >> $GITHUB_OUTPUT
+            echo "rerun_type=none" >> $GITHUB_OUTPUT
             echo "::notice::This is the first run. Will run all tests in matrix."
           fi
 
@@ -274,38 +308,48 @@ jobs:
 
           # Check if this is a rerun
           IS_RERUN="${{ steps.check_rerun.outputs.is_rerun }}"
+          RERUN_TYPE="${{ steps.check_rerun.outputs.rerun_type }}"
 
           if [ "$IS_RERUN" = "true" ]; then
-            echo "::group::Fetching last failed tests from TestDino"
-            # Use custom cache ID that includes run_id to distinguish separate workflow runs
-            # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
-            CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
-            echo "::notice::Using cache ID: $CACHE_ID"
-            # Try to get last failed tests from TestDino
-            # Redirect stderr to /dev/null to avoid capturing npm warnings
-            if LAST_FAILED_FLAGS="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
-              # Trim whitespace
-              LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
+            # Check if this is "re-run all" - if so, skip TestDino and run all tests
+            if [ "$RERUN_TYPE" = "all" ]; then
+              echo "::notice::🔄 Re-run ALL jobs detected - skipping TestDino optimization"
+              echo "::notice::Will run ALL tests in this shard regardless of previous failures"
+              RERUN_MODE="normal"
+              EXTRA_PW_FLAGS=""
+            else
+              # This is "re-run failed" - use TestDino optimization
+              echo "::group::Fetching last failed tests from TestDino"
+              # Use custom cache ID that includes run_id to distinguish separate workflow runs
+              # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
+              CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
+              echo "::notice::Using cache ID: $CACHE_ID"
+              # Try to get last failed tests from TestDino
+              # Redirect stderr to /dev/null to avoid capturing npm warnings
+              if LAST_FAILED_FLAGS="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
+                # Trim whitespace (original working logic - no filtering)
+                LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
 
-              if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
-                echo "::notice::✅ Found failed tests from previous run."
-                echo "::notice::TestDino flags: $LAST_FAILED_FLAGS"
-                RERUN_MODE="optimized"
-                EXTRA_PW_FLAGS="$LAST_FAILED_FLAGS"
+                if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
+                  echo "::notice::✅ Found failed tests from previous run."
+                  echo "::notice::TestDino flags: $LAST_FAILED_FLAGS"
+                  RERUN_MODE="optimized"
+                  EXTRA_PW_FLAGS="$LAST_FAILED_FLAGS"
+                else
+                  echo "::warning::TestDino returned no failed tests. Falling back to running all tests in this matrix job."
+                  echo "::warning::This means you'll be billed for all tests. Please investigate why last-failed returned empty."
+                  RERUN_MODE="fallback"
+                  EXTRA_PW_FLAGS=""
+                fi
               else
-                echo "::warning::TestDino returned no failed tests. Falling back to running all tests in this matrix job."
-                echo "::warning::This means you'll be billed for all tests. Please investigate why last-failed returned empty."
+                echo "::error::Failed to fetch last failed tests from TestDino (exit code: $?)."
+                echo "::warning::Falling back to running all tests in this matrix job."
+                echo "::warning::This means you'll be billed for all tests. Please check TestDino integration."
                 RERUN_MODE="fallback"
                 EXTRA_PW_FLAGS=""
               fi
-            else
-              echo "::error::Failed to fetch last failed tests from TestDino (exit code: $?)."
-              echo "::warning::Falling back to running all tests in this matrix job."
-              echo "::warning::This means you'll be billed for all tests. Please check TestDino integration."
-              RERUN_MODE="fallback"
-              EXTRA_PW_FLAGS=""
+              echo "::endgroup::"
             fi
-            echo "::endgroup::"
           else
             RERUN_MODE="normal"
             EXTRA_PW_FLAGS=""
@@ -528,8 +572,47 @@ jobs:
           merge-multiple: true
 
       - name: Merge Reports
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           cd tests/ui-testing
+
+          # Check if directory exists and contains reports
+          if [ ! -d "all-blob-reports" ] || [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
+            echo "::warning::No blob reports found to merge."
+
+            # Investigate: Check if all test jobs succeeded (meaning they skipped intentionally)
+            # vs test jobs failed (meaning blob reporter might have failed)
+            echo "::group::Investigating why no blob reports exist"
+
+            JOBS_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/jobs")
+
+            # Count test matrix jobs by conclusion
+            SUCCEEDED=$(echo "$JOBS_RESPONSE" | jq -r '[.jobs[] | select(.name | startswith("e2e /")) | select(.conclusion == "success")] | length')
+            FAILED=$(echo "$JOBS_RESPONSE" | jq -r '[.jobs[] | select(.name | startswith("e2e /")) | select(.conclusion == "failure")] | length')
+            TOTAL=$(echo "$JOBS_RESPONSE" | jq -r '[.jobs[] | select(.name | startswith("e2e /"))] | length')
+
+            echo "::notice::Test job results: $SUCCEEDED succeeded, $FAILED failed, $TOTAL total"
+
+            if [ "$SUCCEEDED" -gt 0 ] && [ "$FAILED" -eq 0 ]; then
+              echo "::notice::✅ All test jobs succeeded - they likely skipped because tests already passed"
+              echo "::notice::This is VALID behavior for optimized reruns"
+              echo "::notice::Creating empty report structure for downstream jobs"
+              mkdir -p playwright-results/html-report
+              echo '{"config":{},"suites":[],"errors":[]}' > playwright-results/report.json
+              echo "<html><body><h1>No tests executed - all shards skipped</h1><p>All test shards exited early because tests had already passed in a previous attempt.</p></body></html>" > playwright-results/html-report/index.html
+              echo "::endgroup::"
+              exit 0
+            else
+              echo "::error::❌ Some/all test jobs failed but no blob reports were found"
+              echo "::error::This indicates a problem with test execution or blob reporter"
+              echo "::error::Failed jobs: $FAILED, Succeeded jobs: $SUCCEEDED"
+              echo "::endgroup::"
+              exit 1
+            fi
+          fi
 
           # Unset CI to use non-CI reporter config (html + json instead of blob)
           unset CI
@@ -559,12 +642,21 @@ jobs:
             # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
             CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
             echo "::notice::Using cache ID: $CACHE_ID"
-            if npx tdpw cache --cache-id "$CACHE_ID"; then
-              echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
-              echo "::notice::This data will be used for optimized reruns if tests fail"
+
+            # Suppress verbose debug output from TestDino, only show result
+            if CACHE_OUTPUT=$(npx tdpw cache --cache-id "$CACHE_ID" 2>&1); then
+              # Extract only the success message, filter out debug spam
+              SUCCESS_MSG=$(echo "$CACHE_OUTPUT" | grep "Cache data submitted successfully" || echo "")
+              if [ -n "$SUCCESS_MSG" ]; then
+                echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
+              else
+                echo "::notice::✅ Cache command completed"
+              fi
             else
               echo "::warning::⚠️ Failed to cache test metadata to TestDino"
               echo "::warning::Rerun optimization may not work properly"
+              # Show output only on failure for debugging
+              echo "$CACHE_OUTPUT"
             fi
           else
             echo "::error::JSON report not found at playwright-results/report.json"
