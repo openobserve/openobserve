@@ -983,6 +983,17 @@ export default defineComponent({
       resultTotal.value = newVisibleRows.length;
     }, { immediate: true });
 
+    // Watch selectedUsers to filter out disabled rows
+    watch(selectedUsers, (newSelectedUsers) => {
+      // Filter out any disabled rows (those with enableDelete = false)
+      const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
+
+      // If any disabled rows were selected, update to only include enabled ones
+      if (onlyEnabledSelected.length !== newSelectedUsers.length) {
+        selectedUsers.value = onlyEnabledSelected;
+      }
+    });
+
     return {
       t,
       qTable,
