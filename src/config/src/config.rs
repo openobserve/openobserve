@@ -892,6 +892,18 @@ pub struct Common {
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
     pub ui_sql_base64_enabled: bool,
+    #[env_config(
+        name = "ZO_DEFAULT_THEME_LIGHT_MODE_COLOR",
+        default = "",
+        help = "Default theme color for light mode. If not set, uses application default."
+    )]
+    pub default_theme_light_mode_color: String,
+    #[env_config(
+        name = "ZO_DEFAULT_THEME_DARK_MODE_COLOR",
+        default = "",
+        help = "Default theme color for dark mode. If not set, uses application default."
+    )]
+    pub default_theme_dark_mode_color: String,
     #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
