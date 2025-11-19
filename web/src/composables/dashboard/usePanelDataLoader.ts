@@ -37,6 +37,7 @@ import {
   generateTraceContext,
   escapeSingleQuotes,
 } from "@/utils/zincutils";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
 import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
@@ -730,9 +731,9 @@ export const usePanelDataLoader = (
       }
 
       // Add guard here
-      if (shouldSkipSearchDueToEmptyVariables()) {
-        return;
-      }
+      // if (shouldSkipSearchDueToEmptyVariables()) {
+      //   return;
+      // }
 
       fetchQueryDataWithHttpStream(payload, {
         data: handleSearchResponse,
@@ -1316,9 +1317,9 @@ export const usePanelDataLoader = (
                   periodAsStr: "",
                 },
               };
-              if (shouldSkipSearchDueToEmptyVariables()) {
-                return;
-              }
+              // if (shouldSkipSearchDueToEmptyVariables()) {
+              //   return;
+              // }
               state.metadata.queries[panelQueryIndex] = metadata;
 
               let annotationsPromise: Promise<any> | null = null;
@@ -1568,8 +1569,10 @@ export const usePanelDataLoader = (
 
         let variableValue = "";
         if (Array.isArray(variable.value)) {
+          // If no data found (empty array), use SELECT_ALL_VALUE
+          const valueToUse = variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
           const value =
-            variable.value
+            valueToUse
               .map(
                 (value: any) =>
                   `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
@@ -1578,16 +1581,16 @@ export const usePanelDataLoader = (
           const possibleVariablesPlaceHolderTypes = [
             {
               placeHolder: `\${${variable.name}:csv}`,
-              value: variable.value.join(","),
+              value: valueToUse.join(","),
             },
             {
               placeHolder: `\${${variable.name}:pipe}`,
-              value: variable.value.join("|"),
+              value: valueToUse.join("|"),
             },
             {
               placeHolder: `\${${variable.name}:doublequote}`,
               value:
-                variable.value.map((value: any) => `"${value}"`).join(",") ||
+                valueToUse.map((value: any) => `"${value}"`).join(",") ||
                 '""',
             },
             {
@@ -1596,11 +1599,11 @@ export const usePanelDataLoader = (
             },
             {
               placeHolder: `\${${variable.name}}`,
-              value: queryType === "sql" ? value : variable.value.join("|"),
+              value: queryType === "sql" ? value : valueToUse.join("|"),
             },
             {
               placeHolder: `\$${variable.name}`,
-              value: queryType === "sql" ? value : variable.value.join("|"),
+              value: queryType === "sql" ? value : valueToUse.join("|"),
             },
           ];
 
@@ -1618,10 +1621,9 @@ export const usePanelDataLoader = (
             );
           });
         } else {
-          variableValue =
-            variable.value === null
-              ? ""
-              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
+          // If no data found (null value), use SELECT_ALL_VALUE
+          const valueToUse = variable.value === null ? SELECT_ALL_VALUE : variable.value;
+          variableValue = `${variable.escapeSingleQuotes ? escapeSingleQuotes(valueToUse) : valueToUse}`;
           if (
             query.includes(variableName) ||
             query.includes(variableNameWithBrackets)
@@ -1629,7 +1631,7 @@ export const usePanelDataLoader = (
             metadata.push({
               type: "variable",
               name: variable.name,
-              value: variable.value,
+              value: valueToUse,
             });
           }
           query = query.replaceAll(variableNameWithBrackets, variableValue);

@@ -275,6 +275,11 @@ fn default_enable_streaming_search() -> bool {
     false
 }
 
+#[cfg(feature = "enterprise")]
+fn default_claim_parser_function() -> String {
+    "".to_string()
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -297,6 +302,9 @@ pub struct OrganizationSettingPayload {
     pub light_mode_theme_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dark_mode_theme_color: Option<String>,
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claim_parser_function: Option<String>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -325,10 +333,25 @@ pub struct OrganizationSetting {
     pub light_mode_theme_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dark_mode_theme_color: Option<String>,
+    #[cfg(feature = "enterprise")]
+    #[serde(default = "default_claim_parser_function")]
+    pub claim_parser_function: String,
 }
 
 impl Default for OrganizationSetting {
     fn default() -> Self {
+        let cfg = config::get_config();
+        let light_mode_theme_color = if cfg.common.default_theme_light_mode_color.is_empty() {
+            None
+        } else {
+            Some(cfg.common.default_theme_light_mode_color.clone())
+        };
+        let dark_mode_theme_color = if cfg.common.default_theme_dark_mode_color.is_empty() {
+            None
+        } else {
+            Some(cfg.common.default_theme_dark_mode_color.clone())
+        };
+
         Self {
             scrape_interval: default_scrape_interval(),
             trace_id_field_name: default_trace_id_field_name(),
@@ -338,8 +361,10 @@ impl Default for OrganizationSetting {
             enable_streaming_search: default_enable_streaming_search(),
             min_auto_refresh_interval: default_auto_refresh_interval(),
             free_trial_expiry: None,
-            light_mode_theme_color: None,
-            dark_mode_theme_color: None,
+            light_mode_theme_color,
+            dark_mode_theme_color,
+            #[cfg(feature = "enterprise")]
+            claim_parser_function: default_claim_parser_function(),
         }
     }
 }
