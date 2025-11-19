@@ -74,7 +74,7 @@
             <div>
               <div class="tw-flex tw-items-center tw-gap-x-2">
                 <label :for="'arg-' + argIndex"
-                  >Parameter {{ argIndex + 1 }}</label
+                  >{{ getParameterLabel(fields.functionName, argIndex) }}</label
                 >
               </div>
               <div class="tw-flex">
@@ -529,6 +529,27 @@ export default {
       }
     };
 
+    const getParameterLabel = (functionName: string, argIndex: number) => {
+      const funcValidation: any = getValidationForFunction(functionName);
+
+      if (!funcValidation) {
+        return `Parameter ${argIndex + 1}`;
+      }
+
+      const argsValidation = funcValidation?.args || [];
+      const allowAddArgAt = funcValidation?.allowAddArgAt;
+
+      // Determine the actual index based on allowAddArgAt
+      const adjustedIndex = getAdjustedIndex(
+        argsValidation,
+        argIndex,
+        allowAddArgAt,
+      );
+
+      // Return the label from validation, or fallback to default
+      return argsValidation[adjustedIndex]?.label || `Parameter ${argIndex + 1}`;
+    };
+
     return {
       fields,
       // availableFunctions,
@@ -549,6 +570,7 @@ export default {
       onArgTypeChange,
       getAllSelectedStreams,
       getIconBasedOnArgType,
+      getParameterLabel,
     };
   },
 };

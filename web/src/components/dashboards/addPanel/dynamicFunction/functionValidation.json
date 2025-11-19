@@ -4,6 +4,7 @@
         "functionLabel": "None",
         "args": [
             {
+                "label": "Value",
                 "type": [
                     {
                         "label": "Field",
@@ -23,6 +24,7 @@
         "functionLabel": "Histogram",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -36,6 +38,7 @@
                 "required": true
             },
             {
+                "label": "Interval",
                 "type": [
                     {
                         "label": "Histogram Interval",
@@ -56,6 +59,7 @@
         "functionLabel": "Count",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -76,6 +80,7 @@
         "functionLabel": "Count (Distinct)",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -96,6 +101,7 @@
         "functionLabel": "Sum",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -116,6 +122,7 @@
         "functionLabel": "Avg",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -136,6 +143,7 @@
         "functionLabel": "Min",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -156,6 +164,7 @@
         "functionLabel": "Max",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -176,6 +185,7 @@
         "functionLabel": "P50",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -196,6 +206,7 @@
         "functionLabel": "P90",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -216,6 +227,7 @@
         "functionLabel": "P95",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -236,6 +248,7 @@
         "functionLabel": "P99",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -256,6 +269,7 @@
         "functionLabel": "Array Agg",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -276,6 +290,7 @@
         "functionLabel": "Mean",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -296,6 +311,7 @@
         "functionLabel": "Bit And",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -316,6 +332,7 @@
         "functionLabel": "Bit Or",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -336,6 +353,7 @@
         "functionLabel": "Bit Xor",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -356,6 +374,7 @@
         "functionLabel": "Bool And",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -376,6 +395,7 @@
         "functionLabel": "Bool Or",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -396,6 +416,7 @@
         "functionLabel": "First Value",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -416,6 +437,7 @@
         "functionLabel": "Last Value",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -436,6 +458,7 @@
         "functionLabel": "Median",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -456,6 +479,7 @@
         "functionLabel": "Grouping",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -478,6 +502,7 @@
         "functionLabel": "String Agg",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -491,6 +516,7 @@
                 "required": true
             },
             {
+                "label": "Delimiter",
                 "type": [
                     {
                         "label": "Field",
@@ -515,6 +541,7 @@
         "functionLabel": "Percentile Cont",
         "args": [
             {
+                "label": "Percentile",
                 "type": [
                     {
                         "label": "Field",
@@ -539,6 +566,7 @@
         "functionLabel": "Variance",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -559,6 +587,7 @@
         "functionLabel": "Variance Population",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -579,6 +608,7 @@
         "functionLabel": "Variance Sample",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -599,6 +629,7 @@
         "functionLabel": "Standard Deviation",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -619,6 +650,7 @@
         "functionLabel": "Standard Deviation Population",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -639,6 +671,7 @@
         "functionLabel": "Correlation",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -652,6 +685,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -672,6 +706,7 @@
         "functionLabel": "Covariance",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -685,6 +720,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -705,6 +741,7 @@
         "functionLabel": "Covariance Population",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -718,6 +755,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -738,6 +776,7 @@
         "functionLabel": "Regression Slope",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -751,6 +790,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -771,6 +811,7 @@
         "functionLabel": "Regression Intercept",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -784,6 +825,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -804,6 +846,7 @@
         "functionLabel": "Regression R2",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -817,6 +860,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -837,6 +881,7 @@
         "functionLabel": "Regression Average X",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -850,6 +895,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -870,6 +916,7 @@
         "functionLabel": "Regression Average Y",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -883,6 +930,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -903,6 +951,7 @@
         "functionLabel": "Regression Count",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -916,6 +965,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -936,6 +986,7 @@
         "functionLabel": "Regression SXX",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -949,6 +1000,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -969,6 +1021,7 @@
         "functionLabel": "Regression SXY",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -982,6 +1035,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -1002,6 +1056,7 @@
         "functionLabel": "Regression SYY",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -1015,6 +1070,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -1035,6 +1091,7 @@
         "functionLabel": "Approx Distinct",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1055,6 +1112,7 @@
         "functionLabel": "Approx Median",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1075,6 +1133,7 @@
         "functionLabel": "Approx Percentile Cont",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1088,6 +1147,7 @@
                 "required": true
             },
             {
+                "label": "Percentile",
                 "type": [
                     {
                         "label": "Field",
@@ -1112,6 +1172,7 @@
         "functionLabel": "Approx Percentile Cont With Weight",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1125,6 +1186,7 @@
                 "required": true
             },
             {
+                "label": "Weight",
                 "type": [
                     {
                         "label": "Field",
@@ -1142,6 +1204,7 @@
                 "required": true
             },
             {
+                "label": "Percentile",
                 "type": [
                     {
                         "label": "Field",
@@ -1166,6 +1229,7 @@
         "functionLabel": "Nth Value",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1179,6 +1243,7 @@
                 "required": true
             },
             {
+                "label": "N",
                 "type": [
                     {
                         "label": "Field",
@@ -1203,6 +1268,7 @@
         "functionLabel": "Abs",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1226,6 +1292,7 @@
         "functionLabel": "ArcCos",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1249,6 +1316,7 @@
         "functionLabel": "ArcSin",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1272,6 +1340,7 @@
         "functionLabel": "ArcTan",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1295,6 +1364,7 @@
         "functionLabel": "ArcTan2",
         "args": [
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -1312,6 +1382,7 @@
                 "required": true
             },
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -1335,6 +1406,7 @@
         "functionLabel": "Ceil",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1358,6 +1430,7 @@
         "functionLabel": "Cos",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1381,6 +1454,7 @@
         "functionLabel": "Exp",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1404,6 +1478,7 @@
         "functionLabel": "Floor",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1427,6 +1502,7 @@
         "functionLabel": "Log",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1450,6 +1526,7 @@
         "functionLabel": "Log10",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1473,6 +1550,7 @@
         "functionLabel": "Log2",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1496,6 +1574,7 @@
         "functionLabel": "Pow",
         "args": [
             {
+                "label": "Base",
                 "type": [
                     {
                         "label": "Field",
@@ -1513,6 +1592,7 @@
                 "required": true
             },
             {
+                "label": "Exponent",
                 "type": [
                     {
                         "label": "Field",
@@ -1536,6 +1616,7 @@
         "functionLabel": "Round",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1553,6 +1634,7 @@
                 "required": true
             },
             {
+                "label": "Decimal Places",
                 "type": [
                     {
                         "label": "Field",
@@ -1576,6 +1658,7 @@
         "functionLabel": "Sin",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1599,6 +1682,7 @@
         "functionLabel": "Sqrt",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1622,6 +1706,7 @@
         "functionLabel": "Tan",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1645,6 +1730,7 @@
         "functionLabel": "ArcCosh",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1668,6 +1754,7 @@
         "functionLabel": "ArcSinh",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1691,6 +1778,7 @@
         "functionLabel": "ArcTanh",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1714,6 +1802,7 @@
         "functionLabel": "Cube Root",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1737,6 +1826,7 @@
         "functionLabel": "Cosh",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1760,6 +1850,7 @@
         "functionLabel": "Cot",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1783,6 +1874,7 @@
         "functionLabel": "Degrees",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1806,6 +1898,7 @@
         "functionLabel": "Factorial",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1829,6 +1922,7 @@
         "functionLabel": "GCD (Greatest Common Divisor)",
         "args": [
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -1846,6 +1940,7 @@
                 "required": true
             },
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -1869,6 +1964,7 @@
         "functionLabel": "Is NaN",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1892,6 +1988,7 @@
         "functionLabel": "Is Zero",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1915,6 +2012,7 @@
         "functionLabel": "LCM (Least Common Multiple)",
         "args": [
             {
+                "label": "X",
                 "type": [
                     {
                         "label": "Field",
@@ -1932,6 +2030,7 @@
                 "required": true
             },
             {
+                "label": "Y",
                 "type": [
                     {
                         "label": "Field",
@@ -1955,6 +2054,7 @@
         "functionLabel": "Natural Log",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1978,6 +2078,7 @@
         "functionLabel": "NaN Value",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -1995,6 +2096,7 @@
                 "required": true
             },
             {
+                "label": "Replacement",
                 "type": [
                     {
                         "label": "Field",
@@ -2023,6 +2125,7 @@
         "functionLabel": "Radians",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -2051,6 +2154,7 @@
         "functionLabel": "Signum",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -2074,6 +2178,7 @@
         "functionLabel": "Sinh",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -2097,6 +2202,7 @@
         "functionLabel": "Tanh",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -2120,6 +2226,7 @@
         "functionLabel": "Truncate",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -2137,6 +2244,7 @@
                 "required": true
             },
             {
+                "label": "Decimal Places",
                 "type": [
                     {
                         "label": "Field",
@@ -2160,6 +2268,7 @@
         "functionLabel": "String Length",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2183,6 +2292,7 @@
         "functionLabel": "Char Length",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2206,6 +2316,7 @@
         "functionLabel": "Concat",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2231,6 +2342,7 @@
         "functionLabel": "Lower",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2254,6 +2366,7 @@
         "functionLabel": "Upper",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2277,6 +2390,7 @@
         "functionLabel": "Substring",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2294,6 +2408,7 @@
                 "required": true
             },
             {
+                "label": "Start",
                 "type": [
                     {
                         "label": "Field",
@@ -2311,6 +2426,7 @@
                 "required": true
             },
             {
+                "label": "Length",
                 "type": [
                     {
                         "label": "Field",
@@ -2334,6 +2450,7 @@
         "functionLabel": "Trim",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2357,6 +2474,7 @@
         "functionLabel": "LTrim",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2380,6 +2498,7 @@
         "functionLabel": "RTrim",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2403,6 +2522,7 @@
         "functionLabel": "ASCII",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2426,6 +2546,7 @@
         "functionLabel": "Bit Length",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2449,6 +2570,7 @@
         "functionLabel": "BTrim",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2466,6 +2588,7 @@
                 "required": true
             },
             {
+                "label": "Trim String",
                 "type": [
                     {
                         "label": "Field",
@@ -2489,6 +2612,7 @@
         "functionLabel": "Character Length",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2512,6 +2636,7 @@
         "functionLabel": "Character",
         "args": [
             {
+                "label": "Code",
                 "type": [
                     {
                         "label": "Field",
@@ -2535,6 +2660,7 @@
         "functionLabel": "Concat With Separator",
         "args": [
             {
+                "label": "Separator",
                 "type": [
                     {
                         "label": "Field",
@@ -2552,6 +2678,7 @@
                 "required": true
             },
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2577,6 +2704,7 @@
         "functionLabel": "Init Cap",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2600,6 +2728,7 @@
         "functionLabel": "Left",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2617,6 +2746,7 @@
                 "required": true
             },
             {
+                "label": "Length",
                 "type": [
                     {
                         "label": "Field",
@@ -2640,6 +2770,7 @@
         "functionLabel": "Length",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2663,6 +2794,7 @@
         "functionLabel": "Left Pad",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2680,6 +2812,7 @@
                 "required": true
             },
             {
+                "label": "Length",
                 "type": [
                     {
                         "label": "Field",
@@ -2697,6 +2830,7 @@
                 "required": true
             },
             {
+                "label": "Padding",
                 "type": [
                     {
                         "label": "Field",
@@ -2720,6 +2854,7 @@
         "functionLabel": "Octet Length",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2743,6 +2878,7 @@
         "functionLabel": "Repeat",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2760,6 +2896,7 @@
                 "required": true
             },
             {
+                "label": "Count",
                 "type": [
                     {
                         "label": "Field",
@@ -2783,6 +2920,7 @@
         "functionLabel": "Replace",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2800,6 +2938,7 @@
                 "required": true
             },
             {
+                "label": "Search",
                 "type": [
                     {
                         "label": "Field",
@@ -2817,6 +2956,7 @@
                 "required": true
             },
             {
+                "label": "Replacement",
                 "type": [
                     {
                         "label": "Field",
@@ -2840,6 +2980,7 @@
         "functionLabel": "Reverse",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2863,6 +3004,7 @@
         "functionLabel": "Right",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2880,6 +3022,7 @@
                 "required": true
             },
             {
+                "label": "Length",
                 "type": [
                     {
                         "label": "Field",
@@ -2903,6 +3046,7 @@
         "functionLabel": "Right Pad",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2920,6 +3064,7 @@
                 "required": true
             },
             {
+                "label": "Length",
                 "type": [
                     {
                         "label": "Field",
@@ -2937,6 +3082,7 @@
                 "required": true
             },
             {
+                "label": "Padding",
                 "type": [
                     {
                         "label": "Field",
@@ -2960,6 +3106,7 @@
         "functionLabel": "Split Part",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -2977,6 +3124,7 @@
                 "required": true
             },
             {
+                "label": "Delimiter",
                 "type": [
                     {
                         "label": "Field",
@@ -2994,6 +3142,7 @@
                 "required": true
             },
             {
+                "label": "Index",
                 "type": [
                     {
                         "label": "Field",
@@ -3017,6 +3166,7 @@
         "functionLabel": "Starts With",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -3034,6 +3184,7 @@
                 "required": true
             },
             {
+                "label": "Substring",
                 "type": [
                     {
                         "label": "Field",
@@ -3057,6 +3208,7 @@
         "functionLabel": "String Position",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -3074,6 +3226,7 @@
                 "required": true
             },
             {
+                "label": "Substring",
                 "type": [
                     {
                         "label": "Field",
@@ -3097,6 +3250,7 @@
         "functionLabel": "Substr",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -3114,6 +3268,7 @@
                 "required": true
             },
             {
+                "label": "Start",
                 "type": [
                     {
                         "label": "Field",
@@ -3131,6 +3286,7 @@
                 "required": true
             },
             {
+                "label": "Length",
                 "type": [
                     {
                         "label": "Field",
@@ -3154,6 +3310,7 @@
         "functionLabel": "Translate",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -3171,6 +3328,7 @@
                 "required": true
             },
             {
+                "label": "From",
                 "type": [
                     {
                         "label": "Field",
@@ -3188,6 +3346,7 @@
                 "required": true
             },
             {
+                "label": "To",
                 "type": [
                     {
                         "label": "Field",
@@ -3211,6 +3370,7 @@
         "functionLabel": "Contains",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -3228,6 +3388,7 @@
                 "required": true
             },
             {
+                "label": "Search String",
                 "type": [
                     {
                         "label": "Field",
@@ -3251,6 +3412,7 @@
         "functionLabel": "Ends With",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -3268,6 +3430,7 @@
                 "required": true
             },
             {
+                "label": "Substring",
                 "type": [
                     {
                         "label": "Field",
@@ -3291,6 +3454,7 @@
         "functionLabel": "Find In Set",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -3308,6 +3472,7 @@
                 "required": true
             },
             {
+                "label": "String List",
                 "type": [
                     {
                         "label": "Field",
@@ -3331,6 +3496,7 @@
         "functionLabel": "Instr",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -3348,6 +3514,7 @@
                 "required": true
             },
             {
+                "label": "Substring",
                 "type": [
                     {
                         "label": "Field",
@@ -3371,6 +3538,7 @@
         "functionLabel": "Levenshtein",
         "args": [
             {
+                "label": "String 1",
                 "type": [
                     {
                         "label": "Field",
@@ -3388,6 +3556,7 @@
                 "required": true
             },
             {
+                "label": "String 2",
                 "type": [
                     {
                         "label": "Field",
@@ -3411,6 +3580,7 @@
         "functionLabel": "Overlay",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -3428,6 +3598,7 @@
                 "required": true
             },
             {
+                "label": "Substring",
                 "type": [
                     {
                         "label": "Field",
@@ -3445,6 +3616,7 @@
                 "required": true
             },
             {
+                "label": "Position",
                 "type": [
                     {
                         "label": "Field",
@@ -3462,6 +3634,7 @@
                 "required": true
             },
             {
+                "label": "Length",
                 "type": [
                     {
                         "label": "Field",
@@ -3485,6 +3658,7 @@
         "functionLabel": "Position",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -3502,6 +3676,7 @@
                 "required": true
             },
             {
+                "label": "Substring",
                 "type": [
                     {
                         "label": "Field",
@@ -3525,6 +3700,7 @@
         "functionLabel": "Substr Index",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -3542,6 +3718,7 @@
                 "required": true
             },
             {
+                "label": "Delimiter",
                 "type": [
                     {
                         "label": "Field",
@@ -3559,6 +3736,7 @@
                 "required": true
             },
             {
+                "label": "Count",
                 "type": [
                     {
                         "label": "Field",
@@ -3582,6 +3760,7 @@
         "functionLabel": "Substring Index",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -3599,6 +3778,7 @@
                 "required": true
             },
             {
+                "label": "Delimiter",
                 "type": [
                     {
                         "label": "Field",
@@ -3616,6 +3796,7 @@
                 "required": true
             },
             {
+                "label": "Count",
                 "type": [
                     {
                         "label": "Field",
@@ -3639,6 +3820,7 @@
         "functionLabel": "To Hex",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -3671,6 +3853,7 @@
         "functionLabel": "Date Add",
         "args": [
             {
+                "label": "Date",
                 "type": [
                     {
                         "label": "Field",
@@ -3688,6 +3871,7 @@
                 "required": true
             },
             {
+                "label": "Interval",
                 "type": [
                     {
                         "label": "Field",
@@ -3711,6 +3895,7 @@
         "functionLabel": "Date Sub",
         "args": [
             {
+                "label": "Date",
                 "type": [
                     {
                         "label": "Field",
@@ -3728,6 +3913,7 @@
                 "required": true
             },
             {
+                "label": "Interval",
                 "type": [
                     {
                         "label": "Field",
@@ -3751,6 +3937,7 @@
         "functionLabel": "Date Diff",
         "args": [
             {
+                "label": "Date 1",
                 "type": [
                     {
                         "label": "Field",
@@ -3768,6 +3955,7 @@
                 "required": true
             },
             {
+                "label": "Date 2",
                 "type": [
                     {
                         "label": "Field",
@@ -3791,6 +3979,7 @@
         "functionLabel": "From Unix Time",
         "args": [
             {
+                "label": "Unix Time",
                 "type": [
                     {
                         "label": "Field",
@@ -3808,6 +3997,7 @@
                 "required": true
             },
             {
+                "label": "Format",
                 "type": [
                     {
                         "label": "Field",
@@ -3831,6 +4021,7 @@
         "functionLabel": "To Unix Time",
         "args": [
             {
+                "label": "Timestamp",
                 "type": [
                     {
                         "label": "Field",
@@ -3854,6 +4045,7 @@
         "functionLabel": "Date Part",
         "args": [
             {
+                "label": "Part",
                 "type": [
                     {
                         "label": "Field",
@@ -3871,6 +4063,7 @@
                 "required": true
             },
             {
+                "label": "Date",
                 "type": [
                     {
                         "label": "Field",
@@ -3894,6 +4087,7 @@
         "functionLabel": "Date Trunc",
         "args": [
             {
+                "label": "Precision",
                 "type": [
                     {
                         "label": "Field",
@@ -3911,6 +4105,7 @@
                 "required": true
             },
             {
+                "label": "Date",
                 "type": [
                     {
                         "label": "Field",
@@ -3934,6 +4129,7 @@
         "functionLabel": "To Timestamp",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -3955,6 +4151,7 @@
                 "required": true
             },
             {
+                "label": "Format",
                 "type": [
                     {
                         "label": "Field",
@@ -3978,6 +4175,7 @@
         "functionLabel": "To Date",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -3999,6 +4197,7 @@
                 "required": true
             },
             {
+                "label": "Format",
                 "type": [
                     {
                         "label": "Field",
@@ -4022,6 +4221,7 @@
         "functionLabel": "Extract",
         "args": [
             {
+                "label": "Part",
                 "type": [
                     {
                         "label": "Field",
@@ -4039,6 +4239,7 @@
                 "required": true
             },
             {
+                "label": "Date",
                 "type": [
                     {
                         "label": "Field",
@@ -4082,6 +4283,7 @@
         "functionLabel": "Date Bin",
         "args": [
             {
+                "label": "Interval",
                 "type": [
                     {
                         "label": "Field",
@@ -4099,6 +4301,7 @@
                 "required": true
             },
             {
+                "label": "Timestamp",
                 "type": [
                     {
                         "label": "Field",
@@ -4116,6 +4319,7 @@
                 "required": true
             },
             {
+                "label": "Origin",
                 "type": [
                     {
                         "label": "Field",
@@ -4139,6 +4343,7 @@
         "functionLabel": "Datepart",
         "args": [
             {
+                "label": "Part",
                 "type": [
                     {
                         "label": "Field",
@@ -4156,6 +4361,7 @@
                 "required": true
             },
             {
+                "label": "Date",
                 "type": [
                     {
                         "label": "Field",
@@ -4179,6 +4385,7 @@
         "functionLabel": "Datetrunc",
         "args": [
             {
+                "label": "Precision",
                 "type": [
                     {
                         "label": "Field",
@@ -4196,6 +4403,7 @@
                 "required": true
             },
             {
+                "label": "Date",
                 "type": [
                     {
                         "label": "Field",
@@ -4219,6 +4427,7 @@
         "functionLabel": "Make Date",
         "args": [
             {
+                "label": "Year",
                 "type": [
                     {
                         "label": "Field",
@@ -4236,6 +4445,7 @@
                 "required": true
             },
             {
+                "label": "Month",
                 "type": [
                     {
                         "label": "Field",
@@ -4253,6 +4463,7 @@
                 "required": true
             },
             {
+                "label": "Day",
                 "type": [
                     {
                         "label": "Field",
@@ -4276,6 +4487,7 @@
         "functionLabel": "To Char",
         "args": [
             {
+                "label": "Date",
                 "type": [
                     {
                         "label": "Field",
@@ -4293,6 +4505,7 @@
                 "required": true
             },
             {
+                "label": "Format",
                 "type": [
                     {
                         "label": "Field",
@@ -4316,6 +4529,7 @@
         "functionLabel": "Date Format",
         "args": [
             {
+                "label": "Date",
                 "type": [
                     {
                         "label": "Field",
@@ -4333,6 +4547,7 @@
                 "required": true
             },
             {
+                "label": "Format",
                 "type": [
                     {
                         "label": "Field",
@@ -4356,6 +4571,7 @@
         "functionLabel": "To Local Time",
         "args": [
             {
+                "label": "Timestamp",
                 "type": [
                     {
                         "label": "Field",
@@ -4379,6 +4595,7 @@
         "functionLabel": "To Timestamp Micros",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -4406,6 +4623,7 @@
         "functionLabel": "To Timestamp Millis",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -4433,6 +4651,7 @@
         "functionLabel": "To Timestamp Nanos",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -4460,6 +4679,7 @@
         "functionLabel": "To Timestamp Seconds",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -4492,6 +4712,7 @@
         "functionLabel": "Coalesce",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -4521,6 +4742,7 @@
         "functionLabel": "Greatest",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -4550,6 +4772,7 @@
         "functionLabel": "Least",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -4579,6 +4802,7 @@
         "functionLabel": "Null If",
         "args": [
             {
+                "label": "Expression 1",
                 "type": [
                     {
                         "label": "Field",
@@ -4600,6 +4824,7 @@
                 "required": true
             },
             {
+                "label": "Expression 2",
                 "type": [
                     {
                         "label": "Field",
@@ -4627,6 +4852,7 @@
         "functionLabel": "If Null",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -4648,6 +4874,7 @@
                 "required": true
             },
             {
+                "label": "Replacement",
                 "type": [
                     {
                         "label": "Field",
@@ -4675,6 +4902,7 @@
         "functionLabel": "NVL",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -4696,6 +4924,7 @@
                 "required": true
             },
             {
+                "label": "Replacement",
                 "type": [
                     {
                         "label": "Field",
@@ -4723,6 +4952,7 @@
         "functionLabel": "NVL2",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -4744,6 +4974,7 @@
                 "required": true
             },
             {
+                "label": "If Not Null",
                 "type": [
                     {
                         "label": "Field",
@@ -4765,6 +4996,7 @@
                 "required": true
             },
             {
+                "label": "If Null",
                 "type": [
                     {
                         "label": "Field",
@@ -4792,6 +5024,7 @@
         "functionLabel": "Regexp Like",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -4809,6 +5042,7 @@
                 "required": true
             },
             {
+                "label": "Pattern",
                 "type": [
                     {
                         "label": "Field",
@@ -4826,6 +5060,7 @@
                 "required": true
             },
             {
+                "label": "Flags",
                 "type": [
                     {
                         "label": "Field",
@@ -4849,6 +5084,7 @@
         "functionLabel": "Regexp Match",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -4866,6 +5102,7 @@
                 "required": true
             },
             {
+                "label": "Pattern",
                 "type": [
                     {
                         "label": "Field",
@@ -4883,6 +5120,7 @@
                 "required": true
             },
             {
+                "label": "Flags",
                 "type": [
                     {
                         "label": "Field",
@@ -4906,6 +5144,7 @@
         "functionLabel": "Regexp Replace",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -4923,6 +5162,7 @@
                 "required": true
             },
             {
+                "label": "Pattern",
                 "type": [
                     {
                         "label": "Field",
@@ -4940,6 +5180,7 @@
                 "required": true
             },
             {
+                "label": "Replacement",
                 "type": [
                     {
                         "label": "Field",
@@ -4957,6 +5198,7 @@
                 "required": true
             },
             {
+                "label": "Flags",
                 "type": [
                     {
                         "label": "Field",
@@ -4980,6 +5222,7 @@
         "functionLabel": "Regexp Count",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -4997,6 +5240,7 @@
                 "required": true
             },
             {
+                "label": "Pattern",
                 "type": [
                     {
                         "label": "Field",
@@ -5014,6 +5258,7 @@
                 "required": true
             },
             {
+                "label": "Flags",
                 "type": [
                     {
                         "label": "Field",
@@ -5037,6 +5282,7 @@
         "functionLabel": "Regexp Instr",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -5054,6 +5300,7 @@
                 "required": true
             },
             {
+                "label": "Pattern",
                 "type": [
                     {
                         "label": "Field",
@@ -5071,6 +5318,7 @@
                 "required": true
             },
             {
+                "label": "Start",
                 "type": [
                     {
                         "label": "Field",
@@ -5094,6 +5342,7 @@
         "functionLabel": "Decode",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -5111,6 +5360,7 @@
                 "required": true
             },
             {
+                "label": "Format",
                 "type": [
                     {
                         "label": "Field",
@@ -5134,6 +5384,7 @@
         "functionLabel": "Regexp Substr",
         "args": [
             {
+                "label": "String",
                 "type": [
                     {
                         "label": "Field",
@@ -5151,6 +5402,7 @@
                 "required": true
             },
             {
+                "label": "Pattern",
                 "type": [
                     {
                         "label": "Field",
@@ -5174,6 +5426,7 @@
         "functionLabel": "Encode",
         "args": [
             {
+                "label": "Expression",
                 "type": [
                     {
                         "label": "Field",
@@ -5191,6 +5444,7 @@
                 "required": true
             },
             {
+                "label": "Format",
                 "type": [
                     {
                         "label": "Field",
@@ -5214,6 +5468,7 @@
         "functionLabel": "Power",
         "args": [
             {
+                "label": "Base",
                 "type": [
                     {
                         "label": "Field",
@@ -5231,6 +5486,7 @@
                 "required": true
             },
             {
+                "label": "Exponent",
                 "type": [
                     {
                         "label": "Field",
@@ -5254,6 +5510,7 @@
         "functionLabel": "Array Length",
         "args": [
             {
+                "label": "Array",
                 "type": [
                     {
                         "label": "Field",
@@ -5273,6 +5530,7 @@
         "functionLabel": "Array Sort",
         "args": [
             {
+                "label": "Array",
                 "type": [
                     {
                         "label": "Field",
@@ -5292,6 +5550,7 @@
         "functionLabel": "Array Append",
         "args": [
             {
+                "label": "Array",
                 "type": [
                     {
                         "label": "Field",
@@ -5305,6 +5564,7 @@
                 "required": true
             },
             {
+                "label": "Element",
                 "type": [
                     {
                         "label": "Field",
@@ -5332,6 +5592,7 @@
         "functionLabel": "Array Contains",
         "args": [
             {
+                "label": "Array",
                 "type": [
                     {
                         "label": "Field",
@@ -5345,6 +5606,7 @@
                 "required": true
             },
             {
+                "label": "Element",
                 "type": [
                     {
                         "label": "Field",
