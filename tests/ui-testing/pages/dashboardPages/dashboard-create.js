@@ -22,26 +22,41 @@ export default class DashboardCreate {
 
   //Create Dashboard
   async createDashboard(dashboardName) {
-    // Wait for the dashboards list API to complete loading before clicking
-    await this.page.waitForResponse(
-      response => {
-        const url = response.url();
-        return url.includes('/api/') &&
-               url.includes('/dashboards') &&
-               url.includes('page_num=0') &&
-               response.status() === 200;
-      },
-      { timeout: 50000 }
-    );
+    // Wait for the dashboard page to be fully loaded by checking for the search input
+    await this.searchDash.waitFor({ state: "visible", timeout: 30000 });
 
-    await this.dashCreateBtn.waitFor({ state: "visible", timeout: 50000 });
+    // Wait for the "New Dashboard" button to be ready and enabled
+    await this.dashCreateBtn.waitFor({ state: "visible", timeout: 30000 });
+
+    // Wait for network idle to ensure page is fully loaded
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+      // Ignore timeout - continue anyway
+    });
+
+    // Click the "New Dashboard" button
     await this.dashCreateBtn.click();
 
-    await this.dashName.waitFor({ state: "visible", timeout: 50000 });
-    await this.dashName.click();
+    // Wait for the dialog to appear by checking for the input field to be attached
+    await this.dashName.waitFor({ state: "attached", timeout: 30000 });
+
+    // Wait for the input to be visible and editable
+    await this.dashName.waitFor({ state: "visible", timeout: 30000 });
+
+    // Wait for the input to be enabled (not disabled)
+    await this.page.waitForFunction(
+      (selector) => {
+        const element = document.querySelector(selector);
+        return element && !element.disabled && element.offsetParent !== null;
+      },
+      '[data-test="add-dashboard-name"]',
+      { timeout: 10000 }
+    );
+
+    // Fill the dashboard name
     await this.dashName.fill(dashboardName);
 
-    await this.submitBtn.waitFor({ state: "visible", timeout: 50000 });
+    // Wait for and click the submit button
+    await this.submitBtn.waitFor({ state: "visible", timeout: 30000 });
     await this.submitBtn.click();
   }
 
