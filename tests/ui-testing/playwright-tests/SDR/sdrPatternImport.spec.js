@@ -17,7 +17,7 @@ test.describe("SDR Pattern Import Tests", { tag: '@enterprise' }, () => {
   // ===== SDR PATTERN IMPORT FROM BUILT-IN LIBRARY =====
 
   test("should import and then delete built-in SDR patterns", {
-    tag: ['@sdr', '@all', '@combined', '@sanity']
+    tag: ['@sdr', '@all', '@sanity']
   }, async ({ page }) => {
     testLogger.info('Testing SDR pattern import and deletion workflow');
 
@@ -68,7 +68,7 @@ test.describe("SDR Pattern Import Tests", { tag: '@enterprise' }, () => {
   });
 
   test("should handle pattern selection and deselection during import", {
-    tag: ['@sdr', '@all', '@combined']
+    tag: ['@sdr', '@all']
   }, async ({ page }) => {
     testLogger.info('Testing pattern selection/deselection during import');
 
