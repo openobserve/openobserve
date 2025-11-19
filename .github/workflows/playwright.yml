@@ -248,28 +248,21 @@ jobs:
         run: |
           echo "::notice::GitHub run attempt: ${{ github.run_attempt }}"
           if [ "${{ github.run_attempt }}" -gt "1" ]; then
-            # Check if this is "re-run all" or "re-run failed only"
-            # Strategy: Check if ALL matrix jobs from attempt 1 have a new run_attempt value
-            # "Re-run all" → all jobs show run_attempt = current attempt
-            # "Re-run failed" → some jobs still show run_attempt = previous attempt (not re-executed)
+            # This is a rerun - always try TestDino optimization
+            echo "is_rerun=true" >> $GITHUB_OUTPUT
+            echo "::notice::This is a rerun (attempt ${{ github.run_attempt }}). Will attempt to run only failed tests."
 
+            # Additionally detect if this is "re-run all" vs "re-run failed" for better handling
             echo "::group::Detecting rerun type (all jobs vs failed only)"
 
             CURRENT_ATTEMPT=${{ github.run_attempt }}
-            JOB_NAME="e2e / ${{ matrix.testfolder }}"
 
-            # Get all jobs from the run (including old executions from previous attempts)
+            # Get all jobs from the run
             ALL_JOBS_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
               -H "Accept: application/vnd.github.v3+json" \
               "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=all&per_page=100")
 
-            # Strategy: For "re-run failed", GitHub reuses successful jobs from previous attempts
-            # These show up with old timestamps. We need to count only NEWLY STARTED jobs.
-            # Check: Jobs with run_attempt=current AND status != "completed" (queued/in_progress)
-            # OR jobs that have started_at timestamp from TODAY (not reused from yesterday)
-
-            # Count jobs that are NOT completed (meaning they're actually running now in this attempt)
-            # Completed jobs with run_attempt=2 are reused from the first successful run
+            # Count jobs that are NOT completed (actually running in this attempt)
             CURRENT_ATTEMPT_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | select(.status != \"completed\")] | length")
 
             # Count total unique matrix job names (from attempt 1)
@@ -278,20 +271,19 @@ jobs:
             echo "::notice::Total unique matrix job names: $TOTAL_MATRIX_JOBS"
             echo "::notice::Jobs running in current attempt $CURRENT_ATTEMPT: $CURRENT_ATTEMPT_JOBS"
 
-            # If all matrix jobs are running in current attempt, it's "re-run all"
+            # Store rerun type for potential use
             if [ "$CURRENT_ATTEMPT_JOBS" -eq "$TOTAL_MATRIX_JOBS" ]; then
-              echo "::notice::✅ DETECTED: Re-run ALL jobs (all $TOTAL_MATRIX_JOBS matrix jobs have run_attempt=$CURRENT_ATTEMPT)"
-              echo "is_rerun=false" >> $GITHUB_OUTPUT
-              echo "::notice::Will run ALL tests in this matrix job (no optimization)"
+              echo "::notice::✅ DETECTED: Re-run ALL jobs (all $TOTAL_MATRIX_JOBS matrix jobs running)"
+              echo "rerun_type=all" >> $GITHUB_OUTPUT
             else
               echo "::notice::✅ DETECTED: Re-run FAILED jobs only ($CURRENT_ATTEMPT_JOBS out of $TOTAL_MATRIX_JOBS jobs)"
-              echo "is_rerun=true" >> $GITHUB_OUTPUT
-              echo "::notice::Will attempt to run only failed tests (optimized rerun)"
+              echo "rerun_type=failed" >> $GITHUB_OUTPUT
             fi
 
             echo "::endgroup::"
           else
             echo "is_rerun=false" >> $GITHUB_OUTPUT
+            echo "rerun_type=none" >> $GITHUB_OUTPUT
             echo "::notice::This is the first run. Will run all tests in matrix."
           fi
 
@@ -316,38 +308,48 @@ jobs:
 
           # Check if this is a rerun
           IS_RERUN="${{ steps.check_rerun.outputs.is_rerun }}"
+          RERUN_TYPE="${{ steps.check_rerun.outputs.rerun_type }}"
 
           if [ "$IS_RERUN" = "true" ]; then
-            echo "::group::Fetching last failed tests from TestDino"
-            # Use custom cache ID that includes run_id to distinguish separate workflow runs
-            # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
-            CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
-            echo "::notice::Using cache ID: $CACHE_ID"
-            # Try to get last failed tests from TestDino
-            # Redirect stderr to /dev/null to avoid capturing npm warnings
-            if LAST_FAILED_FLAGS="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
-              # Trim whitespace (original working logic - no filtering)
-              LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
+            # Check if this is "re-run all" - if so, skip TestDino and run all tests
+            if [ "$RERUN_TYPE" = "all" ]; then
+              echo "::notice::🔄 Re-run ALL jobs detected - skipping TestDino optimization"
+              echo "::notice::Will run ALL tests in this shard regardless of previous failures"
+              RERUN_MODE="normal"
+              EXTRA_PW_FLAGS=""
+            else
+              # This is "re-run failed" - use TestDino optimization
+              echo "::group::Fetching last failed tests from TestDino"
+              # Use custom cache ID that includes run_id to distinguish separate workflow runs
+              # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
+              CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
+              echo "::notice::Using cache ID: $CACHE_ID"
+              # Try to get last failed tests from TestDino
+              # Redirect stderr to /dev/null to avoid capturing npm warnings
+              if LAST_FAILED_FLAGS="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
+                # Trim whitespace (original working logic - no filtering)
+                LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
 
-              if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
-                echo "::notice::✅ Found failed tests from previous run."
-                echo "::notice::TestDino flags: $LAST_FAILED_FLAGS"
-                RERUN_MODE="optimized"
-                EXTRA_PW_FLAGS="$LAST_FAILED_FLAGS"
+                if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
+                  echo "::notice::✅ Found failed tests from previous run."
+                  echo "::notice::TestDino flags: $LAST_FAILED_FLAGS"
+                  RERUN_MODE="optimized"
+                  EXTRA_PW_FLAGS="$LAST_FAILED_FLAGS"
+                else
+                  echo "::warning::TestDino returned no failed tests. Falling back to running all tests in this matrix job."
+                  echo "::warning::This means you'll be billed for all tests. Please investigate why last-failed returned empty."
+                  RERUN_MODE="fallback"
+                  EXTRA_PW_FLAGS=""
+                fi
               else
-                echo "::warning::TestDino returned no failed tests. Falling back to running all tests in this matrix job."
-                echo "::warning::This means you'll be billed for all tests. Please investigate why last-failed returned empty."
+                echo "::error::Failed to fetch last failed tests from TestDino (exit code: $?)."
+                echo "::warning::Falling back to running all tests in this matrix job."
+                echo "::warning::This means you'll be billed for all tests. Please check TestDino integration."
                 RERUN_MODE="fallback"
                 EXTRA_PW_FLAGS=""
               fi
-            else
-              echo "::error::Failed to fetch last failed tests from TestDino (exit code: $?)."
-              echo "::warning::Falling back to running all tests in this matrix job."
-              echo "::warning::This means you'll be billed for all tests. Please check TestDino integration."
-              RERUN_MODE="fallback"
-              EXTRA_PW_FLAGS=""
+              echo "::endgroup::"
             fi
-            echo "::endgroup::"
           else
             RERUN_MODE="normal"
             EXTRA_PW_FLAGS=""
