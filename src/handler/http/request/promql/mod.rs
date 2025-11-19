@@ -1352,20 +1352,29 @@ fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Ve
     }
     let mini_step = std::cmp::max(lookback_window * 2, step);
     let interval = generate_aggregation_search_interval(start, end, CardinalityLevel::Low);
-    let partition_step = interval.get_interval_microseconds();
-    if partition_step <= mini_step || end - start <= mini_step {
+    let mut partition_step = interval.get_interval_microseconds();
+    if partition_step < mini_step {
+        partition_step = mini_step;
+    }
+
+    if end - start <= partition_step {
         return vec![(start, end)];
     }
 
-    let mut groups = Vec::new();
+    let mut groups: Vec<(i64, i64)> = Vec::new();
     let mut group_start = start;
-    while group_start < end {
+    while group_start <= end {
         let group_end = std::cmp::min(group_start + partition_step, end);
+        if group_end == end && !groups.is_empty() && (group_end - group_start < step * 5) {
+            groups.last_mut().unwrap().1 = group_end;
+            break;
+        }
         groups.push((group_start, group_end));
         // because of each partition will return data point with start and end timestamp,
         // so the next partition should start from next data point after current end
         group_start = group_end + step;
     }
+
     groups
 }
 
