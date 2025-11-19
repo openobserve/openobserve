@@ -22,6 +22,7 @@ use config::{
     get_config,
     meta::{
         cluster::RoleGroup,
+        promql::value::*,
         search::ScanStats,
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
@@ -45,7 +46,7 @@ use crate::{
     service::{
         promql::{
             DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
-            micros, value::*,
+            micros,
         },
         search::server_internal_error,
         self_reporting::report_request_usage_stats,
@@ -131,7 +132,7 @@ async fn search_in_cluster(
 
     // The number of resolution steps; see the diagram at
     // https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
-    let partition_step = max(micros(DEFAULT_LOOKBACK), step);
+    let partition_step = max(micros(DEFAULT_LOOKBACK) * 2, step);
     let nr_steps = match (end - start) / partition_step {
         0 => 1,
         n => n,

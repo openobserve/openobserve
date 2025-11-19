@@ -1594,7 +1594,7 @@ mod search_history_utils {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum StreamResponses {
     // Original variant - to be deprecated but kept for backward compatibility
@@ -1615,6 +1615,9 @@ pub enum StreamResponses {
     },
     SearchResponseHits {
         hits: Vec<json::Value>,
+    },
+    PromqlResponse {
+        data: super::promql::QueryResult,
     },
     Progress {
         percent: usize,
@@ -1778,6 +1781,14 @@ impl StreamResponses {
             StreamResponses::SearchResponseHits { .. } => {
                 let data = serde_json::to_string(self).unwrap_or_default();
                 let bytes = format_event("search_response_hits", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::PromqlResponse { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("promql_response", &data);
                 StreamResponseChunks {
                     chunks_iter: None,
                     single_chunk: Some(Ok(bytes)),

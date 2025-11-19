@@ -2474,6 +2474,7 @@ dependencies = [
  "dotenvy",
  "expect-test",
  "faststr",
+ "float-cmp",
  "futures 0.3.31",
  "get_if_addrs",
  "gxhash",

@@ -37,7 +37,6 @@ mod rewrite;
 pub mod search;
 pub mod selector_visitor;
 mod utils;
-pub mod value;
 
 pub use engine::Engine;
 pub use exec::PromqlContext;
@@ -70,72 +69,6 @@ pub struct MetricsQueryRequest {
     pub step: i64,
     pub query_exemplars: bool,
     pub use_cache: Option<bool>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Status {
-    Success,
-    Error,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct QueryResult {
-    pub result_type: String, // vector, matrix, scalar, string
-    pub result: value::Value,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(tag = "status", rename_all = "lowercase")]
-pub(crate) enum ApiFuncResponse<T: Serialize> {
-    Success {
-        data: T,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        trace_id: Option<String>,
-    },
-    Error {
-        #[serde(rename = "errorType")]
-        error_type: ApiErrorType,
-        error: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        trace_id: Option<String>,
-    },
-}
-
-impl<T: Serialize> ApiFuncResponse<T> {
-    pub(crate) fn ok(data: T, trace_id: Option<String>) -> Self {
-        ApiFuncResponse::Success { data, trace_id }
-    }
-
-    pub(crate) fn err_bad_data(error: impl ToString, trace_id: Option<String>) -> Self {
-        ApiFuncResponse::Error {
-            error_type: ApiErrorType::BadData,
-            error: error.to_string(),
-            trace_id,
-        }
-    }
-
-    pub(crate) fn err_internal(error: impl ToString, trace_id: Option<String>) -> Self {
-        ApiFuncResponse::Error {
-            error_type: ApiErrorType::Internal,
-            error: error.to_string(),
-            trace_id,
-        }
-    }
-}
-
-// cf. https://github.com/prometheus/prometheus/blob/5c5fa5c319fca713506fa144ec6768fddf00d466/web/api/v1/api.go#L73-L82
-#[derive(Debug, Clone, Copy, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ApiErrorType {
-    Timeout,
-    Cancelled,
-    Exec,
-    BadData,
-    Internal,
-    Unavailable,
-    NotFound,
 }
 
 /// Converts `t` to the number of microseconds elapsed since the beginning of
@@ -206,38 +139,4 @@ pub fn adjust_start_end(start: i64, end: i64, step: i64, disable_cache: bool) ->
     }
 
     (start, end)
-}
-
-#[cfg(test)]
-mod tests {
-    use expect_test::expect;
-
-    use super::*;
-
-    #[test]
-    fn test_api_func_response_serialize() {
-        let ok = ApiFuncResponse::ok("hello".to_owned(), None);
-        assert_eq!(
-            serde_json::to_string(&ok).unwrap(),
-            r#"{"status":"success","data":"hello"}"#
-        );
-
-        let err = ApiFuncResponse::<()>::err_internal("something went wrong".to_owned(), None);
-        assert_eq!(
-            serde_json::to_string(&err).unwrap(),
-            r#"{"status":"error","errorType":"internal","error":"something went wrong"}"#
-        );
-
-        let err = ApiFuncResponse::<()>::err_bad_data(
-            r#"invalid parameter \"start\": Invalid time value for 'start': cannot parse \"foobar\" to a valid timestamp"#,
-            None,
-        );
-        expect![[r#"
-            {
-              "status": "error",
-              "errorType": "bad_data",
-              "error": "invalid parameter \\\"start\\\": Invalid time value for 'start': cannot parse \\\"foobar\\\" to a valid timestamp"
-            }"#
-        ]].assert_eq(&serde_json::to_string_pretty(&err).unwrap());
-    }
 }

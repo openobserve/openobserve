@@ -15,13 +15,10 @@
 
 use std::time::Duration;
 
+use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 
-use crate::service::promql::{
-    common::calculate_trend,
-    functions::RangeFunc,
-    value::{EvalContext, Sample, Value},
-};
+use crate::service::promql::{common::calculate_trend, functions::RangeFunc};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#holt_winters
 pub(crate) fn holt_winters(
@@ -95,8 +92,9 @@ pub fn holt_winters_calculation(
 mod tests {
     use std::time::Duration;
 
+    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+
     use super::*;
-    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
 
     // Test helper
     fn holt_winters_test_helper(
@@ -112,9 +110,9 @@ mod tests {
     fn test_holt_winters_function() {
         // Create a range value with sample data
         let samples = vec![
-            crate::service::promql::value::Sample::new(1000, 10.0),
-            crate::service::promql::value::Sample::new(2000, 15.0),
-            crate::service::promql::value::Sample::new(3000, 20.0),
+            Sample::new(1000, 10.0),
+            Sample::new(2000, 15.0),
+            Sample::new(3000, 20.0),
         ];
 
         let range_value = RangeValue {

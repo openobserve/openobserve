@@ -13,9 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
-
-use crate::service::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 
 pub(crate) fn scalar(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     match data {

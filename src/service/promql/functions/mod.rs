@@ -15,15 +15,13 @@
 
 use std::{collections::HashSet, time::Duration};
 
+use config::meta::promql::value::{EvalContext, LabelsExt, RangeValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use strum::EnumString;
 
-use crate::service::promql::{
-    micros,
-    value::{EvalContext, LabelsExt, RangeValue, Sample, Value},
-};
+use crate::service::promql::micros;
 
 mod absent;
 mod absent_over_time;

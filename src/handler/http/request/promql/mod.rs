@@ -233,7 +233,7 @@ async fn query(
             Err(e) => {
                 log::error!("parse time error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), None),
+                    config::meta::promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), None),
                 ));
             }
         },
@@ -494,7 +494,10 @@ async fn query_range(
             Err(e) => {
                 log::error!("[trace_id: {trace_id}] parse promql error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                    config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                        e.to_string(),
+                        Some(trace_id),
+                    ),
                 ));
             }
         };
@@ -541,7 +544,10 @@ async fn query_range(
             Err(e) => {
                 log::error!("parse time error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                    config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                        e.to_string(),
+                        Some(trace_id),
+                    ),
                 ));
             }
         },
@@ -553,7 +559,10 @@ async fn query_range(
             Err(e) => {
                 log::error!("parse time error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                    config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                        e.to_string(),
+                        Some(trace_id),
+                    ),
                 ));
             }
         },
@@ -565,7 +574,10 @@ async fn query_range(
             Err(e) => {
                 log::error!("parse time error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                    config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                        e.to_string(),
+                        Some(trace_id),
+                    ),
                 ));
             }
         },
@@ -589,6 +601,7 @@ async fn query_range(
     };
     if let Some(use_streaming) = req.use_streaming
         && use_streaming
+        && !query_exemplars
     {
         search_streaming(&trace_id, org_id, search_req, user_email, timeout).await
     } else {
@@ -651,11 +664,16 @@ pub async fn metadata(
 ) -> Result<HttpResponse, Error> {
     Ok(
         match metrics::prom::get_metadata(&org_id, req.into_inner()).await {
-            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp, None)),
+            Ok(resp) => {
+                HttpResponse::Ok().json(config::meta::promql::ApiFuncResponse::ok(resp, None))
+            }
             Err(err) => {
                 log::error!("get_metadata failed: {err}");
                 HttpResponse::InternalServerError().json(
-                    promql::ApiFuncResponse::<()>::err_internal(err.to_string(), None),
+                    config::meta::promql::ApiFuncResponse::<()>::err_internal(
+                        err.to_string(),
+                        None,
+                    ),
                 )
             }
         },
@@ -747,8 +765,9 @@ async fn series(
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest()
-                .json(promql::ApiFuncResponse::<()>::err_bad_data(e, None)));
+            return Ok(HttpResponse::BadRequest().json(
+                config::meta::promql::ApiFuncResponse::<()>::err_bad_data(e, None),
+            ));
         }
     };
 
@@ -811,11 +830,16 @@ async fn series(
 
     Ok(
         match metrics::prom::get_series(org_id, selector, start, end).await {
-            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp, None)),
+            Ok(resp) => {
+                HttpResponse::Ok().json(config::meta::promql::ApiFuncResponse::ok(resp, None))
+            }
             Err(err) => {
                 log::error!("get_series failed: {err}");
                 HttpResponse::InternalServerError().json(
-                    promql::ApiFuncResponse::<()>::err_internal(err.to_string(), None),
+                    config::meta::promql::ApiFuncResponse::<()>::err_internal(
+                        err.to_string(),
+                        None,
+                    ),
                 )
             }
         },
@@ -907,17 +931,23 @@ async fn labels(
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest()
-                .json(promql::ApiFuncResponse::<()>::err_bad_data(e, None)));
+            return Ok(HttpResponse::BadRequest().json(
+                config::meta::promql::ApiFuncResponse::<()>::err_bad_data(e, None),
+            ));
         }
     };
     Ok(
         match metrics::prom::get_labels(org_id, selector, start, end).await {
-            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp, None)),
+            Ok(resp) => {
+                HttpResponse::Ok().json(config::meta::promql::ApiFuncResponse::ok(resp, None))
+            }
             Err(err) => {
                 log::error!("get_labels failed: {err}");
                 HttpResponse::InternalServerError().json(
-                    promql::ApiFuncResponse::<()>::err_internal(err.to_string(), None),
+                    config::meta::promql::ApiFuncResponse::<()>::err_internal(
+                        err.to_string(),
+                        None,
+                    ),
                 )
             }
         },
@@ -971,17 +1001,23 @@ pub async fn label_values(
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest()
-                .json(promql::ApiFuncResponse::<()>::err_bad_data(e, None)));
+            return Ok(HttpResponse::BadRequest().json(
+                config::meta::promql::ApiFuncResponse::<()>::err_bad_data(e, None),
+            ));
         }
     };
     Ok(
         match metrics::prom::get_label_values(&org_id, label_name, selector, start, end).await {
-            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp, None)),
+            Ok(resp) => {
+                HttpResponse::Ok().json(config::meta::promql::ApiFuncResponse::ok(resp, None))
+            }
             Err(err) => {
                 log::error!("get_label_values failed: {err}");
                 HttpResponse::InternalServerError().json(
-                    promql::ApiFuncResponse::<()>::err_internal(err.to_string(), None),
+                    config::meta::promql::ApiFuncResponse::<()>::err_internal(
+                        err.to_string(),
+                        None,
+                    ),
                 )
             }
         },
@@ -1100,11 +1136,17 @@ fn format_query(_org_id: &str, query: &str, _in_req: HttpRequest) -> Result<Http
     let expr = match promql_parser::parser::parse(query) {
         Ok(expr) => expr,
         Err(err) => {
-            return Ok(HttpResponse::BadRequest()
-                .json(promql::ApiFuncResponse::<()>::err_bad_data(err, None)));
+            return Ok(HttpResponse::BadRequest().json(
+                config::meta::promql::ApiFuncResponse::<()>::err_bad_data(err, None),
+            ));
         }
     };
-    Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(expr.prettify(), None)))
+    Ok(
+        HttpResponse::Ok().json(config::meta::promql::ApiFuncResponse::ok(
+            expr.prettify(),
+            None,
+        )),
+    )
 }
 
 fn search_timeout(timeout: Option<String>) -> i64 {
@@ -1128,30 +1170,32 @@ async fn search(
     timeout: i64,
 ) -> Result<HttpResponse, Error> {
     match promql::search::search(trace_id, org_id, &req, user_email, timeout).await {
-        Ok(data) if !req.query_exemplars => {
-            Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(
-                promql::QueryResult {
+        Ok(data) if !req.query_exemplars => Ok(HttpResponse::Ok().json(
+            config::meta::promql::ApiFuncResponse::ok(
+                config::meta::promql::QueryResult {
                     result_type: data.get_type().to_string(),
                     result: data,
                 },
                 Some(trace_id.to_string()),
-            )))
-        }
-        Ok(data) => Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(
-            data,
-            Some(trace_id.to_string()),
-        ))),
+            ),
+        )),
+        Ok(data) => Ok(
+            HttpResponse::Ok().json(config::meta::promql::ApiFuncResponse::ok(
+                data,
+                Some(trace_id.to_string()),
+            )),
+        ),
         Err(err) => {
             let err = match err {
                 errors::Error::ErrorCode(code) => code.get_error_detail(),
                 _ => err.to_string(),
             };
-            Ok(
-                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(
+            Ok(HttpResponse::BadRequest().json(
+                config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
                     err,
                     Some(trace_id.to_string()),
-                )),
-            )
+                ),
+            ))
         }
     }
 }
@@ -1163,7 +1207,7 @@ async fn search_streaming(
     user_email: &str,
     timeout: i64,
 ) -> Result<HttpResponse, Error> {
-    let partitions = generate_search_partition(req.start, req.end, req.step);
+    let partitions = generate_search_partition(&req.query, req.start, req.end, req.step);
     log::info!(
         "[HTTP2_STREAM PromQL trace_id {trace_id}] Generated {} partitions for streaming search",
         partitions.len()
@@ -1176,22 +1220,74 @@ async fn search_streaming(
     let org_id = org_id.to_string();
     let user_email = user_email.to_string();
     actix_web::rt::spawn(async move {
-        for (start, end) in partitions {
+        let total_partitions = partitions.len();
+        for (i, (start, end)) in partitions.into_iter().enumerate() {
             let mut req = req.clone();
             req.start = start;
             req.end = end;
-            let _resp = search(&req_trace_id, &org_id, req, &user_email, timeout).await;
-            // TODO
-            // Send a progress: 0 event as an indicator of search initiation
+            match promql::search::search(&req_trace_id, &org_id, &req, &user_email, timeout).await {
+                Ok(data) => {
+                    let res = StreamResponses::PromqlResponse {
+                        data: config::meta::promql::QueryResult {
+                            result_type: data.get_type().to_string(),
+                            result: data,
+                        },
+                    };
+                    if tx.send(Ok(res)).await.is_err() {
+                        log::warn!(
+                            "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Sender is closed, stop sending data to client",
+                        );
+                        break;
+                    }
+                }
+                Err(err) => {
+                    log::error!(
+                        "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Error in search: {err}"
+                    );
+                    let err_res = match err {
+                        infra::errors::Error::ErrorCode(ref code) => {
+                            let message = code.get_message();
+                            let error_detail = code.get_error_detail();
+                            let http_response = map_error_to_http_response(&err, None);
+                            StreamResponses::Error {
+                                code: http_response.status().into(),
+                                message,
+                                error_detail: Some(error_detail),
+                            }
+                        }
+                        _ => StreamResponses::Error {
+                            code: 500,
+                            message: err.to_string(),
+                            error_detail: None,
+                        },
+                    };
+                    if tx.send(Ok(err_res)).await.is_err() {
+                        log::warn!(
+                            "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Sender is closed, stop sending error to client",
+                        );
+                        break;
+                    }
+                }
+            }
+
+            // Send progress
+            let percent = ((i + 1) * 100) / total_partitions;
             if tx
-                .send(Ok(StreamResponses::Progress { percent: 0 }))
+                .send(Ok(StreamResponses::Progress { percent }))
                 .await
                 .is_err()
             {
                 log::warn!(
                     "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Sender is closed, stop sending progress event to client",
                 );
+                break;
             }
+        }
+        // Send Done
+        if tx.send(Ok(StreamResponses::Done)).await.is_err() {
+            log::warn!(
+                "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Sender is closed, stop sending done event to client",
+            );
         }
     });
 
@@ -1243,13 +1339,21 @@ async fn search_streaming(
         .streaming(stream))
 }
 
-fn generate_search_partition(start: i64, end: i64, step: i64) -> Vec<(i64, i64)> {
+/// Generate search partitions based on the query's lookback window and step
+/// The mini partition should be at least twice the size of the lookback window to avoid redundant
+/// computations on the same data.
+fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Vec<(i64, i64)> {
     if start >= end {
         return vec![(start, end)];
     }
+    let mut lookback_window = get_max_lookback_window(query);
+    if lookback_window == 0 {
+        lookback_window = promql::micros(promql::DEFAULT_LOOKBACK);
+    }
+    let mini_step = std::cmp::max(lookback_window * 2, step);
     let interval = generate_aggregation_search_interval(start, end, CardinalityLevel::Low);
     let partition_step = interval.get_interval_microseconds();
-    if partition_step <= step {
+    if partition_step <= mini_step || start - end <= mini_step {
         return vec![(start, end)];
     }
 
@@ -1258,7 +1362,69 @@ fn generate_search_partition(start: i64, end: i64, step: i64) -> Vec<(i64, i64)>
     while group_start < end {
         let group_end = std::cmp::min(group_start + partition_step, end);
         groups.push((group_start, group_end));
+        // because of each partition will return data point with start and end timestamp,
+        // so the next partition should start from next data point after current end
         group_start = group_end + step;
     }
     groups
+}
+
+fn get_max_lookback_window(query: &str) -> i64 {
+    let ast = match promql_parser::parser::parse(query) {
+        Ok(ast) => ast,
+        Err(_) => {
+            return 0;
+        }
+    };
+    let mut visitor = MaxLookbackWindowVisitor::default();
+    if let Err(err) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+        log::error!("visit promql expr error: {err}");
+        return 0;
+    }
+    visitor.get_range_micros()
+}
+
+use promql_parser::parser::Expr;
+
+struct MaxLookbackWindowVisitor {
+    range: std::time::Duration,
+}
+
+impl MaxLookbackWindowVisitor {
+    fn new() -> Self {
+        MaxLookbackWindowVisitor {
+            range: std::time::Duration::from_micros(0),
+        }
+    }
+
+    fn get_range_micros(&self) -> i64 {
+        promql::micros(self.range)
+    }
+}
+
+impl Default for MaxLookbackWindowVisitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
+    type Error = &'static str;
+
+    fn pre_visit(&mut self, expr: &Expr) -> Result<bool, Self::Error> {
+        match expr {
+            Expr::VectorSelector(_) => {
+                return Ok(false);
+            }
+            Expr::MatrixSelector(ms) => {
+                if ms.range > self.range {
+                    self.range = ms.range;
+                }
+                return Ok(false);
+            }
+            Expr::NumberLiteral(_) | Expr::StringLiteral(_) => return Ok(false),
+            _ => (),
+        }
+        Ok(true)
+    }
 }

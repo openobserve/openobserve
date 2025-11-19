@@ -23,6 +23,7 @@ use std::{
 
 use config::{
     get_config,
+    meta::promql::value::{RangeValue, Value},
     utils::{
         hash::{Sum64, gxhash},
         time::{get_ymdh_from_micros, now_micros, second_micros},
@@ -33,8 +34,6 @@ use infra::errors::{Error, Result};
 use once_cell::sync::Lazy;
 use prost::Message;
 use tokio::sync::RwLock;
-
-use super::{RangeValue, Value};
 
 const METRICS_INDEX_CACHE_GC_TRIGGER_NUM: usize = 10;
 const METRICS_INDEX_CACHE_GC_PERCENT: usize = 10; // 10% of the items will be removed
@@ -477,11 +476,10 @@ impl MetricsIndexCacheItem {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::{Labels, Sample};
+
     use super::*;
-    use crate::service::promql::{
-        adjust_start_end,
-        value::{Labels, Sample},
-    };
+    use crate::service::promql::adjust_start_end;
 
     #[test]
     fn test_promql_cache_hash_key_generation() {

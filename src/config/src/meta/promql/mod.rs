@@ -20,6 +20,9 @@ use serde::{Deserialize, Serialize};
 use strum::Display;
 use utoipa::ToSchema;
 
+pub mod grpc;
+pub mod value;
+
 pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";
 pub const HASH_LABEL: &str = "__hash__";
@@ -295,8 +298,69 @@ impl DownsamplingRule {
     }
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryResult {
+    pub result_type: String, // vector, matrix, scalar, string
+    pub result: value::Value,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "status", rename_all = "lowercase")]
+pub enum ApiFuncResponse<T: Serialize> {
+    Success {
+        data: T,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        trace_id: Option<String>,
+    },
+    Error {
+        #[serde(rename = "errorType")]
+        error_type: ApiErrorType,
+        error: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        trace_id: Option<String>,
+    },
+}
+
+impl<T: Serialize> ApiFuncResponse<T> {
+    pub fn ok(data: T, trace_id: Option<String>) -> Self {
+        ApiFuncResponse::Success { data, trace_id }
+    }
+
+    pub fn err_bad_data(error: impl ToString, trace_id: Option<String>) -> Self {
+        ApiFuncResponse::Error {
+            error_type: ApiErrorType::BadData,
+            error: error.to_string(),
+            trace_id,
+        }
+    }
+
+    pub fn err_internal(error: impl ToString, trace_id: Option<String>) -> Self {
+        ApiFuncResponse::Error {
+            error_type: ApiErrorType::Internal,
+            error: error.to_string(),
+            trace_id,
+        }
+    }
+}
+
+// cf. https://github.com/prometheus/prometheus/blob/5c5fa5c319fca713506fa144ec6768fddf00d466/web/api/v1/api.go#L73-L82
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApiErrorType {
+    Timeout,
+    Cancelled,
+    Exec,
+    BadData,
+    Internal,
+    Unavailable,
+    NotFound,
+}
+
 #[cfg(test)]
 mod tests {
+    use expect_test::expect;
+
     use super::*;
 
     #[test]
@@ -310,5 +374,32 @@ mod tests {
         assert_eq!(MetricType::StateSet.to_string(), "stateset");
         assert_eq!(format!("{}", MetricType::Unknown), "unknown");
         assert_eq!(MetricType::Unknown.to_string(), "unknown");
+    }
+
+    #[test]
+    fn test_api_func_response_serialize() {
+        let ok = ApiFuncResponse::ok("hello".to_owned(), None);
+        assert_eq!(
+            serde_json::to_string(&ok).unwrap(),
+            r#"{"status":"success","data":"hello"}"#
+        );
+
+        let err = ApiFuncResponse::<()>::err_internal("something went wrong".to_owned(), None);
+        assert_eq!(
+            serde_json::to_string(&err).unwrap(),
+            r#"{"status":"error","errorType":"internal","error":"something went wrong"}"#
+        );
+
+        let err = ApiFuncResponse::<()>::err_bad_data(
+            r#"invalid parameter \"start\": Invalid time value for 'start': cannot parse \"foobar\" to a valid timestamp"#,
+            None,
+        );
+        expect![[r#"
+            {
+              "status": "error",
+              "errorType": "bad_data",
+              "error": "invalid parameter \\\"start\\\": Invalid time value for 'start': cannot parse \\\"foobar\\\" to a valid timestamp"
+            }"#
+        ]].assert_eq(&serde_json::to_string_pretty(&err).unwrap());
     }
 }
