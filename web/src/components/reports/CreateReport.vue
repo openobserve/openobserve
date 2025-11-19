@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
+  <div class="tw-w-full tw-h-full tw-px-[0.625rem] q-mt-xs tw-pb-[0.625rem]">
     <div data-test="add-report-section" class="full-width create-report-page">
       <div class="row items-center no-wrap card-container tw-py-[0.675rem] tw-h-[64px] tw-px-[0.675rem] tw-mb-[0.675rem] ">
         <div class="flex items-center">

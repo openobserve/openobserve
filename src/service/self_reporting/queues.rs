@@ -209,6 +209,15 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         additional_reporting_orgs.sort();
         additional_reporting_orgs.dedup();
 
+        // Ensure triggers stream exists with complete schema for each org (lazy, once per restart)
+        for org in &additional_reporting_orgs {
+            if let Err(e) = super::triggers_schema::ensure_triggers_stream_initialized(org).await {
+                log::warn!(
+                    "[SELF-REPORTING] Failed to ensure triggers stream initialized for {org}: {e}"
+                );
+            }
+        }
+
         let mut enqueued_on_failure = false;
 
         for org in &additional_reporting_orgs {

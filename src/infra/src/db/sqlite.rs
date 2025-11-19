@@ -487,8 +487,8 @@ impl super::Db for SqliteDb {
             } else {
                 with_prefix
             };
-            let new_key = if start_dt.is_some() {
-                format!("{}/{}", key, start_dt.unwrap())
+            let new_key = if let Some(start_dt) = start_dt {
+                format!("{}/{}", key, start_dt)
             } else {
                 key.to_string()
             };
