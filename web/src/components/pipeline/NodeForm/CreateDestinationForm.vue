@@ -323,17 +323,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-input
                 data-test="add-destination-metadata-source-input"
                 v-model="formData.metadata!.source"
-                :label="'Source *'"
+                :label="'Source'"
                 :placeholder="'Enter source (e.g., http:my_source)'"
                 class="no-border showLabelOnTop"
                 borderless
                 dense
                 flat
                 stack-label
-                :rules="[
-                  (val: any) =>
-                    !!val?.trim() || 'Source is required for Splunk',
-                ]"
                 tabindex="0"
               >
                 <template v-slot:hint>
@@ -344,17 +340,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-input
                 data-test="add-destination-metadata-sourcetype-input"
                 v-model="formData.metadata!.sourcetype"
-                :label="'Source Type *'"
+                :label="'Source Type'"
                 :placeholder="'Enter source type (e.g., _json)'"
                 class="no-border showLabelOnTop"
                 borderless
                 dense
                 flat
                 stack-label
-                :rules="[
-                  (val: any) =>
-                    !!val?.trim() || 'Source type is required for Splunk',
-                ]"
                 tabindex="0"
               >
                 <template v-slot:hint>
@@ -365,17 +357,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-input
                 data-test="add-destination-metadata-hostname-input"
                 v-model="formData.metadata!.hostname"
-                :label="'Hostname *'"
+                :label="'Hostname'"
                 :placeholder="'Enter hostname (e.g., server01)'"
                 class="no-border showLabelOnTop"
                 borderless
                 dense
                 flat
                 stack-label
-                :rules="[
-                  (val: any) =>
-                    !!val?.trim() || 'Hostname is required for Splunk',
-                ]"
                 tabindex="0"
               >
                 <template v-slot:hint>
