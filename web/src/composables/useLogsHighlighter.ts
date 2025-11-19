@@ -74,7 +74,7 @@ export function useLogsHighlighter() {
         for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
           const cacheKey = `${columns[columnIndex].id}_${rowIndex}`;
 
-          if (processedResults.value[cacheKey]) return;
+          if (processedResults.value[cacheKey]) continue;
 
           // Process the hit data
           const processedHtml = colorizedJson({

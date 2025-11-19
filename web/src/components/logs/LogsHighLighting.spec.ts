@@ -20,23 +20,34 @@ import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 
 installQuasar();
 
-// Mock the useLogsHighlighter composable
-const mockProcessedResults = {
-  "message_0": '<span class="log-string">Error occurred</span>',
-  "level_0": '<span class="log-string">error</span>',
-  "source_0": '<span class="log-object-brace">{</span><span class="log-key">message</span>...',
+// Mock the store
+const mockStore = {
+  state: {
+    theme: "light",
+  },
 };
 
-// Mock processedResults as a global variable for the component
-vi.stubGlobal('processedResults', mockProcessedResults);
+// Mock vuex
+vi.mock("vuex", () => ({
+  useStore: () => mockStore,
+}));
 
+// Mock the useLogsHighlighter composable
 vi.mock("@/composables/useLogsHighlighter", () => ({
   useLogsHighlighter: () => ({
-    processedResults: { value: mockProcessedResults },
-    processHitsInChunks: vi.fn(() => Promise.resolve(mockProcessedResults)),
-    colorizedJson: vi.fn((params) => {
-      if (params.data === null || params.data === undefined) return "";
-      return `<span class="log-string">${params.data}</span>`;
+    colorizeJson: vi.fn((data, isDark, showBraces, showQuotes, queryString, simpleMode) => {
+      if (data === null || data === undefined) return "";
+
+      // Simple mock implementation
+      if (simpleMode) {
+        return `<span class="log-string">${data}</span>`;
+      }
+
+      if (typeof data === "object") {
+        return `<span class="log-object-brace">{</span><span class="log-key">test</span><span class="log-separator">:</span><span class="log-string">value</span><span class="log-object-brace">}</span>`;
+      }
+
+      return `<span class="log-string">${data}</span>`;
     }),
   }),
 }));
@@ -48,11 +59,11 @@ describe("LogsHighLighting", () => {
     wrapper = mount(LogsHighLighting, {
       shallow: false,
       props: {
-        column: {
-          id: "message",
-          header: "Message",
-        },
-        index: 0,
+        data: "test message",
+        showBraces: true,
+        showQuotes: false,
+        queryString: "",
+        simpleMode: false,
       },
     });
   });
@@ -73,99 +84,92 @@ describe("LogsHighLighting", () => {
     expect(span.exists()).toBe(true);
   });
 
-  it("should display processed results from cache", async () => {
-    // Wait for any async operations to complete
+  it("should display string data", async () => {
+    await wrapper.setProps({ data: "Error occurred" });
     await wrapper.vm.$nextTick();
 
     const span = wrapper.find("span.logs-highlight-json");
     expect(span.exists()).toBe(true);
-
-    // The component should render the span (even if content is empty due to mocking)
-    expect(span.element).toBeDefined();
+    expect(span.html()).toContain("Error occurred");
   });
 
-  it("should handle different column IDs", async () => {
+  it("should handle object data with braces", async () => {
     await wrapper.setProps({
-      column: { id: "level", header: "Level" },
-      index: 0,
+      data: { level: "error", message: "test" },
+      showBraces: true,
     });
+    await wrapper.vm.$nextTick();
 
+    const span = wrapper.find("span.logs-highlight-json");
+    expect(span.exists()).toBe(true);
+    expect(span.html()).toContain("log-object-brace");
+  });
+
+  it("should handle number data", async () => {
+    await wrapper.setProps({ data: 42 });
+    await wrapper.vm.$nextTick();
+
+    const span = wrapper.find("span.logs-highlight-json");
+    expect(span.exists()).toBe(true);
+    expect(span.html()).toContain("42");
+  });
+
+  it("should handle boolean data", async () => {
+    await wrapper.setProps({ data: true });
+    await wrapper.vm.$nextTick();
+
+    const span = wrapper.find("span.logs-highlight-json");
+    expect(span.exists()).toBe(true);
+    expect(span.html()).toContain("true");
+  });
+
+  it("should handle null data", async () => {
+    await wrapper.setProps({ data: null });
     await wrapper.vm.$nextTick();
 
     const span = wrapper.find("span.logs-highlight-json");
     expect(span.exists()).toBe(true);
   });
 
-  it("should handle different row indices", async () => {
+  it("should handle undefined data", async () => {
+    await wrapper.setProps({ data: undefined });
+    await wrapper.vm.$nextTick();
+
+    const span = wrapper.find("span.logs-highlight-json");
+    expect(span.exists()).toBe(true);
+  });
+
+  it("should apply simpleMode when specified", async () => {
     await wrapper.setProps({
-      column: { id: "message", header: "Message" },
-      index: 5,
+      data: "simple text",
+      simpleMode: true,
     });
-
     await wrapper.vm.$nextTick();
 
     const span = wrapper.find("span.logs-highlight-json");
     expect(span.exists()).toBe(true);
   });
 
-  it("should handle source column rendering", async () => {
+  it("should handle queryString prop", async () => {
     await wrapper.setProps({
-      column: { id: "source", header: "Source" },
-      index: 0,
+      data: "error message",
+      queryString: "match_all('error')",
     });
-
     await wrapper.vm.$nextTick();
 
     const span = wrapper.find("span.logs-highlight-json");
     expect(span.exists()).toBe(true);
   });
 
-  it("should expose processedResults correctly", () => {
-    expect(wrapper.vm.processedResults).toBeDefined();
-    expect(typeof wrapper.vm.processedResults).toBe("object");
-  });
-
-  it("should handle component lifecycle correctly", () => {
-    // Test that component can be created and destroyed without errors
-    const newWrapper = mount(LogsHighLighting, {
-      props: {
-        column: { id: "test", header: "Test" },
-        index: 0,
-      },
+  it("should handle showQuotes prop", async () => {
+    await wrapper.setProps({
+      data: "test",
+      showQuotes: true,
     });
+    await wrapper.vm.$nextTick();
 
-    expect(newWrapper).toBeTruthy();
-    newWrapper.unmount();
-  });
-
-  it("should render empty content gracefully when no data", async () => {
-    // Mock empty results
-    const emptyWrapper = mount(LogsHighLighting, {
-      props: {
-        column: { id: "empty", header: "Empty" },
-        index: 999, // Non-existent index
-      },
-    });
-
-    await emptyWrapper.vm.$nextTick();
-
-    const span = emptyWrapper.find("span.logs-highlight-json");
+    const span = wrapper.find("span.logs-highlight-json");
     expect(span.exists()).toBe(true);
-
-    emptyWrapper.unmount();
-  });
-
-  it("should handle props validation", () => {
-    // Test with minimal props
-    const minimalWrapper = mount(LogsHighLighting, {
-      props: {
-        column: {},
-        index: 0,
-      },
-    });
-
-    expect(minimalWrapper).toBeTruthy();
-    minimalWrapper.unmount();
   });
 
   it("should apply correct CSS classes", () => {
@@ -173,76 +177,127 @@ describe("LogsHighLighting", () => {
     expect(span.classes()).toContain("logs-highlight-json");
   });
 
-  it("should handle reactive prop changes", async () => {
-    const initialColumn = { id: "message", header: "Message" };
-    const newColumn = { id: "level", header: "Level" };
+  it("should handle component lifecycle correctly", () => {
+    const newWrapper = mount(LogsHighLighting, {
+      props: {
+        data: "test",
+        showBraces: false,
+        showQuotes: false,
+        queryString: "",
+        simpleMode: false,
+      },
+    });
 
-    // Initial state
-    expect(wrapper.props("column")).toEqual(initialColumn);
-
-    // Change props
-    await wrapper.setProps({ column: newColumn });
-
-    // Verify props changed
-    expect(wrapper.props("column")).toEqual(newColumn);
+    expect(newWrapper).toBeTruthy();
+    newWrapper.unmount();
   });
 
-  it("should render with proper accessibility attributes", () => {
-    const span = wrapper.find("span.logs-highlight-json");
-    expect(span.exists()).toBe(true);
+  it("should handle reactive prop changes", async () => {
+    const initialData = "initial";
+    const newData = "updated";
 
-    // Verify it's properly structured for screen readers
-    expect(span.attributes("role")).toBeFalsy(); // No specific role needed for content
+    expect(wrapper.props("data")).toBe("test message");
+
+    await wrapper.setProps({ data: newData });
+
+    expect(wrapper.props("data")).toBe(newData);
+  });
+
+  it("should handle props with default values", () => {
+    const minimalWrapper = mount(LogsHighLighting, {
+      props: {
+        data: "test",
+      },
+    });
+
+    expect(minimalWrapper.props("showBraces")).toBe(true);
+    expect(minimalWrapper.props("showQuotes")).toBe(false);
+    expect(minimalWrapper.props("queryString")).toBe("");
+    expect(minimalWrapper.props("simpleMode")).toBe(false);
+
+    minimalWrapper.unmount();
   });
 
   describe("edge cases", () => {
-    it("should handle null column prop gracefully", () => {
-      // This test validates the component structure but not rendering with null props
-      // since that would be an error condition in real usage
-      expect(() => {
-        mount(LogsHighLighting, {
-          props: {
-            column: { id: "test", header: "Test" }, // Use valid props instead
-            index: 0,
+    it("should handle empty string data", () => {
+      const emptyWrapper = mount(LogsHighLighting, {
+        props: {
+          data: "",
+        },
+      });
+
+      expect(emptyWrapper).toBeTruthy();
+      const span = emptyWrapper.find("span.logs-highlight-json");
+      expect(span.exists()).toBe(true);
+
+      emptyWrapper.unmount();
+    });
+
+    it("should handle complex nested objects", async () => {
+      const complexData = {
+        user: {
+          id: 123,
+          profile: {
+            name: "John",
+            email: "john@example.com",
           },
-        });
-      }).not.toThrow();
+        },
+        timestamp: 1640995200000,
+      };
+
+      await wrapper.setProps({ data: complexData });
+      await wrapper.vm.$nextTick();
+
+      const span = wrapper.find("span.logs-highlight-json");
+      expect(span.exists()).toBe(true);
     });
 
-    it("should handle negative index", () => {
-      const negativeWrapper = mount(LogsHighLighting, {
-        props: {
-          column: { id: "test", header: "Test" },
-          index: -1,
-        },
-      });
+    it("should handle arrays", async () => {
+      const arrayData = [1, 2, 3, 4, 5];
 
-      expect(negativeWrapper).toBeTruthy();
-      negativeWrapper.unmount();
+      await wrapper.setProps({ data: arrayData });
+      await wrapper.vm.$nextTick();
+
+      const span = wrapper.find("span.logs-highlight-json");
+      expect(span.exists()).toBe(true);
     });
 
-    it("should handle very large index", () => {
-      const largeWrapper = mount(LogsHighLighting, {
-        props: {
-          column: { id: "test", header: "Test" },
-          index: 999999,
-        },
-      });
+    it("should handle very long strings", async () => {
+      const longString = "x".repeat(10000);
 
-      expect(largeWrapper).toBeTruthy();
-      largeWrapper.unmount();
+      await wrapper.setProps({ data: longString });
+      await wrapper.vm.$nextTick();
+
+      const span = wrapper.find("span.logs-highlight-json");
+      expect(span.exists()).toBe(true);
     });
 
-    it("should handle column with special characters in ID", () => {
-      const specialWrapper = mount(LogsHighLighting, {
-        props: {
-          column: { id: "test-column.with_special@chars", header: "Special" },
-          index: 0,
-        },
-      });
+    it("should handle special characters", async () => {
+      const specialData = "Test <script>alert('xss')</script> & other symbols";
 
-      expect(specialWrapper).toBeTruthy();
-      specialWrapper.unmount();
+      await wrapper.setProps({ data: specialData });
+      await wrapper.vm.$nextTick();
+
+      const span = wrapper.find("span.logs-highlight-json");
+      expect(span.exists()).toBe(true);
+    });
+  });
+
+  describe("theme handling", () => {
+    it("should respect light theme", async () => {
+      mockStore.state.theme = "light";
+      await wrapper.vm.$nextTick();
+
+      const span = wrapper.find("span.logs-highlight-json");
+      expect(span.exists()).toBe(true);
+    });
+
+    it("should respect dark theme", async () => {
+      mockStore.state.theme = "dark";
+      await wrapper.vm.$nextTick();
+
+      const span = wrapper.find("span.logs-highlight-json");
+      expect(span.exists()).toBe(true);
     });
   });
 
@@ -252,15 +307,13 @@ describe("LogsHighLighting", () => {
 
       const perfWrapper = mount(LogsHighLighting, {
         props: {
-          column: { id: "message", header: "Message" },
-          index: 0,
+          data: "performance test",
         },
       });
 
       const endTime = performance.now();
       const renderTime = endTime - startTime;
 
-      // Should render within reasonable time (< 50ms)
       expect(renderTime).toBeLessThan(50);
 
       perfWrapper.unmount();
@@ -270,24 +323,22 @@ describe("LogsHighLighting", () => {
       const instances = [];
       const startTime = performance.now();
 
-      // Create multiple instances
       for (let i = 0; i < 10; i++) {
-        instances.push(mount(LogsHighLighting, {
-          props: {
-            column: { id: `column_${i}`, header: `Column ${i}` },
-            index: i,
-          },
-        }));
+        instances.push(
+          mount(LogsHighLighting, {
+            props: {
+              data: `message ${i}`,
+            },
+          })
+        );
       }
 
       const endTime = performance.now();
       const totalTime = endTime - startTime;
 
-      // Should create 10 instances within reasonable time (< 200ms)
       expect(totalTime).toBeLessThan(200);
 
-      // Cleanup
-      instances.forEach(instance => instance.unmount());
+      instances.forEach((instance) => instance.unmount());
     });
   });
 
@@ -295,18 +346,16 @@ describe("LogsHighLighting", () => {
     it("should maintain component state correctly", async () => {
       const initialProps = wrapper.props();
 
-      // Trigger a re-render
       await wrapper.vm.$forceUpdate();
 
-      // Props should remain the same
       expect(wrapper.props()).toEqual(initialProps);
     });
 
     it("should handle prop updates without breaking", async () => {
       const updates = [
-        { column: { id: "field1", header: "Field 1" }, index: 1 },
-        { column: { id: "field2", header: "Field 2" }, index: 2 },
-        { column: { id: "field3", header: "Field 3" }, index: 3 },
+        { data: "update 1", simpleMode: false },
+        { data: "update 2", simpleMode: true },
+        { data: { key: "value" }, simpleMode: false },
       ];
 
       for (const update of updates) {
@@ -319,24 +368,26 @@ describe("LogsHighLighting", () => {
     });
   });
 
-  describe("integration with highlighting system", () => {
+  describe("integration with highlighting composable", () => {
     it("should properly integrate with the highlighting composable", () => {
-      // Verify that the component is using the mocked composable
-      expect(wrapper.vm.processedResults).toBeDefined();
+      expect(wrapper.vm).toBeDefined();
+      const span = wrapper.find("span.logs-highlight-json");
+      expect(span.exists()).toBe(true);
     });
 
     it("should handle async highlighting operations", async () => {
-      // Wait for any async operations
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       const span = wrapper.find("span.logs-highlight-json");
       expect(span.exists()).toBe(true);
     });
 
-    it("should update when processed results change", async () => {
-      // This would test reactive updates if the composable data changed
-      // In real usage, this would be triggered by data updates
-      await wrapper.vm.$nextTick();
+    it("should update when data changes", async () => {
+      const initialData = wrapper.props("data");
+
+      await wrapper.setProps({ data: "new data" });
+
+      expect(wrapper.props("data")).not.toBe(initialData);
 
       const span = wrapper.find("span.logs-highlight-json");
       expect(span.exists()).toBe(true);
