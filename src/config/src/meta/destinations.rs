@@ -168,7 +168,10 @@ impl HTTPOutputFormat {
                     ret.push(serde_json::json!({ "index": { "_index": index } }).to_string());
                     ret.push(v.as_ref().to_string());
                 });
-                ret.join("\n").into_bytes()
+                let mut temp = ret.join("\n").into_bytes();
+                // for ES Bulk format, the payload must end with a newline
+                temp.push(b'\n');
+                temp
             }
         }
     }
