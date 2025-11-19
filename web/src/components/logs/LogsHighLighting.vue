@@ -35,127 +35,48 @@ Usage Examples:
 - <LogsHighLighting :data="1234567890123" />  // Timestamp-like number
 -->
 <template>
-  <span
-    class="logs-highlight-json"
-    v-html="processedResults[`${props.column.id}_${props.index}`]"
-  ></span>
+  <span class="logs-highlight-json" v-html="colorizedJson"></span>
 </template>
 
 <script setup lang="ts">
 import { computed, withDefaults } from "vue";
+import { useStore } from "vuex";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
 /**
  * Component Props Interface
  */
 interface Props {
-  column: any; // Only highlighting, no semantic colorization
-  index: number;
+  data: any;
+  showBraces?: boolean;
+  showQuotes?: boolean;
+  queryString?: string;
+  simpleMode?: boolean; // Only highlighting, no semantic colorization
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  column: {},
+  showBraces: true,
+  showQuotes: false,
+  queryString: "",
+  simpleMode: false,
 });
 
 const store = useStore();
-const { processTextWithHighlights, escapeHtml, splitTextByKeywords, extractKeywords } = useTextHighlighter();
-
-/**
- * Color Theme Management
- * Cache colors and watch for theme changes
- */
-const currentColors = ref(getThemeColors(store.state.theme === "dark"));
-
-watch(
-  () => store.state.theme,
-  (newTheme) => {
-    currentColors.value = getThemeColors(newTheme === "dark");
-  },
-);
-
-/**
- * Simple highlighting without semantic colorization 
- * that is when it is not fts key right we dont want to apply color to it so then we just highlight the text if query string is there that is if user
- * added match_all or fuzzy_match_all in the query string
- * if not we will simply return the text as it is without adding any color to it
- * if query string is there we will highlight the text with yellow background
- */
-function simpleHighlight(text: string, queryString: string): string {
-  if (!text || !queryString) return escapeHtml(text);
-  
-  const keywords = extractKeywords(queryString);
-  const parts = splitTextByKeywords(text, keywords);
-  
-  return parts.map(part => {
-    if (part.isHighlighted) {
-      return `<span style="background-color: rgb(255, 213, 0);">${escapeHtml(part.text)}</span>`;
-    } else {
-      return escapeHtml(part.text);
-    }
-  }).join('');
-}
+const { colorizeJson } = useLogsHighlighter();
 
 /**
  * Main colorization logic with integrated highlighting
+ * Uses the composable to avoid code duplication
  */
 const colorizedJson = computed((): string => {
-  if (props.data === null || props.data === undefined) {
-    return "";
-  }
-
-
-  // Simple mode: only highlighting, no semantic colorization
-  if (props.simpleMode) {
-    const textStr = String(props.data);
-    return simpleHighlight(textStr, props.queryString);
-  }
-
-  // Handle single string values with semantic colorization and highlighting
-  if (typeof props.data === "string") {
-    return processTextWithHighlights(
-      props.data, 
-      props.queryString, 
-      currentColors.value, 
-      props.showQuotes
-    );
-  }
-
-  // Handle primitive data types
-  if (typeof props.data !== "object") {
-    const dataStr = String(props.data);
-
-    if (typeof props.data === "number") {
-      // Detect timestamp-like numbers
-      // Numbers should never have quotes
-      if (dataStr.length >= 13) {
-        return createStyledSpan(dataStr, currentColors.value.timestamp, props.queryString, false);
-      } else {
-        return createStyledSpan(dataStr, currentColors.value.numberValue, props.queryString, false);
-      }
-    } else if (typeof props.data === "boolean") {
-      // Booleans should never have quotes
-      return createStyledSpan(String(props.data), currentColors.value.booleanValue, props.queryString, false);
-    } else if (props.data === null) {
-      // null should never have quotes
-      return createStyledSpan("null", currentColors.value.nullValue, props.queryString, false);
-    } else {
-      // String values: use showQuotes from props
-      return processTextWithHighlights(
-        dataStr,
-        props.queryString,
-        currentColors.value,
-        props.showQuotes
-      );
-    }
-  }
-
-  // Handle complex objects with full JSON colorization
-  //this is for objects and arrays if any
-  try {
-    return colorizeObject(props.data, currentColors.value, props.showBraces, props.showQuotes, props.queryString);
-  } catch (error) {
-    return escapeHtml(JSON.stringify(props.data));
-  }
+  return colorizeJson(
+    props.data,
+    store.state.theme === "dark",
+    props.showBraces,
+    props.showQuotes,
+    props.queryString,
+    props.simpleMode
+  );
 });
 
 /**
@@ -323,7 +244,4 @@ function isLogLineWithMixedContent(value: string): boolean {
   word-break: break-word;
   display: inline;
 }
-
-/* Import log highlighting CSS classes */
-@import '@/assets/styles/log-highlighting.css';
 </style>
