@@ -146,18 +146,35 @@ impl HTTPOutputFormat {
         }
     }
 
-    pub fn get_body_from_data<T: AsRef<Value> + Serialize>(&self, data: &[T]) -> Vec<u8> {
+    pub fn get_body_from_data<T: AsRef<Value> + Serialize>(
+        &self,
+        data: &[T],
+        metadata: &HashMap<String, String>,
+    ) -> Vec<u8> {
+        let data = data
+            .iter()
+            .map(|val| {
+                let mut t = val.as_ref().clone();
+                if let Some(obj) = t.as_object_mut() {
+                    for (k, v) in metadata.iter() {
+                        obj.insert(k.clone(), Value::String(v.clone()));
+                    }
+                }
+                t
+            })
+            .collect::<Vec<_>>();
+
         match self {
-            Self::JSON => serde_json::to_vec(data).unwrap(),
+            Self::JSON => serde_json::to_vec(&data).unwrap(),
             Self::NDJSON => data
                 .iter()
-                .map(|x| x.as_ref().to_string())
+                .map(|x| x.to_string())
                 .collect::<Vec<_>>()
                 .join("\n")
                 .into_bytes(),
             Self::NestedEvent => data
                 .iter()
-                .map(|v| serde_json::json!({"event":v.as_ref()}).to_string())
+                .map(|v| serde_json::json!({"event":v}).to_string())
                 .collect::<Vec<_>>()
                 .join("\n")
                 .into_bytes(),
@@ -166,7 +183,7 @@ impl HTTPOutputFormat {
                 let mut ret = Vec::with_capacity(expected_count * 2);
                 data.iter().for_each(|v| {
                     ret.push(serde_json::json!({ "index": { "_index": index } }).to_string());
-                    ret.push(v.as_ref().to_string());
+                    ret.push(v.to_string());
                 });
                 let mut temp = ret.join("\n").into_bytes();
                 // for ES Bulk format, the payload must end with a newline
