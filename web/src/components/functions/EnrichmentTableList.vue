@@ -562,44 +562,49 @@ export default defineComponent({
         );
       });
 
-      Promise.all(promises)
-        .then((responses) => {
-          const successfulDeletions = responses.filter(
-            (res) => res.data.code === 200,
-          );
-          const failedDeletions = responses.filter(
-            (res) => res.data.code !== 200,
-          );
+      Promise.allSettled(promises)
+        .then((results) => {
+          let successfulDeletions = 0;
+          let failedDeletions = 0;
 
-          if (successfulDeletions.length > 0 && failedDeletions.length === 0) {
+          results.forEach((result) => {
+            if (result.status === 'fulfilled') {
+              // Check if the response indicates success
+              if (result.value?.data?.code === 200) {
+                successfulDeletions++;
+              } else {
+                failedDeletions++;
+              }
+            } else {
+              // Handle rejected promises (errors)
+              const error = result.reason;
+              // Don't count 403 errors as failures (silent)
+              if (error?.response?.status !== 403 && error?.status !== 403) {
+                failedDeletions++;
+              }
+            }
+          });
+
+          if (successfulDeletions > 0 && failedDeletions === 0) {
             $q.notify({
               color: "positive",
-              message: `Successfully deleted ${successfulDeletions.length} enrichment table(s).`,
+              message: `Successfully deleted ${successfulDeletions} enrichment table(s).`,
             });
-          } else if (successfulDeletions.length > 0 && failedDeletions.length > 0) {
+          } else if (successfulDeletions > 0 && failedDeletions > 0) {
             $q.notify({
               color: "warning",
-              message: `Deleted ${successfulDeletions.length} enrichment table(s). Failed to delete ${failedDeletions.length} enrichment table(s).`,
+              message: `Deleted ${successfulDeletions} enrichment table(s). Failed to delete ${failedDeletions} enrichment table(s).`,
             });
-          } else if (failedDeletions.length > 0) {
+          } else if (failedDeletions > 0) {
             $q.notify({
               color: "negative",
-              message: `Failed to delete ${failedDeletions.length} enrichment table(s).`,
+              message: `Failed to delete ${failedDeletions} enrichment table(s).`,
             });
           }
 
           resetStreamType("enrichment_tables");
           getLookupTables(true);
           selectedEnrichmentTables.value = [];
-          confirmBulkDelete.value = false;
-        })
-        .catch((err: any) => {
-          if (err.response?.status != 403 || err?.status != 403) {
-            $q.notify({
-              color: "negative",
-              message: err.response?.data?.message || err?.message || "Error while deleting enrichment tables.",
-            });
-          }
           confirmBulkDelete.value = false;
         });
     };
