@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:header="props">
         <q-tr
           :props="props"
-          class="!tw-bg-[var(--o2-hover-accent)]"
+          class="!tw-bg-[var(--o2-table-header-bg)]"
         >
           <q-th
             v-for="col in props.cols"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="col.classes || ''"
             :props="props"
             :style="col.style"
-            class="!tw-bg-[var(--o2-hover-accent)]"
+            class="!tw-bg-[var(--o2-table-header-bg)]"
           >
             {{ col.label }}
           </q-th>
