@@ -133,10 +133,7 @@ async fn search_in_cluster(
     // The number of resolution steps; see the diagram at
     // https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
     let partition_step = max(micros(DEFAULT_LOOKBACK) * 2, step);
-    let nr_steps = match (end - start) / partition_step {
-        0 => 1,
-        n => n,
-    };
+    let nr_steps = (end - start + partition_step - 1) / partition_step;
 
     // get cache data
     let original_start = start;

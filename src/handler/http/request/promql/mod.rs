@@ -1353,7 +1353,7 @@ fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Ve
     let mini_step = std::cmp::max(lookback_window * 2, step);
     let interval = generate_aggregation_search_interval(start, end, CardinalityLevel::Low);
     let partition_step = interval.get_interval_microseconds();
-    if partition_step <= mini_step ||end - start <= mini_step {
+    if partition_step <= mini_step || end - start <= mini_step {
         return vec![(start, end)];
     }
 
