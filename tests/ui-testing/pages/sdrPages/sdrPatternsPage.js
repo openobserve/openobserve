@@ -450,6 +450,35 @@ export class SDRPatternsPage {
     return importSuccess;
   }
 
+  async verifyImportResult() {
+    testLogger.info('Verifying import result (success or error)');
+
+    // Check for success message
+    const importSuccess = await this.page.getByText(/Successfully imported|imported successfully/i).isVisible({ timeout: 3000 }).catch(() => false);
+
+    if (importSuccess) {
+      testLogger.info('✓ Import successful');
+      return { success: true, message: 'Imported successfully' };
+    }
+
+    // Check for duplicate/already exists error
+    const alreadyExistsMsg = await this.page.getByText(/already exists|Pattern with given id\/name/i).isVisible({ timeout: 2000 }).catch(() => false);
+
+    if (alreadyExistsMsg) {
+      testLogger.info('⚠ Patterns already exist (duplicate)');
+      // Close any error dialog
+      const okButton = this.page.getByRole('button', { name: 'OK' });
+      if (await okButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await okButton.click();
+      }
+      return { success: false, message: 'Pattern already exists', isDuplicate: true };
+    }
+
+    // No success or error message detected
+    testLogger.warn('⚠ No success or error message detected');
+    return { success: false, message: 'No response message detected', isDuplicate: false };
+  }
+
   async importBuiltInPatterns(checkboxIndices) {
     testLogger.info(`Importing built-in patterns: ${checkboxIndices.join(', ')}`);
 
