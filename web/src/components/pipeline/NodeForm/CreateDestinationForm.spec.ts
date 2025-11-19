@@ -952,7 +952,7 @@ describe("CreateDestinationForm", () => {
       expect(wrapper.vm.canProceedStep2).toBe(false);
     });
 
-    it("should validate that Elasticsearch requires metadata", async () => {
+    it("should validate that Elasticsearch requires esbulk_index", async () => {
       wrapper.vm.formData.destination_type = "elasticsearch";
       wrapper.vm.formData.name = "test";
       wrapper.vm.formData.url = "https://example.com";
@@ -960,10 +960,10 @@ describe("CreateDestinationForm", () => {
       wrapper.vm.formData.method = "post";
       wrapper.vm.formData.output_format = "esbulk";
       wrapper.vm.formData.esbulk_index = "default";
-      // Without metadata, validation should fail
+      // With esbulk_index, validation should pass
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.canProceedStep2).toBe(false);
+      expect(wrapper.vm.canProceedStep2).toBe(true);
     });
 
     it("should validate that Datadog requires metadata", async () => {
@@ -1023,7 +1023,7 @@ describe("CreateDestinationForm", () => {
       expect(wrapper.vm.canProceedStep2).toBe(false);
     });
 
-    it("should validate Elasticsearch metadata fields", async () => {
+    it("should validate Elasticsearch with esbulk_index", async () => {
       wrapper.vm.formData.destination_type = "elasticsearch";
       wrapper.vm.formData.name = "test";
       wrapper.vm.formData.url = "https://example.com";
@@ -1031,21 +1031,20 @@ describe("CreateDestinationForm", () => {
       wrapper.vm.formData.method = "post";
       wrapper.vm.formData.output_format = "esbulk";
       wrapper.vm.formData.esbulk_index = "default";
-      wrapper.vm.formData.metadata = {
-        _index: "logs-prod",
-      };
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.canProceedStep2).toBe(true);
     });
 
-    it("should fail validation if Elasticsearch metadata is incomplete", async () => {
+    it("should fail validation if Elasticsearch esbulk_index is missing", async () => {
       wrapper.vm.formData.destination_type = "elasticsearch";
+      await wrapper.vm.$nextTick(); // Wait for watcher to set default esbulk_index
       wrapper.vm.formData.name = "test";
       wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.url_endpoint = "/_bulk";
       wrapper.vm.formData.method = "post";
       wrapper.vm.formData.output_format = "esbulk";
-      wrapper.vm.formData.metadata = {};
+      wrapper.vm.formData.esbulk_index = ""; // Override to empty after watcher runs
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.canProceedStep2).toBe(false);

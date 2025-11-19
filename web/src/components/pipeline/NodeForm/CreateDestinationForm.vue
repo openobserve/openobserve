@@ -384,30 +384,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-input>
             </template>
 
-            <!-- Elasticsearch Metadata Fields -->
-            <template v-if="formData.destination_type === 'elasticsearch'">
-              <q-input
-                data-test="add-destination-metadata-index-input"
-                v-model="formData.metadata!._index"
-                :label="'Index *'"
-                :placeholder="'Enter index name (e.g., logs-prod)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[
-                  (val: any) =>
-                    !!val?.trim() || 'Index is required for Elasticsearch',
-                ]"
-                tabindex="0"
-              >
-                <template v-slot:hint>
-                  Elasticsearch index name for routing documents
-                </template>
-              </q-input>
-            </template>
-
             <!-- Datadog Metadata Fields -->
             <template v-if="formData.destination_type === 'datadog'">
               <q-input
@@ -1073,9 +1049,7 @@ const defaultUrlEndpoint = computed(() => {
 
 // Show metadata fields for specific destination types
 const showMetadataFields = computed(() => {
-  return ["splunk", "elasticsearch", "datadog"].includes(
-    formData.value.destination_type,
-  );
+  return ["splunk", "datadog"].includes(formData.value.destination_type);
 });
 
 // Watch to ensure metadata is initialized when needed
@@ -1129,12 +1103,11 @@ const canProceedStep2 = computed(() => {
   }
 
   if (formData.value.destination_type === "elasticsearch") {
-    // Validate both esbulk_index (for backward compatibility) and metadata._index
-    const hasEsbulkIndex =
+    // Validate esbulk_index is set
+    return !!(
       formData.value.output_format === "esbulk" &&
-      formData.value.esbulk_index?.trim();
-    const hasMetadataIndex = !!formData.value.metadata?._index?.trim();
-    return hasEsbulkIndex && hasMetadataIndex;
+      formData.value.esbulk_index?.trim()
+    );
   }
 
   if (formData.value.destination_type === "datadog") {
