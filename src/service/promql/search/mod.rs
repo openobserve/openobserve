@@ -102,7 +102,7 @@ async fn search_in_cluster(
     let cache_disabled =
         !cfg.common.metrics_cache_enabled || !req.use_cache || start == end || step == 0;
     // adjust start and end time
-    let (start, end) = adjust_start_end(start, end, step, cache_disabled);
+    let (start, end) = adjust_start_end(start, end, step);
 
     log::info!(
         "[trace_id {trace_id}] promql->search->start: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}",

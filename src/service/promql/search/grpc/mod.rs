@@ -186,7 +186,6 @@ pub async fn search_inner(
     req: &cluster_rpc::MetricsQueryRequest,
 ) -> Result<(value::Value, String, ScanStats)> {
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
-
     let org_id = &req.org_id;
     let query = req.query.as_ref().unwrap();
     let prom_expr = parser::parse(&query.query).map_err(DataFusionError::Execution)?;

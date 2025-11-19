@@ -510,7 +510,7 @@ mod tests {
         let end = now_micros();
         let start = end - second_micros(3600);
         let step = second_micros(15);
-        let (start, end) = adjust_start_end(start, end, step, false);
+        let (start, end) = adjust_start_end(start, end, step);
 
         // Create test samples
         let mut range_values = vec![RangeValue {
@@ -562,7 +562,7 @@ mod tests {
         let end = now_micros();
         let start = end - second_micros(3600);
         let step = second_micros(15);
-        let (start, end) = adjust_start_end(start, end, step, false);
+        let (start, end) = adjust_start_end(start, end, step);
 
         // Add more than METRICS_INDEX_CACHE_MAX_ITEMS entries
         for i in 0..METRICS_INDEX_CACHE_MAX_ITEMS + 2 {

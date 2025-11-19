@@ -114,14 +114,8 @@ pub fn align_start_end(mut start: i64, mut end: i64, step: i64) -> (i64, i64) {
     (start, end)
 }
 
-pub fn adjust_start_end(start: i64, end: i64, step: i64, disable_cache: bool) -> (i64, i64) {
-    if disable_cache {
-        // Do not adjust start and end values when cache is disabled.
-        return (start, end);
-    }
-
+pub fn adjust_start_end(start: i64, end: i64, step: i64) -> (i64, i64) {
     let points = (end - start) / step + 1;
-
     if points < MIN_TIMESERIES_POINTS_FOR_TIME_ROUNDING {
         // Too small number of points for rounding.
         return (start, end);
