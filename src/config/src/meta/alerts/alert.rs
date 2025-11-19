@@ -28,16 +28,11 @@ use crate::{
     utils::json,
 };
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Clone, Copy, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub enum RowTemplateType {
     Json,
+    #[default]
     String,
-}
-
-impl Default for RowTemplateType {
-    fn default() -> Self {
-        Self::String
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
