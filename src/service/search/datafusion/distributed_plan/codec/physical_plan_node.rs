@@ -36,10 +36,7 @@ use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyEx
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[derive(Debug)]
-pub struct PhysicalPlanNodePhysicalExtensionCodec {
-    #[allow(dead_code)]
-    pub org_id: String,
-}
+pub struct PhysicalPlanNodePhysicalExtensionCodec {}
 
 impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
     fn try_decode(
@@ -63,15 +60,15 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::StreamingAggs(node)) => {
-                super::streaming_aggs_exec::try_decode(node, inputs, registry, &self.org_id)
+                super::streaming_aggs_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::TmpExec(node)) => {
-                super::tmp_exec::try_decode(node, inputs, registry)
+                super::tmp_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::EnrichmentExec(node)) => {
-                super::enrichment_exec::try_decode(node, inputs, registry)
+                super::enrichment_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(not(feature = "enterprise"))]
             Some(_) => {
@@ -130,7 +127,7 @@ mod tests {
         ));
 
         // encode
-        let proto = super::super::get_physical_extension_codec("test".to_string());
+        let proto = super::super::get_physical_extension_codec();
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode

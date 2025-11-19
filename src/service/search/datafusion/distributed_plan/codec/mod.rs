@@ -31,10 +31,10 @@ mod streaming_aggs_exec;
 #[cfg(feature = "enterprise")]
 mod tmp_exec;
 
-pub fn get_physical_extension_codec(org_id: String) -> ComposedPhysicalExtensionCodec {
+pub fn get_physical_extension_codec() -> ComposedPhysicalExtensionCodec {
     ComposedPhysicalExtensionCodec {
         codecs: vec![Arc::new(
-            physical_plan_node::PhysicalPlanNodePhysicalExtensionCodec { org_id },
+            physical_plan_node::PhysicalPlanNodePhysicalExtensionCodec {},
         )],
     }
 }
