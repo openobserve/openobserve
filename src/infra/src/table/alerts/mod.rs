@@ -67,6 +67,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .transpose()?;
         let trigger_frequency_type: intermediate::TriggerFrequencyType =
             value.trigger_frequency_type.try_into()?;
+        let row_template_type: intermediate::RowTemplateType = value.row_template_type.try_into()?;
 
         // Transform database JSON values into intermediate types which can be
         // directly translated into service layer types.
@@ -109,6 +110,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
         alert.destinations = destinations;
         alert.context_attributes = context_attributes;
         alert.row_template = value.row_template.unwrap_or_default();
+        alert.row_template_type = row_template_type.into();
         alert.description = value.description.unwrap_or_default();
         alert.enabled = value.enabled;
         alert.tz_offset = value.tz_offset;
@@ -598,6 +600,7 @@ fn update_mutable_fields(
         .map(serde_json::to_value)
         .transpose()?;
     let row_template = Some(alert.row_template).filter(|s| !s.is_empty());
+    let row_template_type: i16 = intermediate::RowTemplateType::from(alert.row_template_type).into();
     let description = Some(alert.description).filter(|s| !s.is_empty());
     let enabled = alert.enabled;
     let tz_offset = alert.tz_offset;
@@ -679,6 +682,7 @@ fn update_mutable_fields(
     alert_am.destinations = Set(destinations);
     alert_am.context_attributes = Set(context_attributes);
     alert_am.row_template = Set(row_template);
+    alert_am.row_template_type = Set(row_template_type);
     alert_am.description = Set(description);
     alert_am.enabled = Set(enabled);
     alert_am.tz_offset = Set(tz_offset);

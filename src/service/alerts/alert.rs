@@ -1093,11 +1093,18 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     // let resp_body = resp.text().await?;
     let resp_status = 200;
     let resp_body = msg;
+
+    // Parse and pretty print the JSON response body
+    let pretty_body = match serde_json::from_str::<serde_json::Value>(&resp_body) {
+        Ok(json) => serde_json::to_string_pretty(&json).unwrap_or(resp_body.clone()),
+        Err(_) => resp_body.clone(),
+    };
+
     log::info!(
-        "Alert sent to destination {} with status: {}, body: {:?}",
+        "Alert sent to destination {} with status: {}, body:\n{}",
         endpoint.url,
         resp_status,
-        resp_body,
+        pretty_body,
     );
     // if !resp_status.is_success() {
     //     log::error!(
@@ -1530,15 +1537,10 @@ async fn process_dest_template(
         let mut all_json = true;
 
         for v in rows_tpl_val.iter() {
-            if let Value::String(s) = v {
-                // Try to parse the string as JSON
-                match serde_json::from_str::<Value>(s) {
-                    Ok(parsed) => parsed_values.push(parsed),
-                    Err(_) => {
-                        all_json = false;
-                        break;
-                    }
-                }
+            if let Value::String(_) = v {
+                // NO need to parse as json as we should already get the value as json
+                // when the row template type is json.
+                all_json = false;
             } else {
                 // Already a JSON value (object, array, etc.)
                 parsed_values.push(v.clone());
@@ -1550,8 +1552,8 @@ async fn process_dest_template(
             let json_array = Value::Array(parsed_values);
             let json_str = serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
             // Remove the outer brackets to get comma-separated values
-            let json_inner = &json_str[1..json_str.len() - 1];
-            resp = resp.replace("{rows}", json_inner);
+            let json_inner = format!("[{}]", &json_str[1..json_str.len() - 1]);
+            resp = resp.replace("\"{rows}\"", &json_inner);
         } else {
             // Fallback to string behavior
             process_variable_replace(

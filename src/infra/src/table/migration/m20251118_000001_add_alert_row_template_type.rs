@@ -27,9 +27,9 @@ impl MigrationTrait for Migration {
                     .table(Alerts::Table)
                     .add_column_if_not_exists(
                         ColumnDef::new(Alerts::RowTemplateType)
-                            .string_len(10)
+                            .small_integer()
                             .not_null()
-                            .default("String"),
+                            .default(0), // 0 = String, 1 = Json
                     )
                     .to_owned(),
             )
@@ -67,13 +67,13 @@ mod tests {
                 .table(Alerts::Table)
                 .add_column_if_not_exists(
                     ColumnDef::new(Alerts::RowTemplateType)
-                        .string_len(10)
+                        .small_integer()
                         .not_null()
-                        .default("String"),
+                        .default(0),
                 )
                 .to_owned()
                 .to_string(PostgresQueryBuilder),
-            r#"ALTER TABLE "alerts" ADD COLUMN IF NOT EXISTS "row_template_type" varchar(10) NOT NULL DEFAULT 'String'"#
+            r#"ALTER TABLE "alerts" ADD COLUMN IF NOT EXISTS "row_template_type" smallint NOT NULL DEFAULT 0"#
         );
     }
 
@@ -84,13 +84,13 @@ mod tests {
                 .table(Alerts::Table)
                 .add_column_if_not_exists(
                     ColumnDef::new(Alerts::RowTemplateType)
-                        .string_len(10)
+                        .small_integer()
                         .not_null()
-                        .default("String"),
+                        .default(0),
                 )
                 .to_owned()
                 .to_string(MysqlQueryBuilder),
-            r#"ALTER TABLE `alerts` ADD COLUMN IF NOT EXISTS `row_template_type` varchar(10) NOT NULL DEFAULT 'String'"#
+            r#"ALTER TABLE `alerts` ADD COLUMN IF NOT EXISTS `row_template_type` smallint NOT NULL DEFAULT 0"#
         );
     }
 
@@ -103,13 +103,13 @@ mod tests {
                 .table(Alerts::Table)
                 .add_column_if_not_exists(
                     ColumnDef::new(Alerts::RowTemplateType)
-                        .string_len(10)
+                        .small_integer()
                         .not_null()
-                        .default("String"),
+                        .default(0),
                 )
                 .to_owned()
                 .to_string(SqliteQueryBuilder),
-            r#"ALTER TABLE "alerts" ADD COLUMN "row_template_type" varchar(10) NOT NULL DEFAULT 'String'"#
+            r#"ALTER TABLE "alerts" ADD COLUMN "row_template_type" smallint NOT NULL DEFAULT 0"#
         );
     }
 }

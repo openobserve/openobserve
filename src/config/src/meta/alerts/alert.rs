@@ -29,10 +29,11 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+#[repr(i16)]
 pub enum RowTemplateType {
-    Json,
     #[default]
-    String,
+    String = 0,
+    Json = 1,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

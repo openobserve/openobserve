@@ -617,3 +617,56 @@ impl From<StreamType> for MetaStreamType {
         }
     }
 }
+
+/// Row template type. Stored in the DB as a 16-bit integer.
+pub enum RowTemplateType {
+    String,
+    Json,
+}
+
+impl RowTemplateType {
+    const STRING: i16 = 0;
+    const JSON: i16 = 1;
+}
+
+impl From<RowTemplateType> for i16 {
+    fn from(value: RowTemplateType) -> Self {
+        match value {
+            RowTemplateType::String => RowTemplateType::STRING,
+            RowTemplateType::Json => RowTemplateType::JSON,
+        }
+    }
+}
+
+impl TryFrom<i16> for RowTemplateType {
+    type Error = FromI16Error;
+
+    fn try_from(value: i16) -> Result<Self, Self::Error> {
+        match value {
+            Self::STRING => Ok(RowTemplateType::String),
+            Self::JSON => Ok(RowTemplateType::Json),
+            _ => Err(FromI16Error {
+                value,
+                ty: "RowTemplateType".to_owned(),
+            }),
+        }
+    }
+}
+
+impl From<config::meta::alerts::alert::RowTemplateType> for RowTemplateType {
+    fn from(value: config::meta::alerts::alert::RowTemplateType) -> Self {
+        match value {
+            config::meta::alerts::alert::RowTemplateType::String => RowTemplateType::String,
+            config::meta::alerts::alert::RowTemplateType::Json => RowTemplateType::Json,
+        }
+    }
+}
+
+impl From<RowTemplateType> for config::meta::alerts::alert::RowTemplateType {
+    fn from(value: RowTemplateType) -> Self {
+        match value {
+            RowTemplateType::String => config::meta::alerts::alert::RowTemplateType::String,
+            RowTemplateType::Json => config::meta::alerts::alert::RowTemplateType::Json,
+        }
+    }
+}
