@@ -104,6 +104,8 @@ pub struct Endpoint {
     /// Destination type (e.g., "openobserve", "splunk", "elasticsearch", "custom")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination_type: Option<String>,
+    #[serde(default)]
+    pub metadata: HashMap<String, String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
