@@ -298,6 +298,7 @@ mod tests {
             action_id: Some("action_123".to_string()),
             output_format: Some(HTTPOutputFormat::JSON),
             destination_type: Some("custom".to_string()),
+            metadata: HashMap::new(),
         };
 
         assert_eq!(endpoint.url, "https://api.example.com");
@@ -376,6 +377,7 @@ mod tests {
             action_id: None,
             output_format: None,
             destination_type: Some("openobserve".to_string()),
+            metadata: HashMap::new(),
         };
 
         let dest_type = DestinationType::Http(endpoint.clone());
@@ -435,6 +437,7 @@ mod tests {
             action_id: None,
             output_format: None,
             destination_type: Some("splunk".to_string()),
+            metadata: HashMap::new(),
         };
 
         let module = Module::Pipeline {
