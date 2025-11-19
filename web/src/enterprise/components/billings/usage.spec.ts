@@ -308,7 +308,7 @@ describe("Usage Component", () => {
       search: "5.25",
       functions: "2.75",
       pipeline: "0.00",
-      remotepipeline: "0.00"
+      remotepipeline: "0.00",
       dataretention: "0.00"
     });
   });
