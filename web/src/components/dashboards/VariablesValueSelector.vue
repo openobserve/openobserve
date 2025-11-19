@@ -1839,6 +1839,17 @@ export default defineComponent({
       // Update the old variables data
       oldVariablesData[currentVariable.name] = currentVariable.value;
 
+      // IMPORTANT: For lazy-loaded variable levels (tab/panel), don't automatically cascade changes
+      // from user interactions. Initial value setting happens through finalizePartialVariableLoading,
+      // not through this function. This function (onVariablesValueUpdated) is ONLY called when user
+      // changes values through the UI. For lazy-loaded variables, we only emit the change for URL sync
+      // and warning display. Child variables will be reloaded when user clicks refresh.
+      if (props.lazyLoad) {
+        // Just emit the change without cascading to child variables
+        emitVariablesData();
+        return;
+      }
+
       // Get all affected variables recursively
       const getAllAffectedVariables = (
         varName: string,

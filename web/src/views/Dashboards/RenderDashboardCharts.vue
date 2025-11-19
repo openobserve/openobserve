@@ -997,11 +997,32 @@ export default defineComponent({
         return;
       }
 
-      // Also update the main variablesData
-      variablesData.value = {
-        ...variablesData.value,
-        ...data,
-      };
+      // Update the main variablesData by merging values arrays intelligently
+      // We need to preserve variables from other contexts (other tabs, panels, global)
+      if (variablesData.value && data?.values) {
+        // Create a map of existing variables by name for quick lookup
+        const existingVariablesMap = new Map(
+          (variablesData.value.values || []).map((v: any) => [v.name, v])
+        );
+
+        // Update or add variables from the current data
+        data.values.forEach((newVar: any) => {
+          existingVariablesMap.set(newVar.name, newVar);
+        });
+
+        // Reconstruct the variablesData with merged values
+        variablesData.value = {
+          ...variablesData.value,
+          ...data,
+          values: Array.from(existingVariablesMap.values()),
+        };
+      } else {
+        // Fallback to simple merge if structure is unexpected
+        variablesData.value = {
+          ...variablesData.value,
+          ...data,
+        };
+      }
 
       // Mark tab variables as ready and trigger panel loads ONLY on first load
       if (isFirstLoad) {
@@ -1082,15 +1103,45 @@ export default defineComponent({
         }
         lastPanelValues.value[panelId] = { ...currentPanelValues };
 
+        // IMPORTANT: Only update currentVariablesDataRef on initial load
+        // For subsequent changes, wait for user to click refresh
+        if (isFirstLoad) {
+          // This triggers the panel to fetch data with new variable values
+          currentVariablesDataRef.value[panelId] = data;
+        }
+        // For non-initial changes: variables are updated in mergedVariablesValues (for URL sync and warning),
+        // but currentVariablesDataRef is NOT updated, so panels won't re-fetch until refresh is clicked
+
       } else {
         return;
       }
 
-      // Also update the main variablesData
-      variablesData.value = {
-        ...variablesData.value,
-        ...data,
-      };
+      // Update the main variablesData by merging values arrays intelligently
+      // We need to preserve variables from other contexts (other panels, tabs, global)
+      if (variablesData.value && data?.values) {
+        // Create a map of existing variables by name for quick lookup
+        const existingVariablesMap = new Map(
+          (variablesData.value.values || []).map((v: any) => [v.name, v])
+        );
+
+        // Update or add variables from the current data
+        data.values.forEach((newVar: any) => {
+          existingVariablesMap.set(newVar.name, newVar);
+        });
+
+        // Reconstruct the variablesData with merged values
+        variablesData.value = {
+          ...variablesData.value,
+          ...data,
+          values: Array.from(existingVariablesMap.values()),
+        };
+      } else {
+        // Fallback to simple merge if structure is unexpected
+        variablesData.value = {
+          ...variablesData.value,
+          ...data,
+        };
+      }
 
     };
 
