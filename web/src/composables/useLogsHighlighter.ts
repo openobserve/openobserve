@@ -59,23 +59,23 @@ export function useLogsHighlighter() {
       chunks.push(hits.slice(i, i + chunkSize));
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
     // Process each chunk with await to prevent blocking
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
       const chunk = chunks[chunkIndex];
+      const batchUpdates: { [key: string]: string } = {};
 
       // Process chunk items - one hit at a time
       for (let itemIndex = 0; itemIndex < chunk.length; itemIndex++) {
         const hit = chunk[itemIndex];
+
         const rowIndex = chunkIndex * chunkSize + itemIndex;
 
         // Process all columns for this hit
         for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
           const cacheKey = `${columns[columnIndex].id}_${rowIndex}`;
 
-          await new Promise((resolve) => setTimeout(resolve, 0));
+          if (processedResults.value[cacheKey]) return;
+
           // Process the hit data
           const processedHtml = colorizedJson({
             data:
@@ -99,12 +99,16 @@ export function useLogsHighlighter() {
             queryString,
           });
 
-          processedResults.value[cacheKey] = processedHtml;
+          batchUpdates[cacheKey] = processedHtml;
         }
       }
 
-      // Yield to browser between chunks to keep UI responsive
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      processedResults.value = {
+        ...processedResults.value,
+        ...batchUpdates,
+      };
+
+      await new Promise((resolve) => setTimeout(resolve, 200));
     }
     return processedResults.value;
   }

@@ -355,26 +355,13 @@ name="warning" class="q-mr-xs" />
                     @send-to-ai-chat="sendToAiChat"
                   />
                 </template>
-                <LogsHighLighting
-                  :data="
-                    cell.column.columnDef.id === 'source'
-                      ? cell.row.original
-                      : cell.renderValue()
+                <span
+                  v-if="
+                    processedResults[`${cell.column.id}_${virtualRow.index}`]
                   "
-                  :show-braces="cell.column.columnDef.id === 'source'"
-                  :show-quotes="
-                    cell.column.columnDef.id === 'source'
-                  "
-                  :query-string="highlightQuery"
-                  :simple-mode="
-                    !(
-                      cell.column.columnDef.id === 'source' ||
-                      isFTSColumn(
-                        cell.column.columnDef.id,
-                        cell.renderValue(),
-                        selectedStreamFtsKeys,
-                      )
-                    )
+                  :key="`${cell.column.id}_${virtualRow.index}`"
+                  v-html="
+                    processedResults[`${cell.column.id}_${virtualRow.index}`]
                   "
                 />
                 <span v-else>
@@ -408,6 +395,7 @@ import {
   onMounted,
   onBeforeUnmount,
   ComputedRef,
+  defineExpose,
 } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import HighLight from "@/components/HighLight.vue";
@@ -554,13 +542,13 @@ watch(
 
     await nextTick();
 
-    if(props.columns?.length && tableRows.value?.length && !Object.keys(processedResults.value).length) {
+    if (props.columns?.length && tableRows.value?.length) {
       processHitsInChunks(
         tableRows.value,
         props.columns,
         true,
         props.highlightQuery,
-        50,
+        200,
         selectedStreamFtsKeys.value
       );
     }
@@ -579,16 +567,14 @@ watch(
     if (newVal) tableRows.value = [...newVal];
 
     await nextTick();
-    await nextTick();
 
-
-    if(props.columns?.length && tableRows.value?.length) {
+    if (props.columns?.length && tableRows.value?.length) {
       processHitsInChunks(
         tableRows.value,
         props.columns,
-        true,
+        false,
         props.highlightQuery,
-        50,
+        100,
         selectedStreamFtsKeys.value
       );
     }
@@ -1018,6 +1004,7 @@ defineExpose({
   sendToAiChat,
   store,
   selectedStreamFtsKeys,
+  processedResults,
 });
 </script>
 <style>
