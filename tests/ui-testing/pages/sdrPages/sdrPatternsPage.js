@@ -25,6 +25,11 @@ export class SDRPatternsPage {
     this.saveButton = page.locator('[data-test="add-regex-pattern-save-btn"]');
     this.cancelButton = page.getByRole('button', { name: /^cancel$/i });
 
+    // Import Dialog Elements
+    this.importDialogTitle = page.getByText('Import Pattern');
+    this.builtInPatternSearch = page.locator('[data-test="built-in-pattern-search"]');
+    this.importJsonButton = page.locator('[data-test="regex-pattern-import-json-btn"]');
+
     // Messages
     this.successMessage = (text) => page.getByText(text);
     this.errorMessage = (text) => page.getByText(text);
@@ -386,6 +391,116 @@ export class SDRPatternsPage {
       testLogger.warn(`✗ Pattern ${patternName} still exists after deletion attempt`);
       return { success: false, reason: 'unknown', associations: [] };
     }
+  }
+
+  // ===== Import Dialog Methods =====
+
+  async verifyImportDialogOpen() {
+    testLogger.info('Verifying import dialog is open');
+    await expect(this.importDialogTitle).toBeVisible();
+  }
+
+  async searchBuiltInPatterns(searchTerm) {
+    testLogger.info(`Searching for built-in patterns: ${searchTerm}`);
+    await this.builtInPatternSearch.click();
+    await this.builtInPatternSearch.fill(searchTerm);
+    await this.page.waitForTimeout(500);
+  }
+
+  async clearBuiltInPatternSearch() {
+    testLogger.info('Clearing built-in pattern search');
+    await this.builtInPatternSearch.clear();
+    await this.page.waitForTimeout(500);
+  }
+
+  async selectPatternCheckbox(checkboxIndex) {
+    testLogger.info(`Selecting pattern checkbox: ${checkboxIndex}`);
+    await this.page.locator(`[data-test="pattern-checkbox-${checkboxIndex}"]`).click();
+  }
+
+  async selectPatternCheckboxes(checkboxIndices) {
+    testLogger.info(`Selecting pattern checkboxes: ${checkboxIndices.join(', ')}`);
+    for (const index of checkboxIndices) {
+      await this.page.locator(`[data-test="pattern-checkbox-${index}"]`).click();
+    }
+  }
+
+  async isPatternCheckboxChecked(checkboxIndex) {
+    const isChecked = await this.page.locator(`[data-test="pattern-checkbox-${checkboxIndex}"]`).isChecked();
+    testLogger.info(`Pattern checkbox ${checkboxIndex} checked: ${isChecked}`);
+    return isChecked;
+  }
+
+  async clickImportJsonButton() {
+    testLogger.info('Clicking import JSON button');
+    await this.importJsonButton.click();
+    await this.page.waitForTimeout(1500);
+  }
+
+  async verifyImportSuccess() {
+    testLogger.info('Verifying import success message');
+    const importSuccess = await this.page.getByText(/Successfully imported|imported successfully/i).isVisible({ timeout: 3000 }).catch(() => false);
+
+    if (importSuccess) {
+      testLogger.info('✓ Import successful');
+    } else {
+      testLogger.warn('⚠ Import success message not visible');
+    }
+
+    return importSuccess;
+  }
+
+  async importBuiltInPatterns(checkboxIndices) {
+    testLogger.info(`Importing built-in patterns: ${checkboxIndices.join(', ')}`);
+
+    await this.clickImport();
+    await this.page.waitForTimeout(500);
+    await this.verifyImportDialogOpen();
+
+    await this.selectPatternCheckboxes(checkboxIndices);
+    await this.clickImportJsonButton();
+
+    return await this.verifyImportSuccess();
+  }
+
+  async searchAndImportBuiltInPatterns(searchTerm, checkboxIndices) {
+    testLogger.info(`Searching for '${searchTerm}' and importing patterns: ${checkboxIndices.join(', ')}`);
+
+    await this.clickImport();
+    await this.page.waitForTimeout(500);
+    await this.verifyImportDialogOpen();
+
+    await this.searchBuiltInPatterns(searchTerm);
+    await this.selectPatternCheckboxes(checkboxIndices);
+    await this.clickImportJsonButton();
+
+    return await this.verifyImportSuccess();
+  }
+
+  async verifyPatternVisibleInList(patternName, exact = true) {
+    testLogger.info(`Verifying pattern visible in list: ${patternName}`);
+    const isVisible = await this.page.getByText(patternName, { exact }).isVisible({ timeout: 3000 }).catch(() => false);
+
+    if (isVisible) {
+      testLogger.info(`✓ Pattern '${patternName}' is visible`);
+    } else {
+      testLogger.warn(`⚠ Pattern '${patternName}' is not visible`);
+    }
+
+    return isVisible;
+  }
+
+  async verifyPatternNotVisibleInList(patternName, exact = true) {
+    testLogger.info(`Verifying pattern NOT visible in list: ${patternName}`);
+    const isVisible = await this.page.getByText(patternName, { exact }).isVisible({ timeout: 2000 }).catch(() => false);
+
+    if (!isVisible) {
+      testLogger.info(`✓ Pattern '${patternName}' is not visible (as expected)`);
+    } else {
+      testLogger.warn(`⚠ Pattern '${patternName}' is still visible`);
+    }
+
+    return !isVisible;
   }
 
   async createPatternWithDeleteIfExists(name, description, pattern, streamAssociationPage = null) {
