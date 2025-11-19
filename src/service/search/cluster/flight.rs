@@ -815,7 +815,7 @@ impl SearchContextBuilder {
         let analyzer_rules = generate_analyzer_rules(sql);
         let optimizer_rules = generate_optimizer_rules(sql);
         let physical_optimizer_rules = generate_physical_optimizer_rules(req, sql, self.contexts);
-        let mut ctx = DataFusionContextBuilder::new()
+        let ctx = DataFusionContextBuilder::new()
             .trace_id(&req.trace_id)
             .work_group(req.work_group.clone())
             .analyzer_rules(analyzer_rules)
@@ -827,7 +827,7 @@ impl SearchContextBuilder {
 
         // register udf
         register_udf(&ctx, &req.org_id)?;
-        datafusion_functions_json::register_all(&mut ctx)?;
+        // datafusion_functions_json::register_all(&mut ctx)?;
 
         Ok(ctx)
     }

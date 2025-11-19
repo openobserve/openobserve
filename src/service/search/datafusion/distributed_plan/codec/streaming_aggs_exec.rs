@@ -43,7 +43,7 @@ pub(crate) fn try_decode(
     // we can remove the org_id
     let mut ctx = SessionContext::new();
     register_udf(&ctx, org_id)?;
-    datafusion_functions_json::register_all(&mut ctx)?;
+    // datafusion_functions_json::register_all(&mut ctx)?;
     let runtime = RuntimeEnvBuilder::default().build()?;
     let aggregate_plan = aggregate_plan.try_into_physical_plan(&ctx, &runtime, &extension_codec)?;
     let Some(aggregate_plan) = aggregate_plan.as_any().downcast_ref::<AggregateExec>() else {

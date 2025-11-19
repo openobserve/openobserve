@@ -39,7 +39,7 @@ impl Metrics for MetricsQuerier {
         let start = std::time::Instant::now();
         let parent_cx =
             global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(req.metadata())));
-        tracing::Span::current().set_parent(parent_cx);
+        let _ = tracing::Span::current().set_parent(parent_cx);
 
         let req: &MetricsQueryRequest = req.get_ref();
         let org_id = &req.org_id;

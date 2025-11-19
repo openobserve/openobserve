@@ -26,7 +26,7 @@ use object_store::{
     PutOptions, PutPayload, PutResult, Result, WriteMultipart, path::Path,
 };
 use once_cell::sync::Lazy;
-use parquet::file::metadata::ParquetMetaDataReader;
+use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
 
 pub mod accounts;
 mod local;
@@ -267,8 +267,7 @@ async fn get_parquet_metadata(
     .await?;
     let mut buf = [0_u8; parquet::file::FOOTER_SIZE];
     data.copy_to_slice(&mut buf);
-    let metadata_len =
-        ParquetMetaDataReader::decode_footer_tail(&buf).map(|f| f.metadata_length())?;
+    let metadata_len = FooterTail::try_from(buf).map(|f| f.metadata_length())?;
 
     // read metadata
     let data = get_range(

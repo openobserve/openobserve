@@ -80,6 +80,6 @@ pub async fn setup_tracing_with_trace_id(trace_id: &str, span: tracing::Span) ->
     );
     headers.insert("traceparent".to_string(), traceparent);
     let parent_ctx = opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
-    span.set_parent(parent_ctx);
+    let _ = span.set_parent(parent_ctx);
     span
 }

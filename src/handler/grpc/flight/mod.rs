@@ -84,7 +84,7 @@ impl FlightService for FlightServiceImpl {
             prop.extract(&MetadataMap(request.metadata()))
         });
         let span = tracing::info_span!("grpc:search:flight:do_get");
-        span.set_parent(parent_cx);
+        let _ = span.set_parent(parent_cx);
 
         // decode ticket to RemoteExecNode
         let ticket = request.into_inner();

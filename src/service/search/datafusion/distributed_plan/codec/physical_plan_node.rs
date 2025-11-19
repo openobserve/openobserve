@@ -18,7 +18,7 @@ use std::sync::Arc;
 use datafusion::{
     common::{Result, internal_err},
     error::DataFusionError,
-    execution::FunctionRegistry,
+    execution::TaskContext,
     physical_plan::ExecutionPlan,
 };
 use datafusion_proto::physical_plan::PhysicalExtensionCodec;
@@ -46,7 +46,7 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         &self,
         buf: &[u8],
         inputs: &[Arc<dyn ExecutionPlan>],
-        registry: &dyn FunctionRegistry,
+        ctx: &TaskContext,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let proto = cluster_rpc::PhysicalPlanNode::decode(buf).map_err(|e| {
             DataFusionError::Internal(format!(
@@ -55,11 +55,11 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         })?;
         match proto.plan {
             Some(cluster_rpc::physical_plan_node::Plan::EmptyExec(node)) => {
-                super::empty_exec::try_decode(node, inputs, registry)
+                super::empty_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::AggregateTopk(node)) => {
-                super::aggregate_topk_exec::try_decode(node, inputs, registry)
+                super::aggregate_topk_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::StreamingAggs(node)) => {
@@ -135,7 +135,8 @@ mod tests {
 
         // decode
         let ctx = datafusion::prelude::SessionContext::new();
-        let plan2 = physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx, &proto)?;
+        let plan2 =
+            physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.as_any().downcast_ref::<NewEmptyExec>().unwrap();
         let plan = plan.as_any().downcast_ref::<NewEmptyExec>().unwrap();
 

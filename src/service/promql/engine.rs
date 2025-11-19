@@ -1148,7 +1148,7 @@ async fn selector_load_data_from_datafusion(
 
     // check if exemplars field is exists
     if query_exemplars {
-        let schema: Schema = df_group.schema().into();
+        let schema = df_group.schema().as_arrow();
         if schema.field_with_name(EXEMPLARS_LABEL).is_err() {
             return Ok(HashMap::default());
         }

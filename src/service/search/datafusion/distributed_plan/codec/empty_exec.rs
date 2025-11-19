@@ -18,7 +18,7 @@ use std::sync::Arc;
 use datafusion::{
     common::{Result, internal_err},
     error::DataFusionError,
-    execution::FunctionRegistry,
+    execution::TaskContext,
     physical_plan::ExecutionPlan,
 };
 use datafusion_proto::{
@@ -36,7 +36,7 @@ use super::super::empty_exec::NewEmptyExec;
 pub(crate) fn try_decode(
     node: cluster_rpc::NewEmptyExecNode,
     _inputs: &[Arc<dyn ExecutionPlan>],
-    registry: &dyn FunctionRegistry,
+    ctx: &TaskContext,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     let schema = Arc::new(convert_required!(node.schema)?);
     let full_schema = Arc::new(convert_required!(node.full_schema)?);
@@ -44,7 +44,7 @@ pub(crate) fn try_decode(
     let filters = node
         .filters
         .iter()
-        .map(|v| parse_expr(v, registry, &extension_codec))
+        .map(|v| parse_expr(v, ctx, &extension_codec))
         .collect::<Result<Vec<_>, _>>()?;
     let projection = if node.projection.is_empty() {
         None
@@ -124,7 +124,8 @@ mod tests {
 
         // decode
         let ctx = datafusion::prelude::SessionContext::new();
-        let plan2 = physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx, &proto)?;
+        let plan2 =
+            physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.as_any().downcast_ref::<NewEmptyExec>().unwrap();
         let plan = plan.as_any().downcast_ref::<NewEmptyExec>().unwrap();
 

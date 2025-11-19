@@ -83,6 +83,7 @@ mod tests {
         let plan = Arc::new(AnalyzeExec::new(
             false,
             false,
+            vec![],
             Arc::new(EmptyExec::new(get_schema())),
             get_schema(),
         ));
