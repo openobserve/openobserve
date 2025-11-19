@@ -1359,20 +1359,30 @@ mod tests {
         }
 
         let mut matrix = Value::Matrix(vec![
-            RangeValue::new(vec![], vec![Sample::new(1000, 1.0), Sample::new(2000, 1.0)]), /* sum = 2.0 */
-            RangeValue::new(vec![], vec![Sample::new(1000, 2.0), Sample::new(2000, 3.0)]), /* sum = 5.0 */
-            RangeValue::new(vec![], vec![Sample::new(1000, 1.5), Sample::new(2000, 1.5)]), /* sum = 3.0 */
+            RangeValue::new(
+                vec![Arc::new(Label::new("k1", "v1"))],
+                vec![Sample::new(1000, 1.0), Sample::new(2000, 1.0)],
+            ), // sum = 2.0
+            RangeValue::new(
+                vec![Arc::new(Label::new("k1", "v3"))],
+                vec![Sample::new(1000, 2.0), Sample::new(2000, 3.0)],
+            ), // sum = 5.0
+            RangeValue::new(
+                vec![Arc::new(Label::new("k1", "v2"))],
+                vec![Sample::new(1000, 1.5), Sample::new(2000, 1.5)],
+            ), // sum = 3.0
         ]);
 
+        // we sort by alphabetical order of labels
         matrix.sort();
 
         if let Value::Matrix(ref m) = matrix {
             let sum0: f64 = m[0].samples.iter().map(|s| s.value).sum();
             let sum1: f64 = m[1].samples.iter().map(|s| s.value).sum();
             let sum2: f64 = m[2].samples.iter().map(|s| s.value).sum();
-            assert_eq!(sum0, 5.0); // Highest sum first
+            assert_eq!(sum0, 2.0);
             assert_eq!(sum1, 3.0);
-            assert_eq!(sum2, 2.0); // Lowest sum last
+            assert_eq!(sum2, 5.0);
         }
     }
 
