@@ -559,7 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-px-6 tw-py-4 tw-border-b tw-flex tw-items-center tw-justify-between">
           <div class="tw-flex tw-items-center">
             <q-icon name="info" size="24px" class="tw-mr-2" />
-            <h6 class="tw-text-lg tw-font-semibold tw-m-0">Alert Details</h6>
+            <h6 class="tw-text-lg tw-font-semibold tw-m-0">{{ t('alert_list.alert_details') }}</h6>
           </div>
           <q-btn
             flat

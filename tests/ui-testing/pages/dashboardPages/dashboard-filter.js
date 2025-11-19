@@ -70,17 +70,59 @@ export default class DashboardFilter {
           : this.page.locator('[data-test="common-auto-complete"]').last();
 
       await valueInput.waitFor({ state: "visible", timeout: 10000 });
-      // await expect(valueInput).toBeVisible({ timeout: 10000 });
       await valueInput.click();
       await valueInput.fill(value);
 
-      const suggestion = this.page
-        .locator('[data-test="common-auto-complete-option"]')
-        .first();
-      // await expect(suggestion).toBeVisible({ timeout: 10000 });
-      await suggestion.waitFor({ state: "visible", timeout: 10000 });
+      // Retry logic for clicking autocomplete suggestion
+      const maxRetries = 5;
+      let clicked = false;
 
-      await suggestion.click();
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          // Get a fresh reference to the suggestion each time
+          const suggestion = this.page
+            .locator('[data-test="common-auto-complete-option"]')
+            .first();
+
+          // Wait for suggestion to appear
+          await suggestion.waitFor({ state: "visible", timeout: 10000 });
+
+          // Wait for element to be attached and stable
+          await suggestion.waitFor({ state: "attached", timeout: 3000 });
+
+          // Check if still visible
+          const isVisible = await suggestion.isVisible();
+          if (!isVisible) {
+            throw new Error('Element not visible');
+          }
+
+          // Try to click
+          await suggestion.click({ timeout: 3000 });
+
+          clicked = true;
+          break;
+
+        } catch (error) {
+          const isRetryable =
+            error.message.includes('detached') ||
+            error.message.includes('not visible') ||
+            error.message.includes('not found') ||
+            error.message.includes('Target closed');
+
+          if (isRetryable && attempt < maxRetries) {
+            // Wait progressively longer between retries
+            await this.page.waitForTimeout(150 * attempt);
+            continue;
+          }
+
+          // Last attempt failed or non-retryable error
+          throw new Error(`Failed to click autocomplete after ${attempt} attempts: ${error.message}`);
+        }
+      }
+
+      if (!clicked) {
+        throw new Error(`Failed to click autocomplete suggestion after ${maxRetries} retries`);
+      }
     } else if (operator && (newFieldName || initialFieldName)) {
       const selectedField = newFieldName || initialFieldName;
       const expectedError = `Filter: ${selectedField}: Condition value required`;
