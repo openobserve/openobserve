@@ -259,22 +259,30 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .service(users::get_auth),
     );
 
-    svc.service(
-        web::scope("/node")
+    {
+        let mut node_scope = web::scope("/node")
             .wrap(HttpAuthentication::with_fn(
                 super::auth::validator::oo_validator,
             ))
             .wrap(cors.clone())
             .service(status::cache_status)
             .service(status::enable_node)
-            .service(status::flush_node)
-            .service(status::drain_status)
+            .service(status::flush_node);
+
+        #[cfg(feature = "enterprise")]
+        {
+            node_scope = node_scope.service(status::drain_status);
+        }
+
+        node_scope = node_scope
             .service(status::list_node)
             .service(status::node_metrics)
             .service(status::consistent_hash)
             .service(status::refresh_nodes_list)
-            .service(status::refresh_user_sessions),
-    );
+            .service(status::refresh_user_sessions);
+
+        svc.service(node_scope);
+    }
 
     if get_config().common.swagger_enabled {
         svc.service(
@@ -338,6 +346,7 @@ pub fn get_config_routes(svc: &mut web::ServiceConfig) {
             .wrap(cors.clone())
             .service(status::zo_config)
             .service(status::logout)
+            .service(status::config_runtime)
             .service(web::scope("/reload").service(status::config_reload)),
     );
 }
@@ -354,6 +363,7 @@ pub fn get_config_routes(svc: &mut web::ServiceConfig) {
             .service(status::refresh_token_with_dex)
             .service(status::logout)
             .service(users::service_accounts::exchange_token)
+            .service(status::config_runtime)
             .service(web::scope("/reload").service(status::config_reload)),
     );
 }

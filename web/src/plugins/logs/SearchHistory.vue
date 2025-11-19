@@ -19,7 +19,7 @@
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div class="text-h6 tw-font-[600]" data-test="add-alert-title">Search History</div>
+        <div class="text-h6 tw-font-[600]" data-test="add-alert-title">{{ t('search_history.title') }}</div>
       </div>
       <div class="tw-flex tw-items-center q-pr-md">
         <div>
@@ -55,7 +55,7 @@
 
         <div>
           <q-btn
-            label="Get History"
+            :label=" t('search_history.get_history')"
             flat
             @click="fetchSearchHistory"
             class="q-ml-md o2-primary-button tw-h-[36px]"
@@ -209,7 +209,7 @@
           <template #bottom="scope">
             <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
             <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[150px] tw-mr-md">
-              {{ resultTotal }} Results
+              {{ resultTotal }} {{ t('search_history.results') }}
             </div>
             <div class="tw-ml-auto tw-mr-2">Max Limit : <b>1000</b></div>
             <q-separator
@@ -362,9 +362,8 @@ export default defineComponent({
       // Define the desired column order and names
       const desiredColumns = [
         { key: "#", label: "#" },
-        { key: "executed_time", label: "Executed At" },
-
-        { key: "sql", label: "SQL Query" },
+        { key: "executed_time", label: t('search_history.executed_at') },
+        { key: "sql", label: t('search_history.sql_query') },
       ];
       let aligin = "left";
 
