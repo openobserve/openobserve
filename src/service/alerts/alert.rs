@@ -1088,34 +1088,27 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         req = req.header("Content-type", "application/json");
     }
 
-    // let resp = req.body(msg.clone()).send().await?;
-    // let resp_status = resp.status();
-    // let resp_body = resp.text().await?;
-    let resp_status = 200;
-    let resp_body = msg;
+    let resp = req.body(msg.clone()).send().await?;
+    let resp_status = resp.status();
+    let resp_body = resp.text().await?;
 
-    // Parse and pretty print the JSON response body
-    let pretty_body = match serde_json::from_str::<serde_json::Value>(&resp_body) {
-        Ok(json) => serde_json::to_string_pretty(&json).unwrap_or(resp_body.clone()),
-        Err(_) => resp_body.clone(),
-    };
-
-    log::info!(
+    log::debug!(
         "Alert sent to destination {} with status: {}, body:\n{}",
         endpoint.url,
         resp_status,
-        pretty_body,
+        resp_body,
     );
-    // if !resp_status.is_success() {
-    //     log::error!(
-    //         "Alert http notification failed with status: {resp_status}, body: {resp_body},
-    // payload: {msg}"     );
-    //     return Err(anyhow::anyhow!(
-    //         "sent error status: {}, err: {}",
-    //         resp_status,
-    //         resp_body
-    //     ));
-    // }
+
+    if !resp_status.is_success() {
+        log::error!(
+            "Alert http notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
+        );
+        return Err(anyhow::anyhow!(
+            "sent error status: {}, err: {}",
+            resp_status,
+            resp_body
+        ));
+    }
 
     Ok(format!("sent status: {resp_status}, body: {resp_body}"))
 }
