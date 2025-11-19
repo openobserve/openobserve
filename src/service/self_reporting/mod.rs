@@ -43,6 +43,7 @@ pub mod cloud_events;
 mod ingestion;
 mod queues;
 pub mod search;
+mod triggers_schema;
 
 pub async fn run() {
     #[cfg(not(feature = "enterprise"))]

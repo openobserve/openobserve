@@ -513,6 +513,63 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
 }
 
+fn hide_sensitive_fields(mut value: serde_json::Value) -> serde_json::Value {
+    if let Some(obj) = value.as_object_mut() {
+        for (key, val) in obj.iter_mut() {
+            let key_lower = key.to_lowercase();
+
+            // Simple rule: contains any of these sensitive keywords
+            let is_sensitive = key_lower.contains("password")
+                || key_lower.contains("secret")
+                || key_lower.contains("key")
+                || key_lower.contains("auth")
+                || key_lower.contains("token")
+                || key_lower.contains("credential");
+
+            if is_sensitive {
+                if let Some(s) = val.as_str() {
+                    *val = if s.is_empty() {
+                        serde_json::Value::String("[not set]".to_string())
+                    } else {
+                        serde_json::Value::String("[hidden]".to_string())
+                    };
+                }
+            } else if val.is_object() {
+                *val = hide_sensitive_fields(val.clone());
+            }
+        }
+    }
+    value
+}
+
+#[get("/runtime")]
+pub async fn config_runtime() -> Result<HttpResponse, Error> {
+    let cfg = get_config();
+    let mut config_value = serde_json::to_value(cfg.as_ref())
+        .map_err(|e| Error::other(format!("Failed to serialize config: {e}")))?;
+
+    config_value = hide_sensitive_fields(config_value);
+
+    let mut final_response = serde_json::Map::new();
+    final_response.insert(
+        "_metadata".to_string(),
+        json::json!({
+            "version": config::VERSION,
+            "commit_hash": config::COMMIT_HASH,
+            "build_date": config::BUILD_DATE,
+            "instance_id": get_instance_id(),
+        }),
+    );
+
+    if let Some(config_obj) = config_value.as_object() {
+        for (key, value) in config_obj {
+            final_response.insert(key.clone(), value.clone());
+        }
+    }
+
+    Ok(HttpResponse::Ok().json(final_response))
+}
+
 async fn get_stream_schema_status() -> (usize, usize, usize) {
     let mut stream_num = 0;
     let mut stream_schema_num = 0;
@@ -936,27 +993,33 @@ async fn enable_node(
     };
     node.scheduled = enable;
     if !node.scheduled {
-        log::info!("[NODE] Disabling node, initiating graceful drain");
-
         // release all the searching files
         crate::common::infra::wal::clean_lock_files().await;
 
-        // If this is an ingester node, set draining mode and flush
-        if LOCAL_NODE.is_ingester() {
-            // Set draining flag to trigger immediate S3 upload
-            ingester::set_draining(true);
+        #[cfg(feature = "enterprise")]
+        {
+            log::info!("[NODE] Disabling node, initiating graceful drain");
 
-            // Flush memory to WAL
-            if let Err(e) = ingester::flush_all().await {
-                log::error!("[NODE] Error flushing ingester during disable: {e}");
-                return Ok(MetaHttpResponse::internal_error(e));
+            // If this is an ingester node, set draining mode and flush
+            if LOCAL_NODE.is_ingester() {
+                // Set draining flag to trigger immediate S3 upload
+                o2_enterprise::enterprise::drain::set_draining(true);
+
+                // Flush memory to WAL
+                if let Err(e) = ingester::flush_all().await {
+                    log::error!("[NODE] Error flushing ingester during disable: {e}");
+                    return Ok(MetaHttpResponse::internal_error(e));
+                }
+                log::info!("[NODE] Ingester flushed successfully, S3 upload will be prioritized");
             }
-            log::info!("[NODE] Ingester flushed successfully, S3 upload will be prioritized");
         }
     } else {
-        // Re-enabling the node
-        if LOCAL_NODE.is_ingester() {
-            ingester::set_draining(false);
+        #[cfg(feature = "enterprise")]
+        {
+            // Re-enabling the node
+            if LOCAL_NODE.is_ingester() {
+                o2_enterprise::enterprise::drain::set_draining(false);
+            }
         }
     }
     match cluster::update_local_node(&node).await {
@@ -980,64 +1043,11 @@ async fn flush_node() -> Result<HttpResponse, Error> {
     }
 }
 
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DrainStatusResponse {
-    is_draining: bool,
-    is_ingester: bool,
-    memory_flushed: bool,
-    pending_parquet_files: i64,
-    processing_files: usize,
-    ready_for_shutdown: bool,
-}
-
+#[cfg(feature = "enterprise")]
 #[get("/drain_status")]
 async fn drain_status() -> Result<HttpResponse, Error> {
     let is_ingester = LOCAL_NODE.is_ingester();
-    let is_draining = if is_ingester {
-        ingester::is_draining()
-    } else {
-        false
-    };
-
-    // Get pending parquet files from metrics
-    let pending_parquet_files = if is_ingester {
-        // Read from the INGEST_PARQUET_FILES metric
-        config::metrics::INGEST_PARQUET_FILES
-            .get_metric_with_label_values::<&str>(&[])
-            .map(|m| m.get())
-            .unwrap_or(0)
-    } else {
-        0
-    };
-
-    // For simplicity, we'll consider memory flushed if we're draining
-    // In reality, flush_all() is called synchronously in enable_node
-    let memory_flushed = is_draining;
-
-    // Get count of files currently being processed
-    let processing_files = if is_ingester && is_draining {
-        // This would require accessing PROCESSING_FILES from parquet.rs
-        // For now, we'll use a simpler heuristic
-        0 // TODO: expose PROCESSING_FILES.len()
-    } else {
-        0
-    };
-
-    // Ready for shutdown if:
-    // - Not an ingester, OR
-    // - Is draining AND no pending files AND memory is flushed
-    let ready_for_shutdown = !is_ingester || (is_draining && pending_parquet_files == 0);
-
-    let response = DrainStatusResponse {
-        is_draining,
-        is_ingester,
-        memory_flushed,
-        pending_parquet_files,
-        processing_files,
-        ready_for_shutdown,
-    };
-
+    let response = o2_enterprise::enterprise::drain::get_drain_status(is_ingester);
     Ok(MetaHttpResponse::json(response))
 }
 

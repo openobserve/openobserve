@@ -379,7 +379,8 @@
     "confirmDeleteHead": "Delete Service Account",
     "confirmRefreshMsg": "Are you sure you want to refresh this service account token?",
     "confirmRefreshHead": "Refresh Service Token",
-    "downloadToken": "Download Token"
+    "downloadToken": "Download Token",
+    "token":"Token"
   },
   "iam": {
     "users": "Users",
@@ -1517,5 +1518,76 @@
     "patterns_loaded": "Loaded {count} pattern(s)",
     "failed_to_load": "Failed to load patterns",
     "no_patterns_selected": "Please select at least one pattern"
+  },
+  "search_history":{
+    "title":"Search History",
+    "get_history": "Get History",
+    "executed_at":"Executed At",
+    "sql_query":"SQL Query",
+    "resuls":"Results"
+  },
+  "search_scheduler_job": {
+    "title": "Search Job Scheduler",
+    "get_jobs": "Get Jobs",
+    "user_id": "User ID",
+    "created_at": "Created At",
+    "start_time": "Start Time",
+    "duration": "Duration",
+    "status": "Status",
+    "actions": "Actions",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "restart": "Restart",
+    "explore": "Explore",
+    "status_pending": "Pending",
+    "status_running": "Running",
+    "status_finished": "Finished",
+    "status_cancelled": "Cancelled",
+    "status_unknown": "Unknown",
+    "sql_query": "SQL Query",
+    "function_definition": "Function Definition",
+    "more_details": "More Details",
+    "query_function": "Query / Function",
+    "copy_success": "Copied Successfully!",
+    "copy_error": "Error while copy content.",
+    "results": "Results",
+    "max_limit": "Max Limit",
+    "cancel_job_title": "Cancel Scheduled Search",
+    "cancel_job_message": "Are you sure you want to cancel this scheduled search?",
+    "delete_job_title": "Delete Scheduled Search",
+    "delete_job_message": "Are you sure you want to delete this scheduled search?",
+    "job_cancelled_success": "Search Job has been cancelled successfully",
+    "job_cancel_failed": "Failed to cancel search job",
+    "job_restarted_success": "Search Job has been restarted successfully",
+    "job_restart_failed": "Failed to restart search job",
+    "job_deleted_success": "Search Job has been deleted successfully",
+    "job_delete_failed": "Failed to delete search job",
+    "job_applied_success": "Search Job have been applied successfully",
+    "fetch_failed": "Failed to fetch search history. Please try again later.",
+    "logs": "Logs"
+  },
+  "pipeline_list": {
+    "sql_query": "SQL Query",
+    "export": "Export",
+    "pause": "Pause",
+    "resume": "Resume",
+    "last_error": "Last error",
+    "error_summary": "Error Summary",
+    "node_errors": "Node Errors",
+    "close": "Close",
+    "resume_pipeline_title": "Resume Pipeline Ingestion",
+    "tab_all": "All",
+    "tab_scheduled": "Scheduled",
+    "tab_realtime": "Real-Time",
+    "stream_type": "Stream Type",
+    "frequency": "Frequency",
+    "period": "Period",
+    "cron": "Cron",
+    "type": "Type",
+    "run_pipeline":"Run Pipeline"
+  },
+  "alert_list":{
+    "alert_details":"Alert Details"
   }
+
 }
