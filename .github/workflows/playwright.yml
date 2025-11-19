@@ -327,8 +327,11 @@ jobs:
             # Redirect stderr to /dev/null to avoid capturing npm warnings
             if LAST_FAILED_OUTPUT="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
               # DEBUG: Show what TestDino returned before filtering
-              echo "::notice::DEBUG - Raw TestDino output (first 500 chars):"
-              echo "$LAST_FAILED_OUTPUT" | head -c 500
+              echo "::notice::DEBUG - Raw TestDino output (first 2000 chars):"
+              echo "$LAST_FAILED_OUTPUT" | head -c 2000
+              echo ""
+              echo "::notice::DEBUG - Last 500 chars:"
+              echo "$LAST_FAILED_OUTPUT" | tail -c 500
               echo ""
 
               # Filter out debug lines - extract only the line with actual test file path
