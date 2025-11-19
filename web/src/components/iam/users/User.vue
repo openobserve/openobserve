@@ -898,10 +898,10 @@ export default defineComponent({
         await getOrgMembers();
         updateUserActions();
       } catch (err: any) {
-        if (err?.response?.status !== 403) {
+        if (err.response?.status != 403 || err?.status != 403) {
           $q.notify({
             color: "negative",
-            message: "Error while deleting users",
+            message: err.response?.data?.message || err?.message || "Error while deleting users",
             timeout: 2000,
           });
         }

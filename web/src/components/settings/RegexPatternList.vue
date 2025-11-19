@@ -530,12 +530,15 @@
         selectedPatterns.value = [];
         confirmBulkDelete.value = false;
         await getRegexPatterns();
-      } catch (error) {
-        $q.notify({
-          message: error?.data?.message || "Error while deleting regex patterns",
-          color: "negative",
-          timeout: 2000,
-        });
+      } catch (error: any) {
+        const errorMessage = error?.data?.message || error?.message || "Error while deleting regex patterns";
+        if (error.response?.status != 403 || error?.status != 403) {
+          $q.notify({
+            message: errorMessage,
+            color: "negative",
+            timeout: 2000,
+          });
+        }
       }
     };
 

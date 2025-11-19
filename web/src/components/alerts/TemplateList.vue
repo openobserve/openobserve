@@ -517,12 +517,15 @@ const bulkDeleteTemplates = () => {
       confirmBulkDelete.value = false;
       getTemplates();
     })
-    .catch((err) => {
-      q.notify({
-        type: "negative",
-        message: "Error while deleting templates",
-        timeout: 2000,
-      });
+    .catch((err: any) => {
+      const errorMessage = err.response?.data?.message || err?.message || "Error while deleting templates. Please try again.";
+      if (err.response?.status != 403 || err?.status != 403) {
+        q.notify({
+          type: "negative",
+          message: errorMessage,
+          timeout: 2000,
+        });
+      }
     });
 };</script>
 <style lang=""></style>

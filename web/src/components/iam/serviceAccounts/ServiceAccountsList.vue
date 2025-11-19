@@ -758,10 +758,10 @@ export default defineComponent({
         confirmBulkDelete.value = false;
         await getServiceAccountsUsers();
       } catch (err: any) {
-        if (err?.response?.status !== 403) {
+        if (err.response?.status != 403 || err?.status != 403) {
           $q.notify({
             color: "negative",
-            message: err?.response?.data?.message || "Error while deleting service accounts",
+            message: err?.response?.data?.message || err?.message || "Error while deleting service accounts",
             timeout: 2000,
           });
         }

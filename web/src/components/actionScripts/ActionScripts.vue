@@ -742,11 +742,13 @@ export default defineComponent({
         selectedActionScripts.value = [];
         confirmBulkDelete.value = false;
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
-          message: error?.message || "Error while deleting action scripts",
-          timeout: 2000,
-        });
+        if (error.response?.status != 403 || error?.status != 403) {
+          $q.notify({
+            type: "negative",
+            message: error.response?.data?.message || error?.message || "Error while deleting action scripts",
+            timeout: 2000,
+          });
+        }
         confirmBulkDelete.value = false;
       }
     };

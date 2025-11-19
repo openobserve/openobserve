@@ -594,10 +594,10 @@ export default defineComponent({
           confirmBulkDelete.value = false;
         })
         .catch((err: any) => {
-          if (err.response?.status != 403) {
+          if (err.response?.status != 403 || err?.status != 403) {
             $q.notify({
               color: "negative",
-              message: "Error while deleting enrichment tables.",
+              message: err.response?.data?.message || err?.message || "Error while deleting enrichment tables.",
             });
           }
           confirmBulkDelete.value = false;

@@ -1228,15 +1228,15 @@ const bulkDeletePipelines = async () => {
     updateActiveTab();
   } catch (error: any) {
     dismiss();
-    console.error("Error deleting pipelines:", error);
-
     // Show error message from response if available
-    const errorMessage = error.response?.data?.message || "Error deleting pipelines. Please try again.";
-    q.notify({
-      type: "negative",
-      message: errorMessage,
-      timeout: 3000,
-    });
+    const errorMessage = error.response?.data?.message || error?.message || "Error deleting pipelines. Please try again.";
+    if (error.response?.status != 403 || error?.status != 403) {
+      q.notify({
+        type: "negative",
+        message: errorMessage,
+        timeout: 3000,
+      });
+    }
   }
 
   resetConfirmDialog();

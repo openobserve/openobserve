@@ -351,11 +351,13 @@ const bulkDeleteUserGroups = async () => {
     selectedGroups.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
-    q.notify({
-      message: error?.message || "Error while deleting groups",
-      color: "negative",
-      position: "bottom",
-    });
+    if (error.response?.status != 403 || error?.status != 403) {
+      q.notify({
+        message: error.response?.data?.message || error?.message || "Error while deleting groups",
+        color: "negative",
+        position: "bottom",
+      });
+    }
     confirmBulkDelete.value = false;
   }
 };

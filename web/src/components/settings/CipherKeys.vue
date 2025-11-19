@@ -478,12 +478,14 @@ export default defineComponent({
           confirmBulkDelete.value = false;
           getData();
         })
-        .catch((err) => {
-          $q.notify({
-            type: "negative",
-            message: "Error while deleting cipher keys",
-            timeout: 2000,
-          });
+        .catch((err: any) => {
+          if (err.response?.status != 403 || err?.status != 403) {
+            $q.notify({
+              type: "negative",
+              message: err.response?.data?.message || err?.message || "Error while deleting cipher keys",
+              timeout: 2000,
+            });
+          }
         });
     };
 

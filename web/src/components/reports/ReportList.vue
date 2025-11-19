@@ -678,12 +678,14 @@ const bulkDeleteReports = async () => {
     console.error("Error deleting reports:", error);
 
     // Show error message from response if available
-    const errorMessage = error.response?.data?.message || "Error deleting reports. Please try again.";
-    q.notify({
-      type: "negative",
-      message: errorMessage,
-      timeout: 3000,
-    });
+    const errorMessage = error.response?.data?.message || error?.message || "Error deleting reports. Please try again.";
+    if (error.response?.status != 403 || error?.status != 403) {
+      q.notify({
+        type: "negative",
+        message: errorMessage,
+        timeout: 3000,
+      });
+    }
   }
 
   confirmBulkDelete.value = false;
