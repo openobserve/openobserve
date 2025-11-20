@@ -37,7 +37,6 @@ describe("PatternStatistics", () => {
     wrapper = mount(PatternStatistics, {
       props: {
         statistics: mockStatistics,
-        scanSize: 1000,
       },
       global: {
         provide: { store },
@@ -53,16 +52,16 @@ describe("PatternStatistics", () => {
   });
 
   describe("Statistics Cards", () => {
-    it("should display logs analyzed card with correct value", () => {
-      const logsAnalyzedCard = wrapper.find(
-        '[data-test="pattern-stats-logs-analyzed-card"]',
+    it("should display logs scanned card with correct value", () => {
+      const logsScannedCard = wrapper.find(
+        '[data-test="pattern-stats-logs-scanned-card"]',
       );
-      expect(logsAnalyzedCard.exists()).toBe(true);
+      expect(logsScannedCard.exists()).toBe(true);
 
-      const scanSizeValue = wrapper.find(
-        '[data-test="pattern-stats-scan-size-value"]',
+      const logsScannedValue = wrapper.find(
+        '[data-test="pattern-stats-logs-scanned-value"]',
       );
-      expect(scanSizeValue.text()).toBe("1,000");
+      expect(logsScannedValue.text()).toBe("1,000");
     });
 
     it("should display patterns found card with correct value", () => {
@@ -102,84 +101,11 @@ describe("PatternStatistics", () => {
     });
   });
 
-  describe("Scan Size Edit Functionality", () => {
-    it("should show edit button in view mode", () => {
-      const editButton = wrapper.find(
-        '[data-test="pattern-stats-edit-scan-size-btn"]',
-      );
-      expect(editButton.exists()).toBe(true);
-
-      const displayMode = wrapper.find(
-        '[data-test="pattern-stats-scan-size-display"]',
-      );
-      expect(displayMode.exists()).toBe(true);
-    });
-
-    it("should switch to edit mode when edit button is clicked", async () => {
-      const editButton = wrapper.find(
-        '[data-test="pattern-stats-edit-scan-size-btn"]',
-      );
-      await editButton.trigger("click");
-
-      const editMode = wrapper.find(
-        '[data-test="pattern-stats-scan-size-edit"]',
-      );
-      expect(editMode.exists()).toBe(true);
-
-      const input = wrapper.find(
-        '[data-test="pattern-stats-scan-size-input"]',
-      );
-      expect(input.exists()).toBe(true);
-    });
-
-    it("should emit update event when scan size is changed", async () => {
-      // Click edit button to enter edit mode
-      const editButton = wrapper.find(
-        '[data-test="pattern-stats-edit-scan-size-btn"]',
-      );
-      await editButton.trigger("click");
-      await wrapper.vm.$nextTick();
-
-      // Directly set the localScanSize ref in the component
-      wrapper.vm.localScanSize = 2000;
-      await wrapper.vm.$nextTick();
-
-      // Call updateScanSize method directly
-      wrapper.vm.updateScanSize();
-      await wrapper.vm.$nextTick();
-
-      // Check if update:scanSize event was emitted
-      expect(wrapper.emitted("update:scanSize")).toBeTruthy();
-      expect(wrapper.emitted("update:scanSize")![0]).toEqual([2000]);
-    });
-
-    it("should cancel edit mode on escape key", async () => {
-      // Click edit button
-      const editButton = wrapper.find(
-        '[data-test="pattern-stats-edit-scan-size-btn"]',
-      );
-      await editButton.trigger("click");
-
-      // Find input and press escape
-      const input = wrapper.find(
-        '[data-test="pattern-stats-scan-size-input"]',
-      );
-      await input.trigger("keyup.escape");
-
-      // Should return to view mode
-      await wrapper.vm.$nextTick();
-      const displayMode = wrapper.find(
-        '[data-test="pattern-stats-scan-size-display"]',
-      );
-      expect(displayMode.exists()).toBe(true);
-    });
-  });
 
   describe("Empty Statistics", () => {
     it("should display zero values when statistics are null", async () => {
       await wrapper.setProps({
         statistics: null,
-        scanSize: 500,
       });
 
       const patternsFoundValue = wrapper.find(

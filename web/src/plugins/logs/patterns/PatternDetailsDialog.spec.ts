@@ -128,23 +128,23 @@ describe("PatternDetailsDialog", () => {
     });
   });
 
-  describe("Description Section", () => {
-    it("should display pattern description", () => {
+  describe("Variables Summary Section", () => {
+    it("should display variables summary", () => {
       const text = wrapper.text();
-      expect(text).toContain("Description");
-      expect(text).toContain("User login pattern");
+      expect(text).toContain("Variables");
+      expect(text).toContain("2 variable(s) detected");
     });
 
-    it("should display fallback text when description is not available", async () => {
+    it("should display fallback text when no variables are available", async () => {
       await wrapper.setProps({
         selectedPattern: {
           ...mockSelectedPattern,
-          pattern: { ...mockSelectedPattern.pattern, description: null },
+          pattern: { ...mockSelectedPattern.pattern, examples: [{ variables: {} }] },
         },
       });
 
       const text = wrapper.text();
-      expect(text).toContain("No description available");
+      expect(text).toContain("0 variable(s) detected");
     });
   });
 
@@ -179,7 +179,7 @@ describe("PatternDetailsDialog", () => {
       expect(text).toContain("ip");
     });
 
-    it("should not display variables section when no variables", async () => {
+    it("should not display variables table when no variables", async () => {
       await wrapper.setProps({
         selectedPattern: {
           ...mockSelectedPattern,
@@ -187,8 +187,8 @@ describe("PatternDetailsDialog", () => {
         },
       });
 
-      const text = wrapper.text();
-      expect(text).not.toContain("Variables");
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.exists()).toBe(false);
     });
   });
 
