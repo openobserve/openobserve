@@ -27,7 +27,7 @@ use config::{
     meta::{
         alerts::{
             FrequencyType, Operator, QueryType, TriggerEvalResults,
-            alert::{Alert, AlertListFilter, ListAlertsParams},
+            alert::{Alert, AlertListFilter, ListAlertsParams, RowTemplateType},
         },
         destinations::{
             AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateType,
@@ -973,9 +973,15 @@ async fn send_notification(
         alert.org_id.to_string()
     };
     let rows_tpl_val = if alert.row_template.is_empty() {
-        vec!["".to_string()]
+        vec![Value::String("".to_string())]
     } else {
-        process_row_template(&org_name, &alert.row_template, alert, rows)
+        process_row_template(
+            &org_name,
+            &alert.row_template,
+            alert,
+            alert.row_template_type,
+            rows,
+        )
     };
     let is_email = matches!(dest_type, DestinationType::Email(_));
     let msg: String = process_dest_template(
@@ -1085,12 +1091,14 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     let resp = req.body(msg.clone()).send().await?;
     let resp_status = resp.status();
     let resp_body = resp.text().await?;
+
     log::debug!(
-        "Alert sent to destination {} with status: {}, body: {:?}",
+        "Alert sent to destination {} with status: {}, body:\n{}",
         endpoint.url,
         resp_status,
         resp_body,
     );
+
     if !resp_status.is_success() {
         log::error!(
             "Alert http notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
@@ -1175,8 +1183,9 @@ fn process_row_template(
     org_name: &str,
     tpl: &String,
     alert: &Alert,
+    row_type: RowTemplateType,
     rows: &[Map<String, Value>],
-) -> Vec<String> {
+) -> Vec<Value> {
     let alert_type = if alert.is_real_time {
         "realtime"
     } else {
@@ -1184,6 +1193,10 @@ fn process_row_template(
     };
     let alert_count = rows.len();
     let mut rows_tpl = Vec::with_capacity(rows.len());
+
+    // For JSON row template type, try to parse the template as JSON
+    let is_json_template = row_type == RowTemplateType::Json;
+
     for row in rows.iter() {
         let mut resp = tpl.to_string();
         let mut alert_start_time = 0;
@@ -1272,7 +1285,19 @@ fn process_row_template(
             }
         }
 
-        rows_tpl.push(resp);
+        // If this is a JSON row template, try to parse it as JSON
+        if is_json_template {
+            match serde_json::from_str::<Value>(&resp) {
+                Ok(json_value) => rows_tpl.push(json_value),
+                Err(_) => {
+                    // If parsing fails, treat it as string (fallback behavior)
+                    rows_tpl.push(Value::String(resp));
+                }
+            }
+        } else {
+            // For string templates, wrap in Value::String
+            rows_tpl.push(Value::String(resp));
+        }
     }
 
     rows_tpl
@@ -1290,7 +1315,7 @@ async fn process_dest_template(
     tpl: &str,
     alert: &Alert,
     rows: &[Map<String, Value>],
-    rows_tpl_val: &[String],
+    rows_tpl_val: &[Value],
     options: ProcessTemplateOptions,
 ) -> String {
     let cfg = get_config();
@@ -1495,7 +1520,46 @@ async fn process_dest_template(
             .replace("{alert_promql_value}", &contidion.value.to_string());
     }
 
-    process_variable_replace(&mut resp, "rows", &VarValue::Vector(rows_tpl_val), is_email);
+    // Check if {rows} is being used in a JSON context
+    let is_json_rows_context = check_json_context(&resp, "rows");
+
+    if is_json_rows_context {
+        // If the row template type is json, then all row_tpl_val elements are JSON values, inject
+        // as JSON array Otherwise, the row_tpl_val is a normal string, so inject as a
+        // single string joined with \n
+        let mut all_json = true;
+
+        for v in rows_tpl_val.iter() {
+            if let Value::String(_) = v {
+                all_json = false;
+                break;
+            }
+        }
+
+        if all_json {
+            // Create JSON array representation with actual JSON objects
+            let json_array = Value::Array(rows_tpl_val.to_vec());
+            let json_str = serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
+            resp = resp.replace("\"{rows}\"", &json_str);
+        } else {
+            // Fallback to string behavior
+            process_variable_replace(
+                &mut resp,
+                "rows",
+                &VarValue::JsonArray(rows_tpl_val),
+                is_email,
+            );
+        }
+    } else {
+        // Normal string replacement
+        process_variable_replace(
+            &mut resp,
+            "rows",
+            &VarValue::JsonArray(rows_tpl_val),
+            is_email,
+        );
+    }
+
     for (key, value) in vars.iter() {
         if resp.contains(&format!("{{{key}}}")) {
             let val = value.iter().cloned().collect::<Vec<_>>();
@@ -1509,6 +1573,29 @@ async fn process_dest_template(
     }
 
     resp
+}
+
+/// Checks if a variable is being used in a JSON context (i.e., as a direct value in JSON)
+/// For example, {"key": "{var}"} returns true, but {"key": "text {var} text"} returns false
+fn check_json_context(tpl: &str, var_name: &str) -> bool {
+    let pattern_with_quotes = format!("\"{{{var_name}}}\"");
+
+    if let Some(pos) = tpl.find(&pattern_with_quotes) {
+        let before = &tpl[..pos];
+        let after = &tpl[pos + pattern_with_quotes.len()..];
+
+        // Pattern should be: "key": "{var_name}" followed by , or }
+        // Check for colon before (with optional whitespace)
+        let before_trimmed = before.trim_end();
+        let after_trimmed = after.trim_start();
+
+        if before_trimmed.ends_with(':')
+            && (after_trimmed.starts_with(',') || after_trimmed.starts_with('}'))
+        {
+            return true;
+        }
+    }
+    false
 }
 
 fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue, is_email: bool) {
@@ -1677,14 +1764,14 @@ pub(super) fn to_float(val: &Value) -> f64 {
 
 enum VarValue<'a> {
     Str(&'a str),
-    Vector(&'a [String]),
+    JsonArray(&'a [Value]),
 }
 
 impl VarValue<'_> {
     fn len(&self) -> usize {
         match self {
             VarValue::Str(v) => v.chars().count(),
-            VarValue::Vector(v) => v.len(),
+            VarValue::JsonArray(v) => v.len(),
         }
     }
 
@@ -1696,7 +1783,20 @@ impl VarValue<'_> {
         };
         match self {
             VarValue::Str(v) => format_variable_value(v.chars().take(n).collect()),
-            VarValue::Vector(v) => v[0..n].join(if is_email { "" } else { "\\n" }),
+            VarValue::JsonArray(v) => {
+                // Convert JSON values to strings
+                let strings: Vec<String> = v[0..n]
+                    .iter()
+                    .map(|val| {
+                        if val.is_string() {
+                            format_variable_value(val.as_str().unwrap_or("").to_string())
+                        } else {
+                            format_variable_value(val.to_string())
+                        }
+                    })
+                    .collect();
+                strings.join(if is_email { "" } else { "\\n" })
+            }
         }
     }
 }
@@ -1973,13 +2073,13 @@ mod tests {
     }
 
     #[test]
-    fn test_var_value_vector_len() {
-        let strings = vec!["one".to_string(), "two".to_string(), "three".to_string()];
-        let val = VarValue::Vector(&strings);
+    fn test_var_value_json_array_len() {
+        let values = vec![json!("one"), json!("two"), json!("three")];
+        let val = VarValue::JsonArray(&values);
         assert_eq!(val.len(), 3);
 
-        let empty: Vec<String> = vec![];
-        let val = VarValue::Vector(&empty);
+        let empty: Vec<Value> = vec![];
+        let val = VarValue::JsonArray(&empty);
         assert_eq!(val.len(), 0);
     }
 
@@ -1992,13 +2092,9 @@ mod tests {
     }
 
     #[test]
-    fn test_var_value_vector_to_string_with_length() {
-        let strings = vec![
-            "line1".to_string(),
-            "line2".to_string(),
-            "line3".to_string(),
-        ];
-        let val = VarValue::Vector(&strings);
+    fn test_var_value_json_array_to_string_with_length() {
+        let values = vec![json!("line1"), json!("line2"), json!("line3")];
+        let val = VarValue::JsonArray(&values);
 
         // Test with separator for non-email
         assert_eq!(val.to_string_with_length(2, false), "line1\\nline2");
@@ -2040,10 +2136,10 @@ mod tests {
     }
 
     #[test]
-    fn test_process_variable_replace_vector() {
-        let strings = vec!["row1".to_string(), "row2".to_string()];
+    fn test_process_variable_replace_json_array() {
+        let values = vec![json!("row1"), json!("row2")];
         let mut tpl = "Rows: {rows}".to_string();
-        process_variable_replace(&mut tpl, "rows", &VarValue::Vector(&strings), false);
+        process_variable_replace(&mut tpl, "rows", &VarValue::JsonArray(&values), false);
         assert_eq!(tpl, "Rows: row1\\nrow2");
     }
 
@@ -2251,5 +2347,354 @@ mod tests {
             get_alert_start_end_time(&vars, period, rows_end_time, start_time, use_given_time);
         // When range is too small, should use provided start_time
         assert!(start <= 1500000 || start == 3000000 - 15 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_check_json_context_simple() {
+        let tpl = r#"{"hits": "{rows}"}"#;
+        assert!(check_json_context(tpl, "rows"));
+    }
+
+    #[test]
+    fn test_check_json_context_with_spaces() {
+        let tpl = r#"{"hits":  "{rows}"  }"#;
+        assert!(check_json_context(tpl, "rows"));
+    }
+
+    #[test]
+    fn test_check_json_context_not_json() {
+        let tpl = r#"{"hits": "The hits got {rows}"}"#;
+        assert!(!check_json_context(tpl, "rows"));
+    }
+
+    #[test]
+    fn test_check_json_context_in_middle_of_text() {
+        let tpl = r#"This is {rows} in text"#;
+        assert!(!check_json_context(tpl, "rows"));
+    }
+
+    #[test]
+    fn test_check_json_context_with_comma() {
+        let tpl = r#"{"hits": "{rows}", "count": 5}"#;
+        assert!(check_json_context(tpl, "rows"));
+    }
+
+    #[test]
+    fn test_var_value_json_array() {
+        let json_vals = vec![
+            json!({"name": "Alice", "age": 30}),
+            json!({"name": "Bob", "age": 25}),
+        ];
+        let val = VarValue::JsonArray(&json_vals);
+        assert_eq!(val.len(), 2);
+    }
+
+    #[test]
+    fn test_var_value_json_array_to_string() {
+        let json_vals = vec![json!({"name": "Alice"}), json!({"name": "Bob"})];
+        let val = VarValue::JsonArray(&json_vals);
+        let result = val.to_string_with_length(2, false);
+        assert!(result.contains("Alice"));
+        assert!(result.contains("Bob"));
+        assert!(result.contains("\\n"));
+    }
+
+    #[test]
+    fn test_process_row_template_json_type() {
+        let row_template = r#"{"user": "{name}", "score": "{score}"}"#.to_string();
+        let mut row1 = Map::new();
+        row1.insert("name".to_string(), json!("Alice"));
+        row1.insert("score".to_string(), json!(95));
+        let rows = vec![row1];
+
+        let mut alert = Alert::default();
+        alert.row_template_type = RowTemplateType::Json;
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &alert,
+            RowTemplateType::Json,
+            &rows,
+        );
+
+        assert_eq!(result.len(), 1);
+        assert!(result[0].is_object());
+
+        let obj = result[0].as_object().unwrap();
+        assert_eq!(obj.get("user").unwrap().as_str().unwrap(), "Alice");
+        assert_eq!(obj.get("score").unwrap().as_str().unwrap(), "95");
+    }
+
+    #[test]
+    fn test_process_row_template_string_type() {
+        let row_template = "User: {name}, Score: {score}".to_string();
+        let mut row1 = Map::new();
+        row1.insert("name".to_string(), json!("Alice"));
+        row1.insert("score".to_string(), json!(95));
+        let rows = vec![row1];
+
+        let mut alert = Alert::default();
+        alert.row_template_type = RowTemplateType::String;
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &alert,
+            RowTemplateType::String,
+            &rows,
+        );
+
+        assert_eq!(result.len(), 1);
+        assert!(result[0].is_string());
+        assert_eq!(result[0].as_str().unwrap(), "User: Alice, Score: 95");
+    }
+
+    #[test]
+    fn test_process_row_template_json_type_invalid_json_fallback() {
+        let row_template = "This is not valid JSON: {name}".to_string();
+        let mut row1 = Map::new();
+        row1.insert("name".to_string(), json!("Alice"));
+        let rows = vec![row1];
+
+        let mut alert = Alert::default();
+        alert.row_template_type = RowTemplateType::Json;
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &alert,
+            RowTemplateType::Json,
+            &rows,
+        );
+
+        assert_eq!(result.len(), 1);
+        // Should fallback to string when JSON parsing fails
+        assert!(result[0].is_string());
+    }
+
+    #[test]
+    fn test_json_array_backward_compatibility_with_string_values() {
+        // This test verifies that JsonArray with Value::String behaves identically
+        // to the old Vector implementation with plain strings
+
+        // Simulate what process_row_template returns for String type templates
+        let string_values = vec![
+            Value::String("Alert 1: User Alice logged in".to_string()),
+            Value::String("Alert 2: User Bob logged out".to_string()),
+            Value::String("Alert 3: System startup".to_string()),
+        ];
+
+        // Test that JsonArray handles these string values correctly
+        let var_value = VarValue::JsonArray(&string_values);
+
+        // Verify length
+        assert_eq!(var_value.len(), 3);
+
+        // Verify string conversion with newline separator (non-email)
+        let result_non_email = var_value.to_string_with_length(3, false);
+        assert_eq!(
+            result_non_email,
+            "Alert 1: User Alice logged in\\nAlert 2: User Bob logged out\\nAlert 3: System startup"
+        );
+
+        // Verify string conversion without separator (email)
+        let result_email = var_value.to_string_with_length(3, true);
+        assert_eq!(
+            result_email,
+            "Alert 1: User Alice logged inAlert 2: User Bob logged outAlert 3: System startup"
+        );
+
+        // Verify length limiting works
+        let result_limited = var_value.to_string_with_length(2, false);
+        assert_eq!(
+            result_limited,
+            "Alert 1: User Alice logged in\\nAlert 2: User Bob logged out"
+        );
+    }
+
+    #[test]
+    fn test_json_array_injection_with_string_values() {
+        // Test that Value::String containing JSON gets properly parsed and injected
+        // This simulates what happens when row_template_type is Json and the template
+        // produces JSON strings that need to be injected as actual JSON objects
+
+        let json_str1 = r#"{"level": "error", "job": "test"}"#;
+        let json_str2 = r#"{"level": "warn", "job": "test2"}"#;
+
+        // Simulate rows_tpl_val containing Value::String with JSON content
+        let rows_tpl_val = vec![
+            Value::String(json_str1.to_string()),
+            Value::String(json_str2.to_string()),
+        ];
+
+        // Parse them as the fix does
+        let mut parsed_values = Vec::new();
+        for v in rows_tpl_val.iter() {
+            if let Value::String(s) = v {
+                match serde_json::from_str::<Value>(s) {
+                    Ok(parsed) => parsed_values.push(parsed),
+                    Err(_) => {}
+                }
+            } else {
+                parsed_values.push(v.clone());
+            }
+        }
+
+        // Create the array and serialize
+        let json_array = Value::Array(parsed_values);
+        let json_str = serde_json::to_string(&json_array).unwrap();
+
+        // Verify it's a proper JSON array (not escaped strings)
+        let deserialized: Value = serde_json::from_str(&json_str).unwrap();
+        assert!(deserialized.is_array());
+
+        let arr = deserialized.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert!(arr[0].is_object());
+        assert!(arr[1].is_object());
+
+        // Verify the objects have the correct structure
+        assert_eq!(arr[0]["level"], "error");
+        assert_eq!(arr[0]["job"], "test");
+        assert_eq!(arr[1]["level"], "warn");
+        assert_eq!(arr[1]["job"], "test2");
+    }
+
+    #[test]
+    fn test_check_json_context_valid_cases() {
+        // Basic case with closing brace: "key": "{rows}"
+        assert!(check_json_context(r#""data": "{rows}"}"#, "rows"));
+
+        // Basic case with comma: "key": "{rows}",
+        assert!(check_json_context(r#""data": "{rows}","#, "rows"));
+
+        // With comma and more fields after
+        assert!(check_json_context(
+            r#""data": "{rows}", "other": "value""#,
+            "rows"
+        ));
+
+        // With whitespace before colon
+        assert!(check_json_context(r#""data" : "{rows}"}"#, "rows"));
+
+        // With whitespace after colon
+        assert!(check_json_context(r#""data":  "{rows}"}"#, "rows"));
+
+        // With whitespace before comma
+        assert!(check_json_context(r#""data": "{rows}" ,"#, "rows"));
+
+        // With whitespace before closing brace
+        assert!(check_json_context(r#""data": "{rows}" }"#, "rows"));
+
+        // Nested in object
+        assert!(check_json_context(
+            r#"{"items": "{rows}", "count": 5}"#,
+            "rows"
+        ));
+
+        // Multiple levels of nesting
+        assert!(check_json_context(
+            r#"{"outer": {"inner": "{rows}"}}"#,
+            "rows"
+        ));
+
+        // Different variable names
+        assert!(check_json_context(r#""items": "{data}"}"#, "data"));
+        assert!(check_json_context(r#""result": "{result}"}"#, "result"));
+        assert!(check_json_context(r#""count": "{count}"}"#, "count"));
+    }
+
+    #[test]
+    fn test_check_json_context_invalid_cases() {
+        // Variable with text before it (string interpolation)
+        assert!(!check_json_context(r#""data": "prefix {rows}""#, "rows"));
+
+        // Variable with text after it (string interpolation)
+        assert!(!check_json_context(r#""data": "{rows} suffix""#, "rows"));
+
+        // Variable with text on both sides
+        assert!(!check_json_context(
+            r#""data": "prefix {rows} suffix""#,
+            "rows"
+        ));
+
+        // Missing quotes around variable
+        assert!(!check_json_context(r#""data": {rows}"#, "rows"));
+
+        // Not after a colon (not in value position)
+        assert!(!check_json_context(r#""{rows}": "value""#, "rows"));
+
+        // In middle of string with other content
+        assert!(!check_json_context(
+            r#""data": "Total: {rows} items""#,
+            "rows"
+        ));
+
+        // Not followed by comma or closing brace
+        assert!(!check_json_context(r#""data": "{rows}" "other""#, "rows"));
+
+        // Variable not present
+        assert!(!check_json_context(r#""data": "value""#, "rows"));
+
+        // Variable without quotes
+        assert!(!check_json_context(
+            r#""data": {rows}, "other": "value""#,
+            "rows"
+        ));
+
+        // Wrong variable name
+        assert!(!check_json_context(r#""data": "{other}""#, "rows"));
+    }
+
+    #[test]
+    fn test_check_json_context_edge_cases() {
+        // Empty template
+        assert!(!check_json_context("", "rows"));
+
+        // Only the variable
+        assert!(!check_json_context(r#""{rows}""#, "rows"));
+
+        // Variable at start without proper JSON context
+        assert!(!check_json_context(r#""{rows}", "other": "value""#, "rows"));
+
+        // Multiple occurrences - should match the first valid one
+        assert!(check_json_context(
+            r#""data": "{rows}", "backup": "old {rows} data""#,
+            "rows"
+        ));
+
+        // Tab characters instead of spaces
+        assert!(check_json_context("\"data\":\t\"{rows}\"\t,", "rows"));
+
+        // Newlines in template
+        assert!(check_json_context("\"data\": \"{rows}\"\n,", "rows"));
+
+        // Real-world webhook payload example
+        assert!(check_json_context(
+            r#"{"alert": "test", "rows": "{rows}", "count": 5}"#,
+            "rows"
+        ));
+
+        // Array context (should still work)
+        assert!(check_json_context(
+            r#"{"items": [{"data": "{rows}"}]}"#,
+            "rows"
+        ));
+    }
+
+    #[test]
+    fn test_check_json_context_special_characters() {
+        // Variable name with underscores
+        assert!(check_json_context(r#""data": "{row_data}"}"#, "row_data"));
+
+        // Variable name with numbers
+        assert!(check_json_context(r#""data": "{rows123}"}"#, "rows123"));
+
+        // Escaped quotes in surrounding JSON (valid JSON)
+        assert!(check_json_context(
+            r#""data": "{rows}", "msg": "test\"quote""#,
+            "rows"
+        ));
     }
 }

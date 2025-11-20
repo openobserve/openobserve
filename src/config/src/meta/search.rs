@@ -990,9 +990,9 @@ impl SearchEventType {
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct ValuesEventContext {
+    pub field: String,
     pub top_k: Option<i64>,
     pub no_count: bool,
-    pub field: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
@@ -1273,6 +1273,8 @@ pub struct PaginationQuery {
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ValuesRequest {
     pub fields: Vec<String>,
+    #[serde(default)]
+    pub from: Option<i64>,
     #[serde(default)]
     pub size: Option<i64>,
     pub no_count: bool,
@@ -2564,9 +2566,9 @@ mod tests {
     #[test]
     fn test_values_event_context() {
         let ctx = ValuesEventContext {
+            field: "test_field".to_string(),
             top_k: Some(10),
             no_count: true,
-            field: "test_field".to_string(),
         };
         assert_eq!(ctx.top_k, Some(10));
         assert!(ctx.no_count);
@@ -2577,6 +2579,7 @@ mod tests {
     fn test_values_request() {
         let request = ValuesRequest {
             fields: vec!["field1".to_string(), "field2".to_string()],
+            from: None,
             size: Some(100),
             no_count: true,
             regions: vec!["region1".to_string()],

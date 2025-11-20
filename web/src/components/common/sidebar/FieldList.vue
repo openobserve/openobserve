@@ -355,7 +355,7 @@ export default defineComponent({
           start_time: props.timeStamp.startTime,
           end_time: props.timeStamp.endTime,
           fields: [name],
-          size: 10,
+          size: store.state.zoConfig?.query_values_default_num || 10,
           type: props.streamType,
         })
         .then((res: any) => {
