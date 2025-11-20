@@ -824,7 +824,6 @@ const fetchPipelineHistory = async () => {
       params.sort_order = pagination.value.descending ? "desc" : "asc";
     }
 
-    console.log("Fetching pipeline history with params:", params);
 
     const url = `/api/${org}/pipelines/history`;
     const response = await http().get(url, { params });
@@ -839,7 +838,6 @@ const fetchPipelineHistory = async () => {
         id: `${hit.timestamp}_${index}`,
         "#": (index + 1) + (pagination.value.page - 1) * pagination.value.rowsPerPage,
       }));
-      // console.log(pagination.value);
 
       // Update pagination total
       pagination.value.rowsNumber = historyData.total || 0;
