@@ -867,7 +867,7 @@ async fn search_tantivy_index(
     let index = tantivy::Index::open(reader_directory)?;
     index
         .tokenizers()
-        .register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
+        .register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Search));
     let reader = index
         .reader_builder()
         .reload_policy(tantivy::ReloadPolicy::Manual)
