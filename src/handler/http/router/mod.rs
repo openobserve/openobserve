@@ -312,6 +312,8 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
                             || path.starts_with("assets/")
                             || path.starts_with("monacoeditorwork/")
                             || path.eq("favicon.ico")
+                            || !path.eq("openobserve_favicon_dark.ico")
+                            || !path.eq("openobserve_favicon_light.ico")
                         {
                             res
                         } else {
