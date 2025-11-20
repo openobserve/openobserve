@@ -6,6 +6,7 @@ import string
 from pathlib import Path
 import base64
 
+
 BASE_URL = os.environ["ZO_BASE_URL"]
 root_dir = Path(__file__).parent.parent.parent
 
