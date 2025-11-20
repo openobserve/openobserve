@@ -467,7 +467,7 @@ export default defineComponent({
       {
         name: "token",
         field: "token",
-        label: "token",
+        label: t("serviceAccounts.token"),
         align: "left",
         sortable: false,
         style: "width: 230px;", //because token might take more space for displaying the token , eye button and copy button

@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
   
             <!-- additional setup starts here -->
-             <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
+             <div class="tw-px-[0.625rem] tw-w-full tw-h-full">
                    <div
               class="flex justify-start items-center q-pb-sm flex-wrap card-container"
             >
@@ -325,23 +325,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div data-test="add-alert-row-input tw-w-full">
-                <div class="flex items-center q-mb-sm">
-                  <span class="text-bold custom-input-label">Row Template</span>
-                  <q-btn
-                    data-test="add-alert-row-input-info-btn"
-                    style="color: #A0A0A0;"
-                    no-caps
-                    padding="xs"
-                    class="q-ml-xs"
-                    size="sm"
-                    flat
-                    icon="info_outline"
-                  >
-                <q-tooltip>
-               Row Template is used to format the alert message.
-              </q-tooltip>
-          </q-btn>
-          </div>
+                <div class="flex items-center justify-between q-mb-sm">
+                  <div class="flex items-center">
+                    <span class="text-bold custom-input-label">Row Template</span>
+                    <q-btn
+                      data-test="add-alert-row-input-info-btn"
+                      style="color: #A0A0A0;"
+                      no-caps
+                      padding="xs"
+                      class="q-ml-xs"
+                      size="sm"
+                      flat
+                      icon="info_outline"
+                    >
+                      <q-tooltip>
+                        Row Template is used to format the alert message.
+                      </q-tooltip>
+                    </q-btn>
+                  </div>
+                  <div class="flex items-center">
+                    <span class="text-caption q-mr-sm">Template Type:</span>
+                    <q-btn-toggle
+                      data-test="add-alert-row-template-type-toggle"
+                      v-model="formData.row_template_type"
+                      toggle-color="primary"
+                      :options="rowTemplateTypeOptions"
+                      dense
+                      no-caps
+                      unelevated
+                      size="sm"
+                    />
+                  </div>
+                </div>
                 <q-input
                   data-test="add-alert-row-input-textarea"
                   v-model="formData.row_template"
@@ -356,10 +371,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                   style="width: 100%; resize: none;"
                   type="textarea"
-                  placeholder="e.g - Alert was triggered at {timestamp} "
+                  :placeholder="rowTemplatePlaceholder"
                   rows="5"
                 >
-                
+
               </q-input>
               </div>
             </div>
@@ -520,7 +535,7 @@ const defaultValue: any = () => {
     stream_name: "",
     is_real_time: "false",
     query_condition: {
-      conditions: 
+      conditions:
       {
         "or": [
             {
@@ -561,6 +576,8 @@ const defaultValue: any = () => {
     context_attributes: [],
     enabled: true,
     description: "",
+    row_template: "",
+    row_template_type: "String",
     lastTriggeredAt: 0,
     createdAt: "",
     updatedAt: "",
@@ -642,6 +659,10 @@ export default defineComponent({
     const showVrlFunction = ref(false);
     const isFetchingStreams = ref(false);
     const streamTypes = ["logs", "metrics", "traces"];
+    const rowTemplateTypeOptions = [
+      { label: 'String', value: 'String' },
+      { label: 'JSON', value: 'Json' }
+    ];
     const editorUpdate = (e: any) => {
       formData.value.sql = e.target.value;
     };
@@ -706,6 +727,12 @@ export default defineComponent({
 
     const showPreview = computed(() => {
       return formData.value.stream_type && formData.value.stream_name;
+    });
+
+    const rowTemplatePlaceholder = computed(() => {
+      return formData.value.row_template_type === 'Json'
+        ? 'e.g - {"user": "{name}", "timestamp": "{timestamp}"}'
+        : 'e.g - Alert was triggered at {timestamp}';
     });
 
     const editorData = ref("");
@@ -1338,6 +1365,7 @@ export default defineComponent({
       schemaList,
       filteredColumns,
       streamTypes,
+      rowTemplateTypeOptions,
       streams,
       updateStreams,
       isFetchingStreams,
@@ -1357,6 +1385,7 @@ export default defineComponent({
       getParser,
       onInputUpdate,
       showPreview,
+      rowTemplatePlaceholder,
       streamFieldsMap,
       previewQuery,
       previewAlertRef,

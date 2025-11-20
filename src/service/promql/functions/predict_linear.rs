@@ -15,13 +15,10 @@
 
 use std::time::Duration;
 
+use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 
-use crate::service::promql::{
-    common::linear_regression,
-    functions::RangeFunc,
-    value::{EvalContext, Sample, Value},
-};
+use crate::service::promql::{common::linear_regression, functions::RangeFunc};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#predict_linear
 pub(crate) fn predict_linear(data: Value, duration: f64, eval_ctx: &EvalContext) -> Result<Value> {
@@ -53,8 +50,9 @@ impl RangeFunc for PredictLinearFunc {
 mod tests {
     use std::time::Duration;
 
+    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+
     use super::*;
-    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
 
     // Test helper
     fn predict_linear_test_helper(data: Value, duration: f64) -> Result<Value> {
@@ -66,9 +64,9 @@ mod tests {
     fn test_predict_linear_function() {
         // Create a range value with a linear trend
         let samples = vec![
-            crate::service::promql::value::Sample::new(1000, 10.0),
-            crate::service::promql::value::Sample::new(2000, 20.0),
-            crate::service::promql::value::Sample::new(3000, 30.0),
+            Sample::new(1000, 10.0),
+            Sample::new(2000, 20.0),
+            Sample::new(3000, 30.0),
         ];
         let range_value = RangeValue {
             labels: Labels::default(),

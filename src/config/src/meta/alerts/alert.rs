@@ -28,6 +28,14 @@ use crate::{
     utils::json,
 };
 
+#[derive(Clone, Copy, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+#[repr(i16)]
+pub enum RowTemplateType {
+    #[default]
+    String = 0,
+    Json = 1,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(default)]
 pub struct Alert {
@@ -53,6 +61,8 @@ pub struct Alert {
     pub context_attributes: Option<HashMap<String, String>>,
     #[serde(default)]
     pub row_template: String,
+    #[serde(default)]
+    pub row_template_type: RowTemplateType,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
@@ -100,6 +110,7 @@ impl Default for Alert {
             destinations: vec![],
             context_attributes: None,
             row_template: "".to_string(),
+            row_template_type: RowTemplateType::default(),
             description: "".to_string(),
             enabled: false,
             tz_offset: 0, // UTC
@@ -279,6 +290,7 @@ mod tests {
         assert!(alert.destinations.is_empty());
         assert_eq!(alert.context_attributes, None);
         assert_eq!(alert.row_template, "");
+        assert_eq!(alert.row_template_type, RowTemplateType::String);
         assert_eq!(alert.description, "");
         assert_eq!(alert.enabled, false);
         assert_eq!(alert.tz_offset, 0);
@@ -574,5 +586,44 @@ mod tests {
             Some((StreamType::Logs, Some("test_stream".to_string())))
         );
         assert_eq!(params.page_size_and_idx, Some((20, 1)));
+    }
+
+    #[test]
+    fn test_row_template_type_backward_compatibility() {
+        // Test that deserializing an alert without the row_template_type field
+        // defaults to String variant for backward compatibility
+        let json_without_field = r#"{
+            "name": "test_alert",
+            "org_id": "test_org",
+            "stream_type": "logs",
+            "stream_name": "test_stream",
+            "is_real_time": false,
+            "destinations": [],
+            "row_template": "",
+            "description": "",
+            "enabled": false,
+            "tz_offset": 0
+        }"#;
+
+        let alert: Alert = serde_json::from_str(json_without_field).unwrap();
+        assert_eq!(alert.row_template_type, RowTemplateType::String);
+
+        // Test that deserializing an alert with row_template_type set to Json works
+        let json_with_json_variant = r#"{
+            "name": "test_alert",
+            "org_id": "test_org",
+            "stream_type": "logs",
+            "stream_name": "test_stream",
+            "is_real_time": false,
+            "destinations": [],
+            "row_template": "",
+            "row_template_type": "Json",
+            "description": "",
+            "enabled": false,
+            "tz_offset": 0
+        }"#;
+
+        let alert: Alert = serde_json::from_str(json_with_json_variant).unwrap();
+        assert_eq!(alert.row_template_type, RowTemplateType::Json);
     }
 }

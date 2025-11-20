@@ -101,7 +101,7 @@ test.describe("dashboard streaming testcases", () => {
     for (const term of searchTerms) {
       await variableInput.fill(term);
       // await page.waitForTimeout(1500);
-      await page.waitForLoadState("networkidle");
+      // await page.waitForLoadState("networkidle");
     }
     // Select the final value
     const option = page.getByRole("option", { name: "ziox" });
@@ -109,7 +109,7 @@ test.describe("dashboard streaming testcases", () => {
     await option.click();
 
     // Wait for any remaining network activity to settle
-    await page.waitForLoadState("networkidle");
+    // await page.waitForLoadState("networkidle");
 
     expect(valuesResponses.length).toBeGreaterThan(0);
 
@@ -235,7 +235,7 @@ test.describe("dashboard streaming testcases", () => {
        }
      );
   
-    await page.waitForLoadState("networkidle");
+    // await page.waitForLoadState("networkidle");
 
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -274,7 +274,7 @@ test.describe("dashboard streaming testcases", () => {
     await expect(namespaceVariable).toBeVisible();
 
     // Wait for all initial network activity to settle completely
-    await page.waitForLoadState("networkidle");
+    // await page.waitForLoadState("networkidle");
     await page.waitForTimeout(2000);
 
     // Now capture the baseline count after everything has settled

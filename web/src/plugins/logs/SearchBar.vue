@@ -1375,19 +1375,17 @@ class="q-pr-sm q-pt-xs" />
           <q-btn
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-secondary-button"
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
             :label="t('confirmDialog.cancel')"
-            color="secondary"
             v-close-popup
           />
           <q-btn
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-primary-button"
             data-test="logs-search-bar-confirm-dialog-ok-btn"
             :label="t('search.btnDownload')"
-            color="primary"
             @click="downloadRangeData"
           />
         </q-card-actions>
@@ -2751,6 +2749,7 @@ export default defineComponent({
         });
       }
 
+      searchObj.meta.showTransformEditor = true;
       searchObj.config.fnSplitterModel = 60;
       fnEditorRef?.value?.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;

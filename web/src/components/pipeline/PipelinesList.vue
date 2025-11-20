@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-left tw-px-2 q-mb-sm expanded-content"
                   >
                     <div class="tw-flex tw-items-center q-py-sm">
-                      <strong>SQL Query : <span></span></strong>
+                      <strong>{{ t('pipeline_list.sql_query') }} : <span></span></strong>
                     </div>
                     <div class="tw-flex tw-items-start tw-justify-center">
                       <div
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="exportBulkPipelines"
                 >
                   <q-icon name="download" size="16px" />
-                  <span class="tw-ml-2">Export</span>
+                  <span class="tw-ml-2">{{ t('pipeline_list.export') }}</span>
                 </q-btn>
                 <q-btn
                   v-if="selectedPipelines.length > 0"
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="bulkTogglePipelines('pause')"
                 >
                   <q-icon name="pause" size="16px" />
-                  <span class="tw-ml-2">Pause</span>
+                  <span class="tw-ml-2">{{ t('pipeline_list.pause') }}</span>
                 </q-btn>
                 <q-btn
                   v-if="selectedPipelines.length > 0"
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="bulkTogglePipelines('resume')"
                 >
                   <q-icon name="play_arrow" size="16px" />
-                  <span class="tw-ml-2">Resume</span>
+                  <span class="tw-ml-2">{{ t('pipeline_list.resume') }}</span>
                 </q-btn>
                 <q-btn
                   v-if="selectedPipelines.length > 0"
@@ -405,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="pipeline-name">{{ errorDialog.data?.name }}</span>
           </div>
           <div class="error-timestamp">
-            <span class="tw-mr-2">Last error:</span>
+            <span class="tw-mr-2">{{ t('pipeline_list.last_error') }}:</span>
             <q-icon name="schedule" size="14px" class="tw-mr-1" />
             {{ errorDialog.data && new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString() }}
           </div>
@@ -425,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section v-if="errorDialog.data" class="pipeline-error-content">
         <!-- Error Summary -->
         <div v-if="errorDialog.data.last_error.error_summary" class="tw-mb-4">
-          <div class="section-label tw-mb-2">Error Summary</div>
+          <div class="section-label tw-mb-2">{{ t('pipeline_list.error_summary') }}</div>
           <div class="error-summary-box">
             {{ errorDialog.data.last_error.error_summary }}
           </div>
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Node Errors -->
         <div v-if="errorDialog.data.last_error.node_errors && Object.keys(errorDialog.data.last_error.node_errors).length > 0">
-          <div class="section-label tw-mb-3">Node Errors</div>
+          <div class="section-label tw-mb-3">{{ t('pipeline_list.node_errors') }}</div>
           <div class="node-errors-container">
             <div
               v-for="(nodeError, nodeId) in errorDialog.data.last_error.node_errors"
@@ -458,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           flat
           no-caps
-          label="Close"
+          :label="t('pipeline_list.close')"
           class="o2-secondary-button tw-h-[36px]"
           :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="closeErrorDialog"
@@ -531,7 +531,7 @@ const isEnabled = ref(false);
 const shouldStartfromNow = ref(true);
 const resumePipelineDialogMeta: any = ref({
   show: false,
-  title: "Resume Pipeline Ingestion",
+  title: t('pipeline_list.resume_pipeline_title'),
   data: null,
   onConfirm: () =>  handleResumePipeline(),
   onCancel: () => handleCancelResumePipeline(),
@@ -560,15 +560,15 @@ const columns: any = ref([]);
 
 const tabs = reactive([
   {
-    label: "All",
+    label: t('pipeline_list.tab_all'),
     value: "all",
   },
   {
-    label: "Scheduled",
+    label: t('pipeline_list.tab_scheduled'),
     value: "scheduled",
   },
   {
-    label: "Real-Time",
+    label: t('pipeline_list.tab_realtime'),
     value: "realtime",
   },
 ]);
@@ -737,28 +737,28 @@ const getColumnsForActiveTab = (tab: any) => {
     {
       name: "stream_type",
       field: "stream_type",
-      label: "Stream Type",
+      label: t('pipeline_list.stream_type'),
       align: "left",
       sortable: true,
     },
     {
       name: "frequency",
       field: "frequency",
-      label: "Frequency",
+      label: t('pipeline_list.frequency'),
       align: "left",
       sortable: true,
     },
     {
       name: "period",
       field: "period",
-      label: "Period",
+      label: t('pipeline_list.period'),
       align: "left",
       sortable: true,
     },
     {
       name: "cron",
       field: "cron",
-      label: "Cron",
+      label: t('pipeline_list.cron'),
       align: "left",
       sortable: false,
     },
@@ -777,7 +777,7 @@ const getColumnsForActiveTab = (tab: any) => {
     allColumns.splice(2, 0, {
       name: "type",
       field: "type",
-      label: "Type",
+      label: t('pipeline_list.type'),
       align: "left",
       sortable: true,
     });

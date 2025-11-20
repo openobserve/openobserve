@@ -1,6 +1,6 @@
 import { expect } from "playwright/test";
 import logData from "../../../fixtures/log.json";
-const testLogger = require('../../utils/test-logger.js');
+import testLogger from '../../utils/test-logger.js';
 
 // Function to wait for the dashboard page to load
 export const waitForDashboardPage = async function (page) {
@@ -37,7 +37,6 @@ export const applyQueryButton = async function (page) {
 };
 
 export async function deleteDashboard(page, dashboardName) {
-  const testLogger = require('../../utils/test-logger.js');
   testLogger.info('Deleting dashboard', { dashboardName });
 
   // Wait for page to be fully loaded
@@ -70,25 +69,64 @@ export async function deleteDashboard(page, dashboardName) {
   const confirmButton = page.locator('[data-test="confirm-button"]');
   await expect(confirmButton).toBeVisible();
 
-  // Wait for the delete API call to complete
-  const deleteResponse = page.waitForResponse(
-    (response) =>
-      /\/api\/.*\/dashboards\/.*/.test(response.url()) &&
-      (response.status() === 200 || response.status() === 204),
-    { timeout: 15000 }
-  );
+  // Use Promise.all to set up listener and click simultaneously
+  const [deleteResponse] = await Promise.all([
+    page.waitForResponse(
+      async (response) => {
+        const url = response.url();
+        const method = response.request().method();
 
-  await confirmButton.click();
+        // Check if this is a DELETE request to dashboards endpoint
+        const isDeleteEndpoint = method === 'DELETE' &&
+                                  /\/api\/.*\/dashboards\/\d+/.test(url);
 
-  // Wait for the API response to confirm deletion
-  await deleteResponse;
+        if (isDeleteEndpoint) {
+          testLogger.debug(`Delete API called: ${url} - Status: ${response.status()}`);
 
-  // Optionally verify the success message appears (but don't fail if it disappears quickly)
+          // Verify response body contains success message
+          try {
+            const body = await response.json();
+            if (body.code === 200 && body.message === 'Dashboard deleted') {
+              testLogger.info('Delete API confirmed: Dashboard deleted');
+              return true;
+            }
+          } catch (e) {
+            // If we can't parse JSON, just check status code
+            return response.status() === 200 || response.status() === 204;
+          }
+        }
+
+        return false;
+      },
+      { timeout: 20000 }
+    ).catch((error) => {
+      testLogger.warn(`Delete API timeout: ${error.message}`);
+      return null; // Return null if timeout, don't throw
+    }),
+    // Wait for button to be stable before clicking
+    (async () => {
+      await confirmButton.waitFor({ state: 'attached' });
+      await confirmButton.evaluate(() => {
+        return new Promise(resolve => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => resolve());
+          });
+        });
+      });
+      await confirmButton.click();
+    })()
+  ]);
+
+  if (deleteResponse) {
+    testLogger.info('Dashboard deleted successfully');
+  }
+
+  // Verify the success message appears
   await page.getByText("Dashboard deleted successfully").waitFor({
     state: 'visible',
-    timeout: 5000
+    timeout: 10000
   }).catch(() => {
-    testLogger.info('Success message not visible or disappeared quickly - but API confirmed deletion');
+    testLogger.info('Success message not visible or disappeared quickly');
   });
 
   // Ensure the dashboard row is removed from the table

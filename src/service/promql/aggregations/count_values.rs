@@ -16,14 +16,14 @@
 use std::sync::Arc;
 
 use ahash::{HashMap, HashMapExt};
+use config::meta::promql::value::{
+    EvalContext, Label, Labels, LabelsExt, RangeValue, Sample, Value,
+};
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
-use crate::service::promql::{
-    aggregations::{labels_to_exclude, labels_to_include},
-    value::{EvalContext, Label, Labels, LabelsExt, RangeValue, Sample, Value},
-};
+use crate::service::promql::aggregations::{labels_to_exclude, labels_to_include};
 
 /// Aggregates Matrix input for range queries
 /// count_values creates a new label with the metric value as the label value
@@ -235,8 +235,9 @@ pub fn count_values(
 mod tests {
     use std::sync::Arc;
 
+    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
+
     use super::*;
-    use crate::service::promql::value::{Label, RangeValue, Sample, Value};
 
     #[test]
     fn test_count_values_range_function() {
