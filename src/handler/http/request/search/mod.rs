@@ -720,6 +720,7 @@ pub async fn around_v2(
         ("filter" = Option<String>, Query, description = "filter, eg: a=b"),
         ("keyword" = Option<String>, Query, description = "keyword, eg: abc"),
         ("size" = i64, Query, description = "size"), // topN
+        ("from" = i64, Query, description = "from"), // fromK
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
         ("regions" = Option<String>, Query, description = "regions, split by comma"),
@@ -889,8 +890,10 @@ pub async fn build_search_request_per_field(
 
     let mut query = config::meta::search::Query {
         sql: decoded_sql.clone(), // Will be populated per field in the loop below
-        from: 0,
-        size: req.size.unwrap_or(10),
+        from: req.from.unwrap_or(0),
+        size: req
+            .size
+            .unwrap_or(config::get_config().limit.query_values_default_num),
         start_time,
         end_time,
         query_fn: query_fn.clone(),
@@ -1149,12 +1152,15 @@ async fn values_v1(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // search
+    let default_limit = config::get_config().limit.query_values_default_num;
     let req_query = config::meta::search::Query {
         sql: query_sql,
-        from: 0,
+        from: query
+            .get("from")
+            .map_or(0, |v| v.parse::<i64>().unwrap_or(0)),
         size: query
             .get("size")
-            .map_or(10, |v| v.parse::<i64>().unwrap_or(10)),
+            .map_or(default_limit, |v| v.parse::<i64>().unwrap_or(default_limit)),
         start_time,
         end_time,
         uses_zo_fn: uses_fn,
