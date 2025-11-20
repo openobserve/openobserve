@@ -33,8 +33,6 @@ pub async fn serve(path: web::Path<String>) -> EmbedResponse<EmbedableFileRespon
         && !path.starts_with("assets/")
         && !path.starts_with("monacoeditorwork/")
         && !path.eq("favicon.ico")
-        && !path.eq("openobserve_favicon_dark.ico")
-        && !path.eq("openobserve_favicon_light.ico")
     {
         path = "index.html";
     }
