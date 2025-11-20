@@ -1150,6 +1150,7 @@ async fn values_v1(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // search
+    let default_limit = config::get_config().limit.query_values_default_num;
     let req_query = config::meta::search::Query {
         sql: query_sql,
         from: query
@@ -1157,7 +1158,7 @@ async fn values_v1(
             .map_or(0, |v| v.parse::<i64>().unwrap_or(0)),
         size: query
             .get("size")
-            .map_or(10, |v| v.parse::<i64>().unwrap_or(10)),
+            .map_or(default_limit, |v| v.parse::<i64>().unwrap_or(default_limit)),
         start_time,
         end_time,
         uses_zo_fn: uses_fn,

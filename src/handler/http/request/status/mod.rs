@@ -153,7 +153,7 @@ struct ConfigResponse<'a> {
     #[cfg(feature = "enterprise")]
     ingestion_quota_used: f64,
     log_page_default_field_list: String,
-    query_values_default_num: usize,
+    query_values_default_num: i64,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -1012,14 +1012,13 @@ async fn enable_node(
 
             // If this is an ingester node, set draining mode and flush
             if LOCAL_NODE.is_ingester() {
-                // Set draining flag to trigger immediate S3 upload
-                o2_enterprise::enterprise::drain::set_draining(true);
-
                 // Flush memory to WAL
                 if let Err(e) = ingester::flush_all().await {
                     log::error!("[NODE] Error flushing ingester during disable: {e}");
                     return Ok(MetaHttpResponse::internal_error(e));
                 }
+                // Set draining flag to trigger immediate S3 upload after flush memory to disk
+                o2_enterprise::enterprise::drain::set_draining(true);
                 log::info!("[NODE] Ingester flushed successfully, S3 upload will be prioritized");
             }
         }
