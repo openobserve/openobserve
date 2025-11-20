@@ -45,6 +45,10 @@
                         "value": "histogramInterval"
                     },
                     {
+                        "label": "String",
+                        "value": "string"
+                    },
+                    {
                         "label": "Function",
                         "value": "function"
                     }
