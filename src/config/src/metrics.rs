@@ -701,6 +701,101 @@ pub static META_NUM_DASHBOARDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// metrics for alert correlation
+pub static CORRELATION_INCIDENTS_CREATED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "correlation_incidents_created_total",
+            "Total number of incidents created by alert correlation",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static CORRELATION_ALERTS_MATCHED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "correlation_alerts_matched_total",
+            "Total number of alerts matched to incidents",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "match_type"], // match_type: semantic_fields, temporal_only
+    )
+    .expect("Metric created")
+});
+
+pub static CORRELATION_MATCH_CONFIDENCE: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "correlation_match_confidence",
+            "Correlation match confidence distribution",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "confidence"], // confidence: high, medium, low
+    )
+    .expect("Metric created")
+});
+
+pub static CORRELATION_PROCESSING_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "correlation_processing_duration_seconds",
+            "Time spent processing alert correlation",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "operation"], // operation: find_match, create_incident, update_incident
+    )
+    .expect("Metric created")
+});
+
+pub static CORRELATION_INCIDENT_ALERTS_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "correlation_incident_alerts_count",
+            "Number of alerts in incidents by confidence level",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "confidence"],
+    )
+    .expect("Metric created")
+});
+
+pub static CORRELATION_INCIDENTS_RESOLVED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "correlation_incidents_resolved_total",
+            "Total number of incidents resolved",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static CORRELATION_INCIDENT_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "correlation_incident_duration_seconds",
+            "Time from incident creation to resolution",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![
+            60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 14400.0, 28800.0,
+        ]), // 1min to 8 hours
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
 // metrics for query manager
 pub static QUERY_RUNNING_NUMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -1334,6 +1429,29 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(META_NUM_DASHBOARDS.clone()))
+        .expect("Metric registered");
+
+    // correlation metrics
+    registry
+        .register(Box::new(CORRELATION_INCIDENTS_CREATED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(CORRELATION_ALERTS_MATCHED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(CORRELATION_MATCH_CONFIDENCE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(CORRELATION_PROCESSING_DURATION_SECONDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(CORRELATION_INCIDENT_ALERTS_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(CORRELATION_INCIDENTS_RESOLVED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(CORRELATION_INCIDENT_DURATION_SECONDS.clone()))
         .expect("Metric registered");
 
     // db stats

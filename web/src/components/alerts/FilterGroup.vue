@@ -234,6 +234,9 @@
   }
   
   const addCondition = (groupId: string) => {
+    if (!groups.value.items) {
+      groups.value.items = [];
+    }
     groups.value.items.push({
       column: '',
       operator: '=',
@@ -245,7 +248,9 @@
   };
   
   const addGroup = (groupId: string) => {
-
+    if (!groups.value.items) {
+      groups.value.items = [];
+    }
     groups.value.items.push({
       groupId: getUUID(),
       label: 'or',
@@ -322,6 +327,9 @@
   };
 
   const reorderItems = () => {
+    if (!groups.value.items || !Array.isArray(groups.value.items)) {
+      return;
+    }
     // Separate conditions and groups
     const conditions = groups.value.items.filter((item: any) => !isGroup(item));
     const subGroups = groups.value.items.filter((item: any) => isGroup(item));
@@ -430,6 +438,9 @@ const previewString = computed(() => {
 
 // Check if group has only one condition and no sub-groups (to disable AND/OR toggle)
 const hasOnlyOneCondition = computed(() => {
+  if (!groups.value || !groups.value.items || !Array.isArray(groups.value.items)) {
+    return true;
+  }
   const conditions = groups.value.items.filter((item: any) => !isGroup(item));
   const subGroups = groups.value.items.filter((item: any) => isGroup(item));
 

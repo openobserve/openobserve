@@ -480,13 +480,98 @@ describe("Date Utilities", () => {
       // Test with different date formats that might cause issues
       const result1 = convertDateToTimestamp("31-12-2023", "23:59", "UTC");
       const result2 = convertDateToTimestamp("01-01-2024", "00:00", "UTC");
-      
+
       expect(result1.timestamp).toBeGreaterThanOrEqual(0);
       expect(result2.timestamp).toBeGreaterThanOrEqual(0);
       // Only compare if both timestamps are valid (not 0)
       if (result1.timestamp > 0 && result2.timestamp > 0) {
         expect(result2.timestamp).toBeGreaterThan(result1.timestamp);
       }
+    });
+
+    it("should return zero for empty date", () => {
+      const result = convertDateToTimestamp("", "", "UTC");
+      expect(result.timestamp).toBe(0);
+      expect(result.offset).toBe(0);
+    });
+
+    it("should handle leap year dates", () => {
+      const result = convertDateToTimestamp("29-02-2024", "12:00", "UTC");
+      expect(result.timestamp).toBeGreaterThanOrEqual(0);
+    });
+
+    it("should handle different timezone abbreviations", () => {
+      const result = convertDateToTimestamp("15-06-2023", "14:30", "Europe/London");
+      expect(result.timestamp).toBeGreaterThanOrEqual(0);
+      expect(typeof result.offset).toBe("number");
+    });
+  });
+
+  describe("parseDuration edge cases", () => {
+    it("should handle large year values", () => {
+      expect(parseDuration("100y")).toBe(3153600000); // 100 * 31536000
+    });
+
+    it("should handle zero values for all units", () => {
+      expect(parseDuration("0m")).toBe(0);
+      expect(parseDuration("0h")).toBe(0);
+      expect(parseDuration("0d")).toBe(0);
+      expect(parseDuration("0w")).toBe(0);
+    });
+
+    it("should return 0 for malformed strings", () => {
+      expect(parseDuration("abc")).toBe(0);
+      expect(parseDuration("123xyz")).toBe(0);
+      expect(parseDuration("-5m")).toBe(0);
+    });
+
+    it("should handle very large numbers", () => {
+      expect(parseDuration("9999d")).toBe(863913600); // 9999 * 86400
+    });
+  });
+
+  describe("generateDurationLabel edge cases", () => {
+    it("should handle zero seconds", () => {
+      expect(generateDurationLabel(0)).toBe("Off");
+    });
+
+    it("should handle very large second values", () => {
+      const result = generateDurationLabel(999999999);
+      expect(result).toContain("s");
+    });
+
+    it("should handle exact year multiples", () => {
+      expect(generateDurationLabel(31536000)).toBe("1y"); // Exactly 1 year
+      expect(generateDurationLabel(63072000)).toBe("2y"); // Exactly 2 years
+    });
+
+    it("should handle exact month multiples", () => {
+      expect(generateDurationLabel(2592000)).toBe("1M"); // Exactly 1 month
+    });
+
+    it("should handle exact week multiples", () => {
+      expect(generateDurationLabel(604800)).toBe("1w"); // Exactly 1 week
+      expect(generateDurationLabel(1209600)).toBe("2w"); // Exactly 2 weeks
+    });
+
+    it("should default to seconds for irregular durations", () => {
+      expect(generateDurationLabel(125)).toContain("s");
+      expect(generateDurationLabel(3665)).toContain("s"); // 1h + 5s
+    });
+
+    it("should handle exact day multiples", () => {
+      expect(generateDurationLabel(86400)).toBe("1d");
+      expect(generateDurationLabel(172800)).toBe("2d");
+    });
+
+    it("should handle exact hour multiples", () => {
+      expect(generateDurationLabel(3600)).toBe("1h");
+      expect(generateDurationLabel(7200)).toBe("2h");
+    });
+
+    it("should handle exact minute multiples", () => {
+      expect(generateDurationLabel(60)).toBe("1m");
+      expect(generateDurationLabel(120)).toBe("2m");
     });
   });
 });

@@ -168,15 +168,31 @@ async fn create(
 #[get("/{org_id}/settings")]
 async fn get(path: web::Path<String>) -> Result<HttpResponse, StdErr> {
     let org_id = path.into_inner();
+
+    // Fetch org deduplication config
+    #[cfg(feature = "enterprise")]
+    let dedup_config = crate::service::alerts::org_config::get_deduplication_config(&org_id)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|c| serde_json::to_value(c).ok());
+
+    #[cfg(not(feature = "enterprise"))]
+    let dedup_config = None;
+
     match get_org_setting(&org_id).await {
-        Ok(data) => Ok(HttpResponse::Ok().json(OrganizationSettingResponse { data })),
+        Ok(data) => Ok(HttpResponse::Ok().json(OrganizationSettingResponse {
+            data,
+            deduplication_config: dedup_config,
+        })),
         Err(err) => {
             if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
                 let setting = OrganizationSetting::default();
                 if let Ok(()) = set_org_setting(&org_id, &setting).await {
-                    return Ok(
-                        HttpResponse::Ok().json(OrganizationSettingResponse { data: setting })
-                    );
+                    return Ok(HttpResponse::Ok().json(OrganizationSettingResponse {
+                        data: setting,
+                        deduplication_config: dedup_config,
+                    }));
                 }
             };
             Ok(MetaHttpResponse::bad_request(&err))

@@ -1334,7 +1334,8 @@
     "domainSettingsSaved": "Domain settings saved successfully",
     "errorSavingDomainSettings": "Error saving domain settings",
     "noDomainMessage": "No domains configured. Add domains above to restrict access.",
-    "license": "License"
+    "license": "License",
+    "alertCorrelation": "Alert Correlation & Deduplication"
   },
   "reports": {
     "header": "Reports",

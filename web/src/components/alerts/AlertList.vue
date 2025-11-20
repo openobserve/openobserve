@@ -99,6 +99,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
+            :label="t('settings.header')"
+            @click="showCorrelationDrawer = true"
+            data-test="correlation-settings-btn"
+            icon="settings"
+          />
+          <q-btn
+            class="q-ml-sm o2-secondary-button tw-h-[36px]"
+            no-caps
+            flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
@@ -598,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <pre class="tw-bg-gray-100 tw-p-3 tw-rounded tw-text-sm tw-overflow-x-auto" style="white-space: pre-wrap">{{
               selectedAlertDetails.conditions != "" && selectedAlertDetails.conditions != "--"
-                ? (selectedAlertDetails.type == 'sql' ? selectedAlertDetails.conditions : selectedAlertDetails.conditions.length != 2 ? `if ${selectedAlertDetails.conditions}` : 'No condition')
+                ? (selectedAlertDetails.type == 'sql' ? selectedAlertDetails.conditions : (selectedAlertDetails.conditions && selectedAlertDetails.conditions.length != 2) ? `if ${selectedAlertDetails.conditions}` : 'No condition')
                 : "No condition"
             }}</pre>
           </div>
@@ -643,6 +652,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-table>
           </div>
+        </div>
+      </div>
+    </q-drawer>
+
+    <!-- Correlation Settings Drawer -->
+    <q-drawer
+      v-model="showCorrelationDrawer"
+      side="right"
+      :width="800"
+      bordered
+      overlay
+      behavior="mobile"
+      data-test="correlation-settings-drawer"
+    >
+      <div class="tw-h-full tw-flex tw-flex-col">
+        <!-- Drawer Header -->
+        <div class="tw-px-6 tw-py-4 tw-border-b tw-flex tw-items-center tw-justify-between">
+          <div class="tw-flex tw-items-center">
+            <q-icon name="group_work" size="24px" class="tw-mr-2" />
+            <h6 class="tw-text-lg tw-font-semibold tw-m-0">
+              {{ t('settings.alertCorrelation') }}
+            </h6>
+          </div>
+          <q-btn
+            flat
+            round
+            dense
+            icon="close"
+            @click="showCorrelationDrawer = false"
+            data-test="close-correlation-drawer"
+          />
+        </div>
+
+        <!-- Drawer Content -->
+        <div class="tw-flex-1 tw-overflow-y-auto">
+          <OrganizationDeduplicationSettings
+            :org-id="store.state.selectedOrganization.identifier"
+            :config="store.state.organizationSettings?.deduplication_config"
+            @saved="onCorrelationSettingsSaved"
+            @cancel="showCorrelationDrawer = false"
+          />
         </div>
       </div>
     </q-drawer>
@@ -818,6 +868,7 @@ import { nextTick } from "vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
+import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -835,6 +886,7 @@ export default defineComponent({
     AppTabs,
     SelectFolderDropDown,
     AlertHistoryDrawer,
+    OrganizationDeduplicationSettings,
   },
   emits: [
     "updated:fields",
@@ -866,6 +918,7 @@ export default defineComponent({
     const showHistoryDrawer = ref(false);
     const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
+    const showCorrelationDrawer = ref(false);
 
     const { getStreams } = useStreams();
 
@@ -1987,6 +2040,10 @@ export default defineComponent({
       });
     };
 
+    const onCorrelationSettingsSaved = () => {
+      showCorrelationDrawer.value = false;
+    };
+
     const exportAlert = async (row: any) => {
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id);
@@ -2439,6 +2496,8 @@ export default defineComponent({
       importAlert,
       goToAlertInsights,
       goToAlertHistory,
+      showCorrelationDrawer,
+      onCorrelationSettingsSaved,
       getTemplates,
       exportAlert,
       updateActiveFolderId,

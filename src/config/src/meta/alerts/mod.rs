@@ -30,6 +30,7 @@ use crate::{
 };
 
 pub mod alert;
+pub mod correlation;
 pub mod deduplication;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]

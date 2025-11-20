@@ -1465,15 +1465,20 @@ export default defineComponent({
     }
 
     this.formData.is_real_time = this.formData.is_real_time.toString();
-    this.formData.context_attributes = Object.keys(
-      this.formData.context_attributes,
-    ).map((attr) => {
-      return {
-        key: attr,
-        value: this.formData.context_attributes[attr],
-        id: getUUID(),
-      };
-    });
+    // Ensure context_attributes is initialized before using Object.keys
+    if (!this.formData.context_attributes) {
+      this.formData.context_attributes = [];
+    } else if (typeof this.formData.context_attributes === 'object' && !Array.isArray(this.formData.context_attributes)) {
+      this.formData.context_attributes = Object.keys(
+        this.formData.context_attributes,
+      ).map((attr) => {
+        return {
+          key: attr,
+          value: this.formData.context_attributes[attr],
+          id: getUUID(),
+        };
+      });
+    }
     //this is done because 
     //if we are getting the conditions as null or undefined then we need to create a new group 
     //if we are getting the conditions as an object then we need to transform it to the frontend format
