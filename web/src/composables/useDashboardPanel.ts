@@ -1089,7 +1089,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.y.forEach((itemY: any) => {
           itemY.functionName = null;
           // take first arg
-          itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
+          itemY.args = itemY?.args?.length ? [itemY?.args?.[0]] : [];
         });
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
