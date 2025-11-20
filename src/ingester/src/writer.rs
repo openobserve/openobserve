@@ -446,13 +446,19 @@ impl Writer {
             .map(|entry| entry.into_bytes())
             .collect::<Result<Vec<_>>>()?;
 
-        // Bulk convert to Arrow RecordBatch
-        let batch_entries = entries
-            .iter()
-            .map(|entry| {
-                entry.into_batch(self.key.stream_type.clone(), entry.schema.clone().unwrap())
-            })
-            .collect::<Result<Vec<_>>>()?;
+        // Group entries by schema
+        let batch_entries = if entries.len() > 10 {
+            // For larger batches, group by schema
+            self.bulk_into_batch_grouped(&entries)?
+        } else {
+            // For small batches, iteration
+            entries
+                .iter()
+                .map(|entry| {
+                    entry.into_batch(self.key.stream_type.clone(), entry.schema.clone().unwrap())
+                })
+                .collect::<Result<Vec<_>>>()?
+        };
 
         // Calculate total sizes for rotation check
         let (entries_json_size, entries_arrow_size) = batch_entries
@@ -483,6 +489,42 @@ impl Writer {
             entries_json_size,
             entries_arrow_size,
         })
+    }
+
+    /// Group entries by schema and batch convert them to reduce schema operations
+    fn bulk_into_batch_grouped(
+        &self,
+        entries: &[Entry],
+    ) -> Result<Vec<Arc<crate::entry::RecordBatchEntry>>> {
+        use hashbrown::HashMap;
+        let mut schema_groups: HashMap<Arc<Schema>, Vec<usize>> = HashMap::new();
+
+        for (idx, entry) in entries.iter().enumerate() {
+            let schema = entry.schema.as_ref().unwrap().clone();
+            schema_groups.entry(schema).or_default().push(idx);
+        }
+
+        // Pre-allocate results vector
+        let mut results: Vec<(usize, Arc<crate::entry::RecordBatchEntry>)> =
+            Vec::with_capacity(entries.len());
+
+        let stream_type = self.key.stream_type.clone();
+
+        // Process each schema group sequentially
+        // Grouping by schema allows Arrow to optimize within each group
+        for (schema, indices) in schema_groups {
+            // Process all entries with the same schema together
+            // This allows better cache locality and reduces schema-related overhead
+            for idx in indices {
+                let entry = &entries[idx];
+                let batch_entry = entry.into_batch(stream_type.clone(), schema.clone())?;
+                results.push((idx, batch_entry));
+            }
+        }
+
+        // Restore original order (O(n log n))
+        results.sort_unstable_by_key(|(idx, _)| *idx);
+        Ok(results.into_iter().map(|(_, batch)| batch).collect())
     }
 
     async fn consume_processed(&self, batch: crate::ProcessedBatch, fsync: bool) -> Result<()> {

@@ -575,6 +575,71 @@ pub async fn get_uds_and_original_data_streams(
     }
 }
 
+/// Batch prefetch metadata for multiple streams concurrently
+pub async fn batch_get_stream_metadata(
+    org_id: &str,
+    stream_names: &[String],
+    stream_type: StreamType,
+) -> (
+    HashMap<String, Option<ExecutablePipeline>>,
+    HashMap<String, Option<HashSet<String>>>,
+    HashMap<String, bool>,
+    HashMap<String, bool>,
+) {
+    use futures::future::join_all;
+
+    let mut stream_executable_pipelines = HashMap::new();
+    let mut user_defined_schema_map = HashMap::new();
+    let mut streams_need_original = HashMap::new();
+    let mut streams_need_all_values = HashMap::new();
+
+    // Fetch pipelines concurrently
+    let pipeline_futures: Vec<_> = stream_names
+        .iter()
+        .map(|stream_name| async move {
+            let pipeline = get_stream_executable_pipeline(org_id, stream_name, &stream_type).await;
+            (stream_name.clone(), pipeline)
+        })
+        .collect();
+
+    let pipeline_results = join_all(pipeline_futures).await;
+    for (stream_name, pipeline) in pipeline_results {
+        stream_executable_pipelines.insert(stream_name, pipeline);
+    }
+
+    // Collect all streams including pipeline destinations
+    let mut all_streams = Vec::new();
+    for stream_name in stream_names {
+        let mut streams = vec![StreamParams {
+            org_id: org_id.to_owned().into(),
+            stream_type,
+            stream_name: stream_name.to_owned().into(),
+        }];
+
+        if let Some(Some(exec_pl)) = stream_executable_pipelines.get(stream_name) {
+            let pl_destinations = exec_pl.get_all_destination_streams();
+            streams.extend(pl_destinations);
+        }
+        all_streams.extend(streams);
+    }
+
+    // Batch fetch settings for all streams
+    get_uds_and_original_data_streams(
+        &all_streams,
+        &mut user_defined_schema_map,
+        &mut streams_need_original,
+        &mut streams_need_all_values,
+    )
+    .await;
+
+    (
+        stream_executable_pipelines,
+        user_defined_schema_map,
+        streams_need_original,
+        streams_need_all_values,
+    )
+}
+
 /// Calls the SnowflakeIdGenerator instance associated with this stream to generate a new i64 ID.
 pub fn generate_record_id(org_id: &str, stream_name: &str, stream_type: &StreamType) -> i64 {
     let key = format!("{org_id}/{stream_type}/{stream_name}");
