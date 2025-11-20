@@ -25,11 +25,7 @@ pub const O2_TOKENIZER: &str = "o2";
 const MIN_TOKEN_LENGTH: usize = 2;
 const MAX_TOKEN_LENGTH: usize = 64;
 
-pub fn o2_ingest_tokenizer() -> TextAnalyzer {
-    o2_tokenizer_build(CollectType::Ingest)
-}
-
-fn o2_tokenizer_build(collect_type: CollectType) -> TextAnalyzer {
+pub fn o2_tokenizer_build(collect_type: CollectType) -> TextAnalyzer {
     let cfg = get_config();
     let min_token_length =
         std::cmp::max(cfg.limit.inverted_index_min_token_length, MIN_TOKEN_LENGTH);

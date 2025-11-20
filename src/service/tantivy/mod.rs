@@ -26,7 +26,7 @@ use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME, get_config,
     utils::{
         inverted_index::convert_parquet_file_name_to_tantivy_file,
-        tantivy::tokenizer::{O2_TOKENIZER, o2_ingest_tokenizer},
+        tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
     },
 };
 use futures::TryStreamExt;
@@ -168,7 +168,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
 
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
-    tokenizer_manager.register(O2_TOKENIZER, o2_ingest_tokenizer());
+    tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
     let mut index_writer = tantivy::IndexBuilder::new()
         .schema(tantivy_schema.clone())
         .tokenizers(tokenizer_manager)
