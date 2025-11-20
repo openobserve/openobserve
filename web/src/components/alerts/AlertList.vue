@@ -689,6 +689,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-flex-1 tw-overflow-y-auto">
           <OrganizationDeduplicationSettings
             :org-id="store.state.selectedOrganization.identifier"
+            :config="store.state.organizationSettings?.deduplication_config"
             @saved="onCorrelationSettingsSaved"
             @cancel="showCorrelationDrawer = false"
           />

@@ -18,7 +18,9 @@
 //! This module provides functions to store and retrieve org-level alert configs
 //! using the existing key-value DB interface.
 
-use config::meta::alerts::{correlation::CorrelationConfig, deduplication::OrganizationDeduplicationConfig};
+use config::meta::alerts::{
+    correlation::CorrelationConfig, deduplication::GlobalDeduplicationConfig,
+};
 use infra::db;
 
 const MODULE: &str = "alert_config";
@@ -76,13 +78,13 @@ pub async fn delete_correlation_config(org_id: &str) -> Result<(), anyhow::Error
 /// Get deduplication config for an organization
 pub async fn get_deduplication_config(
     org_id: &str,
-) -> Result<Option<OrganizationDeduplicationConfig>, anyhow::Error> {
+) -> Result<Option<GlobalDeduplicationConfig>, anyhow::Error> {
     let key = db::build_key(MODULE, org_id, DEDUPLICATION_KEY, 0);
     let db = db::get_db().await;
 
     match db.get(&key).await {
         Ok(bytes) => {
-            let config: OrganizationDeduplicationConfig = serde_json::from_slice(&bytes)?;
+            let config: GlobalDeduplicationConfig = serde_json::from_slice(&bytes)?;
             Ok(Some(config))
         }
         Err(infra::errors::Error::DbError(infra::errors::DbError::KeyNotExists(_))) => Ok(None),
@@ -93,7 +95,7 @@ pub async fn get_deduplication_config(
 /// Set deduplication config for an organization
 pub async fn set_deduplication_config(
     org_id: &str,
-    config: &OrganizationDeduplicationConfig,
+    config: &GlobalDeduplicationConfig,
 ) -> Result<(), anyhow::Error> {
     let key = db::build_key(MODULE, org_id, DEDUPLICATION_KEY, 0);
     let value = serde_json::to_vec(config)?;

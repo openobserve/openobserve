@@ -36,6 +36,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
+    <!-- Cross-Alert Fingerprint Groups -->
+    <div class="tw-mb-6" v-if="localConfig.cross_alert_dedup">
+      <div class="tw-font-semibold tw-pb-2 tw-flex tw-items-center">
+        Cross-Alert Fingerprint Groups <span class="tw-text-red-500 tw-ml-1">*</span>
+        <q-icon
+          :name="outlinedInfo"
+          size="17px"
+          class="q-ml-xs cursor-pointer"
+          :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+        >
+          <q-tooltip
+            anchor="center right"
+            self="center left"
+            max-width="300px"
+            style="font-size: 12px"
+          >
+            Select which semantic groups to use for cross-alert fingerprinting.
+            Alerts will be deduplicated if they share the same values for these dimensions.
+          </q-tooltip>
+        </q-icon>
+      </div>
+      <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
+        Select at least one semantic group for cross-alert deduplication
+      </div>
+      <div class="tw-flex tw-flex-col tw-gap-2">
+        <q-checkbox
+          v-for="group in localSemanticGroups"
+          :key="group.id"
+          :model-value="localConfig.cross_alert_fingerprint_groups?.includes(group.id)"
+          @update:model-value="(val) => toggleFingerprintGroup(group.id, val)"
+          :label="`${group.display_name} (${group.id})`"
+          dense
+        />
+        <div
+          v-if="!localConfig.cross_alert_fingerprint_groups || localConfig.cross_alert_fingerprint_groups.length === 0"
+          class="tw-text-red-500 tw-text-sm tw-mt-1"
+        >
+          At least one semantic group must be selected
+        </div>
+      </div>
+    </div>
+
     <!-- Time Window -->
     <div class="tw-mb-6">
       <div class="tw-font-semibold tw-pb-2 tw-flex tw-items-center">
@@ -111,6 +153,8 @@ interface SemanticFieldGroup {
 interface OrganizationDeduplicationConfig {
   enabled: boolean;
   semantic_field_groups?: SemanticFieldGroup[];
+  cross_alert_dedup?: boolean;
+  cross_alert_fingerprint_groups?: string[];
   time_window_minutes?: number;
 }
 
@@ -132,6 +176,8 @@ const saving = ref(false);
 
 const localConfig = ref<OrganizationDeduplicationConfig>({
   enabled: true,
+  cross_alert_dedup: props.config?.cross_alert_dedup ?? true,
+  cross_alert_fingerprint_groups: props.config?.cross_alert_fingerprint_groups ?? [],
   time_window_minutes: props.config?.time_window_minutes ?? undefined,
   semantic_field_groups: props.config?.semantic_field_groups ?? [],
 });
@@ -142,6 +188,21 @@ const localSemanticGroups = ref<SemanticFieldGroup[]>(
 
 const handleSemanticGroupsUpdate = (groups: SemanticFieldGroup[]) => {
   localConfig.value.semantic_field_groups = groups;
+};
+
+const toggleFingerprintGroup = (groupId: string, checked: boolean) => {
+  if (!localConfig.value.cross_alert_fingerprint_groups) {
+    localConfig.value.cross_alert_fingerprint_groups = [];
+  }
+
+  if (checked) {
+    if (!localConfig.value.cross_alert_fingerprint_groups.includes(groupId)) {
+      localConfig.value.cross_alert_fingerprint_groups.push(groupId);
+    }
+  } else {
+    localConfig.value.cross_alert_fingerprint_groups =
+      localConfig.value.cross_alert_fingerprint_groups.filter((id) => id !== groupId);
+  }
 };
 
 const emitUpdate = () => {
@@ -176,6 +237,29 @@ const saveSettings = async () => {
   }
 };
 
+// Fetch config on mount if not provided
+const loadConfig = async () => {
+  if (!props.config) {
+    try {
+      const response = await alertsService.getOrganizationDeduplicationConfig(props.orgId);
+      const config = response.data;
+      localConfig.value = {
+        enabled: config.enabled ?? true,
+        cross_alert_dedup: config.cross_alert_dedup ?? false,
+        cross_alert_fingerprint_groups: config.cross_alert_fingerprint_groups ?? [],
+        time_window_minutes: config.time_window_minutes ?? undefined,
+        semantic_field_groups: config.semantic_field_groups ?? [],
+      };
+      localSemanticGroups.value = config.semantic_field_groups ?? [];
+    } catch (error) {
+      console.log("No existing config, using defaults");
+    }
+  }
+};
+
+// Load config on mount
+loadConfig();
+
 // Watch for external changes
 watch(
   () => props.config,
@@ -183,6 +267,8 @@ watch(
     if (newVal) {
       localConfig.value = {
         enabled: true,
+        cross_alert_dedup: newVal.cross_alert_dedup ?? false,
+        cross_alert_fingerprint_groups: newVal.cross_alert_fingerprint_groups ?? [],
         time_window_minutes: newVal.time_window_minutes ?? undefined,
         semantic_field_groups: newVal.semantic_field_groups ?? [],
       };

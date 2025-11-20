@@ -21,7 +21,7 @@
 use config::{
     meta::alerts::{
         alert::Alert,
-        deduplication::{DeduplicationConfig, OrganizationDeduplicationConfig},
+        deduplication::{DeduplicationConfig, GlobalDeduplicationConfig},
     },
     utils::json::{Map, Value},
 };
@@ -36,13 +36,10 @@ pub fn calculate_fingerprint(
     alert: &Alert,
     result_row: &Map<String, Value>,
     config: &DeduplicationConfig,
-    org_config: Option<&OrganizationDeduplicationConfig>,
+    org_config: Option<&GlobalDeduplicationConfig>,
 ) -> String {
     o2_enterprise::enterprise::alerts::dedup::calculate_fingerprint(
-        alert,
-        result_row,
-        config,
-        org_config,
+        alert, result_row, config, org_config,
     )
 }
 
@@ -58,6 +55,7 @@ pub async fn get_dedup_state(
 
 /// Parameters for saving deduplication state
 pub struct DedupStateParams<'a> {
+    pub org_id: &'a str,
     pub fingerprint: &'a str,
     pub alert_id: &'a str,
     pub first_seen_at: i64,
@@ -79,12 +77,17 @@ pub async fn save_dedup_state(
         active.update(db).await
     } else {
         // Insert new
+        let now = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros();
         let new_state = alert_dedup_state::ActiveModel {
+            org_id: Set(params.org_id.to_string()),
             fingerprint: Set(params.fingerprint.to_string()),
             alert_id: Set(params.alert_id.to_string()),
             first_seen_at: Set(params.first_seen_at),
             last_seen_at: Set(params.last_seen_at),
             occurrence_count: Set(params.occurrence_count),
+            notification_sent: Set(false),
+            created_at: Set(now),
+            incident_id: Set(None),
         };
         new_state.insert(db).await
     }
@@ -122,8 +125,6 @@ pub async fn find_matching_semantic_fingerprints(
     semantic_dimensions: &std::collections::HashMap<String, String>,
     time_window_minutes: i64,
 ) -> Result<Vec<alert_dedup_state::Model>, sea_orm::DbErr> {
-    
-
     let cutoff_time = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros()
         - (time_window_minutes * 60 * 1_000_000);
 
@@ -191,11 +192,11 @@ async fn apply_deduplication_impl(
     alert: &Alert,
     result_rows: Vec<Map<String, Value>>,
     dedup_config: &DeduplicationConfig,
-    org_config: Option<&OrganizationDeduplicationConfig>,
+    org_config: Option<&GlobalDeduplicationConfig>,
 ) -> Result<Vec<Map<String, Value>>, sea_orm::DbErr> {
     let now = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros();
     let alert_id = alert.get_unique_key();
-    let _org_id = &alert.org_id;
+    let org_id = &alert.org_id;
 
     // Determine effective time window using enterprise logic
     let time_window_minutes = o2_enterprise::enterprise::alerts::dedup::get_effective_time_window(
@@ -216,6 +217,7 @@ async fn apply_deduplication_impl(
                     if let Err(e) = save_dedup_state(
                         db,
                         DedupStateParams {
+                            org_id: org_id.as_str(),
                             fingerprint: &fingerprint,
                             alert_id: &alert_id,
                             first_seen_at: existing_state.first_seen_at,
@@ -248,6 +250,7 @@ async fn apply_deduplication_impl(
             if let Err(e) = save_dedup_state(
                 db,
                 DedupStateParams {
+                    org_id: org_id.as_str(),
                     fingerprint: &fingerprint,
                     alert_id: &alert_id,
                     first_seen_at: now,

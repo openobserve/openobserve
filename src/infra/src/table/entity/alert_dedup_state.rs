@@ -25,12 +25,20 @@ pub struct Model {
     pub fingerprint: String,
     /// Alert ID reference
     pub alert_id: String,
+    /// org_id
+    pub org_id: String,
     /// First time this fingerprint was seen (microseconds)
     pub first_seen_at: i64,
     /// Last time this fingerprint was seen (microseconds)
     pub last_seen_at: i64,
     /// Number of occurrences
     pub occurrence_count: i64,
+    /// Whether notification was sent
+    pub notification_sent: bool,
+    /// Created timestamp
+    pub created_at: i64,
+    /// Associated incident ID (if correlated)
+    pub incident_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -60,11 +68,15 @@ mod tests {
     #[test]
     fn test_model_creation() {
         let model = Model {
+            incident_id: Some("test".to_string()),
+            org_id: "test_org_id".to_string(),
             fingerprint: "test_fingerprint_123".to_string(),
             alert_id: "alert_id_456".to_string(),
             first_seen_at: 1234567890_000000,
             last_seen_at: 1234567890_000000,
             occurrence_count: 1,
+            notification_sent: false,
+            created_at: 1234567890_000000,
         };
 
         assert_eq!(model.fingerprint, "test_fingerprint_123");

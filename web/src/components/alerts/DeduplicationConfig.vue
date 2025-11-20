@@ -185,10 +185,14 @@ const localConfig = ref<DeduplicationConfig>({
 
 const emitUpdate = () => {
   // Always emit as enabled
+  // Convert empty string to null for time_window_minutes
+  const timeWindow = localConfig.value.time_window_minutes;
+  const timeWindowValue = (timeWindow === "" || timeWindow === undefined) ? null : timeWindow;
+
   emit("update:modelValue", {
     enabled: true,
     fingerprint_fields: localConfig.value.fingerprint_fields,
-    time_window_minutes: localConfig.value.time_window_minutes,
+    time_window_minutes: timeWindowValue,
     grouping: undefined,
   });
 };

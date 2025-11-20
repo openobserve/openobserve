@@ -195,6 +195,15 @@ const alerts = {
     if (query.sort_order) params.append("sort_order", query.sort_order);
     return http().get(`/api/${org_identifier}/alerts/history?${params}`);
   },
+  getOrganizationDeduplicationConfig: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/alerts/deduplication/config`);
+  },
+  setOrganizationDeduplicationConfig: (org_identifier: string, data: any) => {
+    return http().post(`/api/${org_identifier}/alerts/deduplication/config`, data);
+  },
+  deleteOrganizationDeduplicationConfig: (org_identifier: string) => {
+    return http().delete(`/api/${org_identifier}/alerts/deduplication/config`);
+  },
 };
 
 export default alerts;

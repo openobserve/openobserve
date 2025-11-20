@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -41,12 +42,12 @@ pub struct SemanticFieldGroup {
     pub id: String,
 
     /// Human-readable display name (e.g., "Host", "K8s Cluster")
-    pub display_name: String,
+    pub display: String,
 
     /// List of field names that are equivalent (e.g., ["host", "hostname", "node"])
     ///
     /// Note: Field names can overlap with other groups. First-defined group wins.
-    pub field_names: Vec<String>,
+    pub fields: Vec<String>,
 
     /// Whether to normalize values (lowercase + trim)
     #[serde(default)]
@@ -54,106 +55,93 @@ pub struct SemanticFieldGroup {
 }
 
 impl SemanticFieldGroup {
+    pub fn new(
+        id: impl Into<String>,
+        display: impl Into<String>,
+        fields: &[&str],
+        normalize: bool,
+    ) -> Self {
+        let fields = fields.iter().map(|v| v.to_string()).collect_vec();
+
+        Self {
+            id: id.into(),
+            display: display.into(),
+            fields,
+            normalize,
+        }
+    }
     /// Get default semantic groups for common use cases
-    pub fn default_presets() -> Vec<SemanticFieldGroup> {
+    pub fn default_presets() -> Vec<Self> {
         vec![
-            // Common groups
-            SemanticFieldGroup {
-                id: "host".to_string(),
-                display_name: "Host".to_string(),
-                field_names: vec![
-                    "host".to_string(),
-                    "hostname".to_string(),
-                    "node".to_string(),
-                    "node_name".to_string(),
-                    "server".to_string(),
-                    "machine".to_string(),
+            Self::new(
+                "host",
+                "Host",
+                &["host", "hostname", "node", "node_name"],
+                true,
+            ),
+            Self::new(
+                "ip-address",
+                "IP Address",
+                &[
+                    "ip",
+                    "ipaddr",
+                    "ip_address",
+                    "ip_addr",
+                    "client_ip",
+                    "source_ip",
+                    "host_ip",
                 ],
-                normalize: true,
-            },
-            SemanticFieldGroup {
-                id: "ip-address".to_string(),
-                display_name: "IP Address".to_string(),
-                field_names: vec![
-                    "ip".to_string(),
-                    "ipaddr".to_string(),
-                    "ip_address".to_string(),
-                    "ip_addr".to_string(),
-                    "client_ip".to_string(),
-                    "source_ip".to_string(),
-                    "host_ip".to_string(),
+                true,
+            ),
+            Self::new(
+                "service",
+                "Service",
+                &[
+                    "service",
+                    "service_name",
+                    "svc",
+                    "app",
+                    "application",
+                    "app_name",
                 ],
-                normalize: true,
-            },
-            SemanticFieldGroup {
-                id: "service".to_string(),
-                display_name: "Service".to_string(),
-                field_names: vec![
-                    "service".to_string(),
-                    "service_name".to_string(),
-                    "svc".to_string(),
-                    "app".to_string(),
-                    "application".to_string(),
-                    "app_name".to_string(),
-                ],
-                normalize: true,
-            },
+                true,
+            ),
             // Kubernetes groups
-            SemanticFieldGroup {
-                id: "k8s-cluster".to_string(),
-                display_name: "K8s Cluster".to_string(),
-                field_names: vec![
-                    "k8s_cluster".to_string(),
-                    "cluster".to_string(),
-                    "cluster_name".to_string(),
-                    "cluster_id".to_string(),
+            Self::new(
+                "k8s-cluster",
+                "K8s Cluster",
+                &["k8s_cluster", "cluster", "cluster_name", "cluster_id"],
+                false,
+            ),
+            Self::new(
+                "k8s-namespace",
+                "K8s Namespace",
+                &["k8s_namespace", "namespace", "k8s_ns", "ns"],
+                false,
+            ),
+            Self::new(
+                "k8s-pod",
+                "K8s Pod",
+                &["k8s_pod", "pod", "pod_name", "pod_id"],
+                false,
+            ),
+            Self::new(
+                "k8s-node",
+                "K8s Node",
+                &["k8s_node", "node", "node_name", "kubernetes_node"],
+                false,
+            ),
+            Self::new(
+                "k8s-container",
+                "K8s Container",
+                &[
+                    "container",
+                    "container_name",
+                    "container_id",
+                    "k8s_container",
                 ],
-                normalize: false,
-            },
-            SemanticFieldGroup {
-                id: "k8s-namespace".to_string(),
-                display_name: "K8s Namespace".to_string(),
-                field_names: vec![
-                    "k8s_namespace".to_string(),
-                    "namespace".to_string(),
-                    "k8s_ns".to_string(),
-                    "ns".to_string(),
-                ],
-                normalize: false,
-            },
-            SemanticFieldGroup {
-                id: "k8s-pod".to_string(),
-                display_name: "K8s Pod".to_string(),
-                field_names: vec![
-                    "k8s_pod".to_string(),
-                    "pod".to_string(),
-                    "pod_name".to_string(),
-                    "pod_id".to_string(),
-                ],
-                normalize: false,
-            },
-            SemanticFieldGroup {
-                id: "k8s-node".to_string(),
-                display_name: "K8s Node".to_string(),
-                field_names: vec![
-                    "k8s_node".to_string(),
-                    "node".to_string(),
-                    "node_name".to_string(),
-                    "kubernetes_node".to_string(),
-                ],
-                normalize: false,
-            },
-            SemanticFieldGroup {
-                id: "k8s-container".to_string(),
-                display_name: "K8s Container".to_string(),
-                field_names: vec![
-                    "container".to_string(),
-                    "container_name".to_string(),
-                    "container_id".to_string(),
-                    "k8s_container".to_string(),
-                ],
-                normalize: false,
-            },
+                false,
+            ),
         ]
     }
 
@@ -182,7 +170,7 @@ impl SemanticFieldGroup {
 /// Per-alert fingerprint fields are stored in the Alert.deduplication field.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]
-pub struct OrganizationDeduplicationConfig {
+pub struct GlobalDeduplicationConfig {
     /// Enable/disable deduplication globally for this organization
     #[serde(default)]
     pub enabled: bool,
@@ -209,7 +197,18 @@ pub struct OrganizationDeduplicationConfig {
     /// - If cross_alert_dedup=true: Alert B suppressed (shares "host" dimension)
     /// - If cross_alert_dedup=false: Both sent (per-alert dedup only)
     #[serde(default)]
-    pub cross_alert_dedup: bool,
+    pub alert_dedup_enabled: bool,
+
+    /// Semantic group IDs to use for cross-alert fingerprinting
+    ///
+    /// When cross_alert_dedup is enabled, these semantic group IDs are used
+    /// to generate fingerprints across all alerts (instead of per-alert fingerprint_fields).
+    /// Must reference IDs from semantic_field_groups.
+    ///
+    /// Example: ["host", "service"] means fingerprint = hash(host_value + service_value)
+    /// Required when cross_alert_dedup is true.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub alert_fingerprint_groups: Vec<String>,
 
     /// Default time window in minutes for deduplication
     ///
@@ -317,11 +316,34 @@ fn default_group_wait() -> i64 {
     30
 }
 
-impl OrganizationDeduplicationConfig {
+impl GlobalDeduplicationConfig {
     /// Validate the organization-level deduplication configuration
     pub fn validate(&self) -> Result<(), String> {
         if !self.enabled {
             return Ok(());
+        }
+
+        // Validate cross-alert fingerprint groups reference existing semantic groups
+        if self.alert_dedup_enabled && !self.alert_fingerprint_groups.is_empty() {
+            let semantic_group_ids: std::collections::HashSet<_> =
+                self.semantic_field_groups.iter().map(|g| &g.id).collect();
+
+            for group_id in &self.alert_fingerprint_groups {
+                if !semantic_group_ids.contains(group_id) {
+                    return Err(format!(
+                        "Cross-alert fingerprint group '{}' not found in semantic_field_groups",
+                        group_id
+                    ));
+                }
+            }
+        }
+
+        // Require at least one fingerprint group when cross-alert dedup is enabled
+        if self.alert_dedup_enabled && self.alert_fingerprint_groups.is_empty() {
+            return Err(
+                "cross_alert_fingerprint_groups is required when cross_alert_dedup is enabled"
+                    .to_string(),
+            );
         }
 
         // Validate semantic groups
@@ -348,7 +370,7 @@ impl OrganizationDeduplicationConfig {
             }
 
             // Validate display name
-            if group.display_name.is_empty() {
+            if group.display.is_empty() {
                 return Err(format!(
                     "Display name required for semantic group '{}'",
                     group.id
@@ -356,14 +378,14 @@ impl OrganizationDeduplicationConfig {
             }
 
             // Validate field names
-            if group.field_names.is_empty() {
+            if group.fields.is_empty() {
                 return Err(format!(
                     "Semantic group '{}' must have at least one field name",
                     group.id
                 ));
             }
 
-            if group.field_names.len() > 20 {
+            if group.fields.len() > 20 {
                 return Err(format!(
                     "Semantic group '{}' has too many field names (max 20)",
                     group.id
@@ -372,7 +394,7 @@ impl OrganizationDeduplicationConfig {
 
             // Track field name overlaps (warn but allow)
             // Precedence: first-defined group wins when extracting dimensions
-            for field_name in &group.field_names {
+            for field_name in &group.fields {
                 if let Some(existing_group_id) = field_name_to_group.get(field_name) {
                     log::warn!(
                         "[deduplication] Field name '{field_name}' appears in multiple semantic groups: '{existing_group_id}' and '{}'. Using first occurrence (group '{existing_group_id}').",
@@ -392,7 +414,8 @@ impl OrganizationDeduplicationConfig {
         Self {
             enabled: false,
             semantic_field_groups: SemanticFieldGroup::default_presets(),
-            cross_alert_dedup: false,
+            alert_dedup_enabled: false,
+            alert_fingerprint_groups: vec![],
             time_window_minutes: None,
         }
     }
@@ -403,7 +426,7 @@ impl OrganizationDeduplicationConfig {
     /// Used for reverse lookup: actual field name → semantic dimension.
     pub fn get_semantic_group_id(&self, field_name: &str) -> Option<&str> {
         for group in &self.semantic_field_groups {
-            if group.field_names.iter().any(|f| f == field_name) {
+            if group.fields.iter().any(|f| f == field_name) {
                 return Some(&group.id);
             }
         }
@@ -520,32 +543,23 @@ mod tests {
 
     #[test]
     fn test_organization_deduplication_config_default() {
-        let config = OrganizationDeduplicationConfig::default();
+        let config = GlobalDeduplicationConfig::default();
         assert!(!config.enabled);
-        assert!(!config.cross_alert_dedup);
+        assert!(!config.alert_dedup_enabled);
         assert!(config.semantic_field_groups.is_empty());
         assert_eq!(config.time_window_minutes, None);
     }
 
     #[test]
     fn test_organization_deduplication_config_validation() {
-        let mut config = OrganizationDeduplicationConfig {
+        let mut config = GlobalDeduplicationConfig {
             enabled: true,
-            cross_alert_dedup: false,
+            alert_dedup_enabled: false,
             semantic_field_groups: vec![
-                SemanticFieldGroup {
-                    id: "service".to_string(),
-                    display_name: "Service".to_string(),
-                    field_names: vec!["service".to_string(), "service_name".to_string()],
-                    normalize: true,
-                },
-                SemanticFieldGroup {
-                    id: "host".to_string(),
-                    display_name: "Host".to_string(),
-                    field_names: vec!["host".to_string(), "hostname".to_string()],
-                    normalize: true,
-                },
+                SemanticFieldGroup::new("service", "Service", &["service", "service_name"], true),
+                SemanticFieldGroup::new("host", "Host", &["host", "hostname"], true),
             ],
+            alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
         };
 
@@ -557,21 +571,21 @@ mod tests {
         config.semantic_field_groups[0].id = "service".to_string();
 
         // Test duplicate ID
-        config.semantic_field_groups.push(SemanticFieldGroup {
-            id: "service".to_string(),
-            display_name: "Service 2".to_string(),
-            field_names: vec!["svc".to_string()],
-            normalize: true,
-        });
+        config.semantic_field_groups.push(SemanticFieldGroup::new(
+            "service",
+            "Service 2",
+            &["svc"],
+            true,
+        ));
         assert!(config.validate().is_err());
         config.semantic_field_groups.pop();
 
         // Test overlapping field names - allowed with warning
         config.semantic_field_groups[1]
-            .field_names
+            .fields
             .push("service".to_string());
         assert!(config.validate().is_ok()); // Should succeed, just warns
-        config.semantic_field_groups[1].field_names.pop();
+        config.semantic_field_groups[1].fields.pop();
     }
 
     #[test]
@@ -599,23 +613,24 @@ mod tests {
     fn test_organization_config_overlapping_field_names() {
         // Test that overlapping field names are allowed (with warning)
         // Precedence: first-defined group wins
-        let config = OrganizationDeduplicationConfig {
+        let config = GlobalDeduplicationConfig {
             enabled: true,
-            cross_alert_dedup: false,
+            alert_dedup_enabled: false,
             semantic_field_groups: vec![
-                SemanticFieldGroup {
-                    id: "service-primary".to_string(),
-                    display_name: "Primary Service".to_string(),
-                    field_names: vec!["service".to_string(), "primary_service".to_string()],
-                    normalize: true,
-                },
-                SemanticFieldGroup {
-                    id: "service-backup".to_string(),
-                    display_name: "Backup Service".to_string(),
-                    field_names: vec!["service".to_string(), "backup_service".to_string()], /* "service" overlaps */
-                    normalize: true,
-                },
+                SemanticFieldGroup::new(
+                    "service-primary",
+                    "Primary Service",
+                    &["service", "primary_service"],
+                    true,
+                ),
+                SemanticFieldGroup::new(
+                    "service-backup",
+                    "Backup Service",
+                    &["service", "backup_service"],
+                    true,
+                ), // "service" overlaps
             ],
+            alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
         };
 
@@ -625,28 +640,19 @@ mod tests {
 
     #[test]
     fn test_organization_deduplication_config_serialization() {
-        let config = OrganizationDeduplicationConfig {
+        let config = GlobalDeduplicationConfig {
             enabled: true,
-            cross_alert_dedup: true,
+            alert_dedup_enabled: true,
             semantic_field_groups: vec![
-                SemanticFieldGroup {
-                    id: "service".to_string(),
-                    display_name: "Service".to_string(),
-                    field_names: vec!["service".to_string(), "service_name".to_string()],
-                    normalize: true,
-                },
-                SemanticFieldGroup {
-                    id: "host".to_string(),
-                    display_name: "Host".to_string(),
-                    field_names: vec!["host".to_string(), "hostname".to_string()],
-                    normalize: true,
-                },
+                SemanticFieldGroup::new("service", "Service", &["service", "service_name"], true),
+                SemanticFieldGroup::new("host", "Host", &["host", "hostname"], true),
             ],
+            alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
         };
 
         let json = serde_json::to_string_pretty(&config).unwrap();
-        let deserialized: OrganizationDeduplicationConfig = serde_json::from_str(&json).unwrap();
+        let deserialized: GlobalDeduplicationConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(config, deserialized);
     }
 
@@ -688,7 +694,7 @@ mod tests {
 
     #[test]
     fn test_organization_config_minimal_serialization() {
-        let config = OrganizationDeduplicationConfig {
+        let config = GlobalDeduplicationConfig {
             enabled: true,
             ..Default::default()
         };
@@ -700,7 +706,10 @@ mod tests {
         // time_window_minutes should be omitted when None
         assert!(json.get("time_window_minutes").is_none());
         // cross_alert_dedup should be false by default
-        assert_eq!(json.get("cross_alert_dedup").and_then(|v| v.as_bool()), Some(false));
+        assert_eq!(
+            json.get("cross_alert_dedup").and_then(|v| v.as_bool()),
+            Some(false)
+        );
     }
 
     #[test]
@@ -716,8 +725,8 @@ mod tests {
         // Validate all preset IDs
         for preset in &presets {
             assert!(SemanticFieldGroup::validate_id(&preset.id));
-            assert!(!preset.display_name.is_empty());
-            assert!(!preset.field_names.is_empty());
+            assert!(!preset.display.is_empty());
+            assert!(!preset.fields.is_empty());
         }
     }
 }
