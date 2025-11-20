@@ -1285,10 +1285,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 128)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
     pub max_file_size_in_memory: usize,
     #[deprecated(
         since = "0.14.1",
@@ -1386,7 +1386,7 @@ pub struct Limit {
     pub logs_file_retention: String,
     #[env_config(name = "ZO_TRACES_FILE_RETENTION", default = "hourly")]
     pub traces_file_retention: String,
-    #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "daily")]
+    #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "hourly")]
     pub metrics_file_retention: String,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
     pub metrics_leader_push_interval: u64,
@@ -1754,7 +1754,7 @@ pub struct DiskCache {
     #[env_config(name = "ZO_DISK_CACHE_ENABLED", default = true)]
     pub enabled: bool,
     // Disk data cache strategy, default is lru, other value is fifo, time_lru
-    #[env_config(name = "ZO_DISK_CACHE_STRATEGY", default = "lru")]
+    #[env_config(name = "ZO_DISK_CACHE_STRATEGY", default = "time_lru")]
     pub cache_strategy: String,
     // Disk data cache bucket num, multiple bucket means multiple locker, default is 0
     #[env_config(name = "ZO_DISK_CACHE_BUCKET_NUM", default = 0)]
@@ -2095,7 +2095,7 @@ pub struct Pipeline {
     pub max_retry_time_in_hours: u64,
     #[env_config(
         name = "ZO_PIPELINE_MAX_FILE_SIZE_ON_DISK_MB",
-        default = 128,
+        default = 256,
         help = "pipeline max file size on disk in MB"
     )]
     pub pipeline_max_file_size_on_disk_mb: usize,
@@ -2449,13 +2449,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check max_file_size_on_disk to MB
     if cfg.limit.max_file_size_on_disk == 0 {
-        cfg.limit.max_file_size_on_disk = 128 * 1024 * 1024; // 128MB
+        cfg.limit.max_file_size_on_disk = 256 * 1024 * 1024; // 256MB
     } else {
         cfg.limit.max_file_size_on_disk *= 1024 * 1024;
     }
     // check max_file_size_in_memory to MB
     if cfg.limit.max_file_size_in_memory == 0 {
-        cfg.limit.max_file_size_in_memory = 128 * 1024 * 1024; // 128MB
+        cfg.limit.max_file_size_in_memory = 256 * 1024 * 1024; // 256MB
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }
