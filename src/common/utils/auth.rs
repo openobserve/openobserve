@@ -712,7 +712,7 @@ impl FromRequest for AuthExtractor {
                         || path.contains("/re_patterns/bulk")
                         || path.contains("/alerts/templates/bulk")
                         || path.contains("/alerts/destinations/bulk")
-                        || (path.starts_with("/v2/") && path.contains("/alerts/bulk"))
+                        || (path.starts_with("v2/") && path.contains("/alerts/bulk"))
                         || path.contains("/dashboards/bulk")
                         || path.contains("/pipelines/bulk")
                         || path.contains("/actions/bulk")
