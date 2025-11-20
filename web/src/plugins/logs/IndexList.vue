@@ -728,7 +728,7 @@ export default defineComponent({
             // Implement streaming based field values, check getQueryData in useLogs for streaming enabled
             fetchValuesWithWebsocket({
               fields: [name],
-              size: 10,
+              size: store.state.zoConfig.query_values_default_num || 10,
               no_count: false,
               regions: searchObj.meta.regions,
               clusters: searchObj.meta.clusters,
@@ -1233,8 +1233,8 @@ export default defineComponent({
           // Sort by count in descending order
           aggregatedArray.sort((a, b) => b.count - a.count);
 
-          // Take top 10
-          fieldValues.value[fieldName].values = aggregatedArray.slice(0, 10);
+          // Take top N
+          fieldValues.value[fieldName].values = aggregatedArray.slice(0, store.state.zoConfig.query_values_default_num || 10);
         }
 
         // Mark as not loading

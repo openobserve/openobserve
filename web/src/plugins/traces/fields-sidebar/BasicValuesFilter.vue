@@ -221,7 +221,7 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
         start_time: searchObj.data.datetime.startTime,
         end_time: searchObj.data.datetime.endTime,
         fields: [name],
-        size: 10,
+        size: size: store.state.zoConfig.query_values_default_num || 10,
         type: "traces",
         query_context,
       })

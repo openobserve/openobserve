@@ -287,10 +287,10 @@ const useMetricsExplorer = () => {
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
           ? "x_axis_" +
-            (dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.x.length +
-              1)
+          (dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.x.length +
+            1)
           : row.name,
         column: row.name,
         color: null,
@@ -338,10 +338,10 @@ const useMetricsExplorer = () => {
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
           ? "y_axis_" +
-            (dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.y.length +
-              1)
+          (dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.y.length +
+            1)
           : row.name,
         column: row.name,
         color: getNewColorValue(),
@@ -384,10 +384,10 @@ const useMetricsExplorer = () => {
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
           ? "z_axis_" +
-            (dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.z.length +
-              1)
+          (dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.z.length +
+            1)
           : row.name,
         column: row.name,
         color: getNewColorValue(),
@@ -545,31 +545,31 @@ const useMetricsExplorer = () => {
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.x?.forEach(
       (it: any, index: any) =>
-        (it.alias = !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? "x_axis_" + (index + 1)
-          : it?.column)
+      (it.alias = !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].customQuery
+        ? "x_axis_" + (index + 1)
+        : it?.column)
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.y?.forEach(
       (it: any, index: any) =>
-        (it.alias = !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? "y_axis_" + (index + 1)
-          : it?.column)
+      (it.alias = !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].customQuery
+        ? "y_axis_" + (index + 1)
+        : it?.column)
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.z?.forEach(
       (it: any, index: any) =>
-        (it.alias = !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? "z_axis_" + (index + 1)
-          : it?.column)
+      (it.alias = !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].customQuery
+        ? "z_axis_" + (index + 1)
+        : it?.column)
     );
   };
 
@@ -687,7 +687,7 @@ const useMetricsExplorer = () => {
         dashboardPanelData.meta.dateTime["end_time"].toISOString()
       ).getTime(),
       fields: [name],
-      size: 10,
+      size: store.state.zoConfig.query_values_default_num || 10,
       type: dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.stream_type,
@@ -731,7 +731,7 @@ const useMetricsExplorer = () => {
         dashboardPanelData.meta.dateTime["end_time"].toISOString()
       ).getTime(),
       fields: [name],
-      size: 10,
+      size: store.state.zoConfig.query_values_default_num || 10,
       type: dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.stream_type,
@@ -867,9 +867,9 @@ const useMetricsExplorer = () => {
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields.x.length +
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields.y.length
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.y.length
             ) {
               currentFieldType = "y";
             } else {
@@ -886,23 +886,23 @@ const useMetricsExplorer = () => {
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields.y[
-                  index -
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.x.length
+                index -
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.x.length
                 ];
             } else {
               field =
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields.z[
-                  index -
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.x.length -
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.y.length
+                index -
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.x.length -
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.y.length
                 ];
             }
 

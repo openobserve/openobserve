@@ -407,7 +407,7 @@ export default defineComponent({
             end_time: endISOTimestamp,
             fields: [name],
             type: "metrics",
-            size: 10,
+            size: store.state.zoConfig.query_values_default_num || 10,
           })
           .then((res: any) => {
             if (res.data.hits.length) {

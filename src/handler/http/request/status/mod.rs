@@ -153,6 +153,7 @@ struct ConfigResponse<'a> {
     #[cfg(feature = "enterprise")]
     ingestion_quota_used: f64,
     log_page_default_field_list: String,
+    query_values_default_num: usize,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -406,6 +407,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         license_server_url,
         #[cfg(feature = "enterprise")]
         ingestion_quota_used,
+        query_values_default_num: cfg.limit.query_values_default_num,
     }))
 }
 
