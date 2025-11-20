@@ -17,6 +17,8 @@ use actix_web::{HttpResponse, post, web};
 
 #[cfg(feature = "enterprise")]
 use crate::handler::http::request::search::utils::check_stream_permissions;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::extractors::Headers,
@@ -158,7 +160,7 @@ pub async fn extract_patterns(
         // This determines the maximum number of logs to analyze for pattern detection
         // Default is 10K which aligns with industry standards for pattern quality
         if req.query.size == 0 || req.query.size == -1 {
-            let o2_config = o2_enterprise::get_o2_config();
+            let o2_config = get_o2_config();
             req.query.size = if o2_config.log_patterns.max_logs_for_extraction > 0 {
                 o2_config.log_patterns.max_logs_for_extraction as i64
             } else {
