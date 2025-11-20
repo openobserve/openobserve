@@ -17,10 +17,27 @@ use std::str::CharIndices;
 
 use tantivy::tokenizer::{Token, TokenStream, Tokenizer};
 
+#[derive(Default, Clone)]
+pub enum CollectType {
+    #[default]
+    Ingest,
+    Search,
+}
+
 /// Tokenize the text by splitting on whitespaces and punctuation.
 #[derive(Clone, Default)]
 pub struct O2Tokenizer {
     token: Token,
+    collect_type: CollectType,
+}
+
+impl O2Tokenizer {
+    pub fn new(collect_type: CollectType) -> Self {
+        Self {
+            collect_type,
+            ..Default::default()
+        }
+    }
 }
 
 /// TokenStream produced by the `O2Tokenizer`.
@@ -30,6 +47,7 @@ pub struct O2TokenStream<'a> {
     token: &'a mut Token,
     buffer: Vec<&'a str>,
     buffer_offset: usize,
+    collect_type: CollectType,
 }
 
 impl Tokenizer for O2Tokenizer {
@@ -42,6 +60,7 @@ impl Tokenizer for O2Tokenizer {
             token: &mut self.token,
             buffer: Vec::new(),
             buffer_offset: 0,
+            collect_type: self.collect_type.clone(),
         }
     }
 }
@@ -112,10 +131,15 @@ impl TokenStream for O2TokenStream<'_> {
                         }
 
                         // Emit the root token first (the full "CamelCase" before splits)
-                        self.token.offset_from = offset_from;
-                        self.token.offset_to = offset_to;
-                        self.token.text.push_str(token_text);
-                        return true;
+                        if matches!(self.collect_type, CollectType::Ingest) {
+                            self.token.offset_from = offset_from;
+                            self.token.offset_to = offset_to;
+                            self.token.text.push_str(token_text);
+                            return true;
+                        } else {
+                            // Search mode - skip root token and emit first buffered split
+                            return self.get_buffer_token();
+                        }
                     }
                     // If splits.len() == 1, fall through to emit normally
                 }
@@ -216,8 +240,8 @@ mod tests {
         assert_eq!(token.offset_to, to, "expected offset_to {to} but {token:?}");
     }
 
-    fn token_stream_helper(text: &str) -> Vec<Token> {
-        let mut a = TextAnalyzer::from(O2Tokenizer::default());
+    fn token_stream_helper(text: &str, collect_type: CollectType) -> Vec<Token> {
+        let mut a = TextAnalyzer::from(O2Tokenizer::new(collect_type));
         let mut token_stream = a.token_stream(text);
         let mut tokens: Vec<Token> = vec![];
         let mut add_token = |token: &Token| {
@@ -231,6 +255,7 @@ mod tests {
     fn test_o2_tokenizer() {
         let tokens = token_stream_helper(
             "Hello, happy tax payer!민족어대사전中文的ErrorExceptionAndHTTPResponse",
+            CollectType::Ingest,
         );
         assert_eq!(tokens.len(), 19);
         assert_token(&tokens[0], 0, "Hello", 0, 5);
@@ -255,8 +280,37 @@ mod tests {
     }
 
     #[test]
+    fn test_o2_tokenizer_search() {
+        // Search mode - no root token for camelCase
+        let tokens = token_stream_helper(
+            "Hello, happy tax payer!민족어대사전中文的ErrorExceptionAndHTTPResponse",
+            CollectType::Search,
+        );
+        assert_eq!(tokens.len(), 18); // No root token for ErrorExceptionAndHTTPResponse
+        assert_token(&tokens[0], 0, "Hello", 0, 5);
+        assert_token(&tokens[1], 1, "happy", 7, 12);
+        assert_token(&tokens[2], 2, "tax", 13, 16);
+        assert_token(&tokens[3], 3, "payer", 17, 22);
+        assert_token(&tokens[4], 4, "민", 23, 26);
+        assert_token(&tokens[5], 5, "족", 26, 29);
+        assert_token(&tokens[6], 6, "어", 29, 32);
+        assert_token(&tokens[7], 7, "대", 32, 35);
+        assert_token(&tokens[8], 8, "사", 35, 38);
+        assert_token(&tokens[9], 9, "전", 38, 41);
+        assert_token(&tokens[10], 10, "中", 41, 44);
+        assert_token(&tokens[11], 11, "文", 44, 47);
+        assert_token(&tokens[12], 12, "的", 47, 50);
+        // No root token - only splits
+        assert_token(&tokens[13], 13, "Error", 50, 55);
+        assert_token(&tokens[14], 14, "Exception", 55, 64);
+        assert_token(&tokens[15], 15, "And", 64, 67);
+        assert_token(&tokens[16], 16, "HTTP", 67, 71);
+        assert_token(&tokens[17], 17, "Response", 71, 79);
+    }
+
+    #[test]
     fn test_o2_tokenizer_camel_case() {
-        let tokens = token_stream_helper("CamelCase");
+        let tokens = token_stream_helper("CamelCase", CollectType::Ingest);
         assert_eq!(tokens.len(), 3);
         assert_token(&tokens[0], 0, "CamelCase", 0, 9); // Root token first
         assert_token(&tokens[1], 1, "Camel", 0, 5); // Then split tokens
@@ -264,9 +318,17 @@ mod tests {
     }
 
     #[test]
+    fn test_o2_tokenizer_camel_case_search() {
+        let tokens = token_stream_helper("CamelCase", CollectType::Search);
+        assert_eq!(tokens.len(), 2); // No root token in search mode
+        assert_token(&tokens[0], 0, "Camel", 0, 5); // Only split tokens
+        assert_token(&tokens[1], 1, "Case", 5, 9);
+    }
+
+    #[test]
     fn test_o2_tokenizer_camel_case_with_base64() {
         let body = "2025-03-13 INFO Current Users : Ly8gQWRkIHRoaXMgaGVscGVyIGZ1bmN0aW9uIHRvIGRldGVjd+O2gQWRkIHRoaXMgaGVscGVyIGZ1bmN0aW9uIHRvIGRldGVjdCBiYXNlNjQtbGlrZSBzdHJpbmdzCmZuIGxvb2tzX2xpa2VfYmFzZTY0KHM6ICZzdHIpIC0xIGJvb2wgewogICAgLy8gQmFzZTY0IGNoYXJhY3RlcmlzdGljczoKICAgIC8vIDEuIExlbmd0aCBzaG91bGQgYmUgbXVsdGlwbGUgb2YgNCAoZXhjZXB0IGZvciBwYWRkZWQgc3RyaW5ncykKICAgIC8vIDIuIE9ubHkgY29udGFpbnMgW0EtWmEtejAtOSsvPV0KICAgIC8vIDMuIFNob3VsZCBiZSByZWFzb25hYmx5IGxvbmcgKHRvIGF2b2lkIGZhbHNlIHBvc2l0aXZlcykKICAgIGNvbnN0IE1JTl9CQVNFNjRfTEVOR1RIOiB1c2l6ZSA9IgPCBNSU5fQkFTRTY0X0xF==";
-        let tokens = token_stream_helper(body);
+        let tokens = token_stream_helper(body, CollectType::Ingest);
         assert_eq!(tokens.len(), 28);
         assert_token(&tokens[0], 0, "2025", 0, 4);
         assert_token(&tokens[1], 1, "03", 5, 7);
@@ -279,7 +341,7 @@ mod tests {
     #[test]
     fn test_o2_tokenizer_all_caps() {
         // All caps words should NOT be split
-        let tokens = token_stream_helper("HTTP API REST JSON XML");
+        let tokens = token_stream_helper("HTTP API REST JSON XML", CollectType::Ingest);
         assert_eq!(tokens.len(), 5);
         assert_token(&tokens[0], 0, "HTTP", 0, 4);
         assert_token(&tokens[1], 1, "API", 5, 8);
@@ -291,7 +353,7 @@ mod tests {
     #[test]
     fn test_o2_tokenizer_acronym_with_word() {
         // "HTTPSConnection" should emit root + splits: "HTTPS", "Connection"
-        let tokens = token_stream_helper("HTTPSConnection");
+        let tokens = token_stream_helper("HTTPSConnection", CollectType::Ingest);
         assert_eq!(tokens.len(), 3);
         assert_token(&tokens[0], 0, "HTTPSConnection", 0, 15); // Root token
         assert_token(&tokens[1], 1, "HTTPS", 0, 5);
@@ -299,10 +361,19 @@ mod tests {
     }
 
     #[test]
+    fn test_o2_tokenizer_acronym_with_word_search() {
+        // "HTTPSConnection" in search mode - no root token
+        let tokens = token_stream_helper("HTTPSConnection", CollectType::Search);
+        assert_eq!(tokens.len(), 2); // No root token
+        assert_token(&tokens[0], 0, "HTTPS", 0, 5);
+        assert_token(&tokens[1], 1, "Connection", 5, 15);
+    }
+
+    #[test]
     fn test_o2_tokenizer_numbers_in_camel_case() {
         // "base64String" has 'S', so it's camelCase: root + "base64", "String"
         // "utf8Encode" has 'E', so it's camelCase: root + "utf8", "Encode"
-        let tokens = token_stream_helper("base64String utf8Encode");
+        let tokens = token_stream_helper("base64String utf8Encode", CollectType::Ingest);
         assert_eq!(tokens.len(), 6);
         assert_token(&tokens[0], 0, "base64String", 0, 12); // Root
         assert_token(&tokens[1], 1, "base64", 0, 6);
@@ -313,9 +384,20 @@ mod tests {
     }
 
     #[test]
+    fn test_o2_tokenizer_numbers_in_camel_case_search() {
+        // Search mode - no root tokens
+        let tokens = token_stream_helper("base64String utf8Encode", CollectType::Search);
+        assert_eq!(tokens.len(), 4); // No root tokens
+        assert_token(&tokens[0], 0, "base64", 0, 6);
+        assert_token(&tokens[1], 1, "String", 6, 12);
+        assert_token(&tokens[2], 2, "utf8", 13, 17);
+        assert_token(&tokens[3], 3, "Encode", 17, 23);
+    }
+
+    #[test]
     fn test_o2_tokenizer_single_uppercase_first_char() {
         // Single uppercase first character should NOT trigger camelCase
-        let tokens = token_stream_helper("Hello World Welcome");
+        let tokens = token_stream_helper("Hello World Welcome", CollectType::Ingest);
         assert_eq!(tokens.len(), 3);
         assert_token(&tokens[0], 0, "Hello", 0, 5);
         assert_token(&tokens[1], 1, "World", 6, 11);
@@ -325,7 +407,7 @@ mod tests {
     #[test]
     fn test_o2_tokenizer_consecutive_uppercase() {
         // "XMLHttpRequest" -> root + splits: "XML", "Http", "Request"
-        let tokens = token_stream_helper("XMLHttpRequest");
+        let tokens = token_stream_helper("XMLHttpRequest", CollectType::Ingest);
         assert_eq!(tokens.len(), 4);
         assert_token(&tokens[0], 0, "XMLHttpRequest", 0, 14); // Root
         assert_token(&tokens[1], 1, "XML", 0, 3);
@@ -334,9 +416,19 @@ mod tests {
     }
 
     #[test]
+    fn test_o2_tokenizer_consecutive_uppercase_search() {
+        // Search mode - no root token
+        let tokens = token_stream_helper("XMLHttpRequest", CollectType::Search);
+        assert_eq!(tokens.len(), 3); // No root token
+        assert_token(&tokens[0], 0, "XML", 0, 3);
+        assert_token(&tokens[1], 1, "Http", 3, 7);
+        assert_token(&tokens[2], 2, "Request", 7, 14);
+    }
+
+    #[test]
     fn test_o2_tokenizer_mixed_scripts() {
         // Mixed Latin, Chinese, Japanese, Korean - each CJK character is a separate token
-        let tokens = token_stream_helper("Hello世界こんにちは안녕하세요");
+        let tokens = token_stream_helper("Hello世界こんにちは안녕하세요", CollectType::Ingest);
         assert_eq!(tokens.len(), 13);
         assert_token(&tokens[0], 0, "Hello", 0, 5);
         assert_token(&tokens[1], 1, "世", 5, 8);
@@ -356,22 +448,22 @@ mod tests {
     #[test]
     fn test_o2_tokenizer_empty_and_punctuation() {
         // Empty string should produce no tokens
-        let tokens = token_stream_helper("");
+        let tokens = token_stream_helper("", CollectType::Ingest);
         assert_eq!(tokens.len(), 0);
 
         // Only punctuation should produce no tokens
-        let tokens = token_stream_helper("!@#$%^&*()");
+        let tokens = token_stream_helper("!@#$%^&*()", CollectType::Ingest);
         assert_eq!(tokens.len(), 0);
 
         // Only whitespace should produce no tokens
-        let tokens = token_stream_helper("   \t\n  ");
+        let tokens = token_stream_helper("   \t\n  ", CollectType::Ingest);
         assert_eq!(tokens.len(), 0);
     }
 
     #[test]
     fn test_o2_tokenizer_multiple_camel_case_sequence() {
         // Multiple camelCase words in sequence
-        let tokens = token_stream_helper("getUserName getEmailAddress");
+        let tokens = token_stream_helper("getUserName getEmailAddress", CollectType::Ingest);
         assert_eq!(tokens.len(), 8);
         // getUserName: root + get, User, Name
         assert_token(&tokens[0], 0, "getUserName", 0, 11);
@@ -386,8 +478,21 @@ mod tests {
     }
 
     #[test]
+    fn test_o2_tokenizer_multiple_camel_case_sequence_search() {
+        // Search mode - no root tokens
+        let tokens = token_stream_helper("getUserName getEmailAddress", CollectType::Search);
+        assert_eq!(tokens.len(), 6); // No root tokens
+        assert_token(&tokens[0], 0, "get", 0, 3);
+        assert_token(&tokens[1], 1, "User", 3, 7);
+        assert_token(&tokens[2], 2, "Name", 7, 11);
+        assert_token(&tokens[3], 3, "get", 12, 15);
+        assert_token(&tokens[4], 4, "Email", 15, 20);
+        assert_token(&tokens[5], 5, "Address", 20, 27);
+    }
+
+    #[test]
     fn test_o2_tokenizer_numbers_only() {
-        let tokens = token_stream_helper("123 456 789");
+        let tokens = token_stream_helper("123 456 789", CollectType::Ingest);
         assert_eq!(tokens.len(), 3);
         assert_token(&tokens[0], 0, "123", 0, 3);
         assert_token(&tokens[1], 1, "456", 4, 7);
@@ -397,7 +502,7 @@ mod tests {
     #[test]
     fn test_o2_tokenizer_alphanumeric_mix() {
         // Mix of letters and numbers without camelCase
-        let tokens = token_stream_helper("test123 data456abc");
+        let tokens = token_stream_helper("test123 data456abc", CollectType::Ingest);
         assert_eq!(tokens.len(), 2);
         assert_token(&tokens[0], 0, "test123", 0, 7);
         assert_token(&tokens[1], 1, "data456abc", 8, 18);
@@ -405,7 +510,7 @@ mod tests {
 
     #[test]
     fn test_o2_tokenizer_single_char_tokens() {
-        let tokens = token_stream_helper("a b c");
+        let tokens = token_stream_helper("a b c", CollectType::Ingest);
         assert_eq!(tokens.len(), 3);
         assert_token(&tokens[0], 0, "a", 0, 1);
         assert_token(&tokens[1], 1, "b", 2, 3);
@@ -415,14 +520,14 @@ mod tests {
     #[test]
     fn test_o2_tokenizer_special_camel_cases() {
         // "iPhone" should emit root + splits: "i", "Phone"
-        let tokens = token_stream_helper("iPhone");
+        let tokens = token_stream_helper("iPhone", CollectType::Ingest);
         assert_eq!(tokens.len(), 3);
         assert_token(&tokens[0], 0, "iPhone", 0, 6); // Root
         assert_token(&tokens[1], 1, "i", 0, 1);
         assert_token(&tokens[2], 2, "Phone", 1, 6);
 
         // "eBay" should emit root + splits: "e", "Bay"
-        let tokens = token_stream_helper("eBay");
+        let tokens = token_stream_helper("eBay", CollectType::Ingest);
         assert_eq!(tokens.len(), 3);
         assert_token(&tokens[0], 0, "eBay", 0, 4); // Root
         assert_token(&tokens[1], 1, "e", 0, 1);
@@ -430,9 +535,23 @@ mod tests {
     }
 
     #[test]
+    fn test_o2_tokenizer_special_camel_cases_search() {
+        // Search mode - no root tokens
+        let tokens = token_stream_helper("iPhone", CollectType::Search);
+        assert_eq!(tokens.len(), 2); // No root
+        assert_token(&tokens[0], 0, "i", 0, 1);
+        assert_token(&tokens[1], 1, "Phone", 1, 6);
+
+        let tokens = token_stream_helper("eBay", CollectType::Search);
+        assert_eq!(tokens.len(), 2); // No root
+        assert_token(&tokens[0], 0, "e", 0, 1);
+        assert_token(&tokens[1], 1, "Bay", 1, 4);
+    }
+
+    #[test]
     fn test_o2_tokenizer_camel_case_short() {
         let body = "U8iI34Vi";
-        let tokens = token_stream_helper(body);
+        let tokens = token_stream_helper(body, CollectType::Ingest);
         assert_eq!(tokens.len(), 4);
         assert_token(&tokens[0], 0, "U8iI34Vi", 0, 8);
         assert_token(&tokens[1], 1, "U8i", 0, 3);
@@ -441,9 +560,19 @@ mod tests {
     }
 
     #[test]
+    fn test_o2_tokenizer_camel_case_short_search() {
+        let body = "U8iI34Vi";
+        let tokens = token_stream_helper(body, CollectType::Search);
+        assert_eq!(tokens.len(), 3); // No root token
+        assert_token(&tokens[0], 0, "U8i", 0, 3);
+        assert_token(&tokens[1], 1, "I34", 3, 6);
+        assert_token(&tokens[2], 2, "Vi", 6, 8);
+    }
+
+    #[test]
     fn test_o2_tokenizer_camel_case_ip() {
         let body = "192.168.1.80";
-        let tokens = token_stream_helper(body);
+        let tokens = token_stream_helper(body, CollectType::Ingest);
         assert_eq!(tokens.len(), 4);
         assert_token(&tokens[0], 0, "192", 0, 3);
         assert_token(&tokens[1], 1, "168", 4, 7);

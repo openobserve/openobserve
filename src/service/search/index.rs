@@ -21,7 +21,7 @@ use std::{
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, get_config,
     meta::inverted_index::UNKNOWN_NAME,
-    utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_tokens},
+    utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_search_tokens},
 };
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
@@ -506,7 +506,7 @@ impl Condition {
                 if value.is_empty() || value == "*" {
                     Box::new(AllQuery {})
                 } else {
-                    let mut tokens = o2_collect_tokens(value).atomic_tokens;
+                    let mut tokens = o2_collect_search_tokens(value);
                     let contains_search =
                         tokens.len() == 1 && value.starts_with("*") && value.ends_with("*");
                     let first_prefix = if value.starts_with("*") && !tokens.is_empty() {

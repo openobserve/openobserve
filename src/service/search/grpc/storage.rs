@@ -31,7 +31,7 @@ use config::{
     utils::{
         inverted_index::convert_parquet_file_name_to_tantivy_file,
         size::bytes_to_human_readable,
-        tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
+        tantivy::tokenizer::{O2_TOKENIZER, o2_ingest_tokenizer},
         time::BASE_TIME,
     },
 };
@@ -867,7 +867,7 @@ async fn search_tantivy_index(
     let index = tantivy::Index::open(reader_directory)?;
     index
         .tokenizers()
-        .register(O2_TOKENIZER, o2_tokenizer_build());
+        .register(O2_TOKENIZER, o2_ingest_tokenizer());
     let reader = index
         .reader_builder()
         .reload_policy(tantivy::ReloadPolicy::Manual)
