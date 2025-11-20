@@ -15,14 +15,13 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use config::meta::promql::NAME_LABEL;
+use config::meta::promql::{
+    NAME_LABEL,
+    value::{EvalContext, Label, Labels, LabelsExt, RangeValue, Sample, Value},
+};
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
-
-use crate::service::promql::value::{
-    EvalContext, Label, Labels, LabelsExt, RangeValue, Sample, Value,
-};
 
 mod avg;
 mod bottomk;

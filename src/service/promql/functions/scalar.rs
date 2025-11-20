@@ -16,30 +16,26 @@
 use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
 
-pub(crate) fn vector(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let value = match data {
-        Value::Float(f) => f,
-        _ => {
-            return Err(DataFusionError::Plan(
-                "Unexpected input. Expected: \"vector(s scalar)\"".into(),
-            ));
+pub(crate) fn scalar(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    match data {
+        Value::Float(f) => Ok(Value::Float(f)),
+        Value::Matrix(v) => Ok(Value::Matrix(v)),
+        Value::None => {
+            // Generate samples using timestamps from eval_ctx
+            let samples: Vec<Sample> = eval_ctx
+                .timestamps()
+                .iter()
+                .map(|&ts| Sample::new(ts, f64::NAN))
+                .collect();
+            Ok(Value::Matrix(vec![RangeValue {
+                labels: Labels::default(),
+                samples,
+                exemplars: None,
+                time_window: None,
+            }]))
         }
-    };
-
-    // Generate samples using timestamps from eval_ctx
-    let samples: Vec<Sample> = eval_ctx
-        .timestamps()
-        .iter()
-        .map(|&ts| Sample::new(ts, value))
-        .collect();
-
-    // Create a matrix with a single RangeValue containing all generated samples
-    let range_value = RangeValue {
-        labels: Labels::default(),
-        samples,
-        exemplars: None,
-        time_window: None,
-    };
-
-    Ok(Value::Matrix(vec![range_value]))
+        _ => Err(DataFusionError::Plan(
+            "Unexpected input. Expected: \"vector(s scalar)\"".into(),
+        )),
+    }
 }
