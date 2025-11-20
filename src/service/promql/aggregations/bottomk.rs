@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::promql::value::{EvalContext, RangeValue, Value};
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashSet;
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
-
-use crate::service::promql::value::{EvalContext, RangeValue, Value};
 
 /// Aggregates Matrix input for range queries
 /// For each timestamp, selects the bottom K series by value
@@ -84,8 +83,9 @@ pub fn bottomk(
 mod tests {
     use std::sync::Arc;
 
+    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
+
     use super::*;
-    use crate::service::promql::value::{Label, RangeValue, Sample, Value};
 
     #[test]
     fn test_bottomk_range_function() {

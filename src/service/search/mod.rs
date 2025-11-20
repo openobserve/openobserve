@@ -58,6 +58,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use {
     crate::service::search::sql::visitor::group_by::get_group_by_fields,
     config::META_ORG_ID,
+    config::meta::search::CardinalityLevel,
+    config::meta::search::generate_aggregation_search_interval,
     config::meta::self_reporting::usage::USAGE_STREAM,
     config::utils::sql::is_simple_aggregate_query,
     infra::client::grpc::make_grpc_search_client,
@@ -65,13 +67,9 @@ use {
         common::config::get_config as get_o2_config,
         search::{
             TaskStatus, WorkGroup,
-            cache::{
-                CardinalityLevel,
-                streaming_agg::{
-                    create_aggregation_cache_file_path, discover_cache_for_query,
-                    generate_aggregation_cache_interval, generate_optimal_partitions,
-                    get_aggregation_cache_key_from_request,
-                },
+            cache::streaming_agg::{
+                create_aggregation_cache_file_path, discover_cache_for_query,
+                generate_optimal_partitions, get_aggregation_cache_key_from_request,
             },
             cache_aggs_util,
             datafusion::distributed_plan::streaming_aggs_exec,
@@ -1011,7 +1009,7 @@ pub async fn search_partition(
 
         let cardinality_value = cardinality_map.values().product::<f64>();
         let cardinality_level = CardinalityLevel::from(cardinality_value);
-        let cache_interval = generate_aggregation_cache_interval(
+        let cache_interval = generate_aggregation_search_interval(
             query.start_time,
             query.end_time,
             cardinality_level,
