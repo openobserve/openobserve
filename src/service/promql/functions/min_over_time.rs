@@ -15,13 +15,13 @@
 
 use std::time::Duration;
 
-use config::utils::sort::sort_float;
+use config::{
+    meta::promql::value::{EvalContext, Sample, Value},
+    utils::sort::sort_float,
+};
 use datafusion::error::Result;
 
-use crate::service::promql::{
-    functions::RangeFunc,
-    value::{EvalContext, Sample, Value},
-};
+use crate::service::promql::functions::RangeFunc;
 
 pub(crate) fn min_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     super::eval_range(data, MinOverTimeFunc::new(), eval_ctx)
@@ -52,8 +52,9 @@ impl RangeFunc for MinOverTimeFunc {
 mod tests {
     use std::time::Duration;
 
+    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+
     use super::*;
-    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
     // Test helper
     fn min_over_time_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
@@ -64,9 +65,9 @@ mod tests {
     fn test_min_over_time_function() {
         // Create a range value with sample data
         let samples = vec![
-            crate::service::promql::value::Sample::new(1000, 30.0),
-            crate::service::promql::value::Sample::new(2000, 10.0),
-            crate::service::promql::value::Sample::new(3000, 20.0),
+            Sample::new(1000, 30.0),
+            Sample::new(2000, 10.0),
+            Sample::new(3000, 20.0),
         ];
 
         let range_value = RangeValue {

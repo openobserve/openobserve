@@ -186,7 +186,7 @@ impl QueryConditionExt for QueryCondition {
                         return Ok(eval_results);
                     }
                 };
-                let promql::value::Value::Matrix(value) = resp else {
+                let config::meta::promql::value::Value::Matrix(value) = resp else {
                     log::warn!(
                         "Alert evaluate: trace_id: {trace_id}, PromQL query {v} returned unexpected response: {resp:?}"
                     );

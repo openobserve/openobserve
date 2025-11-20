@@ -15,12 +15,10 @@
 
 use std::time::Duration;
 
+use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 
-use crate::service::promql::{
-    functions::RangeFunc,
-    value::{EvalContext, Sample, Value},
-};
+use crate::service::promql::functions::RangeFunc;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#changes
 pub(crate) fn changes(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
@@ -54,8 +52,9 @@ impl RangeFunc for ChangesFunc {
 mod tests {
     use std::time::Duration;
 
+    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+
     use super::*;
-    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
     // Test helper
     fn changes_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
@@ -66,10 +65,10 @@ mod tests {
     fn test_changes_function() {
         // Create a range value with changing counter values
         let samples = vec![
-            crate::service::promql::value::Sample::new(1000, 10.0),
-            crate::service::promql::value::Sample::new(2000, 15.0),
-            crate::service::promql::value::Sample::new(3000, 25.0),
-            crate::service::promql::value::Sample::new(4000, 25.0), // No change
+            Sample::new(1000, 10.0),
+            Sample::new(2000, 15.0),
+            Sample::new(3000, 25.0),
+            Sample::new(4000, 25.0), // No change
         ];
 
         let range_value = RangeValue {
