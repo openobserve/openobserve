@@ -1014,6 +1014,7 @@ import {
   ref,
   onMounted,
   onUpdated,
+  onBeforeUnmount,
   defineAsyncComponent,
   watch,
   nextTick,
@@ -1304,8 +1305,39 @@ export default defineComponent({
 
     const plotChart: any = ref({});
 
+    // Debounce timer for custom color picker changes
+    let debounceTimer: any = null;
+
+    // Watch for theme color changes in localStorage
+    const handleThemeColorChange = () => {
+      const currentMode = store.state.theme === "dark" ? "dark" : "light";
+      const appliedThemeKey = currentMode === "light" ? "appliedLightTheme" : "appliedDarkTheme";
+      const appliedTheme = localStorage.getItem(appliedThemeKey);
+
+      // If -1, user is picking custom color - debounce to avoid performance issues
+      if (appliedTheme === "-1") {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => reDrawChart(), 300);
+      } else {
+        // Predefined theme applied - re-render immediately
+        if (debounceTimer) clearTimeout(debounceTimer);
+        reDrawChart();
+      }
+    };
+
     onMounted(() => {
       reDrawChart();
+      // Listen for theme color changes
+      window.addEventListener('themeColorChanged', handleThemeColorChange);
+    });
+
+    onBeforeUnmount(() => {
+      // Remove event listener to prevent memory leaks
+      window.removeEventListener('themeColorChanged', handleThemeColorChange);
+      // Clear any pending debounce timer
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
     });
 
     onUpdated(() => {
