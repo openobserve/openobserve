@@ -2381,11 +2381,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
    * @returns {string} - the condition as a string.
    */
   const buildCondition = (condition: any) => {
-    const streamAlias =
-      condition?.column?.streamAlias ??
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.stream;
+    // Check if joins exist to determine whether to use stream alias
+    const hasJoins = dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ]?.joins?.length > 0;
+
+    const streamAlias = hasJoins
+      ? (condition?.column?.streamAlias ??
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream)
+      : "";
 
     if (condition.filterType === "group") {
       const groupConditions = condition.conditions
@@ -2405,13 +2411,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
       return groupConditions.length ? `(${groupQuery})` : "";
     } else if (condition.type === "list" && condition.values?.length > 0) {
-      return `${streamAlias}.${condition.column.field} IN (${condition.values
+      const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+      return `${fieldRef} IN (${condition.values
         .map((value: any) => formatValue(value, condition.column))
         .join(", ")})`;
     } else if (condition.type === "condition" && condition.operator != null) {
       let selectFilter = "";
       if (["Is Null", "Is Not Null"].includes(condition.operator)) {
-        selectFilter += `${streamAlias}.${condition.column.field} `;
+        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        selectFilter += `${fieldRef} `;
         switch (condition.operator) {
           case "Is Null":
             selectFilter += `IS NULL`;
@@ -2421,29 +2429,35 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             break;
         }
       } else if (condition.operator === "IN") {
-        selectFilter += `${streamAlias}.${condition.column.field} IN (${formatINValue(
+        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        selectFilter += `${fieldRef} IN (${formatINValue(
           condition.value,
         )})`;
       } else if (condition.operator === "NOT IN") {
-        selectFilter += `${streamAlias}.${condition.column.field} NOT IN (${formatINValue(
+        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        selectFilter += `${fieldRef} NOT IN (${formatINValue(
           condition.value,
         )})`;
       } else if (condition.operator === "match_all") {
         selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
       } else if (condition.operator === "str_match") {
-        selectFilter += `str_match(${streamAlias}.${condition.column.field}, ${formatValue(
+        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        selectFilter += `str_match(${fieldRef}, ${formatValue(
           condition.value,
           condition.column,
         )})`;
       } else if (condition.operator === "str_match_ignore_case") {
-        selectFilter += `str_match_ignore_case(${streamAlias}.${condition.column.field}, ${formatValue(condition.value, condition.column)})`;
+        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        selectFilter += `str_match_ignore_case(${fieldRef}, ${formatValue(condition.value, condition.column)})`;
       } else if (condition.operator === "re_match") {
-        selectFilter += `re_match(${streamAlias}.${condition.column.field}, ${formatValue(
+        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        selectFilter += `re_match(${fieldRef}, ${formatValue(
           condition.value,
           condition.column,
         )})`;
       } else if (condition.operator === "re_not_match") {
-        selectFilter += `re_not_match(${streamAlias}.${condition.column.field}, ${formatValue(
+        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        selectFilter += `re_not_match(${fieldRef}, ${formatValue(
           condition.value,
           condition.column,
         )})`;
@@ -2463,7 +2477,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           (it: any) => it.name == condition.column.field,
         )?.type;
 
-        selectFilter += `${streamAlias}.${condition.column.field} `;
+        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        selectFilter += `${fieldRef} `;
         switch (condition.operator) {
           case "=":
           case "<>":
