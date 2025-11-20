@@ -19,13 +19,19 @@ export default class DashboardVariables {
     filterConfig = null, // optional filter configuration { filterName, operator, value }
     showMultipleValues = false // if true, toggles the show multiple values option
   ) {
-    // Open Variable Tab
-    await this.page
-      .locator('[data-test="dashboard-settings-variable-tab"]')
-      .click();
+    // Wait for the settings panel to be fully opened and variable tab to be available
+    const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
+    await variableTab.waitFor({ state: "attached", timeout: 10000 });
+    await variableTab.waitFor({ state: "visible", timeout: 10000 });
+
+    // Additional wait for panel animation and stability
+    await this.page.waitForTimeout(500);
+
+    // Click the Variable Tab
+    await variableTab.click();
 
     // Add Variable
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click({timeout:50000});
     await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
 
     // Select Stream Type
@@ -52,19 +58,23 @@ export default class DashboardVariables {
       .click();
 
     // Select Field
-    await this.page
-      .locator('[data-test="dashboard-variable-field-select"]')
-      .click();
-    await this.page
-      .locator('[data-test="dashboard-variable-field-select"]')
-      .fill(field);
-    await this.page.getByText(field).click();
+    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
+    await fieldSelect.click();
+    await fieldSelect.fill(field);
+
+    // Wait for dropdown options to populate
+    await this.page.waitForTimeout(500);
+
+    // Select the field from dropdown using role option
+    const fieldOption = this.page.getByRole("option", { name: field, exact: true });
+    await fieldOption.waitFor({ state: "visible", timeout: 10000 });
+    await fieldOption.click();
 
     // Add Filter Configuration if provided
     if (filterConfig) {
 
       const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
-      await addFilterBtn.waitFor({ state: "visible", timeout: 10000 });
+      await addFilterBtn.waitFor({ state: "visible", timeout: 50000 });
       await addFilterBtn.click();
       
       // Wait for and interact with Filter Name selector
