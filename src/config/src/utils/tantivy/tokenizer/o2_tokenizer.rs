@@ -428,7 +428,7 @@ mod tests {
         assert_token(&tokens[1], 1, "e", 0, 1);
         assert_token(&tokens[2], 2, "Bay", 1, 4);
     }
-  
+
     #[test]
     fn test_o2_tokenizer_camel_case_short() {
         let body = "U8iI34Vi";
