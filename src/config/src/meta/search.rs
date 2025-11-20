@@ -2089,6 +2089,7 @@ mod tests {
             query_fn: Some("fn1".to_string()),
             streaming_output: false,
             histogram_interval: 0,
+            sampling_ratio: None,
         };
 
         req.decode().unwrap();
