@@ -12,7 +12,7 @@ pub use super::{
     report_dashboards::Entity as ReportDashboards, reports::Entity as Reports,
     search_job_partitions::Entity as SearchJobPartitions,
     search_job_results::Entity as SearchJobResults, search_jobs::Entity as SearchJobs,
-    search_queue::Entity as SearchQueue, templates::Entity as Templates,
-    timed_annotation_panels::Entity as TimedAnnotationPanels,
+    search_queue::Entity as SearchQueue, // sessions::Entity as Sessions,
+    templates::Entity as Templates, timed_annotation_panels::Entity as TimedAnnotationPanels,
     timed_annotations::Entity as TimedAnnotations, users::Entity as Users,
 };

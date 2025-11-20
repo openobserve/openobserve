@@ -24,6 +24,7 @@ pub mod search_job_partitions;
 pub mod search_job_results;
 pub mod search_jobs;
 pub mod search_queue;
+// pub mod sessions;  // Generate entity first: sea-orm-cli generate entity --tables sessions ...
 pub mod system_prompts;
 pub mod templates;
 pub mod timed_annotation_panels;
