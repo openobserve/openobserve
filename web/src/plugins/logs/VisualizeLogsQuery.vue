@@ -671,11 +671,18 @@ export default defineComponent({
 
     const handleChartApiError = (errorMsg: any) => {
       if (typeof errorMsg === "string") {
-        props.errorData.value = errorMsg;
         errorMessage.value = errorMsg;
-      } else {
+        const errorList = props.errorData.errors ?? [];
+        errorList.splice(0);
+        errorList.push(errorMsg);
+      } else if (errorMsg?.message) {
+        errorMessage.value = errorMsg.message ?? "";
+        const errorList = props.errorData.errors ?? [];
+        errorList.splice(0);
+        errorList.push(errorMsg.message);
         props.errorData.value = errorMsg?.message ?? "";
-        errorMessage.value = errorMsg?.message ?? "";
+      } else {
+        errorMessage.value = "";
       }
 
       emit("handleChartApiError", errorMsg);
