@@ -433,10 +433,11 @@ mod tests {
     fn test_o2_tokenizer_camel_case_short() {
         let body = "U8iI34Vi";
         let tokens = token_stream_helper(body);
-        assert_eq!(tokens.len(), 3);
-        assert_token(&tokens[0], 0, "U8i", 0, 3);
-        assert_token(&tokens[1], 1, "I34", 3, 6);
-        assert_token(&tokens[2], 2, "Vi", 6, 8);
+        assert_eq!(tokens.len(), 4);
+        assert_token(&tokens[0], 0, "U8iI34Vi", 0, 8);
+        assert_token(&tokens[1], 1, "U8i", 0, 3);
+        assert_token(&tokens[2], 2, "I34", 3, 6);
+        assert_token(&tokens[3], 3, "Vi", 6, 8);
     }
 
     #[test]
