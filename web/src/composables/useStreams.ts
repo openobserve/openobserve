@@ -54,6 +54,7 @@ const useStreams = () => {
     notify: boolean = true,
     force: boolean = false,
   ) => {
+    debugger;
     return new Promise(async (resolve, reject) => {
       const streamName = _streamName || "all";
 
@@ -61,6 +62,7 @@ const useStreams = () => {
       // So keeping it false, don't change this
       schema = false;
       if (getStreamsPromise.value) {
+        console.log("Streams promise already present ---");
         await getStreamsPromise.value;
       }
       try {

@@ -405,15 +405,19 @@ export const routeGuard = async (to: any, from: any, next: any) => {
     store.state.zoConfig.restricted_routes_on_empty_data == true &&
     store.state.organizationData.isDataIngested == false
   ) {
-    await getStreams("", false).then((response: any) => {
-      if (response.list.length == 0) {
-        store.dispatch("setIsDataIngested", false);
-        next({ path: "/ingestion" });
-      } else {
-        store.dispatch("setIsDataIngested", true);
-        next();
-      }
-    });
+    try {
+      await getStreams("", false).then((response: any) => {
+        if (response.list.length == 0) {
+          store.dispatch("setIsDataIngested", false);
+          next({ path: "/ingestion" });
+        } else {
+          store.dispatch("setIsDataIngested", true);
+          next();
+        }
+      });
+    } catch (err) {
+      console.error("ERROR while getting streams", err);
+    }
   } else {
     next();
   }
