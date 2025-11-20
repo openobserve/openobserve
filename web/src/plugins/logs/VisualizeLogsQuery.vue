@@ -938,7 +938,7 @@ export default defineComponent({
       resultMetaData.value = resultMetaDataParams ?? null;
 
       maxQueryRangeWarning.value = processQueryMetadataErrors(
-        resultMetaData,
+        resultMetaData.value,
         store.state.timezone,
       );
     };
