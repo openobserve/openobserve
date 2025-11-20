@@ -1789,9 +1789,9 @@ impl VarValue<'_> {
                     .iter()
                     .map(|val| {
                         if val.is_string() {
-                            val.as_str().unwrap_or("").to_string()
+                            format_variable_value(val.as_str().unwrap_or("").to_string())
                         } else {
-                            val.to_string()
+                            format_variable_value(val.to_string())
                         }
                     })
                     .collect();
