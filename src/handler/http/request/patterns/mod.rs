@@ -154,13 +154,16 @@ pub async fn extract_patterns(
             }
         }
 
-        // Set size limit for pattern extraction
-        // use 10K logs for pattern detection
-        // With row-group sampling already applied, just request 10K directly
-        // The search engine will return ~10K sampled results from the already-sampled data
-        // This is memory-efficient and fast
+        // Set size limit for pattern extraction using O2 config
+        // This determines the maximum number of logs to analyze for pattern detection
+        // Default is 10K which aligns with industry standards for pattern quality
         if req.query.size == 0 || req.query.size == -1 {
-            req.query.size = 10_000;
+            let o2_config = o2_enterprise::get_o2_config();
+            req.query.size = if o2_config.log_patterns.max_logs_for_extraction > 0 {
+                o2_config.log_patterns.max_logs_for_extraction as i64
+            } else {
+                config::get_config().limit.query_default_limit
+            };
         }
 
         log::info!(
