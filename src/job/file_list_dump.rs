@@ -100,7 +100,7 @@ static FILE_LIST_DUMP_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
 // and before enqueing, check if the job_id is already waiting in queue or not.
 static ONGOING_JOB_IDS: Lazy<HashSet<i64>> = Lazy::new(HashSet::new);
 
-fn get_dump_stream_key(org: &str, stream: &str) -> String {
+pub fn get_dump_stream_key(org: &str, stream: &str) -> String {
     format!(
         "{}/{}/{}",
         org,
@@ -381,6 +381,17 @@ async fn generate_dump(
     let config = get_config();
     let batch_size = files.len();
 
+    let mut total_records = 0;
+    let mut total_size = 0;
+    let mut index_size = 0;
+    let mut total_compressed_size = 0;
+    for rec in &files {
+        total_records += rec.records;
+        total_size += rec.original_size;
+        total_compressed_size += rec.compressed_size;
+        index_size += rec.index_size;
+    }
+
     // if dual write is not enabled, we will remove the records
     // else keep them
     let ids: Vec<i64> = if !config.common.file_list_dump_dual_write {
@@ -423,10 +434,10 @@ async fn generate_dump(
     let meta = FileMeta {
         min_ts: range.0,
         max_ts: range.1,
-        records: batch_size as i64,
-        original_size: buf.len() as i64,
-        compressed_size: buf.len() as i64,
-        index_size: 0,
+        records: total_records,
+        original_size: total_size,
+        compressed_size: total_compressed_size,
+        index_size,
         flattened: false,
     };
 

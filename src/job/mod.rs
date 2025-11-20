@@ -49,7 +49,7 @@ mod promql_self_consume;
 mod stats;
 
 pub use file_downloader::{download_from_node, queue_download};
-pub use file_list_dump::FILE_LIST_SCHEMA;
+pub use file_list_dump::{FILE_LIST_SCHEMA, get_dump_stream_key};
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 #[cfg(feature = "enterprise")]

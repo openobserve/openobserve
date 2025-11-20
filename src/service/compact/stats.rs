@@ -19,12 +19,12 @@ use config::{
     utils::time::{now_micros, second_micros},
 };
 use hashbrown::HashMap;
-use infra::{dist_lock, file_list as infra_file_list};
-
-use crate::{
-    common::infra::cluster::get_node_by_uuid,
-    service::{db, file_list_dump},
+use infra::{
+    dist_lock,
+    file_list::{self as infra_file_list, parse_stream_key},
 };
+
+use crate::{common::infra::cluster::get_node_by_uuid, job::get_dump_stream_key, service::db};
 
 pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
     let latest_update_at = infra_file_list::get_max_update_at()
@@ -90,20 +90,39 @@ async fn update_stats_from_file_list_inner(
     let stream_stats = infra_file_list::stats(time_range)
         .await
         .map_err(|e| anyhow::anyhow!("get add stream stats error: {e}"))?;
-    // get stats from file_list_dump
-    // dump never store deleted files, so we do not have to consider deleted here
-    let dumped_stats = file_list_dump::stats(time_range)
-        .await
-        .map_err(|e| anyhow::anyhow!("get dumped add stream stats error: {e}"))?;
     let mut stream_stats = stream_stats
         .into_iter()
         .collect::<HashMap<String, StreamStats>>();
+
+    let filter_key = format!("/{}/", StreamType::Filelist);
+    let mut dumped_stats = HashMap::new();
+
+    // here we create a mapping of dumped file stats to the orignal stream
+    for (stream, _) in stream_stats.iter() {
+        // if the stream is dump file stream, skip it
+        if stream.contains(&filter_key) {
+            continue;
+        }
+        // else, get the org and stream name from the stream key,
+        // then get the corresponding dump stream name for that stream,
+        // and store the mapping of the original stream name to dump file stats
+        if let Some((org, _, _stream)) = parse_stream_key(stream) {
+            let k = get_dump_stream_key(&org, &_stream);
+            if let Some(stats) = stream_stats.get(&k) {
+                dumped_stats.insert(stream.clone(), stats.clone());
+            }
+        }
+    }
+
+    // finally go over the mapping we created, and add the dump file stats into
+    // the original stream stats, so we get total stream stats
     for (stream, stats) in dumped_stats {
-        let entry = stream_stats.entry(stream).or_insert(StreamStats::default());
+        let entry = stream_stats
+            .entry(stream.clone())
+            .or_insert(StreamStats::default());
         *entry = &*entry + &stats;
     }
     // remove file_list_dump streams from stream_stats
-    let filter_key = format!("/{}/", StreamType::Filelist);
     stream_stats.retain(|stream, _| !stream.contains(&filter_key));
 
     if !stream_stats.is_empty() {
