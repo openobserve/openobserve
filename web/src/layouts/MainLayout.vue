@@ -749,6 +749,7 @@ export default defineComponent({
                   //   data.CustomerBillingObj.subscription_type;
                   // useLocalOrganization(localOrg.value);
                   useLocalOrganization(optiondata);
+                  store.dispatch("setSelectedOrganization", optiondata);
                 }
 
                 if (
