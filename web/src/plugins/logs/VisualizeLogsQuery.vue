@@ -248,10 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color="primary"
                         @click="addToDashboard"
                         title="Add To Dashboard"
-                        :disabled="
-                          errorData?.errors?.length > 0 ||
-                          errorData?.value !== ''
-                        "
+                        :disabled="errorData?.errors?.length > 0"
                         >Add To Dashboard</q-btn
                       >
                     </div>
@@ -671,11 +668,18 @@ export default defineComponent({
 
     const handleChartApiError = (errorMsg: any) => {
       if (typeof errorMsg === "string") {
-        props.errorData.value = errorMsg;
         errorMessage.value = errorMsg;
-      } else {
+        const errorList = props.errorData.errors ?? [];
+        errorList.splice(0);
+        errorList.push(errorMsg);
+      } else if (errorMsg?.message) {
+        errorMessage.value = errorMsg.message ?? "";
+        const errorList = props.errorData.errors ?? [];
+        errorList.splice(0);
+        errorList.push(errorMsg.message);
         props.errorData.value = errorMsg?.message ?? "";
-        errorMessage.value = errorMsg?.message ?? "";
+      } else {
+        errorMessage.value = "";
       }
 
       emit("handleChartApiError", errorMsg);
@@ -931,7 +935,7 @@ export default defineComponent({
       resultMetaData.value = resultMetaDataParams ?? null;
 
       maxQueryRangeWarning.value = processQueryMetadataErrors(
-        resultMetaData,
+        resultMetaData.value,
         store.state.timezone,
       );
     };

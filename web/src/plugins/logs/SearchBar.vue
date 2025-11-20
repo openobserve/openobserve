@@ -1907,6 +1907,7 @@ export default defineComponent({
       updateUrlQueryParams,
       generateURLQuery,
       isActionsEnabled,
+      checkTimestampAlias,
     } = logsUtils();
     const {
       getSavedViews,
@@ -3965,6 +3966,14 @@ export default defineComponent({
         ) {
           showErrorNotification(
             "Multiple SQL queries are not allowed to visualize",
+          );
+          return;
+        }
+
+        // validate that timestamp column is not used as an alias
+        if (!checkTimestampAlias(logsPageQuery)) {
+          showErrorNotification(
+            `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
           );
           return;
         }
