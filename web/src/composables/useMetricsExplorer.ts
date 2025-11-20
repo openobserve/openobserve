@@ -687,7 +687,7 @@ const useMetricsExplorer = () => {
         dashboardPanelData.meta.dateTime["end_time"].toISOString()
       ).getTime(),
       fields: [name],
-      size: store.state.zoConfig.query_values_default_num || 10,
+      size: store.state.zoConfig?.query_values_default_num || 10,
       type: dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.stream_type,
@@ -731,7 +731,7 @@ const useMetricsExplorer = () => {
         dashboardPanelData.meta.dateTime["end_time"].toISOString()
       ).getTime(),
       fields: [name],
-      size: store.state.zoConfig.query_values_default_num || 10,
+      size: store.state.zoConfig?.query_values_default_num || 10,
       type: dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.stream_type,
