@@ -97,6 +97,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
+            :label="t('settings.header')"
+            @click="showCorrelationDrawer = true"
+            data-test="correlation-settings-btn"
+            icon="settings"
+          />
+          <q-btn
+            class="q-ml-sm o2-secondary-button tw-h-[36px]"
+            no-caps
+            flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
