@@ -377,7 +377,7 @@ tokio-rustls = { version = "0.26", default-features = false, features = [
     "logging",
     "tls12",
 ] }
-tokio-util = { version = "0.7.12", features = ["compat"] }
+tokio-util = { version = "0.7", features = ["compat"] }
 tokio-stream = "0.1"
 tonic = { version = "0.14", features = ["gzip", "tls-webpki-roots"] }
 tonic-prost = "0.14"

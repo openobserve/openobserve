@@ -14,15 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::promql::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL},
+    meta::promql::{
+        BUCKET_LABEL, HASH_LABEL, NAME_LABEL,
+        value::{EvalContext, LabelsExt, RangeValue, Sample, Value, signature_without_labels},
+    },
     utils::sort::sort_float,
 };
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
-
-use crate::service::promql::value::{
-    EvalContext, LabelsExt, RangeValue, Sample, Value, signature_without_labels,
-};
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
 #[derive(Debug, Clone, PartialEq)]

@@ -88,6 +88,7 @@ tracing-opentelemetry.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
+float-cmp = "0.10"
 
 [build-dependencies]
 chrono.workspace = true
