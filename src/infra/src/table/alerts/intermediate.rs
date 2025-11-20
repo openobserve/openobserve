@@ -647,7 +647,7 @@ impl TryFrom<i16> for RowTemplateTypeDb {
             Self::JSON => Ok(RowTemplateTypeDb::Json),
             _ => Err(FromI16Error {
                 value,
-                ty: "RowTemplateType".to_owned(),
+                ty: "RowTemplateTypeDb".to_owned(),
             }),
         }
     }

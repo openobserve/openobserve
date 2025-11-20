@@ -349,10 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-alert-row-template-type-toggle"
                       v-model="formData.row_template_type"
                       toggle-color="primary"
-                      :options="[
-                        {label: 'String', value: 'String'},
-                        {label: 'JSON', value: 'Json'}
-                      ]"
+                      :options="rowTemplateTypeOptions"
                       dense
                       no-caps
                       unelevated
@@ -374,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                   style="width: 100%; resize: none;"
                   type="textarea"
-                  :placeholder="formData.row_template_type === 'Json' ? 'e.g - {&quot;user&quot;: &quot;{name}&quot;, &quot;timestamp&quot;: &quot;{timestamp}&quot;}' : 'e.g - Alert was triggered at {timestamp}'"
+                  :placeholder="rowTemplatePlaceholder"
                   rows="5"
                 >
 
@@ -662,6 +659,10 @@ export default defineComponent({
     const showVrlFunction = ref(false);
     const isFetchingStreams = ref(false);
     const streamTypes = ["logs", "metrics", "traces"];
+    const rowTemplateTypeOptions = [
+      { label: 'String', value: 'String' },
+      { label: 'JSON', value: 'Json' }
+    ];
     const editorUpdate = (e: any) => {
       formData.value.sql = e.target.value;
     };
@@ -726,6 +727,12 @@ export default defineComponent({
 
     const showPreview = computed(() => {
       return formData.value.stream_type && formData.value.stream_name;
+    });
+
+    const rowTemplatePlaceholder = computed(() => {
+      return formData.value.row_template_type === 'Json'
+        ? 'e.g - {"user": "{name}", "timestamp": "{timestamp}"}'
+        : 'e.g - Alert was triggered at {timestamp}';
     });
 
     const editorData = ref("");
@@ -1358,6 +1365,7 @@ export default defineComponent({
       schemaList,
       filteredColumns,
       streamTypes,
+      rowTemplateTypeOptions,
       streams,
       updateStreams,
       isFetchingStreams,
@@ -1377,6 +1385,7 @@ export default defineComponent({
       getParser,
       onInputUpdate,
       showPreview,
+      rowTemplatePlaceholder,
       streamFieldsMap,
       previewQuery,
       previewAlertRef,
