@@ -366,7 +366,7 @@ const useStreams = () => {
           // Return the stream object (with or without updated schema).
           const streamIndex =
             store.state.streams.streamsIndexMapping[streamType][streamName];
-          return streamsCache[streamType].value?.list[streamIndex] || {};
+          return streamsCache[streamType].value?.list?.[streamIndex] || {};
         } catch (e: any) {
           // Use reject in Promise.all to catch errors specifically.
           throw new Error(e.message);
@@ -391,7 +391,7 @@ const useStreams = () => {
   const isStreamFetched = (streamType: string) => {
     let isStreamFetched = false;
     if (streamType === "all") {
-      isStreamFetched = store.state.streams.areStreamsFetched;
+      isStreamFetched = store.state.streams.areAllStreamsFetched;
     } else {
       isStreamFetched = !!streamsCache[streamType].value?.list;
       isStreamFetched = !!streamsCache[streamType]?.value?.list;
@@ -449,7 +449,7 @@ const useStreams = () => {
         );
         streamIndexMapping[key] = {};
 
-        streamsCache[key].value?.list.forEach((stream: any, index: number) => {
+        streamsCache[key].value?.list?.forEach((stream: any, index: number) => {
           streamIndexMapping[key][stream.name] = index;
         });
         updateStreamIndexMappingInStore(streamIndexMapping || {});
@@ -459,7 +459,7 @@ const useStreams = () => {
         store.state.streams.streamsIndexMapping || {},
       );
       streamIndexMapping[streamName] = {};
-      streamsCache[streamName].value?.list.forEach(
+      streamsCache[streamName].value?.list?.forEach(
         (stream: any, index: number) => {
           streamIndexMapping[streamName][stream.name] = index;
         },
