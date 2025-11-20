@@ -85,6 +85,7 @@ pub struct Sql {
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
     pub sorted_by_time: bool, // if only order by _timestamp
+    pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
 }
 
 impl Sql {
@@ -312,7 +313,40 @@ impl Sql {
             order_by,
             histogram_interval,
             sorted_by_time: need_sort_by_time,
+            sampling_config: Self::parse_sampling_config(
+                query,
+                histogram_interval,
+                (query.start_time, query.end_time),
+            ),
         })
+    }
+
+    /// Parse sampling configuration from SearchQuery
+    /// Converts sampling_ratio to SamplingConfig for internal use
+    fn parse_sampling_config(
+        query: &proto::cluster_rpc::SearchQuery,
+        _histogram_interval: Option<i64>,
+        _time_range: (i64, i64),
+    ) -> Option<proto::cluster_rpc::SamplingConfig> {
+        #[cfg(not(feature = "enterprise"))]
+        {
+            if query.sampling_ratio.is_some() {
+                log::warn!(
+                    "[SAMPLING] Sampling is an enterprise feature. Queries will run without sampling. \
+                    To enable sampling, please upgrade to OpenObserve Enterprise Edition."
+                );
+            }
+            None
+        }
+
+        #[cfg(feature = "enterprise")]
+        {
+            o2_enterprise::enterprise::search::sampling::core::parse_sampling_config(
+                query,
+                _histogram_interval,
+                _time_range,
+            )
+        }
     }
 }
 

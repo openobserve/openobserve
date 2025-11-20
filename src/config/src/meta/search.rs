@@ -134,6 +134,13 @@ pub struct Query {
     pub action_id: Option<String>,
     #[serde(default)]
     pub skip_wal: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
+    /// Simplified sampling API: just specify ratio (0.0-1.0), backend uses optimal defaults
+    /// Takes precedence over sampling_config if both are provided
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sampling_ratio: Option<f64>,
     // streaming output
     #[serde(default)]
     pub streaming_output: bool,
@@ -162,6 +169,8 @@ impl Default for Query {
             query_fn: None,
             action_id: None,
             skip_wal: false,
+            sampling_config: None,
+            sampling_ratio: None,
             streaming_output: false,
             streaming_id: None,
             histogram_interval: 0,
@@ -533,6 +542,8 @@ pub struct SearchPartitionRequest {
     pub streaming_output: bool,
     #[serde(default)]
     pub histogram_interval: i64,
+    #[serde(default)]
+    pub sampling_ratio: Option<f64>,
 }
 
 impl SearchPartitionRequest {
@@ -566,6 +577,7 @@ impl From<&Request> for SearchPartitionRequest {
             query_fn: req.query.query_fn.clone(),
             streaming_output: req.query.streaming_output,
             histogram_interval: req.query.histogram_interval,
+            sampling_ratio: req.query.sampling_ratio,
         }
     }
 }
@@ -643,6 +655,8 @@ impl SearchHistoryRequest {
                 query_fn: None,
                 action_id: None,
                 skip_wal: false,
+                sampling_config: None,
+                sampling_ratio: None,
                 streaming_output: false,
                 streaming_id: None,
                 histogram_interval: 0,
@@ -858,6 +872,7 @@ impl From<Query> for cluster_rpc::SearchQuery {
             action_id: query.action_id.unwrap_or_default(),
             skip_wal: query.skip_wal,
             histogram_interval: query.histogram_interval,
+            sampling_ratio: query.sampling_ratio,
         }
     }
 }
@@ -1244,6 +1259,8 @@ impl MultiStreamRequest {
                     query_fn,
                     action_id: None,
                     skip_wal: self.skip_wal,
+                    sampling_config: None,
+                    sampling_ratio: None,
                     streaming_output: false,
                     streaming_id: None,
                     histogram_interval: 0,

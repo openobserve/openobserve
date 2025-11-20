@@ -26,6 +26,13 @@ fn main() -> Result<()> {
         .type_attribute("FileKey", "#[derive(serde::Serialize)]")
         .type_attribute("FileMeta", "#[derive(serde::Serialize)]")
         .type_attribute("Job", "#[derive(serde::Serialize)]")
+        .type_attribute("Partition", "#[derive(Eq)]")
+        .type_attribute(
+            "SamplingConfig",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
+        .type_attribute("SearchRequest", "#[derive(Eq)]")
+        .type_attribute("SearchResponse", "#[derive(Eq)]")
         .type_attribute("SearchResponse", "#[derive(serde::Serialize)]")
         .type_attribute("SearchAggRequest", "#[derive(serde::Serialize)]")
         .type_attribute("SearchAggResponse", "#[derive(serde::Serialize)]")

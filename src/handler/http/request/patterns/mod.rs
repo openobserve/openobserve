@@ -154,10 +154,21 @@ pub async fn extract_patterns(
             }
         }
 
-        // Set a reasonable size limit for pattern extraction
-        if req.query.size == 0 {
-            req.query.size = config::get_config().limit.query_default_limit;
+        // Set size limit for pattern extraction
+        // use 10K logs for pattern detection
+        // With row-group sampling already applied, just request 10K directly
+        // The search engine will return ~10K sampled results from the already-sampled data
+        // This is memory-efficient and fast
+        if req.query.size == 0 || req.query.size == -1 {
+            req.query.size = 10_000;
         }
+
+        log::info!(
+            "[PATTERNS trace_id {}] Query configuration - size: {}, sampling_ratio: {:?}",
+            trace_id,
+            req.query.size,
+            req.query.sampling_ratio
+        );
 
         // Set search_type if not already set (required by search execution)
         if req.search_type.is_none() {

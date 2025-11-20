@@ -115,16 +115,26 @@ pub async fn process_search_stream_request(
         let o2_config = get_o2_config();
         let zo_config = config::get_config();
 
-        // Use O2 config value if set, otherwise fall back to OpenObserve's query_default_limit
-        let max_logs = if o2_config.log_patterns.max_logs_for_extraction > 0 {
+        // Determine max_logs - same logic for both sampling and non-sampling modes
+        // Prioritize: 1) user's size, 2) O2 config, 3) OpenObserve default
+        let max_logs = if req.query.size > 0 && req.query.size < 10_000_000 {
+            req.query.size as usize
+        } else if o2_config.log_patterns.max_logs_for_extraction > 0 {
+            // Use O2 config value if set (default is 10K from Datadog's approach)
             o2_config.log_patterns.max_logs_for_extraction
         } else {
+            // Fall back to OpenObserve's query_default_limit
             zo_config.limit.query_default_limit as usize
         };
 
         log::info!(
-            "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction config: max_logs={}, min_cluster={}, threshold={}, min_field_len={}",
-            max_logs,
+            "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction config: max_logs={}, sampling_ratio={:?}, min_cluster={}, threshold={}, min_field_len={}",
+            if req.query.sampling_ratio.is_some() {
+                format!("{} (sampling mode)", max_logs)
+            } else {
+                max_logs.to_string()
+            },
+            req.query.sampling_ratio,
             o2_config.log_patterns.min_cluster_size,
             o2_config.log_patterns.similarity_threshold,
             o2_config.log_patterns.min_field_length
@@ -618,6 +628,9 @@ pub async fn process_search_stream_request(
             accumulated_results.len()
         );
 
+        // Calculate total scan_records from all search results (actual logs scanned with sampling)
+        let mut total_scan_records = 0;
+
         // Convert accumulated_results to hits for pattern extraction
         for result in &accumulated_results {
             let response = match result {
@@ -625,13 +638,15 @@ pub async fn process_search_stream_request(
                 SearchResultType::Cached(r) => r,
             };
             accumulator.add_hits(&response.hits);
+            total_scan_records += response.scan_records;
         }
 
         let stats = accumulator.stats();
         log::info!(
-            "[HTTP2_STREAM trace_id {trace_id}] Pattern accumulator stats: {} logs accumulated from {} total (sampled: {})",
+            "[HTTP2_STREAM trace_id {trace_id}] Pattern accumulator stats: {} logs accumulated from {} seen by accumulator, {} total scanned with sampling (sampled: {})",
             stats.accumulated_logs,
             stats.total_logs_seen,
+            total_scan_records,
             stats.was_sampled
         );
 
@@ -641,6 +656,7 @@ pub async fn process_search_stream_request(
                 accumulator,
                 all_streams.clone(),
                 pattern_config.unwrap(),
+                total_scan_records,
             )
             .await
             {

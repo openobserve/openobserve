@@ -359,6 +359,7 @@ pub async fn get_partitions(
         query_fn: Default::default(),
         streaming_output: true,
         histogram_interval: req.query.histogram_interval,
+        sampling_ratio: req.query.sampling_ratio,
     };
 
     let res = SearchService::search_partition(
