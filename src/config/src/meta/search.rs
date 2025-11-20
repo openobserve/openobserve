@@ -16,6 +16,7 @@
 use std::collections::VecDeque;
 
 use bytes::Bytes as BytesImpl;
+use chrono::Duration;
 use hashbrown::HashMap;
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -1315,6 +1316,529 @@ pub struct ResultSchemaResponse {
     pub timeseries_field: Option<String>,
 }
 
+const AGGREGATION_CACHE_INTERVALS: [(Option<Duration>, Interval); 6] = [
+    (Duration::try_days(31), Interval::OneDay),
+    (Duration::try_days(8), Interval::SixHours),
+    (Duration::try_hours(23), Interval::TwoHours),
+    (Duration::try_hours(6), Interval::OneHour),
+    (Duration::try_hours(1), Interval::ThirtyMinutes),
+    (Duration::try_minutes(15), Interval::FiveMinutes),
+];
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Interval {
+    Zero = 0,
+    FiveMinutes = 5,
+    TenMinutes = 10,
+    ThirtyMinutes = 30,
+    OneHour = 60,
+    TwoHours = 120,
+    SixHours = 360,
+    TwelveHours = 720,
+    OneDay = 1440,
+}
+
+impl Interval {
+    pub fn get_duration_minutes(&self) -> i64 {
+        *self as i64
+    }
+
+    pub fn get_interval_seconds(&self) -> i64 {
+        self.get_duration_minutes() * 60
+    }
+
+    pub fn get_interval_microseconds(&self) -> i64 {
+        self.get_duration_minutes() * 60 * 1_000_000
+    }
+}
+
+impl std::fmt::Display for Interval {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} minutes", self.get_duration_minutes())
+    }
+}
+
+impl From<i64> for Interval {
+    fn from(minutes: i64) -> Self {
+        match minutes {
+            0 => Interval::Zero,
+            5 => Interval::FiveMinutes,
+            10 => Interval::TenMinutes,
+            30 => Interval::ThirtyMinutes,
+            60 => Interval::OneHour,
+            120 => Interval::TwoHours,
+            360 => Interval::SixHours,
+            720 => Interval::TwelveHours,
+            1440 => Interval::OneDay,
+            _ => {
+                log::warn!("Unknown cache interval: {minutes} minutes, defaulting to Zero");
+                Interval::Zero
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CardinalityLevel {
+    Low,
+    Medium,
+    High,
+    Huge,
+}
+
+impl From<f64> for CardinalityLevel {
+    fn from(value: f64) -> Self {
+        if value < 10000.0 {
+            CardinalityLevel::Low
+        } else if value < 1000000.0 {
+            CardinalityLevel::Medium
+        } else if value < 5000000.0 {
+            CardinalityLevel::High
+        } else {
+            CardinalityLevel::Huge
+        }
+    }
+}
+
+pub fn generate_aggregation_search_interval(
+    start_time: i64,
+    end_time: i64,
+    cardinality_level: CardinalityLevel,
+) -> Interval {
+    let timers = AGGREGATION_CACHE_INTERVALS.iter();
+    let timers = match cardinality_level {
+        #[allow(clippy::iter_skip_zero)]
+        CardinalityLevel::Low => timers.skip(0),
+        CardinalityLevel::Medium => timers.skip(1),
+        CardinalityLevel::High => timers.skip(2),
+        CardinalityLevel::Huge => return Interval::Zero,
+    };
+
+    for (time, value) in timers {
+        let time = time.unwrap().num_microseconds().unwrap();
+        if (end_time - start_time) >= time {
+            return *value;
+        }
+    }
+    Interval::FiveMinutes
+}
+
+mod search_history_utils {
+    pub struct SearchHistoryQueryBuilder {
+        pub org_id: Option<String>,
+        pub stream_type: Option<String>,
+        pub stream_name: Option<String>,
+        pub user_email: Option<String>,
+        pub trace_id: Option<String>,
+    }
+
+    impl SearchHistoryQueryBuilder {
+        pub fn new() -> Self {
+            Self {
+                org_id: None,
+                stream_type: None,
+                stream_name: None,
+                user_email: None,
+                trace_id: None,
+            }
+        }
+
+        pub fn with_org_id(mut self, org_id: &Option<String>) -> Self {
+            self.org_id = org_id.to_owned();
+            self
+        }
+
+        pub fn with_stream_type(mut self, stream_type: &Option<String>) -> Self {
+            self.stream_type = stream_type.to_owned();
+            self
+        }
+
+        pub fn with_stream_name(mut self, stream_name: &Option<String>) -> Self {
+            self.stream_name = stream_name.to_owned();
+            self
+        }
+
+        pub fn with_trace_id(mut self, trace_id: &Option<String>) -> Self {
+            self.trace_id = trace_id.to_owned();
+            self
+        }
+
+        pub fn with_user_email(mut self, email: &Option<String>) -> Self {
+            self.user_email = email.to_owned();
+            self
+        }
+
+        // Method to build the SQL query
+        pub fn build(self, search_stream_name: &str) -> String {
+            let mut query = format!("SELECT * FROM {search_stream_name} WHERE event='Search'");
+
+            if let Some(org_id) = self.org_id.filter(|s| !s.is_empty()) {
+                query.push_str(&format!(" AND org_id = '{org_id}'"));
+            }
+            if let Some(stream_type) = self.stream_type.filter(|s| !s.is_empty()) {
+                query.push_str(&format!(" AND stream_type = '{stream_type}'"));
+            }
+            if let Some(stream_name) = self.stream_name.filter(|s| !s.is_empty()) {
+                query.push_str(&format!(" AND stream_name = '{stream_name}'"));
+            }
+            if let Some(user_email) = self.user_email.filter(|s| !s.is_empty()) {
+                query.push_str(&format!(" AND user_email = '{user_email}'"));
+            }
+            if let Some(trace_id) = self.trace_id.filter(|s| !s.is_empty()) {
+                query.push_str(&format!(" AND trace_id = '{trace_id}'"));
+            }
+
+            query
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::SearchHistoryQueryBuilder;
+        const SEARCH_STREAM_NAME: &str = "usage";
+
+        #[test]
+        fn test_empty_query() {
+            let query = SearchHistoryQueryBuilder::new().build(SEARCH_STREAM_NAME);
+            assert_eq!(query, "SELECT * FROM usage WHERE event='Search'");
+        }
+
+        #[test]
+        fn test_with_org_id() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_org_id(&Some("org123".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE event='Search' AND org_id = 'org123'"
+            );
+        }
+
+        #[test]
+        fn test_with_stream_type() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_stream_type(&Some("logs".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE event='Search' AND stream_type = 'logs'"
+            );
+        }
+
+        #[test]
+        fn test_with_stream_name() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_stream_name(&Some("streamA".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE event='Search' AND stream_name = 'streamA'"
+            );
+        }
+
+        #[test]
+        fn test_with_user_email() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_user_email(&Some("user123@gmail.com".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE event='Search' AND user_email = 'user123@gmail.com'"
+            );
+        }
+
+        #[test]
+        fn test_with_trace_id() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_trace_id(&Some("trace123".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE event='Search' AND trace_id = 'trace123'"
+            );
+        }
+
+        #[test]
+        fn test_combined_query() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_org_id(&Some("org123".to_string()))
+                .with_stream_type(&Some("logs".to_string()))
+                .with_stream_name(&Some("streamA".to_string()))
+                .with_user_email(&Some("user123@gmail.com".to_string()))
+                .with_trace_id(&Some("trace123".to_string()))
+                .build(SEARCH_STREAM_NAME);
+
+            let expected_query = "SELECT * FROM usage WHERE event='Search' \
+            AND org_id = 'org123' \
+            AND stream_type = 'logs' \
+            AND stream_name = 'streamA' \
+            AND user_email = 'user123@gmail.com' \
+            AND trace_id = 'trace123'";
+
+            assert_eq!(query, expected_query);
+        }
+
+        #[test]
+        fn test_partial_query() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_org_id(&Some("org123".to_string()))
+                .with_user_email(&Some("user123@gmail.com".to_string()))
+                .build(SEARCH_STREAM_NAME);
+
+            let expected_query = "SELECT * FROM usage WHERE event='Search' \
+            AND org_id = 'org123' \
+            AND user_email = 'user123@gmail.com'";
+
+            assert_eq!(query, expected_query);
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum StreamResponses {
+    // Original variant - to be deprecated but kept for backward compatibility
+    SearchResponse {
+        results: Response,
+        streaming_aggs: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        streaming_id: Option<String>,
+        time_offset: TimeOffset,
+    },
+    // New focused variants
+    SearchResponseMetadata {
+        results: Response,
+        streaming_aggs: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        streaming_id: Option<String>,
+        time_offset: TimeOffset,
+    },
+    SearchResponseHits {
+        hits: Vec<json::Value>,
+    },
+    PromqlResponse {
+        data: super::promql::QueryResult,
+    },
+    Progress {
+        percent: usize,
+    },
+    Error {
+        code: u16,
+        message: String,
+        error_detail: Option<String>,
+    },
+    PatternExtractionResult {
+        patterns: json::Value,
+    },
+    Done,
+    Cancelled,
+}
+
+/// An iterator that yields formatted chunks from a StreamResponse
+pub struct StreamResponseChunks {
+    /// The inner iterator for search responses with multiple chunks
+    chunks_iter: Option<Box<dyn Iterator<Item = Result<BytesImpl, std::io::Error>> + Send>>,
+    /// Single chunk for simple responses
+    single_chunk: Option<Result<BytesImpl, std::io::Error>>,
+}
+
+impl Iterator for StreamResponseChunks {
+    type Item = Result<BytesImpl, std::io::Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(iter) = &mut self.chunks_iter {
+            iter.next()
+        } else {
+            self.single_chunk.take()
+        }
+    }
+}
+
+impl StreamResponses {
+    /// Convert a response to an iterator of formatted chunks
+    /// For SearchResponse, this will apply the ResponseChunkIterator to break it into multiple
+    /// chunks For other response types, this will return an iterator with a single chunk
+    pub fn to_chunks(&self) -> StreamResponseChunks {
+        // Helper function to format event data
+        let format_event = |event_type: &str, data: &str| -> BytesImpl {
+            let formatted = format!("event: {event_type}\ndata: {data}\n\n");
+            BytesImpl::from(formatted.into_bytes())
+        };
+
+        match self {
+            // Handle search responses with chunking
+            StreamResponses::SearchResponse {
+                results,
+                streaming_aggs,
+                time_offset,
+                streaming_id,
+            } => {
+                log::info!(
+                    "[HTTP2_STREAM] Chunking search response with {} hits using ResponseChunkIterator",
+                    results.hits.len()
+                );
+
+                // Create the iterator
+                let iterator = ResponseChunkIterator::new(
+                    results.clone(),
+                    None, // Use configured chunk size from environment
+                );
+
+                // Add a log message to show the chunk size being used
+                log::info!(
+                    "[HTTP2_STREAM] Using chunk size of {}MB from configuration",
+                    get_config().http_streaming.streaming_response_chunk_size
+                );
+
+                // Capture needed values for the closure
+                let streaming_aggs = *streaming_aggs;
+                let time_offset = time_offset.clone();
+                let streaming_id = streaming_id.clone();
+
+                if results.hits.is_empty() {
+                    // Send metadata first
+                    let metadata = StreamResponses::SearchResponseMetadata {
+                        results: results.clone(),
+                        streaming_aggs,
+                        time_offset: time_offset.clone(),
+                        streaming_id: streaming_id.clone(),
+                    };
+                    let metadata_data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
+                        log::error!("Failed to serialize metadata: {metadata:?}");
+                        String::new()
+                    });
+                    let metadata_bytes = format_event("search_response_metadata", &metadata_data);
+
+                    // Send empty hits
+                    let hits = StreamResponses::SearchResponseHits {
+                        hits: results.hits.clone(),
+                    };
+                    let hits_data = serde_json::to_string(&hits).unwrap_or_else(|_| {
+                        log::error!("Failed to serialize hits: {hits:?}");
+                        String::new()
+                    });
+                    let hits_bytes = format_event("search_response_hits", &hits_data);
+
+                    // Return both chunks in sequence
+                    let chunks_iter =
+                        std::iter::once(Ok(metadata_bytes)).chain(std::iter::once(Ok(hits_bytes)));
+
+                    return StreamResponseChunks {
+                        chunks_iter: Some(Box::new(chunks_iter)),
+                        single_chunk: None,
+                    };
+                }
+
+                // Create an iterator that maps each chunk to a formatted BytesImpl
+                let chunks_iter = iterator.map(move |chunk| {
+                    let (event_type, data) = match chunk {
+                        ResponseChunk::Metadata { response } => {
+                            // Add streaming_aggs and time_offset from the original response
+                            let metadata = StreamResponses::SearchResponseMetadata {
+                                results: *response,
+                                streaming_aggs,
+                                streaming_id: streaming_id.clone(),
+                                time_offset: time_offset.clone(),
+                            };
+                            let data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
+                                log::error!("Failed to serialize metadata: {metadata:?}");
+                                String::new()
+                            });
+                            ("search_response_metadata", data)
+                        }
+                        ResponseChunk::Hits { hits } => {
+                            let data =
+                                serde_json::to_string(&StreamResponses::SearchResponseHits {
+                                    hits,
+                                })
+                                .unwrap_or_else(|e| {
+                                    log::error!("Failed to serialize hits: {e}");
+                                    String::new()
+                                });
+                            ("search_response_hits", data)
+                        }
+                    };
+
+                    // Format and encode the chunk
+                    Ok(format_event(event_type, &data))
+                });
+
+                StreamResponseChunks {
+                    chunks_iter: Some(Box::new(chunks_iter)),
+                    single_chunk: None,
+                }
+            }
+
+            // Handle other response types with a single chunk
+            StreamResponses::SearchResponseMetadata { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("search_response_metadata", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::SearchResponseHits { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("search_response_hits", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::PromqlResponse { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("promql_response", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Progress { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("progress", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Error { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("error", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::PatternExtractionResult { patterns } => {
+                let data = serde_json::to_string(patterns).unwrap_or_else(|_| {
+                    log::error!("Failed to serialize pattern extraction result: {patterns:?}");
+                    String::new()
+                });
+                let bytes = format_event("pattern_extraction_result", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Done => {
+                let bytes = BytesImpl::from("data: [[DONE]]\n\n");
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Cancelled => {
+                let bytes = BytesImpl::from("data: [[CANCELLED]]\n\n");
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2237,409 +2761,303 @@ mod tests {
         assert_eq!(info.start_time, 100);
         assert_eq!(info.end_time, 200);
     }
-}
 
-mod search_history_utils {
-    pub struct SearchHistoryQueryBuilder {
-        pub org_id: Option<String>,
-        pub stream_type: Option<String>,
-        pub stream_name: Option<String>,
-        pub user_email: Option<String>,
-        pub trace_id: Option<String>,
+    #[test]
+    fn test_interval_duration_conversions() {
+        // Test duration in minutes
+        assert_eq!(Interval::FiveMinutes.get_duration_minutes(), 5);
+        assert_eq!(Interval::OneHour.get_duration_minutes(), 60);
+        assert_eq!(Interval::OneDay.get_duration_minutes(), 1440);
+
+        // Test duration in seconds
+        assert_eq!(Interval::FiveMinutes.get_interval_seconds(), 300);
+        assert_eq!(Interval::OneHour.get_interval_seconds(), 3600);
+        assert_eq!(Interval::OneDay.get_interval_seconds(), 86400);
+
+        // Test duration in microseconds
+        assert_eq!(
+            Interval::FiveMinutes.get_interval_microseconds(),
+            300_000_000
+        );
+        assert_eq!(Interval::OneHour.get_interval_microseconds(), 3_600_000_000);
+        assert_eq!(Interval::OneDay.get_interval_microseconds(), 86_400_000_000);
     }
 
-    impl SearchHistoryQueryBuilder {
-        pub fn new() -> Self {
-            Self {
-                org_id: None,
-                stream_type: None,
-                stream_name: None,
-                user_email: None,
-                trace_id: None,
-            }
-        }
-
-        pub fn with_org_id(mut self, org_id: &Option<String>) -> Self {
-            self.org_id = org_id.to_owned();
-            self
-        }
-
-        pub fn with_stream_type(mut self, stream_type: &Option<String>) -> Self {
-            self.stream_type = stream_type.to_owned();
-            self
-        }
-
-        pub fn with_stream_name(mut self, stream_name: &Option<String>) -> Self {
-            self.stream_name = stream_name.to_owned();
-            self
-        }
-
-        pub fn with_trace_id(mut self, trace_id: &Option<String>) -> Self {
-            self.trace_id = trace_id.to_owned();
-            self
-        }
-
-        pub fn with_user_email(mut self, email: &Option<String>) -> Self {
-            self.user_email = email.to_owned();
-            self
-        }
-
-        // Method to build the SQL query
-        pub fn build(self, search_stream_name: &str) -> String {
-            let mut query = format!("SELECT * FROM {search_stream_name} WHERE event='Search'");
-
-            if let Some(org_id) = self.org_id.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND org_id = '{org_id}'"));
-            }
-            if let Some(stream_type) = self.stream_type.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND stream_type = '{stream_type}'"));
-            }
-            if let Some(stream_name) = self.stream_name.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND stream_name = '{stream_name}'"));
-            }
-            if let Some(user_email) = self.user_email.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND user_email = '{user_email}'"));
-            }
-            if let Some(trace_id) = self.trace_id.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND trace_id = '{trace_id}'"));
-            }
-
-            query
-        }
+    #[test]
+    fn test_interval_display() {
+        // Test Display implementation
+        assert_eq!(format!("{}", Interval::FiveMinutes), "5 minutes");
+        assert_eq!(format!("{}", Interval::OneHour), "60 minutes");
+        assert_eq!(format!("{}", Interval::OneDay), "1440 minutes");
     }
 
-    #[cfg(test)]
-    mod tests {
-        use super::SearchHistoryQueryBuilder;
-        const SEARCH_STREAM_NAME: &str = "usage";
+    #[test]
+    fn test_cardinality_level_from_f64() {
+        // Test cardinality level conversion from f64
+        assert_eq!(CardinalityLevel::from(1000.0), CardinalityLevel::Low);
+        assert_eq!(CardinalityLevel::from(50000.0), CardinalityLevel::Medium);
+        assert_eq!(CardinalityLevel::from(2000000.0), CardinalityLevel::High);
+        assert_eq!(CardinalityLevel::from(10000000.0), CardinalityLevel::Huge);
 
-        #[test]
-        fn test_empty_query() {
-            let query = SearchHistoryQueryBuilder::new().build(SEARCH_STREAM_NAME);
-            assert_eq!(query, "SELECT * FROM usage WHERE event='Search'");
-        }
-
-        #[test]
-        fn test_with_org_id() {
-            let query = SearchHistoryQueryBuilder::new()
-                .with_org_id(&Some("org123".to_string()))
-                .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE event='Search' AND org_id = 'org123'"
-            );
-        }
-
-        #[test]
-        fn test_with_stream_type() {
-            let query = SearchHistoryQueryBuilder::new()
-                .with_stream_type(&Some("logs".to_string()))
-                .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE event='Search' AND stream_type = 'logs'"
-            );
-        }
-
-        #[test]
-        fn test_with_stream_name() {
-            let query = SearchHistoryQueryBuilder::new()
-                .with_stream_name(&Some("streamA".to_string()))
-                .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE event='Search' AND stream_name = 'streamA'"
-            );
-        }
-
-        #[test]
-        fn test_with_user_email() {
-            let query = SearchHistoryQueryBuilder::new()
-                .with_user_email(&Some("user123@gmail.com".to_string()))
-                .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE event='Search' AND user_email = 'user123@gmail.com'"
-            );
-        }
-
-        #[test]
-        fn test_with_trace_id() {
-            let query = SearchHistoryQueryBuilder::new()
-                .with_trace_id(&Some("trace123".to_string()))
-                .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE event='Search' AND trace_id = 'trace123'"
-            );
-        }
-
-        #[test]
-        fn test_combined_query() {
-            let query = SearchHistoryQueryBuilder::new()
-                .with_org_id(&Some("org123".to_string()))
-                .with_stream_type(&Some("logs".to_string()))
-                .with_stream_name(&Some("streamA".to_string()))
-                .with_user_email(&Some("user123@gmail.com".to_string()))
-                .with_trace_id(&Some("trace123".to_string()))
-                .build(SEARCH_STREAM_NAME);
-
-            let expected_query = "SELECT * FROM usage WHERE event='Search' \
-            AND org_id = 'org123' \
-            AND stream_type = 'logs' \
-            AND stream_name = 'streamA' \
-            AND user_email = 'user123@gmail.com' \
-            AND trace_id = 'trace123'";
-
-            assert_eq!(query, expected_query);
-        }
-
-        #[test]
-        fn test_partial_query() {
-            let query = SearchHistoryQueryBuilder::new()
-                .with_org_id(&Some("org123".to_string()))
-                .with_user_email(&Some("user123@gmail.com".to_string()))
-                .build(SEARCH_STREAM_NAME);
-
-            let expected_query = "SELECT * FROM usage WHERE event='Search' \
-            AND org_id = 'org123' \
-            AND user_email = 'user123@gmail.com'";
-
-            assert_eq!(query, expected_query);
-        }
+        // Test boundary values
+        assert_eq!(CardinalityLevel::from(9999.9), CardinalityLevel::Low);
+        assert_eq!(CardinalityLevel::from(10000.0), CardinalityLevel::Medium);
+        assert_eq!(CardinalityLevel::from(999999.9), CardinalityLevel::Medium);
+        assert_eq!(CardinalityLevel::from(1000000.0), CardinalityLevel::High);
+        assert_eq!(CardinalityLevel::from(4999999.9), CardinalityLevel::High);
+        assert_eq!(CardinalityLevel::from(5000000.0), CardinalityLevel::Huge);
     }
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum StreamResponses {
-    // Original variant - to be deprecated but kept for backward compatibility
-    SearchResponse {
-        results: Response,
-        streaming_aggs: bool,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        streaming_id: Option<String>,
-        time_offset: TimeOffset,
-    },
-    // New focused variants
-    SearchResponseMetadata {
-        results: Response,
-        streaming_aggs: bool,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        streaming_id: Option<String>,
-        time_offset: TimeOffset,
-    },
-    SearchResponseHits {
-        hits: Vec<json::Value>,
-    },
-    Progress {
-        percent: usize,
-    },
-    Error {
-        code: u16,
-        message: String,
-        error_detail: Option<String>,
-    },
-    PatternExtractionResult {
-        patterns: json::Value,
-    },
-    Done,
-    Cancelled,
-}
+    #[test]
+    fn test_generate_aggregation_search_interval() {
+        // Test CardinalityLevel::Low (skips 0 intervals)
+        let test_cases_low = vec![
+            // (time_range, expected_interval)
+            // 45 days range -> OneDay interval
+            (
+                (
+                    0,
+                    Duration::try_days(45).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::OneDay,
+            ),
+            // 15 days range -> SixHours interval
+            (
+                (
+                    0,
+                    Duration::try_days(15).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::SixHours,
+            ),
+            // 3 days range -> TwoHours interval
+            (
+                (
+                    0,
+                    Duration::try_days(3).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::TwoHours,
+            ),
+            // 1 day range -> TwoHours interval
+            (
+                (
+                    0,
+                    Duration::try_hours(24).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::TwoHours,
+            ),
+            // 8 hours range -> OneHour interval
+            (
+                (
+                    0,
+                    Duration::try_hours(8).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::OneHour,
+            ),
+            // 6 hours range -> OneHour interval
+            (
+                (
+                    0,
+                    Duration::try_hours(6).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::OneHour,
+            ),
+            // 2 hours range -> ThirtyMinutes interval
+            (
+                (
+                    0,
+                    Duration::try_hours(2).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::ThirtyMinutes,
+            ),
+            // 1 hour range -> ThirtyMinutes interval
+            (
+                (
+                    0,
+                    Duration::try_hours(1).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::ThirtyMinutes,
+            ),
+            // 30 minutes range -> FiveMinutes interval
+            (
+                (
+                    0,
+                    Duration::try_minutes(30)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap(),
+                ),
+                Interval::FiveMinutes,
+            ),
+            // 15 minutes range -> FiveMinutes interval
+            (
+                (
+                    0,
+                    Duration::try_minutes(15)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap(),
+                ),
+                Interval::FiveMinutes,
+            ),
+            // Less than 15 minutes -> FiveMinutes interval (default)
+            (
+                (
+                    0,
+                    Duration::try_minutes(10)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap(),
+                ),
+                Interval::FiveMinutes,
+            ),
+        ];
 
-/// An iterator that yields formatted chunks from a StreamResponse
-pub struct StreamResponseChunks {
-    /// The inner iterator for search responses with multiple chunks
-    chunks_iter: Option<Box<dyn Iterator<Item = Result<BytesImpl, std::io::Error>> + Send>>,
-    /// Single chunk for simple responses
-    single_chunk: Option<Result<BytesImpl, std::io::Error>>,
-}
-
-impl Iterator for StreamResponseChunks {
-    type Item = Result<BytesImpl, std::io::Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(iter) = &mut self.chunks_iter {
-            iter.next()
-        } else {
-            self.single_chunk.take()
+        for (time_range, expected_interval) in test_cases_low {
+            let result = generate_aggregation_search_interval(
+                time_range.0,
+                time_range.1,
+                CardinalityLevel::Low,
+            );
+            assert_eq!(
+                result, expected_interval,
+                "CardinalityLevel::Low - Time range {time_range:?} should return {expected_interval}, but got {result}"
+            );
         }
-    }
-}
 
-impl StreamResponses {
-    /// Convert a response to an iterator of formatted chunks
-    /// For SearchResponse, this will apply the ResponseChunkIterator to break it into multiple
-    /// chunks For other response types, this will return an iterator with a single chunk
-    pub fn to_chunks(&self) -> StreamResponseChunks {
-        // Helper function to format event data
-        let format_event = |event_type: &str, data: &str| -> BytesImpl {
-            let formatted = format!("event: {event_type}\ndata: {data}\n\n");
-            BytesImpl::from(formatted.into_bytes())
-        };
+        // Test CardinalityLevel::Medium (skips 1 interval - OneDay)
+        let test_cases_medium = vec![
+            // 45 days range -> SixHours interval (OneDay skipped)
+            (
+                (
+                    0,
+                    Duration::try_days(45).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::SixHours,
+            ),
+            // 15 days range -> SixHours interval
+            (
+                (
+                    0,
+                    Duration::try_days(15).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::SixHours,
+            ),
+            // 3 days range -> TwoHours interval
+            (
+                (
+                    0,
+                    Duration::try_days(3).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::TwoHours,
+            ),
+        ];
 
-        match self {
-            // Handle search responses with chunking
-            StreamResponses::SearchResponse {
-                results,
-                streaming_aggs,
-                time_offset,
-                streaming_id,
-            } => {
-                log::info!(
-                    "[HTTP2_STREAM] Chunking search response with {} hits using ResponseChunkIterator",
-                    results.hits.len()
-                );
-
-                // Create the iterator
-                let iterator = ResponseChunkIterator::new(
-                    results.clone(),
-                    None, // Use configured chunk size from environment
-                );
-
-                // Add a log message to show the chunk size being used
-                log::info!(
-                    "[HTTP2_STREAM] Using chunk size of {}MB from configuration",
-                    get_config().http_streaming.streaming_response_chunk_size
-                );
-
-                // Capture needed values for the closure
-                let streaming_aggs = *streaming_aggs;
-                let time_offset = time_offset.clone();
-                let streaming_id = streaming_id.clone();
-
-                if results.hits.is_empty() {
-                    // Send metadata first
-                    let metadata = StreamResponses::SearchResponseMetadata {
-                        results: results.clone(),
-                        streaming_aggs,
-                        time_offset: time_offset.clone(),
-                        streaming_id: streaming_id.clone(),
-                    };
-                    let metadata_data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
-                        log::error!("Failed to serialize metadata: {metadata:?}");
-                        String::new()
-                    });
-                    let metadata_bytes = format_event("search_response_metadata", &metadata_data);
-
-                    // Send empty hits
-                    let hits = StreamResponses::SearchResponseHits {
-                        hits: results.hits.clone(),
-                    };
-                    let hits_data = serde_json::to_string(&hits).unwrap_or_else(|_| {
-                        log::error!("Failed to serialize hits: {hits:?}");
-                        String::new()
-                    });
-                    let hits_bytes = format_event("search_response_hits", &hits_data);
-
-                    // Return both chunks in sequence
-                    let chunks_iter =
-                        std::iter::once(Ok(metadata_bytes)).chain(std::iter::once(Ok(hits_bytes)));
-
-                    return StreamResponseChunks {
-                        chunks_iter: Some(Box::new(chunks_iter)),
-                        single_chunk: None,
-                    };
-                }
-
-                // Create an iterator that maps each chunk to a formatted BytesImpl
-                let chunks_iter = iterator.map(move |chunk| {
-                    let (event_type, data) = match chunk {
-                        ResponseChunk::Metadata { response } => {
-                            // Add streaming_aggs and time_offset from the original response
-                            let metadata = StreamResponses::SearchResponseMetadata {
-                                results: *response,
-                                streaming_aggs,
-                                streaming_id: streaming_id.clone(),
-                                time_offset: time_offset.clone(),
-                            };
-                            let data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
-                                log::error!("Failed to serialize metadata: {metadata:?}");
-                                String::new()
-                            });
-                            ("search_response_metadata", data)
-                        }
-                        ResponseChunk::Hits { hits } => {
-                            let data =
-                                serde_json::to_string(&StreamResponses::SearchResponseHits {
-                                    hits,
-                                })
-                                .unwrap_or_else(|e| {
-                                    log::error!("Failed to serialize hits: {e}");
-                                    String::new()
-                                });
-                            ("search_response_hits", data)
-                        }
-                    };
-
-                    // Format and encode the chunk
-                    Ok(format_event(event_type, &data))
-                });
-
-                StreamResponseChunks {
-                    chunks_iter: Some(Box::new(chunks_iter)),
-                    single_chunk: None,
-                }
-            }
-
-            // Handle other response types with a single chunk
-            StreamResponses::SearchResponseMetadata { .. } => {
-                let data = serde_json::to_string(self).unwrap_or_default();
-                let bytes = format_event("search_response_metadata", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::SearchResponseHits { .. } => {
-                let data = serde_json::to_string(self).unwrap_or_default();
-                let bytes = format_event("search_response_hits", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::Progress { .. } => {
-                let data = serde_json::to_string(self).unwrap_or_default();
-                let bytes = format_event("progress", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::Error { .. } => {
-                let data = serde_json::to_string(self).unwrap_or_default();
-                let bytes = format_event("error", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::PatternExtractionResult { patterns } => {
-                let data = serde_json::to_string(patterns).unwrap_or_else(|_| {
-                    log::error!("Failed to serialize pattern extraction result: {patterns:?}");
-                    String::new()
-                });
-                let bytes = format_event("pattern_extraction_result", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::Done => {
-                let bytes = BytesImpl::from("data: [[DONE]]\n\n");
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::Cancelled => {
-                let bytes = BytesImpl::from("data: [[CANCELLED]]\n\n");
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
+        for (time_range, expected_interval) in test_cases_medium {
+            let result = generate_aggregation_search_interval(
+                time_range.0,
+                time_range.1,
+                CardinalityLevel::Medium,
+            );
+            assert_eq!(
+                result, expected_interval,
+                "CardinalityLevel::Medium -  Time range {time_range:?} should return {expected_interval}, but got {result}"
+            );
         }
+
+        // Test CardinalityLevel::High (skips 2 intervals - OneDay, SixHours)
+        let test_cases_high = vec![
+            // 45 days range -> TwoHours interval (OneDay, SixHours skipped)
+            (
+                (0, Duration::days(45).num_microseconds().unwrap()),
+                Interval::TwoHours,
+            ),
+            // 3 days range -> TwoHours interval
+            (
+                (0, Duration::days(3).num_microseconds().unwrap()),
+                Interval::TwoHours,
+            ),
+            // 1 day range -> TwoHours interval
+            (
+                (0, Duration::hours(24).num_microseconds().unwrap()),
+                Interval::TwoHours,
+            ),
+        ];
+
+        for (time_range, expected_interval) in test_cases_high {
+            let result = generate_aggregation_search_interval(
+                time_range.0,
+                time_range.1,
+                CardinalityLevel::High,
+            );
+            assert_eq!(
+                result, expected_interval,
+                "CardinalityLevel::High -  Time range {time_range:?} should return {expected_interval}, but got {result}"
+            );
+        }
+
+        // Test CardinalityLevel::Huge (we do not cache for huge cardinality)
+        let test_cases_huge = vec![
+            // 45 days range -> Zero interval
+            (
+                (
+                    0,
+                    Duration::try_days(45).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::Zero,
+            ),
+            // 8 hours range -> Zero interval
+            (
+                (
+                    0,
+                    Duration::try_hours(8).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::Zero,
+            ),
+            // 6 hours range -> Zero interval
+            (
+                (
+                    0,
+                    Duration::try_hours(6).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::Zero,
+            ),
+            // 2 hours range -> Zero interval
+            (
+                (
+                    0,
+                    Duration::try_hours(2).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::Zero,
+            ),
+        ];
+
+        for (time_range, expected_interval) in test_cases_huge {
+            let result = generate_aggregation_search_interval(
+                time_range.0,
+                time_range.1,
+                CardinalityLevel::Huge,
+            );
+            assert_eq!(
+                result, expected_interval,
+                "CardinalityLevel::Huge -  Time range {time_range:?} should return {expected_interval}, but got {result}"
+            );
+        }
+
+        // Test edge cases
+        // Zero time range should return FiveMinutes (default)
+        let result = generate_aggregation_search_interval(100, 100, CardinalityLevel::Low);
+        assert_eq!(
+            result,
+            Interval::FiveMinutes,
+            "Zero time range should return FiveMinutes"
+        );
+
+        // Negative time range should return FiveMinutes (default)
+        let result = generate_aggregation_search_interval(200, 100, CardinalityLevel::Low);
+        assert_eq!(
+            result,
+            Interval::FiveMinutes,
+            "Negative time range should return FiveMinutes"
+        );
     }
 }

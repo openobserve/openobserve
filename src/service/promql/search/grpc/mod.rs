@@ -22,6 +22,7 @@ use std::{
 use async_trait::async_trait;
 use config::{
     meta::{
+        promql::value,
         search::ScanStats,
         stream::{FileKey, PartitionTimeLevel, StreamType},
     },
@@ -33,9 +34,8 @@ use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 
-use super::Value;
 use crate::service::{
-    promql::{DEFAULT_LOOKBACK, PromqlContext, TableProvider, name_visitor, value},
+    promql::{DEFAULT_LOOKBACK, PromqlContext, TableProvider, name_visitor},
     search,
 };
 
@@ -184,9 +184,8 @@ pub async fn search(
 #[tracing::instrument(name = "promql:search:grpc:search_inner", skip_all, fields(org_id = req.org_id))]
 pub async fn search_inner(
     req: &cluster_rpc::MetricsQueryRequest,
-) -> Result<(Value, String, ScanStats)> {
+) -> Result<(value::Value, String, ScanStats)> {
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
-
     let org_id = &req.org_id;
     let query = req.query.as_ref().unwrap();
     let prom_expr = parser::parse(&query.query).map_err(DataFusionError::Execution)?;
@@ -328,7 +327,7 @@ async fn generate_search_group(
     Ok(groups)
 }
 
-pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Value) {
+pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: value::Value) {
     match value {
         value::Value::None => {}
         value::Value::Instant(v) => {
