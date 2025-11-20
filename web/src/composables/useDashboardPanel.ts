@@ -401,7 +401,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
       // Filter out any invalid entries (streams with no name)
       dashboardPanelData.meta.streamFields.groupedFields = groupedFields.filter(
-        (field: any) => field?.name
+        (field: any) => field?.name,
       );
     } finally {
       isUpdatingGroupedFields = false;
@@ -2382,9 +2382,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
    */
   const buildCondition = (condition: any) => {
     // Check if joins exist to determine whether to use stream alias
-    const hasJoins = dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ]?.joins?.length > 0;
+    const hasJoins =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.joins?.length > 0;
 
     const streamAlias = hasJoins
       ? (condition?.column?.streamAlias ??
@@ -2411,14 +2412,18 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
       return groupConditions.length ? `(${groupQuery})` : "";
     } else if (condition.type === "list" && condition.values?.length > 0) {
-      const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+      const fieldRef = streamAlias
+        ? `${streamAlias}.${condition.column.field}`
+        : condition.column.field;
       return `${fieldRef} IN (${condition.values
         .map((value: any) => formatValue(value, condition.column))
         .join(", ")})`;
     } else if (condition.type === "condition" && condition.operator != null) {
       let selectFilter = "";
       if (["Is Null", "Is Not Null"].includes(condition.operator)) {
-        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        const fieldRef = streamAlias
+          ? `${streamAlias}.${condition.column.field}`
+          : condition.column.field;
         selectFilter += `${fieldRef} `;
         switch (condition.operator) {
           case "Is Null":
@@ -2429,34 +2434,44 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             break;
         }
       } else if (condition.operator === "IN") {
-        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
-        selectFilter += `${fieldRef} IN (${formatINValue(
-          condition.value,
-        )})`;
+        const fieldRef = streamAlias
+          ? `${streamAlias}.${condition.column.field}`
+          : condition.column.field;
+        selectFilter += `${fieldRef} IN (${formatINValue(condition.value)})`;
       } else if (condition.operator === "NOT IN") {
-        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        const fieldRef = streamAlias
+          ? `${streamAlias}.${condition.column.field}`
+          : condition.column.field;
         selectFilter += `${fieldRef} NOT IN (${formatINValue(
           condition.value,
         )})`;
       } else if (condition.operator === "match_all") {
         selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
       } else if (condition.operator === "str_match") {
-        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        const fieldRef = streamAlias
+          ? `${streamAlias}.${condition.column.field}`
+          : condition.column.field;
         selectFilter += `str_match(${fieldRef}, ${formatValue(
           condition.value,
           condition.column,
         )})`;
       } else if (condition.operator === "str_match_ignore_case") {
-        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        const fieldRef = streamAlias
+          ? `${streamAlias}.${condition.column.field}`
+          : condition.column.field;
         selectFilter += `str_match_ignore_case(${fieldRef}, ${formatValue(condition.value, condition.column)})`;
       } else if (condition.operator === "re_match") {
-        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        const fieldRef = streamAlias
+          ? `${streamAlias}.${condition.column.field}`
+          : condition.column.field;
         selectFilter += `re_match(${fieldRef}, ${formatValue(
           condition.value,
           condition.column,
         )})`;
       } else if (condition.operator === "re_not_match") {
-        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        const fieldRef = streamAlias
+          ? `${streamAlias}.${condition.column.field}`
+          : condition.column.field;
         selectFilter += `re_not_match(${fieldRef}, ${formatValue(
           condition.value,
           condition.column,
@@ -2477,7 +2492,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           (it: any) => it.name == condition.column.field,
         )?.type;
 
-        const fieldRef = streamAlias ? `${streamAlias}.${condition.column.field}` : condition.column.field;
+        const fieldRef = streamAlias
+          ? `${streamAlias}.${condition.column.field}`
+          : condition.column.field;
         selectFilter += `${fieldRef} `;
         switch (condition.operator) {
           case "=":
@@ -2557,7 +2574,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return "";
   };
 
- const sqlchart = async () => {
+  const sqlchart = async () => {
     // STEP 1: first check if there is at least 1 field selected
     if (
       dashboardPanelData.data.queries[
@@ -2885,11 +2902,29 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return query;
   };
 
+  /**
+   * Helper function to build field expression using buildSQLQueryFromInput
+   * Handles legacy field format and converts it to use the common function
+   */
+  const buildFieldExpression = (field: any, streamAlias: string) => {
+    // Use buildSQLQueryFromInput for fields with functions
+    const expression = buildSQLQueryFromInput(field, streamAlias);
+
+    // Skip fields that return empty expressions
+    if (!expression) {
+      return null;
+    }
+
+    return expression ? `${expression} as "${field.alias}"` : "";
+  };
+
   const mapChart = () => {
-    const { name, value_for_maps } =
+    const queryData =
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields;
+      ];
+    const { name, value_for_maps } = queryData.fields;
+    const stream = queryData.fields.stream;
 
     // Validate required fields
     if (!name?.column) {
@@ -2900,55 +2935,31 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       console.warn("Map value field is required but not provided");
       return "";
     }
-    let query = "";
 
-    if (name && value_for_maps) {
-      query = `SELECT ${name.column} as "${name.alias}", `;
+    // Build SELECT clause using helper
+    const nameExpr = buildFieldExpression(name, stream);
+    const valueExpr = buildFieldExpression(value_for_maps, stream);
 
-      if (value_for_maps?.functionName) {
-        switch (value_for_maps.functionName) {
-          case "p50":
-            query += `approx_percentile_cont(${value_for_maps.column}, 0.5) as ${value_for_maps.alias}`;
-            break;
-          case "p90":
-            query += `approx_percentile_cont(${value_for_maps.column}, 0.9) as ${value_for_maps.alias}`;
-            break;
-          case "p95":
-            query += `approx_percentile_cont(${value_for_maps.column}, 0.95) as ${value_for_maps.alias}`;
-            break;
-          case "p99":
-            query += `approx_percentile_cont(${value_for_maps.column}, 0.99) as ${value_for_maps.alias}`;
-            break;
-          case "count-distinct":
-            query += `count(distinct(${value_for_maps.column})) as "${value_for_maps.alias}"`;
-            break;
-          default:
-            query += `${value_for_maps.functionName}(${value_for_maps.column}) as "${value_for_maps.alias}"`;
-            break;
-        }
-      } else {
-        query += `${value_for_maps.column} as "${value_for_maps.alias}"`;
-      }
+    if (!nameExpr || !valueExpr) {
+      return "";
+    }
 
-      query += ` FROM "${
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream
-      }"`;
+    let query = `SELECT ${nameExpr}, ${valueExpr}`;
 
-      // Add WHERE clause based on applied filters
-      const filterData =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.conditions;
+    // FROM clause with JOIN support
+    query += ` FROM "${stream}" ${buildSQLJoinsFromInput(
+      queryData.joins,
+      queryData?.joins?.length ? stream : "",
+    )}`;
 
-      const whereClause = buildWhereClause(filterData);
-      query += whereClause;
+    // WHERE clause
+    const filterData = queryData.fields.filter.conditions;
+    const whereClause = buildWhereClause(filterData);
+    query += whereClause;
 
-      // Group By clause
-      if (name) {
-        query += ` GROUP BY ${name.alias}`;
-      }
+    // GROUP BY clause
+    if (name && !name.isDerived) {
+      query += ` GROUP BY ${name.alias}`;
     }
 
     // Add HAVING clause if y-axis has operator and value
@@ -3002,72 +3013,53 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const geoMapChart = () => {
-    let query = "";
-
-    const { latitude, longitude, weight } =
+    const queryData =
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields;
+      ];
+    const { latitude, longitude, weight } = queryData.fields;
+    const stream = queryData.fields.stream;
 
-    if (latitude && !latitude.isDerived && longitude && !longitude.isDerived) {
-      query += `SELECT ${latitude.column} as ${latitude.alias}, ${longitude.column} as ${longitude.alias}`;
-    } else if (latitude && !latitude.isDerived) {
-      query += `SELECT ${latitude.column} as ${latitude.alias}`;
-    } else if (longitude && !longitude.isDerived) {
-      query += `SELECT ${longitude.column} as ${longitude.alias}`;
+    // Build SELECT clause
+    const selectFields: string[] = [];
+
+    const latExpr = buildFieldExpression(latitude, stream);
+    if (latExpr) selectFields.push(latExpr);
+
+    const lonExpr = buildFieldExpression(longitude, stream);
+    if (lonExpr) selectFields.push(lonExpr);
+
+    if (selectFields.length === 0) {
+      return "";
     }
 
-    if (query) {
-      if (weight && !weight.isDerived) {
-        switch (weight?.functionName) {
-          case "p50":
-            query += `, approx_percentile_cont(${weight.column}, 0.5) as ${weight.alias}`;
-            break;
-          case "p90":
-            query += `, approx_percentile_cont(${weight.column}, 0.9) as ${weight.alias}`;
-            break;
-          case "p95":
-            query += `, approx_percentile_cont(${weight.column}, 0.95) as ${weight.alias}`;
-            break;
-          case "p99":
-            query += `, approx_percentile_cont(${weight.column}, 0.99) as ${weight.alias}`;
-            break;
-          case "count-distinct":
-            query += `, count(distinct(${weight.column})) as ${weight.alias}`;
-            break;
-          default:
-            query += `, ${weight.functionName}(${weight.column}) as ${weight.alias}`;
-            break;
-        }
-      }
-      query += ` FROM "${
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream
-      }" `;
-    }
+    const weightExpr = buildFieldExpression(weight, stream);
+    if (weightExpr) selectFields.push(weightExpr);
 
-    // Add WHERE clause based on applied filters
-    const filterData =
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter.conditions;
+    let query = `SELECT ${selectFields.join(", ")}`;
 
+    // FROM clause with JOIN support
+    query += ` FROM "${stream}" ${buildSQLJoinsFromInput(
+      queryData.joins,
+      queryData?.joins?.length ? stream : "",
+    )}`;
+
+    // WHERE clause
+    const filterData = queryData.fields.filter.conditions;
     const whereClause = buildWhereClause(filterData);
     query += whereClause;
 
-    // Group By clause
-    let aliases: any = [];
-
+    // GROUP BY clause
+    const groupByAliases: string[] = [];
     if (latitude && !latitude.isDerived) {
-      aliases.push(latitude?.alias);
+      groupByAliases.push(latitude?.alias);
     }
     if (longitude && !longitude.isDerived) {
-      aliases.push(longitude?.alias);
+      groupByAliases.push(longitude?.alias);
     }
-    if (aliases.length) {
-      aliases = aliases.filter(Boolean).join(", ");
-      query += `GROUP BY ${aliases}`;
+
+    if (groupByAliases.length) {
+      query += `GROUP BY ${groupByAliases.join(", ")}`;
     }
 
     // Add HAVING clause if y-axis has operator and value
@@ -3132,70 +3124,46 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       return "";
     }
 
-    let query = "SELECT ";
-    const selectFields = [];
+    // Build SELECT clause using helper
+    const selectFields: string[] = [];
 
-    if (source && !source.isDerived) {
-      selectFields.push(`${source.column} as ${source.alias}`);
+    const sourceExpr = buildFieldExpression(source, stream);
+    if (sourceExpr) selectFields.push(sourceExpr);
+
+    const targetExpr = buildFieldExpression(target, stream);
+    if (targetExpr) selectFields.push(targetExpr);
+
+    const valueExpr = buildFieldExpression(value, stream);
+    if (valueExpr) selectFields.push(valueExpr);
+
+    if (selectFields.length === 0) {
+      return "";
     }
 
-    if (target && !target.isDerived) {
-      selectFields.push(`${target.column} as ${target.alias}`);
-    }
+    let query = `SELECT ${selectFields.join(", ")}`;
 
-    if (value && !value.isDerived) {
-      switch (value?.functionName) {
-        case "p50":
-          selectFields.push(
-            `approx_percentile_cont(${value?.column}, 0.5) as ${value.alias}`,
-          );
-          break;
-        case "p90":
-          selectFields.push(
-            `approx_percentile_cont(${value?.column}, 0.9) as ${value.alias}`,
-          );
-          break;
-        case "p95":
-          selectFields.push(
-            `approx_percentile_cont(${value?.column}, 0.95) as ${value.alias}`,
-          );
-          break;
-        case "p99":
-          selectFields.push(
-            `approx_percentile_cont(${value?.column}, 0.99) as ${value.alias}`,
-          );
-          break;
-        default:
-          selectFields.push(
-            `${value.functionName}(${value.column}) as ${value.alias}`,
-          );
-          break;
-      }
-    }
+    // FROM clause with JOIN support
+    query += ` FROM "${stream}" ${buildSQLJoinsFromInput(
+      queryData.joins,
+      queryData?.joins?.length ? stream : "",
+    )}`;
 
-    // Adding the selected fields to the query
-    query += selectFields.join(", ");
-
-    query += ` FROM "${stream}"`;
-
-    // Adding filter conditions
+    // WHERE clause
     const filterData = queryData.fields.filter.conditions;
-
     const whereClause = buildWhereClause(filterData);
     query += whereClause;
 
-    // Group By clause
-    let aliases: any = [];
-
+    // GROUP BY clause
+    const groupByAliases: string[] = [];
     if (source && !source.isDerived) {
-      aliases.push(source?.alias);
+      groupByAliases.push(source.alias);
     }
     if (target && !target.isDerived) {
-      aliases.push(target?.alias);
+      groupByAliases.push(target.alias);
     }
-    if (aliases.length) {
-      aliases = aliases.filter(Boolean).join(", ");
-      query += `GROUP BY ${aliases}`;
+
+    if (groupByAliases.length) {
+      query += `GROUP BY ${groupByAliases.join(", ")}`;
     }
 
     // Add HAVING clause if y-axis has operator and value
@@ -3274,17 +3242,22 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
-
   // Replace the existing validatePanel function with a wrapper that calls the generic function
   const validatePanelWrapper = (
     errors: string[],
     isFieldsValidationRequired: boolean = true,
   ) => {
-    validatePanel(dashboardPanelData, errors, isFieldsValidationRequired, [
-      ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
-      ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
-      ...dashboardPanelData.meta.stream.customQueryFields,
-    ], pageKey);
+    validatePanel(
+      dashboardPanelData,
+      errors,
+      isFieldsValidationRequired,
+      [
+        ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
+        ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+        ...dashboardPanelData.meta.stream.customQueryFields,
+      ],
+      pageKey,
+    );
   };
 
   const VARIABLE_PLACEHOLDER = "substituteValue";
@@ -3346,7 +3319,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   }
 
   // This function parses the custom query and generates the errors and custom fields
-  const updateQueryValue = async (shouldSkipCustomQueryFields: boolean = false) => {
+  const updateQueryValue = async (
+    shouldSkipCustomQueryFields: boolean = false,
+  ) => {
     // store the query in the dashboard panel data
     // dashboardPanelData.meta.editorValue = value;
     // dashboardPanelData.data.query = value;
@@ -3452,16 +3427,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       }
 
       const currentQuery =
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ];
 
       const tableName = await getStreamNameFromQuery(currentQuery?.query ?? "");
 
       if (tableName) {
         const streamFound = dashboardPanelData.meta.stream.streamResults.find(
-          (it: any) =>
-            it.name == tableName,
+          (it: any) => it.name == tableName,
         );
 
         if (streamFound) {
@@ -3486,7 +3460,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     async (newVal, oldVal) => {
-
       // if pageKey is logs, then return
       // because custom query fields will be extracted from the query using the result schema api
       // NOW: we need to only skip custom query fields for logs page
@@ -3663,13 +3636,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   // Function to determine chart type based on extracted fields
-  const determineChartType = (
-    extractedFields: {
-      group_by: string[];
-      projections: string[];
-      timeseries_field: string | null;
-    }
-  ): string => {
+  const determineChartType = (extractedFields: {
+    group_by: string[];
+    projections: string[];
+    timeseries_field: string | null;
+  }): string => {
     if (
       extractedFields.timeseries_field &&
       extractedFields.group_by.length <= 2
@@ -3681,11 +3652,14 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   // Function to convert result schema to x, y, breakdown fields
-  const convertSchemaToFields = (extractedFields: {
-    group_by: string[];
-    projections: string[];
-    timeseries_field: string | null;
-  }, chartType: string): {
+  const convertSchemaToFields = (
+    extractedFields: {
+      group_by: string[];
+      projections: string[];
+      timeseries_field: string | null;
+    },
+    chartType: string,
+  ): {
     x: string[];
     y: string[];
     breakdown: string[];
