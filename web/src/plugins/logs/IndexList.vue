@@ -180,8 +180,8 @@ size="xs" /> No field found in
                   :data-test="`logs-field-list-item-${props.row.name}`"
                 >
                   <div
-                    class="ellipsis"
-                    style="max-width: 90% !important; display: inline-block"
+                    class="ellipsis !tw-max-w-[calc(100%-1.5rem)]"
+                    style="display: inline-block"
                   >
                     {{ props.row.name }}
                   </div>
@@ -307,8 +307,8 @@ size="xs" /> No field found in
                       :data-test="`logs-field-list-item-${props.row.name}`"
                     >
                       <div
-                        class="ellipsis"
-                        style="max-width: 90% !important; display: inline-block"
+                        class="ellipsis !tw-max-w-[calc(100%-1.5rem)]"
+                        style="display: inline-block"
                       >
                         {{ props.row.name }}
                       </div>
