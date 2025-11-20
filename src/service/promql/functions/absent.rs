@@ -15,9 +15,8 @@
 
 use std::collections::BTreeSet;
 
+use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
-
-use crate::service::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 
 /// Helper function to generate a matrix with value 1.0 for all timestamps in the eval context
 fn generate_absent_matrix(eval_ctx: &EvalContext) -> Value {
