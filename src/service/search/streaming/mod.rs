@@ -656,7 +656,7 @@ pub async fn process_search_stream_request(
                 accumulator,
                 all_streams.clone(),
                 pattern_config.unwrap(),
-                total_scan_records,
+                stats.total_logs_seen, // Use actual logs seen, not file metadata
             )
             .await
             {
