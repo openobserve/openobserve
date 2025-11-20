@@ -1210,6 +1210,12 @@ pub struct Common {
     pub usage_report_to_own_org: bool,
     #[env_config(name = "ZO_FILE_LIST_DUMP_ENABLED", default = false)]
     pub file_list_dump_enabled: bool,
+    #[env_config(
+        name = "ZO_FILE_LIST_DUMP_MIN_FILES",
+        default = 5,
+        help = "minimum number of files to craete a dump from"
+    )]
+    pub file_list_dump_min_files: usize,
     #[env_config(name = "ZO_FILE_LIST_DUMP_DUAL_WRITE", default = true)]
     pub file_list_dump_dual_write: bool,
     #[env_config(name = "ZO_FILE_LIST_DUMP_MIN_HOUR", default = 2)]

@@ -227,6 +227,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     let start = offset;
     let end = offset + hour_micros(1);
 
@@ -248,7 +249,12 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
         return Ok(());
     }
     let files = infra::file_list::get_entries_in_range(org, Some(stream), start, end, None).await?;
-    if files.is_empty() {
+    // skip dump if number of files in the time range is < min_files config
+    if files.len() < cfg.common.file_list_dump_min_files {
+        log::info!(
+            "skipping file list dump for start : {start} end: {end} as only {} files found",
+            files.len()
+        );
         if let Err(e) = infra::file_list::set_job_dumped_status(job_id, true).await {
             log::error!("error in setting dumped = true for job with id {job_id}, error : {e}");
         }
