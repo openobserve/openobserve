@@ -315,7 +315,7 @@ describe("useStreams Composable", () => {
       expect(streamsInstance.isStreamFetched("metrics")).toBe(false);
       
       // Test with 'all'
-      mockStore.state.streams.areStreamsFetched = true;
+      mockStore.state.streams.areAllStreamsFetched = true;
       expect(streamsInstance.isStreamFetched("all")).toBe(true);
     });
 
