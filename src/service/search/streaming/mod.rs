@@ -120,7 +120,7 @@ pub async fn process_search_stream_request(
         let max_logs = if req.query.size > 0 && req.query.size < 10_000_000 {
             req.query.size as usize
         } else if o2_config.log_patterns.max_logs_for_extraction > 0 {
-            // Use O2 config value if set (default is 10K from Datadog's approach)
+            // Use O2 config value if set (default is 10K for consistent pattern quality)
             o2_config.log_patterns.max_logs_for_extraction
         } else {
             // Fall back to OpenObserve's query_default_limit
