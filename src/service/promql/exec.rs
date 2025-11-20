@@ -18,7 +18,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use config::meta::search::ScanStats;
+use config::meta::{promql::value::*, search::ScanStats};
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 use promql_parser::parser::EvalStmt;
@@ -27,7 +27,7 @@ use tokio::sync::{RwLock, Semaphore};
 use super::Engine;
 use crate::service::promql::{
     DEFAULT_LOOKBACK, TableProvider, micros, micros_since_epoch,
-    selector_visitor::MetricSelectorVisitor, value::*,
+    selector_visitor::MetricSelectorVisitor,
 };
 
 #[derive(Clone)]

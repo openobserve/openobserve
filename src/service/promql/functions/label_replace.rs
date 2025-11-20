@@ -15,11 +15,10 @@
 
 use std::sync::Arc;
 
+use config::meta::promql::value::{Label, LabelsExt, RangeValue, Value};
 use datafusion::error::{DataFusionError, Result};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use regex::Regex;
-
-use crate::service::promql::value::{Label, LabelsExt, RangeValue, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#label_replace
 pub(crate) fn label_replace(
@@ -81,7 +80,7 @@ mod tests {
 
     #[test]
     fn test_label_replace_function() {
-        use crate::service::promql::value::{RangeValue, Sample};
+        use config::meta::promql::value::{RangeValue, Sample};
 
         let eval_ts = 1000;
 
