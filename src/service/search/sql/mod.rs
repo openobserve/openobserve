@@ -103,16 +103,6 @@ impl Sql {
         stream_type: StreamType,
         search_event_type: Option<SearchEventType>,
     ) -> Result<Sql, Error> {
-        Self::new_with_options(query, org_id, stream_type, search_event_type, false).await
-    }
-
-    pub async fn new_with_options(
-        query: &SearchQuery,
-        org_id: &str,
-        stream_type: StreamType,
-        search_event_type: Option<SearchEventType>,
-        extract_patterns: bool,
-    ) -> Result<Sql, Error> {
         let cfg = get_config();
         let sql = query.sql.clone();
         let offset = query.from as i64;
@@ -327,7 +317,6 @@ impl Sql {
                 query,
                 histogram_interval,
                 (query.start_time, query.end_time),
-                extract_patterns,
             ),
         })
     }
@@ -338,7 +327,6 @@ impl Sql {
         query: &proto::cluster_rpc::SearchQuery,
         _histogram_interval: Option<i64>,
         _time_range: (i64, i64),
-        _extract_patterns: bool,
     ) -> Option<proto::cluster_rpc::SamplingConfig> {
         #[cfg(not(feature = "enterprise"))]
         {
@@ -357,7 +345,6 @@ impl Sql {
                 query,
                 _histogram_interval,
                 _time_range,
-                _extract_patterns,
             )
         }
     }
