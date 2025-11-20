@@ -99,6 +99,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
+            :label="t('settings.header')"
+            @click="showCorrelationDrawer = true"
+            data-test="correlation-settings-btn"
+            icon="settings"
+          />
+          <q-btn
+            class="q-ml-sm o2-secondary-button tw-h-[36px]"
+            no-caps
+            flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
@@ -536,6 +545,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:templates="getTemplates"
       />
     </template>
+
+    <!-- Correlation Settings Drawer -->
+    <q-drawer
+      v-model="showCorrelationDrawer"
+      side="right"
+      :width="800"
+      bordered
+      overlay
+      behavior="mobile"
+      data-test="correlation-settings-drawer"
+    >
+      <div class="tw-h-full tw-flex tw-flex-col">
+        <!-- Drawer Header -->
+        <div class="tw-px-6 tw-py-4 tw-border-b tw-flex tw-items-center tw-justify-between">
+          <div class="tw-flex tw-items-center">
+            <q-icon name="group_work" size="24px" class="tw-mr-2" />
+            <h6 class="tw-text-lg tw-font-semibold tw-m-0">
+              {{ t('settings.alertCorrelation') }}
+            </h6>
+          </div>
+          <q-btn
+            flat
+            round
+            dense
+            icon="close"
+            @click="showCorrelationDrawer = false"
+            data-test="close-correlation-drawer"
+          />
+        </div>
+
+        <!-- Drawer Content -->
+        <div class="tw-flex-1 tw-overflow-y-auto">
+          <OrganizationDeduplicationSettings
+            :org-id="store.state.selectedOrganization.identifier"
+            :config="store.state.organizationSettings?.deduplication_config"
+            @saved="onCorrelationSettingsSaved"
+            @cancel="showCorrelationDrawer = false"
+          />
+        </div>
+      </div>
+    </q-drawer>
+
     <ConfirmDialog
       title="Delete Alert"
       message="Are you sure you want to delete this alert?"
@@ -795,6 +846,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
+import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import {
   getImageURL,
   getUUID,
@@ -830,6 +882,7 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     ImportAlert,
+    OrganizationDeduplicationSettings,
     FolderList,
     MoveAcrossFolders,
     AppTabs,
@@ -866,6 +919,7 @@ export default defineComponent({
     const showHistoryDrawer = ref(false);
     const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
+    const showCorrelationDrawer = ref(false);
 
     const { getStreams } = useStreams();
 
@@ -1987,6 +2041,12 @@ export default defineComponent({
       });
     };
 
+    const onCorrelationSettingsSaved = async () => {
+      // Reload organization settings to get updated dedup config
+      await store.dispatch("getDefaultOrganizationSettings");
+      showCorrelationDrawer.value = false;
+    };
+
     const exportAlert = async (row: any) => {
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id);
@@ -2478,6 +2538,8 @@ export default defineComponent({
       showHistoryDrawer,
       selectedHistoryAlertId,
       selectedHistoryAlertName,
+      showCorrelationDrawer,
+      onCorrelationSettingsSaved,
       refreshImportedAlerts,
       folderIdToBeCloned,
       updateFolderIdToBeCloned,

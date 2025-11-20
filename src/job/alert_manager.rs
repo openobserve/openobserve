@@ -160,8 +160,7 @@ async fn cleanup_alert_dedup_state() -> Result<(), anyhow::Error> {
     // This is conservative - most alerts have shorter time windows
     let older_than_minutes = 24 * 60; // 24 hours
 
-    match service::alerts::deduplication::cleanup_expired_state(db, None, older_than_minutes).await
-    {
+    match service::alerts::deduplication::cleanup_expired_state(db, older_than_minutes).await {
         Ok(deleted_count) => {
             if deleted_count > 0 {
                 log::info!(
