@@ -275,6 +275,8 @@ export const useSearchQuery = () => {
         setChartInterval(req);
       } else {
         notificationMsg.value = "Invalid date format";
+        if(timestamps.startTime == "Invalid Date") notificationMsg.value = "Invalid start datetime"
+        else if(timestamps.endTime == "Invalid Date") notificationMsg.value = "Invalid end datetime"
         return null;
       }
 

@@ -711,9 +711,9 @@ export default defineComponent({
     const saveDate = (dateType) => {
       // displayValue.value = getDisplayValue();
       const date = getConsumableDateTime();
-      if (isNaN(date.endTime) || isNaN(date.startTime)) {
-        // return false;
-      }
+      // if (isNaN(date.endTime) || isNaN(date.startTime)) {
+      //   // return false;
+      // }
       datePayload.value = date;
       date["valueType"] = dateType || selectedType.value;
       // date["relativeTimePeriod"] = "";
@@ -823,7 +823,7 @@ export default defineComponent({
             selectedTime.value.startTime,
           )
         ) {
-          console.error(`Invalid start date/time: ${startDateStr}`);
+          // console.warn(`Invalid start date/time: ${startDateStr}`);
           // return new Date();
         }
 
@@ -835,7 +835,7 @@ export default defineComponent({
             selectedTime.value.endTime,
           )
         ) {
-          console.error(`Invalid end date/time: ${endDateStr}`);
+          // console.error(`Invalid end date/time: ${endDateStr}`);
           // return new Date();
         }
 
