@@ -227,10 +227,19 @@ export class LogsPage {
     }
 
     async selectIndexAndStreamJoin() {
+        // Select both default and e2e_automate streams for join queries
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
         await this.page.waitForTimeout(3000);
+
+        // Select default stream
         await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
         await this.page.waitForTimeout(1000);
+
+        // Select e2e_automate stream (dropdown stays open after first selection)
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Close dropdown
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
     }
 

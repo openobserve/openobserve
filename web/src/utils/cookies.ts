@@ -23,7 +23,7 @@ export const setSidebarStatus = (sidebarStatus: string) =>
 
 export const getLanguage = () => Cookies.get(Keys.languageKey);
 export const setLanguage = (language: string) =>
-  Cookies.set(Keys.languageKey, language, { path: "/" });
+  Cookies.set(Keys.languageKey, language, { path: "/", expires: 365 });
 
 export const getSize = () => Cookies.get(Keys.sizeKey);
 export const setSize = (size: string) =>
