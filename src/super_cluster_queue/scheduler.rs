@@ -24,7 +24,10 @@ use infra::{
     errors::{Error, Result},
     scheduler,
 };
-use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
+use o2_enterprise::enterprise::{
+    scheduled_jobs::StatusUpdateTuple,
+    super_cluster::queue::{Message, MessageType},
+};
 
 use crate::service::db;
 pub(crate) async fn process(msg: Message) -> Result<()> {
@@ -40,6 +43,12 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         }
         MessageType::SchedulerDelete => {
             delete(msg).await?;
+        }
+        MessageType::BulkSchedulerUpdate => {
+            bulk_update(msg).await?;
+        }
+        MessageType::BulkSchedulerStatusUpdate => {
+            bulk_update_status(msg).await?;
         }
         _ => {
             log::error!(
@@ -207,6 +216,24 @@ async fn update_status(msg: Message) -> Result<()> {
             trigger.module_key,
             e
         );
+        return Err(e);
+    }
+    Ok(())
+}
+
+async fn bulk_update(msg: Message) -> Result<()> {
+    let triggers: Vec<Trigger> = json::from_slice(&msg.value.unwrap())?;
+    if let Err(e) = scheduler::bulk_update_triggers(triggers).await {
+        log::error!("[SUPER_CLUSTER:sync] Failed to bulk update triggers error: {e}");
+        return Err(e);
+    }
+    Ok(())
+}
+
+async fn bulk_update_status(msg: Message) -> Result<()> {
+    let updates: Vec<StatusUpdateTuple> = json::from_slice(&msg.value.unwrap())?;
+    if let Err(e) = scheduler::bulk_update_status(updates).await {
+        log::error!("[SUPER_CLUSTER:sync] Failed to bulk update triggers error: {e}");
         return Err(e);
     }
     Ok(())
