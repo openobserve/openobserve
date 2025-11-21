@@ -2545,15 +2545,17 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
-    // Log MySQL deprecation warning
+    // Print MySQL deprecation warning (logger not initialized yet at this stage)
     if cfg.common.meta_store.starts_with("mysql") {
-        log::warn!("╔════════════════════════════════════════════════════════════════════════════╗");
-        log::warn!("║                              ⚠️  WARNING  ⚠️                                ║");
-        log::warn!("║                                                                            ║");
-        log::warn!("║  MySQL support is DEPRECATED and will be removed in future.               ║");
-        log::warn!("║  Please migrate to PostgreSQL.                                            ║");
-        log::warn!("║                                                                            ║");
-        log::warn!("╚════════════════════════════════════════════════════════════════════════════╝");
+        eprintln!("╔════════════════════════════════════════════════════════════════════════════╗");
+        eprintln!(
+            "║                              ⚠️  WARNING  ⚠️                                 ║"
+        );
+        eprintln!("║                                                                            ║");
+        eprintln!("║  MySQL support is DEPRECATED and will be removed in future.                ║");
+        eprintln!("║  Please migrate to PostgreSQL.                                             ║");
+        eprintln!("║                                                                            ║");
+        eprintln!("╚════════════════════════════════════════════════════════════════════════════╝");
     }
 
     // If the default scrape interval is less than 5s, raise an error
