@@ -66,16 +66,8 @@ export const useSearchQuery = () => {
       return null;
     }
 
-    if (
-      Number.isNaN(searchObj.data.datetime.endTime) ||
-      Number.isNaN(searchObj.data.datetime.startTime)
-    ) {
-      const period =
-        (router.currentRoute.value?.query?.period as string) || "15m";
-      const extractedDate: any = extractTimestamps(period);
-      searchObj.data.datetime.startTime = extractedDate.from;
-      searchObj.data.datetime.endTime = extractedDate.to;
-    }
+    if (Number.isNaN(searchObj.data.datetime.endTime))   searchObj.data.datetime.endTime = "Invalid Date"
+    if (Number.isNaN(searchObj.data.datetime.startTime)) searchObj.data.datetime.startTime = "Invalid Date"
 
     const queryReq: SearchRequestPayload = buildSearch();
 
@@ -283,6 +275,8 @@ export const useSearchQuery = () => {
         setChartInterval(req);
       } else {
         notificationMsg.value = "Invalid date format";
+        if(timestamps.startTime == "Invalid Date") notificationMsg.value = "Invalid start datetime"
+        else if(timestamps.endTime == "Invalid Date") notificationMsg.value = "Invalid end datetime"
         return null;
       }
 

@@ -1148,6 +1148,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       to enhance search.
                     </h6>
                     <h6
+                      v-else-if="notificationMsgValue != ''"
+                      data-test="logs-search-no-stream-selected-text"
+                      class="text-center col-10 q-mx-none"
+                    >
+                    {{ 
+                      notificationMsgValue
+                     }}
+                    </h6>
+                    <h6
                       v-else
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
@@ -1356,6 +1365,8 @@ let parser: any;
 const selectedStreamName = ref("");
 
 const streamOptions = ref([]);
+
+const notificationMsgValue = ref("");
 
 const getColumns = computed(() => {
   return [
@@ -2162,6 +2173,17 @@ const updateDateChange = (date: any) => {
 };
 
 const runQuery = async () => {
+  notificationMsgValue.value = "";
+  //check if datetime is present or not 
+  //else show the error message
+  if(!dateTime.value.startTime) {
+    notificationMsgValue.value = "Invalid start datetime";
+    return null;
+  }
+  if(!dateTime.value.endTime){
+     notificationMsgValue.value = "Invalid end datetime";
+     return null;
+  }
   if (tab.value == "sql") {
     loading.value = true;
 
@@ -2189,7 +2211,12 @@ const runQuery = async () => {
         }
       })
       .catch((err: any) => {
-        console.log(err, "err");
+        if(err.response?.data){
+          notificationMsgValue.value = err.response?.data?.message || err.response?.data
+        }
+        else {
+          notificationMsgValue.value = "Error while getting results"
+        }
       })
       .finally(() => {
         loading.value = false;
