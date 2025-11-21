@@ -2587,6 +2587,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.common.file_list_dump_debug_check =
         cfg.common.file_list_dump_dual_write && cfg.common.file_list_dump_debug_check;
 
+    // for dump at min, we can allow 1 file
+    cfg.common.file_list_dump_min_files = cfg.common.file_list_dump_min_files.max(1);
+
     if cfg.common.default_hec_stream.is_empty() {
         cfg.common.default_hec_stream = "_hec".to_string();
     }

@@ -116,11 +116,12 @@ impl super::FileList for MysqlFileList {
             parse_file_key_columns(&dump_file.key).map_err(|e| Error::Message(e.to_string()))?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         let meta = &dump_file.meta;
+        let now_ts = now_micros();
         DB_QUERY_NUMS
             .with_label_values(&["insert", "file_list", ""])
             .inc();
-        if let Err(e) =  sqlx::query(r#"INSERT IGNORE INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"#)
+        if let Err(e) =  sqlx::query(r#"INSERT IGNORE INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"#)
         .bind(&dump_file.account)
         .bind(org_id)
         .bind(stream_key)
@@ -134,6 +135,8 @@ impl super::FileList for MysqlFileList {
         .bind(meta.compressed_size)
         .bind(meta.index_size)
         .bind(meta.flattened)
+        .bind(now_ts)
+        .bind(now_ts)
         .execute(&pool)
         .await {
             if let Err(e) = tx.rollback().await {
