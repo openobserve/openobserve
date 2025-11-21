@@ -37,10 +37,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-history-back-btn"
             />
             <div
-              class="q-table__title tw-font-[600] q-ml-sm"
+              class="q-table__title tw-font-[600] q-ml-sm tw-flex tw-items-center tw-gap-2"
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
+              <q-icon name="info" size="18px" color="grey-6">
+                <q-tooltip>
+                  History is only available for scheduled and manually triggered pipelines.
+                  Real-time pipelines do not generate history records.
+                </q-tooltip>
+              </q-icon>
             </div>
           </div>
           <div class="flex q-ml-auto items-center">
