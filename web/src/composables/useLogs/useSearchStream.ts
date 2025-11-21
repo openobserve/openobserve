@@ -65,6 +65,8 @@ export const useSearchStream = () => {
    */
   const getDataThroughStream = (isPagination: boolean) => {
     try {
+      if (!isPagination) resetQueryData();
+
       // 1. Build the query using the query composable
       const queryReq = queryBuilder.getQueryReq(isPagination);
       if (!queryReq) return;
