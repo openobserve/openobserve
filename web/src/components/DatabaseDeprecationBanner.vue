@@ -16,29 +16,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="full-width database-deprecation-container q-pa-md gradient-banner"
+    class="database-deprecation-wrapper q-px-md q-pt-md"
     v-if="showDeprecationWarning"
   >
-    <div class="row items-center">
-      <div class="col">
-        <span class="deprecation-message">
-          ⚠️ MySQL support is DEPRECATED and will be removed in future.
-        </span>
-        <br />
-        <span class="deprecation-subtitle">
-          Please migrate to PostgreSQL to ensure continued support.
-        </span>
-      </div>
-      <div class="col-auto q-ml-sm">
-        <q-btn
-          @click="dismissWarning"
-          flat
-          round
-          dense
-          icon="close"
-          size="sm"
-          class="text-grey-7"
-        />
+    <div class="database-deprecation-container q-pa-md gradient-banner">
+      <div class="row items-center">
+        <div class="col">
+          <span class="deprecation-message">
+            ⚠️ MySQL support is DEPRECATED and will be removed in future.
+          </span>
+          <br />
+          <span class="deprecation-subtitle">
+            Please migrate to PostgreSQL to ensure continued support.
+          </span>
+        </div>
+        <div class="col-auto q-ml-sm">
+          <q-btn
+            @click="dismissWarning"
+            flat
+            round
+            dense
+            icon="close"
+            size="sm"
+            class="text-grey-7"
+          />
+        </div>
       </div>
     </div>
   </div>
