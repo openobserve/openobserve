@@ -356,17 +356,6 @@ const useRoutes = () => {
       },
     },
     {
-      path: "alerts/history",
-      name: "alertHistory",
-      component: () => import("@/components/alerts/AlertHistory.vue"),
-      meta: {
-        title: "Alert History",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
-    {
       path: "alerts/insights",
       name: "alertInsights",
       component: () => import("@/components/alerts/AlertInsights.vue"),
