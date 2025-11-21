@@ -397,6 +397,28 @@ export default defineComponent({
           dateTimeToBeSent.value.endTime = convertedData.to * 1000;
         }
         const { startTime, endTime } = dateTimeToBeSent.value;
+
+        //check if datetime is present or not
+        //else show the error message
+        if(!startTime) {
+          $q.notify({
+            type: "negative",
+            message: "Invalid start datetime",
+            timeout: 5000,
+          });
+          isLoading.value = false;
+          return;
+        }
+        if(!endTime){
+          $q.notify({
+            type: "negative",
+            message: "Invalid end datetime",
+            timeout: 5000,
+          });
+          isLoading.value = false;
+          return;
+        }
+
         const response = await searchService.get_history(
           org_identifier,
           startTime,
