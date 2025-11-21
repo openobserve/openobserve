@@ -965,7 +965,11 @@ const closeErrorDialog = () => {
 };
 
 const goBack = () => {
-  router.push({ name: "pipelines" });
+  router.push({ 
+    name: "pipelines",
+    query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          }});
 };
 
 // Lifecycle
