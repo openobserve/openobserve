@@ -52,9 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </q-header>
 
-    <!-- Database Deprecation Warning Banner -->
-    <DatabaseDeprecationBanner />
-
     <q-drawer
       v-model="drawer"
       show-if-above
@@ -84,6 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="store.state.selectedOrganization?.identifier"
       >
         <q-page-container v-if="isLoading">
+          <!-- Database Deprecation Warning Banner -->
+          <DatabaseDeprecationBanner />
           <router-view v-slot="{ Component }">
             <component :is="Component" @sendToAiChat="sendToAiChat" />
           </router-view>
