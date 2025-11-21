@@ -154,6 +154,7 @@ struct ConfigResponse<'a> {
     ingestion_quota_used: f64,
     log_page_default_field_list: String,
     query_values_default_num: i64,
+    mysql_deprecated_warning: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -408,6 +409,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         #[cfg(feature = "enterprise")]
         ingestion_quota_used,
         query_values_default_num: cfg.limit.query_values_default_num,
+        mysql_deprecated_warning: cfg.common.meta_store.starts_with("mysql"),
     }))
 }
 
