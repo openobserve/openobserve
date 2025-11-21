@@ -921,7 +921,7 @@ export default defineComponent({
       },
     ];
 
-    const fetchAlertHistory = async (alertName: string) => {
+    const fetchAlertHistory = async (alertId: string) => {
       isLoadingHistory.value = true;
       try {
         // Get history for last 30 days
@@ -931,7 +931,7 @@ export default defineComponent({
         const response = await alertsService.getHistory(
           store?.state?.selectedOrganization?.identifier,
           {
-            alert_name: alertName,
+            alert_id: alertId,
             size: 50, // Get last 50 evaluations
             start_time: startTime,
             end_time: endTime
@@ -951,7 +951,7 @@ export default defineComponent({
       selectedAlertDetails.value = props.row;
       showAlertDetailsDrawer.value = true;
       // Fetch history for this alert
-      fetchAlertHistory(props.row.name);
+      fetchAlertHistory(props.row.alert_id);
     };
 
     // Handle ESC key and click outside to close drawer
