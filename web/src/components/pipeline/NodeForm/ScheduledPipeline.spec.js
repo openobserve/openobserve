@@ -197,6 +197,14 @@ describe("ScheduledPipeline Component", () => {
       threshold: 1
     };
 
+    // Initialize dateTime with valid values
+    wrapper.vm.dateTime = {
+      startTime: Date.now() - 3600000, // 1 hour ago
+      endTime: Date.now(),
+      relativeTimePeriod: "15m",
+      valueType: "relative"
+    };
+
     wrapper.vm.cronJobError = "";
     await flushPromises();
   });
