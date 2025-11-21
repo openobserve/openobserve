@@ -40,6 +40,7 @@ export const useSearchQuery = () => {
     addTransformToQuery,
     updateUrlQueryParams,
     fnUnparsedSQL,
+    checkTimestampAlias,
   } = logsUtils();
 
   const { searchObj, notificationMsg, initialQueryPayload, searchAggData } = searchState();
@@ -333,6 +334,12 @@ export const useSearchQuery = () => {
     const parsedSQL: any = fnParsedSQL();
 
     if (parsedSQL != undefined) {
+
+     if (!checkTimestampAlias(searchObj.data.query)) {
+            const errorMsg = `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`;
+            notificationMsg.value = errorMsg;
+            return null;
+          }
 
       if (Array.isArray(parsedSQL) && parsedSQL.length == 0) {
         notificationMsg.value =

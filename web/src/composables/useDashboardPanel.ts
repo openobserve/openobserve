@@ -1352,7 +1352,24 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].config.time_shift = [];
         break;
       case "html":
+        // Preserve current stream and stream_type before resetting
+        const htmlCurrentStream = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream;
+        const htmlCurrentStreamType = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type;
+        
         dashboardPanelData.data.queries = getDefaultQueries();
+        
+        // Restore the preserved stream and stream_type
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream = htmlCurrentStream;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type = htmlCurrentStreamType;
+        
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
           getDefaultCustomChartText();
@@ -1362,7 +1379,24 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].config.time_shift = [];
         break;
       case "markdown":
+        // Preserve current stream and stream_type before resetting
+        const markdownCurrentStream = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream;
+        const markdownCurrentStreamType = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type;
+        
         dashboardPanelData.data.queries = getDefaultQueries();
+        
+        // Restore the preserved stream and stream_type
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream = markdownCurrentStream;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type = markdownCurrentStreamType;
+        
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.customChartContent =
           getDefaultCustomChartText();
@@ -1373,7 +1407,24 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].config.time_shift = [];
         break;
       case "custom_chart":
+        // Preserve current stream and stream_type before resetting
+        const customChartCurrentStream = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream;
+        const customChartCurrentStreamType = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type;
+        
         dashboardPanelData.data.queries = getDefaultQueries();
+        
+        // Restore the preserved stream and stream_type
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream = customChartCurrentStream;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type = customChartCurrentStreamType;
+        
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queryType = "";

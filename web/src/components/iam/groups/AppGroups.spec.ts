@@ -124,7 +124,7 @@ describe("AppGroups Component", () => {
     it("renders add group button", () => {
       const addButton = wrapper.find('[data-test="iam-groups-add-group-btn"]');
       expect(addButton.exists()).toBe(true);
-      expect(addButton.text()).toContain("Add User Group");
+      expect(addButton.text()).toContain("New user group");
     });
   });
 

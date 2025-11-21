@@ -1472,7 +1472,7 @@ $traceChartCollapseHeight: 42px;
   padding-bottom: 2px;
 
   &:hover {
-    background-color: var(--o2-theme-color);
+    background-color: var(--o2-primary-btn-bg);
     color: #ffffff;
 
     .q-icon {
