@@ -66,6 +66,7 @@ impl From<crate::service::promql::MetricsQueryRequest> for cluster_rpc::MetricsQ
             query: Some(req_query),
             timeout: 0,
             use_cache: req.use_cache.unwrap_or(true),
+            is_super_cluster: false,
         }
     }
 }

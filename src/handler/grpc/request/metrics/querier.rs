@@ -13,9 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::pin::Pin;
+
 use config::{meta::stream::StreamType, metrics};
+use futures::Stream;
 use infra::errors;
 use opentelemetry::global;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -31,6 +36,9 @@ pub struct MetricsQuerier;
 
 #[tonic::async_trait]
 impl Metrics for MetricsQuerier {
+    type DataStream =
+        Pin<Box<dyn Stream<Item = Result<MetricsQueryResponse, Status>> + Send + 'static>>;
+
     #[tracing::instrument(name = "grpc:metrics:query", skip_all, fields(org_id = req.get_ref().org_id))]
     async fn query(
         &self,
@@ -69,5 +77,25 @@ impl Metrics for MetricsQuerier {
             .inc();
 
         Ok(Response::new(result))
+    }
+
+    #[tracing::instrument(name = "grpc:metrics:data", skip_all, fields(org_id = req.get_ref().org_id))]
+    async fn data(
+        &self,
+        req: Request<MetricsQueryRequest>,
+    ) -> Result<Response<Self::DataStream>, Status> {
+        let cap = std::cmp::max(2, config::get_config().limit.cpu_num);
+        let (tx, rx) = mpsc::channel::<Result<MetricsQueryResponse, Status>>(cap);
+        let req: MetricsQueryRequest = req.into_inner();
+
+        // spawn a task to push streaming responses
+        tokio::task::spawn(async move {
+            if let Err(e) = crate::service::promql::search::grpc::data(&req, tx).await {
+                log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
+            }
+        });
+
+        let out_stream = ReceiverStream::new(rx);
+        Ok(Response::new(Box::pin(out_stream) as Self::DataStream))
     }
 }
