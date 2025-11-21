@@ -249,7 +249,7 @@ export function useLatencyInsightsAnalysis() {
   };
 
   /**
-   * Calculate difference score (Honeycomb's ranking metric)
+   * Calculate difference score for ranking dimensions by impact
    */
   const calculateDifferenceScore = (data: ValueDistribution[]): number => {
     return data.reduce((sum, item) => {
