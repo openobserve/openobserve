@@ -16,6 +16,11 @@ export const deleteGroup = (group_name: string, org_identifier: string) => {
   return http().delete(url);
 };
 
+export const bulkDeleteGroups = (org_identifier: string, data: any) => {
+  const url = `/api/${org_identifier}/groups/bulk`;
+  return http().delete(url, { data });
+};
+
 export const createGroup = (group_name: string, org_identifier: string) => {
   const url = `/api/${org_identifier}/groups`;
   return http({}).post(url, {
@@ -54,6 +59,11 @@ export const getRole = (role_id: string, org_identifier: string) => {
 export const deleteRole = (role_id: string, org_identifier: string) => {
   const url = `/api/${org_identifier}/roles/${role_id}`;
   return http().delete(url);
+};
+
+export const bulkDeleteRoles = (org_identifier: string, data: any) => {
+  const url = `/api/${org_identifier}/roles/bulk`;
+  return http().delete(url, { data });
 };
 
 export const createRole = (role_id: string, org_identifier: string) => {

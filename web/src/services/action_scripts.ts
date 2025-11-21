@@ -36,6 +36,9 @@ const actions = {
       `/api/${org_identifier}/actions/${encodeURIComponent(action_id)}`,
     );
   },
+  bulkDelete: (org_identifier: string, data: any) => {
+    return http().delete(`/api/${org_identifier}/actions/bulk`, { data });
+  },
 };
 
 export default actions;
