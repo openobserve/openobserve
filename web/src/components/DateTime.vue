@@ -712,7 +712,7 @@ export default defineComponent({
       // displayValue.value = getDisplayValue();
       const date = getConsumableDateTime();
       if (isNaN(date.endTime) || isNaN(date.startTime)) {
-        return false;
+        // return false;
       }
       datePayload.value = date;
       date["valueType"] = dateType || selectedType.value;
@@ -824,7 +824,7 @@ export default defineComponent({
           )
         ) {
           console.error(`Invalid start date/time: ${startDateStr}`);
-          return new Date();
+          // return new Date();
         }
 
         const endDateStr =
@@ -836,7 +836,7 @@ export default defineComponent({
           )
         ) {
           console.error(`Invalid end date/time: ${endDateStr}`);
-          return new Date();
+          // return new Date();
         }
 
         let start, end;
