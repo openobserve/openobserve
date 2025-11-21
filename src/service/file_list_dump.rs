@@ -457,8 +457,29 @@ WHERE {field} = '{value}'
         .map(|id| id.to_string())
         .unwrap_or_else(|| rand::random::<u64>().to_string());
     let fake_trace_id = format!("stats_on_dump-{task_id}");
-    let t = exec(&fake_trace_id, cfg.limit.cpu_num, &dump_files, &sql).await?;
-    let ret = t.into_iter().flat_map(record_batch_to_stats).collect();
+    let mut stats_map = HashMap::new();
+    log::info!(
+        "[O2::FILE_DUMP::STATS] total dump file count : {}, chunk size : {}",
+        dump_files.len(),
+        cfg.common.file_list_dump_stats_chunk
+    );
+
+    for (ctr, chunk) in dump_files
+        .chunks(cfg.common.file_list_dump_stats_chunk)
+        .enumerate()
+    {
+        let t = exec(&fake_trace_id, cfg.limit.cpu_num, chunk, &sql).await?;
+        let ret = t
+            .into_iter()
+            .flat_map(record_batch_to_stats)
+            .collect::<Vec<_>>();
+        for (stream, stats) in ret {
+            let entry = stats_map.entry(stream).or_insert(StreamStats::default());
+            *entry = &*entry + &stats;
+        }
+        log::info!("[O2::FILE_DUMP::STATS] chunk {ctr} done");
+    }
+    let ret = stats_map.into_iter().collect();
     Ok(ret)
 }
 

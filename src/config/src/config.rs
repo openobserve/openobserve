@@ -1216,6 +1216,12 @@ pub struct Common {
         help = "minimum number of files to craete a dump from"
     )]
     pub file_list_dump_min_files: usize,
+    #[env_config(
+        name = "ZO_FILE_LIST_DUMP_STATS_CHUNK_SIZE",
+        default = 100,
+        help = "chunk size to use when calculating stats from dumped files"
+    )]
+    pub file_list_dump_stats_chunk: usize,
     #[env_config(name = "ZO_FILE_LIST_DUMP_DUAL_WRITE", default = true)]
     pub file_list_dump_dual_write: bool,
     #[env_config(name = "ZO_FILE_LIST_DUMP_MIN_HOUR", default = 2)]
@@ -2589,6 +2595,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // for dump at min, we can allow 1 file
     cfg.common.file_list_dump_min_files = cfg.common.file_list_dump_min_files.max(1);
+    if cfg.common.file_list_dump_stats_chunk < 1 {
+        cfg.common.file_list_dump_stats_chunk = 100;
+    }
 
     if cfg.common.default_hec_stream.is_empty() {
         cfg.common.default_hec_stream = "_hec".to_string();
