@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <Teleport to="body">
   <q-drawer
     v-model="isOpen"
     side="right"
@@ -22,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :width="600"
     overlay
     elevated
+    behavior="mobile"
     class="alert-history-drawer"
   >
     <div class="tw-h-full tw-flex tw-flex-col">
@@ -163,10 +165,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </q-drawer>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import alertsService from "@/services/alerts";
@@ -375,6 +378,13 @@ const close = () => {
   isOpen.value = false;
 };
 
+// Handle ESC key
+const handleKeyDown = (event: KeyboardEvent) => {
+  if (event.key === "Escape" && isOpen.value) {
+    close();
+  }
+};
+
 // Watch for drawer opening
 watch(
   () => props.modelValue,
@@ -398,6 +408,15 @@ watch(
     }
   }
 );
+
+// Add/remove keyboard event listener
+onMounted(() => {
+  document.addEventListener("keydown", handleKeyDown);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("keydown", handleKeyDown);
+});
 </script>
 
 <style scoped lang="scss">
