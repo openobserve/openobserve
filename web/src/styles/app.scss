@@ -1503,6 +1503,53 @@ body {
   background: var(--o2-table-header-bg);
 }
 
+/* ============================================================================
+   MODERN TOOLTIP STYLING
+   Global styling for q-tooltip with modern design
+   ============================================================================ */
+
+.q-tooltip {
+  background-color: var(--o2-card-bg) !important;
+  color: var(--o2-text-primary) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15),
+              0 0 0 1px var(--o2-border-color) !important;
+  backdrop-filter: blur(8px);
+  max-width: 320px !important;
+
+  // Smooth fade-in animation
+  animation: tooltipFadeIn 0.2s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Dark theme specific styling
+.body--dark .q-tooltip {
+  background-color: rgba(33, 33, 33, 0.95) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4),
+              0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+}
+
+// Light theme specific styling
+.body--light .q-tooltip {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1),
+              0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+}
+
 
 .splitter-icon-collapse {
   min-height: 3em !important;
