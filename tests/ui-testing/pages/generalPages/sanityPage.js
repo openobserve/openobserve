@@ -75,7 +75,7 @@ export class SanityPage {
         
         // Generic locators
         this.searchFunctionInput = '[placeholder="Search Function"]';
-        this.createNewFunctionButton = { role: 'button', name: 'Create new function' };
+        this.createNewFunctionButton = { role: 'button', name: 'New function' };
         this.nameLabel = { label: 'Name' };
         this.saveButton = { role: 'button', name: 'Save' };
         
