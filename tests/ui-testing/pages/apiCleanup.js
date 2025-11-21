@@ -1104,6 +1104,42 @@ class APICleanup {
     }
 
     /**
+     * Clean up custom logo from _meta organization
+     * Deletes the custom logo via DELETE API call
+     */
+    async cleanupLogo() {
+        testLogger.info('Starting logo cleanup');
+
+        try {
+            const response = await fetch(`${this.baseUrl}/api/_meta/settings/logo`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete logo', { status: response.status });
+                return { successful: 'false', status: response.status };
+            }
+
+            const result = await response.json();
+
+            if (result.successful === 'true') {
+                testLogger.info('Logo cleanup completed successfully');
+            } else {
+                testLogger.warn('Logo cleanup returned unexpected result', { result });
+            }
+
+            return result;
+        } catch (error) {
+            testLogger.error('Logo cleanup failed', { error: error.message });
+            return { successful: 'false', error: error.message };
+        }
+    }
+
+    /**
      * Complete cascade cleanup: Alert -> Folder -> Destination -> Template
      * Only deletes resources linked to destinations matching the prefix
      * @param {string} prefix - Prefix to match destination names (e.g., 'auto_playwright')
