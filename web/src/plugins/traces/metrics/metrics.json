@@ -1,6 +1,6 @@
 {
   "version": 5,
-  "dashboardId": "7287465283705383292",
+  "dashboardId": "",
   "title": "Traces",
   "description": "",
   "role": "",
@@ -78,7 +78,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "WITH unique_traces AS (\n    -- Pick one record per trace (earliest timestamp or whatever makes sense)\n    SELECT\n        min(_timestamp) as _time,\n        max(duration) AS max_duration\n    FROM \"default\" [WHERE_CLAUSE] \n    GROUP BY trace_id\n),\nhistogram_data AS (\n    -- Assign histogram buckets\n    SELECT\n        histogram(_time) AS time_bucket,\n        max_duration\n    FROM unique_traces\n)\nSELECT\n    time_bucket,\n    max(max_duration) AS sum_durations\nFROM histogram_data\nGROUP BY time_bucket\nORDER BY time_bucket ASC;",
+              "query": "SELECT histogram(_timestamp) AS time_bucket, max(duration) AS max_trace_duration, approx_distinct(trace_id) AS max_rate, approx_distinct(trace_id) filter (where span_status = 'ERROR') AS error_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -98,8 +98,8 @@
                 "y": [
                   {
                     "label": "",
-                    "alias": "sum_durations",
-                    "column": "sum_durations",
+                    "alias": "max_trace_duration",
+                    "column": "max_trace_duration",
                     "color": "#5960b2",
                     "isDerived": true,
                     "havingConditions": [],
@@ -202,7 +202,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "WITH traces AS (SELECT min(_timestamp) as _time, max(trace_id) AS max_trace_id FROM \"default\" [WHERE_CLAUSE] GROUP BY trace_id), histogram_data AS (SELECT histogram(_time) AS time_bucket, max_trace_id FROM traces) SELECT time_bucket, count(max_trace_id) as trace_count FROM histogram_data GROUP BY time_bucket ORDER BY time_bucket ASC;",
+              "query": "SELECT histogram(_timestamp) AS time_bucket, max(duration) AS max_trace_duration, approx_distinct(trace_id) AS max_rate, approx_distinct(trace_id) filter (where span_status = 'ERROR') AS error_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -222,8 +222,8 @@
                 "y": [
                   {
                     "label": "",
-                    "alias": "trace_count",
-                    "column": "trace_count",
+                    "alias": "max_rate",
+                    "column": "max_rate",
                     "color": "#5960b2",
                     "aggregationFunction": "count",
                     "isDerived": false,
@@ -327,7 +327,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "WITH traces AS (SELECT min(_timestamp) as _time, max(trace_id) AS max_trace_id FROM \"default\" [WHERE_CLAUSE] GROUP BY trace_id), histogram_data AS (SELECT histogram(_time) AS x_axis_1, max_trace_id FROM traces) SELECT x_axis_1, count(max_trace_id) as y_axis_1 FROM histogram_data GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+              "query": "SELECT histogram(_timestamp) AS time_bucket, max(duration) AS max_trace_duration, approx_distinct(trace_id) AS max_rate, approx_distinct(trace_id) filter (where span_status = 'ERROR') AS error_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -336,8 +336,8 @@
                 "x": [
                   {
                     "label": "",
-                    "alias": "x_axis_1",
-                    "column": "x_axis_1",
+                    "alias": "time_bucket",
+                    "column": "time_bucket",
                     "color": null,
                     "aggregationFunction": "histogram",
                     "sortBy": "ASC",
@@ -349,8 +349,8 @@
                 "y": [
                   {
                     "label": "",
-                    "alias": "y_axis_1",
-                    "column": "y_axis_1",
+                    "alias": "error_rate",
+                    "column": "error_rate",
                     "color": null,
                     "aggregationFunction": "count",
                     "isDerived": false,

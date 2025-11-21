@@ -170,6 +170,7 @@ pub(crate) async fn around(
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: default_use_cache(),
+        clear_cache: false,
         local_mode: None,
     };
     let resp_forward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)
@@ -206,6 +207,7 @@ pub(crate) async fn around(
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: default_use_cache(),
+        clear_cache: false,
         local_mode: None,
     };
     let resp_backward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)

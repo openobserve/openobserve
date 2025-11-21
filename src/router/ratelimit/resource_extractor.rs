@@ -33,7 +33,7 @@ use regex::Regex;
 use utoipa::OpenApi;
 
 use crate::{
-    common::utils::auth::extract_auth_str,
+    common::utils::auth::extract_basic_auth_str,
     handler::http::{
         auth::validator::get_user_email_from_auth_str,
         request::ratelimit::QUOTA_PAGE_GLOBAL_RULES_ORG, router::openapi::ApiDoc,
@@ -136,7 +136,7 @@ fn rule_extractor(
 }
 
 pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, ExtractorRuleResult> {
-    let auth_str = extract_auth_str(req.request());
+    let auth_str = extract_basic_auth_str(req.request());
     let local_path = req.path().to_string();
     rule_extractor(auth_str, local_path, req.method())
 }

@@ -69,9 +69,6 @@ const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
 const ImportPipeline = () => import("@/components/pipeline/ImportPipeline.vue");
 
-const ActionScipts = () =>
-  import("@/components/actionScripts/ActionScipts.vue");
-
 import useIngestionRoutes from "./useIngestionRoutes";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import config from "@/aws-exports";
@@ -162,6 +159,11 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
+    },
+    {
+      // Redirect old service-graph route to traces page
+      path: "service-graph",
+      redirect: "/traces",
     },
     {
       name: "streamExplorer",
@@ -315,6 +317,18 @@ const useRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
+            {
+              path: "history",
+              name: "pipelineHistory",
+              component: () =>
+                import("@/components/pipelines/PipelineHistory.vue"),
+              meta: {
+                title: "Pipeline History",
+              },
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
           ],
         },
       ],
@@ -336,6 +350,28 @@ const useRoutes = () => {
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
         title: "Add Alert",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alerts/history",
+      name: "alertHistory",
+      component: () => import("@/components/alerts/AlertHistory.vue"),
+      meta: {
+        title: "Alert History",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alerts/insights",
+      name: "alertInsights",
+      component: () => import("@/components/alerts/AlertInsights.vue"),
+      meta: {
+        title: "Alert Insights",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

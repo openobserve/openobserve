@@ -50,7 +50,7 @@ use crate::{
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = OrganizationSettingPayload, description = "Organization settings", content_type = "application/json"),
+    request_body(content = inline(OrganizationSettingPayload), description = "Organization settings", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -113,9 +113,20 @@ async fn create(
         data.enable_streaming_search = enable_streaming_search;
     }
 
-    if let Some(enable_streaming_search) = settings.enable_streaming_search {
+    if let Some(light_mode_theme_color) = settings.light_mode_theme_color {
         field_found = true;
-        data.enable_streaming_search = enable_streaming_search;
+        data.light_mode_theme_color = Some(light_mode_theme_color);
+    }
+
+    if let Some(dark_mode_theme_color) = settings.dark_mode_theme_color {
+        field_found = true;
+        data.dark_mode_theme_color = Some(dark_mode_theme_color);
+    }
+
+    #[cfg(feature = "enterprise")]
+    if let Some(claim_parser_function) = settings.claim_parser_function {
+        field_found = true;
+        data.claim_parser_function = claim_parser_function;
     }
 
     if !field_found {
@@ -175,7 +186,12 @@ async fn get(path: web::Path<String>) -> Result<HttpResponse, StdErr> {
 
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/settings/logo")]
-async fn upload_logo(mut payload: Multipart) -> Result<HttpResponse, StdErr> {
+async fn upload_logo(
+    mut payload: Multipart,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> Result<HttpResponse, StdErr> {
+    let theme = query.get("theme").map(|s| s.to_string());
+
     match payload.try_next().await {
         Ok(field) => {
             let mut data: Vec<u8> = Vec::<u8>::new();
@@ -188,7 +204,7 @@ async fn upload_logo(mut payload: Multipart) -> Result<HttpResponse, StdErr> {
                     return Ok(MetaHttpResponse::bad_request("Image data not present"));
                 }
 
-                match settings::upload_logo(data).await {
+                match settings::upload_logo(data, theme).await {
                     Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
                     Err(e) => Ok(MetaHttpResponse::bad_request(e)),
                 }
@@ -208,8 +224,12 @@ async fn upload_logo() -> Result<HttpResponse, StdErr> {
 
 #[cfg(feature = "enterprise")]
 #[delete("/{org_id}/settings/logo")]
-async fn delete_logo() -> Result<HttpResponse, StdErr> {
-    match settings::delete_logo().await {
+async fn delete_logo(
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> Result<HttpResponse, StdErr> {
+    let theme = query.get("theme").map(|s| s.to_string());
+
+    match settings::delete_logo(theme).await {
         Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }

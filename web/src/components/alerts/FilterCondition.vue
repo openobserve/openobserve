@@ -1,57 +1,53 @@
 <template>
-    <div class=" tw-flex tw-items-center tw-gap-2 tw-flex-no-wrap ">
-      <div class="tw-text-sm tw-w-[20px] tw-mr-2 ">
-        {{ 
-        index == 0 && depth == 0 ? 'if' : computedLabel
+    <div class=" tw-flex tw-items-start tw-gap-2 tw-flex-no-wrap ">
+      <div class="tw-text-sm tw-w-[20px] tw-mr-2 tw-mt-2">
+        {{
+        index == 0 ? 'if' : computedLabel
            }}
       </div>
         <div
           data-test="alert-conditions-select-column"
-          class="q-ml-none o2-input"
+          class="q-ml-none tw-mb-2"
         >
           <q-select
             v-model="condition.column"
             :options="filteredFields"
             :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            :class="store.state.isAiChatEnabled ? 'o2-ai-condition-input' : 'xl:tw-min-w-[200px] lg:tw-max-w-[120px] lg:tw-w-fit'"
-            bg-color="input-bg"
-            class="q-py-sm mini-select conditions-input"
-            filled
+            borderless
             emit-value
             dense
             use-input
             hide-selected
             fill-input
+            hide-bottom-space
             :input-debounce="400"
             :placeholder="t('alerts.column')"
+            class="tw-mb-2"
             @filter="filterColumns"
             behavior="menu"
             :rules="[(val: any) => !!val || 'Field is required!']"
+            :class="inputWidth ? inputWidth : ''"
             @update:model-value="emits('input:update', 'conditions', condition)"
           >
-          <q-tooltip v-if="condition.column && store.state.isAiChatEnabled"> 
+          <q-tooltip v-if="condition.column && store.state.isAiChatEnabled">
             {{ condition.column }}
           </q-tooltip>
         </q-select>
         </div>
         <div
           data-test="alert-conditions-operator-select"
-          class="q-ml-none o2-input"
+          class="q-ml-none"
         >
           <q-select
             v-model="condition.operator"
             :options="triggerOperators"
             :popup-content-style="{ textTransform: 'capitalize' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm mini-select conditions-input"
             stack-label
-            outlined
-            filled
+            borderless
             dense
+            hide-bottom-space
             :rules="[(val: any) => !!val || 'Field is required!']"
-            :class="store.state.isAiChatEnabled ? 'tw-w-[70px]' : 'xl:tw-min-w-[200px] lg:tw-min-w-[90px] lg:tw-w-fit'"
+            :class="inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw-w-[70px]' : computedInputWidth)"
             @update:model-value="emits('input:update', 'conditions', condition)"
           >
           <q-tooltip v-if="condition.operator && store.state.isAiChatEnabled">
@@ -61,24 +57,20 @@
         </div>
         <div
           data-test="alert-conditions-value-input"
-          class="q-ml-none flex items-end o2-input"
+          class="q-ml-none"
         >
           <q-input
             v-model="condition.value"
             :options="streamFields"
             :popup-content-style="{ textTransform: 'capitalize' }"
             :placeholder="t('common.value')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm mini-select conditions-input" 
             stack-label
-            outlined
-            filled
+            borderless
             dense
+            hide-bottom-space
             :rules="[(val: any) => !!val || 'Field is required!']"
-            :class="store.state.isAiChatEnabled ? 'tw-w-[110px]' : 'xl:tw-min-w-[200px] lg:tw-w-fit lg:tw-min-w-[80px]'"
+            :class="inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw-w-[110px]' : computedValueWidth)"
             @update:model-value="emits('input:update', 'conditions', condition)"
-
           >
           <q-tooltip v-if="condition.value && store.state.isAiChatEnabled">
             {{ condition.value }}
@@ -114,6 +106,11 @@
         type: Number,
         default: 0,
         required: true,
+    },
+    inputWidth: {
+        type: String,
+        default: '',
+        required: false,
     },
     });
 
@@ -157,6 +154,16 @@ const computedLabel = computed(() => {
   return props.label;
 });
 
+const computedInputWidth = computed(() => {
+  // If custom width is provided, use it; otherwise use default responsive width
+  return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'xl:tw-min-w-[200px] lg:tw-min-w-[90px] lg:tw-w-fit');
+});
+
+const computedValueWidth = computed(() => {
+  // If custom width is provided, use it; otherwise use default responsive width
+  return props.inputWidth || (store.state.isAiChatEnabled ? 'tw-w-[110px]' : 'xl:tw-min-w-[200px] lg:tw-w-fit lg:tw-min-w-[80px]');
+});
+
 
 const filterColumns = (val: string, update: Function) => {
   if (val === "") {
@@ -173,12 +180,6 @@ const filterColumns = (val: string, update: Function) => {
 };
   </script>
 
-  <style > 
-  .conditions-input .q-field__control{
-    border: 1px solid #424242 !important;
-  }
-  .o2-ai-condition-input .q-field__control{
-    width: 130px !important;
-  }
+  <style >
 </style>
   

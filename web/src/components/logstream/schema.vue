@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div 
-                    class="tile-value tw-text-lg tw-font-bold tw-flex tw-items-end tw-justify-start"
+                    class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
                     :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
                   >
                     {{ parseInt(indexData.stats.doc_num).toLocaleString("en-US") }}
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div 
-                    class="tile-value tw-text-lg tw-font-bold tw-flex tw-items-end tw-justify-start"
+                    class="tile-value tw-text-lg  tw-flex tw-items-end tw-justify-start"
                     :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
                   >
                     {{ formatSizeFromMB(indexData.stats.storage_size) }}
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div 
-                    class="tile-value tw-text-lg tw-font-bold tw-flex tw-items-end tw-justify-start"
+                    class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
                     :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
                   >
                     {{ formatSizeFromMB(indexData.stats.compressed_size) }}
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div 
-                    class="tile-value tw-text-lg tw-font-bold tw-flex tw-items-end tw-justify-start"
+                    class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
                     :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
                   >
                     {{ formatSizeFromMB(indexData.stats.index_size) }}
@@ -222,9 +222,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tabs v-model="activeMainTab" inline-label dense>
                   <!-- Schema Settings Tab with conditional class -->
                   <q-tab
-                    :class="{
-                      'text-primary': activeMainTab === 'schemaSettings',
-                    }"
                     name="schemaSettings"
                     icon="settings"
                     label="Schema Settings"
@@ -233,7 +230,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Red Button Tab -->
                   <q-tab
-                    :class="{ 'text-primary': activeMainTab === 'redButton' }"
                     name="redButton"
                     icon="backup"
                     label="Extended Retention"
@@ -242,7 +238,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Configuration Tab -->
                     <q-tab
-                    :class="{ 'text-primary': activeMainTab === 'configuration' }"
                     name="configuration"
                     icon="tune"
                     label="Configuration"
@@ -269,19 +264,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
                 <div class="flex justify-between items-center full-width">
                   <div class="flex items-center">
+                    <div class="app-tabs-container">
                     <app-tabs
-                      v-if="isSchemaUDSEnabled"
-                      class="schema-fields-tabs"
-                      style="
-                        border: 1px solid #8a8a8a;
-                        border-radius: 4px;
-                        overflow: hidden;
-                      "
-                      data-test="schema-fields-tabs"
-                      :tabs="tabs"
-                      :active-tab="activeTab"
-                      @update:active-tab="updateActiveTab"
-                    />
+                          v-if="isSchemaUDSEnabled"
+                          class="tabs-selection-container"
+                          data-test="schema-fields-tabs"
+                          :tabs="tabs"
+                          :active-tab="activeTab"
+                          @update:active-tab="updateActiveTab"
+                        />
+                    </div>
+                   
                     <div v-if="hasUserDefinedSchema" class="q-ml-sm">
                       <q-icon
                         name="info"
@@ -315,13 +308,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-input>
                     <q-btn
                       v-if="isSchemaUDSEnabled"
-                      color="primary"
                       data-test="schema-add-fields-title"
                       @click="openDialog"
                       no-caps
                       :disable="isDialogOpen"
                       class="o2-secondary-button tw-h-[36px] tw-w-[32px] q-my-sm"
-                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                       style="min-width: 0px !important; min-height: 0px !important;"
                       flat
                       @click.stop="openDialog"
@@ -396,8 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :pagination="pagination"
                   selection="multiple"
                   v-model:selected="selectedFields"
-                  class="q-table o2-schema-table"
-                  :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark' : 'o2-last-row-border-light o2-schema-table-header-sticky-light'"
+                  class="q-table o2-quasar-table o2-row-md o2-schema-table"
                   id="schemaFieldList"
                   :style="{
                     height: `${indexData.defaultFts ? 'calc(100vh - 363px)' : 'calc(100vh - 330px)'}`,
@@ -417,8 +407,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :props="props"
                       >
                         <span v-if="col.icon" class="tw-ml-[5px]">
-                          <q-icon color="primary" size="12px" :name="outlinedPerson"></q-icon>
-                          <q-icon color="primary" size="12px" :name="outlinedSchema"></q-icon>
+                          <q-icon  size="12px" :name="outlinedPerson"></q-icon>
+                          <q-icon  size="12px" :name="outlinedSchema"></q-icon>
                         </span>
                         <span class="tw-pl-7" v-else-if="col.name === 'patterns'">
                           {{ col.label }}
@@ -449,20 +439,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <template v-slot:body-selection="scope">
-                      <q-checkbox
-                        v-if="
-                          !(
-                            scope.row.name ==
-                              store.state.zoConfig.timestamp_column ||
-                            scope.row.name == allFieldsName
-                          )
-                        "
-                        dense
-                        :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
-                        v-model="scope.selected"
-                        size="xs"
-                        class="tw-flex tw-items-center tw-justify-center tw-w-full"
-                      />
+                    <q-checkbox
+                      v-if="
+                        !(
+                          scope.row.name ==
+                            store.state.zoConfig.timestamp_column ||
+                          scope.row.name == allFieldsName
+                        )
+                      "
+                      dense
+                      :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
+                      v-model="scope.selected"
+                      size="xs"
+                      class="tw-flex tw-items-center tw-justify-center tw-w-full"
+                    />
                   </template>
 
                   <template v-slot:body-cell-name="props">
@@ -491,12 +481,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template v-slot:body-cell-type="props">
                     <q-td>
-                      <span 
+                      <span
                         class="field-type-badge"
                         :class="{
                           'badge-int64': props.row.type === 'Int64',
-                          'badge-float64': props.row.type === 'Float64', 
-                          'badge-utf8': props.row.type === 'Utf8'
+                          'badge-float64': props.row.type === 'Float64',
+                          'badge-utf8': props.row.type === 'Utf8',
+                          'badge-bool': props.row.type === 'Boolean'
                         }"
                       >
                         {{ props.row.type }}
@@ -505,8 +496,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template v-slot:body-cell-settings="props">
                     <q-td class="text-left" v-if="props.row.isUserDefined">
-                      <q-icon size="12px" color="primary" :name="outlinedPerson"></q-icon>
-                      <q-icon size="12px" color="primary" :name="outlinedSchema"></q-icon>
+                      <q-icon size="12px"  :name="outlinedPerson"></q-icon>
+                      <q-icon size="12px" :name="outlinedSchema"></q-icon>
                     </q-td>
                     <q-td v-else> </q-td>
                   </template>
@@ -528,7 +519,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color="input-border"
                         bg-color="input-bg"
                         class="mini-select"
-                        :class="store.state.theme == 'dark' ? 'schema-index-select-dropdown-dark' : 'schema-index-select-dropdown-light'"
                         input-class="mini-select"
                         :option-disable="
                           (_option) => disableOptions(props.row, _option)
@@ -540,7 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         autoclose
                         borderless
                         dense
-                        input-style="height: 12px; min-height: 8px; margin: 0px; width: 120px;"
+                        input-style="height: 12px !important; min-height: 8px !important; margin: 0px; width: 120px;"
                         style="width: 190px;"
                         @update:model-value="val => updateIndexType(props, val)"
                       >
@@ -587,17 +577,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <template #bottom="scope">
-                    <div class="bottom-btn">
-                      <div class="tw-text-sm tw-w-full tw-flex tw-justify-">
-                      </div>
+                    <div class="schema-table-pagination-wrapper">
                       <QTablePagination
-                      class="tw-pr-0 tw-py-0  2xl:tw-pl-[230px] lg:tw-pl-[50px]"
-                      :scope="scope"
-                      :position="'bottom'"
-                      :resultTotal="resultTotal"
-                      :perPageOptions="perPageOptions"
-                      @update:changeRecordPerPage="changePagination"
-                    />
+                        :scope="scope"
+                        :position="'bottom'"
+                        :resultTotal="resultTotal"
+                        :perPageOptions="perPageOptions"
+                        @update:changeRecordPerPage="changePagination"
+                      />
                     </div>
                   </template>
                 </q-table>
@@ -775,16 +762,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
 
-                    <div 
+                    <div
                       :class="[
-                        'tw-flex tw-items-center tw-justify-between tw-text-sm',
-                        store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                        'tw-flex tw-items-center tw-justify-between tw-border-b tw-text-sm',
+                        store.state.theme === 'dark' ? 'tw-border-gray-600 tw-text-gray-200' : 'tw-border-gray-200 tw-text-gray-700'
                       ]"
                     >
                       <span>Enable Distinct Values</span>
                       <q-toggle
                         data-test="log-stream-enabled-distinct-values-toggle-btn"
                         v-model="enableDistinctFields"
+                        class="o2-toggle-button-lg"
+                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+                        size="lg"
+                        @click="formDirtyFlag = true"
+                      />
+                    </div>
+
+                    <div
+                      v-if="config.isEnterprise === 'true'"
+                      :class="[
+                        'tw-flex tw-items-center tw-justify-between tw-text-sm',
+                        store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                      ]"
+                    >
+                      <span>Enable Log Patterns Extraction</span>
+                      <q-toggle
+                        data-test="log-stream-enabled-patterns-extraction-toggle-btn"
+                        v-model="enableLogPatternsExtraction"
                         class="o2-toggle-button-lg"
                         :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
                         size="lg"
@@ -837,7 +842,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :pagination="pagination"
                     selection="multiple"
                     v-model:selected="selectedDateFields"
-                    class="q-table o2-schema-table"
+                    class="q-table o2-quasar-table o2-row-md o2-schema-table"
                     id="schemaFieldList"
                     :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark' : 'o2-last-row-border-light o2-schema-table-header-sticky-light'"
                     style="height: calc(100vh - 363px);"
@@ -858,6 +863,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
                           v-model="scope.selected"
                           size="xs"
+                          class="o2-table-checkbox"
                         />
                     </template>
 
@@ -914,7 +920,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </q-btn>
                   <q-btn
-                    v-if="activeMainTab == 'schemaSettings'"
                     v-bind:disable="
                       !selectedFields.length && !selectedDateFields.length
                     "
@@ -1072,6 +1077,7 @@ export default defineComponent({
     const dataRetentionDays = ref(0);
     const storeOriginalData = ref(false);
     const enableDistinctFields = ref(false);
+    const enableLogPatternsExtraction = ref(false);
     const maxQueryRange = ref(0);
     const flattenLevel = ref(null);
     const confirmQueryModeChangeDialog = ref(false);
@@ -1210,6 +1216,17 @@ export default defineComponent({
       }
     });
 
+    // Watch activeTab and update resultTotal accordingly
+    // This ensures resultTotal is always in sync with the active tab
+    // If selected tab is schemaFields we will show the uds length otherwise we will show the actual schema length
+    watch(activeTab, (newTab) => {
+      if (newTab === "schemaFields") {
+        resultTotal.value = indexData.value.defined_schema_fields?.length || 0;
+      } else {
+        resultTotal.value = indexData.value.schema?.length || 0;
+      }
+    }, { immediate: true });
+
     const isSchemaUDSEnabled = computed(() => {
       return store.state.zoConfig.user_defined_schemas_enabled;
     });
@@ -1223,6 +1240,7 @@ export default defineComponent({
         .deleteFields(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
+          indexData.value.stream_type,
           selectedFields.value.map((field) => field.name),
         )
         .then(async (res) => {
@@ -1396,6 +1414,7 @@ export default defineComponent({
       storeOriginalData.value =
         streamResponse.settings.store_original_data || false;
       enableDistinctFields.value = streamResponse.settings.enable_distinct_fields || false;
+      enableLogPatternsExtraction.value = streamResponse.settings.enable_log_patterns_extraction || false;
       approxPartition.value = streamResponse.settings.approx_partition || false;
 
       if (!streamResponse.schema) {
@@ -1493,6 +1512,7 @@ export default defineComponent({
 
       settings["store_original_data"] = storeOriginalData.value;
       settings["enable_distinct_fields"] = enableDistinctFields.value;
+      settings["enable_log_patterns_extraction"] = enableLogPatternsExtraction.value;
       settings["approx_partition"] = approxPartition.value;
 
       if (flattenLevel.value !== null) {
@@ -1898,11 +1918,31 @@ export default defineComponent({
     };
 
     const updateDefinedSchemaFields = () => {
-      markFormDirty();
-
       const selectedFieldsSet = new Set(
         selectedFields.value.map((field) => field.name),
       );
+
+      //  Check max limit when adding fields
+      //  We need to check store.state.zoConfig.user_defined_schema_max_fields this config value before adding to UDS 
+      //  Because it should not exceed this value
+      if (activeTab.value !== "schemaFields") {
+        const maxFieldsLength = store.state.zoConfig?.user_defined_schema_max_fields;
+        const currentDefinedSchemaLength = indexData.value.defined_schema_fields.length;
+        const newSchemaFieldLength = currentDefinedSchemaLength + selectedFieldsSet.size;
+
+        if (maxFieldsLength && newSchemaFieldLength > maxFieldsLength) {
+          q.notify({
+            type: "negative",
+            message: `Cannot add fields. Maximum allowed fields in User Defined Schema is ${maxFieldsLength}. Current: ${currentDefinedSchemaLength}, Attempting to add: ${selectedFieldsSet.size}`,
+            timeout: 3000,
+          });
+          selectedFields.value = [];
+          return;
+        }
+      };
+
+      markFormDirty();
+
 
       if (selectedFieldsSet.has(allFieldsName.value))
         selectedFieldsSet.delete(allFieldsName.value);
@@ -2212,6 +2252,7 @@ export default defineComponent({
       t,
       q,
       store,
+      config,
       dateChangeValue,
       isCloud,
       indexData,
@@ -2225,6 +2266,7 @@ export default defineComponent({
       dataRetentionDays,
       storeOriginalData,
       enableDistinctFields,
+      enableLogPatternsExtraction,
       approxPartition,
       maxQueryRange,
       flattenLevel,
@@ -2334,25 +2376,49 @@ export default defineComponent({
     padding: 1rem;
   }
 
-  .q-table {
-    border: 1px solid $input-field-border-color;
-  }
 
-  .q-table {
+
+  .o2-schema-table {
     border-radius: 0.5rem;
     position: relative;
+    border: 0.0625rem solid var(--o2-border-color);
 
-    thead tr {
-      height: 2.5rem;
+    // Custom pagination wrapper styling
+    .schema-table-pagination-wrapper {
+      display: flex;
+      justify-content: flex-end;
+      width: 100%;
 
-      th {
-        font-size: 0.875rem;
-        font-weight: 700;
-        height: 35px;
+      // Override the QTablePagination component's justify-between
+      :deep(.q-table__control) {
+        justify-content: flex-end !important;
+
+        &.row.justify-between {
+          justify-content: flex-end !important;
+        }
+      }
+
+      // Prevent pagination text from wrapping
+      :deep(.q-table__bottom-item) {
+        white-space: nowrap;
       }
     }
 
-    .q-table tbody td:after {
+    thead tr {
+      height: 2.5rem;
+      background: var(--o2-table-header-bg) !important;
+
+      th {
+        font-size: 0.875rem;
+        // font-weight: 700;
+        height: 35px;
+      }
+
+
+    }
+    
+
+    .o2-schema-table tbody td:after {
       background: none !important;
     }
 
@@ -2361,11 +2427,12 @@ export default defineComponent({
 
       td {
         font-size: 0.875rem;
-        font-weight: 600;
+        // font-weight: 600;
         height: 25px;
         padding: 0px 5px;
       }
     }
+    
   }
 
   .q-list {
@@ -2465,5 +2532,39 @@ export default defineComponent({
 }
 .single-line-tab {
   display: inline-flex;
+}
+.mini-select{
+  min-height: 24px !important;
+  max-height: 24px !important;
+  height: 24px !important;
+  font-size: 0.813rem;
+
+  .q-field__inner {
+    min-height: 24px !important;
+    height: 24px !important;
+    max-height: 24px !important;
+  }
+
+  .q-field__control {
+    min-height: 24px !important;
+    max-height: 24px !important;
+    height: 24px !important;
+    padding: 0px 8px !important;
+  }
+
+  .q-field__control-container {
+    .q-field__native {
+      min-height: 24px !important;
+      height: 24px !important;
+    }
+  }
+
+  .q-field__marginal {
+    height: 24px !important;
+  }
+
+  .q-field__append {
+    height: 24px !important;
+  }
 }
 </style>

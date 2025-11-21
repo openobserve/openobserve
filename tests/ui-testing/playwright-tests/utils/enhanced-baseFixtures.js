@@ -122,9 +122,10 @@ async function verifyAuthentication(page) {
  * @param {import('@playwright/test').Page} page 
  */
 async function navigateToBase(page) {
-  testLogger.info('Navigating to base URL', { url: process.env["ZO_BASE_URL"] });
-  
-  await page.goto(process.env["ZO_BASE_URL"]);
+  const baseUrlWithOrg = `${process.env["ZO_BASE_URL"]}?org_identifier=${process.env["ORGNAME"]}`;
+  testLogger.info('Navigating to base URL with org identifier', { url: baseUrlWithOrg });
+
+  await page.goto(baseUrlWithOrg);
   await page.waitForLoadState('domcontentloaded');
   
   const isAuthenticated = await verifyAuthentication(page);

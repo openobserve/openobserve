@@ -300,7 +300,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let key_columns = ev.key.split('/').collect::<Vec<&str>>();
-                let (ev_key, ev_start_dt) = if key_columns.len() > 5 {
+                let (ev_key, mut ev_start_dt) = if key_columns.len() > 5 {
                     (
                         key_columns[..5].join("/"),
                         key_columns[5].parse::<i64>().unwrap_or(0),
@@ -308,6 +308,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 } else {
                     (ev.key.to_string(), ev.start_dt.unwrap_or_default())
                 };
+                if ev_start_dt == 0 && ev.start_dt.is_some() {
+                    ev_start_dt = ev.start_dt.unwrap();
+                }
 
                 let item_key = ev_key.strip_prefix(key).unwrap();
                 let r = STREAM_SCHEMAS.read().await;
@@ -405,11 +408,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
 
+                #[cfg(feature = "enterprise")]
+                let usage_enabled = true;
+                #[cfg(not(feature = "enterprise"))]
+                let usage_enabled = cfg.common.usage_enabled;
+
                 // if create_org_through_ingestion is enabled, we need to create the org
                 // if it doesn't exist. Hence, we need to check if the org exists in the cache
-                if (cfg.common.create_org_through_ingestion
-                    || cfg.common.usage_enabled
-                    || audit_enabled)
+                if (cfg.common.create_org_through_ingestion || usage_enabled || audit_enabled)
                     && !ORGANIZATIONS.read().await.contains_key(org_id)
                     && let Err(e) = check_and_create_org(org_id).await
                 {
@@ -424,8 +430,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let stream_name = columns[2];
                 let start_dt = match columns.get(3) {
                     Some(start_dt) => start_dt.parse::<i64>().unwrap_or_default(),
-                    None => 0,
+                    None => ev.start_dt.unwrap_or_default(),
                 };
+                log::warn!(
+                    "[Schema:watch] Deleting schema cache for {org_id}/{stream_type}/{stream_name} with start_dt {start_dt}",
+                );
                 if start_dt > 0 {
                     // delete only one version
                     continue;
@@ -602,19 +611,32 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
     }
 
     // fill data
+    let total = std::time::Instant::now();
     for (key, tbl) in tables {
+        let start = std::time::Instant::now();
+        // Only use the primary region if specified to fetch enrichment table data assuming only the
+        // primary region contains the data.
         let data =
-            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name).await?;
+            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name, true)
+                .await?;
+        let len = data.len();
         ENRICHMENT_TABLES.insert(
             key,
             StreamTable {
-                org_id: tbl.org_id,
-                stream_name: tbl.stream_name,
-                data: data.into(),
+                org_id: tbl.org_id.clone(),
+                stream_name: tbl.stream_name.clone(),
+                data,
             },
         );
+        log::info!(
+            "EnrichmentTables Cached: org_id: {}, stream_name: {}, len: {}, took {:?}",
+            tbl.org_id,
+            tbl.stream_name,
+            len,
+            start.elapsed()
+        );
     }
-    log::info!("EnrichmentTables Cached");
+    log::info!("EnrichmentTables Cached, took {:?}", total.elapsed());
     Ok(())
 }
 

@@ -13,15 +13,15 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
-
 <template>
-  <q-page class="q-px-md" style="overflow-y: auto;" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
-    <div v-if="!no_data_ingest && !isLoadingSummary" class="q-pt-md" style="display: flex; flex-direction: column; gap: 16px;">
+  <q-page class="tw-px-[0.625rem] q-pt-xs" style="overflow-y: auto; min-height: inherit; height: calc(100vh - 40px);" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
+    <div v-if="!no_data_ingest && !isLoadingSummary" class="tw-w-full tw-h-full tw-px-[0.625rem] tw-py-[0.625rem] card-container" style="display: flex; flex-direction: column; ">
         <!-- 1st section -->
          <div>
           <TrialPeriod></TrialPeriod>
          </div>
-        <div class="streams-container"
+          <LicensePeriod @update-license="goToLicensePage"></LicensePeriod>
+        <div class="feature-card"
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
         role="region"
         aria-label="Streams overview section"
@@ -40,7 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="arrow_forward" class="view-arrow-icon" />
                 <router-link
                   exact
-                  :to="{ name: 'logstreams' }"
+                  :to="{
+                    name: 'logstreams',
+                    query: { org_identifier: store.state.selectedOrganization?.identifier }
+                  }"
                   class="absolute full-width full-height"
                   aria-label="Navigate to streams page"
                 ></router-link>
@@ -109,6 +112,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             </div>
+
+            <div class="tile">
+              <div class="tile-content rounded-borders text-center column justify-between "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               role="article"
+               aria-label="Ingested data size statistics">
+              <!-- Top Section (60%) -->
+                <div class="column justify-between" >
+                  <!-- Title row -->
+                  <div class="row justify-between">
+                    <div class="tile-title">{{ t("home.totalDataIngested") }}</div>
+                    <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                      <img :src="ingestedSizeIcon" alt="" />
+                    </div>
+                  </div>
+
+                  <!-- Performance text -->
+                  <div v-if="false" class="performance-text "
+                  :class="store.state.theme === 'dark' ? 'negative-increase-dark' : 'negative-increase-light'"
+                  >
+                    <q-icon name="arrow_downward" size="14px" /> 2.89% from last week
+                  </div>
+                </div>
+
+                <!-- Bottom Section (40%) -->
+                <div class="data-to-display row items-end " aria-live="polite">
+                  {{ formattedAnimatedIngestedSize }}
+                </div>
+              </div>
+            </div>
+
+            
             <div class="tile">
               <div class="tile-content rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
@@ -135,36 +170,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Bottom Section (40%) -->
             <div class="data-to-display row items-end " aria-live="polite">
               {{ formattedAnimatedCompressedSize }}
-            </div>
-            </div>
-            </div>
-
-            <div class="tile">
-              <div class="tile-content rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               role="article"
-               aria-label="Ingested data size statistics">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between" >
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="tile-title">{{ t("home.totalDataIngested") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="ingestedSizeIcon" alt="" />
-                  </div>
-                </div>
-
-                <!-- Performance text -->
-                <div v-if="false" class="performance-text "
-                :class="store.state.theme === 'dark' ? 'negative-increase-dark' : 'negative-increase-light'"
-                >
-                  <q-icon name="arrow_downward" size="14px" /> 2.89% from last week
-                </div>
-              </div>
-
-            <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end " aria-live="polite">
-              {{ formattedAnimatedIngestedSize }}
             </div>
             </div>
             </div>
@@ -208,26 +213,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="functions-dashboards-column">
 
           <div class="tile-wrapper">
-            <div class="functions-tile-content rounded-borders text-center column justify-between"
+            <div class="feature-card rounded-borders text-center column justify-between"
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
               role="article"
               aria-label="Functions count statistics">
               <div class="column justify-between">
-                <div class="row justify-between tw-items-center">
-                  <div class="row tw-items-center tw-gap-2">
-                    <div class="tile-icon icon-bg-orange" aria-hidden="true">
-                      <img :src="functionsIcon" alt="" />
-                    </div>
-                    <div class="tile-title">{{ t("home.functionTitle") }}</div>
+                <div class="row tw-items-center tw-gap-2 tw-flex-nowrap full-width">
+                  <div class="tile-icon icon-bg-orange tw-flex-shrink-0" aria-hidden="true">
+                    <img :src="functionsIcon" alt="" />
                   </div>
+                  <div class="tile-title tw-flex-1 tw-text-left tw-whitespace-nowrap tw-overflow-hidden tw-text-ellipsis">{{ t("home.functionTitle") }}</div>
                   <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                   aria-label="View all functions"
+                  class="tw-flex-shrink-0"
                   >
                       <q-tooltip>View</q-tooltip>
                       <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
                       exact
-                      :to="{ name: 'functionList' }"
+                      :to="{
+                        name: 'functionList',
+                        query: { org_identifier: store.state.selectedOrganization?.identifier }
+                      }"
                       class="absolute full-width full-height"
                       aria-label="Navigate to functions page"
                     ></router-link>
@@ -242,26 +249,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Tile 2 -->
           <div class="tile-wrapper">
-            <div class="dashboards-tile-content rounded-borders text-center column justify-between"
+            <div class="feature-card rounded-borders text-center column justify-between"
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
               role="article"
               aria-label="Dashboards count statistics">
               <div class="column justify-between">
-                <div class="row justify-between tw-items-center">
-                  <div class="row tw-items-center tw-gap-2">
-                    <div class="tile-icon icon-bg-orange" aria-hidden="true">
-                      <img :src="dashboardsIcon" alt="" />
-                    </div>
-                    <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
+                <div class="row tw-items-center tw-gap-2 tw-flex-nowrap full-width">
+                  <div class="tile-icon icon-bg-orange tw-flex-shrink-0" aria-hidden="true">
+                    <img :src="dashboardsIcon" alt="" />
                   </div>
+                  <div class="tile-title tw-flex-1 tw-text-left tw-whitespace-nowrap tw-overflow-hidden tw-text-ellipsis">{{ t("home.dashboardTitle") }}</div>
                   <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                   aria-label="View all dashboards"
+                  class="tw-flex-shrink-0"
                   >
                   <q-tooltip>View</q-tooltip>
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
                       exact
-                      :to="{ name: 'dashboards' }"
+                      :to="{
+                        name: 'dashboards',
+                        query: { org_identifier: store.state.selectedOrganization?.identifier }
+                      }"
                       class="absolute full-width full-height"
                       aria-label="Navigate to dashboards page"
                     ></router-link>
@@ -275,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
                   <!-- Chart 1 -->
-          <div class="chart-container first-chart-container rounded-borders tw-p-4"
+          <div class="feature-card first-chart-container rounded-borders tw-p-4"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           role="region"
           aria-label="Alerts overview section"
@@ -294,7 +303,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
-                    :to="{ name: 'alertList' }"
+                    :to="{
+                      name: 'alertList',
+                      query: { org_identifier: store.state.selectedOrganization?.identifier }
+                    }"
                     class="absolute full-width full-height"
                     aria-label="Navigate to alerts page"
                   ></router-link>
@@ -320,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="chart-container second-chart-container rounded-borders tw-p-4"
+          <div class="feature-card second-chart-container rounded-borders tw-p-4"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           role="region"
           aria-label="Pipelines overview section"
@@ -339,7 +351,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
-                    :to="{ name: 'pipelines' }"
+                    :to="{
+                      name: 'pipelines',
+                      query: { org_identifier: store.state.selectedOrganization?.identifier }
+                    }"
                     class="absolute full-width full-height"
                     aria-label="Navigate to pipelines page"
                   ></router-link>
@@ -373,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="margin: 0 auto; justify-content: center"
     >
     <TrialPeriod></TrialPeriod>
-      <div class="my-card card-container">
+      <div class="my-card">
         <div align="center" flat
 bordered class="my-card q-py-md">
           <div class="text-h6">{{ t("home.noData") }}</div>
@@ -413,6 +428,8 @@ import useStreams from "@/composables/useStreams";
 import pipelines from "@/services/pipelines";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
+import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
+import { useRouter } from "vue-router";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import store from "@/test/unit/helpers/store";
 import { outlinedWindow } from "@quasar/extras/material-icons-outlined";
@@ -431,6 +448,7 @@ export default defineComponent({
     const alertsPanelDataKey = ref(0);
     const pipelinesPanelDataKey = ref(0);
     const isLoadingSummary = ref(false);
+    const router = useRouter();
 
     // Animated counters for numbers
     const animatedStreamsCount = ref(0);
@@ -564,140 +582,181 @@ export default defineComponent({
       getSummary(store.state.selectedOrganization.identifier);
     }
 
-  const alertsPanelData = computed (() => ({
-    chartType: "custom_chart",
-    title: {
-      text: "Last 15 minutes",
-      left: "70%",
-      top: "35%",
-      textStyle: {
-        fontSize: 16,
-        fontWeight: "normal",
-        color: store.state.theme === 'dark' ? '#D9D9D9' : '#262626'
-      }
-    },
-    tooltip: {
-      trigger: "item"
-    },
-    legend: {
-      top: "50%",
-      orient: "vertical",
-      left: "70%",
-      textStyle: {
-        color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
-      }
-    },
-    series: [
-      {
-        name: "Alert Status",
-        type: "pie",
-        radius: ["35%", "55%"],
-        center: ["50%", "50%"],
-        right: "40%",
-        startAngle: 0,
-        endAngle: 360,
-        label: {
-          formatter: "{d}%",
-          show: true,
-          fontSize: 16,
-          color: store.state.theme === 'dark' ? '#ffffff' : '#000000'
-        },
-        labelLine: {
-          show: true,
-          length: 10,
-          length2: 10,
-          lineStyle: {
-            width: 2
-          }
-        },
-        data: [
-          {
-            value: summary.value.healthy_alerts,
-            name: "Success Alerts",
-            itemStyle: {
-              color: "#15ba73"
-            }
-          },
-          {
-            value: summary.value.failed_alerts,
-            name: "Failed Alerts",
-            itemStyle: {
-              color: "#db373a"
-            }
-          }
-        ]
-      }
-    ]
-  }));
+  const alertsPanelData = computed (() => {
+    const healthyAlerts = summary.value.healthy_alerts || 0;
+    const failedAlerts = summary.value.failed_alerts || 0;
+    const total = healthyAlerts + failedAlerts;
 
-  const pipelinesPanelData = computed(() => {
-
+    // If no data, show placeholder
+    if (total === 0) {
       return {
         chartType: "custom_chart",
-        xAxis: {
-          type: "category",
-          data: ["Healthy", "Failed", "Warning"],
-          name: "Last 15 minutes",
-          nameLocation: "middle",
-          nameGap: 30,
-          nameTextStyle: {
+        title: {
+          text: "No data available",
+          left: "center",
+          top: "center",
+          textStyle: {
             fontSize: 16,
             fontWeight: "normal",
             color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
-          },
-          axisLabel: {
-            fontSize: 14,
-            color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
           }
-        },
-        yAxis: {
-          type: "value",
-          min: 0,
-          max:Math.ceil((summary.value.healthy_pipelines + summary.value.failed_pipelines + summary.value.warning_pipelines) / 3 / 10) * 10 ,
-          interval: 10,
-          name: "Number of Pipelines",
-          nameLocation: "middle",
-          nameGap: 60,
-          nameRotate: 90,
-          nameTextStyle: {
-            fontSize: 16,
-            fontWeight: "normal",
-            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+        }
+      };
+    }
+
+    return {
+      chartType: "custom_chart",
+      title: {
+        text: "Last 15 minutes",
+        left: "65%",
+        top: "50%",
+        textStyle: {
+          fontSize: 16,
+          fontWeight: "normal",
+          color: store.state.theme === 'dark' ? '#D9D9D9' : '#262626'
+        }
+      },
+      tooltip: {
+        trigger: "item"
+      },
+      legend: {
+        top: "65%",
+        orient: "vertical",
+        left: "65%",
+        textStyle: {
+          color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
+        }
+      },
+      series: [
+        {
+          name: "Alert Status",
+          type: "pie",
+          radius: ["35%", "55%"],
+          center: ["35%", "50%"],
+          startAngle: 0,
+          endAngle: 360,
+          label: {
+            formatter: "{d}%",
+            show: true,
+            fontSize: 14,
+            color: store.state.theme === 'dark' ? '#ffffff' : '#000000'
           },
-          axisLabel: {
-            fontSize: 12,
-            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
-          },
-          splitLine: {
+          labelLine: {
+            show: true,
+            length: 15,
+            length2: 8,
             lineStyle: {
-              color: store.state.theme === 'dark' ? '#444' : '#e0e0e0'
+              width: 2
             }
           },
-          offset: -20
-
-        },
-
-        series: [
-          {
-            data: [summary.value.healthy_pipelines, summary.value.failed_pipelines, summary.value.warning_pipelines],
-            type: "bar",
-            barWidth: "50%",
-            label: {
-              show: true,
-              position: "top",
-              fontSize: 14,
-              fontWeight: "bold",
-              color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
+          data: [
+            {
+              value: healthyAlerts,
+              name: "Success Alerts",
+              itemStyle: {
+                color: "#15ba73"
+              }
             },
-            itemStyle: {
-              color: function (params: any) {
-                const colors = ['#16b26a', '#db373b', '#ffc328'];
-                return colors[params.dataIndex];
+            {
+              value: failedAlerts,
+              name: "Failed Alerts",
+              itemStyle: {
+                color: "#db373a"
               }
             }
-          }
           ]
+        }
+      ]
+    };
+  });
+
+  const pipelinesPanelData = computed(() => {
+    const healthyPipelines = summary.value.healthy_pipelines || 0;
+    const failedPipelines = summary.value.failed_pipelines || 0;
+    const warningPipelines = summary.value.warning_pipelines || 0;
+    const total = healthyPipelines + failedPipelines + warningPipelines;
+
+    // If no data, show placeholder
+    if (total === 0) {
+      return {
+        chartType: "custom_chart",
+        title: {
+          text: "No data available",
+          left: "center",
+          top: "center",
+          textStyle: {
+            fontSize: 16,
+            fontWeight: "normal",
+            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+          }
+        }
       };
+    }
+
+    return {
+      chartType: "custom_chart",
+      xAxis: {
+        type: "category",
+        data: ["Healthy", "Failed", "Warning"],
+        name: "Last 15 minutes",
+        nameLocation: "middle",
+        nameGap: 30,
+        nameTextStyle: {
+          fontSize: 16,
+          fontWeight: "normal",
+          color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+        },
+        axisLabel: {
+          fontSize: 14,
+          color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
+        }
+      },
+      yAxis: {
+        type: "value",
+        min: 0,
+        max: Math.ceil((healthyPipelines + failedPipelines + warningPipelines) / 3 / 10) * 10 || 10,
+        interval: 10,
+        name: "Number of Pipelines",
+        nameLocation: "middle",
+        nameGap: 60,
+        nameRotate: 90,
+        nameTextStyle: {
+          fontSize: 16,
+          fontWeight: "normal",
+          color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+        },
+        axisLabel: {
+          fontSize: 12,
+          color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+        },
+        splitLine: {
+          lineStyle: {
+            color: store.state.theme === 'dark' ? '#444' : '#e0e0e0'
+          }
+        },
+        offset: -20
+      },
+      series: [
+        {
+          data: [healthyPipelines, failedPipelines, warningPipelines],
+          type: "bar",
+          barWidth: "50%",
+          label: {
+            show: true,
+            position: "top",
+            fontSize: 14,
+            fontWeight: "bold",
+            color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
+          },
+          itemStyle: {
+            color: function (params: any) {
+              const colors = ['#16b26a', '#db373b', '#ffc328'];
+              return colors[params.dataIndex];
+            }
+          }
+        }
+      ]
+    };
   });
 
   const compressedSizeIcon = computed(() => {
@@ -744,6 +803,9 @@ export default defineComponent({
     return getImageURL('images/home/pipeline.svg');
   });
 
+  const goToLicensePage = () => {
+    router.push({ name: 'license' });
+  };
   const getForwardIcon = computed(() => {
     const icon = store.state.theme === 'dark' ? 'images/home/forward_dark.svg' : 'images/home/forward_light.svg';
     return getImageURL(icon);
@@ -813,8 +875,9 @@ export default defineComponent({
       isLoadingSummary,
       pipelinesIcon,
       alertsIcon,
-      getForwardIcon,
+      goToLicensePage,
       formatEventCount,
+      getForwardIcon,
       animatedStreamsCount,
       animatedEventsCount,
       formattedAnimatedEventsCount,
@@ -849,6 +912,7 @@ export default defineComponent({
   components: {
     CustomChartRenderer,
     TrialPeriod,
+    LicensePeriod,
     HomeViewSkeleton,
   },
 });
@@ -950,6 +1014,13 @@ export default defineComponent({
   border-left: 3px solid var(--accent-blue);
   contain: layout style;
   padding: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px var(--hover-shadow);
+  }
 }
 
 .streams-header {
@@ -958,7 +1029,7 @@ export default defineComponent({
 .dark-stream-container,
 .light-stream-container {
   background: var(--tile-bg);
-  border: 1px solid var(--tile-border);
+  border: 0.0625rem solid var(--o2-border-color);
 }
 .view-button-light {
   cursor: pointer;
@@ -1029,8 +1100,10 @@ export default defineComponent({
 }
 
 .tile {
-  animation: fadeInUp 0.5s ease-out backwards;
-  contain: layout style paint;
+  border-radius: 0.325rem;
+  border: 0.0625rem solid var(--o2-border-color);
+  // animation: fadeInUp 0.5s ease-out backwards;
+  // contain: layout style paint;
 }
 
 // Stagger animation for tiles
@@ -1053,27 +1126,42 @@ export default defineComponent({
 
 .tile-content {
   @include tile-base;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+
+  &:hover {
+    // transform: translateY(-4px) scale(1.02);
+    // box-shadow: 0 8px 24px var(--hover-shadow);
+  }
 }
 
-.dashboards-tile-content,
-.functions-tile-content {
-  @include tile-base;
-  animation: fadeInUp 0.5s ease-out backwards;
-}
+// .dashboards-tile-content,
+// .functions-tile-content {
+//   @include tile-base;
+//   animation: fadeInUp 0.5s ease-out backwards;
+//   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+//   cursor: pointer;
 
-.functions-tile-content {
-  animation-delay: 250ms;
-}
+//   &:hover {
+//     transform: translateY(-4px) scale(1.02);
+//     // box-shadow: 0 8px 24px var(--hover-shadow);
+//   }
+// }
 
-.dashboards-tile-content {
-  animation-delay: 300ms;
-}
-.dark-tile-content,
-.light-tile-content {
-  background: var(--tile-bg);
-  border: 1px solid var(--tile-border);
-  color: var(--text-primary);
-}
+// .functions-tile-content {
+//   animation-delay: 250ms;
+// }
+
+// .dashboards-tile-content {
+//   animation-delay: 300ms;
+// }
+
+// .dark-tile-content,
+// .light-tile-content {
+//   background: var(--tile-bg);
+//   border: 1px solid var(--tile-border);
+//   color: var(--text-primary);
+// }
 .section-header {
   font-size: 20px;
   font-weight: 600;
@@ -1119,12 +1207,19 @@ export default defineComponent({
   font-weight: 600;
   line-height: 32px;
 }
-.chart-container {
-  @include container-base;
-  display: flex;
-  flex-direction: column;
-  contain: layout style;
-}
+// .chart-container {
+//   @include container-base;
+//   display: flex;
+//   flex-direction: column;
+//   contain: layout style;
+//   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+//   cursor: pointer;
+
+//   &:hover {
+//     transform: translateY(-4px) scale(1.01);
+//     box-shadow: 0 12px 32px var(--hover-shadow);
+//   }
+// }
 
 // Layout for charts section
 .charts-main-container {
@@ -1162,36 +1257,41 @@ export default defineComponent({
   flex: 1;
   display: flex;
   min-width: 0;
-}
-
-.functions-tile-content,
-.dashboards-tile-content {
   width: 100%;
-  flex: 1;
-  min-width: 0;
 
-  // Only apply to the outer row (title + button), not the inner row (icon + title text)
-  > .column > .row.justify-between {
-    flex-wrap: nowrap;
+  .feature-card {
+    width: 100%;
   }
 }
 
-.first-chart-container {
-  border-left: 3px solid var(--accent-orange);
-  animation-delay: 350ms;
-}
+// .functions-tile-content,
+// .dashboards-tile-content {
+//   width: 100%;
+//   flex: 1;
+//   min-width: 0;
 
-.second-chart-container {
-  border-left: 3px solid var(--accent-purple);
-  animation-delay: 400ms;
-}
+//   // Only apply to the outer row (title + button), not the inner row (icon + title text)
+//   > .column > .row.justify-between {
+//     flex-wrap: nowrap;
+//   }
+// }
 
-.chart-container-light,
-.chart-container-dark {
-  border: 1px solid var(--tile-border);
-  background: var(--tile-bg);
-  position: relative;
-}
+// .first-chart-container {
+//   border-left: 3px solid var(--accent-orange);
+//   animation-delay: 350ms;
+// }
+
+// .second-chart-container {
+//   border-left: 3px solid var(--accent-purple);
+//   animation-delay: 400ms;
+// }
+
+// .chart-container-light,
+// .chart-container-dark {
+//   border: 1px solid var(--tile-border);
+//   background: var(--tile-bg);
+//   position: relative;
+// }
 
 // Chart loading shimmer animation
 @keyframes shimmer {
@@ -1320,9 +1420,10 @@ export default defineComponent({
 .dashboards-tile-content,
 .chart-container,
 .streams-container {
-  &:hover {
-    box-shadow: 0 4px 12px var(--hover-shadow);
-  }
+
+  // &:hover {
+    // box-shadow: 0 4px 12px var(--hover-shadow);
+  // }
 }
 
 /* Focus visible states for keyboard navigation */

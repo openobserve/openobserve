@@ -15,94 +15,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <q-btn
-      data-test="logs-search-field-list-collapse-btn"
-      :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
-      :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
-      dense
-      size="12px"
-      round
-      class="q-mr-xs field-list-collapse-btn tw-absolute tw-top-0 tw-z-10"
-      color="primary"
-      :style="{
-        left: showSidebar ? splitterModel - 14 + 'px' : '-8px',
-      }"
-      @click="collapseSidebar"
-    />
-    <q-splitter
-      v-model="splitterModel"
-      unit="px"
-      :limits="[0, 300]"
-      class="tw-overflow-hidden"
-    >
-      <template v-slot:before>
-        <div v-if="showSidebar" class="functions-tabs">
-          <q-tabs
-            v-model="activeTab"
-            indicator-color="transparent"
-            inline-label
-            vertical
-          >
-            <q-route-tab
-              v-if="
-                !store.state.zoConfig?.custom_hide_menus
-                  ?.split(',')
-                  .includes('pipelines')
-              "
-              data-test="stream-pipelines-tab"
-              name="streamPipelines"
-              :to="{
-                name: 'pipelines',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('function.streamPipeline')"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              data-test="function-stream-tab"
-              default
-              name="functions"
-              :to="{
-                name: 'functionList',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('function.header')"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              data-test="function-enrichment-table-tab"
-              name="enrichmentTables"
-              :to="{
-                name: 'enrichmentTables',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('function.enrichmentTables')"
-              content-class="tab_content"
-            />
-          </q-tabs>
-        </div>
-      </template>
-      <template v-slot:after>
-        <div
-          style="height: calc(100vh - 42px)"
-        >
+  <q-page>
+    <div class=" tw-pb-[0.625rem]">
+      <q-splitter
+        v-model="splitterModel"
+        unit="px"
+        :limits="[0, 400]"
+        class="tw-overflow-hidden logs-splitter-smooth"
+      >
+        <template v-slot:before>
+          <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
+            <div v-if="showSidebar" class="card-container tw-h-[calc(100vh-50px)]">
+              <q-tabs
+                v-model="activeTab"
+                indicator-color="transparent"
+                inline-label
+                vertical
+                class="card-container"
+              >
+                <q-route-tab
+                  v-if="
+                    !store.state.zoConfig?.custom_hide_menus
+                      ?.split(',')
+                      .includes('pipelines')
+                  "
+                  data-test="stream-pipelines-tab"
+                  name="streamPipelines"
+                  :to="{
+                    name: 'pipelines',
+                    query: {
+                      org_identifier: store.state.selectedOrganization.identifier,
+                    },
+                  }"
+                  :label="t('function.streamPipeline')"
+                  content-class="tab_content"
+                />
+                <q-route-tab
+                  data-test="function-stream-tab"
+                  default
+                  name="functions"
+                  :to="{
+                    name: 'functionList',
+                    query: {
+                      org_identifier: store.state.selectedOrganization.identifier,
+                    },
+                  }"
+                  :label="t('function.header')"
+                  content-class="tab_content"
+                />
+                <q-route-tab
+                  data-test="function-enrichment-table-tab"
+                  name="enrichmentTables"
+                  :to="{
+                    name: 'enrichmentTables',
+                    query: {
+                      org_identifier: store.state.selectedOrganization.identifier,
+                    },
+                  }"
+                  :label="t('function.enrichmentTables')"
+                  content-class="tab_content"
+                />
+              </q-tabs>
+            </div>
+          </div>
+        </template>
+        <template #separator>
+          <q-btn
+            data-test="logs-search-field-list-collapse-btn"
+            :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
+            :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+            :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
+            color="primary"
+            size="sm"
+            dense
+            round
+            @click="collapseSidebar"
+          />
+        </template>
+        <template v-slot:after>
           <!-- :templates="templates"
             :functionAssociatedStreams="functionAssociatedStreams"
             @get:functionAssociatedStreams="getFunctionAssociatedStreams"
             @get:templates="getTemplates" -->
-          <RouterView v-slot="{ Component }">
-            <component :is="Component" @sendToAiChat="sendToAiChat" />
-          </RouterView>
-        </div>
-      </template>
-    </q-splitter>
+            <div class=" q-pt-xs">
+              <RouterView v-slot="{ Component }">
+                <component :is="Component" @sendToAiChat="sendToAiChat" />
+              </RouterView>
+            </div>
+        </template>
+      </q-splitter>
+    </div>
   </q-page>
 </template>
 
@@ -203,29 +205,29 @@ export default defineComponent({
   }
 }
 .functions-tabs {
-  .q-tabs {
-    &--vertical {
-      margin: 20px 16px 0 16px;
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        text-transform: capitalize;
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          background-color: $accent;
-          color: black;
-        }
-      }
-    }
-  }
+  // .q-tabs_bkcss {
+  //   &--vertical {
+  //     margin: 20px 16px 0 16px;
+  //     .q-tab {
+  //       justify-content: flex-start;
+  //       padding: 0 1rem 0 1.25rem;
+  //       border-radius: 0.5rem;
+  //       margin-bottom: 0.5rem;
+  //       text-transform: capitalize;
+  //       &__content.tab_content {
+  //         .q-tab {
+  //           &__icon + &__label {
+  //             padding-left: 0.875rem;
+  //             font-weight: 600;
+  //           }
+  //         }
+  //       }
+  //       &--active {
+  //         background-color: $accent;
+  //         color: black;
+  //       }
+  //     }
+  //   }
+  // }
 }
 </style>

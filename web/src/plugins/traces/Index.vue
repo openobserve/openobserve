@@ -16,24 +16,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage"
-id="tracePage" style="min-height: auto">
+  <q-page class="tracePage" id="tracePage"
+style="min-height: auto">
     <div id="tracesSecondLevel">
-      <div class="tw-min-h-[82px]">
+      <div
+        class="tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs"
+        :class="
+          activeTab === 'service-maps' ? 'tw-min-h-[45px]' : 'tw-min-h-[82px]'
+        "
+      >
+        <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
         <search-bar
           data-test="logs-search-bar"
           ref="searchBarRef"
           :fieldValues="fieldValues"
           :isLoading="searchObj.loading"
+          :activeTab="activeTab"
+          class="card-container"
           @searchdata="searchData"
           @onChangeTimezone="refreshTimezone"
           @shareLink="copyTracesUrl"
+          @update:activeTab="activeTab = $event"
         />
       </div>
+
+      <!-- Service Maps Tab Content -->
       <div
+        v-if="activeTab === 'service-maps'"
+        class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-h-[calc(100vh-98px)] tw-overflow-hidden"
+      >
+        <service-graph class="tw-h-full" />
+      </div>
+
+      <!-- Search Tab Content -->
+      <div
+        v-if="activeTab === 'search'"
         id="tracesThirdLevel"
-        class="row scroll traces-search-result-container"
-        style="width: 100%"
+        class="traces-search-result-container relative-position"
       >
         <!-- Note: Splitter max-height to be dynamically calculated with JS -->
         <q-splitter
@@ -41,102 +60,120 @@ id="tracePage" style="min-height: auto">
           :limits="searchObj.config.splitterLimit"
           style="width: 100%"
           @update:model-value="onSplitterUpdate"
+          class="tw-h-full"
         >
-          <template #before v-if="searchObj.meta.showFields">
-            <index-list
-              ref="indexListRef"
-              :field-list="searchObj.data.stream.selectedStreamFields"
-              data-test="logs-search-index-list"
-              :key="searchObj.data.stream.streamLists"
-              @update:changeStream="onChangeStream"
-            />
+          <template #before>
+            <div class="tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
+              <index-list
+                v-show="searchObj.meta.showFields"
+                ref="indexListRef"
+                :field-list="searchObj.data.stream.selectedStreamFields"
+                data-test="logs-search-index-list"
+                class="card-container"
+                :key="searchObj.data.stream.streamLists"
+                @update:changeStream="onChangeStream"
+              />
+            </div>
           </template>
           <template #separator>
-            <q-avatar
+            <q-btn
+              data-test="logs-search-field-list-collapse-btn"
+              :icon="searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'"
+              :title="
+                searchObj.meta.showFields ? 'Collapse Fields' : 'Open Fields'
+              "
+              :class="searchObj.meta.showFields ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
               color="primary"
-              text-color="white"
-              size="20px"
-              icon="drag_indicator"
-              style="top: 10px"
+              size="sm"
+              dense
+              round
+              @click="collapseFieldList"
             />
           </template>
           <template #after>
             <div
-              v-if="
-                searchObj.data.errorMsg !== '' && searchObj.loading == false
-              "
+              class="tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]"
             >
-              <h5 class="text-center">
+              <div class="card-container tw-h-full">
                 <div
-                  data-test="logs-search-result-not-found-text"
                   v-if="
-                    searchObj.data.stream.streamLists.length &&
-                    searchObj.data.errorCode == 0
+                    searchObj.data.errorMsg !== '' && searchObj.loading == false
                   "
                 >
-                  Result not found.
-                </div>
-                <SanitizedHtmlRenderer
-                  data-test="logs-search-error-message"
-                  :htmlContent="`${searchObj.data.errorMsg}
+                  <h5 class="text-center">
+                    <div
+                      data-test="logs-search-result-not-found-text"
+                      v-if="
+                        searchObj.data.stream.streamLists.length &&
+                        searchObj.data.errorCode == 0
+                      "
+                    >
+                      Result not found.
+                    </div>
+                    <SanitizedHtmlRenderer
+                      data-test="logs-search-error-message"
+                      :htmlContent="`${searchObj.data.errorMsg}
                   ${searchObj.data.errorDetail ? `<h6 style='font-size: 14px; margin: 0;'>${searchObj.data.errorDetail}</h6>` : ''}`"
-                />
-                <div
-                  data-test="logs-search-error-20003"
-                  v-if="parseInt(searchObj.data.errorCode) == 20003"
-                >
-                  <q-btn
-                    no-caps
-                    unelevated
-                    size="sm"
-                    bg-secondary
-                    class="no-border bg-secondary text-white"
-                    :to="
-                      '/streams?dialog=' +
-                      searchObj.data.stream.selectedStream.label
-                    "
-                    >Click here</q-btn
-                  >
-                  to configure a full text search field to the stream.
+                    />
+                    <div
+                      data-test="logs-search-error-20003"
+                      v-if="parseInt(searchObj.data.errorCode) == 20003"
+                    >
+                      <q-btn
+                        no-caps
+                        unelevated
+                        size="sm"
+                        bg-secondary
+                        class="no-border bg-secondary text-white"
+                        :to="
+                          '/streams?dialog=' +
+                          searchObj.data.stream.selectedStream.label
+                        "
+                        >Click here</q-btn
+                      >
+                      to configure a full text search field to the stream.
+                    </div>
+                    <br />
+                    <q-item-label>{{
+                      searchObj.data.additionalErrorMsg
+                    }}</q-item-label>
+                  </h5>
                 </div>
-                <br />
-                <q-item-label>{{
-                  searchObj.data.additionalErrorMsg
-                }}</q-item-label>
-              </h5>
-            </div>
-            <div v-else-if="!isStreamSelected">
-              <h5
-                data-test="logs-search-no-stream-selected-text"
-                class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
-              >
-                <q-icon name="info"
-color="primary" size="md" /> Select a stream
-                and press 'Run query' to continue. Additionally, you can apply
-                additional filters and adjust the date range to enhance search.
-              </h5>
-            </div>
-            <div
-              data-test="logs-search-result-not-found-text"
-              v-else-if="
-                isStreamSelected &&
-                !searchObj.searchApplied &&
-                !searchObj.data.queryResults?.hits?.length
-              "
-              class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
-            >
-              <q-icon name="info"
+                <div v-else-if="!isStreamSelected">
+                  <h5
+                    data-test="logs-search-no-stream-selected-text"
+                    class="text-center tw-mx-[10%] tw-py-[40px] tw-mt-0 tw-text-[20px]"
+                  >
+                    <q-icon name="info" color="primary"
+size="md" /> Select a
+                    stream and press 'Run query' to continue. Additionally, you
+                    can apply additional filters and adjust the date range to
+                    enhance search.
+                  </h5>
+                </div>
+                <div
+                  data-test="logs-search-result-not-found-text"
+                  v-else-if="
+                    isStreamSelected &&
+                    !searchObj.searchApplied &&
+                    !searchObj.data.queryResults?.hits?.length
+                  "
+                  class="text-center tw-mx-[10%] tw-py-[40px] tw-text-[20px]"
+                >
+                  <q-icon name="info"
 color="primary" size="md" />
-              {{ t("search.applySearch") }}
-            </div>
+                  {{ t("search.applySearch") }}
+                </div>
 
-            <div data-test="logs-search-search-result">
-              <search-result
-                ref="searchResultRef"
-                @update:datetime="setHistogramDate"
-                @update:scroll="getMoreData"
-                @shareLink="copyTracesUrl"
-              />
+                <div data-test="logs-search-search-result">
+                  <search-result
+                    ref="searchResultRef"
+                    @update:datetime="setHistogramDate"
+                    @update:scroll="getMoreData"
+                    @shareLink="copyTracesUrl"
+                  />
+                </div>
+              </div>
             </div>
           </template>
         </q-splitter>
@@ -188,8 +225,10 @@ const SearchResult = defineAsyncComponent(() => import("./SearchResult.vue"));
 const SanitizedHtmlRenderer = defineAsyncComponent(
   () => import("@/components/SanitizedHtmlRenderer.vue"),
 );
+const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 
 const store = useStore();
+const activeTab = ref("search");
 const router = useRouter();
 const $q = useQuasar();
 const { t } = useI18n();
@@ -205,6 +244,7 @@ const serviceColorIndex = ref(0);
 const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
 const indexListRef = ref(null);
 const { getStreams, getStream } = useStreams();
+const chartRedrawTimeout = ref(null);
 
 searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
 
@@ -1027,14 +1067,15 @@ function generateHistogramData() {
     layout: layout,
   };
 
-  if (searchResultRef.value?.reDrawChart) {
-    searchResultRef.value.reDrawChart();
-  }
+  // if (searchResultRef.value?.reDrawChart) {
+  //   searchResultRef.value.reDrawChart();
+  // }
 }
 
 async function loadPageData() {
   searchObj.loadingStream = true;
-  searchObj.data.resultGrid.currentPage = 0;
+  if (!searchObj.data?.queryResults?.hits?.length)
+    searchObj.data.resultGrid.currentPage = 0;
 
   // resetSearchObj();
   searchObj.organizationIdentifier =
@@ -1058,6 +1099,11 @@ function refreshStreamData() {
 
 onBeforeMount(async () => {
   restoreUrlQueryParams();
+  // Restore active tab from URL query params
+  const queryParams = router.currentRoute.value.query;
+  if (queryParams.tab === 'service-maps') {
+    activeTab.value = 'service-maps';
+  }
   await importSqlParser();
   if (searchObj.loading == false) {
     await loadPageData();
@@ -1084,7 +1130,7 @@ onActivated(() => {
 
   if (router.currentRoute.value.path.indexOf("/traces") > -1) {
     setTimeout(() => {
-      if (searchResultRef.value) searchResultRef.value.reDrawChart();
+      // if (searchResultRef.value) searchResultRef.value?.reDrawChart();
     }, 300);
   }
 });
@@ -1132,7 +1178,7 @@ const refreshTimezone = () => {
   updateGridColumns();
   generateHistogramData();
 
-  searchResultRef.value.reDrawChart();
+  // searchResultRef.value?.reDrawChart();
 };
 
 const restoreFiltersFromQuery = (node: any) => {
@@ -1226,6 +1272,11 @@ const onChangeStream = () => {
   extractFields();
 };
 
+const collapseFieldList = () => {
+  if (searchObj.meta.showFields) searchObj.meta.showFields = false;
+  else searchObj.meta.showFields = true;
+};
+
 const showFields = computed(() => {
   return searchObj.meta.showFields;
 });
@@ -1256,15 +1307,19 @@ const runQuery = computed(() => {
 
 watch(showFields, () => {
   if (searchObj.meta.showHistogram == true && searchObj.meta.sqlMode == false) {
-    setTimeout(() => {
-      if (searchResultRef.value) searchResultRef.value.reDrawChart();
+    // Clear any existing timeout
+    if (chartRedrawTimeout.value) {
+      clearTimeout(chartRedrawTimeout);
+    }
+    chartRedrawTimeout.value = setTimeout(() => {
+      // if (searchResultRef.value) searchResultRef.value?.reDrawChart();
     }, 100);
   }
   if (searchObj.config.splitterModel > 0) {
     searchObj.config.lastSplitterPosition = searchObj.config.splitterModel;
   }
 
-  this.searchObj.config.splitterModel = this.searchObj.meta.showFields
+  searchObj.config.splitterModel = searchObj.meta.showFields
     ? searchObj.config.lastSplitterPosition
     : 0;
 });
@@ -1279,7 +1334,7 @@ watch(showFields, () => {
 
 watch(moveSplitter, () => {
   if (searchObj.meta.showFields == false) {
-    searchObj.meta.showFields = this.searchObj.config.splitterModel > 0;
+    searchObj.meta.showFields = searchObj.config.splitterModel > 0;
   }
 });
 
@@ -1309,11 +1364,22 @@ watch(updateSelectedColumns, () => {
     updateGridColumns();
   }, 300);
 });
+
+// Watch for active tab changes and update URL
+watch(activeTab, (newTab) => {
+  const query = { ...router.currentRoute.value.query };
+  if (newTab === 'service-maps') {
+    query.tab = 'service-maps';
+  } else {
+    delete query.tab;
+  }
+  router.replace({ query });
+});
 </script>
 
 <style lang="scss" scoped>
 .traces-search-result-container {
-  height: calc(100vh - 130px) !important;
+  height: calc(100vh - 144px) !important;
 }
 </style>
 <style lang="scss">

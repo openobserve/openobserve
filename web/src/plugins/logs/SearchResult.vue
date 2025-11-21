@@ -17,15 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="col column overflow-hidden full-height">
-    <div
-      class="search-list full-height"
-      ref="searchListContainer"
-      style="width: 100%"
-    >
-      <div class="row tw-min-h-[44px]">
+  <div
+    class="col column full-height"
+    style="
+      overflow: hidden !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      height: 100%;
+    "
+  >
+    <div class="search-list full-height full-width" ref="searchListContainer">
+      <div class="row tw-min-h-[28px] tw-pt-[0.375rem]">
         <div
-          class="col-7 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
+          class="col-7 text-left q-pl-lg bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -33,23 +37,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div
-          v-else
-          class="col-7 text-left q-pl-lg q-mt-xs warning flex items-center"
-        >
+        <div v-else class="col-7 text-left q-pl-lg warning flex items-center">
           {{ noOfRecordsTitle }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
             <q-spinner-hourglass
               color="primary"
               size="25px"
-              style="margin: 0 auto; display: block"
+              class="search-spinner"
             />
             <q-tooltip
               anchor="center right"
               self="center left"
               max-width="300px"
             >
-              <span style="font-size: 14px">Fetching the search events</span>
+              <span class="search-loading-text"
+                >Fetching the search events</span
+              >
             </q-tooltip>
           </span>
           <div
@@ -66,16 +69,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- {{ searchObj.data.histogram.errorMsg }} -->
-            <q-icon name="info" color="warning" size="sm"> </q-icon>
+            <q-icon name="info"
+color="warning" size="sm"> </q-icon>
             <q-tooltip position="top" class="tw-text-sm tw-font-semi-bold">
               {{ searchObj.data.histogram.errorMsg }}
             </q-tooltip>
           </div>
         </div>
 
-        <div class="col-5 text-right q-pr-md q-gutter-xs pagination-block">
+        <div class="col-5 text-right q-pr-sm q-gutter-xs pagination-block">
           <q-pagination
-            v-if="searchObj.meta.resultGrid.showPagination"
+            v-if="
+              searchObj.meta.resultGrid.showPagination &&
+              searchObj.meta.logsVisualizeToggle === 'logs'
+            "
             :disable="searchObj.loading == true"
             v-model="pageNumberInput"
             :key="
@@ -86,8 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :max="
               Math.max(
                 1,
-                (searchObj.communicationMethod === 'ws' ||
-                searchObj.communicationMethod === 'streaming' ||
+                (searchObj.communicationMethod === 'streaming' ||
                 searchObj.meta.jobId != ''
                   ? searchObj.data.queryResults?.pagination?.length
                   : searchObj.data.queryResults?.partitionDetail?.paginations
@@ -108,26 +114,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             rowsPerPageLabel="Rows per page"
             :rows-per-page-options="rowsPerPageOptions"
             :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
-            style="line-height: 30px; max-height: 30px"
             data-test="logs-search-result-pagination"
           />
           <q-select
-            v-if="searchObj.meta.resultGrid.showPagination"
+            v-if="
+              searchObj.meta.resultGrid.showPagination &&
+              searchObj.meta.logsVisualizeToggle === 'logs'
+            "
             data-test="logs-search-result-records-per-page"
             v-model="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
             class="float-right select-pagination"
             size="sm"
             dense
+            borderless
             @update:model-value="getPageData('recordsPerPage')"
-            style="line-height: 20px"
           ></q-select>
         </div>
       </div>
       <div
-        :style="{
-          height: searchObj.meta.showHistogram ? '100px' : '0px',
-        }"
+        :class="[
+          'histogram-container',
+          searchObj.meta.showHistogram
+            ? 'histogram-container--visible'
+            : 'histogram-container--hidden',
+        ]"
         v-if="
           searchObj.data?.histogram?.errorMsg == '' &&
           searchObj.data.histogram.errorCode != -1
@@ -141,12 +152,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           data-test="logs-search-result-bar-chart"
           :data="plotChart"
-          style="max-height: 100px"
+          class="histogram-chart"
           @updated:dataZoom="onChartUpdate"
         />
 
         <div
-          style="height: 100px"
+          class="histogram-empty"
           v-else-if="
             searchObj.meta.showHistogram &&
             !searchObj.loadingHistogram &&
@@ -154,37 +165,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <h3 class="text-center">
-            <span style="min-height: 50px">
-              <q-icon name="warning" color="warning" size="xs"></q-icon> No data
+            <span class="histogram-empty__message">
+              <q-icon name="warning"
+color="warning" size="xs"></q-icon> No data
               found for histogram.</span
             >
           </h3>
         </div>
 
         <div
-          style="height: 100px"
+          class="histogram-empty"
           v-else-if="
             searchObj.meta.showHistogram && Object.keys(plotChart)?.length === 0
           "
         >
           <h3 class="text-center">
-            <span style="min-height: 50px; color: transparent">.</span>
+            <span class="histogram-empty__message"
+style="color: transparent"
+              >.</span
+            >
           </h3>
         </div>
 
-        <div
-          class="q-pb-lg"
-          style="top: 50px; position: absolute; left: 50%"
-          v-if="histogramLoader"
-        >
+        <div class="q-pb-sm histogram-loader" v-if="histogramLoader">
           <q-spinner-hourglass
             color="primary"
             size="25px"
-            style="margin: 0 auto; display: block"
+            class="search-spinner"
           />
         </div>
       </div>
       <div
+        :class="[
+          'histogram-container',
+          searchObj.meta.showHistogram
+            ? 'histogram-container--visible'
+            : 'histogram-container--hidden',
+        ]"
         v-else-if="
           searchObj.data.histogram?.errorMsg != '' &&
           searchObj.meta.showHistogram &&
@@ -192,19 +209,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <h6
-          class="text-center"
-          style="margin: 30px 0px"
+          class="text-center histogram-error"
           v-if="
             searchObj.data.histogram.errorCode != 0 &&
             searchObj.data.histogram.errorCode != -1
           "
         >
-          <q-icon name="warning" color="warning" size="xs"></q-icon> Error while
+          <q-icon name="warning"
+color="warning" size="xs"></q-icon> Error while
           fetching histogram data.
           <q-btn
             @click="toggleErrorDetails"
             size="sm"
             data-test="logs-page-histogram-error-details-btn"
+            class="o2-secondary-button"
             >{{ t("search.histogramErrorBtnLabel") }}</q-btn
           ><br />
           <span v-if="disableMoreErrorDetails">
@@ -224,44 +242,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </h6>
       </div>
-      <tenstack-table
-        ref="searchTableRef"
-        :columns="getColumns || []"
-        :rows="searchObj.data.queryResults?.hits || []"
-        :wrap="searchObj.meta.toggleSourceWrap"
-        :width="getTableWidth"
-        :err-msg="searchObj.data.missingStreamMessage"
-        :loading="searchObj.loading"
-        :functionErrorMsg="searchObj?.data?.functionError"
-        :expandedRows="expandedLogs"
-        :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
-        :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
-        :highlight-query="
-          searchObj.meta.sqlMode
-            ? searchObj.data.query.toLowerCase().split('where')[1]
-            : searchObj.data.query.toLowerCase()
-        "
-        :default-columns="!searchObj.data.stream.selectedFields.length"
-        class="col-12"
-        :style="{
-          height:
+
+      <!-- Logs View -->
+      <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
+        <tenstack-table
+          ref="searchTableRef"
+          :columns="getColumns || []"
+          :rows="searchObj.data.queryResults?.hits || []"
+          :wrap="searchObj.meta.toggleSourceWrap"
+          :width="getTableWidth"
+          :err-msg="searchObj.data.missingStreamMessage"
+          :loading="searchObj.loading"
+          :functionErrorMsg="searchObj?.data?.functionError"
+          :expandedRows="expandedLogs"
+          :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
+          :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
+          :highlight-query="
+            searchObj.meta.sqlMode
+              ? searchObj.data.query.toLowerCase().split('where')[1]
+              : searchObj.data.query.toLowerCase()
+          "
+          :default-columns="!searchObj.data.stream.selectedFields.length"
+          class="col-12 tw-mt-[0.375rem]"
+          :class="[
             !searchObj.meta.showHistogram ||
             (searchObj.meta.showHistogram &&
               searchObj.data.histogram.errorCode == -1)
-              ? 'calc(100% - 40px)'
-              : 'calc(100% - 140px)',
-        }"
-        @update:columnSizes="handleColumnSizesUpdate"
-        @update:columnOrder="handleColumnOrderUpdate"
-        @copy="copyLogToClipboard"
-        @add-field-to-table="addFieldToTable"
-        @add-search-term="addSearchTerm"
-        @close-column="closeColumn"
-        @click:data-row="openLogDetails"
-        @expand-row="expandLog"
-        @send-to-ai-chat="sendToAiChat"
-        @view-trace="redirectToTraces"
-      />
+              ? 'table-container--without-histogram'
+              : 'table-container--with-histogram',
+          ]"
+          @update:columnSizes="handleColumnSizesUpdate"
+          @update:columnOrder="handleColumnOrderUpdate"
+          @copy="copyLogToClipboard"
+          @add-field-to-table="addFieldToTable"
+          @add-search-term="addSearchTerm"
+          @close-column="closeColumn"
+          @click:data-row="openLogDetails"
+          @expand-row="expandLog"
+          @send-to-ai-chat="sendToAiChat"
+          @view-trace="redirectToTraces"
+        />
+      </template>
+
+      <!-- Patterns View -->
+      <div
+        v-if="searchObj.meta.logsVisualizeToggle === 'patterns'"
+        class="tw-flex tw-flex-col"
+        :class="[
+          !searchObj.meta.showHistogram ||
+          (searchObj.meta.showHistogram &&
+            searchObj.data.histogram.errorCode == -1)
+            ? 'table-container--without-histogram'
+            : 'table-container--with-histogram',
+        ]"
+      >
+        <!-- Statistics Bar -->
+        <PatternStatistics
+          v-if="patternsState?.patterns?.statistics"
+          :statistics="patternsState?.patterns?.statistics"
+          :scanSize="patternsState.scanSize"
+          @update:scanSize="patternsState.scanSize = $event"
+        />
+
+        <!-- Patterns List -->
+        <PatternList
+          :patterns="patternsState?.patterns?.patterns || []"
+          :loading="searchObj.loading"
+          :totalLogsAnalyzed="
+            patternsState?.patterns?.statistics?.total_logs_analyzed
+          "
+          @open-details="openPatternDetails"
+          @add-to-search="addPatternToSearch"
+        />
+      </div>
 
       <q-dialog
         data-test="logs-search-result-detail-dialog"
@@ -284,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]
           "
           :stream-type="searchObj.data.stream.streamType"
-          style="margin-bottom: 15px"
+          class="detail-table-dialog"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
           :highlight-query="
@@ -309,6 +362,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @closeTable="closeTable"
         />
       </q-dialog>
+
+      <!-- Pattern Details Drawer -->
+      <PatternDetailsDialog
+        v-model="showPatternDetails"
+        :selectedPattern="selectedPattern"
+        :totalPatterns="patternsState?.patterns?.patterns?.length || 0"
+        @navigate="navigatePatternDetail"
+      />
     </div>
   </div>
 </template>
@@ -320,27 +381,30 @@ import {
   ref,
   onMounted,
   onUpdated,
+  onBeforeUnmount,
   defineAsyncComponent,
   watch,
+  nextTick,
 } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
-import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
-import {useSearchStream} from "@/composables/useLogs/useSearchStream";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import usePatterns from "@/composables/useLogs/usePatterns";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
-import TenstackTable from "./TenstackTable.vue";
 import { useSearchAround } from "@/composables/useLogs/searchAround";
 import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { searchState } from "@/composables/useLogs/searchState";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -351,6 +415,17 @@ export default defineComponent({
     ),
     SanitizedHtmlRenderer,
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
+    EqualIcon,
+    NotEqualIcon,
+    PatternStatistics: defineAsyncComponent(
+      () => import("./patterns/PatternStatistics.vue"),
+    ),
+    PatternList: defineAsyncComponent(
+      () => import("./patterns/PatternList.vue"),
+    ),
+    PatternDetailsDialog: defineAsyncComponent(
+      () => import("./patterns/PatternDetailsDialog.vue"),
+    ),
   },
   emits: [
     "update:scroll",
@@ -388,7 +463,6 @@ export default defineComponent({
       // If selected fields are empty, then we are setting colOrder to empty array as we
       // don't change the order of default columns
       // If you store the colOrder it will create issue when you save the view and load it again
-
       if (!this.searchObj.data.stream.selectedFields.length) {
         this.searchObj.data.resultGrid.colOrder[
           this.searchObj.data.stream.selectedStream
@@ -398,12 +472,12 @@ export default defineComponent({
           this.searchObj.data.stream.selectedStream
         ] = [...newColOrder];
 
-        if(newColOrder.length > 0){
+        if (newColOrder.length > 0) {
           this.searchObj.organizationIdentifier =
             this.store.state.selectedOrganization.identifier;
           let selectedFields = this.reorderSelectedFields();
 
-          this.searchObj.data.stream.selectedFields = selectedFields;
+          this.searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (this.store?.state?.zoConfig?.timestamp_column || '_timestamp'));
           this.updatedLocalLogFilterField();
         }
       }
@@ -435,10 +509,7 @@ export default defineComponent({
       } else if (actionType == "recordsPerPage") {
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
-        if (
-          this.searchObj.communicationMethod === "ws" ||
-          this.searchObj.communicationMethod === "streaming"
-        ) {
+        if (this.searchObj.communicationMethod === "streaming") {
           if (this.searchObj.meta.jobId == "") {
             this.refreshPagination();
           } else {
@@ -462,7 +533,6 @@ export default defineComponent({
           this.searchObj.data.queryResults.pagination = [];
         }
         const maxPages =
-          this.searchObj.communicationMethod === "ws" ||
           this.searchObj.communicationMethod === "streaming" ||
           this.searchObj.meta.jobId != ""
             ? this.searchObj.data.queryResults.pagination.length
@@ -497,7 +567,7 @@ export default defineComponent({
 
       selectedFields.splice(SFIndex, 1);
 
-      this.searchObj.data.stream.selectedFields = selectedFields;
+      this.searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (this.store?.state?.zoConfig?.timestamp_column || '_timestamp'));
 
       this.searchObj.organizationIdentifier =
         this.store.state.selectedOrganization.identifier;
@@ -531,31 +601,124 @@ export default defineComponent({
     const router = useRouter();
     const { searchAroundData } = useSearchAround();
     const { refreshPagination } = useSearchStream();
-    const { refreshPartitionPagination, refreshJobPagination } = usePagination();
+    const { refreshPartitionPagination, refreshJobPagination } =
+      usePagination();
     const { updatedLocalLogFilterField } = logsUtils();
     const { extractFTSFields, filterHitsColumns } = useStreamFields();
 
-    const {
-      reorderSelectedFields,
-      getFilterExpressionByFieldType,
-    } = useLogs();
+    const { reorderSelectedFields, getFilterExpressionByFieldType } = useLogs();
 
     const { searchObj } = searchState();
 
+    // Use separate patterns state (completely isolated from logs)
+    const { patternsState } = usePatterns();
+
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
+    const selectedPattern = ref(null);
+    const showPatternDetails = ref(false);
 
     const searchTableRef: any = ref(null);
 
+    const patternsColumns = [
+      {
+        accessorKey: "pattern_id",
+        header: "#",
+        id: "index",
+        size: 60,
+        cell: (info: any) => info.row.index + 1,
+        meta: {
+          closable: false,
+          showWrap: false,
+        },
+      },
+      {
+        accessorKey: "template",
+        header: "Pattern Template",
+        id: "template",
+        cell: (info: any) => info.getValue(),
+        size: 500,
+        meta: {
+          closable: false,
+          showWrap: true,
+        },
+      },
+      {
+        accessorKey: "frequency",
+        header: "Count",
+        id: "frequency",
+        size: 100,
+        cell: (info: any) =>
+          `${info.getValue()} (${info.row.original.percentage.toFixed(1)}%)`,
+        meta: {
+          closable: false,
+          showWrap: false,
+        },
+      },
+      {
+        accessorKey: "examples",
+        header: "Example Log",
+        id: "example",
+        size: 400,
+        cell: (info: any) => {
+          const examples = info.getValue();
+          if (examples && examples.length > 0) {
+            const msg = examples[0].log_message;
+            return msg.length > 200 ? msg.substring(0, 200) + "..." : msg;
+          }
+          return "";
+        },
+        meta: {
+          closable: false,
+          showWrap: false,
+        },
+      },
+    ];
+
     const plotChart: any = ref({});
+
+    // Debounce timer for custom color picker changes
+    let debounceTimer: any = null;
+
+    // Watch for theme color changes in localStorage
+    const handleThemeColorChange = () => {
+      const currentMode = store.state.theme === "dark" ? "dark" : "light";
+      const appliedThemeKey = currentMode === "light" ? "appliedLightTheme" : "appliedDarkTheme";
+      const appliedTheme = localStorage.getItem(appliedThemeKey);
+
+      // If -1, user is picking custom color - debounce to avoid performance issues
+      if (appliedTheme === "-1") {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => reDrawChart(), 300);
+      } else {
+        // Predefined theme applied - re-render immediately
+        if (debounceTimer) clearTimeout(debounceTimer);
+        reDrawChart();
+      }
+    };
 
     onMounted(() => {
       reDrawChart();
+      // Listen for theme color changes
+      window.addEventListener('themeColorChanged', handleThemeColorChange);
+    });
+
+    onBeforeUnmount(() => {
+      // Remove event listener to prevent memory leaks
+      window.removeEventListener('themeColorChanged', handleThemeColorChange);
+      // Clear any pending debounce timer
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
     });
 
     onUpdated(() => {
       pageNumberInput.value = searchObj.data.resultGrid.currentPage;
     });
+
+    // Patterns are kept in memory when switching views and only cleared on explicit search
+    // This allows users to toggle between logs/patterns/visualize without losing pattern data
+
     const columnSizes = ref({});
 
     const reDrawChart = () => {
@@ -582,6 +745,102 @@ export default defineComponent({
     const openLogDetails = (props: any, index: number) => {
       searchObj.meta.showDetailTab = true;
       searchObj.meta.resultGrid.navigation.currentRowIndex = index;
+    };
+
+    const openPatternDetails = (pattern: any, index: number) => {
+      selectedPattern.value = { pattern, index };
+      showPatternDetails.value = true;
+    };
+
+    const navigatePatternDetail = (next: boolean, prev: boolean) => {
+      if (!selectedPattern.value) return;
+
+      const currentIndex = (selectedPattern.value as any).index;
+      const totalPatterns = patternsState.value.patterns?.patterns?.length || 0;
+
+      let newIndex = currentIndex;
+      if (next && currentIndex < totalPatterns - 1) {
+        newIndex = currentIndex + 1;
+      } else if (prev && currentIndex > 0) {
+        newIndex = currentIndex - 1;
+      }
+
+      if (newIndex !== currentIndex && patternsState.value.patterns?.patterns) {
+        const newPattern = patternsState.value.patterns.patterns[newIndex];
+        selectedPattern.value = { pattern: newPattern, index: newIndex };
+      }
+    };
+
+    // const sanitizeForMatchAll = (text: string): string => {
+    //   // Remove special characters that Tantivy's match_all doesn't handle well
+    //   // Keep only alphanumeric characters and spaces
+    //   // Replace multiple spaces with single space
+    //   return text
+    //     .replace(/[^\w\s]/g, ' ') // Replace special chars with space
+    //     .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
+    //     .trim();
+    // };
+
+    const extractConstantsFromPattern = (template: string): string[] => {
+      // Extract longest non-variable strings from pattern template
+      // Pattern template has format like: "INFO action <*> at 14:47.1755283"
+      // We want continuous strings between <*> that are longer than 10 chars
+      const constants: string[] = [];
+      const parts = template.split("<*>");
+
+      for (const part of parts) {
+        const trimmed = part.trim();
+        // For now, use the string as-is without sanitization
+        // const sanitized = sanitizeForMatchAll(trimmed);
+        // Only include strings longer than 10 characters
+        if (trimmed.length > 10) {
+          constants.push(trimmed);
+        }
+      }
+
+      return constants;
+    };
+
+    const addPatternToSearch = (
+      pattern: any,
+      action: "include" | "exclude",
+    ) => {
+      // Extract constants from pattern template
+      const constants = extractConstantsFromPattern(pattern.template);
+
+      if (constants.length === 0) {
+        $q.notify({
+          type: "warning",
+          message: "No strings longer than 10 characters found in pattern",
+          timeout: 2000,
+        });
+        return;
+      }
+
+      // Build multiple match_all() clauses, one for each constant
+      // Each match_all takes a single string
+      const matchAllClauses = constants.map((constant) => {
+        // Escape backslashes first, then single quotes in the constant
+        const escapedConstant = constant
+          .replace(/\\/g, "\\\\")
+          .replace(/'/g, "\\'");
+        return `match_all('${escapedConstant}')`;
+      });
+
+      // Combine with AND
+      let filterExpression = matchAllClauses.join(" AND ");
+
+      // For exclude action, wrap the entire expression in NOT (...)
+      if (action === "exclude") {
+        if (matchAllClauses.length > 1) {
+          filterExpression = `NOT (${filterExpression})`;
+        } else {
+          filterExpression = `NOT ${filterExpression}`;
+        }
+      }
+
+      // Set the filter to be added to the query
+      searchObj.data.stream.addToFilter = filterExpression;
     };
 
     const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
@@ -632,7 +891,7 @@ export default defineComponent({
           searchObj.data.stream.selectedFields.filter(
             (v: any) => v !== fieldName,
           );
-      } else {
+      } else if(fieldName !== (store?.state?.zoConfig?.timestamp_column || '_timestamp')) {
         searchObj.data.stream.selectedFields.push(fieldName);
       }
       searchObj.organizationIdentifier =
@@ -742,13 +1001,26 @@ export default defineComponent({
         plotChart.value = {};
         searchObj.meta.resetPlotChart = false;
       }
-    });    
-    
+    });
+
+    // Debug watcher for patterns state
+    watch(
+      () => patternsState.value.patterns,
+      (newPatterns) => {
+        // console.log("[SearchResult] Patterns state changed:", {
+        //   hasPatterns: !!newPatterns,
+        //   patternCount: newPatterns?.patterns?.length || 0,
+        //   statistics: newPatterns?.statistics,
+        // });
+      },
+      { deep: true },
+    );
+
     const selectedStreamFullTextSearchKeys = computed(() => {
       const defaultFTSKeys = store?.state?.zoConfig?.default_fts_keys || [];
-      const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields.filter(
-        (field: string) => field.ftsKey
-      ).map((field: any) => field.name);
+      const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields
+        .filter((field: string) => field.ftsKey)
+        .map((field: any) => field.name);
       //merge default FTS keys with selected stream FTS keys
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
     });
@@ -758,6 +1030,7 @@ export default defineComponent({
       store,
       plotChart,
       searchObj,
+      patternsState,
       updatedLocalLogFilterField,
       byString,
       searchTableRef,
@@ -799,7 +1072,14 @@ export default defineComponent({
       getSocketPaginations,
       resetPlotChart,
       columnSizes,
-      selectedStreamFullTextSearchKeys
+      selectedStreamFullTextSearchKeys,
+      patternsColumns,
+      selectedPattern,
+      showPatternDetails,
+      openPatternDetails,
+      navigatePatternDetail,
+      addPatternToSearch,
+      extractConstantsFromPattern,
     };
   },
   computed: {
@@ -837,254 +1117,5 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.max-result {
-  width: 170px;
-}
-
-.pagination-block {
-  .q-field--dense .q-field__control,
-  .q-field--dense .q-field__marginal {
-    height: 30px !important;
-  }
-
-  .select-pagination {
-    position: relative;
-    top: -5px;
-  }
-}
-
-.search-list {
-  width: 100%;
-
-  .chart {
-    width: 100%;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-  }
-
-  .my-sticky-header-table {
-    .q-table__top,
-    .q-table__bottom,
-    thead tr:first-child th {
-      /* bg color is important for th; just specify one */
-      background-color: white;
-    }
-
-    thead tr th {
-      position: sticky;
-      z-index: 1;
-    }
-
-    thead tr:first-child th {
-      top: 0;
-    }
-
-    /* this is when the loading indicator appears */
-    &.q-table--loading thead tr:last-child th {
-      /* height of all previous header rows */
-      top: 48px;
-    }
-  }
-
-  .q-table__top {
-    padding-left: 0;
-    padding-top: 0;
-  }
-
-  .q-table thead tr,
-  .q-table tbody td,
-  .q-table th,
-  .q-table td {
-    height: 25px;
-    padding: 0px 5px;
-    font-size: 0.75rem;
-  }
-
-  .q-table__bottom {
-    width: 100%;
-  }
-
-  .q-table__bottom {
-    min-height: 40px;
-    padding-top: 0;
-    padding-bottom: 0;
-  }
-
-  .q-td {
-    overflow: hidden;
-    min-width: 100px;
-
-    .expanded {
-      margin: 0;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      word-break: break-all;
-    }
-  }
-
-  .highlight {
-    background-color: rgb(255, 213, 0);
-  }
-
-  .table-header {
-    // text-transform: capitalize;
-
-    .table-head-chip {
-      background-color: #f5f5f5;
-      padding: 0px;
-
-      .header-col-title {
-        margin-right: 0.5rem;
-        font-size: 14px;
-        color: $dark;
-      }
-
-      .close-icon {
-        &:hover {
-          opacity: 0.7;
-        }
-      }
-
-      .q-table th.sortable {
-        cursor: pointer;
-        text-transform: capitalize;
-        font-weight: bold;
-      }
-    }
-
-    &.isClosable {
-      padding-right: 30px;
-      position: relative;
-
-      .q-table-col-close {
-        transform: translateX(26px);
-        position: absolute;
-        margin-top: 2px;
-        color: #808080;
-      }
-    }
-
-    .q-table th.sortable {
-      cursor: pointer;
-      text-transform: capitalize;
-      font-weight: bold;
-    }
-  }
-}
-.thead-sticky tr > *,
-.tfoot-sticky tr > * {
-  position: sticky;
-  opacity: 1;
-  z-index: 1;
-  background: #f5f5f5;
-}
-
-.q-table--dark .thead-sticky tr > *,
-.q-table--dark .tfoot-sticky tr > * {
-  background: #565656;
-}
-
-.q-table--dark .table-header {
-  // text-transform: capitalize;
-
-  .table-head-chip {
-    background-color: #565656;
-  }
-}
-
-.thead-sticky tr:last-child > * {
-  top: 0;
-}
-
-.tfoot-sticky tr:first-child > * {
-  bottom: 0;
-}
-
-.field_list,
-.table-head-chip {
-  padding: 0px;
-  margin-bottom: 0.125rem;
-  position: relative;
-  overflow: visible;
-  cursor: default;
-  font-size: 12px;
-  font-family: monospace;
-
-  .field_overlay {
-    width: fit-content;
-    position: absolute;
-    height: 100%;
-    right: 0;
-    top: 0;
-    background-color: #ffffff;
-    border-radius: 6px;
-    padding: 0 6px;
-    visibility: hidden;
-    display: flex;
-    align-items: center;
-    transition: all 0.3s linear;
-
-    &.field_overlay_dark {
-      background-color: #181a1b;
-    }
-
-    .q-icon,
-    .q-toggle__inner {
-      cursor: pointer;
-      opacity: 0;
-      transition: all 0.3s linear;
-      margin: 0 1px;
-    }
-  }
-
-  &:hover {
-    .field_overlay {
-      visibility: visible;
-
-      .q-icon,
-      .q-toggle__inner {
-        opacity: 1;
-      }
-    }
-  }
-}
-
-.table-head-chip {
-  font-family: "Nunito Sans", sans-serif;
-  .field_overlay {
-    background-color: #f5f5f5;
-
-    &.field_overlay_dark {
-      background-color: #565656;
-    }
-  }
-}
-</style>
-
-<style lang="scss">
-.search-list {
-  .copy-log-btn {
-    .q-icon {
-      font-size: 12px !important;
-    }
-  }
-
-  .view-trace-btn {
-    .q-icon {
-      font-size: 13px !important;
-    }
-  }
-
-  .q-pagination__content input {
-    border: 1px solid lightgrey;
-    top: 7px;
-    position: relative;
-    height: 30px;
-  }
-}
-.histogram-unavailable-text {
-  color: #f5a623;
-}
-.histogram-unavailable-text-light {
-  color: #ff8800;
-}
+@import "@/styles/logs/search-result.scss";
 </style>

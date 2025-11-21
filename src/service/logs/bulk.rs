@@ -245,7 +245,7 @@ pub async fn ingest(
                 }
 
                 if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                    local_val = crate::service::logs::refactor_map(local_val, fields);
+                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
                 }
 
                 // add `_original` and '_record_id` if required by StreamSettings
@@ -445,7 +445,8 @@ pub async fn ingest(
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
                             {
-                                local_val = crate::service::logs::refactor_map(local_val, fields);
+                                local_val =
+                                    crate::service::ingestion::refactor_map(local_val, fields);
                             }
 
                             // add `_original` and '_record_id` if required by StreamSettings

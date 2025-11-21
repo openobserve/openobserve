@@ -22,10 +22,12 @@ log.workspace = true
 datafusion.workspace = true
 once_cell.workspace = true
 parquet.workspace = true
+scc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 snafu.workspace = true
 tokio.workspace = true
+core_affinity = "0.8"
 
 [[bin]]
 name = "wal-reader"

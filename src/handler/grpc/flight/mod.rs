@@ -214,6 +214,7 @@ impl FlightService for FlightServiceImpl {
 
         let mut stream = FlightEncoderStreamBuilder::new(write_options, 33554432)
             .with_trace_id(trace_id.to_string())
+            .with_is_super(is_super_cluster)
             .with_defer(defer)
             .with_start(start)
             .with_custom_message(PreCustomMessage::ScanStats(scan_stats))
@@ -346,7 +347,11 @@ fn clear_session_data(trace_id: &str) {
     // clear session data
     crate::service::search::datafusion::storage::file_list::clear(trace_id);
     // release wal lock files
-    crate::common::infra::wal::release_request(trace_id);
+    let trace_id_owned = trace_id.to_string();
+    let _handle = tokio::spawn(async move {
+        crate::common::infra::wal::release_request(&trace_id_owned).await;
+        log::info!("Cleared session for trace_id: {trace_id_owned}");
+    });
 }
 
 fn super_cluster_enabled() -> bool {

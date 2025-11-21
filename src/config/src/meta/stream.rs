@@ -27,7 +27,7 @@ use crate::{
     meta::self_reporting::usage::Stats,
     utils::{
         hash::{Sum64, gxhash},
-        json::{self, Map, Value},
+        json::{self, Value},
     },
 };
 
@@ -136,6 +136,13 @@ impl StreamType {
         matches!(
             *self,
             StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Metadata
+        )
+    }
+
+    pub fn support_uds(&self) -> bool {
+        matches!(
+            *self,
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces
         )
     }
 
@@ -328,7 +335,7 @@ pub struct FileListDeleted {
     pub flattened: bool,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Serialize, Debug, Default, Clone, PartialEq)]
 pub enum QueryPartitionStrategy {
     #[default]
     FileNum,
@@ -702,6 +709,8 @@ pub struct UpdateStreamSettings {
     pub pattern_associations: UpdateSettingsWrapper<PatternAssociation>,
     #[serde(default)]
     pub enable_distinct_fields: Option<bool>,
+    #[serde(default)]
+    pub enable_log_patterns_extraction: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -832,6 +841,8 @@ pub struct StreamSettings {
     pub index_all_values: bool,
     #[serde(default)]
     pub enable_distinct_fields: bool,
+    #[serde(default)]
+    pub enable_log_patterns_extraction: bool,
 }
 
 impl Default for StreamSettings {
@@ -854,6 +865,7 @@ impl Default for StreamSettings {
             index_original_data: false,
             index_all_values: false,
             enable_distinct_fields: true,
+            enable_log_patterns_extraction: false,
         }
     }
 }
@@ -886,6 +898,10 @@ impl Serialize for StreamSettings {
         state.serialize_field("index_original_data", &self.index_original_data)?;
         state.serialize_field("index_all_values", &self.index_all_values)?;
         state.serialize_field("enable_distinct_fields", &self.enable_distinct_fields)?;
+        state.serialize_field(
+            "enable_log_patterns_extraction",
+            &self.enable_log_patterns_extraction,
+        )?;
 
         if !self.defined_schema_fields.is_empty() {
             let mut fields = self.defined_schema_fields.clone();
@@ -986,16 +1002,16 @@ impl From<&str> for StreamSettings {
             defined_schema_fields = fields;
         }
 
-        let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());
+        let flatten_level = settings.get("flatten_level").and_then(Value::as_i64);
 
         let store_original_data = settings
             .get("store_original_data")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
 
         let approx_partition = settings
             .get("approx_partition")
-            .and_then(|v| v.as_bool())
+            .and_then(Value::as_bool)
             .unwrap_or(
                 get_config()
                     .common
@@ -1013,7 +1029,7 @@ impl From<&str> for StreamSettings {
 
         let index_updated_at = settings
             .get("index_updated_at")
-            .and_then(|v| v.as_i64())
+            .and_then(Value::as_i64)
             .unwrap_or_default();
 
         let mut extended_retention_days = vec![];
@@ -1024,26 +1040,30 @@ impl From<&str> for StreamSettings {
             for item in values {
                 let start = item
                     .get("start")
-                    .and_then(|v| v.as_i64())
+                    .and_then(Value::as_i64)
                     .unwrap_or_default();
-                let end = item.get("end").and_then(|v| v.as_i64()).unwrap_or_default();
+                let end = item.get("end").and_then(Value::as_i64).unwrap_or_default();
                 extended_retention_days.push(TimeRange::new(start, end));
             }
         }
 
         let index_original_data = settings
             .get("index_original_data")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
 
         let index_all_values = settings
             .get("index_all_values")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
         let enable_distinct_fields = settings
             .get("enable_distinct_fields")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(true);
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
+        let enable_log_patterns_extraction = settings
+            .get("enable_log_patterns_extraction")
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
         Self {
             partition_time_level,
             partition_keys,
@@ -1062,6 +1082,7 @@ impl From<&str> for StreamSettings {
             index_original_data,
             index_all_values,
             enable_distinct_fields,
+            enable_log_patterns_extraction,
         }
     }
 }
@@ -1151,127 +1172,6 @@ impl Display for StreamPartitionType {
 pub struct PartitioningDetails {
     pub partition_keys: Vec<StreamPartition>,
     pub partition_time_level: Option<PartitionTimeLevel>,
-}
-
-// Code Duplicated from alerts
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct RoutingCondition {
-    pub column: String,
-    pub operator: Operator,
-    #[schema(value_type = Object)]
-    pub value: Value,
-    #[serde(default)]
-    pub ignore_case: bool,
-}
-// Code Duplicated from alerts
-impl RoutingCondition {
-    pub fn evaluate(&self, row: &Map<String, Value>) -> bool {
-        let val = match row.get(&self.column) {
-            Some(val) => val,
-            None => {
-                // field not found -> dropped
-                return false;
-            }
-        };
-        match val {
-            Value::String(v) => {
-                let val = v.as_str();
-                let con_val = self.value.as_str().unwrap_or_default().trim_matches('"'); // "" is interpreted as empty string
-                match self.operator {
-                    Operator::EqualTo => val == con_val,
-                    Operator::NotEqualTo => val != con_val,
-                    Operator::GreaterThan => val > con_val,
-                    Operator::GreaterThanEquals => val >= con_val,
-                    Operator::LessThan => val < con_val,
-                    Operator::LessThanEquals => val <= con_val,
-                    Operator::Contains => val.contains(con_val),
-                    Operator::NotContains => !val.contains(con_val),
-                }
-            }
-            Value::Number(_) => {
-                let val = val.as_f64().unwrap_or_default();
-                let con_val = if self.value.is_number() {
-                    self.value.as_f64().unwrap_or_default()
-                } else {
-                    self.value
-                        .as_str()
-                        .unwrap_or_default()
-                        .parse()
-                        .unwrap_or_default()
-                };
-                match self.operator {
-                    Operator::EqualTo => val == con_val,
-                    Operator::NotEqualTo => val != con_val,
-                    Operator::GreaterThan => val > con_val,
-                    Operator::GreaterThanEquals => val >= con_val,
-                    Operator::LessThan => val < con_val,
-                    Operator::LessThanEquals => val <= con_val,
-                    _ => false,
-                }
-            }
-            Value::Bool(v) => {
-                let val = v.to_owned();
-                let con_val = if self.value.is_boolean() {
-                    self.value.as_bool().unwrap_or_default()
-                } else {
-                    self.value
-                        .as_str()
-                        .unwrap_or_default()
-                        .parse()
-                        .unwrap_or_default()
-                };
-                match self.operator {
-                    Operator::EqualTo => val == con_val,
-                    Operator::NotEqualTo => val != con_val,
-                    _ => false,
-                }
-            }
-            Value::Null => {
-                matches!(self.operator, Operator::EqualTo)
-                    && matches!(&self.value, Value::String(v) if v == "null")
-            }
-            _ => false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub enum Operator {
-    #[serde(rename = "=")]
-    EqualTo,
-    #[serde(rename = "!=")]
-    NotEqualTo,
-    #[serde(rename = ">")]
-    GreaterThan,
-    #[serde(rename = ">=")]
-    GreaterThanEquals,
-    #[serde(rename = "<")]
-    LessThan,
-    #[serde(rename = "<=")]
-    LessThanEquals,
-    Contains,
-    NotContains,
-}
-
-impl Default for Operator {
-    fn default() -> Self {
-        Self::EqualTo
-    }
-}
-
-impl std::fmt::Display for Operator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Operator::EqualTo => write!(f, "="),
-            Operator::NotEqualTo => write!(f, "!="),
-            Operator::GreaterThan => write!(f, ">"),
-            Operator::GreaterThanEquals => write!(f, ">="),
-            Operator::LessThan => write!(f, "<"),
-            Operator::LessThanEquals => write!(f, "<="),
-            Operator::Contains => write!(f, "contains"),
-            Operator::NotContains => write!(f, "not contains"),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

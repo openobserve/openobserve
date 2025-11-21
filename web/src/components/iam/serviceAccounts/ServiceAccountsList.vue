@@ -19,176 +19,182 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 <template>
-  <q-page class="q-pa-none "  :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'" style="min-height: inherit">
-    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-full-width tw-h-[71px] tw-border-b-[1px]"
-    :class="store.state.theme =='dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
-    >
+  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+    <div>
+      <div class="card-container tw-mb-[0.625rem]">
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-full-width tw-h-[68px] tw-border-b-[1px]"
+      >
 
-      <div
-          class="q-table__title full-width tw-font-[600]"
-          data-test="service-accounts-title-text"
-        >
-          {{ t("serviceAccounts.header") }}
-        </div>
-        <div class="full-width tw-flex tw-justify-end">
-          <q-input
-              v-model="filterQuery"
-              borderless
-              dense
-              class="q-ml-auto no-border o2-search-input tw-h-[36px]"
-              :placeholder="t('serviceAccounts.search')"
-              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
-            >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
-              </template>
-            </q-input>
-            <q-btn
-              class="q-ml-md o2-primary-button tw-h-[36px]"
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              no-caps
-              :label="t(`serviceAccounts.add`)"
-              @click="addRoutePush({})"
-            />
-        </div>
-    </div>
-    <q-table
-      ref="qTable"
-      class="o2-quasar-table o2-quasar-table-header-sticky"
-      :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
-      :rows="visibleRows"
-      :columns="columns"
-      row-key="id"
-      :pagination="pagination"
-      :filter="filterQuery"
-      :style="hasVisibleRows ? 'height: calc(100vh - 114px); overflow-y: auto;' : ''"
-    >
-      <template #no-data>
-        <NoData></NoData>
-      </template>
-
-      <template #body-cell-token="props">
-      <q-td :props="props" side >
-        <div class="tw-flex tw-items-center" v-if="props.row.isLoading">
-          <q-spinner-dots color="primary"  />
-        </div>
-        <!-- Display the token or masked text based on visibility -->
-      <div v-else  class="tw-flex tw-items-center">
-        <span 
-          style="
-          display: inline-block;
-          width: 150px; /* Set a fixed width */
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          text-align: center;
-        "
+        <div
+            class="q-table__title full-width tw-font-[600]"
+            data-test="service-accounts-title-text"
           >
-          {{ getDisplayToken(props.row) }}
-          </span>
-
-          <!-- Button to fetch or toggle token visibility -->
-          <q-btn
-            :icon="props.row.isTokenVisible ? 'visibility_off' : 'visibility'"
-            :title="props.row.isTokenVisible ? t('serviceAccounts.hideToken') : t('serviceAccounts.showToken')"
-            unelevated
-            size="sm"
-            round
-            flat
-            style="cursor: pointer !important; "
-            @click="getServiceToken(props.row)"
-          />
-          <q-btn
-            @click.stop="copyToClipboard(props.row.token)"
-            size="sm"
-            dense
-            flat
-            :title="t('serviceAccounts.copyToken')"
-            icon="content_copy"
-            :disable="!props.row.token"
-            :class="{ 'disabled-opacity': !props.row.token }"
-            class="copy-btn-sql"
-          />
-        </div>
-      </q-td>
-    </template>
-
-      <template #body-cell-actions="props">
-        <q-td :props="props" side>
-          <q-btn
-          data-test="service-accounts-refresh"
-          icon="refresh"
-          :title="t('serviceAccounts.refresh')"
-          class="q-ml-xs"
-          padding="sm"
-          unelevated
-          size="sm"
-          round
-          flat
-          style="cursor: pointer !important"
-          @click="confirmRefreshAction(props.row)"
-          />
-          <q-btn
-            data-test="service-accounts-edit"
-            icon="edit"
-            :title="t('serviceAccounts.update')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="addRoutePush(props)"
-            style="cursor: pointer !important"
-          />
-          <q-btn
-            data-test="service-accounts-delete"
-            :icon="outlinedDelete"
-            :title="t('serviceAccounts.delete')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            style="cursor: pointer !important"
-            @click="confirmDeleteAction(props)"
-          />
-
-        </q-td>
-      </template>
-      <template #bottom="scope">
-        <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-          <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
-            {{ resultTotal }} {{ t('serviceAccounts.header') }}
+            {{ t("serviceAccounts.header") }}
           </div>
-          <QTablePagination
-            :scope="scope"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            position="bottom"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </div>
-      </template>
-
-      <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Rendering the rest of the columns -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
+          <div class="full-width tw-flex tw-justify-end">
+            <q-input
+                v-model="filterQuery"
+                borderless
+                dense
+                class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+                :placeholder="t('serviceAccounts.search')"
               >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
-    </q-table>
+                <template #prepend>
+                  <q-icon class="o2-search-input-icon" name="search" />
+                </template>
+              </q-input>
+              <q-btn
+                class="q-ml-sm o2-primary-button tw-h-[36px]"
+                flat
+                no-caps
+                :label="t(`serviceAccounts.add`)"
+                @click="addRoutePush({})"
+              />
+          </div>
+      </div>
+      </div>
+      <div class="tw-w-full tw-h-full">
+        <div class="card-container tw-h-[calc(100vh-127px)]">
+          <q-table
+            ref="qTable"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+            :rows="visibleRows"
+            :columns="columns"
+            row-key="id"
+            :pagination="pagination"
+            :filter="filterQuery"
+            :style="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
+          >
+            <template #no-data>
+              <NoData></NoData>
+            </template>
 
+            <template #body-cell-token="props">
+            <q-td :props="props" side >
+              <div class="tw-flex tw-items-center" v-if="props.row.isLoading">
+                <q-spinner-dots color="primary"  />
+              </div>
+              <!-- Display the token or masked text based on visibility -->
+            <div v-else  class="tw-flex tw-items-center">
+              <span 
+                style="
+                display: inline-block;
+                width: 150px; /* Set a fixed width */
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                text-align: center;
+              "
+                >
+                {{ getDisplayToken(props.row) }}
+                </span>
+
+                <!-- Button to fetch or toggle token visibility -->
+                <q-btn
+                  :icon="props.row.isTokenVisible ? 'visibility_off' : 'visibility'"
+                  :title="props.row.isTokenVisible ? t('serviceAccounts.hideToken') : t('serviceAccounts.showToken')"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  style="cursor: pointer !important; "
+                  @click="getServiceToken(props.row)"
+                />
+                <q-btn
+                  @click.stop="copyToClipboard(props.row.token)"
+                  size="sm"
+                  dense
+                  flat
+                  :title="t('serviceAccounts.copyToken')"
+                  icon="content_copy"
+                  :disable="!props.row.token"
+                  :class="{ 'disabled-opacity': !props.row.token }"
+                  class="copy-btn-sql"
+                />
+              </div>
+            </q-td>
+          </template>
+
+            <template #body-cell-actions="props">
+              <q-td :props="props" side>
+                <q-btn
+                  data-test="service-accounts-refresh"
+                  :title="t('serviceAccounts.refresh')"
+                  icon="refresh"
+                  class="q-ml-xs"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  style="cursor: pointer !important"
+                  @click="confirmRefreshAction(props.row)"
+                >
+                </q-btn>
+                <q-btn
+                  data-test="service-accounts-edit"
+                  :title="t('serviceAccounts.update')"
+                  icon="edit"
+                  class="q-ml-xs"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  @click="addRoutePush(props)"
+                  style="cursor: pointer !important"
+                >
+                </q-btn>
+                <q-btn
+                  data-test="service-accounts-delete"
+                  :title="t('serviceAccounts.delete')"
+                  class="q-ml-xs"
+                  :icon="outlinedDelete"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  style="cursor: pointer !important"
+                  @click="confirmDeleteAction(props)"
+                >
+                </q-btn>
+
+              </q-td>
+            </template>
+            <template #bottom="scope">
+              <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+                  {{ resultTotal }} {{ t('serviceAccounts.header') }}
+                </div>
+                <QTablePagination
+                  :scope="scope"
+                  :resultTotal="resultTotal"
+                  :perPageOptions="perPageOptions"
+                  position="bottom"
+                  @update:changeRecordPerPage="changePagination"
+                />
+              </div>
+            </template>
+
+            <template v-slot:header="props">
+                  <q-tr :props="props">
+                    <!-- Rendering the rest of the columns -->
+                    <q-th
+                      v-for="col in props.cols"
+                      :key="col.name"
+                      :props="props"
+                      :class="col.classes"
+                      :style="col.style"
+                    >
+                      {{ col.label }}
+                    </q-th>
+                  </q-tr>
+                </template>
+          </q-table>
+      </div>
+      </div>
+  </div>
     <q-dialog
       v-model="showAddUserDialog"
       position="right"
@@ -261,10 +267,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-dialog>
 
     <q-dialog v-model="isShowToken"  persistent>
-  <q-card  style="width: 40vw; max-height: 90vh; overflow-y: auto;">
+  <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
     <q-card-section  class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center" >
       <div>Service Account Token </div>
-          <q-btn   dense flat icon="close" size="md" @click="isShowToken = false" style="cursor: pointer" />
+          <q-btn data-test="sa-cancel-button" dense flat icon="cancel" size="md" @click="isShowToken = false" style="cursor: pointer" />
     </q-card-section>
 
     <q-card-section>
@@ -272,8 +278,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-flex tw-items-center tw-gap-2" style="padding: 0rem 1rem;  border-radius: 8px;">
   <!-- Token section taking 75% of the width -->
   <div
-    class="text-h6 text-center tw-truncate"
-    style="flex: 3;  padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
+    class="text-h6 text-center tw-truncate el-border"
+    style="flex: 3;  padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
   >
     {{  serviceToken }}
   </div>
@@ -283,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.stop="copyToClipboard(serviceToken)"
       size="lg"
       dense
-      flat
+      outline
       :title="t('serviceAccounts.copyToken')"
       icon="content_copy"
       class="q-mr-xs"
@@ -292,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.stop="downloadTokenAsFile(serviceToken)"
       size="lg"
       dense
-      flat
+      outline
       :title="t('serviceAccounts.downloadToken')"
       icon="file_download"
     />
@@ -314,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, onMounted } from "vue";
+import { defineComponent, ref, onActivated, onBeforeMount, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -341,7 +347,7 @@ import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { QTablePagination,  NoData,AddServiceAccount},
+  components: { QTablePagination,  NoData,AddServiceAccount, },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
@@ -400,7 +406,7 @@ export default defineComponent({
       {
         name: "token",
         field: "token",
-        label: "token",
+        label: t("serviceAccounts.token"),
         align: "left",
         sortable: false,
         style: "width: 230px;", //because token might take more space for displaying the token , eye button and copy button
@@ -738,7 +744,12 @@ export default defineComponent({
       if (!filterQuery.value) return serviceAccountsState.service_accounts_users || []
       return filterData(serviceAccountsState.service_accounts_users || [], filterQuery.value)
     });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+    // Watch visibleRows to sync resultTotal with search filter
+    watch(visibleRows, (newVisibleRows) => {
+      resultTotal.value = newVisibleRows.length;
+    }, { immediate: true });
 
     return {
       $q,
@@ -805,7 +816,7 @@ export default defineComponent({
   opacity: 0.1 !important;
 }
 .warning-text {
-  color: #F5A623;
+  color: #ec960c;
 }
 
 

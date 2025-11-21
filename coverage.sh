@@ -30,10 +30,12 @@ _cov_test() {
     cargo llvm-cov nextest \
         --workspace \
         --verbose \
+        --no-cfg-coverage \
+        --no-cfg-coverage-nightly \
         --ignore-filename-regex 'job|.*generated.*' \
         --test-threads=1 \
         --no-fail-fast \
-        --retries 3 \
+        --retries 1 \
         "$@"
 }
 

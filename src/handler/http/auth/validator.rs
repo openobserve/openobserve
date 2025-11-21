@@ -17,7 +17,7 @@ use core::clone::Clone;
 use std::net::IpAddr;
 
 use actix_web::{
-    Error,
+    Error, HttpResponse,
     dev::ServiceRequest,
     error::{ErrorForbidden, ErrorNotFound, ErrorUnauthorized},
     http::{Method, header},
@@ -672,13 +672,13 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    if auth_info.auth.starts_with("Basic") {
-        let decoded = match base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim()) {
+    if let Some(info) = auth_info.auth.strip_prefix("Basic ").map(str::trim) {
+        let decoded = match base64::decode(info) {
             Ok(val) => val,
             Err(_) => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
         };
 
-        let (username, password) = match get_user_details(decoded) {
+        let (username, password) = match get_user_details(&decoded) {
             Some(value) => value,
             None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
         };
@@ -686,11 +686,10 @@ async fn oo_validator_internal(
     } else if auth_info.auth.starts_with("Bearer") {
         log::debug!("Bearer token found");
         super::token::token_validator(req, auth_info).await
-    } else if auth_info.auth.starts_with("{\"auth_ext\":") {
+    } else if let Ok(auth_tokens) = config::utils::json::from_str::<AuthTokensExt>(&auth_info.auth)
+    {
         log::debug!("Auth ext token found");
-        let auth_tokens: AuthTokensExt =
-            config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
-        if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
+        if auth_tokens.has_expired() {
             Err((ErrorUnauthorized("Unauthorized Access"), req))
         } else {
             log::debug!("Auth ext token found: decoding");
@@ -704,7 +703,7 @@ async fn oo_validator_internal(
                 Ok(val) => val,
                 Err(_) => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
             };
-            let (username, password) = match get_user_details(decoded) {
+            let (username, password) = match get_user_details(&decoded) {
                 Some(value) => value,
                 None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
             };
@@ -712,7 +711,8 @@ async fn oo_validator_internal(
             validator(req, &username, &password, auth_info, path_prefix).await
         }
     } else {
-        Err((ErrorUnauthorized("Unauthorized Access"), req))
+        // Missing or unrecognized auth - return WWW-Authenticate header
+        Err((create_unauthorized_response("Unauthorized Access"), req))
     }
 }
 
@@ -756,19 +756,40 @@ pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
     }
 }
 
-fn get_user_details(decoded: String) -> Option<(String, String)> {
-    let credentials = match String::from_utf8(decoded.into()).map_err(|_| ()) {
-        Ok(val) => val,
-        Err(_) => return None,
+fn get_user_details(decoded: impl AsRef<[u8]>) -> Option<(String, String)> {
+    let credentials = str::from_utf8(decoded.as_ref()).ok()?;
+    credentials
+        .split_once(':')
+        .map(|(u, p)| (u.to_string(), p.to_string()))
+}
+
+/// Creates an Unauthorized error response with WWW-Authenticate header
+fn create_unauthorized_response(message: &str) -> Error {
+    #[cfg(feature = "enterprise")]
+    let auth_server_uri = {
+        let dex_config = get_dex_config();
+        if dex_config.dex_enabled {
+            dex_config.dex_url.clone()
+        } else {
+            String::new()
+        }
     };
-    let parts: Vec<&str> = credentials.splitn(2, ':').collect();
-    if parts.len() != 2 {
-        return None;
-    }
-    let (username, password) = (parts[0], parts[1]);
-    let username = username.to_owned();
-    let password = password.to_owned();
-    Some((username, password))
+    #[cfg(not(feature = "enterprise"))]
+    let auth_server_uri = String::new();
+
+    let www_authenticate = if !auth_server_uri.is_empty() {
+        format!(r#"Bearer as_uri="{auth_server_uri}""#)
+    } else {
+        r#"Bearer realm="openobserve""#.to_string()
+    };
+
+    actix_web::error::InternalError::from_response(
+        message.to_string(),
+        HttpResponse::Unauthorized()
+            .insert_header(("WWW-Authenticate", www_authenticate))
+            .finish(),
+    )
+    .into()
 }
 
 /// Validates the authentication information in the incoming request and returns the request if

@@ -17,7 +17,7 @@ use std::io::{Error, ErrorKind};
 
 use base64::Engine;
 
-pub fn decode(s: &str) -> Result<String, Error> {
+pub fn decode(s: impl AsRef<[u8]>) -> Result<String, Error> {
     match String::from_utf8(decode_raw(s)?) {
         Ok(v) => Ok(v),
         Err(e) => Err(Error::new(
@@ -27,9 +27,9 @@ pub fn decode(s: &str) -> Result<String, Error> {
     }
 }
 
-pub fn decode_raw(s: &str) -> Result<Vec<u8>, Error> {
+pub fn decode_raw(s: impl AsRef<[u8]>) -> Result<Vec<u8>, Error> {
     base64::engine::general_purpose::STANDARD
-        .decode(s.as_bytes())
+        .decode(s.as_ref())
         .map_err(|e| Error::new(ErrorKind::InvalidData, format!("base64 decode error: {e}")))
 }
 

@@ -13,60 +13,80 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
+use config::meta::promql::value::{
+    EvalContext, ExtrapolationKind, Sample, Value, extrapolated_rate,
+};
 use datafusion::error::Result;
 
-use crate::service::promql::value::{ExtrapolationKind, RangeValue, Value, extrapolated_rate};
+use crate::service::promql::functions::RangeFunc;
 
-pub(crate) fn increase(data: Value) -> Result<Value> {
-    super::eval_idelta(data, "increase", exec, false)
+pub(crate) fn increase(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    super::eval_range(data, IncreaseFunc::new(), eval_ctx)
 }
 
-fn exec(series: RangeValue) -> Option<f64> {
-    let tw = series
-        .time_window
-        .as_ref()
-        .expect("BUG: `increase` function requires time window");
-    extrapolated_rate(
-        &series.samples,
-        tw.eval_ts,
-        tw.range,
-        tw.offset,
-        ExtrapolationKind::Increase,
-    )
+pub struct IncreaseFunc;
+
+impl IncreaseFunc {
+    pub fn new() -> Self {
+        IncreaseFunc {}
+    }
+}
+
+impl RangeFunc for IncreaseFunc {
+    fn name(&self) -> &'static str {
+        "increase"
+    }
+
+    fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64> {
+        extrapolated_rate(
+            samples,
+            eval_ts,
+            *range,
+            Duration::ZERO,
+            ExtrapolationKind::Increase,
+        )
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
 
+    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+
     use super::*;
-    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+    // Test helper
+    fn increase_test_helper(data: Value) -> Result<Value> {
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
+        increase(data, &eval_ctx)
+    }
 
     #[test]
     fn test_increase_function() {
         // Create a range value with increasing counter values
-        let samples = vec![crate::service::promql::value::Sample::new(1000, 10.0)];
+        let samples = vec![Sample::new(1000, 10.0)];
 
         let range_value = RangeValue {
             labels: Labels::default(),
             samples,
             exemplars: None,
             time_window: Some(TimeWindow {
-                eval_ts: 3000,
                 range: Duration::from_secs(2),
                 offset: Duration::ZERO,
             }),
         };
 
         let matrix = Value::Matrix(vec![range_value]);
-        let result = increase(matrix).unwrap();
+        let result = increase_test_helper(matrix).unwrap();
 
-        // Should return a vector with increase value
+        // Should return a matrix with increase value
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 0);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 0);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }

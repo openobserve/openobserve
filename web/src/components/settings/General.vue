@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div :class="store.state.theme == 'dark' ? 'dark-settings-theme' : 'light-settings-theme'">
+  <div>
     <div class="q-px-md q-py-md">
       <div class="general-page-title">
         {{ t("settings.generalPageTitle") }}
@@ -39,16 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model.number="scrapeIntereval"
               type="number"
               min="0"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop o2-numeric-input q-ml-sm"
-              :class="store.state.theme == 'dark' ? 'o2-numeric-input-dark' : 'o2-numeric-input-light' "
+              class="showLabelOnTop q-ml-sm"
               stack-label
-              outlined
-              filled
               dense
-              data-test="general-settings-scrape-interval"
+              borderless
               hide-bottom-space
+              data-test="general-settings-scrape-interval"
               :rules="[(val: any) => !!val || 'Scrape interval is required']"
               :lazy-rules="true"
               style="width: 120px;"
@@ -57,58 +53,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               The scrape interval is the frequency, in seconds, at which the monitoring system collects metrics.
             </span>
           </div>
-          <!-- enable web socket search section -->
-          <div v-if="store.state.zoConfig.websocket_enabled" class="settings-grid-item">
+
+          <!-- Manage Theme section -->
+          <div class="settings-grid-item tw-items-start">
             <span class="individual-setting-title">
-              {{ t('settings.enableWebsocketSearch') }}
+              Manage Theme
             </span>
-            <q-toggle
-              style="width: 120px;"
-              v-model="enableWebsocketSearch"
-              :label="'Enabled'"
-              size="lg"
-              data-test="general-settings-enable-websocket"
-              class=" showLabelOnTop o2-toggle-button-lg"
-              :class="store.state.theme == 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-            />
-            <span class="individual-setting-description">
-              Websockets Search uses sockets logic to improve performance.
-            </span>
-          </div>
-          <!-- enable search streaming section -->
-          <div v-if="store.state.zoConfig.streaming_enabled" class="settings-grid-item">
-            <span class="individual-setting-title">
-              {{ t('settings.enableStreamingSearch') }}
-            </span>
-            <q-toggle
-              style="width: 120px;"
-              v-model="enableStreamingSearch"
-              :label="'Enabled'"
-              size="lg"
-              data-test="general-settings-enable-streaming"
-              class="showLabelOnTop o2-toggle-button-lg"
-              :class="store.state.theme == 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-            />
-            <span class="individual-setting-description">
-              Enabling search streaming will increase performance.
-            </span>
-          </div>
-          <!-- enable aggregation cache section -->
-          <div v-if="config.isEnterprise == 'true'" class="settings-grid-item no-border-bottom">
-            <span class="individual-setting-title">
-              {{ t('settings.enableStreamingAggregation') }}
-            </span>
-            <q-toggle
-              style="width: 120px;"
-              v-model="enableStreamingAggregation"
-              :label="'Enabled'"
-              size="lg"
-              data-test="general-settings-enable-streaming-aggregation"
-              class="showLabelOnTop o2-toggle-button-lg"
-              :class="store.state.theme == 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-            />
-            <span class="individual-setting-description">
-              Enabling streaming aggregates will help improve the performance of aggregate queries.
+            <div class="tw-flex tw-gap-2 tw-items-center" style="margin-left: -60px;">
+              <!-- Light Mode Theme -->
+              <div
+                class="theme-color-chip"
+                @click="handleThemeChipClick('light')"
+                data-test="theme-light-chip"
+              >
+                <div class="color-circle" :style="{ backgroundColor: customLightColor }">
+                  <q-icon name="palette" size="14px" color="white" class="palette-icon" />
+                </div>
+                <span class="chip-label">Light</span>
+                <span class="chip-value">{{ customLightColor }}</span>
+              </div>
+
+              <!-- Dark Mode Theme -->
+              <div
+                class="theme-color-chip"
+                @click="handleThemeChipClick('dark')"
+                data-test="theme-dark-chip"
+              >
+                <div class="color-circle" :style="{ backgroundColor: customDarkColor }">
+                  <q-icon name="palette" size="14px" color="white" class="palette-icon" />
+                </div>
+                <span class="chip-label">Dark</span>
+                <span class="chip-value">{{ customDarkColor }}</span>
+              </div>
+
+              <!-- Reset Button -->
+              <div
+                class="theme-reset-chip"
+                @click="resetThemeColors"
+                data-test="reset-theme-colors-btn"
+              >
+                <q-icon name="refresh" size="16px" />
+                <q-tooltip>Reset to default colors</q-tooltip>
+              </div>
+            </div>
+            <span class="individual-setting-description tw-self-start">
+              Manage your organization's theme colors for both light and dark modes. These colors will be applied at the organization level.
             </span>
           </div>
           <span>&nbsp;</span>
@@ -119,7 +108,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="onSubmit.isLoading.value"
               :label="t('dashboard.save')"
               class="q-mb-md o2-primary-button no-border tw-h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               type="submit"
               no-caps
               size="md"
@@ -146,27 +134,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div v-if="editingText || store.state.zoConfig.custom_logo_text == ''" class="tw-flex tw-gap-3 tw-items-center">
             <q-input
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop o2-text-input tw-w-[250px] tw-mr-sm"
+              class="showLabelOnTop tw-w-[250px] tw-mr-sm"
               stack-label
-              outlined
-              filled
+              borderless
               dense
               data-test="settings_ent_logo_custom_text"
-              :class="store.state.theme == 'dark' ? 'o2-text-input-dark' : 'o2-text-input-light'"
               v-model="customText"
             />
             <div class="btn-group tw-flex tw-h-[28px]">
               <q-btn
                 type="button"
                 class="q-mr-sm"
-                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 no-caps
                 color="red"
                 icon="close"
                 dense
-                flat
                 size="sm"
                 @click="editingText = !editingText"
               ></q-btn>
@@ -177,8 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mr-sm "
                 dense
                 size="sm"
-                flat
-                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 color="primary"
                 type="submit"
                 no-caps
@@ -206,9 +186,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Custom logo text is used to change the default branding text displayed in the application.
           </span>
         </div>
+        <!-- Light Mode Logo -->
         <div class="settings-grid-item q-ml-xs">
-          <div class="q-pt-sm individual-setting-title  full-width tw-mb-5">
-            {{ t("settings.customLogoTitle") }}
+          <div class="q-pt-sm individual-setting-title full-width tw-mb-5">
+            {{ t("settings.customLogoTitle") }} (Light Mode)
           </div>
           <div
             v-if="
@@ -229,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               icon="delete"
               data-test="setting_ent_custom_logo_img_delete_btn"
-              @click="confirmDeleteLogo()"
+              @click="confirmDeleteLogo('light')"
               class="q-mx-md"
               size="sm"
             ></q-btn>
@@ -237,17 +218,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="tw-flex tw-items-center tw-gap-3">
             <q-file
             data-test="setting_ent_custom_logo_img_file_upload"
-            v-model="files"
+            v-model="filesLight"
             :label="'Drag & drop or click to upload'"
-            filled
             counter
             :counter-label="counterLabelFn"
             max-file-size="20481"
             accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
             @rejected="onRejected"
             dense
+            borderless
             class="q-mx-none o2-file-input tw-w-[250px] "
-            :class="store.state.theme == 'dark' ? 'o2-text-input-dark' : 'o2-text-input-light'"
           >
             <template v-slot:prepend>
               <q-icon name="attach_file" />
@@ -257,34 +237,109 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 type="button"
                 class="q-mr-sm"
-                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 no-caps
                 color="red"
                 icon="close"
                 dense
-                flat
                 size="sm"
-                @click="files = null"
+                @click="filesLight = null"
               ></q-btn>
               <q-btn
-                data-test="settings_ent_logo_custom_text_save_btn"
+                data-test="settings_ent_logo_custom_light_save_btn"
                 :loading="onSubmit.isLoading.value"
                 icon="check"
                 class="q-mr-sm "
                 dense
                 size="sm"
-                flat
-                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 color="primary"
                 type="submit"
                 no-caps
-                @click="uploadImage(files)"
+                @click="uploadImage(filesLight, 'light')"
               />
             </div>
           </div>
           <div class="tw-flex tw-flex-col tw-mb-5">
             <span class="individual-setting-description">
-              Custom logo is used to change the default branding logo displayed in the application.
+              Custom logo for light mode theme. This will be displayed when users are in light mode.
+            </span>
+          </div>
+        </div>
+
+        <!-- Dark Mode Logo -->
+        <div class="settings-grid-item q-ml-xs">
+          <div class="q-pt-sm individual-setting-title full-width tw-mb-5">
+            {{ t("settings.customLogoTitle") }} (Dark Mode)
+          </div>
+          <div
+            v-if="
+              store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
+              store.state.zoConfig.custom_logo_dark_img != null
+            "
+            class="full-width"
+          >
+            <q-img
+              data-test="setting_ent_custom_logo_dark_img"
+              :src="
+                `data:image; base64, ` + store.state.zoConfig.custom_logo_dark_img
+              "
+              :alt="t('settings.logoLabel')"
+              style="max-width: 150px; max-height: 31px"
+              class="q-mx-md"
+            />
+            <q-btn
+              icon="delete"
+              data-test="setting_ent_custom_logo_dark_img_delete_btn"
+              @click="confirmDeleteLogo('dark')"
+              class="q-mx-md"
+              size="sm"
+            ></q-btn>
+          </div>
+          <div v-else class="tw-flex tw-items-center tw-gap-3">
+            <q-file
+            data-test="setting_ent_custom_logo_dark_img_file_upload"
+            v-model="filesDark"
+            :label="'Drag & drop or click to upload'"
+            counter
+            :counter-label="counterLabelFn"
+            max-file-size="20481"
+            accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
+            @rejected="onRejected"
+            dense
+            borderless
+            class="q-mx-none o2-file-input tw-w-[250px] "
+          >
+            <template v-slot:prepend>
+              <q-icon name="attach_file" />
+            </template>
+          </q-file>
+          <div class="btn-group tw-flex tw-h-[28px] tw-mb-5">
+              <q-btn
+                type="button"
+                class="q-mr-sm"
+                no-caps
+                color="red"
+                icon="close"
+                dense
+                size="sm"
+                @click="filesDark = null"
+              ></q-btn>
+              <q-btn
+                data-test="settings_ent_logo_custom_dark_save_btn"
+                :loading="onSubmit.isLoading.value"
+                icon="check"
+                class="q-mr-sm "
+                dense
+                size="sm"
+                color="primary"
+                type="submit"
+                no-caps
+                @click="uploadImage(filesDark, 'dark')"
+              />
+            </div>
+          </div>
+          <div class="tw-flex tw-flex-col tw-mb-5">
+            <span class="individual-setting-description">
+              Custom logo for dark mode theme. This will be displayed when users are in dark mode.
             </span>
           </div>
         </div>
@@ -310,14 +365,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button tw-h-[28px] no-border"
           flat
           no-caps
-          :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelConfirmDialog"
         />
         <q-btn
           data-test="logs-search-bar-confirm-dialog-ok-btn"
           :label="t('confirmDialog.ok')"
           class="o2-primary-button tw-h-[28px] no-border"
-          :class="store.state.theme == 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           no-caps
           flat
           @click="confirmDialogOK"
@@ -325,11 +378,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-actions>
     </q-card>
   </q-dialog>
+
+  <!-- Color Picker Dialog -->
+  <q-dialog v-model="showColorPicker" @hide="onColorPickerClose">
+    <q-card style="min-width: 300px">
+      <q-card-section>
+        <div class="text-h6">Pick Custom Color</div>
+      </q-card-section>
+      <q-card-section>
+        <q-color
+          v-model="tempColor"
+          @update:model-value="updateCustomColor"
+        />
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat label="Close" color="primary" v-close-popup />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, onActivated, ref, watch } from "vue";
+import { defineComponent, onActivated, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -342,6 +413,7 @@ import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
+import { applyThemeColors } from "@/utils/theme";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -351,9 +423,10 @@ export default defineComponent({
     },
     confirmDialogOK() {
       this.confirmDeleteImage = false;
-      this.deleteLogo();
+      this.deleteLogo(this.logoThemeToDelete);
     },
-    confirmDeleteLogo() {
+    confirmDeleteLogo(theme: string) {
+      this.logoThemeToDelete = theme;
       this.confirmDeleteImage = true;
     },
   },
@@ -370,56 +443,103 @@ export default defineComponent({
         15,
     );
 
-    const enableWebsocketSearch = ref(
-      store.state?.organizationData?.organizationSettings
-        ?.enable_websocket_search ?? false,
-    );
-
-    const enableStreamingSearch = ref(
-      store.state?.organizationData?.organizationSettings
-        ?.enable_streaming_search ?? false,
-    );
-
-    const enableStreamingAggregation = ref(
-      store.state?.organizationData?.organizationSettings
-        ?.streaming_aggregation_enabled ?? false,
-    );
-
     const loadingState = ref(false);
     const customText = ref("");
     const editingText = ref(false);
     const files = ref(null);
+    const filesLight = ref(null);
+    const filesDark = ref(null);
+    const logoThemeToDelete = ref<string>('light');
 
     customText.value = store.state.zoConfig.custom_logo_text;
 
+    // Theme management state
+    // Get default colors from Vuex store (centralized - can be updated in one place)
+    const DEFAULT_LIGHT_COLOR = store.state.defaultThemeColors.light;
+    const DEFAULT_DARK_COLOR = store.state.defaultThemeColors.dark;
+
+    // Custom theme colors for light and dark modes
+    // Priority: Vuex store tempThemeColors > organizationSettings (backend) > defaults
+    // These refs display the current color in the UI and in the color picker
+    const customLightColor = ref(
+      store.state.tempThemeColors?.light ||
+      store.state?.organizationData?.organizationSettings?.light_mode_theme_color ||
+      DEFAULT_LIGHT_COLOR
+    );
+    const customDarkColor = ref(
+      store.state.tempThemeColors?.dark ||
+      store.state?.organizationData?.organizationSettings?.dark_mode_theme_color ||
+      DEFAULT_DARK_COLOR
+    );
+
+    // Color picker dialog state
+    const showColorPicker = ref(false);                          // Controls dialog visibility
+    const currentPickerMode = ref<"light" | "dark">("light");    // Which mode is being edited
+    const tempColor = ref(DEFAULT_LIGHT_COLOR);                  // Bound to q-color component
+
+    /**
+     * Update theme colors from Vuex store
+     * Called on component mount and when organization settings change
+     * Priority: Vuex store tempThemeColors > organizationSettings > defaults
+     */
     const updateFromStore = () => {
+      // Update scrape interval setting
       scrapeIntereval.value =
         store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15;
 
-      enableWebsocketSearch.value =
-        store.state?.organizationData?.organizationSettings
-          ?.enable_websocket_search ?? false;
+      // Get theme colors from store with priority order
+      // 1. Check Vuex store for temporary preview colors (highest priority)
+      // 2. Check organization settings for backend defaults
+      // 3. Use application defaults
+      const tempLightFromStore = store.state.tempThemeColors?.light;
+      const tempDarkFromStore = store.state.tempThemeColors?.dark;
 
-      enableStreamingSearch.value =
-        store.state?.organizationData?.organizationSettings
-          ?.enable_streaming_search ?? false;
+      const newLightColor =
+        tempLightFromStore ||
+        store.state?.organizationData?.organizationSettings?.light_mode_theme_color ||
+        DEFAULT_LIGHT_COLOR;
+      const newDarkColor =
+        tempDarkFromStore ||
+        store.state?.organizationData?.organizationSettings?.dark_mode_theme_color ||
+        DEFAULT_DARK_COLOR;
 
-      enableStreamingAggregation.value =
-        store.state?.organizationData?.organizationSettings
-          ?.streaming_aggregation_enabled ?? false;
+      // Check if colors changed and need to be applied
+      let shouldApply = false;
+
+      if (customLightColor.value !== newLightColor) {
+        customLightColor.value = newLightColor;
+        shouldApply = true;
+      }
+      if (customDarkColor.value !== newDarkColor) {
+        customDarkColor.value = newDarkColor;
+        shouldApply = true;
+      }
+
+      // Apply the theme colors if they changed
+      if (shouldApply) {
+        const currentMode = store.state.theme === "dark" ? "dark" : "light";
+        const color = currentMode === "light" ? newLightColor : newDarkColor;
+        const isDefault = color === DEFAULT_LIGHT_COLOR || color === DEFAULT_DARK_COLOR;
+        applyThemeColors(color, currentMode, isDefault);
+      }
     };
 
     onActivated(() => {
+      // Initialize from store on mount
       updateFromStore();
     });
 
+    // Watch for changes in organization settings (backend config)
+    // This handles when admin updates org settings while General Settings page is open
     watch(
       () => store.state.organizationData?.organizationSettings,
       () => {
-        updateFromStore();
+        // Only update from org settings if user is NOT actively previewing a color
+        // If temp colors exist in store, skip update to preserve the preview
+          updateFromStore();
       },
-      { deep: true, immediate: true }
+      { deep: true, immediate: true }  // Deep watch to catch nested property changes
     );
 
     watch(
@@ -438,9 +558,8 @@ export default defineComponent({
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
           scrape_interval: scrapeIntereval.value,
-          enable_websocket_search: enableWebsocketSearch.value,
-          enable_streaming_search: enableStreamingSearch.value,
-          streaming_aggregation_enabled: enableStreamingAggregation.value,
+          light_mode_theme_color: customLightColor.value,
+          dark_mode_theme_color: customDarkColor.value,
         });
 
         //update settings in backend
@@ -448,6 +567,14 @@ export default defineComponent({
           store.state?.selectedOrganization?.identifier,
           store.state?.organizationData?.organizationSettings,
         );
+
+        // Apply the current mode's theme
+        const currentMode = store.state.theme === "dark" ? "dark" : "light";
+        const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
+        applyThemeColors(color, currentMode, false);
+
+        // Clear temporary theme colors from store since we're saving permanently
+        store.commit('clearTempThemeColors');
 
         q.notify({
           type: "positive",
@@ -463,7 +590,7 @@ export default defineComponent({
       }
     });
 
-    const uploadImage = (fileList: any = null) => {
+    const uploadImage = (fileList: any = null, theme: string = 'light') => {
       const selectedFiles = fileList || files.value;
       // Handle single file or file array
       //but mostly we will support single file because we only show one image at a time right
@@ -475,7 +602,7 @@ export default defineComponent({
           fileToUpload = selectedFiles;
         }
       }
-      
+
       if (config.isEnterprise == "true" && fileToUpload) {
         loadingState.value = true;
         const formData = new FormData();
@@ -490,12 +617,13 @@ export default defineComponent({
           .createLogo(
             store.state.selectedOrganization?.identifier || orgIdentifier,
             formData,
+            theme,
           )
           .then(async (res) => {
             if (res.status == 200) {
               q.notify({
                 type: "positive",
-                message: "Logo updated successfully.",
+                message: `${theme === 'dark' ? 'Dark mode' : 'Light mode'} logo updated successfully.`,
                 timeout: 2000,
               });
 
@@ -503,6 +631,12 @@ export default defineComponent({
                 store.dispatch("setConfig", res.data);
               });
 
+              // Clear the appropriate file ref
+              if (theme === 'dark') {
+                filesDark.value = null;
+              } else {
+                filesLight.value = null;
+              }
               files.value = null;
             } else {
               q.notify({
@@ -537,7 +671,7 @@ export default defineComponent({
       }
     };
 
-    const deleteLogo = () => {
+    const deleteLogo = (theme: string = 'light') => {
       loadingState.value = true;
       let orgIdentifier = "default";
       for (let item of store.state.organizations) {
@@ -548,12 +682,13 @@ export default defineComponent({
       settingsService
         .deleteLogo(
           store.state.selectedOrganization?.identifier || orgIdentifier,
+          theme,
         )
         .then(async (res: any) => {
           if (res.status == 200) {
             q.notify({
               type: "positive",
-              message: "Logo deleted successfully.",
+              message: `${theme === 'dark' ? 'Dark mode' : 'Light mode'} logo deleted successfully.`,
               timeout: 2000,
             });
 
@@ -585,6 +720,122 @@ export default defineComponent({
 
       // Used DOMPurify for thorough sanitization
       return DOMPurify.sanitize(text);
+    };
+
+    // ========== Theme Management Functions ==========
+
+    /**
+     * Handle theme chip click - switches theme mode and opens color picker
+     * This provides a unified interaction: click to switch mode, then customize color
+     * @param mode - 'light' or 'dark' theme mode to switch to
+     */
+    const handleThemeChipClick = (mode: "light" | "dark") => {
+      // First, switch the theme mode if it's different from current
+      if (store.state.theme !== mode) {
+        toggleThemeMode(mode);
+      }
+
+      // Then open the color picker for customization
+      openColorPicker(mode);
+    };
+
+    /**
+     * Open color picker dialog for light or dark mode
+     * @param mode - 'light' or 'dark' theme mode to edit
+     */
+    const openColorPicker = (mode: "light" | "dark") => {
+      currentPickerMode.value = mode;
+      // Initialize tempColor with current color for this mode
+      tempColor.value = mode === "light" ? customLightColor.value : customDarkColor.value;
+      showColorPicker.value = true;
+    };
+
+    /**
+     * Handle color picker dialog close
+     * Temp colors remain in Vuex store for preview until user clicks "Save"
+     */
+    const onColorPickerClose = () => {
+      // No action needed - temp colors stay in store for continued preview
+    };
+
+    /**
+     * Update custom color as user drags the color picker (live preview)
+     * This function is called on every color change via @update:model-value
+     *
+     * Flow:
+     * 1. Update local ref (customLightColor or customDarkColor)
+     * 2. Save to Vuex store (tempThemeColors) so it persists across navigation
+     * 3. Apply theme immediately to UI for live preview
+     *
+     * Note: Color is NOT saved permanently until user clicks "Save" button
+     */
+    const updateCustomColor = () => {
+      // Update the local ref for the current mode
+      if (currentPickerMode.value === "light") {
+        customLightColor.value = tempColor.value;
+      } else {
+        customDarkColor.value = tempColor.value;
+      }
+
+      // Store temporarily in Vuex store
+      // This makes the color available to App.vue and PredefinedThemes.vue
+      // and prevents other watchers/observers from overriding it
+      store.commit('setTempThemeColor', {
+        mode: currentPickerMode.value,
+        color: tempColor.value
+      });
+
+      // Apply the theme immediately to the UI for live preview
+      // isDefault=false because user is customizing the color
+      applyThemeColors(tempColor.value, currentPickerMode.value, false);
+    };
+
+    const resetThemeColors = () => {
+      // Reset to default colors
+      customLightColor.value = DEFAULT_LIGHT_COLOR;
+      customDarkColor.value = DEFAULT_DARK_COLOR;
+
+      // Store temporarily in Vuex store
+      store.commit('setTempThemeColor', { mode: 'light', color: DEFAULT_LIGHT_COLOR });
+      store.commit('setTempThemeColor', { mode: 'dark', color: DEFAULT_DARK_COLOR });
+
+      // Apply the theme immediately for current mode
+      const currentMode = store.state.theme === "dark" ? "dark" : "light";
+      const color = currentMode === "light" ? DEFAULT_LIGHT_COLOR : DEFAULT_DARK_COLOR;
+      applyThemeColors(color, currentMode, true);
+
+      // Show notification
+      q.notify({
+        type: "positive",
+        message: "Theme colors reset to defaults and applied.",
+        timeout: 2000,
+      });
+    };
+
+    /**
+     * Toggle between light and dark theme modes
+     * Updates the store, Quasar dark mode, and applies the corresponding theme color
+     * @param mode - 'light' or 'dark' theme mode to switch to
+     */
+    const toggleThemeMode = (mode: "light" | "dark") => {
+      // Update theme mode in store
+      store.dispatch("appTheme", mode);
+
+      // Update Quasar's dark mode - this is critical for proper theme application
+      q.dark.set(mode === "dark");
+
+      // Persist theme preference to localStorage
+      localStorage.setItem("theme", mode);
+
+      // Get the color for the new mode
+      const color = mode === "light" ? customLightColor.value : customDarkColor.value;
+
+      // Check if the color is a default color
+      const isDefault = (mode === "light" && color === DEFAULT_LIGHT_COLOR) ||
+                       (mode === "dark" && color === DEFAULT_DARK_COLOR);
+
+      // Apply the theme color for the new mode
+      applyThemeColors(color, mode, isDefault);
     };
 
     const updateCustomText = () => {
@@ -657,9 +908,11 @@ export default defineComponent({
       config,
       router,
       scrapeIntereval,
-      enableWebsocketSearch,
       onSubmit,
       files,
+      filesLight,
+      filesDark,
+      logoThemeToDelete,
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {
         return `(Only .png, .jpg, .jpeg, .gif, .bmp formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
       },
@@ -683,8 +936,16 @@ export default defineComponent({
       updateCustomText,
       confirmDeleteImage: ref(false),
       sanitizeInput,
-      enableStreamingSearch,
-      enableStreamingAggregation,
+      // Theme management
+      customLightColor,
+      customDarkColor,
+      showColorPicker,
+      tempColor,
+      handleThemeChipClick,
+      onColorPickerClose,
+      updateCustomColor,
+      resetThemeColors,
+      currentPickerMode,
     };
   },
 });
@@ -718,11 +979,11 @@ export default defineComponent({
   gap: 1rem;
   align-items: center;
   padding: 1rem 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid var(--o2-border-color);
 }
 
 .dark-settings-theme .settings-grid-item {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid var(--o2-border-color) !important;
 }
 .text-btn-border-light{
   border: 1px solid #D3D5DB ;
@@ -731,9 +992,111 @@ export default defineComponent({
   border: 1px solid #6F737A ;
 }
 
-:deep(.o2-file-input .q-field__bottom) {
-  padding: 0px;
-  padding-top: 8px;
+// Theme management styles - Compact chip design
+.theme-color-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.theme-color-chip:hover {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: var(--q-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+body.body--dark .theme-color-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+body.body--dark .theme-color-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.color-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.palette-icon {
+  opacity: 0;
+  transition: opacity 0.2s;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+}
+
+.theme-color-chip:hover .palette-icon {
+  opacity: 0.9;
+}
+
+.chip-label {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.5;
+  letter-spacing: 0.5px;
+}
+
+.chip-value {
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.7;
+  letter-spacing: -0.2px;
+}
+
+.theme-reset-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  opacity: 0.6;
+}
+
+.theme-reset-chip:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.4);
+  border-style: solid;
+  opacity: 1;
+  transform: translateY(-1px) rotate(180deg);
+}
+
+.theme-reset-chip:hover .q-icon {
+  color: rgb(239, 68, 68);
+}
+
+body.body--dark .theme-reset-chip {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+body.body--dark .theme-reset-chip:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+body.body--dark .theme-reset-chip:hover .q-icon {
+  color: rgb(248, 113, 113);
 }
 
 </style>

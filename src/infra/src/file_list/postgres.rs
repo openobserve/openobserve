@@ -815,28 +815,6 @@ SELECT date
             .collect())
     }
 
-    async fn get_min_ts(
-        &self,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-    ) -> Result<i64> {
-        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
-        let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
-            .inc();
-        let ret: Option<i64> = sqlx::query_scalar(
-            r#"SELECT MIN(min_ts)::BIGINT AS num FROM file_list WHERE stream = $1 AND min_ts > $2;"#,
-        )
-        .bind(stream_key)
-        .bind(min_ts)
-        .fetch_one(&pool)
-        .await?;
-        Ok(ret.unwrap_or_default())
-    }
-
     async fn get_min_date(
         &self,
         org_id: &str,
@@ -958,12 +936,12 @@ GROUP BY stream
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        let sql = if stream_type.is_some() && stream_name.is_some() {
+        let sql = if let Some(stream_type) = stream_type
+            && let Some(stream_name) = stream_name
+        {
             format!(
                 "SELECT * FROM stream_stats WHERE stream = '{}/{}/{}';",
-                org_id,
-                stream_type.unwrap(),
-                stream_name.unwrap()
+                org_id, stream_type, stream_name
             )
         } else {
             format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
@@ -1516,7 +1494,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
                     .or_default()
                     .entry(stream_type)
                     .and_modify(|e| {
-                        *e = counts;
+                        *e += counts;
                     })
                     .or_insert(counts);
             }
@@ -1959,12 +1937,13 @@ CREATE TABLE IF NOT EXISTS stream_stats
     .await?;
 
     // create column created_at and updated_at for version >= 0.14.7
+    // Nov 11 2025, just a value, anything large than past is fine
     let column = "created_at";
-    let data_type = "BIGINT default 0 not null";
+    let data_type = "BIGINT default 1762819200000000 not null";
     add_column("file_list", column, data_type).await?;
     add_column("file_list_history", column, data_type).await?;
     let column = "updated_at";
-    let data_type = "BIGINT default 0 not null";
+    let data_type = "BIGINT default 1762819200000000 not null";
     add_column("file_list", column, data_type).await?;
     add_column("file_list_history", column, data_type).await?;
 

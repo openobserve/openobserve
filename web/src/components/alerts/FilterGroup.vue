@@ -1,41 +1,45 @@
 <template>
-    <div :class="[`  tw-px-2 tw-mb-2 tw-border group-border tw-mt-6  `, 
-        store.state.theme === 'dark' ? 'dark-mode' : 'light-mode',
+    <!-- Preview Section (only for root level) -->
+    <div v-if="depth === 0 && previewString"
+         class="tw-mb-2 tw-p-2 tw-rounded tw-border"
+         :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-gray-50 tw-border-gray-300'">
+      <div class="tw-flex tw-items-center tw-gap-1 tw-cursor-pointer tw-min-w-0" @click="showPreview = !showPreview">
+        <q-icon
+          :name="showPreview ? 'expand_more' : 'chevron_right'"
+          size="16px"
+          class="tw-flex-shrink-0"
+          :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'"
+        />
+        <span class="tw-font-medium tw-text-xs tw-flex-shrink-0"
+              :class="store.state.theme === 'dark' ? 'tw-text-gray-300' : 'tw-text-gray-700'">
+          Preview:
+        </span>
+        <span v-if="showPreview"
+              class="tw-text-[10px] tw-font-mono tw-leading-[1.3] tw-min-w-0 tw-break-words"
+              :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">
+          {{ previewString }}
+        </span>
+      </div>
+    </div>
+
+    <div :class="[`  tw-px-2 tw-mb-2 el-border tw-mt-6 el-border-radius `,
         store.state.isAiChatEnabled ? `tw-w-full tw-ml-[${depth * 10}px]` : `xl:tw-w-fit tw-ml-[${depth * 20}px]`
     ]"
     :style="{
         opacity: computedOpacity,
         backgroundColor: computedStyleMap
     }"
-    >    <!-- here we can implment the color picker bg -->
-        <div class="  tw-w-fit group-tabs"
-        :class="store.state.theme === 'dark' ? 'dark-mode-group-tabs ' : 'light-mode-group-tabs'"
-        >
-            <q-tabs
+    >
+        <div class="tw-w-fit condition-tabs el-border">
+          <AppTabs
             data-test="scheduled-alert-tabs"
-            v-model="label"
-            no-caps
-            outside-arrows
-            size="sm"
-            mobile-arrows
-            class=""
-            @update:model-value="toggleLabel"
-      >
-        <q-tab
-        class=""
-          data-test="scheduled-alert-custom-tab"
-          name="or"
-          :label="'OR'"
-        />
-        <q-tab
-          data-test="scheduled-alert-metrics-tab"
-          name="and"
-          :label="'AND'"
-          
-        />
-      </q-tabs>
+            :tabs="tabOptions"
+            class="tw-h-[20px] custom-tabs-selection-container"
+            v-model:active-tab="label"
+            @update:active-tab="toggleLabel"
+          />
       </div>
-  
+
       <!-- Group content -->
 
       <div v-if="isOpen" class="tw-overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
@@ -49,6 +53,8 @@
             @add-group="emit('add-group', $event)"
             @remove-group="emit('remove-group', $event)"
             :stream-fields="props.streamFields"
+            :condition-input-width="props.conditionInputWidth"
+            :disable-first-condition="props.disableFirstCondition"
             @input:update="(name, field) => inputUpdate(name, field)"
           />
           <div
@@ -63,8 +69,9 @@
                 :index="index"
                 :label="group.label"
                 :depth="depth"
+                :input-width="props.conditionInputWidth"
             />
-            <div class="tw-mb-1">
+            <div class="tw-mb-1" v-if="!(props.disableFirstCondition && index === 0 && depth === 0)">
                 <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
             </div>
                 </div>
@@ -81,45 +88,77 @@
             unelevated
             size="sm"
             flat
-            title="Add Condition"
             @click="addCondition(props.group.groupId)"
             color="primary"
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="12px" style="border-radius: 50%;  border: 1px solid;" name="add" />
             <span class="text-bold">Condition</span>
+            <q-tooltip :delay="300">
+              Add a new condition to this group
+            </q-tooltip>
         </q-btn>
         <q-btn
-            data-test="alert-conditions-add-condition-btn"
+            data-test="alert-conditions-add-condition-group-btn"
             class="q-ml-xs flex justify-between items-center"
             :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
             padding="sm"
             unelevated
             size="sm"
             flat
-            title="Add Condition Group"
             @click="addGroup(props.group.groupId)"
             :disabled="depth >= 2"
             color="primary"
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="12px" style="border-radius: 50%;  border: 1px solid;" name="add" />
             <span class="text-bold">Condition Group</span>
+            <q-tooltip v-if="depth < 2" :delay="300">
+              Add a nested condition group (max depth: 2)
+            </q-tooltip>
+            <q-tooltip v-else :delay="300">
+              Maximum nesting depth reached
+            </q-tooltip>
+        </q-btn>
+        <q-btn
+            data-test="alert-conditions-reorder-btn"
+            class="q-ml-xs flex justify-between items-center"
+            padding="sm"
+            unelevated
+            size="sm"
+            flat
+            @click="reorderItems()"
+            color="primary"
+            >
+            <q-icon color="primary" class="q-mr-xs text-bold" size="12px" name="swap_vert" />
+            <span class="text-bold">Reorder</span>
+            <q-tooltip :delay="300">
+              Reorder items: Conditions first, then Groups
+            </q-tooltip>
         </q-btn>
      </div>
         </div>
     </div>
+    <confirm-dialog
+      v-model="confirmDialog.show"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :warning-message="confirmDialog.warningMessage"
+      @update:ok="confirmDialog.okCallback"
+      @update:cancel="confirmDialog.show = false"
+    />
   </template>
-  
+
   <script setup lang="ts">
-    import { computed, ref } from 'vue';
+    import { computed, ref, watch } from 'vue';
     import FilterCondition from './FilterCondition.vue';
     import { useStore } from 'vuex';
     import { getUUID } from '@/utils/zincutils';
     import AppTabs from '../common/AppTabs.vue';
+    import ConfirmDialog from '@/components/ConfirmDialog.vue';
     const props = defineProps({
     group: {
         type: Object,
         default: () => {
-          
+
         },
         required: true,
     },
@@ -132,7 +171,17 @@
         type: Number,
         default: 0,
         required: true,
-    },    
+    },
+    conditionInputWidth: {
+        type: String,
+        default: '',
+        required: false,
+    },
+    disableFirstCondition: {
+        type: Boolean,
+        default: true,
+        required: false,
+    },
     });
   
   const emit = defineEmits<{
@@ -145,11 +194,41 @@
   
   const isOpen = ref(true);
   const groups = ref(props.group);
+  const showPreview = ref(true);
 
   const store = useStore();
 
   const label = ref(props.group.label);
-  
+
+  const confirmDialog = ref({
+    show: false,
+    title: '',
+    message: '',
+    warningMessage: '',
+    okCallback: () => {},
+  });
+
+  // Watch for prop changes to keep groups in sync with parent
+  watch(() => props.group, (newGroup) => {
+    groups.value = newGroup;
+    label.value = newGroup.label;
+  }, { deep: true });
+
+  const tabOptions = computed(() => [
+    {
+      label: "OR",
+      value: "or",
+      disabled: hasOnlyOneCondition.value,
+      tooltipLabel: hasOnlyOneCondition.value ? "Add at least one more condition to enable AND/OR toggle" : undefined,
+    },
+    {
+      label: "AND",
+      value: "and",
+      disabled: hasOnlyOneCondition.value,
+      tooltipLabel: hasOnlyOneCondition.value ? "Add at least one more condition to enable AND/OR toggle" : undefined,
+    },
+  ]);
+
   function isGroup(item: any) {
     return item && item.items && Array.isArray(item.items);
   }
@@ -184,23 +263,75 @@
   };
   
   // Toggle AND/OR
-  const toggleLabel = () => {
-    groups.value.label = groups.value.label === 'and' ? 'or' : 'and';
+  const toggleLabel = (newLabel?: string) => {
+    // If newLabel is provided, use it; otherwise toggle
+    if (newLabel) {
+      groups.value.label = newLabel;
+    } else {
+      groups.value.label = groups.value.label === 'and' ? 'or' : 'and';
+    }
     emit('add-group', groups.value); // optional, sync with parent
     emit('input:update', 'conditions', groups.value);
   };
 
   const removeCondition = (id: string) => {
+    // First, check what will happen after removing this condition
+    const itemsAfterRemoval = groups.value.items.filter((item: any) => item.id !== id);
+    const hasConditionsAfterRemoval = itemsAfterRemoval.some((item: any) => !isGroup(item));
+
+    // Count sub-groups that will be deleted
+    const subGroupCount = itemsAfterRemoval.filter((item: any) => isGroup(item)).length;
+
+    // If removing this condition will cause the group to be deleted (no conditions left)
+    // and there are sub-groups, show confirmation dialog
+    if (!hasConditionsAfterRemoval && subGroupCount > 0) {
+      confirmDialog.value = {
+        show: true,
+        title: 'Delete Condition',
+        message: 'Deleting this condition will remove the entire condition group.',
+        warningMessage: `This will also delete ${subGroupCount} sub-group${subGroupCount > 1 ? 's' : ''} nested under this group. This action cannot be undone.`,
+        okCallback: () => {
+          // User confirmed, proceed with deletion
+          performRemoveCondition(id);
+          confirmDialog.value.show = false;
+        },
+      };
+    } else {
+      // Safe to delete without confirmation
+      performRemoveCondition(id);
+    }
+  };
+
+  const performRemoveCondition = (id: string) => {
     groups.value.items = groups.value.items.filter((item: any) => item.id !== id);
-    if (groups.value.items.length == 0) {
-         emit('remove-group', props.group.groupId); // ask parent to remove this group
-  } else {
-    emit('add-group', groups.value); // update as usual
-  }
+
+    // Check if there are any conditions left (not sub-groups)
+    const hasConditions = groups.value.items.some((item: any) => !isGroup(item));
+
+    if (!hasConditions) {
+      // No conditions left, clear all items (including sub-groups) and remove this entire group
+      groups.value.items = [];
+      emit('remove-group', props.group.groupId);
+    } else {
+      emit('add-group', groups.value); // update as usual
+    }
   };
 
   const inputUpdate = (name: string, field: any) => {
     emit('input:update', name, field);
+  };
+
+  const reorderItems = () => {
+    // Separate conditions and groups
+    const conditions = groups.value.items.filter((item: any) => !isGroup(item));
+    const subGroups = groups.value.items.filter((item: any) => isGroup(item));
+
+    // Reorder: conditions first, then groups
+    groups.value.items = [...conditions, ...subGroups];
+
+    // Emit update
+    emit('add-group', groups.value);
+    emit('input:update', 'conditions', groups.value);
   };
 
 
@@ -259,6 +390,53 @@ const computedOpacity = computed(() => {
   return props.depth + 10;
 });
 
+// Build preview string recursively
+const buildPreviewString = (group: any): string => {
+  if (!group || !group.items || group.items.length === 0) {
+    return '';
+  }
+
+  const parts: string[] = [];
+
+  group.items.forEach((item: any) => {
+    if (isGroup(item)) {
+      // Nested group - recursively build its preview
+      const nestedPreview = buildPreviewString(item);
+      if (nestedPreview) {
+        parts.push(`(${nestedPreview})`);
+      }
+    } else {
+      // Condition - show full condition: column operator value
+      const column = item.column || 'field';
+      const operator = item.operator || '=';
+      const value = item.value !== undefined && item.value !== null && item.value !== ''
+        ? `'${item.value}'`
+        : "''";
+      parts.push(`${column} ${operator} ${value}`);
+    }
+  });
+
+  // Join with the group's label (AND/OR)
+  const operator = (group.label || 'or').toUpperCase();
+  return parts.join(` ${operator} `);
+};
+
+// Computed preview string
+const previewString = computed(() => {
+  const preview = buildPreviewString(groups.value);
+  // Wrap the entire root expression in parentheses
+  return preview ? `(${preview})` : '';
+});
+
+// Check if group has only one condition and no sub-groups (to disable AND/OR toggle)
+const hasOnlyOneCondition = computed(() => {
+  const conditions = groups.value.items.filter((item: any) => !isGroup(item));
+  const subGroups = groups.value.items.filter((item: any) => isGroup(item));
+
+  // Disable only if there's exactly 1 condition AND no sub-groups
+  return conditions.length === 1 && subGroups.length === 0;
+});
+
 // Expose functions for testing
 defineExpose({
   isGroup,
@@ -266,31 +444,29 @@ defineExpose({
   addGroup,
   toggleLabel,
   removeCondition,
+  performRemoveCondition,
   inputUpdate,
+  reorderItems,
   hexToHSL,
   hslToCSS,
   computedStyleMap,
   computedOpacity,
+  hasOnlyOneCondition,
   groups,
   label,
-  isOpen
+  isOpen,
+  confirmDialog
 });
 
   </script>
 
-  <style lang="scss">   
+  <style lang="scss">
+
     .condition-container {
         overflow-x: auto;
         max-width: 900px;
     }
 
-    .dark-mode .group-border {
-        border: 1px solid #464646;
-    }
-
-    .light-mode .group-border {
-        border-color: #e5e4e4;
-    }
 
     .group-tabs {
       position: relative;
@@ -340,53 +516,67 @@ defineExpose({
   border-radius: 4px;
 }
 
-    .group-tabs {
-      .q-tab--active {
-        background-color: $primary;
-        color: $white;
-      }
+  .group-tabs {
+      border: 1px solid $border-color;
+      background-color: transparent !important;
+    .q-tab--active {
+      background-color: var(--o2-primary-btn-bg);
+      color: $white;
+    }
 
       .q-tab__indicator {
         display: none;
       }
 
-    }
-    .dark-mode-group-tabs  .q-tab--inactive{
-        background-color: #494A4A !important;
-        
-        color: $white
+  
+
+    .q-tab--inactive {
+      background-color: var(--o2-inactive-tab-bg);
     }
 
+    .q-tab{
+          &:hover:not(.q-tab--active) {
+    background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
+  }
 
-    .light-mode-group-tabs {
-      border: 1px solid #cdcdcd;
-      .q-tab--inactive{
-        background-color: #ffffff !important;
-        color: black;
-      }
-
+    &:hover.q-tab--active {
+      background-color: var(--o2-primary-btn-bg) !important;
     }
-    .dark-mode-group-tabs{
-      border: 1px solid #464646;
-        .q-tab--inactive{
-        background-color: #494A4A !important;
-        opacity: 1;
-        color: $white;
-      }      
-    }
-    .group-tabs{
-      .q-tab--active {
-        background-color: $primary;
-        color: $white;
-      }
-      .q-tab{
-        border: none;
-      }
-
-      .q-tab__indicator {
-        display: none;
       }
     }
+    
+  .condition-tabs{
+    position: relative;
+    bottom: 14px;
+    border-radius: 4px;
+    height: 28px;
+    padding: 2px;
+    background-color: var(--o2-card-bg);
+  }
+  .custom-tabs-selection-container{
+    border: none;
+    border-radius: none;
+    .o2-tab{
+      border-radius: 4px;
+      height: 22px;
+      padding: 4px 12px;
+      border-bottom: none;
+      white-space: normal;
+      line-height: 1rem;
+      font-size: 10px;
+      border-bottom: none !important;
+    }
+    .o2-tab.active{
+      background-color: var(--o2-primary-btn-bg) !important;
+      color: rgba(255,255,255) !important;
+    }
+    .o2-tab:hover{
+      background-color: var(--o2-hover-accent) !important;
+    }
+    .o2-tab.active:hover{
+      background-color: var(--o2-primary-btn-bg) !important;
+    }
+  }
 
 
   </style>

@@ -4,21 +4,51 @@ on:
   pull_request:
     branches:
       - "*"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   AWS_REGION: us-east-1
 
 jobs:
+  check_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.check_changes.outputs.has_changes }}
+      should_build: ${{ steps.check_changes.outputs.should_build }}
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check if relevant code has changes
+        id: check_changes
+        run: |
+          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qvE '\.(md|yml|yaml)$'; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Also check if this is a non-fork PR
+          if [ "${{ github.event_name }}" == "pull_request" ] && \
+             [ "${{ github.event.pull_request.head.repo.full_name }}" == "${{ github.repository }}" ] && \
+             [ "${{ github.event.pull_request.head.repo.fork }}" == "false" ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          fi
+
   build_pr_image_amd64:
     name: build_pr_image_amd64
+    needs: check_changes
     permissions:
       id-token: write
       contents: read
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
+    if: needs.check_changes.outputs.has_changes == 'true' && needs.check_changes.outputs.should_build == 'true'
     runs-on: ubicloud-standard-8
     steps:
       - name: Remove unused tools
@@ -39,7 +69,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-07-20
+          toolchain: nightly-2025-11-11
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -100,10 +130,11 @@ jobs:
 
   build_pr_image_arm64:
     name: build_pr_image_arm64
+    needs: check_changes
     permissions:
       id-token: write
       contents: read
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
+    if: needs.check_changes.outputs.has_changes == 'true' && needs.check_changes.outputs.should_build == 'true'
     runs-on: "ubicloud-standard-16-arm"
     steps:
       - name: Remove unused tools
@@ -124,7 +155,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-07-20
+          toolchain: nightly-2025-11-11
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -226,11 +257,16 @@ jobs:
   build_pr_image_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [build_pr_image_amd64, build_pr_image_arm64, build]
+    needs: [check_changes, build_pr_image_amd64, build_pr_image_arm64, build]
     if: always()
     steps:
       - name: Check build results
         run: |
+          if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ] || [ "${{ needs.check_changes.outputs.should_build }}" != "true" ]; then
+            echo "No relevant changes or not a non-fork PR - builds skipped"
+            exit 0
+          fi
+
           if [ "${{ needs.build_pr_image_amd64.result }}" == "success" ] || [ "${{ needs.build_pr_image_amd64.result }}" == "skipped" ]; then
             echo "AMD64 build passed or skipped"
           else

@@ -1,11 +1,12 @@
 <template>
-  <div class="q-px-md q-pt-md q-pb-md">
-    <div class="text-body1 text-bold">
-      {{ t("settings.logDetails") }}
+  <div>
+    <div class="q-px-md q-pt-md q-pb-md">
+      <div class="text-body1 text-bold">
+        {{ t("settings.logDetails") }}
+      </div>
     </div>
-  </div>
 
-  <div class="q-mx-md q-mb-md">
+    <div class="q-mx-md q-mb-md">
     <div
       data-test="add-role-rolename-input-btn"
       class="trace-id-field-name o2-input q-mb-sm"
@@ -16,9 +17,8 @@
         color="input-border"
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
-        outlined
         stack-label
-        filled
+        borderless
         dense
         :rules="[
           (val: string) =>
@@ -45,8 +45,7 @@
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
-        filled
+        borderless
         dense
         :rules="[
           (val: string) =>
@@ -71,7 +70,6 @@
         stack-label
         class="q-mt-sm o2-toggle-button-lg tw-mr-3 -tw-ml-4"
         size="lg"
-        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
       >
       </q-toggle>
     </div>
@@ -84,7 +82,6 @@
         :label="t('alerts.cancel')"
         no-caps
         flat
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         @click="$emit('cancel:hideform')"
       />
       <q-btn
@@ -94,15 +91,15 @@
         type="submit"
         no-caps
         flat
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         @click="saveOrgSettings"
       />
+    </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import organizations from "@/services/organizations";
 import { useStore } from "vuex";
@@ -151,21 +148,25 @@ const updateFieldName = (fieldName: string) => {
 
 const saveOrgSettings = async () => {
   try {
+    const payload: any = {
+      trace_id_field_name: traceIdFieldName.value,
+      span_id_field_name: spanIdFieldName.value,
+      toggle_ingestion_logs: toggleIngestionLogs.value,
+    };
+
     await organizations.post_organization_settings(
       store.state.selectedOrganization.identifier,
-      {
-        trace_id_field_name: traceIdFieldName.value,
-        span_id_field_name: spanIdFieldName.value,
-        toggle_ingestion_logs: toggleIngestionLogs.value,
-      },
+      payload,
     );
 
-    store.dispatch("setOrganizationSettings", {
+    const updatedSettings: any = {
       ...store.state?.organizationData?.organizationSettings,
       trace_id_field_name: traceIdFieldName.value,
       span_id_field_name: spanIdFieldName.value,
       toggle_ingestion_logs: toggleIngestionLogs.value,
-    });
+    };
+
+    store.dispatch("setOrganizationSettings", updatedSettings);
 
     q.notify({
       message: "Organization settings updated successfully",

@@ -23,6 +23,7 @@ use std::{
 
 use config::{
     get_config,
+    meta::promql::value::{RangeValue, Value},
     utils::{
         hash::{Sum64, gxhash},
         time::{get_ymdh_from_micros, now_micros, second_micros},
@@ -33,8 +34,6 @@ use infra::errors::{Error, Result};
 use once_cell::sync::Lazy;
 use prost::Message;
 use tokio::sync::RwLock;
-
-use super::{RangeValue, Value};
 
 const METRICS_INDEX_CACHE_GC_TRIGGER_NUM: usize = 10;
 const METRICS_INDEX_CACHE_GC_PERCENT: usize = 10; // 10% of the items will be removed
@@ -214,6 +213,7 @@ pub async fn get(
     Ok(Some((new_start, resp.series)))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn set(
     trace_id: &str,
     org: &str,
@@ -222,6 +222,7 @@ pub async fn set(
     end: i64,
     step: i64,
     mut range_values: Vec<RangeValue>,
+    update: bool,
 ) -> Result<()> {
     // check time range, if over ZO_MAX_FILE_RETENTION_TIME, return
     let cfg = get_config();
@@ -245,11 +246,12 @@ pub async fn set(
             );
             return Ok(());
         }
-        // check if the cache already converted
-        if index
-            .entries
-            .iter()
-            .any(|entry| entry.start <= start && entry.end >= new_end)
+        // check if the cache already covered
+        if !update
+            && index
+                .entries
+                .iter()
+                .any(|entry| entry.start <= start && entry.end >= new_end)
         {
             return Ok(());
         }
@@ -474,11 +476,10 @@ impl MetricsIndexCacheItem {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::{Labels, Sample};
+
     use super::*;
-    use crate::service::promql::{
-        adjust_start_end,
-        value::{Labels, Sample},
-    };
+    use crate::service::promql::adjust_start_end;
 
     #[test]
     fn test_promql_cache_hash_key_generation() {
@@ -509,7 +510,7 @@ mod tests {
         let end = now_micros();
         let start = end - second_micros(3600);
         let step = second_micros(15);
-        let (start, end) = adjust_start_end(start, end, step, false);
+        let (start, end) = adjust_start_end(start, end, step);
 
         // Create test samples
         let mut range_values = vec![RangeValue {
@@ -534,7 +535,7 @@ mod tests {
         let expected_value = range_values.first().unwrap().clone();
 
         // Test setting cache
-        let set_result = set(trace_id, org, query, start, end, step, range_values).await;
+        let set_result = set(trace_id, org, query, start, end, step, range_values, false).await;
         assert!(set_result.is_ok());
 
         // Test getting cache
@@ -561,7 +562,7 @@ mod tests {
         let end = now_micros();
         let start = end - second_micros(3600);
         let step = second_micros(15);
-        let (start, end) = adjust_start_end(start, end, step, false);
+        let (start, end) = adjust_start_end(start, end, step);
 
         // Add more than METRICS_INDEX_CACHE_MAX_ITEMS entries
         for i in 0..METRICS_INDEX_CACHE_MAX_ITEMS + 2 {
@@ -576,8 +577,17 @@ mod tests {
                 time_window: None,
             }];
 
-            let set_result =
-                set(trace_id, org, query, start, end, step, range_values.clone()).await;
+            let set_result = set(
+                trace_id,
+                org,
+                query,
+                start,
+                end,
+                step,
+                range_values.clone(),
+                false,
+            )
+            .await;
             assert!(set_result.is_ok());
         }
 

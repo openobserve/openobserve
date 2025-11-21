@@ -17,146 +17,149 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <q-page>
     <div v-if="!showAddJSTransformDialog">
-      <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-h-[71px] tw-border-b-[1px]" 
-      :class="store.state.theme === 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
-      >
-        <div class="q-table__title tw-font-[600]">
-            {{ t("function.enrichmentTables") }}
-          </div>
-          <div class="q-ml-auto" data-test="enrichment-tables-search-input">
-            <q-input
-              v-model="filterQuery"
-              borderless
-              dense
-              class="q-ml-auto no-border o2-search-input tw-w-[220px]"
-              :placeholder="t('function.searchEnrichmentTable')"
-              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+      <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+        <div class="card-container tw-mb-[0.625rem]">
+          <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-h-[68px]">
+            <div class="q-table__title tw-font-[600]">
+                {{ t("function.enrichmentTables") }}
+              </div>
+              <div class="q-ml-auto" data-test="enrichment-tables-search-input">
+                <q-input
+                  v-model="filterQuery"
+                  borderless
+                  dense
+                  class="q-ml-auto no-border o2-search-input tw-w-[220px]"
+                  :placeholder="t('function.searchEnrichmentTable')"
 
+                >
+                  <template #prepend>
+                    <q-icon class="o2-search-input-icon" name="search" />
+                  </template>
+                </q-input>
+              </div>
+              <q-btn
+                class="q-ml-sm o2-primary-button tw-h-[36px]"
+                no-caps
+                flat
+                :label="t(`function.addEnrichmentTable`)"
+                @click="showAddUpdateFn({})"
+              />
+          </div>
+        </div>
+        <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+          <div class="card-container tw-h-[calc(100vh-127px)]">
+            <q-table
+              ref="qTable"
+              :rows="visibleRows"
+              :columns="columns"
+              row-key="id"
+              :pagination="pagination"
+              :filter="filterQuery"
+              style="width: 100%"
+              :style="hasVisibleRows
+                  ? 'width: 100%; height: calc(100vh - 127px)' 
+                  : 'width: 100%'"
+              class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky "
             >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+              <template #no-data>
+                <NoData />
               </template>
-            </q-input>
+              <template v-slot:body-cell-actions="props">
+                <q-td :props="props">
+                  <q-btn
+                    :data-test="`${props.row.name}-explore-btn`"
+                    :title="t('logStream.explore')"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    @click="exploreEnrichmentTable(props)"
+                    icon="search"
+                  >
+                </q-btn>
+                  <q-btn
+                    icon="list_alt"
+                    :title="t('logStream.schemaHeader')"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    @click="listSchema(props)"
+                  >
+                </q-btn>
+                  <q-btn
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    icon="edit"
+                    round
+                    flat
+                    :title="t('function.enrichmentTables')"
+                    @click="showAddUpdateFn(props)"
+                  >
+                </q-btn>
+                  <q-btn
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    :icon="outlinedDelete"
+                    flat
+                    :title="t('function.delete')"
+                    @click="showDeleteDialogFn(props)"
+                  >
+                </q-btn>
+                </q-td>
+              </template>
+
+              <template v-slot:body-cell-function="props">
+                <q-td :props="props">
+                  <q-tooltip>
+                    <pre>{{ props.row.function }}</pre>
+                  </q-tooltip>
+                  <pre style="white-space: break-spaces">{{
+                    props.row.function
+                  }}</pre>
+                </q-td>
+              </template>
+
+              <template #bottom="scope">
+                <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
+                  <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+                    {{ resultTotal }} {{ t('function.enrichmentTables') }}
+                  </div>
+                <QTablePagination
+                  :scope="scope"
+                  :position="'bottom'"
+                  :resultTotal="resultTotal"
+                  :perPageOptions="perPageOptions"
+                  @update:changeRecordPerPage="changePagination"
+                />
+                </div>
+              </template>
+              <template v-slot:header="props">
+                  <q-tr :props="props">
+                    <!-- Rendering the of the columns -->
+                    <!-- here we can add the classes class so that the head will be sticky -->
+                    <q-th
+                      v-for="col in props.cols"
+                      :key="col.name"
+                      :props="props"
+                      :class="col.classes"
+                      :style="col.style"
+                    >
+                      {{ col.label }}
+                    </q-th>
+                  </q-tr>
+                </template>
+            </q-table>
           </div>
-          <q-btn
-            class="q-ml-md o2-primary-button tw-h-[36px]"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            :label="t(`function.addEnrichmentTable`)"
-            @click="showAddUpdateFn({})"
-          />
+        </div>
       </div>
-      <q-table
-        ref="qTable"
-        :rows="visibleRows"
-        :columns="columns"
-        row-key="id"
-        :pagination="pagination"
-        :filter="filterQuery"
-        style="width: 100%"
-        :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 114px)' 
-            : 'width: 100%'"
-        class="o2-quasar-table o2-quasar-table-header-sticky "
-        :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
-      >
-        <template #no-data>
-          <NoData />
-        </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <q-btn
-              :data-test="`${props.row.name}-explore-btn`"
-              icon="search"
-              :title="t('logStream.explore')"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click="exploreEnrichmentTable(props)"
-            />
-            <q-btn
-              icon="list_alt"
-              :title="t('logStream.schemaHeader')"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click="listSchema(props)"
-            />
-            <q-btn
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('function.enrichmentTables')"
-              @click="showAddUpdateFn(props)"
-            ></q-btn>
-            <q-btn
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('function.delete')"
-              @click="showDeleteDialogFn(props)"
-            ></q-btn>
-          </q-td>
-        </template>
-
-        <template v-slot:body-cell-function="props">
-          <q-td :props="props">
-            <q-tooltip>
-              <pre>{{ props.row.function }}</pre>
-            </q-tooltip>
-            <pre style="white-space: break-spaces">{{
-              props.row.function
-            }}</pre>
-          </q-td>
-        </template>
-
-        <template #bottom="scope">
-          <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
-              {{ resultTotal }} {{ t('function.enrichmentTables') }}
-            </div>
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-          </div>
-        </template>
-        <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Rendering the of the columns -->
-               <!-- here we can add the classes class so that the head will be sticky -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
-      </q-table>
     </div>
     <div v-else>
       <add-enrichment-table
@@ -185,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeMount, onMounted, ref } from "vue";
+import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
@@ -589,7 +592,12 @@ export default defineComponent({
       if (!filterQuery.value) return jsTransforms.value || []
       return filterData(jsTransforms.value || [], filterQuery.value)
     });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+    // Watch visibleRows to sync resultTotal with search filter
+    watch(visibleRows, (newVisibleRows) => {
+      resultTotal.value = newVisibleRows.length;
+    }, { immediate: true });
     return {
       t,
       qTable,

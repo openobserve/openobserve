@@ -32,7 +32,10 @@ use crate::{
         CacheQueryRequest, CachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
     },
     service::search::{
-        cache::{MultiCachedQueryResponse, result_utils::get_ts_value},
+        cache::{
+            MultiCachedQueryResponse,
+            result_utils::{get_ts_value, has_non_timestamp_ordering, is_timestamp_field},
+        },
         sql::{
             RE_HISTOGRAM, RE_SELECT_FROM, Sql,
             visitor::histogram_interval::generate_histogram_interval,
@@ -114,10 +117,16 @@ pub async fn check_cache(
         };
     }
 
+    // Check if query contains histogram function
+    let is_histogram_query = sql.histogram_interval.is_some();
+
     // skip the count queries & queries first order by is not _timestamp field
+    // Exception: Allow histogram queries even if ORDER BY is not on timestamp,
+    // because histogram is plotted based on timestamp
     if req.query.track_total_hits
         || (!order_by.is_empty()
             && order_by.first().as_ref().unwrap().0 != TIMESTAMP_COL_NAME
+            && !is_histogram_query
             && (result_ts_col.is_none()
                 || (result_ts_col.is_some()
                     && result_ts_col.as_ref().unwrap() != &order_by.first().as_ref().unwrap().0)))
@@ -176,23 +185,42 @@ pub async fn check_cache(
     let mut is_descending = true;
 
     if !order_by.is_empty() {
+        // For histogram queries, if ORDER BY is not on the histogram/timestamp column,
+        // we should still cache based on the histogram's inherent time ordering
+        // Check if any order_by field matches the result_ts_col
+        let mut found_ts_order = false;
         for (field, order) in &order_by {
-            if field.eq(&result_ts_col) || field.replace("\"", "").eq(&result_ts_col) {
+            if is_timestamp_field(field, &result_ts_col) {
                 is_descending = order == &OrderBy::Desc;
+                found_ts_order = true;
                 break;
             }
+        }
+
+        // For histogram queries ordered by non-timestamp columns (e.g., ORDER BY count),
+        // use ascending as default
+        if !found_ts_order && is_histogram_query {
+            is_descending = false;
         }
     }
     if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
     }
+
+    // Determine if this is a histogram query with non-timestamp ORDER BY.
+    // These queries need special handling because results may not be time-ordered,
+    // requiring us to scan all hits to find the actual time range.
+    let is_histogram_non_ts_order = is_histogram_query
+        && !order_by.is_empty()
+        && has_non_timestamp_ordering(&order_by, &result_ts_col);
+
     let mut multi_resp = MultiCachedQueryResponse {
         trace_id: trace_id.to_string(),
         is_aggregate,
         is_descending,
         ..Default::default()
     };
-    if histogram_interval > -1 {
+    if histogram_interval > 0 {
         multi_resp.histogram_interval = histogram_interval / 1000 / 1000;
     }
     log::info!(
@@ -214,6 +242,7 @@ pub async fn check_cache(
                 ts_column: result_ts_col.clone(),
                 histogram_interval,
                 is_descending,
+                is_histogram_non_ts_order,
             },
         )
         .await;
@@ -277,6 +306,7 @@ pub async fn check_cache(
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.file_path = file_path.to_string();
         multi_resp.order_by = order_by;
+        multi_resp.is_aggregate = is_aggregate;
         multi_resp
     } else {
         let c_resp = match get_cached_results(
@@ -289,6 +319,7 @@ pub async fn check_cache(
                 ts_column: result_ts_col.clone(),
                 histogram_interval,
                 is_descending,
+                is_histogram_non_ts_order,
             },
             None,
         )
@@ -366,6 +397,7 @@ pub async fn check_cache(
         multi_resp.ts_column = result_ts_col;
         multi_resp.file_path = file_path.to_string();
         multi_resp.order_by = order_by;
+        multi_resp.is_aggregate = is_aggregate;
         multi_resp
     }
 }
@@ -519,21 +551,59 @@ pub fn calculate_deltas(
 }
 
 pub async fn cache_results_to_disk(
+    trace_id: &str,
     file_path: &str,
     file_name: &str,
     data: String,
+    clear_cache: bool,
+    clean_start_ts: Option<i64>,
+    clean_end_ts: Option<i64>,
 ) -> std::io::Result<bool> {
+    let start = std::time::Instant::now();
+    log::info!("[trace_id {trace_id}] Caching results to disk");
+
+    if clear_cache {
+        log::info!(
+            "[trace_id {trace_id}] Clearing cache for file path as use_cache: false, clear_cache: {clear_cache}, start: {},  {file_path}",
+            start.elapsed().as_millis(),
+        );
+        let _ = delete_cache(file_path, 0, clean_start_ts, clean_end_ts)
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[trace_id {trace_id}] Clearing cache for file path error: {}",
+                    e
+                );
+                e
+            });
+        log::info!(
+            "[trace_id {trace_id}] Clearing cache for file path completed. use_cache: false, clear_cache: {clear_cache}, took: {} ms, {file_path}",
+            start.elapsed().as_millis(),
+        );
+    }
+
     let file = format!("results/{file_path}/{file_name}");
     if disk::exist(&file).await {
         return Ok(false);
     }
     match disk::set(&file, Bytes::from(data)).await {
-        Ok(_) => Ok(true),
+        Ok(_) => {
+            log::info!(
+                "[trace_id {trace_id}] After clearing cache, Cached results to disk completed, took: {} ms",
+                start.elapsed().as_millis()
+            );
+        }
         Err(e) => {
-            log::error!("Error caching results to disk: {e}");
-            Err(std::io::Error::other("Error caching results to disk"))
+            log::error!("[trace_id {trace_id}] Error caching results to disk: {e}");
+            return Err(std::io::Error::other("Error caching results to disk"));
         }
     }
+
+    log::info!(
+        "[trace_id {trace_id}] Cached results to disk completed, took: {} ms",
+        start.elapsed().as_millis()
+    );
+    Ok(true)
 }
 
 pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<String> {
@@ -588,7 +658,7 @@ pub fn get_ts_col_order_by(
 
     if !order_by.is_empty() && !result_ts_col.is_empty() {
         for (field, order) in order_by {
-            if field.eq(&result_ts_col) || field.replace("\"", "").eq(&result_ts_col) {
+            if is_timestamp_field(field, &result_ts_col) {
                 is_descending = order == &OrderBy::Desc;
                 break;
             }
@@ -599,6 +669,12 @@ pub fn get_ts_col_order_by(
     } else {
         Some((result_ts_col, is_descending))
     }
+}
+
+enum DeletionCriteria {
+    TimeRange(i64, i64),
+    ThresholdTimestamp(i64),
+    DeleteAll,
 }
 
 /// Cache selection strategies determine how to choose the best cached result when multiple caches
@@ -642,8 +718,52 @@ pub(crate) fn select_cache_meta(
     }
 }
 
+fn parse_cache_file_timestamps(file_path: &str) -> Option<(i64, i64)> {
+    let file_name = file_path.split('/').next_back()?;
+    // Remove file extension (e.g., .json, .arrow) before parsing
+    let file_name_without_ext = file_name.split('.').next()?;
+
+    let parts: Vec<&str> = file_name_without_ext.split('_').collect();
+    if parts.len() >= 2
+        && let (Ok(start_ts), Ok(end_ts)) = (parts[0].parse::<i64>(), parts[1].parse::<i64>())
+    {
+        return Some((start_ts, end_ts));
+    }
+    None
+}
+
+fn time_ranges_overlap(start1: i64, end1: i64, start2: i64, end2: i64) -> bool {
+    // Check if file data range overlaps with clean range
+    // File overlaps if: file_start < clean_end AND file_end > clean_start
+    // NOTE: Partial overlap is considered an overlap
+    start1 < end2 && end1 > start2
+}
+
+fn should_delete_cache_file(file_path: &str, criteria: &DeletionCriteria) -> bool {
+    let Some((file_start_ts, file_end_ts)) = parse_cache_file_timestamps(file_path) else {
+        return false;
+    };
+
+    match criteria {
+        // First check for time range overlapping files
+        DeletionCriteria::TimeRange(clean_start, clean_end) => {
+            time_ranges_overlap(file_start_ts, file_end_ts, *clean_start, *clean_end)
+        }
+        // Second check for threshold timestamp
+        // Only delete if start_time <= delete_ts (keep cache from delete_ts onwards)
+        DeletionCriteria::ThresholdTimestamp(delete_ts) => file_start_ts <= *delete_ts,
+        // Last check for delete all
+        DeletionCriteria::DeleteAll => true,
+    }
+}
+
 #[tracing::instrument]
-pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
+pub async fn delete_cache(
+    path: &str,
+    delete_ts: i64,
+    clean_start_ts: Option<i64>,
+    clean_end_ts: Option<i64>,
+) -> std::io::Result<bool> {
     let root_dir = disk::get_dir().await;
     // Part 1: delete the results cache
     let pattern = format!("{root_dir}/results/{path}");
@@ -651,26 +771,23 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut remove_files: Vec<String> = vec![];
 
-    for file in files {
-        // If timestamp is provided, check if we should delete this file
-        if delete_ts > 0 {
-            // Parse the start_time from filename:
-            // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
-            if let Some(file_name) = file.split('/').next_back()
-                && let Some(start_time_str) = file_name.split('_').next()
-                && let Ok(start_time) = start_time_str.parse::<i64>()
-            {
-                // Only delete if start_time > delete_ts (keep cache from delete_ts onwards)
-                if start_time > delete_ts {
-                    continue; // Skip this file, keep it
-                }
-            }
-        }
+    let criteria = match (clean_start_ts, clean_end_ts, delete_ts) {
+        // First check for time range
+        (Some(start), Some(end), _) => DeletionCriteria::TimeRange(start, end),
+        // Second check for threshold timestamp
+        (_, _, ts) if ts > 0 => DeletionCriteria::ThresholdTimestamp(ts),
+        // Last check for delete all
+        _ => DeletionCriteria::DeleteAll,
+    };
 
+    for file in files {
+        if !should_delete_cache_file(&file, &criteria) {
+            continue;
+        }
         match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {
-                log::error!("Error deleting cache: {e}");
+                log::error!("Error deleting cache: {:?}", e);
                 return Err(std::io::Error::other("Error deleting cache"));
             }
         }
@@ -683,26 +800,13 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
         let aggs_files = scan_files(&aggs_pattern, "arrow", None).unwrap_or_default();
 
         for file in aggs_files {
-            // If timestamp is provided, check if we should delete this file
-            if delete_ts > 0 {
-                // Parse the start_time from filename
-                // {start_time}_{end_time}.arrow
-                if let Some(file_name) = file.split('/').next_back()
-                    && let Some(start_time_str) = file_name.split('_').next()
-                    && let Ok(start_time) = start_time_str.parse::<i64>()
-                {
-                    // Only delete if start_time > delete_ts (keep cache from delete_ts
-                    // onwards)
-                    if start_time > delete_ts {
-                        continue; // Skip this file, keep it
-                    }
-                }
+            if !should_delete_cache_file(&file, &criteria) {
+                continue;
             }
-
             match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
-                Ok(_) => {}
+                Ok(_) => remove_files.push(file),
                 Err(e) => {
-                    log::error!("Error deleting cache: {e:?}");
+                    log::error!("Error deleting cache: {:?}", e);
                     return Err(std::io::Error::other("Error deleting cache"));
                 }
             }
@@ -884,6 +988,7 @@ mod tests {
                 order_by_metadata: vec![(String::from("x_axis_1"), OrderBy::Asc)],
                 converted_histogram_query: None,
                 is_histogram_eligible: None,
+                query_index: None,
             },
             deltas: vec![],
             has_cached_data: true,
@@ -984,7 +1089,7 @@ mod tests {
                     took: 100,
                     took_detail: ResponseTook::default(),
                     columns: vec![],
-                    hits: vec![serde_json::json!({"timestamp": "2025-01-01T10:00:00Z"})],
+                    hits: vec![serde_json::json!({"timestamp":"2025-01-01T10:00:00Z"})],
                     total: 1,
                     from: 0,
                     size: 10,
@@ -1006,6 +1111,7 @@ mod tests {
                     order_by_metadata: vec![],
                     converted_histogram_query: None,
                     is_histogram_eligible: None,
+                    query_index: None,
                 },
                 deltas: vec![],
                 has_cached_data: true,
@@ -1043,6 +1149,7 @@ mod tests {
                     order_by_metadata: vec![],
                     converted_histogram_query: None,
                     is_histogram_eligible: None,
+                    query_index: None,
                 },
                 deltas: vec![],
                 has_cached_data: true,
@@ -1107,6 +1214,7 @@ mod tests {
             search_type: Some(SearchEventType::UI),
             search_event_context: None,
             use_cache: true,
+            clear_cache: false,
             local_mode: None,
         };
         let mut origin_sql = req.query.sql.clone();

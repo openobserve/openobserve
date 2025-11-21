@@ -202,7 +202,7 @@ impl Sql {
         // 8. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
-            let has_original_column = has_original_column(&column_visitor.columns);
+            let has_original_column = has_original_column(&columns);
             used_schemas = generate_select_star_schema(
                 total_schemas,
                 &columns,

@@ -1,0 +1,54 @@
+.layout-panel-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.splitter {
+  height: 4px;
+  width: 100%;
+}
+
+.splitter-vertical {
+  width: 4px;
+  height: 100%;
+}
+
+.splitter-enabled {
+  background-color: #ffffff00;
+  transition: 0.3s;
+  transition-delay: 0.2s;
+}
+
+.splitter-enabled:hover {
+  background-color: orange;
+}
+
+:deep(.query-editor-splitter .q-splitter__separator) {
+  background-color: transparent !important;
+}
+
+.field-list-sidebar-header-collapsed {
+  cursor: pointer;
+  width: 50px;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.field-list-collapsed-icon {
+  margin-top: 10px;
+  font-size: 20px;
+}
+
+.field-list-collapsed-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: bold;
+}
+
+.warning {
+  color: var(--q-warning);
+}

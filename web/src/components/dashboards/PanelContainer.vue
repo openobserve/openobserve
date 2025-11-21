@@ -21,9 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     data-test="dashboard-panel-container"
   >
-    <div class="drag-allow">
+    <div :class="{ 'drag-allow': !viewOnly }">
       <q-bar
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'transparent'"
         dense
         class="q-px-xs"
         style="border-top-left-radius: 3px; border-top-right-radius: 3px"
@@ -98,7 +98,7 @@ self="top right" max-width="220px">
           </q-tooltip>
         </q-btn>
         <q-btn
-          v-if="maxQueryRange.length > 0"
+          v-if="maxQueryRangeWarning"
           :icon="outlinedWarning"
           flat
           size="xs"
@@ -109,7 +109,7 @@ self="top right" max-width="220px">
           <q-tooltip anchor="bottom right"
 self="top right" max-width="220px">
             <div style="white-space: pre-wrap">
-              {{ maxQueryRange.join("\n\n") }}
+              {{ maxQueryRangeWarning }}
             </div>
           </q-tooltip>
         </q-btn>
@@ -177,7 +177,7 @@ self="top right" max-width="220px">
           flat
           size="sm"
           padding="1px"
-          @click="onRefreshPanel"
+          @click="() => onRefreshPanel(false)"
           :title="t('panel.refreshPanel')"
           data-test="dashboard-panel-refresh-panel-btn"
           :color="variablesDataUpdated ? 'warning' : ''"
@@ -314,6 +314,20 @@ self="top right" max-width="220px">
               </q-item-section>
             </q-item>
             <q-item
+              v-if="config.isEnterprise === 'true'"
+              clickable
+              v-close-popup="true"
+              @click="onPanelModifyClick('Refresh')"
+            >
+              <q-item-section>
+                <q-item-label
+                  data-test="dashboard-refresh-without-cache"
+                  class="q-pa-sm"
+                  >Refresh Cache & Reload</q-item-label
+                >
+              </q-item-section>
+            </q-item>
+            <q-item
               clickable
               v-close-popup="true"
               @click="onPanelModifyClick('MovePanel')"
@@ -361,6 +375,7 @@ self="top right" max-width="220px">
       :dashboardName="props.dashboardName"
       :folderName="props.folderName"
       :viewOnly="viewOnly"
+      :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @limit-number-of-series-warning-message-update="
@@ -431,11 +446,12 @@ import {
 } from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
-import { getFunctionErrorMessage, getUUID } from "@/utils/zincutils";
+import { getFunctionErrorMessage, getUUID, processQueryMetadataErrors } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
+import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
 
 const QueryInspector = defineAsyncComponent(() => {
@@ -475,6 +491,7 @@ export default defineComponent({
     "dashboardName",
     "folderName",
     "allowAlertCreation",
+    "shouldRefreshWithoutCache",
   ],
   components: {
     PanelSchemaRenderer,
@@ -502,33 +519,15 @@ export default defineComponent({
       metaData.value = metadata;
     };
 
-    const maxQueryRange: any = ref([]);
+    const maxQueryRangeWarning = ref("");
 
     const limitNumberOfSeriesWarningMessage = ref("");
 
     const handleResultMetadataUpdate = (metadata: any) => {
-      const combinedWarnings: any[] = [];
-      metadata.forEach((query: any) => {
-        if (
-          query?.function_error &&
-          query?.new_start_time &&
-          query?.new_end_time
-        ) {
-          const combinedMessage = getFunctionErrorMessage(
-            query.function_error,
-            query.new_start_time,
-            query.new_end_time,
-            store.state.timezone,
-          );
-          combinedWarnings.push(combinedMessage);
-        } else if (query?.function_error) {
-          combinedWarnings.push(query.function_error);
-        }
-      });
-
-      // NOTE: for multi query, just show the first query warning
-      maxQueryRange.value =
-        combinedWarnings.length > 0 ? [combinedWarnings[0]] : [];
+      maxQueryRangeWarning.value = processQueryMetadataErrors(
+        metadata,
+        store.state.timezone,
+      );
     };
 
     // to store and show when the panel was last loaded
@@ -807,7 +806,7 @@ export default defineComponent({
       return newRunId;
     };
 
-    const onRefreshPanel = async () => {
+    const onRefreshPanel = async (shouldRefreshWithoutCache=false) => {
       // Need to generate a new run id when refreshing the panel
       generateNewDashboardRunId();
 
@@ -815,7 +814,7 @@ export default defineComponent({
 
       isPanelLoading.value = true;
       try {
-        await emit("refreshPanelRequest", props.data.id);
+        await emit("refreshPanelRequest", props.data.id, shouldRefreshWithoutCache);
       } finally {
         isPanelLoading.value = false;
       }
@@ -920,7 +919,7 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange,
       handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
       lastTriggeredAt,
-      maxQueryRange,
+      maxQueryRangeWarning,
       metaData,
       showViewPanel,
       dependentAdHocVariable,
@@ -939,6 +938,7 @@ export default defineComponent({
       handleLimitNumberOfSeriesWarningMessageUpdate,
       isPartialData,
       handleIsPartialDataUpdate,
+      config,
       t,
     };
   },
@@ -958,6 +958,8 @@ export default defineComponent({
         this.$emit("onEditLayout", this.props.data.id);
       } else if (evt == "CreateAlert") {
         this.createAlertFromPanel();
+      } else if (evt == "Refresh") {
+        this.onRefreshPanel(true);
       } else {
       }
     },

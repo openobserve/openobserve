@@ -57,7 +57,7 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
       ),
-    request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
+    request_body(content = inline(Alert), description = "Alert data", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -114,7 +114,7 @@ pub async fn save_alert(
         ("stream_name" = String, Path, description = "Stream name"),
         ("alert_name" = String, Path, description = "Alert name"),
       ),
-    request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
+    request_body(content = inline(Alert), description = "Alert data", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -336,7 +336,7 @@ async fn list_alerts(
         ("alert_name" = String, Path, description = "Alert name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Alert),
+        (status = 200, description = "Success",  content_type = "application/json", body = inline(Alert)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(

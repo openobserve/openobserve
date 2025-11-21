@@ -615,7 +615,7 @@ mod meta {
                 )
                 .await
                 {
-                    match db::scheduler::update_trigger(trigger).await {
+                    match db::scheduler::update_trigger(trigger, false, "").await {
                         Ok(_) => Ok(()),
                         Err(e) => {
                             log::error!("Failed to update trigger for alert {schedule_key}: {e}");
@@ -849,9 +849,10 @@ mod meta {
         pub ignore_case: bool,
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
     pub enum Operator {
         #[serde(rename = "=")]
+        #[default]
         EqualTo,
         #[serde(rename = "!=")]
         NotEqualTo,
@@ -865,12 +866,6 @@ mod meta {
         LessThanEquals,
         Contains,
         NotContains,
-    }
-
-    impl Default for Operator {
-        fn default() -> Self {
-            Self::EqualTo
-        }
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]

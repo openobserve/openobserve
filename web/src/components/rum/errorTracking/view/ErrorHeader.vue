@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-pt-sm q-pb-xs flex justify-start">
         <div
           data-test="back-button"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
+          class="flex justify-center items-center q-mr-md cursor-pointer hover:tw-text-[var(--o2-primary-btn-bg)]"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon
             size="12px"
             name="content_copy"
+            class="hover:tw-text-[var(--o2-primary-btn-bg)]"
             @click="copyErrorId(error.error_id)"
         /></span>
         <span class="q-ml-lg">{{ error.timestamp }}</span>

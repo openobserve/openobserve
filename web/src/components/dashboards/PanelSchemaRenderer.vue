@@ -183,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outline
           size="sm"
           @click="toggleAddAnnotationMode"
+          class="el-border"
         >
           <q-tooltip anchor="top middle" self="bottom right">
             {{
@@ -222,8 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openDrilldown(index)"
             style="cursor: pointer; display: flex; align-items: center"
           >
-            <q-icon class="q-mr-xs q-mt-xs"
-size="16px" name="link" />
+            <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
             <span>{{ drilldown.name }}</span>
           </div>
         </div>
@@ -309,7 +309,7 @@ import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
-import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { getUTCTimestampFromZonedTimestamp, validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 import { exportFile } from "quasar";
@@ -444,6 +444,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    shouldRefreshWithoutCache: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -504,6 +509,7 @@ export default defineComponent({
       folderName,
       searchResponse,
       is_ui_histogram,
+      shouldRefreshWithoutCache,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -535,6 +541,7 @@ export default defineComponent({
       is_ui_histogram,
       dashboardName,
       folderName,
+      shouldRefreshWithoutCache,
     );
 
     const {
@@ -916,6 +923,34 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Listen for layout changes to update chart dimensions
+    const handleWindowLayoutChanges = async () => {
+      if (chartPanelRef.value) {
+        await nextTick();
+        await convertPanelDataCommon();
+      }
+    };
+
+    // ResizeObserver to detect chartPanelRef dimension changes
+    let resizeObserver: ResizeObserver | null = null;
+
+    onMounted(() => {
+      if (chartPanelRef.value) {
+        resizeObserver = new ResizeObserver(() => {
+          handleWindowLayoutChanges();
+        });
+
+        resizeObserver.observe(chartPanelRef.value);
+      }
+    });
+
+    onUnmounted(() => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+        resizeObserver = null;
+      }
+    });
+
     watch(
       panelData,
       () => {
@@ -1281,7 +1316,7 @@ export default defineComponent({
 
     // get interval from resultMetaData if it exists
     const interval = computed(
-      () => resultMetaData?.value?.[0]?.histogram_interval,
+      () => resultMetaData?.value?.[0]?.[0]?.histogram_interval,
     );
 
     // get interval in micro seconds
@@ -1312,7 +1347,7 @@ export default defineComponent({
       interval: number | undefined,
     ) => {
       if (interval && hoveredTimestamp) {
-        const startTime = hoveredTimestamp * 1000; // Convert to microseconds
+        const startTime = hoveredTimestamp; // hovertedTimestamp is in microseconds
         return {
           startTime,
           endTime: startTime + interval,
@@ -1416,7 +1451,11 @@ export default defineComponent({
           variableValue =
             variable.value === null
               ? ""
-              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
+              : `${
+                  variable.escapeSingleQuotes
+                    ? escapeSingleQuotes(variable.value)
+                    : variable.value
+                }`;
           // if (query.includes(variableName)) {
           //   metadata.push({
           //     type: "variable",
@@ -1494,7 +1533,10 @@ export default defineComponent({
 
           const hoveredTime = drilldownParams[0]?.value?.[0];
           const hoveredTimestamp = hoveredTime
-            ? new Date(hoveredTime).getTime()
+            ? getUTCTimestampFromZonedTimestamp(
+                hoveredTime,
+                store.state.timezone,
+              )
             : null;
           const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 

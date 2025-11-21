@@ -13,13 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use config::ider;
 use opentelemetry::propagation::Extractor;
 use proto::cluster_rpc;
-
-use crate::service::promql;
 
 pub mod auth;
 pub mod flight;
@@ -46,8 +42,8 @@ impl Extractor for MetadataMap<'_> {
     }
 }
 
-impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
-    fn from(req: promql::MetricsQueryRequest) -> Self {
+impl From<crate::service::promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
+    fn from(req: crate::service::promql::MetricsQueryRequest) -> Self {
         let req_query = cluster_rpc::MetricsQueryStmt {
             query: req.query.to_owned(),
             start: req.start,
@@ -69,61 +65,8 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
             need_wal: false,
             query: Some(req_query),
             timeout: 0,
-            no_cache: req.no_cache.unwrap_or_default(),
+            use_cache: req.use_cache.unwrap_or(true),
             is_super_cluster: false,
-        }
-    }
-}
-
-impl From<&cluster_rpc::Label> for promql::value::Label {
-    fn from(req: &cluster_rpc::Label) -> Self {
-        promql::value::Label {
-            name: req.name.to_owned(),
-            value: req.value.to_owned(),
-        }
-    }
-}
-
-impl From<&promql::value::Label> for cluster_rpc::Label {
-    fn from(req: &promql::value::Label) -> Self {
-        cluster_rpc::Label {
-            name: req.name.to_owned(),
-            value: req.value.to_owned(),
-        }
-    }
-}
-
-impl From<&cluster_rpc::Sample> for promql::value::Sample {
-    fn from(req: &cluster_rpc::Sample) -> Self {
-        promql::value::Sample::new(req.time, req.value)
-    }
-}
-
-impl From<&promql::value::Sample> for cluster_rpc::Sample {
-    fn from(req: &promql::value::Sample) -> Self {
-        cluster_rpc::Sample {
-            time: req.timestamp,
-            value: req.value,
-        }
-    }
-}
-
-impl From<&promql::value::Exemplar> for cluster_rpc::Exemplar {
-    fn from(req: &promql::value::Exemplar) -> Self {
-        cluster_rpc::Exemplar {
-            time: req.timestamp,
-            value: req.value,
-            labels: req.labels.iter().map(|x| x.as_ref().into()).collect(),
-        }
-    }
-}
-
-impl From<&cluster_rpc::Exemplar> for promql::value::Exemplar {
-    fn from(req: &cluster_rpc::Exemplar) -> Self {
-        promql::value::Exemplar {
-            timestamp: req.time,
-            value: req.value,
-            labels: req.labels.iter().map(|x| Arc::new(x.into())).collect(),
         }
     }
 }

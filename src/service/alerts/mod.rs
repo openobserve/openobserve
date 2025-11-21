@@ -38,10 +38,14 @@ use tracing::Instrument;
 
 use super::promql;
 use crate::service::{
-    search as SearchService, self_reporting::http_report_metrics, setup_tracing_with_trace_id,
+    search::{self as SearchService, utils::is_permissable_function_error},
+    self_reporting::http_report_metrics,
+    setup_tracing_with_trace_id,
 };
 
 pub mod alert;
+#[cfg(feature = "enterprise")]
+pub mod deduplication;
 pub mod derived_streams;
 pub mod destinations;
 pub mod scheduler;
@@ -174,7 +178,7 @@ impl QueryConditionExt for QueryCondition {
                         (end - start) / promql::MAX_DATA_POINTS,
                     ),
                     query_exemplars: false,
-                    no_cache: None,
+                    use_cache: None,
                 };
                 let resp = match promql::search::search(&trace_id, org_id, &req, "", 0).await {
                     Ok(v) => v,
@@ -182,7 +186,7 @@ impl QueryConditionExt for QueryCondition {
                         return Ok(eval_results);
                     }
                 };
-                let promql::value::Value::Matrix(value) = resp else {
+                let config::meta::promql::value::Value::Matrix(value) = resp else {
                     log::warn!(
                         "Alert evaluate: trace_id: {trace_id}, PromQL query {v} returned unexpected response: {resp:?}"
                     );
@@ -398,6 +402,7 @@ impl QueryConditionExt for QueryCondition {
                 search_type,
                 search_event_context,
                 use_cache: false,
+                clear_cache: false,
                 local_mode: None,
             };
             log::debug!(
@@ -420,7 +425,13 @@ impl QueryConditionExt for QueryCondition {
         // 1. Vec<Map<String, Value>> - for normal alert
         // 2. Vec<Vec<Map<String, Value>>> - for multi_time_range alert
         let resp = match resp {
-            Ok(v) => {
+            Ok(mut v) => {
+                // Check if function error is only query limit default error
+                if is_permissable_function_error(&v.function_error) {
+                    v.function_error.clear();
+                    v.is_partial = false;
+                }
+
                 // the search request doesn't via cache layer, so need report usage separately
                 http_report_metrics(
                     req_start,

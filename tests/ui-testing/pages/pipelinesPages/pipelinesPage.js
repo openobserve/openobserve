@@ -29,10 +29,12 @@ export class PipelinesPage {
         this.savePipelineButton = page.locator(
           '[data-test="add-pipeline-save-btn"]'
         );
-        this.pipelineNameRequiredMessage = page.getByText(
+        // Target the form field error inside q-field__bottom, not the notification
+        this.pipelineNameRequiredMessage = page.locator('.q-field__bottom [role="alert"]').getByText(
           "Pipeline name is required"
         );
-        this.pipelineNameInput = page.getByLabel("Enter Pipeline Name");
+        // Updated selector to use placeholder since aria-label doesn't exist
+        this.pipelineNameInput = page.locator('input[placeholder="Enter Pipeline Name"]');
         this.sourceNodeRequiredMessage = page.getByText("Source node is required");
         this.streamNameInput = page.getByLabel("Stream Name *");
         this.e2eAutomateOption = page.getByRole("option", { name: "e2e_automate" , exact: true});
@@ -66,7 +68,11 @@ export class PipelinesPage {
         this.functionNameRequiredError = page.getByText('Function Name is required')
         this.functionRequiredError = page.getByText('Function is required')
         this.streamSelectionError = page.getByText('Please select Stream from the')
-        this.columnInput = page.getByPlaceholder('Column'); // Locator for the "Column" input field
+        // FilterGroup selectors for new condition UI
+        this.columnSelect = page.locator('[data-test="alert-conditions-select-column"]');
+        this.operatorSelect = page.locator('[data-test="alert-conditions-operator-select"]');
+        this.valueInput = page.locator('[data-test="alert-conditions-value-input"]');
+        this.addConditionButton = page.locator('[data-test="alert-conditions-add-condition-btn"]');
         this.columnOption = page.getByRole('option', { name: 'kubernetes_container_name' })
         this.fieldRequiredError = page.getByText('Field is required!')
         this.tableRowsLocator = page.locator("tbody tr");
@@ -79,7 +85,7 @@ export class PipelinesPage {
         this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
         this.enrichmentTableTab =
           '[data-test="function-enrichment-table-tab"] > .q-tab__content > .q-tab__label';
-        this.addEnrichmentTableButton = 'text=Add Enrichment Table';
+        this.addEnrichmentTableButton = 'text=New enrichment table';
         this.editButton = page.locator("button").filter({ hasText: "edit" });
         this.remoteDestinationIcon = page.getByRole("img", { name: "Remote Destination" });
         this.nameInput = page.getByLabel("Name *");
@@ -97,11 +103,10 @@ export class PipelinesPage {
         this.streamIcon = page.getByRole("img", { name: "Stream", exact: true });
         this.outputStreamIcon = page.getByRole("img", { name: "Output Stream" });
         this.containsOption = page.getByText("Contains", { exact: true });
-        this.valueInput = page.getByPlaceholder("Value");
         this.kubernetesContainerNameOption = page.getByRole("option", { name: "kubernetes_container_name" });
         this.conditionText = page.getByText('kubernetes_container_name');
         this.pipelineSavedMessage = page.getByText('Pipeline saved successfully');
-        this.addEnrichmentTableText = page.getByText("Add Enrichment Table");
+        this.addEnrichmentTableText = page.getByText("New enrichment table");
         this.deletedSuccessfullyText = page.getByText('deleted successfully');
         this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native");
         this.deleteButtonNth1 = page.locator("button").filter({ hasText: "delete" }).nth(1);
@@ -184,6 +189,7 @@ export class PipelinesPage {
     }
 
     async enterPipelineName(pipelineName) {
+        await this.pipelineNameInput.waitFor({ state: 'visible', timeout: 10000 });
         await this.pipelineNameInput.click();
         await this.pipelineNameInput.fill(pipelineName);
     }
@@ -324,8 +330,9 @@ export class PipelinesPage {
         await this.dragStreamToTarget(this.conditionButton, { x: 250, y: 250 });
     }
     async fillColumnAndSelectOption(columnName) {
-        await this.columnInput.click();
-        await this.columnInput.fill(columnName);
+        // Click the column select (q-select in FilterCondition)
+        await this.columnSelect.locator('input').click();
+        await this.columnSelect.locator('input').fill(columnName);
         await this.columnOption.click();
     }
     async saveCondition() {
@@ -485,16 +492,23 @@ export class PipelinesPage {
     async setupContainerNameCondition() {
         // Use drag and drop approach for condition node
         await this.selectAndDragCondition();
-        await this.columnInput.click();
-        await this.columnInput.fill("container_name");
         await this.page.waitForTimeout(1000);
+
+        // FilterGroup UI: Click column select and fill
+        await this.columnSelect.locator('input').click();
+        await this.columnSelect.locator('input').fill("container_name");
+        await this.page.waitForTimeout(500);
         await this.page.getByRole("option", { name: "kubernetes_container_name" }).click();
-        await this.page.locator(
-            "div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native"
-        ).click();
+
+        // Click operator select and choose Contains
+        await this.operatorSelect.click();
+        await this.page.waitForTimeout(300);
         await this.containsOption.click();
-        await this.valueInput.click();
-        await this.valueInput.fill("ziox");
+
+        // Fill value input
+        await this.valueInput.locator('input').click();
+        await this.valueInput.locator('input').fill("ziox");
+
         await this.saveCondition();
         await this.page.waitForTimeout(2000);
     }

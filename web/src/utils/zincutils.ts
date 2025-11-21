@@ -1098,27 +1098,11 @@ export const getWebSocketUrl = (
 };
 
 export const isWebSocketEnabled = (data: any) => {
-  if (!data.zoConfig?.websocket_enabled) {
-    return false;
-  }
-
-  if ((window as any).use_web_socket === undefined) {
-    return data.organizationData?.organizationSettings?.enable_websocket_search;
-  } else {
-    return (window as any).use_web_socket;
-  }
+  return false;
 };
 
 export const isStreamingEnabled = (data: any) => {
-  if (!data.zoConfig?.streaming_enabled) {
-    return false;
-  }
-
-  if ((window as any).use_streaming === undefined) {
-    return data.organizationData?.organizationSettings?.enable_streaming_search;
-  } else {
-    return (window as any).use_streaming;
-  }
+  return true;
 };
 
 export const maxLengthCharValidation = (
@@ -1261,4 +1245,175 @@ export const getDuration = (createdAt: number) => {
     durationInSeconds,
     duration: durationFormatter(durationInSeconds),
   };
+};
+
+
+export const mergeAndRemoveDuplicates = (arr1: string[], arr2: string[]): string[] => {
+  // Merge both arrays, then remove duplicates using Set
+  return [...new Set([...arr1, ...arr2])];
+};
+
+/**
+ * Process query metadata and extract error messages with deduplication
+ * Handles both multi-query format (array of arrays) and single query format
+ *
+ * @param metadata - Query metadata containing potential function errors
+ * @param timezone - Timezone for formatting time in error messages (default: "UTC")
+ * @returns Joined string of deduplicated error messages
+ */
+export const processQueryMetadataErrors = (
+  metadata: any,
+  timezone: string = "UTC"
+): string => {
+  if (!metadata || metadata.length === 0) {
+    return "";
+  }
+
+  const combinedWarnings: string[] = [];
+
+  // Handle multi-query format (array of arrays)
+  if (Array.isArray(metadata[0])) {
+    metadata[0].forEach((query: any) => {
+      if (query?.function_error && query?.new_start_time && query?.new_end_time) {
+        const combinedMessage = getFunctionErrorMessage(
+          query.function_error,
+          query.new_start_time,
+          query.new_end_time,
+          timezone,
+        );
+        combinedWarnings.push(combinedMessage);
+      } else if (query?.function_error) {
+        combinedWarnings.push(...query.function_error);
+      }
+    });
+  } else {
+    // Handle single query format (backward compatibility)
+    const query = metadata[0];
+    if (query?.function_error && query?.new_start_time && query?.new_end_time) {
+      const combinedMessage = getFunctionErrorMessage(
+        query.function_error,
+        query.new_start_time,
+        query.new_end_time,
+        timezone,
+      );
+      combinedWarnings.push(combinedMessage);
+    } else if (query?.function_error) {
+      combinedWarnings.push(query.function_error);
+    }
+  }
+
+  // Deduplicate using mergeAndRemoveDuplicates (pass empty array as second param)
+  const dedupedWarnings = mergeAndRemoveDuplicates(combinedWarnings, []);
+  return dedupedWarnings.join(", ");
+};
+
+/**
+ * Calculates relative time period from start and end time in microseconds
+ * @param startTime - Start time in microseconds
+ * @param endTime - End time in microseconds
+ * @returns Relative time period string (e.g., "15m", "1h", "7d")
+ */
+export const calculateRelativeTimePeriod = (
+  startTime: number,
+  endTime: number
+): string => {
+  const diffInMicroseconds = endTime - startTime;
+  const diffInSeconds = Math.floor(diffInMicroseconds / 1000000);
+
+  // Define time units in seconds
+  const units = [
+    { label: "M", value: 2592000 }, // ~30 days
+    { label: "w", value: 604800 },  // 7 days
+    { label: "d", value: 86400 },   // 1 day
+    { label: "h", value: 3600 },    // 1 hour
+    { label: "m", value: 60 },      // 1 minute
+    { label: "s", value: 1 },       // 1 second
+  ];
+
+  // Find the best matching unit
+  for (const unit of units) {
+    if (diffInSeconds >= unit.value && diffInSeconds % unit.value === 0) {
+      const value = Math.floor(diffInSeconds / unit.value);
+      return `${value}${unit.label}`;
+    }
+  }
+
+  // If no exact match, return in seconds
+  return `${diffInSeconds}s`;
+};
+
+/**
+ * Calculates selectedDate and selectedTime for absolute time type
+ * @param startTime - Start time in microseconds
+ * @param endTime - End time in microseconds
+ * @returns Object with selectedDate (from/to) and selectedTime (startTime/endTime)
+ */
+export const calculateAbsoluteDateTime = (
+  startTime: number,
+  endTime: number
+): {
+  selectedDate: { from: string; to: string };
+  selectedTime: { startTime: string; endTime: string };
+} => {
+  const startDate = new Date(startTime / 1000); // Convert microseconds to milliseconds
+  const endDate = new Date(endTime / 1000);
+
+  // Format date as YYYY/MM/DD
+  const formatDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}/${month}/${day}`;
+  };
+
+  // Format time as HH:mm:ss
+  const formatTime = (date: Date): string => {
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    return `${hours}:${minutes}:${seconds}`;
+  };
+
+  return {
+    selectedDate: {
+      from: formatDate(startDate),
+      to: formatDate(endDate),
+    },
+    selectedTime: {
+      startTime: formatTime(startDate),
+      endTime: formatTime(endDate),
+    },
+  };
+};
+
+/**
+ * Builds complete datetime object with all required fields based on type
+ * @param startTime - Start time in microseconds
+ * @param endTime - End time in microseconds
+ * @param type - Type of datetime ("relative" or "absolute")
+ * @returns Complete datetime object with all required fields
+ */
+export const buildDateTimeObject = (
+  startTime: number,
+  endTime: number,
+  type: "relative" | "absolute"
+): any => {
+  const baseObj: any = {
+    startTime,
+    endTime,
+    type,
+  };
+
+  if (type === "relative") {
+    // For relative type, calculate relativeTimePeriod
+    baseObj.relativeTimePeriod = calculateRelativeTimePeriod(startTime, endTime);
+  } else if (type === "absolute") {
+    // For absolute type, calculate selectedDate and selectedTime
+    const absoluteDateTime = calculateAbsoluteDateTime(startTime, endTime);
+    baseObj.selectedDate = absoluteDateTime.selectedDate;
+    baseObj.selectedTime = absoluteDateTime.selectedTime;
+    baseObj.relativeTimePeriod = null; // Set to null for absolute type
+  }
+
+  return baseObj;
 };

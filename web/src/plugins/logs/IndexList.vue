@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="column logs-index-menu full-height"
+    class="column logs-index-menu !tw-p-[0.375rem] tw-h-[calc(100%-0.7rem)]"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div>
@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :placeholder="placeHolderText"
         input-debounce="0"
         behavior="menu"
-        filled
         borderless
         dense
         use-input
@@ -74,690 +73,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-no-field-found-text"
         class="text-center col-10 q-mx-none"
       >
-        <q-icon name="info" color="primary" size="xs" /> No field found in
+        <q-icon name="info" color="primary"
+size="xs" /> No field found in
         selected stream.
       </h3>
     </div>
     <div v-else class="index-table q-mt-xs">
-      <q-table
-        data-test="log-search-index-list-fields-table"
-        v-model="sortedStreamFields"
-        :visible-columns="['name']"
-        :rows="streamFieldsRows"
-        :row-key="
-          (row: any) => searchObj.data.stream.selectedStream[0] + row.name
-        "
-        :filter="searchObj.data.stream.filterField"
-        :filter-method="filterFieldFn"
-        v-model:pagination="pagination"
-        hide-header
+      <FieldList
+        ref="fieldListRef"
+        :stream-fields-rows="streamFieldsRows"
+        :selected-stream="searchObj.data.stream.selectedStream[0]"
+        :filter-field="searchObj.data.stream.filterField"
+        :filter-field-fn="filterFieldFn"
+        :pagination="pagination"
+        @update:pagination="pagination = $event"
+        @update:filter-field="searchObj.data.stream.filterField = $event"
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-        class="field-table full-height"
-        id="fieldList"
-        :rows-per-page-options="[]"
-      >
-        <template #body-cell-name="props">
-          <q-tr
-            :props="props"
-            v-if="
-              props.row.label &&
-              (showOnlyInterestingFields
-                ? searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-                    props.row.group
-                  ]
-                : true)
-            "
-            @click="
-              searchObj.data.stream.expandGroupRows[props.row.group] =
-                !searchObj.data.stream.expandGroupRows[props.row.group]
-            "
-            class="cursor-pointer text-bold"
-          >
-            <q-td
-              class="field_list"
-              style="line-height: 28px; padding-left: 10px"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'bg-grey-3'
-              "
-            >
-              {{ props.row.name }} ({{
-                showOnlyInterestingFields
-                  ? searchObj.data.stream
-                      .interestingExpandedGroupRowsFieldCount[props.row.group]
-                  : searchObj.data.stream.expandGroupRowsFieldCount[
-                      props.row.group
-                    ]
-              }})
-              <q-icon
-                v-if="
-                  searchObj.data.stream.expandGroupRowsFieldCount[
-                    props.row.group
-                  ] > 0
-                "
-                :name="
-                  searchObj.data.stream.expandGroupRows[props.row.group]
-                    ? 'expand_less'
-                    : 'expand_more'
-                "
-                size="20px"
-                class="float-right q-mt-xs"
-              ></q-icon>
-            </q-td>
-          </q-tr>
-          <q-tr
-            :props="props"
-            v-else-if="
-              !showOnlyInterestingFields ||
-              (showOnlyInterestingFields &&
-                props.row.isInterestingField &&
-                searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-                  props.row.group
-                ])
-            "
-            v-show="searchObj.data.stream.expandGroupRows[props.row.group]"
-          >
-            <q-td
-              :props="props"
-              class="field_list"
-              :class="
-                searchObj.data.stream.selectedFields.includes(props.row.name)
-                  ? 'selected'
-                  : ''
-              "
-            >
-              <!-- TODO OK : Repeated code make separate component to display field  -->
-              <div
-                v-if="
-                  props.row.ftsKey ||
-                  !props.row.isSchemaField ||
-                  !props.row.showValues
-                "
-                class="field-container flex content-center ellipsis q-pl-lg full-width"
-                :title="props.row.name"
-              >
-                <div
-                  class="field_label full-width"
-                  :data-test="`logs-field-list-item-${props.row.name}`"
-                >
-                  <div
-                    class="ellipsis"
-                    style="max-width: 90% !important; display: inline-block"
-                  >
-                    {{ props.row.name }}
-                  </div>
-                  <span class="float-right">
-                    <q-icon
-                      :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                      v-if="
-                        searchObj.meta.quickMode &&
-                        props.row.name !== store.state.zoConfig.timestamp_column
-                      "
-                      :name="
-                        props.row.isInterestingField ? 'info' : 'info_outline'
-                      "
-                      :class="
-                        store.state.theme === 'dark' ? '' : 'light-dimmed'
-                      "
-                      style="margin-right: 0.375rem"
-                      size="1.1rem"
-                      :title="
-                        props.row.isInterestingField
-                          ? 'Remove from interesting fields'
-                          : 'Add to interesting fields'
-                      "
-                    />
-                  </span>
-                </div>
-                <div class="field_overlay" v-if="props.row.name !== store.state.zoConfig.timestamp_column">
-                  <q-btn
-                    v-if="
-                      props.row.isSchemaField &&
-                      props.row.name != store.state.zoConfig.timestamp_column
-                    "
-                    :icon="outlinedAdd"
-                    :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                    style="margin-right: 0.375rem"
-                    size="0.4rem"
-                    class="q-mr-sm"
-                    @click.stop="addToFilter(`${props.row.name}=''`)"
-                    round
-                  />
-                  <q-icon
-                    :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
-                    v-if="
-                      !searchObj.data.stream.selectedFields.includes(
-                        props.row.name,
-                      ) && props.row.name !== store.state.zoConfig.timestamp_column
-                    "
-                    :name="outlinedVisibility"
-                    style="margin-right: 0.375rem"
-                    size="1.1rem"
-                    title="Add field to table"
-                    @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                  />
-                  <q-icon
-                    :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
-                    v-if="
-                      searchObj.data.stream.selectedFields.includes(
-                        props.row.name,
-                      )
-                    "
-                    :name="outlinedVisibilityOff"
-                    style="margin-right: 0.375rem"
-                    size="1.1rem"
-                    title="Remove field from table"
-                    @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                  />
-                  <q-icon
-                    :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                    v-if="
-                      searchObj.meta.quickMode &&
-                      props.row.name !== store.state.zoConfig.timestamp_column
-                    "
-                    :name="
-                      props.row.isInterestingField ? 'info' : 'info_outline'
-                    "
-                    size="1.1rem"
-                    :title="
-                      props.row.isInterestingField
-                        ? 'Remove from interesting fields'
-                        : 'Add to interesting fields'
-                    "
-                    @click.stop="
-                      addToInterestingFieldList(
-                        props.row,
-                        props.row.isInterestingField,
-                      )
-                    "
-                  />
-                </div>
-              </div>
-              <q-expansion-item
-                v-else
-                dense
-                switch-toggle-side
-                :label="props.row.name"
-                expand-icon-class="field-expansion-icon"
-                expand-icon="
-                  expand_more
-                "
-                expanded-icon="
-                  expand_less
-                "
-                @before-show="
-                  (event: any) => openFilterCreator(event, props.row)
-                "
-                @before-hide="(event: any) => cancelFilterCreator(props.row)"
-              >
-                <template v-slot:header>
-                  <div
-                    class="flex content-center ellipsis full-width"
-                    :title="props.row.name"
-                    :data-test="`log-search-expand-${props.row.name}-field-btn`"
-                  >
-                    <div
-                      class="field_label full-width"
-                      :data-test="`logs-field-list-item-${props.row.name}`"
-                    >
-                      <div
-                        class="ellipsis"
-                        style="max-width: 90% !important; display: inline-block"
-                      >
-                        {{ props.row.name }}
-                      </div>
-                      <span class="float-right">
-                        <q-icon
-                          :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                          v-if="searchObj.meta.quickMode"
-                          :name="
-                            props.row.isInterestingField
-                              ? 'info'
-                              : 'info_outline'
-                          "
-                          :class="
-                            store.state.theme === 'dark' ? '' : 'light-dimmed'
-                          "
-                          style="margin-right: 0.375rem"
-                          size="1.1rem"
-                          :title="
-                            props.row.isInterestingField
-                              ? 'Remove from interesting fields'
-                              : 'Add to interesting fields'
-                          "
-                        />
-                      </span>
-                    </div>
-                    <div class="field_overlay">
-                      <q-btn
-                        v-if="props.row.isSchemaField"
-                        :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                        :icon="outlinedAdd"
-                        style="margin-right: 0.375rem"
-                        size="0.4rem"
-                        class="q-mr-sm"
-                        @click.stop="addToFilter(`${props.row.name}=''`)"
-                        round
-                      />
-                      <q-icon
-                        :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
-                        v-if="
-                          !searchObj.data.stream.selectedFields.includes(
-                            props.row.name,
-                          )
-                        "
-                        :name="outlinedVisibility"
-                        style="margin-right: 0.375rem"
-                        size="1.1rem"
-                        title="Add field to table"
-                        @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                      />
-                      <q-icon
-                        :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
-                        v-if="
-                          searchObj.data.stream.selectedFields.includes(
-                            props.row.name,
-                          )
-                        "
-                        :name="outlinedVisibilityOff"
-                        style="margin-right: 0.375rem"
-                        title="Remove field from table"
-                        size="1.1rem"
-                        @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                      />
-                      <q-icon
-                        :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                        v-if="searchObj.meta.quickMode"
-                        :name="
-                          props.row.isInterestingField ? 'info' : 'info_outline'
-                        "
-                        size="1.1rem"
-                        :title="
-                          props.row.isInterestingField
-                            ? 'Remove from interesting fields'
-                            : 'Add to interesting fields'
-                        "
-                        @click.stop="
-                          addToInterestingFieldList(
-                            props.row,
-                            props.row.isInterestingField,
-                          )
-                        "
-                      />
-                    </div>
-                  </div>
-                </template>
-                <q-card>
-                  <q-card-section class="q-pl-md q-pr-xs q-py-xs">
-                    <div class="filter-values-container">
-                      <div
-                        v-show="fieldValues[props.row.name]?.isLoading"
-                        class="q-pl-md q-py-xs"
-                        style="height: 60px"
-                      >
-                        <q-inner-loading
-                          size="xs"
-                          :showing="fieldValues[props.row.name]?.isLoading"
-                          label="Fetching values..."
-                          label-style="font-size: 1.1em"
-                        />
-                      </div>
-                      <div
-                        v-show="
-                          !fieldValues[props.row.name]?.values?.length &&
-                          !fieldValues[props.row.name]?.isLoading
-                        "
-                        class="q-pl-md q-py-xs text-subtitle2"
-                      >
-                        {{
-                          fieldValues[props.row.name]?.errMsg ||
-                          "No values found"
-                        }}
-                      </div>
-                      <div
-                        v-for="value in fieldValues[props.row.name]?.values ||
-                        []"
-                        :key="value.key"
-                      >
-                        <q-list dense>
-                          <q-item
-                            tag="label"
-                            class="q-pr-none"
-                            :data-test="`logs-search-subfield-add-${props.row.name}-${value.key}`"
-                          >
-                            <div
-                              class="flex row wrap justify-between"
-                              :style="
-                                searchObj.data.stream.selectedStream.length ==
-                                props.row.streams.length
-                                  ? 'width: calc(100% - 42px)'
-                                  : 'width: calc(100% - 0px)'
-                              "
-                            >
-                              <div
-                                :title="value.key"
-                                class="ellipsis q-pr-xs"
-                                style="width: calc(100% - 50px)"
-                              >
-                                {{ value.key }}
-                              </div>
-                              <div
-                                :title="value.count.toString()"
-                                class="ellipsis text-right q-pr-sm"
-                                style="display: contents"
-                                :style="
-                                  searchObj.data.stream.selectedStream.length ==
-                                  props.row.streams.length
-                                    ? 'width: 50px'
-                                    : ''
-                                "
-                              >
-                                {{ formatLargeNumber(value.count) }}
-                              </div>
-                            </div>
-                            <div
-                              v-if="
-                                searchObj.data.stream.selectedStream.length ==
-                                props.row.streams.length
-                              "
-                              class="flex row"
-                              :class="
-                                store.state.theme === 'dark'
-                                  ? 'text-white'
-                                  : 'text-black'
-                              "
-                            >
-                              <q-btn
-                                class="q-mr-xs"
-                                size="6px"
-                                @click="
-                                  addSearchTerm(
-                                    props.row.name,
-                                    value.key,
-                                    'include',
-                                  )
-                                "
-                                title="Include Term"
-                                round
-                                :data-test="`log-search-subfield-list-equal-${props.row.name}-field-btn`"
-                              >
-                                <q-icon>
-                                  <EqualIcon></EqualIcon>
-                                </q-icon>
-                              </q-btn>
-                              <q-btn
-                                size="6px"
-                                @click="
-                                  addSearchTerm(
-                                    props.row.name,
-                                    value.key,
-                                    'exclude',
-                                  )
-                                "
-                                title="Exclude Term"
-                                round
-                                :data-test="`log-search-subfield-list-not-equal-${props.row.name}-field-btn`"
-                              >
-                                <q-icon>
-                                  <NotEqualIcon></NotEqualIcon>
-                                </q-icon>
-                              </q-btn>
-                            </div>
-                          </q-item>
-                        </q-list>
-                      </div>
-                    </div>
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
-            </q-td>
-          </q-tr>
-        </template>
-        <template #top-right>
-          <q-input
-            data-test="log-search-index-list-field-search-input"
-            v-model="searchObj.data.stream.filterField"
-            data-cy="index-field-search-input"
-            filled
-            borderless
-            dense
-            clearable
-            debounce="1"
-            :placeholder="t('search.searchField')"
-          >
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-          <q-tr v-if="searchObj.loadingStream == true">
-            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
-              <div class="text-subtitle2 text-weight-bold">
-                <q-spinner-hourglass size="20px" />
-                {{ t("confirmDialog.loading") }}
-              </div>
-            </q-td>
-          </q-tr>
-        </template>
-        <template v-slot:pagination="scope">
-          <div v-if="showUserDefinedSchemaToggle">
-            <q-btn-toggle
-              no-caps
-              v-model="searchObj.meta.useUserDefinedSchemas"
-              data-test="logs-page-field-list-user-defined-schema-toggle"
-              class="schema-field-toggle q-mr-xs"
-              toggle-color="primary"
-              bordered
-              size="8px"
-              color="white"
-              text-color="primary"
-              @update:model-value="toggleSchema"
-              :options="userDefinedSchemaBtnGroupOption"
-            >
-              <template v-slot:user_defined_slot>
-                <div data-test="logs-user-defined-fields-btn">
-                  <q-icon name="person"></q-icon>
-                  <q-icon name="schema"></q-icon>
-                  <q-tooltip
-                    data-test="logs-page-fields-list-user-defined-fields-warning-tooltip"
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    class="text-body2"
-                  >
-                    <span class="text-bold" color="white">{{
-                      t("search.userDefinedSchemaLabel")
-                    }}</span>
-                  </q-tooltip>
-                </div>
-              </template>
-              <template v-slot:all_fields_slot>
-                <div data-test="logs-all-fields-btn">
-                  <q-icon name="schema"></q-icon>
-                  <q-tooltip
-                    data-test="logs-page-fields-list-all-fields-warning-tooltip"
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    class="text-body2"
-                  >
-                    <span class="text-bold" color="white">{{
-                      t("search.allFieldsLabel")
-                    }}</span>
-                    <q-separator color="white" class="q-mt-xs q-mb-xs" />
-                    {{ t("search.allFieldsWarningMsg") }}
-                  </q-tooltip>
-                </div>
-              </template>
-              <template
-                v-slot:interesting_fields_slot
-                v-if="searchObj.meta.quickMode"
-              >
-                <div data-test="logs-interesting-fields-btn">
-                  <q-icon name="info" />
-                  <q-icon name="schema"></q-icon>
-                  <q-tooltip
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    class="text-body2"
-                  >
-                    <span class="text-bold" color="white">{{
-                      t("search.showOnlyInterestingFields")
-                    }}</span>
-                  </q-tooltip>
-                </div>
-              </template>
-            </q-btn-toggle>
-          </div>
-          <div v-else-if="searchObj.meta.quickMode">
-            <q-btn-toggle
-              no-caps
-              v-model="showOnlyInterestingFields"
-              data-test="logs-page-field-list-user-defined-schema-toggle"
-              class="schema-field-toggle q-mr-xs"
-              toggle-color="primary"
-              bordered
-              size="8px"
-              color="white"
-              text-color="primary"
-              :options="selectedFieldsBtnGroupOption"
-              @update:model-value="toggleInterestingFields"
-            >
-              <template v-slot:all_fields_slot>
-                <div data-test="logs-all-fields-btn">
-                  <q-icon name="schema"></q-icon>
-                  <q-tooltip
-                    data-test="logs-page-fields-list-all-fields-warning-tooltip"
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    class="text-body2"
-                  >
-                    <span class="text-bold" color="white">{{
-                      t("search.allFieldsLabel")
-                    }}</span>
-                    <q-separator color="white" class="q-mt-xs q-mb-xs" />
-                    {{ t("search.allFieldsWarningMsg") }}
-                  </q-tooltip>
-                </div>
-              </template>
-              <template
-                v-slot:interesting_fields_slot
-                v-if="searchObj.meta.quickMode"
-              >
-                <div data-test="logs-interesting-fields-btn">
-                  <q-icon name="info" />
-                  <q-icon name="schema"></q-icon>
-                  <q-tooltip
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    class="text-body2"
-                  >
-                    <span class="text-bold" color="white">{{
-                      t("search.showOnlyInterestingFields")
-                    }}</span>
-                  </q-tooltip>
-                </div>
-              </template>
-            </q-btn-toggle>
-          </div>
-          <div class="q-ml-xs text-right col" v-if="scope.pagesNumber > 1">
-            <q-tooltip
-              data-test="logs-page-fields-list-pagination-tooltip"
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              class="text-body2"
-            >
-              Total Fields:
-              {{
-                searchObj.data.stream.selectedStream.length > 1
-                  ? searchObj.data.stream.selectedStreamFields.length -
-                    (searchObj.data.stream.selectedStream.length + 1)
-                  : searchObj.data.stream.selectedStreamFields.length
-              }}
-            </q-tooltip>
-
-            <q-btn
-              data-test="logs-page-fields-list-pagination-firstpage-button"
-              v-if="scope.pagesNumber > 2"
-              icon="skip_previous"
-              color="grey-8"
-              round
-              dense
-              flat
-              :disable="scope.isFirstPage"
-              @click="scope.firstPage"
-            />
-
-            <q-btn
-              data-test="logs-page-fields-list-pagination-previouspage-button"
-              icon="fast_rewind"
-              color="grey-8"
-              round
-              dense
-              flat
-              :disable="scope.isFirstPage"
-              @click="scope.prevPage"
-            />
-
-            <q-btn
-              round
-              data-test="logs-page-fields-list-pagination-message-button"
-              dense
-              flat
-              class="text text-caption text-regular"
-              >{{ scope.pagination.page }}/{{ scope.pagesNumber }}</q-btn
-            >
-
-            <q-btn
-              data-test="logs-page-fields-list-pagination-nextpage-button"
-              icon="fast_forward"
-              color="grey-8"
-              round
-              dense
-              flat
-              :disable="scope.isLastPage"
-              @click="scope.nextPage"
-            />
-
-            <q-btn
-              data-test="logs-page-fields-list-pagination-lastpage-button"
-              v-if="scope.pagesNumber > 2"
-              icon="skip_next"
-              color="grey-8"
-              round
-              dense
-              flat
-              :disable="scope.isLastPage"
-              @click="scope.lastPage"
-            />
-          </div>
-          <div
-            class="q-ml-xs text-right"
-            :class="scope.pagesNumber > 1 ? 'col-1' : 'col'"
-          >
-            <q-icon
-              name="restart_alt"
-              size="21px"
-              data-test="logs-page-fields-list-reset-icon"
-              class="cursor-pointer"
-              @click="resetSelectedFileds"
-            />
-            <q-tooltip
-              data-test="logs-page-fields-list-reset-tooltip"
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              class="text-body2"
-            >
-              <span class="text-bold" color="white">{{
-                t("search.resetFields")
-              }}</span>
-            </q-tooltip>
-          </div>
-        </template>
-      </q-table>
+        :loading-stream="searchObj.loadingStream"
+        :show-only-interesting-fields="showOnlyInterestingFields"
+        :interesting-expanded-group-rows-field-count="
+          searchObj.data.stream.interestingExpandedGroupRowsFieldCount
+        "
+        :expand-group-rows-field-count="
+          searchObj.data.stream.expandGroupRowsFieldCount
+        "
+        :expand-group-rows="searchObj.data.stream.expandGroupRows"
+        :theme="store.state.theme"
+        :selected-fields="searchObj.data.stream.selectedFields"
+        :timestamp-column="store.state.zoConfig.timestamp_column"
+        :show-quick-mode="searchObj.meta.quickMode"
+        :field-values="fieldValues"
+        :selected-streams-count="searchObj.data.stream.selectedStream.length"
+        :show-user-defined-schema-toggle="showUserDefinedSchemaToggle"
+        :use-user-defined-schemas="searchObj.meta.useUserDefinedSchemas"
+        :user-defined-schema-btn-group-option="userDefinedSchemaBtnGroupOption"
+        :selected-fields-btn-group-option="selectedFieldsBtnGroupOption"
+        :total-fields-count="
+          searchObj.data.stream.selectedStream.length > 1
+            ? searchObj.data.stream.selectedStreamFields.length -
+              (searchObj.data.stream.selectedStream.length + 1)
+            : searchObj.data.stream.selectedStreamFields.length
+        "
+        @add-to-filter="addToFilter"
+        @toggle-field="clickFieldFn"
+        @toggle-interesting="addToInterestingFieldList"
+        @add-search-term="addSearchTerm"
+        @before-show="openFilterCreator"
+        @before-hide="cancelFilterCreator"
+        @toggle-group="toggleFieldGroup"
+        @toggle-schema="toggleSchema"
+        @toggle-interesting-fields="toggleInterestingFields"
+        @set-page="setPage"
+        @reset-fields="resetSelectedFileds"
+      />
     </div>
   </div>
 </template>
@@ -771,6 +139,8 @@ import {
   computed,
   onBeforeMount,
   onBeforeUnmount,
+  nextTick,
+  defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -784,11 +154,8 @@ import {
   formatLargeNumber,
   useLocalInterestingFields,
   generateTraceContext,
-  isWebSocketEnabled,
   isStreamingEnabled,
-  b64EncodeStandard,
   addSpacesToOperators,
-  deepCopy,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import {
@@ -816,7 +183,13 @@ interface Filter {
 }
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
-  components: { EqualIcon, NotEqualIcon },
+  components: { 
+    EqualIcon, 
+    NotEqualIcon,      
+    FieldList: defineAsyncComponent(
+      () => import("@/plugins/logs/components/FieldList.vue"),
+    ), 
+  },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {
@@ -868,7 +241,8 @@ export default defineComponent({
     const { onStreamChange, handleQueryData } = useSearchBar();
     const { validateFilterForMultiStream } = useSearchStream();
 
-    const {fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField} = logsUtils();
+    const { fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField } =
+      logsUtils();
 
     const {
       fetchQueryDataWithWebSocket,
@@ -928,6 +302,11 @@ export default defineComponent({
       };
     }> = ref({});
 
+    const pagination = ref({
+      page: 1,
+      rowsPerPage: 25,
+    });
+
     const streamTypes = [
       { label: t("search.logs"), value: "logs" },
       { label: t("search.enrichmentTables"), value: "enrichment_tables" },
@@ -965,18 +344,45 @@ export default defineComponent({
 
     const resetFields = async () => {
       searchObj.loadingStream = true;
-      streamSchemaFieldsIndexMapping.value = {};
 
-      // Selected streams has usd
-      setTimeout(async () => {
-        await extractFields();
-        searchObj.loadingStream = false;
-      }, 0);
+      // Wait for next tick to ensure loading state is rendered
+      await nextTick();
+
+      streamSchemaFieldsIndexMapping.value = {};
+      await extractFields();
+
+      // Wait for next tick before removing loading state
+      await nextTick();
+      searchObj.loadingStream = false;
+    };
+
+    const fieldListRef = ref<HTMLElement | null>(null);
+
+    const scrollToTop = () => {
+      if (fieldListRef.value) {
+        // Find the scrollable container within the q-table
+        const scrollContainer = fieldListRef.value.querySelector(
+          ".q-table__middle.scroll",
+        );
+        if (scrollContainer) {
+          scrollContainer.scrollTop = 0;
+        }
+      }
+    };
+
+    const resetPagination = () => {
+      pagination.value.page = 1;
+
+      // Reset scroll position when changing tabs
+      nextTick(() => {
+        scrollToTop();
+      });
     };
 
     watch(
       () => searchObj.meta.quickMode,
       (isActive) => {
+
         if (isActive) {
           // check if its present in the array dont add it again
           if (
@@ -990,7 +396,6 @@ export default defineComponent({
               slot: "interesting_fields_slot",
             });
           }
-
           setDefaultFieldTab();
         } else {
           userDefinedSchemaBtnGroupOption.value =
@@ -999,8 +404,13 @@ export default defineComponent({
             );
 
           if (searchObj.meta.useUserDefinedSchemas === "interesting_fields") {
+            // As we are changing the tab reset the pagination
+            if (pagination.value) resetPagination();
             searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
           }
+
+          if(showOnlyInterestingFields.value)if (pagination.value) resetPagination();
+          
           showOnlyInterestingFields.value = false;
         }
       },
@@ -1009,13 +419,13 @@ export default defineComponent({
       },
     );
 
-    watch(
-      () => searchObj.meta.quickMode,
-      () => {
-        // if quick mode is called, reset fields
-        resetFields();
-      },
-    );
+    // Removed resetFields() call on quick mode toggle to prevent flicker
+    // watch(
+    //   () => searchObj.meta.quickMode,
+    //   () => {
+    //     resetFields();
+    //   },
+    // );
 
     watch(
       () => [
@@ -1057,9 +467,13 @@ export default defineComponent({
     // store.state.zoConfig.interesting_field_enabled was set as interesting fields was getting set by default with _timestamp field
     function setDefaultFieldTab() {
       if (store.state.zoConfig.log_page_default_field_list === "uds") {
+        // reset pagination only if tab has changed
+        if(searchObj.meta.useUserDefinedSchemas !== 'user_defined_schema') resetPagination();
         searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
         showOnlyInterestingFields.value = false;
       } else {
+        // reset pagination only if tab has changed
+        if(searchObj.meta.useUserDefinedSchemas !== 'interesting_fields') resetPagination();
         searchObj.meta.useUserDefinedSchemas = "interesting_fields";
         showOnlyInterestingFields.value = true;
       }
@@ -1080,6 +494,9 @@ export default defineComponent({
           }
         }
       }
+      if(!filtered.length){
+        return [{name: "no-fields-found", label: "No matching fields found"}];
+      }
       return filtered;
     };
 
@@ -1087,7 +504,7 @@ export default defineComponent({
       searchObj.data.stream.addToFilter = field;
     };
 
-    function clickFieldFn(row: { name: never }, pageIndex: number) {
+    function clickFieldFn(row: { name: never }) {
       let selectedFields = reorderSelectedFields();
 
       if (selectedFields.includes(row.name)) {
@@ -1096,7 +513,7 @@ export default defineComponent({
         selectedFields.push(row.name);
       }
 
-      searchObj.data.stream.selectedFields = selectedFields;
+      searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || '_timestamp'));;
 
       searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;
@@ -1107,6 +524,33 @@ export default defineComponent({
     function resetSelectedFileds() {
       searchObj.data.stream.selectedFields = [];
       updatedLocalLogFilterField();
+    }
+
+    // Get page numbers to display (3 at a time)
+    function getPageNumbers(currentPage: number, totalPages: number) {
+      const pages: number[] = [];
+
+      if (totalPages <= 3) {
+        // If 3 or fewer pages, show all
+        for (let i = 1; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        // Show 3 pages centered around current page
+        let startPage = Math.max(1, currentPage - 1);
+        let endPage = Math.min(totalPages, startPage + 2);
+
+        // Adjust if we're near the end
+        if (endPage === totalPages) {
+          startPage = Math.max(1, endPage - 2);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+          pages.push(i);
+        }
+      }
+
+      return pages;
     }
 
     /**
@@ -1281,112 +725,25 @@ export default defineComponent({
           if (query_context !== "") {
             query_context = query_context == undefined ? "" : query_context;
 
-            // Implement websocket based field values, check getQueryData in useLogs for websocket enabled
-            if (
-              isWebSocketEnabled(store.state) ||
-              isStreamingEnabled(store.state)
-            ) {
-              fetchValuesWithWebsocket({
-                fields: [name],
-                size: 10,
-                no_count: false,
-                regions: searchObj.meta.regions,
-                clusters: searchObj.meta.clusters,
-                vrl_fn: query_fn,
-                start_time: startISOTimestamp,
-                end_time: endISOTimestamp,
-                timeout: 30000,
-                stream_name: selectedStream,
-                stream_type: searchObj.data.stream.streamType,
-                use_cache: (window as any).use_cache ?? true,
-                sql:
-                  b64EncodeUnicode(
-                    query_context.replace("[INDEX_NAME]", selectedStream),
-                  ) || "",
-              });
-              continue;
-            }
-
-            //TODO : add comments for this in future
-            //for future reference
-            //values api using partition based api
-            let queryToBeSent = query_context.replace(
-              "[INDEX_NAME]",
-              selectedStream,
-            );
-
-            const response = await getValuesPartition(
-              startISOTimestamp,
-              endISOTimestamp,
-              name,
-              queryToBeSent,
-            );
-            const partitions: any = response?.data.partitions || [];
-
-            for (const partition of partitions) {
-              try {
-                //check if the field is opened because sometimes
-                // user might close the field before all the subsequent requests are completed
-                if (!openedFilterFields.value.includes(name)) {
-                  return;
-                }
-
-                const res: any = await streamService.fieldValues({
-                  org_identifier: store.state.selectedOrganization.identifier,
-                  stream_name: selectedStream,
-                  start_time: partition[0],
-                  end_time: partition[1],
-                  fields: [name],
-                  size: 10,
-                  query_context: b64EncodeUnicode(queryToBeSent) || "",
-                  query_fn: query_fn,
-                  action_id,
-                  type: searchObj.data.stream.streamType,
-                  clusters:
-                    Object.hasOwn(searchObj.meta, "clusters") &&
-                    searchObj.meta.clusters.length > 0
-                      ? searchObj.meta.clusters.join(",")
-                      : "",
-                  traceparent: generateTraceContext().traceId,
-                });
-
-                if (res.data.hits.length) {
-                  res.data.hits.forEach((item: any) => {
-                    item.values.forEach((subItem: any) => {
-                      const index = fieldValues.value[name]["values"].findIndex(
-                        (value: any) => value.key === subItem.zo_sql_key,
-                      );
-                      if (index !== -1) {
-                        fieldValues.value[name]["values"][index].count +=
-                          parseInt(subItem.zo_sql_num);
-                      } else {
-                        fieldValues.value[name]["values"].push({
-                          key: subItem.zo_sql_key,
-                          count: parseInt(subItem.zo_sql_num),
-                        });
-                      }
-                    });
-                  });
-
-                  if (fieldValues.value[name]["values"].length > 10) {
-                    fieldValues.value[name]["values"].sort(
-                      (a, b) => b.count - a.count,
-                    );
-                    fieldValues.value[name]["values"] = fieldValues.value[name][
-                      "values"
-                    ].slice(0, 10);
-                  }
-                }
-              } catch (err: any) {
-                console.error("Failed to fetch field values:", err);
-                fieldValues.value[name].errMsg = "Failed to fetch field values";
-              } finally {
-                countTotal--;
-                if (countTotal <= 0) {
-                  fieldValues.value[name].isLoading = false;
-                }
-              }
-            }
+            // Implement streaming based field values, check getQueryData in useLogs for streaming enabled
+            fetchValuesWithWebsocket({
+              fields: [name],
+              size: store.state.zoConfig?.query_values_default_num || 10,
+              no_count: false,
+              regions: searchObj.meta.regions,
+              clusters: searchObj.meta.clusters,
+              vrl_fn: query_fn,
+              start_time: startISOTimestamp,
+              end_time: endISOTimestamp,
+              timeout: 30000,
+              stream_name: selectedStream,
+              stream_type: searchObj.data.stream.streamType,
+              use_cache: (window as any).use_cache ?? true,
+              sql:
+                b64EncodeUnicode(
+                  query_context.replace("[INDEX_NAME]", selectedStream),
+                ) || "",
+            });
           }
         }
 
@@ -1426,15 +783,6 @@ export default defineComponent({
         });
       }
     };
-    //   const query = searchObj.meta.sqlMode
-    //     ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
-    //     : "";
-
-    //   searchObj.data.editorValue = query;
-    //   searchObj.data.query = query;
-
-    //   handleQueryData();
-    // };
 
     let fieldIndex: any = -1;
     const addToInterestingFieldList = (
@@ -1667,12 +1015,14 @@ export default defineComponent({
         ] + 1;
     };
 
-    const pagination = ref({
-      page: 1,
-      rowsPerPage: 25,
-    });
 
-    const toggleSchema = async () => {
+    const toggleSchema = async (newValue: string) => {
+      // Update the schema type with the new value from the toggle
+      searchObj.meta.useUserDefinedSchemas = newValue;
+
+      // Reset pagination to page 1 before resetting fields
+      resetPagination();
+
       const isInterestingFields =
         searchObj.meta.useUserDefinedSchemas === "interesting_fields";
 
@@ -1683,10 +1033,21 @@ export default defineComponent({
       }
 
       await resetFields();
+      
     };
 
-    const toggleInterestingFields = () => {
+    const toggleInterestingFields = (newValue: boolean) => {
+      // Update the interesting fields toggle with the new value
+      showOnlyInterestingFields.value = newValue;
+
+      // Reset pagination to page 1 before resetting fields
+      resetPagination();
       resetFields();
+    };
+
+    const toggleFieldGroup = (group: string) => {
+      searchObj.data.stream.expandGroupRows[group] =
+        !searchObj.data.stream.expandGroupRows[group];
     };
 
     const hasUserDefinedSchemas = () => {
@@ -1727,18 +1088,7 @@ export default defineComponent({
     };
 
     const initializeWebSocketConnection = (payload: any) => {
-      if (isWebSocketEnabled(store.state)) {
-        fetchQueryDataWithWebSocket(payload, {
-          open: sendSearchMessage,
-          close: handleSearchClose,
-          error: handleSearchError,
-          message: handleSearchResponse,
-          reset: handleSearchReset,
-        }) as string;
-        return;
-      }
-
-      if (isStreamingEnabled(store.state)) {
+      // if (isStreamingEnabled(store.state)) {
         fetchQueryDataWithHttpStream(payload, {
           data: handleSearchResponse,
           error: handleSearchError,
@@ -1746,7 +1096,7 @@ export default defineComponent({
           reset: handleSearchReset,
         });
         return;
-      }
+      // }
     };
 
     const sendSearchMessage = (queryReq: any) => {
@@ -1883,8 +1233,8 @@ export default defineComponent({
           // Sort by count in descending order
           aggregatedArray.sort((a, b) => b.count - a.count);
 
-          // Take top 10
-          fieldValues.value[fieldName].values = aggregatedArray.slice(0, 10);
+          // Take top N
+          fieldValues.value[fieldName].values = aggregatedArray.slice(0, store.state.zoConfig?.query_values_default_num || 10);
         }
 
         // Mark as not loading
@@ -1933,11 +1283,7 @@ export default defineComponent({
     const cancelFilterCreator = (row: any) => {
       //if it is websocker based then cancel the trace id
       //else cancel the further value api calls using the openedFilterFields
-      if (isWebSocketEnabled(store.state)) {
-        cancelTraceId(row.name);
-      } else {
-        cancelValueApi(row.name);
-      }
+      cancelValueApi(row.name);
     };
 
     const cancelTraceId = (field: string) => {
@@ -1987,6 +1333,10 @@ export default defineComponent({
       }
     };
 
+    const setPage = (page) => {
+      pagination.value = { ...pagination.value, page };
+    };
+
     return {
       t,
       store,
@@ -2014,6 +1364,8 @@ export default defineComponent({
       pagination,
       toggleSchema,
       toggleInterestingFields,
+      fieldListRef,
+      toggleFieldGroup,
       streamFieldsRows: computed(() => {
         let expandKeys = Object.keys(
           searchObj.data.stream.expandGroupRows,
@@ -2055,7 +1407,6 @@ export default defineComponent({
           }
           count++;
         }
-        // console.log(JSON.parse(JSON.stringify(selectedStreamFields)));
         return selectedStreamFields;
       }),
       formatLargeNumber,
@@ -2070,6 +1421,7 @@ export default defineComponent({
       traceIdMapper,
       checkSelectedFields,
       resetSelectedFileds,
+      getPageNumbers,
       handleSearchResponse,
       handleSearchReset,
       showOnlyInterestingFields,
@@ -2085,320 +1437,35 @@ export default defineComponent({
       getValuesPartition,
       streamList,
       hasUserDefinedSchemas,
+      setPage,
     };
   },
 });
 </script>
 
-<style lang="scss">
-$streamSelectorHeight: 44px;
-
-.logs-index-menu {
-  width: 100%;
-
-  .q-menu {
-    box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-    transform: translateY(0.5rem);
-    border-radius: 0px;
-
-    .q-virtual-scroll__content {
-      padding: 0.5rem;
-    }
+<style scoped lang="scss">
+.indexlist-search-input {
+  height: 36px;
+  .q-field__control {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    padding: 0px 6px !important;
+    font-weight: 500;
+  }
+  .q-field__prepend {
+    height: 36px !important;
+    padding-bottom: 4px !important;
+  }
+  .q-field__append {
+    padding-top: 8px !important;
   }
 
-  .q-field {
-    &__control {
-      height: 35px;
-      padding: 0px 5px;
-      min-height: auto !important;
-
-      &-container {
-        padding-top: 0px !important;
-      }
-    }
-  }
-
-  .index-table {
-    width: 100%;
-    height: calc(100% - $streamSelectorHeight);
-    // border: 1px solid rgba(0, 0, 0, 0.02);
-
-    .q-table {
-      display: table;
-      table-layout: fixed !important;
-    }
-
-    tr {
-      margin-bottom: 1px;
-    }
-
-    tbody,
-    tr,
-    td {
-      width: 100%;
-      display: block;
-      height: fit-content;
-      overflow: hidden;
-    }
-
-    .q-table__control,
-    label.q-field {
-      width: 100%;
-    }
-
-    .q-table thead tr,
-    .q-table tbody td {
-      height: auto;
-    }
-
-    .q-table__top {
-      padding: 0 !important;
-      border-bottom: unset;
-    }
-  }
-
-  .field-table {
-    width: 100%;
-
-    > .q-table__bottom {
-      padding: 0px !important;
-    }
-  }
-
-  .field_list {
-    padding: 0px;
-    margin-bottom: 0.125rem;
-    position: relative;
-    overflow: visible;
-    cursor: default;
-
-    .field_label {
-      pointer-events: none;
-      font-size: 0.825rem;
-      position: relative;
-      display: inline;
-      z-index: 2;
-      left: 0;
-      height: 20px;
-      // text-transform: capitalize;
-    }
-
-    .field-container {
-      height: 25px;
-    }
-
-    .field_overlay {
-      position: absolute;
-      height: 100%;
-      right: 0;
-      top: 0;
-      z-index: 5;
-      padding: 0 6px;
-      visibility: hidden;
-      display: flex;
-      align-items: center;
-
-      .q-icon {
-        cursor: pointer;
-        opacity: 0;
-        margin: 0 1px;
-      }
-    }
-
-    &.selected {
-      .field_overlay {
-        background-color: rgba(89, 96, 178, 0.3);
-
-        .field_icons {
-          opacity: 0;
-        }
-      }
-    }
-
-    &:hover {
-      .field-container {
-        // background-color: #ffffff;
-      }
-    }
-  }
-
-  &.theme-dark {
-    .field_list {
-      &:hover {
-        box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
-
-        .field_overlay {
-          background-color: #3f4143;
-          opacity: 1;
-        }
-      }
-    }
-  }
-
-  &.theme-light {
-    .field_list {
-      &:hover {
-        box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
-
-        .field_overlay {
-          background-color: #e8e8e8;
-          opacity: 1;
-        }
-      }
-    }
-  }
-
-  .q-item {
-    min-height: 1.3rem;
-    padding: 5px 10px;
-
-    &__label {
-      font-size: 0.75rem;
-    }
-
-    &.q-manual-focusable--focused > .q-focus-helper {
-      background: currentColor !important;
-      opacity: 0.3 !important;
-    }
-  }
-
-  .q-field--dense .q-field__before,
-  .q-field--dense .q-field__prepend {
-    padding: 0px 0px 0px 0px;
-    height: auto;
-    line-height: auto;
-  }
-
-  .q-field__native,
-  .q-field__input {
-    padding: 0px 0px 0px 0px;
-  }
-
-  .q-field--dense .q-field__label {
-    top: 5px;
-  }
-
-  .q-field--dense .q-field__control,
-  .q-field--dense .q-field__marginal {
-    height: 34px;
+  .q-icon {
+    height: 16px;
+    width: 16px;
+    margin-right: 10px;
   }
 }
-</style>
-
-<style lang="scss">
-.logs-index-menu {
-  .index-table {
-    .q-table {
-      width: 100%;
-      table-layout: fixed;
-
-      .q-expansion-item {
-        .q-item {
-          display: flex;
-          align-items: center;
-          padding: 0;
-          height: 25px !important;
-          min-height: 25px !important;
-        }
-
-        .q-item__section--avatar {
-          min-width: 12px;
-          max-width: 12px;
-          margin-right: 8px;
-        }
-
-        .filter-values-container {
-          .q-item {
-            padding-left: 4px;
-
-            .q-focus-helper {
-              background: none !important;
-            }
-          }
-        }
-
-        .q-item-type {
-          &:hover {
-            .field_overlay {
-              visibility: visible;
-
-              .q-icon {
-                opacity: 1;
-              }
-            }
-          }
-        }
-
-        .field-expansion-icon {
-          img {
-            width: 12px;
-            height: 12px;
-          }
-
-          .q-icon {
-            font-size: 18px;
-            color: #808080;
-          }
-        }
-      }
-
-      .field-container {
-        &:hover {
-          .field_overlay {
-            visibility: visible;
-
-            .q-icon {
-              opacity: 1;
-            }
-          }
-        }
-      }
-
-      .field_list {
-        &.selected {
-          background-color: rgba(89, 96, 178, 0.3);
-
-          .field_overlay {
-            // background-color: #ffffff;
-          }
-        }
-      }
-    }
-
-    .schema-field-toggle {
-      border: 1px solid light-grey;
-      border-radius: 5px;
-      line-height: 10px;
-    }
-
-    .q-table__bottom {
-      padding: 0px !important;
-    }
-
-    .pagination-field-count {
-      line-height: 32px;
-      font-weight: 700;
-      font-size: 13px;
-    }
-  }
-
-  .field-table {
-    .q-table__bottom {
-      padding: 5px !important;
-    }
-
-    .schema-field-toggle .q-btn {
-      padding: 5px !important;
-    }
-  }
-}
-
-// .q-field--auto-height.q-field--dense .q-field__control,
-// .q-field--auto-height.q-field--dense .q-field__native,
-// .q-field--auto-height.q-field--dense .q-field__native span {
-//   text-overflow: ellipsis !important;
-//   overflow: hidden !important;
-//   white-space: nowrap !important;
-//   max-height: 40px !important;
-// }
 </style>

@@ -109,7 +109,6 @@ describe("SyntaxGuide.vue", () => {
     const button = wrapper.findComponent({ name: "QBtn" });
     expect(button.exists()).toBe(true);
     expect(button.attributes("data-cy")).toBe("syntax-guide-button");
-    expect(button.props("size")).toBe("sm");
     expect(button.props("dense")).toBe(true);
     expect(button.props("flat")).toBe(true);
     expect(button.props("icon")).toBe("help");

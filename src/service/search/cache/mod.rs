@@ -25,7 +25,7 @@ use config::{
     meta::{
         dashboards::usage_report::DashboardInfo,
         function::RESULT_ARRAY_SKIP_VRL,
-        search::{self, ResponseTook},
+        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
@@ -56,7 +56,7 @@ use crate::{
     service::{
         search::{
             self as SearchService,
-            cache::cacher::check_cache,
+            cache::{cacher::check_cache, result_utils::extract_timestamp_range},
             init_vrl_runtime,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         },
@@ -277,9 +277,14 @@ pub async fn search(
                 c_resp.order_by,
             )
         } else {
-            // if there is no cached response, we return the first search response, because there is
-            // no delta, we only run a full time range search
-            results[0].clone()
+            let mut reps = results[0].clone();
+            sort_response(
+                c_resp.is_descending,
+                &mut reps,
+                &c_resp.ts_column,
+                &c_resp.order_by,
+            );
+            reps
         }
     };
 
@@ -327,7 +332,7 @@ pub async fn search(
     if is_aggregate
         && res.histogram_interval.is_none()
         && !c_resp.ts_column.is_empty()
-        && c_resp.histogram_interval > -1
+        && c_resp.histogram_interval > 0
     {
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
@@ -369,7 +374,7 @@ pub async fn search(
     .await;
 
     if res.is_partial {
-        let partial_err = "Please be aware that the response is based on partial data";
+        let partial_err = PARTIAL_ERROR_RESPONSE_MESSAGE;
         res.function_error = if res.function_error.is_empty() {
             vec![partial_err.to_string()]
         } else {
@@ -422,6 +427,16 @@ pub async fn search(
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
     {
+        // Determine if this is a non-timestamp histogram query
+        // Note: write_res.order_by_metadata contains the same ORDER BY info
+        let is_histogram_non_ts_order = c_resp.histogram_interval > 0
+            && !res.order_by_metadata.is_empty()
+            && res
+                .order_by_metadata
+                .first()
+                .map(|(field, _)| field != &c_resp.ts_column)
+                .unwrap_or(false);
+
         write_results(
             trace_id,
             &c_resp.ts_column,
@@ -431,6 +446,8 @@ pub async fn search(
             file_path,
             is_aggregate,
             c_resp.is_descending,
+            req.clear_cache,
+            is_histogram_non_ts_order,
         )
         .await;
     }
@@ -542,13 +559,12 @@ pub async fn prepare_cache_response(
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
-                let order_by = v.order_by;
-
                 MultiCachedQueryResponse {
                     ts_column,
                     is_aggregate,
                     is_descending,
-                    order_by,
+                    order_by: v.order_by,
+                    limit: v.limit,
                     ..Default::default()
                 }
             }
@@ -689,19 +705,33 @@ pub fn merge_response(
         as usize;
     if !fn_error.is_empty() {
         cache_response.function_error.extend(fn_error);
+        cache_response.is_partial = true;
     }
+    cache_response.is_histogram_eligible = search_response
+        .first()
+        .map(|res| res.is_histogram_eligible)
+        .unwrap_or_default();
     cache_response
 }
 
 fn sort_response(
-    _is_descending: bool,
+    is_descending: bool,
     cache_response: &mut search::Response,
     ts_column: &str,
-    order_by: &Vec<(String, OrderBy)>,
+    in_order_by: &Vec<(String, OrderBy)>,
 ) {
-    if order_by.is_empty() {
-        return;
-    }
+    let order_by = if in_order_by.is_empty() {
+        &vec![(
+            ts_column.to_string(),
+            if is_descending {
+                OrderBy::Desc
+            } else {
+                OrderBy::Asc
+            },
+        )]
+    } else {
+        in_order_by
+    };
 
     cache_response.hits.sort_by(|a, b| {
         for (field, order) in order_by {
@@ -796,6 +826,8 @@ pub async fn write_results(
     file_path: String,
     is_aggregate: bool,
     is_descending: bool,
+    clear_cache: bool,
+    is_histogram_non_ts_order: bool,
 ) {
     if res.hits.is_empty() {
         return;
@@ -805,7 +837,10 @@ pub async fn write_results(
     let mut accept_start_time = req_query_start_time;
     let mut accept_end_time = req_query_end_time;
     let mut need_adjust_end_time = false;
-    if is_aggregate && let Some(interval) = res.histogram_interval {
+    if is_aggregate
+        && let Some(interval) = res.histogram_interval
+        && interval > 0
+    {
         let interval = interval * 1000 * 1000; // convert to microseconds
         // next interval of start_time
         if (accept_start_time % interval) != 0 {
@@ -819,13 +854,14 @@ pub async fn write_results(
     }
 
     // 2. get the data time range, check if need to remove records with discard_duration
+    // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
+    // to find actual min/max timestamps, since results may not be time-ordered
+    let is_time_ordered = !is_histogram_non_ts_order;
+    let (data_start_time, data_end_time) =
+        extract_timestamp_range(&res.hits, ts_column, is_time_ordered);
     let delay_ts = second_micros(get_config().limit.cache_delay_secs);
     let mut accept_end_time =
         std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
-    let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
-    let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
-    let data_start_time = std::cmp::min(first_rec_ts, last_rec_ts);
-    let data_end_time = std::cmp::max(first_rec_ts, last_rec_ts);
     if data_start_time < accept_start_time || data_end_time > accept_end_time {
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
@@ -858,6 +894,7 @@ pub async fn write_results(
     if need_adjust_end_time
         && is_aggregate
         && let Some(interval) = res.histogram_interval
+        && interval > 0
     {
         accept_end_time += interval * 1000 * 1000;
     }
@@ -872,9 +909,18 @@ pub async fn write_results(
     );
     let res_cache = json::to_string(&res).unwrap();
     let query_key = file_path.replace('/', "_");
+    let trace_id = trace_id.to_string();
     tokio::spawn(async move {
-        match SearchService::cache::cacher::cache_results_to_disk(&file_path, &file_name, res_cache)
-            .await
+        match SearchService::cache::cacher::cache_results_to_disk(
+            &trace_id,
+            &file_path,
+            &file_name,
+            res_cache,
+            clear_cache,
+            Some(accept_start_time),
+            Some(accept_end_time),
+        )
+        .await
         {
             Ok(success) => {
                 if success {
@@ -1062,5 +1108,22 @@ pub async fn apply_regex_to_response(
             log::error!("error in processing records for patterns for stream {all_streams} : {e}");
             Err(infra::errors::Error::Message(e.to_string()))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_result_array_skip_vrl() {
+        let query_fn = r#"#ResultArray#SkipVRL#
+        arr1_final = []
+        for_each(array!(.)) -> |index, value| {
+            value.arr = {"a": 4}
+            arr1_final = push(arr1_final,value)
+        }
+        . = arr1_final"#;
+        assert!(is_result_array_skip_vrl(query_fn));
     }
 }

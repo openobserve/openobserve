@@ -1,5 +1,341 @@
 @import 'variables';
 
+html, body {
+  margin: 0 !important;
+padding: 0 !important;
+}
+
+body {
+  background: var(--o2-body-secondary-bg);  /* fallback for old browsers */
+  background: -webkit-linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));  /* Chrome 10-25, Safari 5.1-6 */
+  background: linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg)); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+  overflow: hidden;
+  color: var(--o2-text-primary);
+
+  // background: -webkit-linear-gradient(
+  //   to bottom right,
+  //   rgba(63, 121, 148, 0.05),
+  //   rgba(89, 185, 122, 0.4)
+  // );
+
+  // /* Modern browsers (W3C, IE10+, Edge, Firefox, Chrome, Safari) */
+  // background: linear-gradient(
+  //   to bottom right,
+  //   rgba(63, 121, 148, 0.05),
+  //   rgba(89, 185, 122, 0.4)
+  // );
+}
+
+//here also we need to change whenever we decided to change the bg 
+//because we are using this in alert destination import , pipeline destination import , sdr import 
+//because there the after slot is covered with card container so using thig
+.o2-custom-bg{
+    background: var(--o2-body-secondary-bg);  /* fallback for old browsers */
+  background: -webkit-linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));  /* Chrome 10-25, Safari 5.1-6 */
+  background: linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg)); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+  overflow: hidden;
+}
+  
+.card-container {
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
+}
+
+.q-page {
+  border-radius: 0.375rem;
+}
+
+.q-btn {
+  &::before {
+    border: none;
+  }
+}
+
+.header-menu {
+  @extend .el-border-radius;
+
+  width: auto;
+  display: inline-flex;
+  background-color: var(--o2-header-menu-bg);
+  position: relative;
+
+  .q-btn .q-icon, .q-btn .q-spinner {
+    font-size: 1.3rem;
+  }
+}
+
+.logs-table-list {
+  .q-btn .q-icon, .q-btn .q-spinner {
+    font-size: 0.8rem;
+  }
+}
+
+// .element-box-shadow {
+//   box-shadow: var(--o2-box-shadow);
+// }
+
+.q-splitter--vertical {
+  >.q-splitter__separator {
+    width: 0.625rem; // 10px
+    z-index: 999 !important;
+    height: 100vh;
+    background: transparent;
+  }
+}
+
+.q-splitter--horizontal {
+  >.q-splitter__separator {
+    height: 0; // 10px
+    z-index: 99;
+    background: transparent;
+  }
+}
+
+.el-border {
+  border: 0.0625rem solid var(--o2-border-color);
+}
+
+.el-border-radius {
+  border-radius: 0.375rem;
+}
+
+/** 
+=====================================================================
+    input related heights defined here
+=====================================================================
+**/
+
+.el-input-min-height {
+  min-height: 2.25rem !important;
+}
+
+.el-input-height {
+  height: 2.25rem !important;
+}
+
+.el-input-max-height {
+  height: 2.25rem !important;
+}
+
+
+/** 
+=====================================================================
+    select (dropdown) related heights defined here
+=====================================================================
+**/
+
+.el-select-min-height {
+  min-height: 2.25rem !important;
+}
+
+.el-select-height {
+  height: 2.25rem !important;
+}
+
+.el-select-max-height {
+  height: 2.25rem !important;
+}
+
+
+/** 
+=====================================================================
+    side dropdown related widths defined here
+=====================================================================
+**/
+.el-side-dropdown-width{
+  width: 30vw !important; 
+}
+
+
+
+/** 
+=====================================================================
+    input file related heights defined here
+=====================================================================
+**/
+.el-input-file-min-height {
+  min-height: 2.25rem !important;
+}
+
+.el-input-file-height {
+  height: 2.25rem !important;
+}
+
+.el-input-file-max-height {
+  height: 2.25rem !important;
+}
+
+.o2-run-query-button{
+  font-size: 11px;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  padding: 0px 12px !important;
+  width: 92px !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  /* subtle default glow */
+  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
+}
+.o2-color-primary{
+    background-color: var(--o2-primary-btn-bg);
+    color: var(--o2-primary-btn-text);
+    &:hover {
+    opacity: 0.9;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
+  }
+}
+
+
+.o2-secondary-button {
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.q-tabs {
+  &--vertical {
+    .q-tab {
+      @extend .el-border-radius;
+      justify-content: flex-start;
+      padding: 0 0.6rem 0 0.6rem;
+      text-transform: capitalize;
+      margin: 0.5rem;
+
+      &:hover{
+        background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
+      }
+
+      &__content.tab_content {
+        .q-tab {
+          &__icon + &__label {
+            padding-left: 0.875rem;
+            font-weight: 600;
+          }
+        }
+      }
+      &--active {
+        color: var(--o2-tab-text-color);
+        background-color: var(--o2-tab-bg);
+      }
+    }
+  }
+
+  &--horizontal {
+    .q-tab {
+      border-radius: 0.375rem 0.375rem 0 0;
+      justify-content: flex-start;
+      padding: 0 0.6rem 0 0.6rem;
+      text-transform: capitalize;
+      min-height: 35px;
+
+      &:hover{
+        background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
+      }
+
+      &__content.tab_content {
+        padding: 0px;
+        .q-tab {
+          &__icon + &__label {
+            padding-left: 0.875rem;
+            font-weight: 600;
+          }
+        }
+      }
+      &--active {
+        color: var(--o2-tab-text-color);
+        background-color: var(--o2-tab-bg);
+      }
+    }
+  }
+}
+
+/* ============================================================================
+   CUSTOM TAB ICON STYLING
+   Icon styling for vertical tabs with Lucide icons
+   ============================================================================ */
+
+.o2-tab-icon {
+  width: 20px !important;
+  height: 20px !important;
+  margin-right: 0.6rem !important; // 12px spacing after icon
+  margin-left: 0.1rem !important; // 12px spacing after icon
+  flex-shrink: 0 !important; // Prevent icon from shrinking
+}
+
+.spitter-container {
+  width: 100%;
+  height: 100%;
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  overflow: auto;
+  flex: 10000 1 0%;
+}
+
+// .q-splitter--vertical {
+//   width: 0.625rem; // 10px
+//   height: 100%;
+// }
+
+// .q-splitter--horizontal {
+//   width: 0.625rem; // 10px
+//   height: 100%;
+// }
+
+/* ============================================================================
+   MODERN LEAN SCROLLBAR STYLES
+   Thin, minimal design with primary color scheme
+   ============================================================================ */
+
+/* Base scrollbar style */
+::-webkit-scrollbar {
+  width: 0.4rem;   // thinner for modern look
+  height: 0.4rem;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--o2-scrollbar-track-bg, transparent);
+  border-radius: 0.25rem;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 0.25rem;
+  background: white; // hidden by default
+  transition: background 0.3s ease;
+  cursor: pointer;
+}
+
+/* When user hovers over the entire scrollable area */
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--o2-scrollbar-thumb-bg, transparent);
+}
+
+*:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--o2-scrollbar-thumb-hover-bg, rgba(0, 0, 0, 0.1));
+  cursor: pointer;
+}
+
+*:hover::-webkit-scrollbar-thumb:active {
+  background: var(--o2-scrollbar-thumb-active-bg, rgba(0, 0, 0, 0.15));
+  cursor: grabbing;
+}
+
+*:hover::-webkit-scrollbar-track {
+  background: var(--o2-scrollbar-track-hover-bg, rgba(0, 0, 0, 0.02));
+}
+
+/* Firefox support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+/* When hovered */
+*:hover {
+  scrollbar-color: var(--o2-scrollbar-thumb-bg, transparent)
+                   var(--o2-scrollbar-track-hover-bg, rgba(0, 0, 0, 0.02));
+}
 
 .q-w-sm {
   width: 360px;
@@ -83,6 +419,7 @@
   // tab content bg color
   padding: 0px 10px;
   border-radius: 0.5rem;
+  position: relative; // Make this the positioning context for absolute children
   &__head {
     justify-content: end;
     display: flex;
@@ -102,7 +439,7 @@
         line-height: 0px;
         float: inline-end;
         position: absolute;
-        right: 30px;
+        right: 10px; // Adjusted from 30px to 10px for better spacing
       }
     }
   }
@@ -118,9 +455,10 @@
   }
 }
 
-.monaco-editor {
-  outline-width: 0px;
-  outline-style: none;
+.o2-container-navbarheight {
+  height: calc(100vh - 42px);
+  overflow: auto;
+  // padding: 0.625rem; // 10px
 }
 
 .o2-page-title {
@@ -164,6 +502,10 @@
   line-height: 15.72px;
 }
 
+.o2-monospace-font {
+  font-family: "Monaco", "Menlo", "Courier New", monospace;
+}
+
 .o2-card-wrapper {
   box-shadow: none;
   border: 1px solid #E4E7EC;
@@ -181,11 +523,40 @@
 //add if we want to apply dark theme to the table , we need to add a class dark-o2-quasar-table to the table
 //add if we want to apply light theme to the table , we need to add a class light-o2-quasar-table to the table
 //if there are actions in the table , we need to add a class actions-column to the last column
+.table-container thead, .o2-quasar-table thead {
+    // background: var(--o2-table-header-bg);
+    // opacity: 0.9;
+    tr {
+      background: var(--o2-table-header-bg) !important;
+    }
+}
+
+.q-table {
+  border-radius: 0.375rem;
+  tbody .q-tr:hover {
+    background: color-mix(in srgb, var(--o2-theme-color) 5%, var(--o2-theme-mode) 90%);
+  }
+
+  thead tr {
+    height: 35px;
+  }
+}
+
+.q-table__card{
+  box-shadow: none;
+  background-color: transparent;
+}
 
 .o2-quasar-table{
+
+  &.o2-row-md{
+    th, td {
+      height: 36px !important;
+    }
+  }
   th,td {
-    padding: 0px 16px !important;
-    height: 36px !important;
+    padding: 0px 5px !important;
+    height: 36px;
   };
 
 
@@ -195,27 +566,27 @@
     position: sticky;
     right: 0;
     z-index: 1;
-    background: #ffffff;
-    box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
   }
-}
-//here we have dark theme styling for the table
-//`. we are changing the background color of the actions column
-.o2-quasar-table-dark{
-  th:last-child.actions-column,
-  td:last-child.actions-column {
-    background: var(--q-dark);
-    box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1);
-    width: 150px;
+    td:last-child.actions-column {
+      background-color: var(--o2-table-actions-bg);
+    }
+  tr{
+    td{
+      border-bottom: 1px solid var(--o2-border-color) !important;
+    }
+  }
+  tr{
+    td{
+      border-bottom: 1px solid var(--o2-border-color) !important;
+    }
   }
 }
 
-.o2-quasar-table-light{
+.o2-quasar-table{
   th:last-child.actions-column,
   td:last-child.actions-column {
-    background: #ffffff;
     width: 150px;
-    box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
+    box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
   }
 }
 //this is for in some of pages we are having a header for eg: pipelines ,functions ,enrichments listing pages
@@ -263,23 +634,6 @@
 }
 
 
-//some times if there are less records or if user tries to search anything the last row of the table is not having border at the bottom
-
-.o2-last-row-border-light{
-  tr:last-child{
-    td{
-      border-bottom: 1px solid #E4E7EC !important;
-    }
-  }
-}
-
-.o2-last-row-border-dark{
-  tr:last-child{
-    td{
-      border-bottom: 1px solid #575A5A !important;
-    }
-  }
-}
 
 
 //this is used to target the table in the app-table component internally it uses q-table component
@@ -299,52 +653,20 @@
       position: sticky;
       right: 0;
       z-index: 1;
-      width: 150px !important;
+      width: 100px ;
+      box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
+      background-color: var(--o2-table-actions-bg);
     }
   }
   .q-table{
     thead{
+            background: var(--o2-table-header-bg) !important;
       th:last-child.actions-column{
         position: sticky;
         right: 0;
         z-index: 1;
-      }
-    }
-  }
-}
-.o2-quasar-app-table-light{
-  .q-virtual-scroll__content{
-    td:last-child.actions-column {
-      background: #ffffff !important;
-      box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1) !important;
-      width: 150px !important;
-    }
-  }
-  .q-table{
-    thead{
-      th:last-child.actions-column{
-        background: #ffffff !important;
-        box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1) !important;
-        width: 150px !important;
-      }
-    }
-  }
-}
-
-.o2-quasar-app-table-dark{
-  .q-virtual-scroll__content{
-    td:last-child.actions-column {
-      background: var(--q-dark) !important;
-      box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1) !important;
-      width: 150px !important;
-    }
-  }
-  .q-table{
-    thead{
-      th:last-child.actions-column{
-        background: var(--q-dark) !important;
-        box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1) !important;
-        width: 150px !important;
+        box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
+        width: 100px;
       }
     }
   }
@@ -353,9 +675,9 @@
 //so to make this work just introduce a new div around the app-tabs component and add the class app-tabs-container to it
 //and then add the class tabs-selection-container-dark or tabs-selection-container-light to the app-tabs component
 .app-tabs-container{
-  border: 1px solid #cacaca;
+  @extend .el-border;
+  @extend .el-border-radius;
   padding: 2px;
-  border-radius: 2px;
 }
 
 .tabs-selection-container-dark{
@@ -374,7 +696,7 @@
     background-color: $primary !important;
     color: white !important;
     border: 1px solid #cacaca !important;
-    border-bottom: 1px solid #cacaca !important;
+    // border-bottom: 1px solid #cacaca !important;
   }
   .rum-tab:hover{
     background-color: #373A3B !important;
@@ -384,28 +706,29 @@
   }
 }
 
-.tabs-selection-container-light{
-  border: none !important;
-  border-radius: none !important;
-  .rum-tab{
-    border-radius: 4px !important;
-    height: 30px !important;
-    margin: 0 2px !important;
-    padding: 4px 12px !important;
+.tabs-selection-container{
+  border: none;
+  border-radius: none;
+  border-bottom: none !important;
+  .o2-tab{
+    border-radius: 4px;
+    height: 30px;
+    padding: 4px 12px;
+    border-bottom: none;
+    width: auto;
+    white-space: normal;
+    line-height: 1.5rem;
     border-bottom: none !important;
-    width: auto !important;
-    white-space: normal !important;
   }
-  .rum-tab.active{
-    background-color: $primary !important;
-    color: white !important;
-    border: 1px solid #cacaca !important;
+  .o2-tab.active{
+    background-color: var(--o2-primary-btn-bg) !important;
+    color: rgba(255,255,255) !important;
   }
-  .rum-tab:hover{
-    background-color: #f0f0f0 !important;
+  .o2-tab:hover{
+    background-color: var(--o2-hover-accent) !important;
   }
-  .rum-tab.active:hover{
-    background-color: $primary !important;
+  .o2-tab.active:hover{
+    background-color: var(--o2-primary-btn-bg) !important;
   }
 }
 
@@ -416,24 +739,11 @@
 //any non theme related styling should be done here inside the o2-table-checkbox class
 .o2-table-checkbox{
   .q-checkbox__bg{
-    width: 16px !important;
-    height: 16px !important;
-  }
-}
-.o2-table-checkbox-light{
-  .q-checkbox__inner--truthy .q-checkbox__bg, .q-checkbox__inner--indet .q-checkbox__bg {
-    background: #575FC5 !important;
-    border: 2px solid #575FC5 !important;
+    width: 13px !important;
+    height: 13px !important;
   }
 }
 
-
-.o2-table-checkbox-dark{
-  .q-checkbox__inner--truthy .q-checkbox__bg, .q-checkbox__inner--indet .q-checkbox__bg {
-    background: #575FC5 !important;
-    border: 2px solid #575FC5 !important;
-  }
-}
 
 //this is used to target the radio button in the app
 //we need to add the class o2-radio-button-light or o2-radio-button-dark to the radio button directly
@@ -502,75 +812,34 @@
 //any non theme related styling should be done here inside the o2-search-input class
 
 .o2-search-input{
-  height: 36px !important;
+  
+  height: 36px;
+  width: 200px !important;
   .q-field__control{
-  height: 36px !important;
-  border-radius: 4px !important;
-  display: flex;
-  align-items: end;
-  font-size: 13px;
-  padding: 0px 6px !important;
-  font-weight: 500 !important;
-  color: transparent !important;
-}
+    @extend .el-border-radius;
+    @extend .el-border;
+    
+    height: 36px;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    padding: 0px 6px !important;
+    font-weight: 500;
+  }
   .q-field__prepend{
     height: 36px !important;
     padding-bottom: 4px !important;
   }
-  .q-field--highlighted{
-    .q-field__control{
-      background-color: red !important;
-    }
-  }
   .q-field__append{
-    padding-top: 8px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .q-icon {
+    height: 16px;
+    width: 16px;
+    margin-right: 10px;
   }
 }
-
-.o2-search-input-light{
-  .q-field__control{
-    background-color: #ffffff !important;
-    outline: 1px solid #C9CCD6 !important;
-
-  }
-}
-.o2-search-input-dark{
-  .q-field__control{
-    background-color: #2B2D30 !important;
-    border: 1px solid #4E5157 !important;
-  }
-}
-//this is done because we need to select the search input when it is focused
-.o2-search-input-light.q-field--focused .q-field__control {
-  outline: 2px solid #575FC5 !important;
-  box-shadow: none !important;
-  background-color: #FFFFFF !important;
-  border-radius: 4px !important;
-}
-
-.o2-search-input-dark.q-field--focused .q-field__control {
-  outline: 2px solid #575FC5 !important;
-  box-shadow: none !important;
-  background-color: #2B2D30 !important;
-  border-radius: 4px !important;
-}
-
-//this is for search input icon
-//we have added the class o2-search-input-icon-light or o2-search-input-icon-dark to the search input icon
-//any non theme related styling should be done here inside the o2-search-input-icon class
-
-.o2-search-input-icon{
-  height: 16px !important;
-  width: 16px !important;
-  margin-right: 10px;
-}
-.o2-search-input-icon-light{
-  color: #818594;
-}
-.o2-search-input-icon-dark{
-  color: #6F737A;
-}
-
 //this is for o2 secondary button
 //in a page we can have multiple secondary buttons so we need to add the class o2-secondary-button-light or o2-secondary-button-dark to the button
 //any non theme related styling should be done here inside the o2-secondary-button class
@@ -582,6 +851,13 @@
   border-radius: 4px !important;
   padding: 0px 12px !important;
   min-width: 90px !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
+  }
 }
 
 
@@ -594,28 +870,50 @@
   padding: 0px 12px !important;
   min-width: 90px !important;
   height: 28px !important;
-}
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
 
-.o2-secondary-button-light{
-  color: #19191E !important;
-  border: 1px solid #D3D5DB !important;
-  background-color: #F7F8FA;
-}
-.o2-secondary-button-dark{
-  color: #DFE1E5 !important;
-  border: 1px solid #6F737A !important;
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
+  }
 }
 
 
+// .o2-primary-button{
+//   font-size: 13px ;
+//   font-weight: 500 !important;
+//   line-height: 16px !important;
+//   padding: 0px 12px !important;
+//   border-radius: 0.375rem !important;
+//   min-width: 90px !important;
+//   background-color: var(--o2-primary-btn-bg);
+//   color: var(--o2-primary-btn-text);
 
-.o2-primary-button{
-  font-size: 13px ;
+//   &:hover {
+//     opacity: 0.8;
+//   }
+// }
+.o2-primary-button {
+  font-size: 13px;
   font-weight: 500 !important;
   line-height: 16px !important;
   padding: 0px 12px !important;
-  border-radius: 4px !important;
+  border-radius: 0.375rem !important;
   min-width: 90px !important;
+  background-color: var(--o2-primary-btn-bg);
+  color: var(--o2-primary-btn-text);
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+
+  /* subtle default glow */
+  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
+
+  &:hover {
+    opacity: 0.9;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
+  }
 }
+
 .o2-primary-button-small{
   height: 28px !important;
   font-size: 13px !important;
@@ -624,25 +922,41 @@
   padding: 0px 12px !important;
   border-radius: 4px !important;
   min-width: 90px !important;
-}
+  background-color: var(--o2-primary-btn-bg);
+  color: var(--o2-primary-btn-text);
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
 
-.o2-primary-button-light{
-  background-color: #575FC5 !important;
-  color: #ffffff !important;
-  border: 1px solid #575FC5 !important;
-  &:hover{
-    background-color: #6B76E3 !important;
-    border: 1px solid #6B76E3 !important;
+  /* subtle default glow */
+  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
+
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
   }
 }
-//TODO o2: after getting the dark theme work on it
-.o2-primary-button-dark{
-  background-color: #575FC5 !important;
+
+.o2-negative-button-light{
+  background-color: #ec1414 !important;
   color: #ffffff !important;
-  border: 1px solid #575FC5 !important;
+  border: 1px solid #ec1414 !important;
+  // box-shadow: 0 0 8px color-mix(in srgb, #ec1414, transparent 60%);
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
   &:hover{
-    background-color: #6B76E3 !important;
-    border: 1px solid #6B76E3 !important;
+    background-color: #f13939 !important;
+    border: 1px solid #f13939 !important;
+      
+  }
+}
+.o2-negative-button-dark{
+  background-color: #ec1414 !important;
+  color: #ffffff !important;
+  border: 1px solid #ec1414 !important;
+  // box-shadow: 0 0 8px color-mix(in srgb, #ec1414, transparent 60%);
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  &:hover{
+    background-color: #f13939 !important;
+    border: 1px solid #f13939 !important;
+    box-shadow: 0 0 14px color-mix(in srgb, #f13939, transparent 30%);
   }
 }
 
@@ -652,7 +966,7 @@
     height: 20px;
     border-radius: 16px;
     width: 36px;
-    background-color: #EBECF0;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__thumb:after{
@@ -665,6 +979,10 @@
     margin-top: 6px;
   }
   .q-toggle__inner--truthy{
+      color: #ffffff !important;
+      .q-toggle__track{
+        background-color: var(--o2-toggle-track-bg);
+      }
     .q-toggle__thumb:after{
       position: relative;
       top: 3.2px !important;
@@ -676,28 +994,26 @@
 
 .o2-toggle-button-sm-light{
   .q-toggle__track{
-    background-color: #acbbf3;
-    border: 1px solid #D3D5DB !important;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff !important;
     .q-toggle__track{
-      background-color: #575FC5;
+      background-color: var(--o2-toggle-track-bg);
     }
-    }
+  }
 }
 
 .o2-toggle-button-sm-dark{
   .q-toggle__track{
-    background-color: #2f415e;
-    border: 1px solid #6F737A !important;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff !important;
     .q-toggle__track{
-      background-color: #6B76E3;
+      background-color: var(--o2-toggle-track-bg);
     }
     } 
 }
@@ -708,7 +1024,7 @@
     height: 24px;
     border-radius: 16px;
     width: 44px;
-    background-color: #EBECF0;
+   background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__thumb:after{
@@ -729,6 +1045,10 @@
     margin-top: 6px;
   }
   .q-toggle__inner--truthy{
+    color: #ffffff;
+    .q-toggle__track{
+      background-color: var(--o2-toggle-track-bg);
+    }
     .q-toggle__thumb:after{
       top: 5.8px;
       left: 3.8px;
@@ -744,33 +1064,6 @@
   }
 }
 
-.o2-toggle-button-lg-light{
-  .q-toggle__track{
-    background-color: #acbbf3;
-    border: 1px solid #D3D5DB !important;
-    opacity: 100%;
-  }
-  .q-toggle__inner--truthy{
-    color: #ffffff;
-    .q-toggle__track{
-      background-color: #575FC5;
-    }
-    }
-}
-
-.o2-toggle-button-lg-dark{
-  .q-toggle__track{
-    background-color: #2f415e;
-    border: 1px solid #6F737A !important;
-    opacity: 100%;
-  }
-  .q-toggle__inner--truthy{
-    color: #ffffff;
-    .q-toggle__track{
-      background-color: #6B76E3;
-    }
-    }
-}
 
 
 //o2 in xs size
@@ -800,15 +1093,15 @@
   }
   
   .q-toggle__track{
-    height: 20px;
+    height: 17px;
     padding-bottom: 16px;
     border-radius: 16px;
-    width: 32px;
-    background-color: #EBECF0;
+    width: 30px;
+    background-color: var(--o2-toggle-track-off-bg);
     opacity: 100%;
   }
   .q-toggle__thumb:after{
-    top: 0.5px;
+    top: 0.02em;
     left: -0.5px;
     height: 14px;
     width: 14px;
@@ -826,6 +1119,10 @@
   }
 
   .q-toggle__inner--truthy{
+     color: #ffffff;
+      .q-toggle__track{
+        background-color: var(--o2-toggle-track-bg);
+      }
     .q-toggle__thumb:after{
       top: 0.5px;
       left: 1.2px;
@@ -850,36 +1147,9 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 32px;
+  min-height: 30px;
 }
 
-.o2-toggle-button-xs-light{
-  .q-toggle__track{
-    background-color: #acbbf3;
-    border: 1px solid #D3D5DB !important;
-    opacity: 100%;
-  }
-  .q-toggle__inner--truthy{
-    color: #ffffff;
-    .q-toggle__track{
-      background-color: #575FC5;
-    }
-    }
-}
-
-.o2-toggle-button-xs-dark{
-  .q-toggle__track{
-    background-color: #2f415e;
-    border: 1px solid #6F737A !important;
-    opacity: 100%;
-  }
-  .q-toggle__inner--truthy{
-    color: #ffffff;
-    .q-toggle__track{
-      background-color: #6B76E3;
-    }
-    }
-}
 
 
 .o2-input-text-box-light{
@@ -939,5 +1209,869 @@
   }
 }
 
+/* ============================================================================
+   SPLITTER TRANSITIONS
+   Disable transitions for smoother splitter behavior
+   ============================================================================ */
+
+.q-splitter {
+  .q-splitter__before,
+  .q-splitter__after {
+    transition: none !important;
+  }
+
+  .q-splitter__separator {
+    transition: none !important;
+    z-index: 1 !important; // Lower z-index so scrollbar overlaps it
+
+    &[aria-disabled="true"] {
+      width: 0px;
+    }
+
+    .q-btn {
+      .q-icon {
+        font-size: 0.8rem;
+      }
+    }
+  }
+}
+
+.q-splitter--vertical > .q-splitter__separator > div {
+  left:0px;
+  right: 0px;
+}
 
 
+
+/* ============================================================================
+   Input Section
+   Reusable Input Section across all pages with consistent borders and radius
+   ============================================================================ */
+
+.q-input {
+  min-height: 2.25rem;
+  font-size: 0.813rem;
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    min-height: 2.25rem;
+    max-height: 2.25rem;
+    background-color: transparent;
+    line-height: 1.5rem;
+    padding: 0rem 0.75rem !important;
+  }
+  .q-field__control-container{
+      .q-field__native{
+       height: 2.25rem !important;
+    }
+  }
+  &:hover .q-field__control {
+    border-color: var(--border-color-hover) !important;
+  }
+}
+
+
+/* ============================================================================
+   Select Section (Dropdown)
+   Reusable Select Section across all pages with consistent borders and radius
+   ============================================================================ */
+
+.q-select {
+  min-height: 2.25rem !important;
+  font-size: 0.813rem;
+  .q-field__inner {
+    min-height: 2.25rem !important;
+    max-height: 2.25rem !important;
+  }
+
+
+
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    min-height: 2.25rem !important;
+    max-height: 2.25rem !important;
+    height: 2.25rem !important;
+    background-color: transparent;
+    line-height: 1.5rem;
+    padding: 0rem 0.75rem !important;
+
+  }
+
+  .q-field__bottom{
+    padding: 4px !important
+  }
+
+  .q-field__control-container{
+      .q-field__native{
+        min-height: 2.25rem;
+       height: 2.25rem;
+    }
+  }
+
+  .q-field__control-container{
+      .q-field__native{
+        min-height: 2.25rem !important;
+       height: 2.25rem !important;
+       padding: 0px !important;
+    }
+  }
+
+  .q-field__marginal {
+    height: 2.25rem !important;
+  }
+
+  &:not(.q-field--disabled):hover .q-field__control {
+    border-color: var(--border-color-hover) !important;
+  }
+
+  .q-field__append {
+    align-items: center;
+    height: 2.25rem !important;
+  }
+
+  .q-field__append .q-icon:not(.q-select__dropdown-icon) {
+    margin-top: 4px;
+  }
+
+  .q-select__dropdown-icon {
+    transition: transform 0.3s ease;
+  }
+}
+
+.select-pagination {
+  .q-field__control-container{
+      .q-field__native{
+        min-height: 1.5rem !important;
+       height: 1.5rem !important;
+    }
+  }
+}
+
+/* ============================================================================
+   Select Dropdown Options Hover
+   Adds hover background color and text color to q-select dropdown menu options
+   ============================================================================ */
+
+.q-menu .q-item {
+  &:hover {
+    background-color: var(--o2-tab-bg) !important;
+    color: var(--o2-primary-btn-bg) !important;
+  }
+}
+
+// Exception: Disable hover for saved views dropdown menu
+// Disable table row hover
+.saved-views-dropdown-menu .q-tr:hover,
+.saved-views-dropdown-menu tr:hover,
+.saved-views-dropdown-menu tbody tr:hover,
+.saved-views-dropdown-menu tbody .q-tr:hover {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+.saved-views-dropdown-menu td:hover,
+.saved-views-dropdown-menu .q-td:hover {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+// Disable default q-item hover but enable for saved-view-item specifically
+.saved-views-dropdown-menu .q-item:hover {
+  background-color: transparent !important;
+  background: transparent !important;
+  color: inherit !important;
+}
+
+// Enable hover only for individual saved view items
+.saved-views-dropdown-menu .saved-view-item:hover {
+  background-color: var(--o2-hover-accent) !important;
+  border-radius: 4px;
+}
+
+.q-list--dark, .q-item--dark {
+  color: var(--o2-text-primary);
+}
+
+
+
+/* ============================================================================
+   reusable side dialog  in the app
+   ============================================================================
+ */
+
+ .o2-side-dialog {
+  width: 30vw !important;
+ }
+
+
+/* ============================================================================
+   use this as class for any icons in actions section of the table 
+   ============================================================================
+ */
+
+ .o2-actions-icons {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+
+/* ============================================================================
+   resuable file input in the app
+   ============================================================================
+ */
+
+.o2-file-input {
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    min-height: 2.25rem;
+    max-height: 2.25rem;
+    background-color: transparent;
+    line-height: 1.5rem;
+    padding: 0rem 0.75rem !important;
+  }
+  &:hover .q-field__control {
+    border-color: var(--border-color-hover) !important;
+  }
+}
+
+
+
+.o2-management-header{
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
+  padding: 1rem 1.5rem;
+}
+
+
+//============================================================================
+//   Monaco Editor Styling Start
+//============================================================================ 
+
+  .monaco-editor {
+    outline-width: 0px;
+    outline-style: none;
+  }
+
+  .empty-query .monaco-editor-background {
+    background-image: url("../assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
+  }
+
+  .empty-function .monaco-editor-background {
+    background-image: url("../assets/images/common/vrl-function.png");
+    background-repeat: no-repeat;
+    background-size: 170px;
+  }
+
+  
+//============================================================================
+//     Monaco Editor Styling End
+//============================================================================ 
+  
+
+.o2-custom-select-dashboard{
+  min-height: 2.7rem !important;
+
+  .q-field__control {
+    @extend .el-border;
+    @extend .el-border-radius;
+    min-height: 2.7rem !important;
+    max-height: 2.7rem !important;
+    height: 2.7rem !important;
+  }
+
+  .q-field__native, .q-field__input {
+    padding-bottom: 0.25rem !important;
+  }
+
+  .q-field__append {
+    align-items: center;
+    height: 2.7rem !important;
+  }
+
+}
+
+.dashboard-chart-border{
+  border: 0.03rem solid var(--o2-border-color);
+}
+
+.o2-custom-table-header-bg{
+  background: var(--o2-table-header-bg);
+}
+
+
+.splitter-icon-collapse {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
+  position: absolute !important;
+  top: 26px !important;
+  left: 4px !important;
+  z-index: 100 !important;
+  border-radius: 0.325rem;
+}
+
+.splitter-icon-expand {
+  min-height: 3em !important;
+  min-width: 0.3rem !important;
+  position: absolute !important;
+  top: 26px !important;
+  left: 5px !important;
+  z-index: 100 !important;
+  border-radius: 0.325rem;
+}
+
+.feature-card {
+  @extend .el-border-radius;
+  padding: 1rem;
+  transition: all 0.3s ease;
+  position: relative;
+  border: 1px solid;
+  background: var(--tile-bg);
+  border: 0.0625rem solid var(--o2-border-color);
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  }
+}
+
+.actions-column {
+  .q-btn {
+    &:hover {
+      background-color: var(--o2-tab-bg) !important;
+    }
+  }
+}
+
+.add-folder-btn{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  border-radius: 4px !important;
+  padding: 0px 12px !important;
+  margin-top: 0px !important;
+  min-width: auto !important;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
+  }
+  
+}
+
+.no-data-image {
+  color: var(--o2-primary-btn-bg);
+}
+
+.organization-menu-o2 .org-table {
+  .q-table__bottom .q-btn{
+    @extend .el-border-radius;
+    @extend .el-border;
+
+    margin-left: 0.625rem !important;
+    min-height: 10px !important;
+    min-width: 10px !important;
+    .q-icon{
+      font-size: 1.5rem;
+    }
+
+    color: var(--o2-text-primary);
+  }
+}
+
+  
+//============================================================================
+//    Logs and Traces toggle buttons
+//============================================================================ 
+
+.logs-visualize-toggle {
+  .button-group {
+    border: 0.0625rem solid var(--o2-border) !important; // 1px
+    border-radius: 0.5625rem; // 9px
+  }
+
+  .button {
+    background-color: var(--o2-muted-background);
+    border-radius: 0.375rem; // 6px
+    transition: background-color 0.2s ease;
+  }
+
+  .button-left {
+    border-radius: 0 !important;
+    border-top-left-radius: 0.375rem !important; // 6px
+    border-bottom-left-radius: 0.375rem !important; // 6px
+    color: var(--o2-text-primary);
+    border-right: 1px solid var(--o2-border-color) !important;
+  }
+
+  .button-center {
+    border-radius: 0 !important;
+    color: var(--o2-text-primary);
+    border-right: 1px solid var(--o2-border-color) !important;
+
+  }
+
+  .button-right {
+    border-radius: 0 !important;
+    border-top-right-radius: 0.375rem !important; // 6px
+    border-bottom-right-radius: 0.375rem !important; // 6px
+    color: var(--o2-text-primary);
+    transition: all 0.3s ease;
+  }
+
+  .selected {
+    background-color: var(--q-primary) !important;
+    color: white !important;
+  }
+}
+
+.dark-theme{
+  .logs-visualize-toggle {
+    .button-right {
+      border-top-right-radius: 0.375rem; // 6px
+      border-bottom-right-radius: 0.375rem; // 6px
+      color: var(--o2-text-primary);
+      background-color: rgba(255, 255, 255, 0.1);
+
+      &:hover{
+        color: white;
+      }
+    }
+
+    .selected {
+      background-color: var(--q-primary) !important;
+      color: white !important;
+    }
+    .button-left {
+      background-color: rgba(255, 255, 255, 0.1);
+      &:hover{
+        color: white;
+      }
+    }
+     .button-center {
+      background-color: rgba(255, 255, 255, 0.1);
+      &:hover{
+        color: white;
+      }
+    }
+  }
+}
+
+
+//////////////////// Field List /////////////////////
+.default-index-menu {
+  width: 100%;
+
+  .q-menu {
+    // box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
+    transform: translateY(0.5rem);
+    border-radius: 0px;
+
+    .q-virtual-scroll__content {
+      padding: 0.5rem;
+    }
+  }
+
+  .q-field {
+    &__control {
+      height: 35px;
+      padding: 0px 5px;
+      min-height: auto !important;
+
+      &-container {
+        padding-top: 0px !important;
+      }
+    }
+  }
+
+  .index-table {
+    width: 100%;
+    height: calc(100% - 40px);
+    // border: 1px solid rgba(0, 0, 0, 0.02);
+
+    .q-table {
+      display: table;
+      table-layout: fixed !important;
+    }
+
+    tr {
+      margin-bottom: 1px;
+    }
+
+    tbody,
+    tr,
+    td {
+      width: 100%;
+      display: block;
+      height: fit-content;
+      overflow: hidden;
+    }
+
+    .q-table__control,
+    label.q-field {
+      width: 100%;
+    }
+
+    .q-table thead tr,
+    .q-table tbody td {
+      height: auto;
+    }
+
+    .q-table__top {
+      padding: 0 !important;
+      border-bottom: unset;
+    }
+  }
+
+  .field-table {
+    width: 100%;
+
+    > .q-table__bottom {
+      padding: 0.5rem 0 0.5rem 0.5rem !important; // 8px top, bottom, left padding for button groups
+      min-height: auto !important;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    // Field list pagination styling - right-aligned, consistent with SearchResult
+    .field-list-pagination {
+      display: flex;
+      align-items: center;
+      gap: 0.125rem; // 4px - better spacing
+
+      .pagination-nav-btn {
+        padding: 0 !important;
+        margin: 0 !important;
+        min-width: auto !important;
+        min-height: auto !important;
+        width: auto !important;
+        height: auto !important;
+        border-radius: 0 !important;
+
+        .q-btn__content {
+          font-size: 0.75rem !important; // 12px - even smaller icon
+          padding: 0 !important; // 0px - no padding
+        }
+
+        &.disabled {
+          opacity: 0.4;
+        }
+
+        // Remove hover effects
+        &:hover,
+        &:focus {
+          background-color: transparent !important;
+        }
+
+        .q-focus-helper {
+          display: none !important;
+        }
+      }
+
+      .pagination-page-btn {
+        padding: 0.375rem 0.25rem !important;
+        margin: 0 !important;
+        min-width: 1.5rem !important;
+        width: 1.5rem !important;
+        min-height: 1.375rem !important;
+        height: 1.375rem !important;
+        font-size: 0.75rem !important; // 13px - slightly larger
+        font-weight: 500;
+        line-height: 1;
+        color: var(--o2-text-primary) !important;
+        border-radius: 0.25rem !important; // 4px - rounded border
+        overflow: visible !important;
+
+        .q-btn__content {
+          min-height: auto !important;
+          line-height: 1;
+        }
+      }
+
+      .pagination-page-active {
+        background-color: var(--q-primary) !important;
+        color: var(--o2-primary-foreground) !important;
+        font-weight: 600;
+      }
+    }
+
+    .field-list-reset {
+      display: flex;
+      align-items: center;
+
+      .reset-icon {
+        font-size: 1.25rem !important; // 20px
+        color: var(--o2-text-primary);
+        transition: color 0.2s ease;
+
+        &:hover {
+          color: var(--q-primary);
+        }
+      }
+    }
+  }
+
+  .field_list {
+    padding: 0px;
+    margin-bottom: 0.125rem;
+    position: relative;
+    overflow: visible;
+    cursor: default;
+
+    .field_label {
+      pointer-events: none;
+      font-size: 0.825rem;
+      position: relative;
+      display: inline;
+      z-index: 2;
+      left: 0;
+      height: 20px;
+      color: var(--o2-text-primary);
+      // text-transform: capitalize;
+    }
+
+    .field-container {
+      height: 25px;
+    }
+
+    .field_overlay {
+      position: absolute;
+      height: 100%;
+      right: 0;
+      top: 0;
+      z-index: 5;
+      padding: 0 6px;
+      visibility: hidden;
+      display: flex;
+      align-items: center;
+
+      .q-icon {
+        cursor: pointer;
+        opacity: 0;
+        margin: 0 1px;
+      }
+    }
+
+    &.selected {
+      .field_overlay {
+        background-color: var(--o2-hover-accent);
+
+        .field_icons {
+          opacity: 0;
+        }
+      }
+    }
+
+    &:hover {
+      .field-container {
+        // background-color: #ffffff;
+      }
+    }
+  }
+
+  &.theme-dark {
+    .field_list {
+      &:hover {
+        .field_overlay {
+          background-color: var(--o2-hover-accent);
+        }
+
+        .q-focus-helper{
+          opacity: 1;
+          background: none !important;
+
+          &:before{
+            opacity: 1 !important;
+            background: none !important;
+          }
+
+          &:after{
+            opacity: 1 !important;
+            background: none !important;
+          }
+        }
+      }
+    }
+
+    .field-list-pagination {
+      .q-btn {
+        color: var(--o2-text-primary) !important;
+        border-radius: 0.25rem !important;
+      }
+    }
+
+    .field-list-reset {
+      .reset-icon {
+        color: var(--o2-text-primary);
+        border: 1px solid rgba(196, 196, 196);
+        border-radius: 0.375rem !important;
+        padding: 0.125rem;
+
+
+        &:hover {
+          color: white;
+        }
+      }
+    }
+  }
+
+  &.theme-light {
+    .field_list {
+      &:hover {
+        // box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
+
+        .field_overlay {
+          background-color: var(--o2-hover-accent);
+          opacity: 1;
+        }
+      }
+    }
+  }
+
+  .q-item {
+    min-height: 1.3rem;
+    padding: 5px 10px;
+
+    &__label {
+      font-size: 0.75rem;
+    }
+
+    &.q-manual-focusable--focused > .q-focus-helper {
+      background: currentColor !important;
+      opacity: 0.3 !important;
+    }
+  }
+
+  .q-field--dense .q-field__before,
+  .q-field--dense .q-field__prepend {
+    padding: 0px 0px 0px 0px;
+    height: auto;
+    line-height: auto;
+  }
+
+  .q-field__native,
+  .q-field__input {
+    padding: 0px 0px 0px 0px;
+  }
+
+  .q-field--dense .q-field__label {
+    top: 5px;
+  }
+
+  .q-field--dense .q-field__control,
+  .q-field--dense .q-field__marginal {
+    height: 34px;
+  }
+}
+
+.default-index-menu {
+  .index-table {
+    .q-table {
+      width: 100%;
+      table-layout: fixed;
+
+      .q-expansion-item {
+        .q-item {
+          display: flex;
+          align-items: center;
+          padding: 0;
+          height: 25px !important;
+          min-height: 25px !important;
+        }
+
+        .q-item__section--avatar {
+          min-width: 12px;
+          max-width: 12px;
+          margin-right: 8px;
+        }
+
+        .filter-values-container {
+          .q-item {
+            padding-left: 4px;
+
+            .q-focus-helper {
+              background: none !important;
+            }
+          }
+        }
+
+        .q-item-type {
+          &:hover {
+            .field_overlay {
+              visibility: visible;
+
+              .q-icon {
+                opacity: 1;
+              }
+            }
+          }
+        }
+
+        .field-expansion-icon {
+          img {
+            width: 12px;
+            height: 12px;
+          }
+
+          .q-icon {
+            font-size: 18px;
+            color: #808080;
+          }
+        }
+      }
+
+      .field-container {
+        &:hover {
+          .field_overlay {
+            visibility: visible;
+
+            .q-icon {
+              opacity: 1;
+            }
+          }
+        }
+      }
+
+      .field_list {
+        &.selected {
+          background-color: var(--o2-hover-accent);
+        }
+      }
+    }
+
+    .schema-field-toggle {
+      border: 1px solid var(--o2-border-color);
+      border-radius: 0.325rem;
+      background-color: transparent;
+      line-height: 10px;
+    }
+
+    .q-table__bottom {
+      padding: 0 !important;
+      min-height: 2.43rem !important; // 31.2px
+      max-height: 2.43rem !important;
+    }
+
+    .pagination-field-count {
+      line-height: 1.95rem; // 31.2px
+      font-weight: 700;
+      font-size: 0.8125rem; // 13px
+    }
+  }
+
+  .field-table {
+    .q-table__bottom {
+      // padding: 0.3125rem !important; // 5px
+    }
+
+    .schema-field-toggle .q-btn {
+      padding: 0.3125rem !important; // 5px
+    }
+  }
+}

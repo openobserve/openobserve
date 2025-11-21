@@ -46,7 +46,9 @@ use {
 use super::request::*;
 use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
-    handler::http::request::search::search_inspector,
+    handler::http::{
+        request::search::search_inspector, router::middlewares::blocked_orgs_middleware,
+    },
 };
 
 pub mod middlewares;
@@ -245,6 +247,10 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
     #[cfg(feature = "cloud")]
     svc.service(web::scope("/webhook").service(cloud::billings::handle_stripe_event));
 
+    // OAuth 2.0 Authorization Server Metadata endpoint (RFC 8414)
+    // Must be publicly accessible (no auth) at root per MCP spec
+    svc.service(mcp::oauth_authorization_server_metadata);
+
     svc.service(
         web::scope("/auth")
             .wrap(cors.clone())
@@ -253,21 +259,30 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .service(users::get_auth),
     );
 
-    svc.service(
-        web::scope("/node")
+    {
+        let mut node_scope = web::scope("/node")
             .wrap(HttpAuthentication::with_fn(
                 super::auth::validator::oo_validator,
             ))
             .wrap(cors.clone())
             .service(status::cache_status)
             .service(status::enable_node)
-            .service(status::flush_node)
+            .service(status::flush_node);
+
+        #[cfg(feature = "enterprise")]
+        {
+            node_scope = node_scope.service(status::drain_status);
+        }
+
+        node_scope = node_scope
             .service(status::list_node)
             .service(status::node_metrics)
             .service(status::consistent_hash)
             .service(status::refresh_nodes_list)
-            .service(status::refresh_user_sessions),
-    );
+            .service(status::refresh_user_sessions);
+
+        svc.service(node_scope);
+    }
 
     if get_config().common.swagger_enabled {
         svc.service(
@@ -331,6 +346,7 @@ pub fn get_config_routes(svc: &mut web::ServiceConfig) {
             .wrap(cors.clone())
             .service(status::zo_config)
             .service(status::logout)
+            .service(status::config_runtime)
             .service(web::scope("/reload").service(status::config_reload)),
     );
 }
@@ -347,6 +363,7 @@ pub fn get_config_routes(svc: &mut web::ServiceConfig) {
             .service(status::refresh_token_with_dex)
             .service(status::logout)
             .service(users::service_accounts::exchange_token)
+            .service(status::config_runtime)
             .service(web::scope("/reload").service(status::config_reload)),
     );
 }
@@ -366,6 +383,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
 
     #[allow(deprecated)]
     let service = web::scope("/api")
+        .wrap(middleware::from_fn(blocked_orgs_middleware))
         .wrap(middleware::from_fn(audit_middleware))
         .wrap(HttpAuthentication::with_fn(
             super::auth::validator::oo_validator,
@@ -408,6 +426,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(stream::schema)
         .service(stream::create)
         .service(stream::update_settings)
+        .service(stream::update_fields)
         .service(stream::delete_fields)
         .service(stream::delete)
         .service(stream::list)
@@ -502,6 +521,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::enable_alert_bulk)
         .service(alerts::trigger_alert)
         .service(alerts::move_alerts)
+        .service(alerts::history::get_alert_history)
         .service(alerts::deprecated::save_alert)
         .service(alerts::deprecated::update_alert)
         .service(alerts::deprecated::get_alert)
@@ -551,7 +571,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(pipeline::delete_pipeline)
         .service(pipeline::enable_pipeline)
         .service(pipeline::enable_pipeline_bulk)
+        .service(pipelines::history::get_pipeline_history)
         .service(search::multi_streams::search_multi)
+        .service(search::multi_streams::search_multi_stream)
         .service(search::multi_streams::_search_partition_multi)
         .service(search::multi_streams::around_multi)
         .service(stream::delete_stream_cache)
@@ -561,7 +583,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(service_accounts::save)
         .service(service_accounts::delete)
         .service(service_accounts::update)
-        .service(service_accounts::get_api_token);
+        .service(service_accounts::get_api_token)
+        .service(mcp::handle_mcp_post)
+        .service(mcp::handle_mcp_get);
 
     #[cfg(feature = "enterprise")]
     let service = service
@@ -597,14 +621,20 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ai::prompt::get_prompt)
         .service(ai::prompt::update_prompt)
         .service(ai::prompt::rollback_prompt)
-        .service(re_pattern::get)
+        .service(re_pattern::get_built_in_patterns)
+        .service(re_pattern::test)
         .service(re_pattern::list)
         .service(re_pattern::save)
+        .service(re_pattern::get)
         .service(re_pattern::update)
         .service(re_pattern::delete)
-        .service(re_pattern::test)
         .service(domain_management::get_domain_management_config)
-        .service(domain_management::set_domain_management_config);
+        .service(domain_management::set_domain_management_config)
+        .service(license::get_license_info)
+        .service(license::store_license)
+        .service(traces::get_service_graph_metrics)
+        .service(traces::get_store_stats)
+        .service(patterns::extract_patterns);
 
     #[cfg(feature = "cloud")]
     let service = service

@@ -48,7 +48,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
   });
 
   describe('Label Display Branch Coverage', () => {
-    it('should show "if" when index is 0 and depth is 0', async () => {
+    it('should show "if" when index is 0', async () => {
       const wrapper = mount(FilterCondition, {
         props: {
           ...defaultProps,
@@ -63,12 +63,12 @@ describe('FilterCondition.vue Branch Coverage', () => {
         },
       });
 
-      // Branch: index == 0 && depth == 0 ? 'if' : computedLabel (line 5)
+      // Branch: index == 0 ? 'if' : computedLabel (line 5)
       const labelElement = wrapper.find('.tw-text-sm');
       expect(labelElement.text().trim()).toBe('if');
     });
 
-    it('should show computed label when index is not 0 or depth is not 0', async () => {
+    it('should show computed label when index is not 0', async () => {
       const wrapper = mount(FilterCondition, {
         props: {
           ...defaultProps,
@@ -84,17 +84,17 @@ describe('FilterCondition.vue Branch Coverage', () => {
         },
       });
 
-      // Branch: computedLabel (when condition is false)
+      // Branch: computedLabel (when index != 0)
       const labelElement = wrapper.find('.tw-text-sm');
       expect(labelElement.text().trim()).toBe('OR');
     });
 
-    it('should show computed label when depth is not 0', async () => {
+    it('should show "if" when index is 0 regardless of depth', async () => {
       const wrapper = mount(FilterCondition, {
         props: {
           ...defaultProps,
           index: 0,
-          depth: 1, // Branch condition: depth != 0
+          depth: 1, // Even with depth != 0, index 0 should show "if"
           label: 'AND',
         },
         global: {
@@ -105,83 +105,12 @@ describe('FilterCondition.vue Branch Coverage', () => {
         },
       });
 
-      // Branch: computedLabel (when condition is false)
+      // Branch: index == 0 shows "if" regardless of depth (updated logic)
       const labelElement = wrapper.find('.tw-text-sm');
-      expect(labelElement.text().trim()).toBe('AND');
+      expect(labelElement.text().trim()).toBe('if');
     });
   });
 
-  describe('AI Chat Enabled Styling Branch Coverage', () => {
-    it('should apply AI chat styles when isAiChatEnabled is true', async () => {
-      const aiEnabledStore = createStore({
-        state: {
-          isAiChatEnabled: true, // Branch condition: true
-        },
-      });
-
-      const wrapper = mount(FilterCondition, {
-        props: {
-          ...defaultProps,
-          condition: {
-            column: 'test_column',
-            operator: 'equals',
-            value: 'test_value',
-          },
-        },
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: aiEnabledStore,
-          },
-        },
-      });
-
-      // Branch: store.state.isAiChatEnabled = true (line 17)
-      const columnSelect = wrapper.find('[data-test="alert-conditions-select-column"] .q-select');
-      expect(columnSelect.classes()).toContain('o2-ai-condition-input');
-
-      // Branch: store.state.isAiChatEnabled = true (line 54)
-      const operatorSelect = wrapper.find('[data-test="alert-conditions-operator-select"] .q-select');
-      expect(operatorSelect.classes()).toContain('tw-w-[70px]');
-
-      // Branch: store.state.isAiChatEnabled = true (line 79)  
-      const valueInput = wrapper.find('[data-test="alert-conditions-value-input"] .q-input');
-      expect(valueInput.classes()).toContain('tw-w-[110px]');
-    });
-
-    it('should apply regular styles when isAiChatEnabled is false', async () => {
-      const aiDisabledStore = createStore({
-        state: {
-          isAiChatEnabled: false, // Branch condition: false
-        },
-      });
-
-      const wrapper = mount(FilterCondition, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: aiDisabledStore,
-          },
-        },
-      });
-
-      // Branch: store.state.isAiChatEnabled = false (line 17)
-      const columnSelect = wrapper.find('[data-test="alert-conditions-select-column"] .q-select');
-      expect(columnSelect.classes()).not.toContain('o2-ai-condition-input');
-      expect(columnSelect.classes()).toContain('xl:tw-min-w-[200px]');
-
-      // Branch: store.state.isAiChatEnabled = false (line 54)
-      const operatorSelect = wrapper.find('[data-test="alert-conditions-operator-select"] .q-select');
-      expect(operatorSelect.classes()).not.toContain('tw-w-[70px]');
-      expect(operatorSelect.classes()).toContain('xl:tw-min-w-[200px]');
-
-      // Branch: store.state.isAiChatEnabled = false (line 79)
-      const valueInput = wrapper.find('[data-test="alert-conditions-value-input"] .q-input');
-      expect(valueInput.classes()).not.toContain('tw-w-[110px]');
-      expect(valueInput.classes()).toContain('xl:tw-min-w-[200px]');
-    });
-  });
 
   describe('Tooltip Display Branch Coverage', () => {
     it('should conditionally render tooltips based on AI chat and field values', async () => {

@@ -101,7 +101,7 @@ test.describe("Logs Downloads testcases", () => {
     // 1. Normal Downloads
     await executeDownloadTest('Normal CSV Download', async () => {
       await pageManager.logsPage.clickMoreOptionsButton();
-      await pageManager.logsPage.clickDownloadResults();
+      await pageManager.logsPage.hoverDownloadResults();
       const csvDownloadPromise = pageManager.logsPage.waitForDownload();
 
       const csvButton = page.getByText('CSV', { exact: true });
@@ -110,6 +110,7 @@ test.describe("Logs Downloads testcases", () => {
         await csvButton.click();
       } catch (error) {
         await pageManager.logsPage.clickMoreOptionsButton();
+        await pageManager.logsPage.hoverDownloadResults();
         await csvButton.click();
       }
 
@@ -126,7 +127,7 @@ test.describe("Logs Downloads testcases", () => {
       await page.waitForTimeout(2000);
 
       await pageManager.logsPage.clickMoreOptionsButton();
-      await pageManager.logsPage.clickDownloadResults();
+      await pageManager.logsPage.hoverDownloadResults();
       const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
 
       const jsonButton = page.getByText('JSON', { exact: true });
@@ -135,6 +136,7 @@ test.describe("Logs Downloads testcases", () => {
         await jsonButton.click();
       } catch (error) {
         await pageManager.logsPage.clickMoreOptionsButton();
+        await pageManager.logsPage.hoverDownloadResults();
         await jsonButton.click();
       }
 
@@ -201,7 +203,7 @@ test.describe("Logs Downloads testcases", () => {
       await setupSQLMode(page);
 
       await pageManager.logsPage.clickMoreOptionsButton();
-      await pageManager.logsPage.clickDownloadResults();
+      await pageManager.logsPage.hoverDownloadResults();
       const csvDownloadPromise = pageManager.logsPage.waitForDownload();
       await page.getByText('CSV', { exact: true }).click();
       const csvDownload = await csvDownloadPromise;
@@ -218,7 +220,7 @@ test.describe("Logs Downloads testcases", () => {
       await setupSQLMode(page);
 
       await pageManager.logsPage.clickMoreOptionsButton();
-      await pageManager.logsPage.clickDownloadResults();
+      await pageManager.logsPage.hoverDownloadResults();
       const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
       await page.getByText('JSON', { exact: true }).click();
       const jsonDownload = await jsonDownloadPromise;

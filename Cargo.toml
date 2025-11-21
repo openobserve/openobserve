@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.16.0"
+version = "0.17.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -45,15 +45,16 @@ inherits = "release"
 debug = true
 strip = false
 codegen-units = 4
+split-debuginfo = "packed"
 
 [dependencies]
 actix-cors = "0.7"
-actix-http = "3.9"
+actix-http = "3.11.2"
 actix-multipart = { version = "0.7", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
 actix-web-opentelemetry = { version = "0.22", features = ["metrics"] }
-actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
+actix-web-rust-embed-responder = { version = "2.3", default-features = false, features = [
     "support-rust-embed-for-web",
     "base64",
 ] }
@@ -90,6 +91,7 @@ datafusion-functions-aggregate-common.workspace = true
 datafusion-functions-json.workspace = true
 arrow.workspace = true
 arrow-flight.workspace = true
+arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
@@ -105,6 +107,7 @@ itertools.workspace = true
 jsonwebtoken = "9.3"
 log.workspace = true
 maxminddb = "0.26"
+md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.43", default-features = false, optional = true }
 once_cell.workspace = true
@@ -114,7 +117,7 @@ opentelemetry-otlp.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
 prometheus.workspace = true
-promql-parser = "0.6"
+promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-parser", branch = "openobserve" }
 prost.workspace = true
 prost-wkt-types.workspace = true
 proto.workspace = true
@@ -129,6 +132,7 @@ reqwest.workspace = true
 rust-embed-for-web = "11.2.1"
 rustls.workspace = true
 rustls-pemfile.workspace = true
+scc.workspace = true
 sea-orm.workspace = true
 segment.workspace = true
 serde.workspace = true
@@ -222,8 +226,8 @@ report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
-actix-web = { version = "4.11", features = ["rustls-0_23"] }
-actix-tls = { version = "3.4", features = [
+actix-web = { version = "4.12", features = ["rustls-0_23"] }
+actix-tls = { version = "3.5", features = [
     "connect",
     "uri",
     "rustls-0_23-native-roots",
@@ -248,13 +252,14 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
     "_fetcher-rusttls-tokio",
 ], default-features = false, rev = "6f2392f78ae851e2acf33df8e9764cc299d837db" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+chrono-tz = "0.10"
 cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "50.1.0"
-datafusion-proto = "50.1.0"
-datafusion-functions-aggregate-common = "50.1.0"
+datafusion = "50.3.0"
+datafusion-proto = "50.3.0"
+datafusion-functions-aggregate-common = "50.3.0"
 datafusion-functions-json = "0.50.0"
 expect-test = "1.4"
 arrow = { version = "56.0.0", features = ["ipc_compression", "prettyprint"] }
@@ -283,7 +288,7 @@ lettre = { version = "0.11", default-features = false, features = [
     "pool",
     "tokio1",
     "tokio1-rustls-tls",
-    "aws-lc-rs"
+    "aws-lc-rs",
 ] }
 log = "0.4"
 md5 = "0.8.0"
@@ -305,7 +310,7 @@ opentelemetry-otlp = { version = "0.30", features = [
     "serde",
     "trace",
     "reqwest-client",
-    "grpc-tonic"
+    "grpc-tonic",
 ] }
 opentelemetry-proto = { version = "0.30", features = [
     "gen-tonic",
@@ -332,6 +337,7 @@ rustls = { version = "0.23.20", default-features = false, features = [
     "std",
     "tls12",
 ] }
+scc = { version = "3.4", features = ["equivalent"] }
 sea-orm = { version = "1.1.8", features = [
     "sqlx-all",
     "runtime-tokio-rustls",
@@ -363,14 +369,14 @@ sysinfo = "0.37"
 tantivy = { version = "0.25", features = ["quickwit"] }
 tantivy-fst = "0.5"
 tempfile = "3"
-thiserror = "1.0"
+thiserror = "2.0.17"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-rustls = { version = "0.26", default-features = false, features = [
     "logging",
     "tls12",
 ] }
-tokio-util = { version = "0.7.12", features = ["compat"] }
+tokio-util = { version = "0.7", features = ["compat"] }
 tokio-stream = "0.1"
 tonic = { version = "0.13", features = ["gzip", "prost", "tls-webpki-roots"] }
 tracing = "0.1.40"
@@ -387,7 +393,7 @@ urlencoding = "2.1"
 utoipa = { version = "5", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 uuid = { version = "1.18.1", features = ["v7"] }
-vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "2003d617c7befdc7aa7f73a37263d272cd4a3718" }
-vrl = { version = "0.27.0", git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["value", "compiler", "test"] }
-zip = "5.1.1"
+vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "v0.49.0-24092025" }
+vrl = { version = "0.26.0", features = ["value", "compiler", "test"] }
+zip = "6.0.0"
 zstd = "0.13"

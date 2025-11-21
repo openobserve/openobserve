@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
     <div class="q-pa-md " style="height: calc(100vh - 130px); width: 100%;" >
       <div class="row items-baseline justify-between">
-        <div class="row text-body1 tw-font-bold tw-text-[16px] tw-opacity-[90%] q-pb-md">
+        <div class="row q-table__title tw-font-[600] q-pb-md">
           {{ t("billing.totalUsage") }}
         </div>
       </div>
@@ -33,10 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- tab-info-section -->
       <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
         <div v-if="false" class="row wrap justify-evenly q-gutter-md ">
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%; ">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
-               style="height: 100%; gap: 12px">
+            <div class="feature-card">
+              <div class="tile-content text-center column justify-between ">
               <!-- Top Section (60%) -->
               <div class="column justify-between">
                 <!-- Title row -->
@@ -54,10 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             </div>
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
-               style="height: 100%; gap: 12px">
+            <div class="feature-card">
+              <div class="tile-content text-center column justify-between ">
               <!-- Top Section (60%) -->
               <div class="column justify-between">
                 <!-- Title row -->
@@ -75,10 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             </div>
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
-               style="height: 100%; gap: 12px">
+            <div class="feature-card">
+              <div class="tile-content text-center column justify-between ">
               <!-- Top Section (60%) -->
               <div class="column justify-between">
                 <!-- Title row -->
@@ -101,10 +95,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- new section introduced to show the usage for ingestion , search , functions -->
         <div v-if="!dataLoading && Object.keys(usageData).length > 0" class="row wrap justify-evenly q-gutter-md ">
             <div class="tw-grid tw-grid-cols-3 tw-gap-4 tw-w-full">
-                <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%; ">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
-               style="height: 100%; gap: 12px">
+                <div class="feature-card">
+              <div class="tile-content text-center column justify-between ">
               <!-- Top Section (60%) -->
               <div class="column justify-between">
                 <!-- Title row -->
@@ -122,10 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
                 </div>
-                <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-                <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
-                :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
-                style="height: 100%; gap: 12px">
+                <div class="feature-card">
+              <div class="tile-content text-center column justify-between ">
                 <!-- Top Section (60%) -->
                 <div class="column justify-between">
                     <!-- Title row -->
@@ -143,10 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 </div>
                 </div>
-                <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-                <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
-                :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
-                style="height: 100%; gap: 12px">
+                <div class="feature-card">
+              <div class="tile-content text-center column justify-between ">
                 <!-- Top Section (60%) -->
                 <div class="column justify-between">
                     <!-- Title row -->
@@ -165,11 +153,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 </div>
             </div>
-            <div class="tw-grid tw-grid-cols-2 tw-gap-4 tw-w-full">
-                <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-                <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
-                :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
-                style="height: 100%; gap: 12px">
+            <div class="tw-grid tw-grid-cols-3 tw-gap-4 tw-w-full">
+                <div class="feature-card">
+              <div class="tile-content text-center column justify-between ">
                 <!-- Top Section (60%) -->
                 <div class="column justify-between">
                     <!-- Title row -->
@@ -187,10 +173,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 </div>
                 </div>
-                <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-                <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
-                :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
-                style="height: 100%; gap: 12px">
+                <div class="feature-card">
+              <div class="tile-content text-center column justify-between ">
                 <!-- Top Section (60%) -->
                 <div class="column justify-between">
                     <!-- Title row -->
@@ -205,6 +189,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Bottom Section (40%) -->
                 <div class="usage-data-to-display row items-end ">
                 {{ usageData.remotepipeline }} {{ usageDataType.toUpperCase() }}
+                </div>
+                </div>
+                </div>
+                <div class="feature-card">
+              <div class="tile-content text-center column justify-between ">
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
+                    <!-- Title row -->
+                    <div class="row justify-between">
+                    <div class="usage-tile-title">Data Retention</div>
+                    <div style="opacity: 0.8;" class="tw-bg-[#FFF4E6] tw-flex tw-items-center tw-justify-center tw-rounded-[9px] tw-h-[33px] tw-w-[33px]">
+                        <img :src="dataRetentionIcon" class="tw-h-[18px] tw-w-[18px] tw-mx-[7px] tw-my-[7px]" />
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Section (40%) -->
+                <div class="usage-data-to-display row items-end ">
+                {{ usageData.dataretention }} {{ usageDataType.toUpperCase() }}
                 </div>
                 </div>
                 </div>
@@ -259,7 +262,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         search: "0.00",
         functions: "0.00",
         pipeline: "0.00",
-        remotepipeline: "0.00"
+        remotepipeline: "0.00",
+        dataretention: "0.00"
       });
       let chartData: any = ref({});
       onMounted(async () => {
@@ -318,6 +322,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       const functionsIcon = getImageURL("images/usage/function.svg");
       const pipelineIcon = getImageURL("images/usage/pipeline.svg");
       const remotePipelineIcon = getImageURL("images/usage/remote_pipeline.svg");
+      const dataRetentionIcon = getImageURL("images/usage/data_retention.svg");
       //this is the example data that needs to be used to get the chart in usage page 
       //we just need to have the data in the format of the dataModel
       //eg: date and value and in the array format
@@ -904,6 +909,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         router,
         pipelineIcon,
         remotePipelineIcon,
+        dataRetentionIcon,
       };
     },
   });
@@ -913,9 +919,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
     width: 200px;
   }
   .tile-content {
-  height: 130px !important; /* or any fixed height */
-  padding: 16px;
-  border-radius: 8px;
+  border-radius: 0.325rem;
 }
 .dark-usage-tile-content {
   background: #2B2C2D;

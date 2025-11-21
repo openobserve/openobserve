@@ -103,7 +103,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                     Ok(job) => {
                         trigger.data = job.data;
                         trigger.start_time = job.start_time;
-                        match db::scheduler::update_trigger(trigger).await {
+                        match db::scheduler::update_trigger(trigger, false, "").await {
                             Ok(_) => Ok(alert),
                             Err(e) => {
                                 log::error!(
@@ -203,9 +203,11 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     {
         trigger.data = job.data;
         trigger.start_time = job.start_time;
-        let _ = db::scheduler::update_trigger(trigger).await.map_err(|e| {
-            log::error!("Failed to update trigger for alert {schedule_key}: {e}");
-        });
+        let _ = db::scheduler::update_trigger(trigger, false, "")
+            .await
+            .map_err(|e| {
+                log::error!("Failed to update trigger for alert {schedule_key}: {e}");
+            });
     } else {
         let _ = db::scheduler::push(trigger).await.map_err(|e| {
             log::error!("Failed to save trigger for alert {schedule_key}: {e}");
@@ -444,7 +446,10 @@ pub fn scheduler_key(alert_id: Option<Ksuid>) -> String {
 /// Helper functions for sending events to the super cluster queue.
 #[cfg(feature = "enterprise")]
 mod super_cluster {
-    use config::meta::{alerts::alert::Alert, stream::StreamType};
+    use config::{
+        get_config,
+        meta::{alerts::alert::Alert, stream::StreamType},
+    };
     use infra::errors::Error;
     use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
     use svix_ksuid::Ksuid;
@@ -456,7 +461,9 @@ mod super_cluster {
         folder_id: &str,
         alert: Alert,
     ) -> Result<(), infra::errors::Error> {
-        if get_o2_config().super_cluster.enabled {
+        let o2_config = get_o2_config();
+        let oss_config = get_config();
+        if o2_config.super_cluster.enabled && !oss_config.common.local_mode {
             // let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
             // let value = json::to_vec(&alert)?.into();
             log::debug!("Sending super cluster alert creation event: {alert:?}");
@@ -477,7 +484,9 @@ mod super_cluster {
         folder_id: Option<&str>,
         alert: Alert,
     ) -> Result<(), infra::errors::Error> {
-        if get_o2_config().super_cluster.enabled {
+        let o2_config = get_o2_config();
+        let oss_config = get_config();
+        if o2_config.super_cluster.enabled && !oss_config.common.local_mode {
             // let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
             // let value = json::to_vec(&alert)?.into();
             log::debug!("Sending super cluster alert update event: {alert:?}");
@@ -500,7 +509,9 @@ mod super_cluster {
         alert_name: &str,
         alert_id: Ksuid,
     ) -> Result<(), infra::errors::Error> {
-        if get_o2_config().super_cluster.enabled {
+        let o2_config = get_o2_config();
+        let oss_config = get_config();
+        if o2_config.super_cluster.enabled && !oss_config.common.local_mode {
             let key = alert_key(org, stream_type, stream_name, alert_name);
             log::debug!("Sending super cluster alert delete event: {key:?}");
             // o2_enterprise::enterprise::super_cluster::queue::delete(&key, false, true, None)
@@ -516,7 +527,9 @@ mod super_cluster {
     /// Sends event to the super cluster queue indicating that all alert have
     /// been deleted from the database.
     pub async fn _emit_delete_all_event() -> Result<(), infra::errors::Error> {
-        if get_o2_config().super_cluster.enabled {
+        let o2_config = get_o2_config();
+        let oss_config = get_config();
+        if o2_config.super_cluster.enabled && !oss_config.common.local_mode {
             o2_enterprise::enterprise::super_cluster::queue::delete("/alerts/", true, false, None)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;

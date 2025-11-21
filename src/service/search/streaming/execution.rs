@@ -33,6 +33,8 @@ use super::{
     sorting::order_search_results,
     utils::{calculate_progress_percentage, get_top_k_values},
 };
+#[cfg(feature = "enterprise")]
+use crate::service::search::cache::cacher::delete_cache;
 use crate::{
     common::meta::search::{QueryDelta, SearchResultType},
     service::search::{self as SearchService},
@@ -106,6 +108,26 @@ pub async fn do_partitioned_search(
         );
     }
 
+    // If clear_cache is set, delete streaming aggregation cache files before processing
+    #[cfg(feature = "enterprise")]
+    if is_streaming_aggs
+        && req.clear_cache
+        && let Some(streaming_id) = &partition_resp.streaming_id
+        && let Err(e) = clear_streaming_agg_cache(
+            trace_id,
+            streaming_id,
+            req.query.start_time,
+            req.query.end_time,
+        )
+        .await
+    {
+        log::error!(
+            "[HTTP2_STREAM] [trace_id: {}] Failed to clear cache: {}",
+            trace_id,
+            e
+        );
+    }
+
     // The order by for the partitions is the same as the order by in the query
     // unless the query is a dashboard or histogram
     let mut partition_order_by = req_order_by;
@@ -174,13 +196,15 @@ pub async fn do_partitioned_search(
             );
         }
 
-        curr_res_size += total_hits;
-        if req_size > 0 && curr_res_size >= req_size {
-            log::info!(
-                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
-            );
-            search_res.hits.truncate(req_size as usize);
-            search_res.total = search_res.hits.len();
+        if !is_streaming_aggs {
+            curr_res_size += total_hits;
+            if req_size > 0 && curr_res_size >= req_size {
+                log::info!(
+                    "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
+                );
+                search_res.hits.truncate(req_size as usize);
+                search_res.total = search_res.hits.len();
+            }
         }
 
         search_res = order_search_results(search_res, fallback_order_by_col.clone());
@@ -312,6 +336,7 @@ pub async fn do_partitioned_search(
         #[cfg(feature = "enterprise")]
         streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
     }
+
     Ok(())
 }
 
@@ -390,8 +415,6 @@ pub fn handle_partial_response(mut res: Response) -> Response {
         res.function_error = if res.function_error.is_empty() {
             vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()]
         } else {
-            res.function_error
-                .push(PARTIAL_ERROR_RESPONSE_MESSAGE.to_string());
             res.function_error
         };
     }
@@ -758,6 +781,59 @@ async fn send_partial_search_resp(
     Ok(())
 }
 
+/// Clear streaming aggregation cache files for the given streaming_id
+/// This should be called once before processing partitions when clear_cache is true
+#[cfg(feature = "enterprise")]
+async fn clear_streaming_agg_cache(
+    trace_id: &str,
+    streaming_id: &str,
+    start_time: i64,
+    end_time: i64,
+) -> Result<(), infra::errors::Error> {
+    use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec::GLOBAL_CACHE;
+
+    log::info!(
+        "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] clear_cache is set, deleting old cache files",
+        trace_id,
+        streaming_id
+    );
+
+    // Get the cache file path from GLOBAL_CACHE
+    let streaming_item = GLOBAL_CACHE.id_cache.get(streaming_id);
+    if let Some(item) = streaming_item {
+        let cache_file_path = item.get_cache_file_path();
+
+        // Delete cache files in the time range using DeletionCriteria::TimeRange
+        if let Err(e) = delete_cache(&cache_file_path, 0, Some(start_time), Some(end_time)).await {
+            log::error!(
+                "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] Error deleting cache files: {}",
+                trace_id,
+                streaming_id,
+                e
+            );
+            return Err(infra::errors::Error::Message(format!(
+                "Failed to delete cache: {e}",
+            )));
+        }
+
+        log::info!(
+            "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] Successfully deleted cache files for time range: {} - {}",
+            trace_id,
+            streaming_id,
+            start_time,
+            end_time
+        );
+    } else {
+        log::warn!(
+            "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] No cache file path found in GLOBAL_CACHE",
+            trace_id,
+            streaming_id
+        );
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::sql::OrderBy;
@@ -814,27 +890,6 @@ mod tests {
         let result = calc_queried_range(start_time, end_time, 50);
         let expected = 0.5; // 1 hour * 0.5
         assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_handle_partial_response() {
-        let response = Response {
-            is_partial: true,
-            function_error: vec!["Custom error".to_string()],
-            trace_id: "test-123".to_string(),
-            ..Default::default()
-        };
-
-        let result = handle_partial_response(response.clone());
-
-        // Should add the partial error message
-        assert!(
-            result
-                .function_error
-                .contains(&PARTIAL_ERROR_RESPONSE_MESSAGE.to_string())
-        );
-        assert!(result.function_error.contains(&"Custom error".to_string()));
-        assert_eq!(result.function_error.len(), 2);
     }
 
     #[test]

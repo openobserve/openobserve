@@ -76,7 +76,7 @@ impl From<ReportError> for HttpResponse {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = Report,
+        content = inline(Report),
         description = "Report details",
         example = json!({
             "title": "Network Traffic Overview",
@@ -128,7 +128,7 @@ pub async fn create_report(
         ("name" = String, Path, description = "Report name"),
     ),
     request_body(
-        content = Report,
+        content = inline(Report),
         description = "Report details",
     ),
     responses(
@@ -173,7 +173,7 @@ async fn update_report(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = StatusCode::OK, body = Vec<Report>),
+        (status = StatusCode::OK, body = inline(Vec<Report>)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"}))
@@ -276,7 +276,7 @@ async fn list_reports(
         ("name" = String, Path, description = "Report name"),
     ),
     responses(
-        (status = StatusCode::OK, body = Report),
+        (status = StatusCode::OK, body = inline(Report)),
         (status = StatusCode::NOT_FOUND, description = "Report not found", body = ()),
     ),
     extensions(
