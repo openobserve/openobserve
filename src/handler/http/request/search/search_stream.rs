@@ -203,6 +203,16 @@ pub async fn search_http2_stream(
         return http_response;
     }
 
+    // Sampling is not available for /_search_stream endpoint
+    if req.query.sampling_config.is_some() || req.query.sampling_ratio.is_some() {
+        log::warn!(
+            "[trace_id {}] Sampling is not available for /_search_stream endpoint. Ignoring sampling parameters.",
+            trace_id
+        );
+        req.query.sampling_config = None;
+        req.query.sampling_ratio = None;
+    }
+
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {
         Ok(v) => v.clone(),
