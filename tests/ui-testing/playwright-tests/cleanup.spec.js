@@ -48,6 +48,9 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up all users matching patterns "email*@gmail.com" and "duplicate*@gmail.com"
     await pm.apiCleanup.cleanupUsers();
 
+    // Clean up custom logo from _meta organization
+    await pm.apiCleanup.cleanupLogo();
+
     testLogger.info('Pre-test cleanup completed successfully');
   });
 });
