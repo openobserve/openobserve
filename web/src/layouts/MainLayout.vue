@@ -52,6 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </q-header>
 
+    <!-- Database Deprecation Warning Banner -->
+    <DatabaseDeprecationBanner />
+
     <q-drawer
       v-model="drawer"
       show-if-above
@@ -201,6 +204,7 @@ import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
+import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -239,6 +243,7 @@ export default defineComponent({
     PredefinedThemes,
     O2AIChat,
     GetStarted,
+    DatabaseDeprecationBanner,
   },
   methods: {
     navigateToDocs() {
