@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <div>
   <q-page v-if="currentRouteName === 'pipelines'">
     <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
       <div class="card-container tw-mb-[0.625rem]">
@@ -46,20 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-icon class="o2-search-input-icon" name="search" />
                   </template>
                 </q-input>
-                <q-btn
-                    data-test="pipeline-list-history-btn"
-                    class="q-ml-sm o2-secondary-button tw-h-[36px]"
-                    :class="
-                        store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    no-caps
-                    flat
-                    :label="t(`pipeline.history`)"
-                    @click="goToPipelineHistory"
-                    icon="history"
-                />
                 <q-btn
                   data-test="pipeline-list-import-pipeline-btn"
                   class="q-ml-sm o2-secondary-button tw-h-[36px]"
@@ -112,18 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="o2-table-checkbox"
                     size="sm"
                     @click.stop
-                  />
-                </q-td>
-                <q-td v-if="activeTab == 'scheduled'" auto-width>
-                  <q-btn
-                    dense
-                    flat
-                    size="xs"
-                    :icon="
-                      expandedRow != props.row.pipeline_id
-                        ? 'expand_more'
-                        : 'expand_less'
-                    "
                   />
                 </q-td>
                 <q-td v-for="col in filterColumns()" :key="col.name" :props="props">
@@ -218,32 +193,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-btn>
                     </div>
                   </template>
-                </q-td>
-              </q-tr>
-              <q-tr
-                data-test="scheduled-pipeline-row-expand"
-                v-show="expandedRow === props.row.pipeline_id"
-                :props="props"
-              >
-                <q-td v-if="props.row?.sql_query" colspan="100%">
-                  <div
-                    data-test="scheduled-pipeline-expanded-content"
-                    class="text-left tw-px-2 q-mb-sm expanded-content"
-                  >
-                    <div class="tw-flex tw-items-center q-py-sm">
-                      <strong>{{ t('pipeline_list.sql_query') }} : <span></span></strong>
-                    </div>
-                    <div class="tw-flex tw-items-start tw-justify-center">
-                      <div
-                        data-test="scheduled-pipeline-expanded-sql"
-                        class="scrollable-content expanded-sql"
-                      >
-                        <pre style="text-wrap: wrap"
-                          >{{ props.row?.sql_query }} </pre
-                        >
-                      </div>
-                    </div>
-                  </div>
                 </q-td>
               </q-tr>
             </template>
@@ -454,6 +403,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-actions>
     </q-card>
   </q-dialog>
+
+  <!-- Pipeline History Drawer - Outside q-page for full overlay -->
+  <PipelineHistoryDrawer
+    v-model="showHistoryDrawer"
+    :pipeline-id="selectedHistoryPipelineId"
+    :pipeline-name="selectedHistoryPipelineName"
+    :pipeline-type="selectedHistoryPipelineType"
+    :is-silenced="selectedHistoryIsSilenced"
+  />
+  </div>
 </template>
 <script setup lang="ts">
 import {
@@ -487,6 +446,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
 import PipelineView from "./PipelineView.vue";
 import ResumePipelineDialog from "../ResumePipelineDialog.vue";
+import PipelineHistoryDrawer from "@/components/pipelines/PipelineHistoryDrawer.vue";
 
 import { filter, update } from "lodash-es";
 
@@ -545,6 +505,13 @@ const confirmDialogMeta: any = ref({
 const activeTab = ref("all");
 const filteredPipelines: any = ref([]);
 const columns: any = ref([]);
+
+// Pipeline History Drawer state
+const showHistoryDrawer = ref(false);
+const selectedHistoryPipelineId = ref("");
+const selectedHistoryPipelineName = ref("");
+const selectedHistoryPipelineType = ref("");
+const selectedHistoryIsSilenced = ref(false);
 
 const tabs = reactive([
   {
@@ -674,15 +641,12 @@ const togglePipelineState = (row: any, from_now: boolean) => {
 };
 
 const triggerExpand = (props: any) => {
-  if (
-    expandedRow.value === props.row.pipeline_id ||
-    props.row.source.source_type === "realtime"
-  ) {
-    expandedRow.value = null;
-  } else {
-    // Otherwise, expand the clicked row and collapse any other row
-    expandedRow.value = props.row.pipeline_id;
-  }
+  // Open pipeline history drawer when row is clicked
+  selectedHistoryPipelineId.value = props.row.pipeline_id;
+  selectedHistoryPipelineName.value = props.row.name;
+  selectedHistoryPipelineType.value = props.row.source?.source_type || 'realtime';
+  selectedHistoryIsSilenced.value = props.row.is_silenced || false;
+  showHistoryDrawer.value = true;
 };
 
 const getColumnsForActiveTab = (tab: any) => {
@@ -1070,15 +1034,6 @@ const showErrorDialog = (pipeline: any) => {
 const closeErrorDialog = () => {
   errorDialog.value.show = false;
   errorDialog.value.data = null;
-};
-
-const goToPipelineHistory = () => {
-  router.push({
-    name: "pipelineHistory",
-    query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-  });
 };
 
 const bulkTogglePipelines = async (action: "pause" | "resume") => {

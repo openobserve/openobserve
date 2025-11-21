@@ -562,7 +562,13 @@
     "view": "View",
     "delay": "Delay",
     "history": "Pipeline History",
-    "searchHistory": "Enter Pipeline Name"
+    "searchHistory": "Enter Pipeline Name",
+    "totalExecutions": "Total Executions",
+    "errorCount": "Errors",
+    "avgExecutionTime": "Avg. Execution Time",
+    "successRate": "Success Rate",
+    "noHistoryData": "No history data available",
+    "failedToFetchHistory": "Failed to fetch pipeline history"
   },
   "function": {
     "header": "Functions",

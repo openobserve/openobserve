@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <Teleport to="body">
   <q-drawer
     v-model="isOpen"
     side="right"
@@ -22,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :width="600"
     overlay
     elevated
+    behavior="mobile"
     class="pipeline-history-drawer"
   >
     <div class="tw-h-full tw-flex tw-flex-col">
@@ -37,7 +39,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-flex tw-items-center tw-gap-3">
           <q-icon name="history" size="24px" />
           <div>
-            <div class="tw-font-semibold tw-text-lg">{{ props.pipelineName }}</div>
+            <div class="tw-flex tw-items-center tw-gap-2 tw-font-semibold tw-text-lg">
+              <span>{{ props.pipelineName }}</span>
+              <q-icon
+                :name="props.pipelineType === 'realtime' ? 'check_circle' : 'schedule'"
+                size="20px"
+                :color="props.pipelineType === 'realtime' ? 'positive' : 'grey'"
+              >
+                <q-tooltip>{{ props.pipelineType === 'realtime' ? 'Real-time' : 'Scheduled' }}</q-tooltip>
+              </q-icon>
+              <q-icon
+                :name="props.isSilenced ? 'volume_off' : 'volume_up'"
+                size="20px"
+                :color="props.isSilenced ? 'orange' : 'positive'"
+              >
+                <q-tooltip>{{ props.isSilenced ? 'Silenced' : 'Not Silenced' }}</q-tooltip>
+              </q-icon>
+            </div>
             <div class="tw-text-sm tw-text-gray-500 dark:tw-text-gray-400">
               {{ t("pipeline.history") }}
             </div>
@@ -53,9 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <!-- Stats Summary -->
+      <!-- Stats Summary - Always shown -->
       <div
-        v-if="stats"
         class="tw-p-4 tw-border-b"
         :class="
           store.state.theme === 'dark'
@@ -69,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("pipeline.totalExecutions") }}
             </div>
             <div class="tw-text-xl tw-font-semibold">
-              {{ stats.total }}
+              {{ stats?.total || 0 }}
             </div>
           </div>
           <div>
@@ -77,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("pipeline.errorCount") }}
             </div>
             <div class="tw-text-xl tw-font-semibold tw-text-red-500">
-              {{ stats.errors }}
+              {{ stats?.errors || 0 }}
             </div>
           </div>
           <div>
@@ -85,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("pipeline.avgExecutionTime") }}
             </div>
             <div class="tw-text-lg tw-font-semibold">
-              {{ formatDuration(stats.avgDuration) }}
+              {{ stats ? formatDuration(stats.avgDuration) : 'N/A' }}
             </div>
           </div>
           <div>
@@ -93,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("pipeline.successRate") }}
             </div>
             <div class="tw-text-lg tw-font-semibold tw-text-green-500">
-              {{ stats.successRate }}%
+              {{ stats?.successRate || 0 }}%
             </div>
           </div>
         </div>
@@ -130,16 +147,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #subtitle>
               <div class="tw-text-sm tw-mt-1 tw-space-y-1">
-                <div v-if="item.is_realtime">
-                  <q-badge color="blue" label="Real-time" />
+                <div class="tw-flex tw-gap-2 tw-flex-wrap">
+                  <q-badge v-if="item.is_realtime" color="blue" label="Real-time" />
+                  <q-badge v-if="item.is_silenced" color="orange" label="Silenced" />
+                  <q-badge v-if="item.is_partial" color="warning" label="Partial" />
                 </div>
-                <div v-if="item.is_silenced">
-                  <q-badge color="orange" label="Silenced" />
+                <div v-if="item.start_time" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>Start Time:</strong> {{ formatDate(item.start_time) }}
                 </div>
-                <div v-if="item.evaluation_took_in_secs">
-                  <span class="tw-text-gray-600 dark:tw-text-gray-400">
-                    Duration: {{ formatDuration(item.evaluation_took_in_secs) }}
-                  </span>
+                <div v-if="item.end_time" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>End Time:</strong> {{ formatDate(item.end_time) }}
+                </div>
+                <div v-if="item.start_time && item.end_time" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>Duration:</strong> {{ formatDuration((item.end_time - item.start_time) / 1000000) }}
+                </div>
+                <div v-if="item.evaluation_took_in_secs" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>Eval Time:</strong> {{ formatDuration(item.evaluation_took_in_secs) }}
+                </div>
+                <div v-if="item.query_took" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>Query Time:</strong> {{ (item.query_took / 1000).toFixed(2) }}ms
+                </div>
+                <div v-if="item.retries" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>Retries:</strong> {{ item.retries }}
+                </div>
+                <div v-if="item.delay_in_secs" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>Delay:</strong> {{ item.delay_in_secs }}s
                 </div>
                 <div v-if="item.error" class="tw-text-red-500 tw-mt-1">
                   <q-icon name="error" size="14px" class="tw-mr-1" />
@@ -163,10 +195,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </q-drawer>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
@@ -181,7 +214,13 @@ interface PipelineHistoryItem {
   status: string;
   is_realtime: boolean;
   is_silenced: boolean;
+  start_time?: number;
+  end_time?: number;
   evaluation_took_in_secs?: number;
+  retries?: number;
+  is_partial?: boolean;
+  delay_in_secs?: number;
+  query_took?: number;
   error?: string;
 }
 
@@ -196,6 +235,8 @@ interface Props {
   modelValue: boolean;
   pipelineId: string;
   pipelineName: string;
+  pipelineType?: string;
+  isSilenced?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -282,6 +323,11 @@ const formatDuration = (seconds: number) => {
   return `${minutes}m ${remainingSeconds}s`;
 };
 
+const formatDate = (timestamp: number) => {
+  if (!timestamp) return "-";
+  return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
+};
+
 const fetchHistory = async (append = false) => {
   if (!props.pipelineId) return;
 
@@ -308,7 +354,13 @@ const fetchHistory = async (append = false) => {
         status: hit.status,
         is_realtime: hit.is_realtime || false,
         is_silenced: hit.is_silenced || false,
+        start_time: hit.start_time,
+        end_time: hit.end_time,
         evaluation_took_in_secs: hit.evaluation_took_in_secs,
+        retries: hit.retries,
+        is_partial: hit.is_partial,
+        delay_in_secs: hit.delay_in_secs,
+        query_took: hit.query_took,
         error: hit.error,
       }));
 
@@ -376,6 +428,13 @@ const close = () => {
   isOpen.value = false;
 };
 
+// Handle ESC key
+const handleKeyDown = (event: KeyboardEvent) => {
+  if (event.key === "Escape" && isOpen.value) {
+    close();
+  }
+};
+
 // Watch for drawer opening
 watch(isOpen, (newValue) => {
   if (newValue) {
@@ -385,6 +444,15 @@ watch(isOpen, (newValue) => {
     hasMore.value = true;
     fetchHistory();
   }
+});
+
+// Add/remove keyboard event listener
+onMounted(() => {
+  document.addEventListener("keydown", handleKeyDown);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("keydown", handleKeyDown);
 });
 </script>
 
