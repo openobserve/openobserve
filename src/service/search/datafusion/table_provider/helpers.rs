@@ -60,10 +60,9 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
     // Determine sampling mode based on BitVec size:
     // - If BitVec size == row_group_count: row-group-level sampling (enterprise feature)
     // - If BitVec size == num_rows: row-level sampling (original behavior)
-    let is_row_group_sampling = row_ids.len() == row_group_count;
 
     #[cfg(feature = "enterprise")]
-    if is_row_group_sampling {
+    if row_ids.len() == row_group_count {
         return Some(
             o2_enterprise::enterprise::search::sampling::execution::generate_row_group_access_plan(
                 &row_ids,
@@ -71,15 +70,6 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
                 file.path().as_ref(),
             ),
         );
-    }
-
-    #[cfg(not(feature = "enterprise"))]
-    if is_row_group_sampling {
-        log::warn!(
-            "[SAMPLING] Row-group-level sampling is an enterprise feature. File will not be scanned: {:?}",
-            file.path().as_ref()
-        );
-        return None;
     }
 
     // Row-level sampling: each bit represents a row (original behavior)
@@ -125,7 +115,7 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
     }
 
     log::debug!(
-        "[SAMPLING] Row-level access plan: file={:?}, row_group_count={}, access_plan={:?}",
+        "file path: file={:?}, row_group_count={}, access_plan={:?}",
         file.path().as_ref(),
         row_group_count,
         access_plan
