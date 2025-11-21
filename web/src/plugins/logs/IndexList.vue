@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="column logs-index-menu !tw-p-[0.375rem] tw-h-[calc(100%-0.7rem)]"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
-    <div>
+    <div style="max-width: 100%; overflow: hidden;">
       <q-select
         ref="streamSelect"
         data-test="log-search-index-list-select-stream"
@@ -37,8 +37,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         map-options
         @filter="filterStreamFn"
         @update:model-value="handleMultiStreamSelection"
-        :title="searchObj.data.stream.selectedStream.join(',')"
       >
+        <q-tooltip
+          v-if="searchObj.data.stream.selectedStream.length > 0"
+          :delay="500"
+          anchor="bottom left"
+          self="top left"
+          max-width="280px"
+          style="font-size: 13px;"
+        >
+          {{ searchObj.data.stream.selectedStream.join(', ') }}
+        </q-tooltip>
         <template #no-option>
           <q-item>
             <q-item-section> {{ t("search.noResult") }}</q-item-section>
