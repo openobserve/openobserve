@@ -30,6 +30,7 @@ import { logsErrorMessage } from "@/utils/common";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import { convertDateToTimestamp } from "@/utils/date";
+import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
 export const useSearchResponseHandler = () => {
   const { showErrorNotification, showCancelSearchNotification } =
@@ -41,6 +42,8 @@ export const useSearchResponseHandler = () => {
     useHistogram();
 
   const { refreshPagination } = useSearchPagination();
+
+  const { clearCache } = useLogsHighlighter();
 
   const store = useStore();
   const { t } = useI18n();
@@ -180,6 +183,7 @@ export const useSearchResponseHandler = () => {
       (isPagination && searchPartitionMap[payload.traceId].partition === 1) ||
       !appendResult
     ) {
+      clearCache();
       searchObj.data.queryResults.hits = response.content.results.hits;
     } else if (appendResult) {
       searchObj.data.queryResults.hits.push(...response.content.results.hits);
