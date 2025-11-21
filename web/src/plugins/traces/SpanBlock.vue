@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="spanMarkerRef"
           data-test="span-marker"
         >
+          {{ leftPosition }} {{ spanWidth }}
           <div
             :style="{
               width: 'calc(100% - 6px)',
@@ -177,6 +178,7 @@ export default defineComponent({
     };
 
     const getSpanWidth = () => {
+      console.log(props.span?.durationUs, props.baseTracePosition?.durationUs);
       return Number(
         (
           (props.span?.durationUs / props.baseTracePosition?.durationUs) *
@@ -228,6 +230,7 @@ export default defineComponent({
     watch(
       () => props.span?.durationUs + props.baseTracePosition?.durationUs,
       () => {
+        console.log("calculate width");
         spanWidth.value = getSpanWidth();
       },
       {
