@@ -1107,6 +1107,10 @@ export default defineComponent({
       this.store.dispatch("setOrganizationPasscode", "");
       this.store.dispatch("resetOrganizationData", {});
 
+      // Clear temporary theme colors when switching organizations
+      // This ensures each org shows its own theme colors without preview colors from another org
+      this.store.commit("clearTempThemeColors");
+
       await this.getOrganizationSettings();
 
       this.isLoading = true;
