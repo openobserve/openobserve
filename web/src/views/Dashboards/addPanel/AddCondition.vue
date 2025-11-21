@@ -194,6 +194,7 @@ import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplet
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 
 export default defineComponent({
   name: "AddCondition",
@@ -216,7 +217,7 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { getAllSelectedStreams, buildCondition, getStreamNameFromStreamAlias } = useDashboardPanelData(
+    const { getAllSelectedStreams, getStreamNameFromStreamAlias, dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
     const { t } = useI18n();
@@ -312,7 +313,7 @@ export default defineComponent({
       // } else {
       //   return props.condition.column;
       // }
-      const builtCondition = buildCondition(condition);
+      const builtCondition = buildCondition(condition, dashboardPanelData);
 
       return builtCondition === ""
         ? condition.column.field

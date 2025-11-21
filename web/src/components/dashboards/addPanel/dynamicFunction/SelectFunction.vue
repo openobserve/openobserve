@@ -221,7 +221,7 @@ import functionValidation from "@/components/dashboards/addPanel/dynamicFunction
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { useSelectAutoComplete } from "@/composables/useSelectAutocomplete";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
-import { addMissingArgs } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { addMissingArgs } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import SubTaskArrow from "@/components/icons/SubTaskArrow.vue";
 import {

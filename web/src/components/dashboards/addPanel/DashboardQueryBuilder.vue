@@ -698,7 +698,7 @@ import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
-import { buildSQLQueryFromInput } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { useStore } from "vuex";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 
