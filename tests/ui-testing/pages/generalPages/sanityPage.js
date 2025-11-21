@@ -338,13 +338,16 @@ export class SanityPage {
         await this.page.locator(this.fnEditor).locator(".inputarea").fill(".a=2");
         await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
 
+        // Wait for 3 seconds before attempting to click save button
+        await this.page.waitForTimeout(3000);
+
         // Try clicking the Save button with fallback strategies
         let saveDialogVisible = false;
 
         // First attempt: Click primary save button
         try {
           testLogger.info('Attempting to click primary function save button');
-          await this.page.locator(this.functionSaveButton).click();
+          await this.page.locator(this.functionSaveButton).click({ timeout: 10000 });
           await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
           saveDialogVisible = true;
           testLogger.info('Primary save button click succeeded');
