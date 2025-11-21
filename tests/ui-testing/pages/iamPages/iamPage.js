@@ -9,7 +9,7 @@ export class IamPage {
 
         this.serviceAccountsLink = "//a[contains(@data-test,'service-accounts')]";
 
-        this.addServiceAccountButton = "//span[text()='New service account']";
+        this.addServiceAccountButton = "//span[text()='Add Service Account']";
 
         this.emailInput = "//input[@aria-label='Email *']";
 
