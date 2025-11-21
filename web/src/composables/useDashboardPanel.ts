@@ -3262,19 +3262,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   });
 
   const resetFields = () => {
-    // Preserve current stream and stream_type
-    const currentStream = dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.stream;
-    const currentStreamType = dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.stream_type;
-
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields = {
-      stream: currentStream || "",
-      stream_type: currentStreamType || "logs",
+      stream: "",
+      stream_type: "logs",
       x: [],
       y: [],
       z: [],
