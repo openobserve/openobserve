@@ -79,6 +79,22 @@ class="tw-mx-1 tw-text-red-500" />
           @click="removeRangeFilter(panelId)"
         />
       </div>
+
+      <!-- Analyze Button (shown when Duration filter exists) -->
+      <q-btn
+        v-if="hasDurationFilter"
+        outline
+        dense
+        no-caps
+        color="primary"
+        icon="analytics"
+        :label="t('latencyInsights.analyzeButton')"
+        class="analyze-button tw-h-[2rem]"
+        @click="openAnalysisDashboard"
+        data-test="analyze-button"
+      >
+        <q-tooltip>{{ t('latencyInsights.analyzeTooltip') }}</q-tooltip>
+      </q-btn>
     </div>
 
     <!-- Charts Section -->
@@ -109,6 +125,16 @@ class="tw-mx-1 tw-text-red-500" />
       @select="handleContextMenuSelect"
       @close="hideContextMenu"
     />
+
+    <!-- Latency Insights Dashboard -->
+    <TracesAnalysisDashboard
+      v-if="showAnalysisDashboard"
+      :streamName="streamName"
+      :timeRange="timeRange"
+      :durationFilter="analysisDurationFilter"
+      :baseFilter="filter"
+      @close="showAnalysisDashboard = false"
+    />
   </div>
 </template>
 
@@ -119,8 +145,11 @@ import {
   onBeforeUnmount,
   computed,
   defineAsyncComponent,
+  watch,
+  triggerRef,
 } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics.json";
@@ -135,6 +164,10 @@ const TracesMetricsContextMenu = defineAsyncComponent(
   () => import("./TracesMetricsContextMenu.vue"),
 );
 
+const TracesAnalysisDashboard = defineAsyncComponent(
+  () => import("./TracesAnalysisDashboard.vue"),
+);
+
 interface TimeRange {
   startTime: number;
   endTime: number;
@@ -145,6 +178,7 @@ const props = defineProps<{
   timeRange: TimeRange;
   filter?: string;
   show?: boolean;
+  streamFields?: any[];
 }>();
 
 const emit = defineEmits<{
@@ -154,6 +188,7 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 const store = useStore();
 const { searchObj } = useTraces();
+const { t } = useI18n();
 
 const autoRefreshEnabled = ref(false);
 const autoRefreshIntervalId = ref<number | null>(null);
@@ -168,6 +203,18 @@ const currentTimeObj = ref({
 
 const dashboardData = ref(null);
 
+// Latency Insights state
+const showAnalysisDashboard = ref(false);
+const analysisDurationFilter = ref({ start: 0, end: 0 });
+
+// Reactivity trigger for Map changes (Vue 3 doesn't track Map.set() automatically)
+const rangeFiltersVersion = ref(0);
+
+// Stream fields for dimension selector
+const streamFields = computed(() => {
+  return props.streamFields || searchObj.data.stream.selectedStreamFields || [];
+});
+
 // Use filters from searchObj
 const showErrorOnly = computed({
   get: () => searchObj.meta.showErrorOnly,
@@ -176,6 +223,29 @@ const showErrorOnly = computed({
   },
 });
 const rangeFilters = computed(() => searchObj.meta.metricsRangeFilters);
+
+// Check if duration filter exists
+const hasDurationFilter = computed(() => {
+  // Force reactivity by accessing rangeFiltersVersion
+  rangeFiltersVersion.value;
+
+  let hasFilter = false;
+  rangeFilters.value.forEach((filter) => {
+    if (filter.panelTitle === "Duration") {
+      // Show analyze button if we have any duration filter (start or end)
+      if (filter.start !== null || filter.end !== null) {
+        hasFilter = true;
+      }
+    }
+  });
+  console.log('Duration filter check:', {
+    rangeFiltersSize: rangeFilters.value.size,
+    hasFilter,
+    filters: Array.from(rangeFilters.value.entries()),
+    version: rangeFiltersVersion.value
+  });
+  return hasFilter;
+});
 
 // Context menu state
 const contextMenuVisible = ref(false);
@@ -266,6 +336,16 @@ const loadDashboard = async () => {
 
     dashboardData.value = convertedDashboard;
 
+    // Debug: Check if Duration panel has dataZoom config
+    console.log('Dashboard loaded. Checking Duration panel config:', {
+      panels: convertedDashboard.tabs[0].panels.map(p => ({
+        id: p.id,
+        title: p.title,
+        hasDataZoom: !!p.config?.dataZoom,
+        dataZoomConfig: p.config?.dataZoom
+      }))
+    });
+
     updateLayout();
   } catch (err: any) {
     console.error("Error loading dashboard:", err);
@@ -292,12 +372,30 @@ const createRangeFilter = (data, start = null, end = null) => {
   const panelId = data?.id;
   const panelTitle = data?.title || "Chart";
 
+  console.log('createRangeFilter called:', {
+    panelId,
+    panelTitle,
+    start,
+    end,
+    data
+  });
+
   if (panelId && panelTitle === "Duration") {
     searchObj.meta.metricsRangeFilters.set(panelId, {
       panelTitle,
       start: start ? Math.floor(start) : null,
       end: end ? Math.floor(end) : null,
     });
+    // Increment version to trigger reactivity
+    rangeFiltersVersion.value++;
+    console.log('Duration filter added to rangeFilters:', {
+      filterAdded: true,
+      mapSize: searchObj.meta.metricsRangeFilters.size,
+      allFilters: Array.from(searchObj.meta.metricsRangeFilters.entries()),
+      newVersion: rangeFiltersVersion.value
+    });
+  } else {
+    console.log('Filter NOT added:', { panelId, panelTitle, expectedTitle: 'Duration' });
   }
 };
 
@@ -314,15 +412,29 @@ const onDataZoom = ({
   end1: number;
   data: any; // contains panel schema with data.id as panel id
 }) => {
+  console.log('onDataZoom event received:', {
+    start,
+    end,
+    start1,
+    end1,
+    data,
+    panelId: data?.id,
+    panelTitle: data?.title
+  });
+
   if (start && end) {
     // Create or update range filter chip for this panel
     createRangeFilter(data, start1, end1);
     emit("time-range-selected", { start, end });
+  } else {
+    console.log('onDataZoom: start or end missing, not creating filter');
   }
 };
 
 const removeRangeFilter = (panelId: string) => {
   searchObj.meta.metricsRangeFilters.delete(panelId);
+  // Increment version to trigger reactivity
+  rangeFiltersVersion.value++;
 };
 
 const formatTimestamp = (timestamp: number) => {
@@ -354,6 +466,27 @@ const hideContextMenu = () => {
   contextMenuVisible.value = false;
 };
 
+const openAnalysisDashboard = () => {
+  // Get the current duration range from existing filters
+  let durationStart = null;
+  let durationEnd = null;
+
+  rangeFilters.value.forEach((filter) => {
+    if (filter.panelTitle === "Duration") {
+      durationStart = filter.start;
+      durationEnd = filter.end;
+    }
+  });
+
+  // Set the duration filter for analysis
+  analysisDurationFilter.value = {
+    start: durationStart || 0,
+    end: durationEnd || Number.MAX_SAFE_INTEGER,
+  };
+
+  showAnalysisDashboard.value = true;
+};
+
 const handleContextMenuSelect = (selection: {
   condition: string;
   value: number;
@@ -369,9 +502,6 @@ const handleContextMenuSelect = (selection: {
   );
 
   hideContextMenu();
-
-  // You can emit this to parent or handle filtering logic here
-  // For example: emit("filter-applied", selection);
 };
 
 const toggleAutoRefresh = () => {
@@ -448,6 +578,19 @@ defineExpose({
     &:hover {
       color: #0d447a;
     }
+  }
+}
+
+// Analyze button
+.analyze-button {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0 0.75rem;
+  transition: all 0.2s;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 }
 

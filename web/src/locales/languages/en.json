@@ -605,6 +605,25 @@
     "errorDetails": "Error",
     "function_definition": "Function Definition"
   },
+  "latencyInsights": {
+    "title": "Latency Insights",
+    "analyzeButton": "Latency Analysis",
+    "analyzeTooltip": "Analyze latency patterns across trace dimensions",
+    "compareToLabel": "Compare to:",
+    "fullTimeRange": "Full time range",
+    "beforePeriod": "Before selected period",
+    "afterPeriod": "After selected period",
+    "durationLabel": "Duration:",
+    "analyzingDimensions": "Analyzing dimensions...",
+    "computingDistributions": "Computing frequency distributions across {count} dimensions",
+    "failedToLoad": "Failed to load analysis",
+    "retryButton": "Retry",
+    "percentileLabel": "Latency Percentile",
+    "p50Median": "P50 (Median)",
+    "p75": "P75",
+    "p95": "P95",
+    "p99": "P99"
+  },
   "confirmDialog": {
     "cancel": "Cancel",
     "ok": "OK",
