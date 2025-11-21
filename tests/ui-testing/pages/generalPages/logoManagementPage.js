@@ -77,7 +77,7 @@ export
         await this.customLogoTextBox.click();
         await expect(this.page.getByText('Unauthorized Access')).not.toBeVisible(); // Check Unauthorized Access
         await this.customLogoTextBox.fill(text);
-        await this.saveButton.waitFor({ state: 'visible' });
+        await this.saveButton.first().waitFor({ state: 'visible' });
         await this.saveButton.first().click({ force: true });
         return;
     } catch (error) {
@@ -99,7 +99,7 @@ export
     await this.customLogoTextBox.click();
     await expect(this.page.getByText('Unauthorized Access')).not.toBeVisible(); // Check Unauthorized Access
     await this.customLogoTextBox.fill(text);
-    await this.saveButton.waitFor({ state: 'visible' });
+    await this.saveButton.first().waitFor({ state: 'visible' });
     await this.saveButton.first().click({ force: true });
 }
 
