@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             endTime: searchObj.data.datetime.endTime,
           }"
           :filter="searchObj.data.editorValue"
+          :streamFields="searchObj.data.stream.selectedStreamFields"
           :show="
             searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
           "
