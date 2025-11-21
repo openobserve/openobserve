@@ -892,8 +892,9 @@ export default defineComponent({
     const calculateTracePosition = () => {
       const tics = [];
       baseTracePosition.value["durationMs"] = timeRange.value.end;
-      baseTracePosition.value["startTimeMs"] =
-        traceTree.value[0].startTimeMs + timeRange.value.start;
+      baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
+      baseTracePosition.value["startTimeUs"] =
+        traceTree.value[0].startTimeUs + (timeRange.value.start * 1000);
       const quarterMs = (timeRange.value.end - timeRange.value.start) / 4;
       let time = timeRange.value.start;
       for (let i = 0; i <= 4; i++) {
@@ -1088,8 +1089,8 @@ export default defineComponent({
       return {
         [store.state.zoConfig.timestamp_column]:
           span[store.state.zoConfig.timestamp_column],
-        startTimeMs: convertTimeFromNsToMs(span.start_time),
-        endTimeMs: convertTimeFromNsToMs(span.end_time),
+        startTimeUs: convertTimeFromNsToUs(span.start_time),
+        endTimeUs: convertTimeFromNsToUs(span.end_time),
         durationMs: Number((span.duration / 1000).toFixed(4)), // This key is standard, we use for calculating width of span block. This should always be in ms
         durationUs: Number(span.duration.toFixed(4)), // This key is used for displaying duration in span block. We convert this us to ms, s in span block
         idleMs: convertTime(span.idle_ns),
@@ -1110,7 +1111,7 @@ export default defineComponent({
     };
 
     const convertTime = (time: number) => {
-      return Number((time / 1000000).toFixed(2));
+      return Number((time / 1000).toFixed(2));
     };
 
     const convertTimeFromNsToUs = (time: number) => {
@@ -1153,8 +1154,8 @@ export default defineComponent({
       const data: any = [];
       for (let i = spanPositionList.value.length - 1; i > -1; i--) {
         const absoluteStartTime =
-          spanPositionList.value[i].startTimeMs -
-          convertTimeFromNsToMs(traceTree.value[0].lowestStartTime * 1000);
+          spanPositionList.value[i].startTimeUs -
+          convertTimeFromNsToUs(traceTree.value[0].lowestStartTime * 1000);
 
         const x1 = Number(
           (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(4),
