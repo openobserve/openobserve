@@ -69,7 +69,7 @@ export class IamPage {
 
     async iamPageAddServiceAccount() {
 
-        await this.page.getByRole('button', { name: 'New service account' }).click();
+        await this.page.getByRole('button', { name: 'Add Service Account' }).click();
 
     }
 
