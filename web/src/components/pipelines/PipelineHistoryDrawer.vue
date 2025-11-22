@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     overlay
     elevated
     behavior="mobile"
-    class="alert-history-drawer"
+    class="pipeline-history-drawer"
   >
     <div class="tw-h-full tw-flex tw-flex-col">
       <!-- Header -->
@@ -39,9 +39,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-flex tw-items-center tw-gap-3">
           <q-icon name="history" size="24px" />
           <div>
-            <div class="tw-font-semibold tw-text-lg">{{ props.alertName }}</div>
+            <div class="tw-flex tw-items-center tw-gap-2 tw-font-semibold tw-text-lg">
+              <span>{{ props.pipelineName }}</span>
+              <q-icon
+                :name="props.pipelineType === 'realtime' ? 'check_circle' : 'schedule'"
+                size="20px"
+                :color="props.pipelineType === 'realtime' ? 'positive' : 'grey'"
+              >
+                <q-tooltip>{{ props.pipelineType === 'realtime' ? 'Real-time' : 'Scheduled' }}</q-tooltip>
+              </q-icon>
+              <q-icon
+                :name="props.isSilenced ? 'volume_off' : 'volume_up'"
+                size="20px"
+                :color="props.isSilenced ? 'orange' : 'positive'"
+              >
+                <q-tooltip>{{ props.isSilenced ? 'Silenced' : 'Not Silenced' }}</q-tooltip>
+              </q-icon>
+            </div>
             <div class="tw-text-sm tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("alerts.alertHistory") }}
+              {{ t("pipeline.history") }}
             </div>
           </div>
         </div>
@@ -51,13 +67,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           round
           dense
           @click="close"
-          data-test="alert-history-drawer-close-btn"
+          data-test="pipeline-history-drawer-close-btn"
         />
       </div>
 
-      <!-- Stats Summary -->
+      <!-- Stats Summary - Always shown -->
       <div
-        v-if="stats"
         class="tw-p-4 tw-border-b"
         :class="
           store.state.theme === 'dark'
@@ -68,34 +83,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-grid tw-grid-cols-2 tw-gap-4">
           <div>
             <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("alerts.totalEvaluations") }}
+              {{ t("pipeline.totalExecutions") }}
             </div>
             <div class="tw-text-xl tw-font-semibold">
-              {{ stats.total }}
+              {{ stats?.total || 0 }}
             </div>
           </div>
           <div>
             <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("alerts.firingCount") }}
+              {{ t("pipeline.errorCount") }}
             </div>
             <div class="tw-text-xl tw-font-semibold tw-text-red-500">
-              {{ stats.firing }}
+              {{ stats?.errors || 0 }}
             </div>
           </div>
           <div>
             <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("alerts.avgEvaluationTime") }}
+              {{ t("pipeline.avgExecutionTime") }}
             </div>
             <div class="tw-text-lg tw-font-semibold">
-              {{ formatDuration(stats.avgDuration) }}
+              {{ stats ? formatDuration(stats.avgDuration) : 'N/A' }}
             </div>
           </div>
           <div>
             <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("alerts.successRate") }}
+              {{ t("pipeline.successRate") }}
             </div>
             <div class="tw-text-lg tw-font-semibold tw-text-green-500">
-              {{ stats.successRate }}%
+              {{ stats?.successRate || 0 }}%
             </div>
           </div>
         </div>
@@ -110,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else-if="historyItems.length === 0" class="tw-text-center tw-py-8">
           <q-icon name="history" size="48px" class="tw-text-gray-400" />
           <div class="tw-mt-2 tw-text-gray-600 dark:tw-text-gray-400">
-            {{ t("alerts.noHistoryData") }}
+            {{ t("pipeline.noHistoryData") }}
           </div>
         </div>
 
@@ -132,16 +147,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #subtitle>
               <div class="tw-text-sm tw-mt-1 tw-space-y-1">
-                <div v-if="item.is_realtime">
-                  <q-badge color="blue" label="Real-time" />
+                <div class="tw-flex tw-gap-2 tw-flex-wrap">
+                  <q-badge v-if="item.is_realtime" color="blue" label="Real-time" />
+                  <q-badge v-if="item.is_silenced" color="orange" label="Silenced" />
+                  <q-badge v-if="item.is_partial" color="warning" label="Partial" />
                 </div>
-                <div v-if="item.is_silenced">
-                  <q-badge color="orange" label="Silenced" />
+                <div v-if="item.start_time" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>Start Time:</strong> {{ formatDate(item.start_time) }}
                 </div>
-                <div v-if="item.evaluation_took_in_secs">
-                  <span class="tw-text-gray-600 dark:tw-text-gray-400">
-                    Duration: {{ formatDuration(item.evaluation_took_in_secs) }}
-                  </span>
+                <div v-if="item.end_time" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>End Time:</strong> {{ formatDate(item.end_time) }}
+                </div>
+                <div v-if="item.start_time && item.end_time" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>Duration:</strong> {{ formatDuration((item.end_time - item.start_time) / 1000000) }}
+                </div>
+                <div v-if="item.evaluation_took_in_secs" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>Eval Time:</strong> {{ formatDuration(item.evaluation_took_in_secs) }}
+                </div>
+                <div v-if="item.query_took" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>Query Time:</strong> {{ (item.query_took / 1000).toFixed(2) }}ms
+                </div>
+                <div v-if="item.retries" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>Retries:</strong> {{ item.retries }}
+                </div>
+                <div v-if="item.delay_in_secs" class="tw-text-gray-600 dark:tw-text-gray-400">
+                  <strong>Delay:</strong> {{ item.delay_in_secs }}s
                 </div>
                 <div v-if="item.error" class="tw-text-red-500 tw-mt-1">
                   <q-icon name="error" size="14px" class="tw-mr-1" />
@@ -157,9 +187,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             flat
             color="primary"
-            :label="t('alerts.loadMore')"
+            :label="t('common.loadMore')"
             @click="loadMore"
-            data-test="alert-history-load-more-btn"
+            data-test="pipeline-history-load-more-btn"
           />
         </div>
       </div>
@@ -172,32 +202,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import alertsService from "@/services/alerts";
-import { date } from "quasar";
+import { useQuasar, date } from "quasar";
+import http from "@/services/http";
 
 const { t } = useI18n();
 const store = useStore();
+const $q = useQuasar();
 
-interface AlertHistoryItem {
+interface PipelineHistoryItem {
   timestamp: number;
   status: string;
   is_realtime: boolean;
   is_silenced: boolean;
+  start_time?: number;
+  end_time?: number;
   evaluation_took_in_secs?: number;
+  retries?: number;
+  is_partial?: boolean;
+  delay_in_secs?: number;
+  query_took?: number;
   error?: string;
 }
 
-interface AlertHistoryStats {
+interface PipelineHistoryStats {
   total: number;
-  firing: number;
+  errors: number;
   avgDuration: number;
   successRate: number;
 }
 
 interface Props {
   modelValue: boolean;
-  alertId: string;
-  alertName: string;
+  pipelineId: string;
+  pipelineName: string;
+  pipelineType?: string;
+  isSilenced?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -212,8 +251,8 @@ const isOpen = computed({
 });
 
 const loading = ref(false);
-const historyItems = ref<AlertHistoryItem[]>([]);
-const stats = ref<AlertHistoryStats | null>(null);
+const historyItems = ref<PipelineHistoryItem[]>([]);
+const stats = ref<PipelineHistoryStats | null>(null);
 const currentPage = ref(0);
 const pageSize = 50;
 const hasMore = ref(true);
@@ -221,7 +260,6 @@ const hasMore = ref(true);
 const getStatusIcon = (status: string) => {
   switch (status.toLowerCase()) {
     case "firing":
-      return "warning";
     case "error":
       return "error";
     case "ok":
@@ -235,7 +273,6 @@ const getStatusIcon = (status: string) => {
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
     case "firing":
-      return "warning";
     case "error":
       return "negative";
     case "ok":
@@ -286,8 +323,13 @@ const formatDuration = (seconds: number) => {
   return `${minutes}m ${remainingSeconds}s`;
 };
 
+const formatDate = (timestamp: number) => {
+  if (!timestamp) return "-";
+  return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
+};
+
 const fetchHistory = async (append = false) => {
-  if (!props.alertId) return;
+  if (!props.pipelineId) return;
 
   loading.value = true;
   try {
@@ -295,21 +337,30 @@ const fetchHistory = async (append = false) => {
     const endTime = Date.now() * 1000; // microseconds
     const startTime = endTime - 30 * 24 * 60 * 60 * 1000000; // 30 days ago
 
-    const response = await alertsService.getHistory(orgIdentifier, {
-      alert_id: props.alertId,
-      start_time: startTime,
-      end_time: endTime,
-      from: currentPage.value * pageSize,
-      size: pageSize,
-    });
+    const params = {
+      pipeline_id: props.pipelineId,
+      start_time: startTime.toString(),
+      end_time: endTime.toString(),
+      from: (currentPage.value * pageSize).toString(),
+      size: pageSize.toString(),
+    };
+
+    const url = `/api/${orgIdentifier}/pipelines/history`;
+    const response = await http().get(url, { params });
 
     if (response.data && response.data.hits) {
       const items = response.data.hits.map((hit: any) => ({
         timestamp: hit.timestamp,
         status: hit.status,
-        is_realtime: hit.is_realtime,
-        is_silenced: hit.is_silenced,
+        is_realtime: hit.is_realtime || false,
+        is_silenced: hit.is_silenced || false,
+        start_time: hit.start_time,
+        end_time: hit.end_time,
         evaluation_took_in_secs: hit.evaluation_took_in_secs,
+        retries: hit.retries,
+        is_partial: hit.is_partial,
+        delay_in_secs: hit.delay_in_secs,
+        query_took: hit.query_took,
         error: hit.error,
       }));
 
@@ -324,11 +375,14 @@ const fetchHistory = async (append = false) => {
       // Calculate stats
       calculateStats();
     }
-  } catch (error) {
-    console.error("Failed to fetch alert history:", error);
-    store.dispatch("showNotification", {
-      message: t("alerts.failedToFetchHistory"),
-      color: "negative",
+  } catch (error: any) {
+    console.error("Failed to fetch pipeline history:", error);
+    $q.notify({
+      type: "negative",
+      message:
+        error.response?.data?.message ||
+        error.message ||
+        t("pipeline.failedToFetchHistory"),
     });
   } finally {
     loading.value = false;
@@ -342,8 +396,8 @@ const calculateStats = () => {
   }
 
   const total = historyItems.value.length;
-  const firing = historyItems.value.filter(
-    (item) => item.status === "firing" || item.status === "error"
+  const errors = historyItems.value.filter(
+    (item) => item.status === "error" || item.status === "firing"
   ).length;
 
   const durations = historyItems.value
@@ -355,15 +409,11 @@ const calculateStats = () => {
       ? durations.reduce((sum, d) => sum + d, 0) / durations.length
       : 0;
 
-  const successful = historyItems.value.filter(
-    (item) => item.status === "ok" || item.status === "completed"
-  ).length;
-
-  const successRate = total > 0 ? Math.round((successful / total) * 100) : 0;
+  const successRate = total > 0 ? Math.round(((total - errors) / total) * 100) : 0;
 
   stats.value = {
     total,
-    firing,
+    errors,
     avgDuration,
     successRate,
   };
@@ -386,28 +436,15 @@ const handleKeyDown = (event: KeyboardEvent) => {
 };
 
 // Watch for drawer opening
-watch(
-  () => props.modelValue,
-  (newVal) => {
-    if (newVal && props.alertId) {
-      currentPage.value = 0;
-      historyItems.value = [];
-      fetchHistory();
-    }
+watch(isOpen, (newValue) => {
+  if (newValue) {
+    currentPage.value = 0;
+    historyItems.value = [];
+    stats.value = null;
+    hasMore.value = true;
+    fetchHistory();
   }
-);
-
-// Watch for alert name changes
-watch(
-  () => props.alertId,
-  (newVal) => {
-    if (newVal && props.modelValue) {
-      currentPage.value = 0;
-      historyItems.value = [];
-      fetchHistory();
-    }
-  }
-);
+});
 
 // Add/remove keyboard event listener
 onMounted(() => {
@@ -420,17 +457,9 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
-.alert-history-drawer {
+.pipeline-history-drawer {
   :deep(.q-drawer__content) {
     overflow: hidden;
-  }
-
-  :deep(.q-timeline) {
-    padding: 0;
-  }
-
-  :deep(.q-timeline__entry) {
-    margin-bottom: 16px;
   }
 }
 </style>
