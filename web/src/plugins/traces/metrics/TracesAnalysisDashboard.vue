@@ -30,9 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-flex tw-items-center tw-gap-3">
           <q-icon name="dashboard" size="md" color="primary" />
           <div>
-            <div class="tw-text-lg tw-font-semibold">{{ t('latencyInsights.title') }}</div>
+            <div class="tw-text-lg tw-font-semibold">
+              {{ props.analysisType === 'latency' ? t('latencyInsights.title') : t('volumeInsights.title') }}
+            </div>
             <div class="tw-text-xs tw-text-gray-500">
-              {{ t('latencyInsights.durationLabel') }} {{ formatTimeWithSuffix(durationFilter.start) }} - {{ formatTimeWithSuffix(durationFilter.end) }}
+              <span v-if="props.analysisType === 'latency' && durationFilter">
+                {{ t('latencyInsights.durationLabel') }} {{ formatTimeWithSuffix(durationFilter.start) }} - {{ formatTimeWithSuffix(durationFilter.end) }}
+              </span>
+              <span v-else-if="props.analysisType === 'volume' && rateFilter">
+                {{ t('volumeInsights.rateLabel') }} {{ rateFilter.start }} - {{ rateFilter.end }} traces/interval
+              </span>
             </div>
           </div>
         </div>
@@ -141,19 +148,29 @@ interface DurationFilter {
   end: number;
 }
 
+interface RateFilter {
+  start: number;
+  end: number;
+}
+
 interface TimeRange {
   startTime: number;
   endTime: number;
 }
 
 interface Props {
-  durationFilter: DurationFilter;
+  durationFilter?: DurationFilter;
+  rateFilter?: RateFilter;
   timeRange: TimeRange;
   streamName: string;
   baseFilter?: string;
+  analysisType?: "latency" | "volume"; // New prop to distinguish analysis type
+  streamFields?: any[]; // Stream schema fields for smart dimension selection
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  analysisType: "latency",
+});
 
 const emit = defineEmits<{
   (e: "close"): void;
@@ -177,14 +194,70 @@ const baselineModeOptions = computed(() => [
   { label: t("latencyInsights.afterPeriod"), value: "after" },
 ]);
 
-// Dimensions to analyze (only dimensions that exist in the trace schema)
-const selectedDimensions = ref([
-  "service_name",
-  "http_method",
-  "http_status_code",
-  "span_kind",
-  "http_route",
-]);
+/**
+ * Smart dimension selection based on OpenTelemetry semantic conventions
+ * Prioritizes low-cardinality, high-coverage attributes that exist in the schema
+ */
+const selectedDimensions = computed(() => {
+  const availableFields = new Set(
+    (props.streamFields || []).map((f: any) => f.name || f)
+  );
+
+  // Priority-ordered list of good dimensions for trace analysis
+  // Excludes high-cardinality fields (user_id, trace_id, span_id, etc.)
+  const prioritizedDimensions = [
+    // Core OTel attributes (always useful, low cardinality)
+    "service_name",        // Primary grouping dimension
+    "span_kind",           // INTERNAL, CLIENT, SERVER, PRODUCER, CONSUMER
+    "span_status",         // OK, ERROR, UNSET
+    "operation_name",      // Operation/endpoint name
+    "span_name",           // Alternative to operation_name
+
+    // HTTP attributes (medium cardinality, HTTP-specific)
+    "http_method",         // GET, POST, PUT, DELETE, etc.
+    "http_status_code",    // 200, 404, 500, etc.
+    "http_route",          // /api/users/{id}, etc.
+    "http_target",         // Request target
+
+    // Database attributes (DB-specific)
+    "db_system",           // postgresql, mysql, mongodb, etc.
+    "db_operation",        // SELECT, INSERT, UPDATE, etc.
+    "db_name",             // Database name
+
+    // Messaging attributes (messaging-specific)
+    "messaging_system",    // kafka, rabbitmq, etc.
+    "messaging_operation", // publish, receive, etc.
+
+    // RPC attributes (RPC-specific)
+    "rpc_system",          // grpc, thrift, etc.
+    "rpc_service",         // Service name
+    "rpc_method",          // Method name
+
+    // Infrastructure
+    "host_name",           // Host identifier
+    "container_name",      // Container name
+    "k8s_pod_name",        // Kubernetes pod
+    "k8s_namespace_name",  // Kubernetes namespace
+  ];
+
+  // Filter to only dimensions that exist in the schema
+  const existingDimensions = prioritizedDimensions.filter((dim) =>
+    availableFields.has(dim)
+  );
+
+  // If schema info not available or no matches, use safe defaults
+  if (existingDimensions.length === 0) {
+    return [
+      "service_name",
+      "span_kind",
+      "span_status",
+      "operation_name",
+    ];
+  }
+
+  // Return top 8 dimensions to keep dashboard manageable
+  return existingDimensions.slice(0, 8);
+});
 
 const currentOrgIdentifier = computed(() => {
   return store.state.selectedOrganization.identifier;
@@ -241,18 +314,25 @@ const baselineTimeRange = computed(() => {
 
 const loadAnalysis = async () => {
   try {
+    console.log('[Analysis] Selected dimensions for analysis:', selectedDimensions.value);
+    console.log('[Analysis] Available stream fields:', props.streamFields?.length || 0);
+
+    // Determine which filter to use based on analysis type
+    const filterConfig = props.analysisType === 'latency'
+      ? { durationFilter: props.durationFilter, rateFilter: undefined }
+      : { durationFilter: undefined, rateFilter: props.rateFilter };
+
     const config: LatencyInsightsConfig = {
       streamName: props.streamName,
       streamType: "traces",
       orgIdentifier: currentOrgIdentifier.value,
       selectedTimeRange: props.timeRange,
       baselineTimeRange: baselineTimeRange.value,
-      durationFilter: props.durationFilter,
+      ...filterConfig,
       baseFilter: props.baseFilter,
       dimensions: selectedDimensions.value,
+      analysisType: props.analysisType,
     };
-
-    console.log("[Latency Insights] Starting analysis with config:", config);
 
     // OPTIMIZATION: Skip analyzeAllDimensions() to avoid 20 extra queries
     // Instead, create mock analyses with dimension names only
@@ -265,19 +345,11 @@ const loadAnalysis = async () => {
       differenceScore: 0, // Will be calculated from query results
     }));
 
-    console.log("[Latency Insights] Using dimensions:", selectedDimensions.value);
-
     // Generate dashboard JSON with UNION queries
     const dashboard = generateDashboard(mockAnalyses, config);
     dashboardData.value = dashboard;
-
-    console.log("[Latency Insights] Generated dashboard:", {
-      dashboard,
-      panelCount: dashboard.tabs[0].panels.length,
-      firstPanelQuery: dashboard.tabs[0].panels[0]?.queries[0]?.query,
-    });
   } catch (err: any) {
-    console.error("[Latency Insights] Error loading analysis:", err);
+    console.error("[Analysis] Error loading analysis:", err);
     showErrorNotification(err.message || "Failed to load analysis");
   }
 };
@@ -309,7 +381,7 @@ watch(
 
 // Watch for changes in props
 watch(
-  () => [props.durationFilter, props.timeRange, props.streamName],
+  () => [props.durationFilter, props.rateFilter, props.timeRange, props.streamName, props.analysisType],
   () => {
     if (isOpen.value) {
       loadAnalysis();

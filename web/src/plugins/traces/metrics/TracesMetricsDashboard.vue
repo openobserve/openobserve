@@ -52,14 +52,13 @@ class="tw-mx-1 tw-text-red-500" />
       >
         <span class="chip-label"
           >{{ filter.panelTitle }}
-          <span
-            v-if="
-              filter.panelTitle === 'Errors' || filter.panelTitle === 'Rate'
-            "
-          >
-            >= {{ filter.start }}</span
-          >
-          <span v-if="filter.panelTitle === 'Duration'">
+          <span v-if="filter.panelTitle === 'Rate'">
+            : Time Range Selected
+          </span>
+          <span v-else-if="filter.panelTitle === 'Errors'">
+            >= {{ filter.start }}
+          </span>
+          <span v-else-if="filter.panelTitle === 'Duration'">
             <span v-if="filter.start !== null && filter.end !== null">
               {{ formatTimeWithSuffix(filter.start) }} -
               {{ formatTimeWithSuffix(filter.end) }}
@@ -94,6 +93,22 @@ class="tw-mx-1 tw-text-red-500" />
         data-test="analyze-button"
       >
         <q-tooltip>{{ t('latencyInsights.analyzeTooltip') }}</q-tooltip>
+      </q-btn>
+
+      <!-- Volume Analysis Button (shown when Rate filter exists) -->
+      <q-btn
+        v-if="hasRateFilter"
+        outline
+        dense
+        no-caps
+        color="secondary"
+        icon="bar_chart"
+        :label="t('volumeInsights.analyzeButton')"
+        class="analyze-button tw-h-[2rem]"
+        @click="openVolumeAnalysisDashboard"
+        data-test="volume-analyze-button"
+      >
+        <q-tooltip>{{ t('volumeInsights.analyzeTooltip') }}</q-tooltip>
       </q-btn>
     </div>
 
@@ -133,7 +148,21 @@ class="tw-mx-1 tw-text-red-500" />
       :timeRange="timeRange"
       :durationFilter="analysisDurationFilter"
       :baseFilter="filter"
+      :streamFields="streamFields"
+      analysisType="latency"
       @close="showAnalysisDashboard = false"
+    />
+
+    <!-- Volume Insights Dashboard -->
+    <TracesAnalysisDashboard
+      v-if="showVolumeAnalysisDashboard"
+      :streamName="streamName"
+      :timeRange="timeRange"
+      :rateFilter="analysisRateFilter"
+      :baseFilter="filter"
+      :streamFields="streamFields"
+      analysisType="volume"
+      @close="showVolumeAnalysisDashboard = false"
     />
   </div>
 </template>
@@ -207,6 +236,10 @@ const dashboardData = ref(null);
 const showAnalysisDashboard = ref(false);
 const analysisDurationFilter = ref({ start: 0, end: 0 });
 
+// Volume Insights state
+const showVolumeAnalysisDashboard = ref(false);
+const analysisRateFilter = ref({ start: 0, end: 0 });
+
 // Reactivity trigger for Map changes (Vue 3 doesn't track Map.set() automatically)
 const rangeFiltersVersion = ref(0);
 
@@ -238,11 +271,22 @@ const hasDurationFilter = computed(() => {
       }
     }
   });
-  console.log('Duration filter check:', {
-    rangeFiltersSize: rangeFilters.value.size,
-    hasFilter,
-    filters: Array.from(rangeFilters.value.entries()),
-    version: rangeFiltersVersion.value
+  return hasFilter;
+});
+
+// Check if rate filter exists
+const hasRateFilter = computed(() => {
+  // Force reactivity by accessing rangeFiltersVersion
+  rangeFiltersVersion.value;
+
+  let hasFilter = false;
+  rangeFilters.value.forEach((filter) => {
+    if (filter.panelTitle === "Rate") {
+      // Show volume analyze button if we have any rate filter (start or end)
+      if (filter.start !== null || filter.end !== null) {
+        hasFilter = true;
+      }
+    }
   });
   return hasFilter;
 });
@@ -372,15 +416,8 @@ const createRangeFilter = (data, start = null, end = null) => {
   const panelId = data?.id;
   const panelTitle = data?.title || "Chart";
 
-  console.log('createRangeFilter called:', {
-    panelId,
-    panelTitle,
-    start,
-    end,
-    data
-  });
-
-  if (panelId && panelTitle === "Duration") {
+  // Support both Duration and Rate panels
+  if (panelId && (panelTitle === "Duration" || panelTitle === "Rate")) {
     searchObj.meta.metricsRangeFilters.set(panelId, {
       panelTitle,
       start: start ? Math.floor(start) : null,
@@ -388,14 +425,6 @@ const createRangeFilter = (data, start = null, end = null) => {
     });
     // Increment version to trigger reactivity
     rangeFiltersVersion.value++;
-    console.log('Duration filter added to rangeFilters:', {
-      filterAdded: true,
-      mapSize: searchObj.meta.metricsRangeFilters.size,
-      allFilters: Array.from(searchObj.meta.metricsRangeFilters.entries()),
-      newVersion: rangeFiltersVersion.value
-    });
-  } else {
-    console.log('Filter NOT added:', { panelId, panelTitle, expectedTitle: 'Duration' });
   }
 };
 
@@ -423,8 +452,18 @@ const onDataZoom = ({
   });
 
   if (start && end) {
-    // Create or update range filter chip for this panel
-    createRangeFilter(data, start1, end1);
+    const panelTitle = data?.title;
+
+    // For Rate panel: use placeholder values to indicate time-based selection
+    // Volume analysis will use the time range, not Y-axis values
+    if (panelTitle === "Rate") {
+      // Use -1 as placeholder to indicate time-based zoom (not Y-axis value zoom)
+      createRangeFilter(data, -1, -1);
+    } else {
+      // For Duration/other panels: use actual Y-axis values (start1, end1)
+      createRangeFilter(data, start1, end1);
+    }
+
     emit("time-range-selected", { start, end });
   } else {
     console.log('onDataZoom: start or end missing, not creating filter');
@@ -485,6 +524,27 @@ const openAnalysisDashboard = () => {
   };
 
   showAnalysisDashboard.value = true;
+};
+
+const openVolumeAnalysisDashboard = () => {
+  // Get the current rate range from existing filters
+  let rateStart = null;
+  let rateEnd = null;
+
+  rangeFilters.value.forEach((filter) => {
+    if (filter.panelTitle === "Rate") {
+      rateStart = filter.start;
+      rateEnd = filter.end;
+    }
+  });
+
+  // Set the rate filter for analysis
+  analysisRateFilter.value = {
+    start: rateStart || 0,
+    end: rateEnd || Number.MAX_SAFE_INTEGER,
+  };
+
+  showVolumeAnalysisDashboard.value = true;
 };
 
 const handleContextMenuSelect = (selection: {

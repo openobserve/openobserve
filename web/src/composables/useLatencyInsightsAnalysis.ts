@@ -45,12 +45,17 @@ export interface LatencyInsightsConfig {
     startTime: number;
     endTime: number;
   };
-  durationFilter: {
+  durationFilter?: {
+    start: number;
+    end: number;
+  };
+  rateFilter?: {
     start: number;
     end: number;
   };
   baseFilter?: string;
   dimensions: string[]; // List of dimension names to analyze
+  analysisType?: "latency" | "volume"; // Type of analysis to perform
 }
 
 export function useLatencyInsightsAnalysis() {

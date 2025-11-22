@@ -22,6 +22,7 @@ import type { DimensionAnalysis, LatencyInsightsConfig } from "./useLatencyInsig
 export function useLatencyInsightsDashboard() {
   /**
    * Build comparison query using UNION to combine baseline and selected results
+   * Supports both latency analysis (duration-based) and volume analysis (rate-based)
    */
   const buildComparisonQuery = (
     dimensionName: string,
@@ -30,43 +31,74 @@ export function useLatencyInsightsDashboard() {
     const baseFilters = config.baseFilter?.trim().length
       ? config.baseFilter.trim()
       : "";
+    const isVolumeAnalysis = config.analysisType === "volume";
 
-    // Build baseline WHERE clause (WITHOUT duration filter)
+    // Build baseline WHERE clause
     const baselineWhere = baseFilters ? `WHERE ${baseFilters}` : "";
 
-    // Build selected WHERE clause (WITH duration filter)
-    const durationFilter = `duration >= ${config.durationFilter.start} AND duration <= ${config.durationFilter.end}`;
-    const selectedFilters = baseFilters
-      ? `${durationFilter} AND ${baseFilters}`
-      : durationFilter;
-    const selectedWhere = `WHERE ${selectedFilters}`;
+    // Build selected WHERE clause with appropriate filter
+    let filterClause = "";
+    if (isVolumeAnalysis && config.rateFilter) {
+      // For volume analysis: rate filter defines time period selection, not individual trace filtering
+      // No additional WHERE clause needed - we compare ALL traces in selected vs baseline periods
+      filterClause = "";
+    } else if (config.durationFilter) {
+      // For latency analysis: filter by duration
+      filterClause = `duration >= ${config.durationFilter.start} AND duration <= ${config.durationFilter.end}`;
+    }
 
-    // Baseline query (without ORDER BY/LIMIT)
-    // Uses dashboard variable ${percentile} for percentile calculation
-    const baselineQuery = `
-      SELECT
-        COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-        'Baseline' AS series,
-        approx_percentile_cont(duration, \${percentile}) AS percentile_latency
-      FROM "${config.streamName}"
-      ${baselineWhere}
-      GROUP BY ${dimensionName}
-    `.trim();
+    const selectedFilters = baseFilters && filterClause
+      ? `${filterClause} AND ${baseFilters}`
+      : (filterClause || baseFilters);
+    const selectedWhere = selectedFilters ? `WHERE ${selectedFilters}` : "";
 
-    // Selected query (without ORDER BY/LIMIT)
-    // Uses dashboard variable ${percentile} for percentile calculation
-    const selectedQuery = `
-      SELECT
-        COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
-        'Selected' AS series,
-        approx_percentile_cont(duration, \${percentile}) AS percentile_latency
-      FROM "${config.streamName}"
-      ${selectedWhere}
-      GROUP BY ${dimensionName}
-    `.trim();
+    if (isVolumeAnalysis) {
+      // Volume Analysis: Compare trace counts by dimension
+      const baselineQuery = `
+        SELECT
+          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+          'Baseline' AS series,
+          COUNT(*) AS trace_count
+        FROM "${config.streamName}"
+        ${baselineWhere}
+        GROUP BY ${dimensionName}
+      `.trim();
 
-    // Combine with UNION and apply ORDER BY/LIMIT at the end
-    return `${baselineQuery} UNION ${selectedQuery} ORDER BY percentile_latency DESC LIMIT 40`;
+      const selectedQuery = `
+        SELECT
+          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+          'Selected' AS series,
+          COUNT(*) AS trace_count
+        FROM "${config.streamName}"
+        ${selectedWhere}
+        GROUP BY ${dimensionName}
+      `.trim();
+
+      return `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 40`;
+    } else {
+      // Latency Analysis: Compare percentile latencies by dimension
+      const baselineQuery = `
+        SELECT
+          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+          'Baseline' AS series,
+          approx_percentile_cont(duration, \${percentile}) AS percentile_latency
+        FROM "${config.streamName}"
+        ${baselineWhere}
+        GROUP BY ${dimensionName}
+      `.trim();
+
+      const selectedQuery = `
+        SELECT
+          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+          'Selected' AS series,
+          approx_percentile_cont(duration, \${percentile}) AS percentile_latency
+        FROM "${config.streamName}"
+        ${selectedWhere}
+        GROUP BY ${dimensionName}
+      `.trim();
+
+      return `${baselineQuery} UNION ${selectedQuery} ORDER BY percentile_latency DESC LIMIT 40`;
+    }
   };
 
   /**
@@ -76,23 +108,26 @@ export function useLatencyInsightsDashboard() {
     analyses: DimensionAnalysis[],
     config: LatencyInsightsConfig
   ) => {
+    const isVolumeAnalysis = config.analysisType === "volume";
     const panels = analyses.map((analysis, index) => {
-      // Build panel description with metadata (simplified to avoid pre-computation)
-      const description = `Percentile latency comparison for dimension: ${analysis.dimensionName}`;
+      // Build panel description based on analysis type
+      const description = isVolumeAnalysis
+        ? `Trace count comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value appears more frequently in high-volume periods.`
+        : `Percentile latency comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value correlates with slower traces.`;
 
       // Generate SQL query for this dimension
       const sqlQuery = buildComparisonQuery(analysis.dimensionName, config);
 
       return {
-        id: `Panel_LatencyInsights_${index}`,
+        id: `Panel_${isVolumeAnalysis ? 'VolumeInsights' : 'LatencyInsights'}_${index}`,
         type: "bar",
         title: analysis.dimensionName,
         description,
         config: {
           show_legends: true,
           legends_position: "bottom",
-          unit: "microseconds",
-          decimals: 2,
+          unit: isVolumeAnalysis ? "traces" : "microseconds",
+          decimals: isVolumeAnalysis ? 0 : 2,
           axis_border_show: true,
           label_option: {
             rotate: 45,
@@ -171,8 +206,8 @@ export function useLatencyInsightsDashboard() {
               y: [
                 {
                   label: "",
-                  alias: "percentile_latency",
-                  column: "percentile_latency",
+                  alias: isVolumeAnalysis ? "trace_count" : "percentile_latency",
+                  column: isVolumeAnalysis ? "trace_count" : "percentile_latency",
                   color: null,
                   isDerived: false,
                   havingConditions: [],
@@ -221,11 +256,38 @@ export function useLatencyInsightsDashboard() {
       };
     });
 
+    const title = isVolumeAnalysis ? "Volume Insights" : "Latency Insights";
+    const description = isVolumeAnalysis
+      ? `Comparing trace count distribution ${config.rateFilter ? `of selected periods (rate ${config.rateFilter.start}-${config.rateFilter.end} traces)` : ''} vs baseline across dimensions`
+      : `Comparing percentile latency of selected traces (duration ${config.durationFilter?.start}-${config.durationFilter?.end}µs) vs baseline across dimensions`;
+
+    // Only include percentile variable for latency analysis
+    const variables = isVolumeAnalysis
+      ? { list: [], showDynamicFilters: false }
+      : {
+          list: [
+            {
+              type: "custom",
+              name: "percentile",
+              label: "Latency Percentile",
+              value: "0.95",
+              multiSelect: false,
+              options: [
+                { label: "P50 (Median)", value: "0.50", selected: false },
+                { label: "P75", value: "0.75", selected: false },
+                { label: "P95", value: "0.95", selected: true },
+                { label: "P99", value: "0.99", selected: false },
+              ],
+            },
+          ],
+          showDynamicFilters: false,
+        };
+
     return {
       version: 5,
       dashboardId: ``,
-      title: "Latency Insights",
-      description: `Comparing percentile latency of selected traces (duration ${config.durationFilter.start}-${config.durationFilter.end}µs) vs baseline across dimensions`,
+      title,
+      description,
       role: "",
       owner: "",
       created: new Date().toISOString(),
@@ -236,24 +298,7 @@ export function useLatencyInsightsDashboard() {
           panels,
         },
       ],
-      variables: {
-        list: [
-          {
-            type: "custom",
-            name: "percentile",
-            label: "Latency Percentile",
-            value: "0.95",
-            multiSelect: false,
-            options: [
-              { label: "P50 (Median)", value: "0.50", selected: false },
-              { label: "P75", value: "0.75", selected: false },
-              { label: "P95", value: "0.95", selected: true },
-              { label: "P99", value: "0.99", selected: false },
-            ],
-          },
-        ],
-        showDynamicFilters: false,
-      },
+      variables,
       defaultDatetimeDuration: {
         type: "relative",
         relativeTimePeriod: "15m",
