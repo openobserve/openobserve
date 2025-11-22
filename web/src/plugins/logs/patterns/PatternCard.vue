@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-avatar>
         </div>
         <div class="col">
-          <!-- Template shown first with info icon -->
+          <!-- Template shown first -->
           <div class="tw-flex tw-items-center q-mb-xs">
             <div
               class="text-body2 ellipsis tw-text-[0.8rem] o2-monospace-font"
@@ -47,32 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ pattern.template }}
             </div>
-            <q-icon
-              :name="outlinedInfo"
-              size="1rem"
-              class="q-ml-xs cursor-pointer"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-              "
-              :data-test="`pattern-card-${index}-info-icon`"
-            >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
-                max-width="18.75rem"
-                class="tw-text-[0.75rem]"
-              >
-                <div class="text-weight-bold q-mb-xs">
-                  Template vs Description
-                </div>
-                <div class="q-mb-xs">
-                  <strong>Template:</strong> {{ pattern.template }}
-                </div>
-                <div>
-                  <strong>Description:</strong> {{ pattern.description }}
-                </div>
-              </q-tooltip>
-            </q-icon>
           </div>
           <!-- Occurrences and percentage on second line -->
           <div
@@ -155,7 +129,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useStore } from "vuex";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 

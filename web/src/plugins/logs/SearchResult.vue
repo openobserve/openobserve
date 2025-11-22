@@ -300,8 +300,6 @@ color="warning" size="xs"></q-icon> Error while
         <PatternStatistics
           v-if="patternsState?.patterns?.statistics"
           :statistics="patternsState?.patterns?.statistics"
-          :scanSize="patternsState.scanSize"
-          @update:scanSize="patternsState.scanSize = $event"
         />
 
         <!-- Patterns List -->

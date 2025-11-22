@@ -391,6 +391,8 @@ impl QueryConditionExt for QueryCondition {
                         None
                     },
                     skip_wal: false,
+                    sampling_config: None,
+                    sampling_ratio: None,
                     streaming_output: false,
                     streaming_id: None,
                     histogram_interval: 0,

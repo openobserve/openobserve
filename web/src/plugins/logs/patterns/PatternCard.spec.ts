@@ -99,11 +99,11 @@ describe("PatternCard", () => {
       expect(percentage.text()).toBe("45.67%");
     });
 
-    it("should display info icon with tooltip", () => {
-      const infoIcon = wrapper.find(
-        '[data-test="pattern-card-0-info-icon"]',
+    it("should display details icon with tooltip", () => {
+      const detailsIcon = wrapper.find(
+        '[data-test="pattern-card-0-details-icon"]',
       );
-      expect(infoIcon.exists()).toBe(true);
+      expect(detailsIcon.exists()).toBe(true);
     });
   });
 

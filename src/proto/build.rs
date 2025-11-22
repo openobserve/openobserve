@@ -32,7 +32,10 @@ fn main() -> Result<()> {
         .type_attribute("Job", "#[derive(Eq)]")
         .type_attribute("Job", "#[derive(serde::Serialize)]")
         .type_attribute("Partition", "#[derive(Eq)]")
-        .type_attribute("SearchQuery", "#[derive(Eq)]")
+        .type_attribute(
+            "SamplingConfig",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
         .type_attribute("SearchRequest", "#[derive(Eq)]")
         .type_attribute("SearchResponse", "#[derive(Eq)]")
         .type_attribute("SearchResponse", "#[derive(serde::Serialize)]")

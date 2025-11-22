@@ -358,6 +358,8 @@ pub async fn get_latest_traces(
             query_fn: None,
             action_id: None,
             skip_wal: false,
+            sampling_config: None,
+            sampling_ratio: None,
             streaming_output: false,
             streaming_id: None,
             histogram_interval: 0,

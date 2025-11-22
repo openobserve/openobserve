@@ -264,6 +264,18 @@ pub async fn search(
             )
         );
 
+        // Apply sampling if configured (enterprise feature)
+        #[cfg(feature = "enterprise")]
+        if let Some(sampling_config) = &req.search_info.sampling_config {
+            o2_enterprise::enterprise::search::sampling::execution::apply_sampling_to_files(
+                &mut file_list,
+                sampling_config,
+                query_params.time_range,
+                req.search_info.histogram_interval,
+                &trace_id,
+            );
+        }
+
         // sort by max_ts, the latest file should be at the top
         let sort_start = std::time::Instant::now();
         if empty_exec.sorted_by_time() {
@@ -325,6 +337,8 @@ pub async fn search(
     }
 
     // search in WAL memory first to capture the snapshot_time
+    // IMPORTANT: WAL data is NEVER sampled - it's always returned in full
+    // Sampling only applies to parquet files (applied above in file_list processing)
     let mut snapshot_time = None;
     if LOCAL_NODE.is_ingester() {
         // Set snapshot_time before searching memtable to avoid duplicates with parquet

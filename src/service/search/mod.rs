@@ -1496,6 +1496,7 @@ pub async fn search_partition_multi(
                 query_fn: req.query_fn.clone(),
                 streaming_output: req.streaming_output,
                 histogram_interval: req.histogram_interval,
+                sampling_ratio: None,
             },
             false,
             true,
