@@ -58,6 +58,9 @@ module.exports = defineConfig({
     /* Capture screenshots and videos on failure for CI debugging */
     screenshot: process.env.CI ? 'only-on-failure' : 'off',
     video: process.env.CI ? 'retain-on-failure' : 'off',
+
+    /* Slow down execution for Pipeline tests on deployed environments to avoid sync issues */
+    slowMo: (process.env.SLOW_MO_TESTS === 'true' && process.env.TEST_SHARD === 'Pipelines') ? 1000 : 0,
     },
   /* Test timeout: 3 minutes locally, 5 minutes in CI */
   timeout: process.env.CI ? 5 * 60 * 1000 : 3 * 60 * 1000,

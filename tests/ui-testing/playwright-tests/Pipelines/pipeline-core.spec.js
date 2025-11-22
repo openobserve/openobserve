@@ -6,6 +6,12 @@ const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
 
+test.use({
+  contextOptions: {
+    slowMo: 1000
+  }
+});
+
 
 const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 
