@@ -83,6 +83,7 @@ uuid.workspace = true
 vrl.workspace = true
 roaring.workspace = true
 tonic.workspace = true
+tonic-prost.workspace = true
 tracing-opentelemetry.workspace = true
 
 [dev-dependencies]

@@ -451,7 +451,7 @@ impl TableProvider for NewListingTable {
                 )
                 .with_file_groups(partitioned_file_lists)
                 .with_statistics(statistics)
-                .with_projection(parquet_projection.cloned())
+                .with_projection_indices(parquet_projection.cloned())
                 .with_limit(limit)
                 .with_output_ordering(output_ordering)
                 .with_table_partition_cols(table_partition_cols)

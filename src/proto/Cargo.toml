@@ -13,8 +13,9 @@ prost-wkt-types.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tonic.workspace = true
+tonic-prost.workspace = true
 tokio.workspace = true
 
 [build-dependencies]
-tonic-build = { version = "0.13", features = ["prost"] }
-prost-build = "0.13"
+prost-build = { version = "0.14.1" }
+tonic-prost-build = { version = "0.14.1" }

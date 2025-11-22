@@ -82,7 +82,7 @@ impl FlightEncoderStreamBuilder {
         span: tracing::Span,
     ) -> FlightEncoderStream {
         let child_span = info_span!("grpc:search:flight:execute_physical_plan");
-        child_span.set_parent(span.context());
+        let _ = child_span.set_parent(span.context());
         FlightEncoderStream {
             inner,
             encoder: self.encoder,

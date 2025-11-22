@@ -150,7 +150,7 @@ pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) 
             });
             let trace_id = ctx.span().span_context().trace_id().to_string();
             if !span.is_none() {
-                span.set_parent(ctx);
+                let _ = span.set_parent(ctx);
             }
             trace_id
         } else {

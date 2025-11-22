@@ -17,7 +17,7 @@ use arrow::{
     array::RecordBatch,
     ipc::{
         MessageHeader,
-        writer::{DictionaryTracker, IpcDataGenerator, IpcWriteOptions},
+        writer::{CompressionContext, DictionaryTracker, IpcDataGenerator, IpcWriteOptions},
     },
 };
 use arrow_flight::{FlightData, SchemaAsIpc, error::Result};
@@ -33,6 +33,7 @@ pub struct FlightDataEncoder {
     data_gen: IpcDataGenerator,
     dictionary_tracker: DictionaryTracker,
     max_flight_data_size: usize,
+    compression_context: CompressionContext,
 }
 
 impl FlightDataEncoder {
@@ -42,6 +43,7 @@ impl FlightDataEncoder {
             data_gen: IpcDataGenerator::default(),
             dictionary_tracker: DictionaryTracker::new(false),
             max_flight_data_size,
+            compression_context: CompressionContext::default(),
         }
     }
 
@@ -55,9 +57,12 @@ impl FlightDataEncoder {
         let mut flight_data = Vec::new();
 
         for batch in split_batch_for_grpc_response(batch, self.max_flight_data_size) {
-            let (encoded_dictionaries, encoded_batch) =
-                self.data_gen
-                    .encoded_batch(&batch, &mut self.dictionary_tracker, &self.options)?;
+            let (encoded_dictionaries, encoded_batch) = self.data_gen.encode(
+                &batch,
+                &mut self.dictionary_tracker,
+                &self.options,
+                &mut self.compression_context,
+            )?;
 
             flight_data.extend(encoded_dictionaries.into_iter().map(Into::into));
             flight_data.push(encoded_batch.into());
