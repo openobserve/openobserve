@@ -1,0 +1,506 @@
+{
+  "pipeline_id": "7397988779245445120",
+  "version": 1,
+  "enabled": false,
+  "org": "default",
+  "name": "test",
+  "description": "",
+  "source": {
+    "source_type": "scheduled",
+    "org_id": "default",
+    "stream_type": "logs",
+    "query_condition": {
+      "type": "sql",
+      "conditions": null,
+      "sql": "SELECT * FROM \"e2e_automate\"",
+      "promql": null,
+      "promql_condition": null,
+      "aggregation": null,
+      "vrl_function": null,
+      "search_event_type": "derivedstream",
+      "multi_time_range": null
+    },
+    "trigger_condition": {
+      "period": 15,
+      "operator": "=",
+      "threshold": 0,
+      "frequency": 15,
+      "cron": "",
+      "frequency_type": "minutes",
+      "silence": 0,
+      "timezone": "UTC",
+      "tolerance_in_secs": null,
+      "align_time": true
+    },
+    "tz_offset": 0,
+    "delay": 0
+  },
+  "nodes": [
+    {
+      "id": "df015a50-959b-4e36-9a7d-ba2a584910ab",
+      "type": "input",
+      "dimensions": {
+        "width": 112,
+        "height": 65
+      },
+      "computedPosition": {
+        "x": 393.72632,
+        "y": 57.30329,
+        "z": 0
+      },
+      "handleBounds": {
+        "source": [
+          {
+            "id": "output",
+            "type": "source",
+            "nodeId": "df015a50-959b-4e36-9a7d-ba2a584910ab",
+            "position": "bottom",
+            "x": 48.14842224121094,
+            "y": 56.000003814697266,
+            "width": 16,
+            "height": 16
+          }
+        ],
+        "target": null
+      },
+      "selected": false,
+      "dragging": false,
+      "resizing": false,
+      "initialized": false,
+      "isParent": false,
+      "position": {
+        "x": 393.72632,
+        "y": 57.30329
+      },
+      "data": {
+        "node_type": "query",
+        "org_id": "default",
+        "stream_type": "logs",
+        "query_condition": {
+          "type": "sql",
+          "conditions": null,
+          "sql": "SELECT * FROM \"e2e_automate\"",
+          "promql": null,
+          "promql_condition": null,
+          "aggregation": null,
+          "vrl_function": null,
+          "search_event_type": "derivedstream",
+          "multi_time_range": null
+        },
+        "trigger_condition": {
+          "period": 15,
+          "operator": "=",
+          "threshold": 0,
+          "frequency": 15,
+          "cron": "",
+          "frequency_type": "minutes",
+          "silence": 0,
+          "timezone": "UTC",
+          "tolerance_in_secs": null,
+          "align_time": true
+        },
+        "tz_offset": 0,
+        "delay": 0
+      },
+      "events": {},
+      "io_type": "input"
+    },
+    {
+      "id": "127842b9-1f56-4dc7-96de-c2c18c146afc",
+      "type": "output",
+      "dimensions": {
+        "width": 215,
+        "height": 65
+      },
+      "computedPosition": {
+        "x": 478.75,
+        "y": 388.75,
+        "z": 0
+      },
+      "handleBounds": {
+        "source": null,
+        "target": [
+          {
+            "id": "input",
+            "type": "target",
+            "nodeId": "127842b9-1f56-4dc7-96de-c2c18c146afc",
+            "position": "top",
+            "x": 99.71878051757812,
+            "y": -7.000007629394531,
+            "width": 16,
+            "height": 16
+          }
+        ]
+      },
+      "selected": false,
+      "dragging": false,
+      "resizing": false,
+      "initialized": false,
+      "isParent": false,
+      "position": {
+        "x": 478.75,
+        "y": 388.75
+      },
+      "data": {
+        "node_type": "stream",
+        "org_id": "default",
+        "stream_name": "e2e_automate",
+        "stream_type": "logs"
+      },
+      "events": {},
+      "io_type": "output"
+    },
+    {
+      "id": "6b1ca5db-2e23-4191-8612-75b1468a4a55",
+      "type": "default",
+      "dimensions": {
+        "width": 304,
+        "height": 55
+      },
+      "computedPosition": {
+        "x": 184.25,
+        "y": 282.5,
+        "z": 0
+      },
+      "handleBounds": {
+        "source": [
+          {
+            "id": "output",
+            "type": "source",
+            "nodeId": "6b1ca5db-2e23-4191-8612-75b1468a4a55",
+            "position": "bottom",
+            "x": 144.0625,
+            "y": 46.000022888183594,
+            "width": 16,
+            "height": 16
+          }
+        ],
+        "target": [
+          {
+            "id": "input",
+            "type": "target",
+            "nodeId": "6b1ca5db-2e23-4191-8612-75b1468a4a55",
+            "position": "top",
+            "x": 144.0625,
+            "y": -6.999969482421875,
+            "width": 16,
+            "height": 16
+          }
+        ]
+      },
+      "selected": false,
+      "dragging": false,
+      "resizing": false,
+      "initialized": false,
+      "isParent": false,
+      "position": {
+        "x": 184.25,
+        "y": 282.5
+      },
+      "data": {
+        "node_type": "condition",
+        "conditions": {
+          "and": [
+            {
+              "column": "kubernetes_container_hash",
+              "operator": "=",
+              "value": "test",
+              "ignore_case": true
+            }
+          ]
+        }
+      },
+      "events": {},
+      "io_type": "default"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e6b1ca5db-2e23-4191-8612-75b1468a4a55-127842b9-1f56-4dc7-96de-c2c18c146afc",
+      "type": "custom",
+      "source": "6b1ca5db-2e23-4191-8612-75b1468a4a55",
+      "target": "127842b9-1f56-4dc7-96de-c2c18c146afc",
+      "updatable": true,
+      "data": {},
+      "events": {},
+      "label": "",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "width": 20,
+        "height": 20
+      },
+      "style": {
+        "strokeWidth": 2
+      },
+      "animated": true,
+      "sourceNode": {
+        "id": "6b1ca5db-2e23-4191-8612-75b1468a4a55",
+        "type": "default",
+        "dimensions": {
+          "width": 304,
+          "height": 55
+        },
+        "computedPosition": {
+          "x": 184.25,
+          "y": 282.5,
+          "z": 0
+        },
+        "handleBounds": {
+          "source": [
+            {
+              "id": "output",
+              "type": "source",
+              "nodeId": "6b1ca5db-2e23-4191-8612-75b1468a4a55",
+              "position": "bottom",
+              "x": 144.0625,
+              "y": 46.000022888183594,
+              "width": 16,
+              "height": 16
+            }
+          ],
+          "target": [
+            {
+              "id": "input",
+              "type": "target",
+              "nodeId": "6b1ca5db-2e23-4191-8612-75b1468a4a55",
+              "position": "top",
+              "x": 144.0625,
+              "y": -6.999969482421875,
+              "width": 16,
+              "height": 16
+            }
+          ]
+        },
+        "selected": false,
+        "dragging": false,
+        "resizing": false,
+        "initialized": false,
+        "isParent": false,
+        "position": {
+          "x": 184.25,
+          "y": 282.5
+        },
+        "data": {
+          "node_type": "condition",
+          "conditions": {
+            "and": [
+              {
+                "column": "kubernetes_container_hash",
+                "operator": "=",
+                "value": "test",
+                "ignore_case": true
+              }
+            ]
+          }
+        },
+        "events": {},
+        "io_type": "default"
+      },
+      "targetNode": {
+        "id": "127842b9-1f56-4dc7-96de-c2c18c146afc",
+        "type": "output",
+        "dimensions": {
+          "width": 215,
+          "height": 65
+        },
+        "computedPosition": {
+          "x": 478.75,
+          "y": 388.75,
+          "z": 0
+        },
+        "handleBounds": {
+          "source": null,
+          "target": [
+            {
+              "id": "input",
+              "type": "target",
+              "nodeId": "127842b9-1f56-4dc7-96de-c2c18c146afc",
+              "position": "top",
+              "x": 99.71878051757812,
+              "y": -7.000007629394531,
+              "width": 16,
+              "height": 16
+            }
+          ]
+        },
+        "selected": false,
+        "dragging": false,
+        "resizing": false,
+        "initialized": false,
+        "isParent": false,
+        "position": {
+          "x": 478.75,
+          "y": 388.75
+        },
+        "data": {
+          "node_type": "stream",
+          "org_id": "default",
+          "stream_name": "e2e_automate",
+          "stream_type": "logs"
+        },
+        "events": {},
+        "io_type": "output"
+      },
+      "sourceX": 336.3125,
+      "sourceY": 344.5000228881836,
+      "targetX": 586.4687805175781,
+      "targetY": 381.74999237060547
+    },
+    {
+      "id": "edf015a50-959b-4e36-9a7d-ba2a584910ab-6b1ca5db-2e23-4191-8612-75b1468a4a55",
+      "type": "custom",
+      "source": "df015a50-959b-4e36-9a7d-ba2a584910ab",
+      "target": "6b1ca5db-2e23-4191-8612-75b1468a4a55",
+      "updatable": true,
+      "data": {},
+      "events": {},
+      "label": "",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "width": 20,
+        "height": 20
+      },
+      "style": {
+        "strokeWidth": 2
+      },
+      "animated": true,
+      "sourceNode": {
+        "id": "df015a50-959b-4e36-9a7d-ba2a584910ab",
+        "type": "input",
+        "dimensions": {
+          "width": 112,
+          "height": 65
+        },
+        "computedPosition": {
+          "x": 393.72632,
+          "y": 57.30329,
+          "z": 0
+        },
+        "handleBounds": {
+          "source": [
+            {
+              "id": "output",
+              "type": "source",
+              "nodeId": "df015a50-959b-4e36-9a7d-ba2a584910ab",
+              "position": "bottom",
+              "x": 48.14842224121094,
+              "y": 56.000003814697266,
+              "width": 16,
+              "height": 16
+            }
+          ],
+          "target": null
+        },
+        "selected": false,
+        "dragging": false,
+        "resizing": false,
+        "initialized": false,
+        "isParent": false,
+        "position": {
+          "x": 393.72632,
+          "y": 57.30329
+        },
+        "data": {
+          "node_type": "query",
+          "org_id": "default",
+          "stream_type": "logs",
+          "query_condition": {
+            "type": "sql",
+            "conditions": null,
+            "sql": "SELECT * FROM \"e2e_automate\"",
+            "promql": null,
+            "promql_condition": null,
+            "aggregation": null,
+            "vrl_function": null,
+            "search_event_type": "derivedstream",
+            "multi_time_range": null
+          },
+          "trigger_condition": {
+            "period": 15,
+            "operator": "=",
+            "threshold": 0,
+            "frequency": 15,
+            "cron": "",
+            "frequency_type": "minutes",
+            "silence": 0,
+            "timezone": "UTC",
+            "tolerance_in_secs": null,
+            "align_time": true
+          },
+          "tz_offset": 0,
+          "delay": 0
+        },
+        "events": {},
+        "io_type": "input"
+      },
+      "targetNode": {
+        "id": "6b1ca5db-2e23-4191-8612-75b1468a4a55",
+        "type": "default",
+        "dimensions": {
+          "width": 304,
+          "height": 55
+        },
+        "computedPosition": {
+          "x": 184.25,
+          "y": 282.5,
+          "z": 0
+        },
+        "handleBounds": {
+          "source": [
+            {
+              "id": "output",
+              "type": "source",
+              "nodeId": "6b1ca5db-2e23-4191-8612-75b1468a4a55",
+              "position": "bottom",
+              "x": 144.0625,
+              "y": 46.000022888183594,
+              "width": 16,
+              "height": 16
+            }
+          ],
+          "target": [
+            {
+              "id": "input",
+              "type": "target",
+              "nodeId": "6b1ca5db-2e23-4191-8612-75b1468a4a55",
+              "position": "top",
+              "x": 144.0625,
+              "y": -6.999969482421875,
+              "width": 16,
+              "height": 16
+            }
+          ]
+        },
+        "selected": false,
+        "dragging": false,
+        "resizing": false,
+        "initialized": false,
+        "isParent": false,
+        "position": {
+          "x": 184.25,
+          "y": 282.5
+        },
+        "data": {
+          "node_type": "condition",
+          "conditions": {
+            "and": [
+              {
+                "column": "kubernetes_container_hash",
+                "operator": "=",
+                "value": "test",
+                "ignore_case": true
+              }
+            ]
+          }
+        },
+        "events": {},
+        "io_type": "default"
+      },
+      "sourceX": 449.8747422412109,
+      "sourceY": 129.30329381469727,
+      "targetX": 336.3125,
+      "targetY": 275.5000305175781
+    }
+  ],
+  "paused_at": 0
+}
