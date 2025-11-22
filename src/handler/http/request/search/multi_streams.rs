@@ -1274,7 +1274,11 @@ pub async fn search_multi_stream(
 
     // Set each of the sql queries with use_cache from query params
     let clear_cache = get_clear_cache_from_request(&query);
-    let use_cache = get_use_cache_from_request(&query) && !clear_cache;
+    #[allow(unused_assignments)]
+    let mut use_cache = get_use_cache_from_request(&query) && !clear_cache;
+    // Disable cache temporarily for `multi_stream_search`
+    // TODO: fix cache
+    use_cache = false;
 
     // Before making any requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
