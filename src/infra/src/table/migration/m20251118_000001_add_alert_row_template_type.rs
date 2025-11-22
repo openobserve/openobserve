@@ -21,19 +21,39 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Alerts::Table)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(Alerts::RowTemplateType)
-                            .small_integer()
-                            .not_null()
-                            .default(0), // 0 = String, 1 = Json
-                    )
-                    .to_owned(),
-            )
-            .await
+        let db_backend = manager.get_database_backend();
+
+        if matches!(db_backend, sea_orm::DbBackend::MySql) {
+            // MySQL doesn't support IF NOT EXISTS in ALTER TABLE
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(Alerts::Table)
+                        .add_column(
+                            ColumnDef::new(Alerts::RowTemplateType)
+                                .small_integer()
+                                .not_null()
+                                .default(0), // 0 = String, 1 = Json
+                        )
+                        .to_owned(),
+                )
+                .await
+        } else {
+            // PostgreSQL and SQLite support IF NOT EXISTS
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(Alerts::Table)
+                        .add_column_if_not_exists(
+                            ColumnDef::new(Alerts::RowTemplateType)
+                                .small_integer()
+                                .not_null()
+                                .default(0), // 0 = String, 1 = Json
+                        )
+                        .to_owned(),
+                )
+                .await
+        }
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -79,10 +99,11 @@ mod tests {
 
     #[test]
     fn mysql() {
+        // MySQL doesn't support IF NOT EXISTS in ALTER TABLE
         collapsed_eq!(
             &Table::alter()
                 .table(Alerts::Table)
-                .add_column_if_not_exists(
+                .add_column(
                     ColumnDef::new(Alerts::RowTemplateType)
                         .small_integer()
                         .not_null()
@@ -90,7 +111,7 @@ mod tests {
                 )
                 .to_owned()
                 .to_string(MysqlQueryBuilder),
-            r#"ALTER TABLE `alerts` ADD COLUMN IF NOT EXISTS `row_template_type` smallint NOT NULL DEFAULT 0"#
+            r#"ALTER TABLE `alerts` ADD COLUMN `row_template_type` smallint NOT NULL DEFAULT 0"#
         );
     }
 
