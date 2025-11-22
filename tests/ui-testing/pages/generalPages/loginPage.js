@@ -40,7 +40,21 @@ export class LoginPage {
       { timeout: 60000 }
     );
 
-    await this.loginButton.click();
+    // Wait for page to be fully loaded before clicking
+    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.waitForTimeout(1000);
+
+    // Click with retry logic to handle DOM detachment
+    for (let i = 0; i < 3; i++) {
+      try {
+        await this.loginButton.click({ timeout: 5000 });
+        break;
+      } catch (error) {
+        if (i === 2) throw error;
+        await this.page.waitForTimeout(1000);
+      }
+    }
+
     await waitForLogin;
     await this.page.waitForTimeout(2000);
     await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {

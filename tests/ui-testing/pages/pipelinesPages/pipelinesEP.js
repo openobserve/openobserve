@@ -205,7 +205,22 @@ export class PipelinesEP {
         await this.page.locator('[data-test="pipeline-import-name-input"]').click();
         await this.page.locator('[data-test="pipeline-import-name-input"]').fill(name);
         await this.page.locator('[data-test="pipeline-import-destination-function-name-input"]').click();
-        await this.page.getByText(functionName).click();
+
+        // Wait for dropdown to open and scroll to find the function
+        await this.page.waitForTimeout(1000);
+
+        // Try to find and scroll to the function option
+        const functionOption = this.page.getByText(functionName);
+        try {
+            await functionOption.scrollIntoViewIfNeeded({ timeout: 5000 });
+        } catch (error) {
+            // If scroll fails, wait a bit more for the dropdown to populate
+            await this.page.waitForTimeout(2000);
+        }
+
+        await functionOption.waitFor({ state: 'visible', timeout: 10000 });
+        await functionOption.click();
+
         await this.page.locator('[data-test="pipeline-import-destination-stream-type-input"]').click();
         await this.page.getByRole('option', { name: remoteDestination }).click();
 
