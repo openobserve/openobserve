@@ -9,7 +9,7 @@ export class PipelinesEP {
         this.pipelinesMenu = page.locator('[data-test="menu-link-\\/pipeline-item"]');
         this.functionStreamTab = '[data-test="function-stream-tab"]';
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
-        this.createFunctionButton = this.page.getByRole('button', { name: 'Create new function' });
+        this.createFunctionButton = this.page.getByRole('button', { name: 'New function' });
         this.functionNameInput = '[data-test="add-function-name-input"]';
         this.saveFunctionButton = '[data-test="add-function-save-btn"]';
         this.logsSearchField = '[data-test="logs-vrl-function-editor"]';
