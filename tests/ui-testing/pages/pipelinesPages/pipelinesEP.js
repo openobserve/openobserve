@@ -122,39 +122,77 @@ export class PipelinesEP {
         await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput).waitFor({ state: 'visible' });
         await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput).click();
 
-        // Wait for dropdown to open and scroll to find the option
+        // Wait for dropdown to open
         await this.page.waitForTimeout(1000);
 
-        // Try to find and scroll to the first function option
-        const option1 = this.page.getByRole('option', { name: functionName1 });
-        try {
-            await option1.scrollIntoViewIfNeeded({ timeout: 5000 });
-        } catch (error) {
-            // If scroll fails, wait a bit more for the dropdown to populate
-            await this.page.waitForTimeout(2000);
+        // Wait for dropdown menu to be visible
+        const dropdownMenu1 = this.page.locator('.q-menu.scroll');
+        await dropdownMenu1.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Scroll through the virtual scroll dropdown to find the option
+        let option1Visible = false;
+        let scrollAttempts = 0;
+        const maxScrollAttempts = 50;
+
+        while (!option1Visible && scrollAttempts < maxScrollAttempts) {
+            // Check if option is visible
+            const option1 = this.page.getByRole('option', { name: functionName1 });
+            option1Visible = await option1.isVisible().catch(() => false);
+
+            if (!option1Visible) {
+                // Scroll down in the dropdown
+                await dropdownMenu1.evaluate(menu => {
+                    menu.scrollTop += 200;
+                });
+                await this.page.waitForTimeout(100);
+                scrollAttempts++;
+            } else {
+                await option1.click();
+                break;
+            }
         }
 
-        await option1.waitFor({ state: 'visible', timeout: 10000 });
-        await option1.locator('div').nth(2).click();
+        if (!option1Visible) {
+            throw new Error(`Could not find option: ${functionName1} after ${maxScrollAttempts} scroll attempts`);
+        }
 
         // Wait for the second function name input field to be visible before clicking
         await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput2).waitFor({ state: 'visible' });
         await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput2).click();
 
-        // Wait for dropdown to open and scroll to find the second option
+        // Wait for dropdown to open
         await this.page.waitForTimeout(1000);
 
-        // Try to find and scroll to the second function option
-        const option2 = this.page.getByRole('option', { name: functionName2 });
-        try {
-            await option2.scrollIntoViewIfNeeded({ timeout: 5000 });
-        } catch (error) {
-            // If scroll fails, wait a bit more for the dropdown to populate
-            await this.page.waitForTimeout(2000);
+        // Wait for dropdown menu to be visible
+        const dropdownMenu2 = this.page.locator('.q-menu.scroll');
+        await dropdownMenu2.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Scroll through the virtual scroll dropdown to find the option
+        let option2Visible = false;
+        let scrollAttempts2 = 0;
+        const maxScrollAttempts2 = 50;
+
+        while (!option2Visible && scrollAttempts2 < maxScrollAttempts2) {
+            // Check if option is visible
+            const option2 = this.page.getByRole('option', { name: functionName2 });
+            option2Visible = await option2.isVisible().catch(() => false);
+
+            if (!option2Visible) {
+                // Scroll down in the dropdown
+                await dropdownMenu2.evaluate(menu => {
+                    menu.scrollTop += 200;
+                });
+                await this.page.waitForTimeout(100);
+                scrollAttempts2++;
+            } else {
+                await option2.click();
+                break;
+            }
         }
 
-        await option2.waitFor({ state: 'visible', timeout: 10000 });
-        await option2.click();
+        if (!option2Visible) {
+            throw new Error(`Could not find option: ${functionName2} after ${maxScrollAttempts2} scroll attempts`);
+        }
     }
 
 
