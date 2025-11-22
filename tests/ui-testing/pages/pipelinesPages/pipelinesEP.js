@@ -206,20 +206,39 @@ export class PipelinesEP {
         await this.page.locator('[data-test="pipeline-import-name-input"]').fill(name);
         await this.page.locator('[data-test="pipeline-import-destination-function-name-input"]').click();
 
-        // Wait for dropdown to open and scroll to find the function
+        // Wait for dropdown to open
         await this.page.waitForTimeout(1000);
 
-        // Try to find and scroll to the function option
-        const functionOption = this.page.getByText(functionName);
-        try {
-            await functionOption.scrollIntoViewIfNeeded({ timeout: 5000 });
-        } catch (error) {
-            // If scroll fails, wait a bit more for the dropdown to populate
-            await this.page.waitForTimeout(2000);
+        // Wait for dropdown menu to be visible
+        const dropdownMenu = this.page.locator('.q-menu.scroll');
+        await dropdownMenu.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Scroll through the virtual scroll dropdown to find the option
+        let functionOptionVisible = false;
+        let scrollAttempts = 0;
+        const maxScrollAttempts = 50;
+
+        while (!functionOptionVisible && scrollAttempts < maxScrollAttempts) {
+            // Check if option is visible
+            const functionOption = this.page.getByText(functionName, { exact: true });
+            functionOptionVisible = await functionOption.isVisible().catch(() => false);
+
+            if (!functionOptionVisible) {
+                // Scroll down in the dropdown
+                await dropdownMenu.evaluate(menu => {
+                    menu.scrollTop += 200;
+                });
+                await this.page.waitForTimeout(100);
+                scrollAttempts++;
+            } else {
+                await functionOption.click();
+                break;
+            }
         }
 
-        await functionOption.waitFor({ state: 'visible', timeout: 10000 });
-        await functionOption.click();
+        if (!functionOptionVisible) {
+            throw new Error(`Could not find option: ${functionName} after ${maxScrollAttempts} scroll attempts`);
+        }
 
         await this.page.locator('[data-test="pipeline-import-destination-stream-type-input"]').click();
         await this.page.getByRole('option', { name: remoteDestination }).click();
