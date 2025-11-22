@@ -48,18 +48,20 @@ use crate::{
             auth::UserEmail,
             functions,
             http::{
-                get_dashboard_info_from_request, get_enable_align_histogram_from_request,
-                get_fallback_order_by_col_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request,
+                get_clear_cache_from_request, get_dashboard_info_from_request,
+                get_enable_align_histogram_from_request, get_fallback_order_by_col_from_request,
+                get_or_create_trace_id, get_search_event_context_from_request,
+                get_search_type_from_request, get_stream_type_from_request,
+                get_use_cache_from_request,
             },
             stream::get_settings_max_query_range,
         },
     },
     handler::http::request::search::{Headers, error_utils::map_error_to_http_response},
     service::{
-        search as SearchService, search::streaming::process_search_stream_request_multi,
-        self_reporting::report_request_usage_stats, setup_tracing_with_trace_id,
+        search::{self as SearchService, streaming::process_search_stream_request_multi},
+        self_reporting::report_request_usage_stats,
+        setup_tracing_with_trace_id,
     },
 };
 
@@ -1270,8 +1272,16 @@ pub async fn search_multi_stream(
 
     let mut queries = multi_req.to_query_req();
 
+    // Set each of the sql queries with use_cache from query params
+    let clear_cache = get_clear_cache_from_request(&query);
+    let use_cache = get_use_cache_from_request(&query) && !clear_cache;
+
     // Before making any requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
+        // Update `use_cache` & `clear_cache` from query params
+        req.use_cache = use_cache;
+        req.clear_cache = clear_cache;
+
         if let Err(e) = req.decode() {
             #[cfg(feature = "enterprise")]
             let error_message = e.to_string();
