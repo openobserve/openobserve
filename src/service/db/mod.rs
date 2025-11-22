@@ -44,6 +44,7 @@ pub mod pipeline;
 pub mod pipeline_errors;
 #[cfg(feature = "enterprise")]
 pub mod re_pattern;
+pub mod saml;
 pub mod saved_view;
 pub mod scheduler;
 pub mod schema;

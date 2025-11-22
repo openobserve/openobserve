@@ -45,6 +45,7 @@ pub mod ratelimit;
 #[cfg(feature = "enterprise")]
 pub mod re_pattern;
 pub mod rum;
+pub mod saml;
 #[cfg(feature = "enterprise")]
 pub mod script_server;
 pub mod search;

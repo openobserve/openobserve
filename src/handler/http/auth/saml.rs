@@ -38,29 +38,30 @@ pub struct SAMLResponse {
     pub relay_state: Option<String>,
 }
 
-/// Get SAML service provider instance
-fn get_service_provider(cfg: &Arc<Config>) -> Result<ServiceProvider, Box<dyn std::error::Error>> {
-    if cfg.auth.saml_sp_entity_id.is_empty() || cfg.auth.saml_acs_url.is_empty() {
+/// Get SAML service provider instance from database config
+async fn get_service_provider() -> Result<ServiceProvider, Box<dyn std::error::Error>> {
+    // Get SAML config from database (or fallback to env vars)
+    let saml_config = crate::service::db::saml::get().await?;
+
+    if !saml_config.enabled {
+        return Err("SAML is not enabled".into());
+    }
+
+    if saml_config.sp_entity_id.is_empty() || saml_config.acs_url.is_empty() {
         return Err("SAML SP Entity ID and ACS URL must be configured".into());
     }
 
-    let idp_metadata_xml = if !cfg.auth.saml_idp_metadata_xml.is_empty() {
-        cfg.auth.saml_idp_metadata_xml.clone()
-    } else if !cfg.auth.saml_idp_metadata_url.is_empty() {
-        // In production, fetch from URL
-        // For now, require XML to be provided
-        return Err("IDP metadata XML must be provided".into());
-    } else {
-        return Err("SAML IDP metadata must be configured".into());
-    };
+    if saml_config.idp_metadata_xml.is_empty() {
+        return Err("SAML IdP metadata must be configured".into());
+    }
 
-    let idp_metadata: EntityDescriptor = idp_metadata_xml.parse()?;
+    let idp_metadata: EntityDescriptor = saml_config.idp_metadata_xml.parse()?;
 
     let sp = ServiceProviderBuilder::default()
-        .entity_id(cfg.auth.saml_sp_entity_id.clone())
-        .acs_url(cfg.auth.saml_acs_url.clone())
+        .entity_id(saml_config.sp_entity_id)
+        .acs_url(saml_config.acs_url)
         .idp_metadata(idp_metadata)
-        .allow_idp_initiated(true)
+        .allow_idp_initiated(saml_config.allow_idp_initiated)
         .contact_person(ContactPerson::default())
         .build()?;
 
@@ -81,13 +82,7 @@ fn get_service_provider(cfg: &Arc<Config>) -> Result<ServiceProvider, Box<dyn st
 )]
 #[get("/login")]
 pub async fn saml_login(_req: HttpRequest) -> Result<HttpResponse, actix_web::Error> {
-    let cfg = get_config();
-
-    if !cfg.auth.saml_enabled {
-        return Ok(HttpResponse::Forbidden().json("SAML authentication is not enabled"));
-    }
-
-    let sp = match get_service_provider(&cfg) {
+    let sp = match get_service_provider().await {
         Ok(sp) => sp,
         Err(e) => {
             log::error!("Failed to initialize SAML SP: {}", e);
@@ -141,13 +136,7 @@ pub async fn saml_acs(
     form: web::Form<SAMLResponse>,
     _req: HttpRequest,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let cfg = get_config();
-
-    if !cfg.auth.saml_enabled {
-        return Ok(HttpResponse::Forbidden().json("SAML authentication is not enabled"));
-    }
-
-    let sp = match get_service_provider(&cfg) {
+    let sp = match get_service_provider().await {
         Ok(sp) => sp,
         Err(e) => {
             log::error!("Failed to initialize SAML SP: {}", e);
@@ -180,15 +169,25 @@ pub async fn saml_acs(
         }
     };
 
+    // Get SAML config to extract user info
+    let saml_config = match crate::service::db::saml::get().await {
+        Ok(config) => config,
+        Err(e) => {
+            log::error!("Failed to get SAML config: {}", e);
+            return Ok(HttpResponse::InternalServerError()
+                .json("Failed to retrieve SAML configuration"));
+        }
+    };
+
     // Extract user information from SAML assertion
     let email = assertion
-        .attribute_value(&cfg.auth.saml_email_attribute)
+        .attribute_value(&saml_config.email_attribute)
         .or_else(|| assertion.subject.as_ref()?.name_id.as_ref()?.value.as_deref())
         .unwrap_or("")
         .to_lowercase();
 
     let name = assertion
-        .attribute_value(&cfg.auth.saml_name_attribute)
+        .attribute_value(&saml_config.name_attribute)
         .unwrap_or(&email)
         .to_string();
 
@@ -201,7 +200,7 @@ pub async fn saml_acs(
     log::info!("SAML authentication successful for user: {}", email);
 
     // Create or update user in database
-    let user_role = match cfg.auth.saml_default_role.as_str() {
+    let user_role = match saml_config.default_role.as_str() {
         "admin" => UserRole::Admin,
         "editor" => UserRole::Editor,
         "viewer" => UserRole::Viewer,
@@ -224,7 +223,7 @@ pub async fn saml_acs(
             is_external: true,
         };
 
-        if let Err(e) = users::post_user(&cfg.auth.saml_default_org, user_request, &email).await {
+        if let Err(e) = users::post_user(&saml_config.default_org, user_request, &email).await {
             log::error!("Failed to create SAML user: {}", e);
             return Ok(
                 HttpResponse::InternalServerError().json("Failed to create user session")
@@ -255,6 +254,7 @@ pub async fn saml_acs(
         refresh_token: String::new(),
     };
 
+    let cfg = get_config();
     let tokens_json = config::utils::json::to_string(&tokens).unwrap();
     let tokens_encoded = base64::encode(&tokens_json);
 
@@ -307,13 +307,7 @@ pub async fn saml_acs(
 )]
 #[get("/metadata")]
 pub async fn saml_metadata(_req: HttpRequest) -> Result<HttpResponse, actix_web::Error> {
-    let cfg = get_config();
-
-    if !cfg.auth.saml_enabled {
-        return Ok(HttpResponse::Forbidden().json("SAML authentication is not enabled"));
-    }
-
-    let sp = match get_service_provider(&cfg) {
+    let sp = match get_service_provider().await {
         Ok(sp) => sp,
         Err(e) => {
             log::error!("Failed to initialize SAML SP: {}", e);

@@ -358,7 +358,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
         sso_enabled,
         native_login_enabled,
-        saml_enabled: cfg.auth.saml_enabled,
+        saml_enabled: crate::service::db::saml::is_enabled().await,
         saml_default_auth: cfg.auth.saml_default_auth.clone(),
         rbac_enabled,
         super_cluster_enabled,

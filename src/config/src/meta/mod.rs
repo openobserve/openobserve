@@ -32,6 +32,7 @@ pub mod plan;
 pub mod projections;
 pub mod promql;
 pub mod ratelimit;
+pub mod saml;
 pub mod search;
 pub mod self_reporting;
 pub mod short_url;

@@ -29,6 +29,16 @@ const settings = {
   updateCustomText: (org_identifier: string, key: string, value: string) => {
     return http().post(`/api/${org_identifier}/settings/logo/text`, value);
   },
+  // SAML Configuration
+  get_saml_config: () => {
+    return http().get(`/api/saml/config`);
+  },
+  update_saml_config: (config: any) => {
+    return http().put(`/api/saml/config`, config);
+  },
+  delete_saml_config: () => {
+    return http().delete(`/api/saml/config`);
+  },
 };
 
 export default settings;
