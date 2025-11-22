@@ -65,7 +65,7 @@ const mockLinks =
 
 const mockSpan = {
   _timestamp: 1752490492843047,
-  start_time: 1752490492843047200,
+  start_time: 1752490492843000000,
   end_time: 1752490493164419300,
   duration: 321372,
   span_id: "d9603ec7f76eb499",
@@ -92,8 +92,8 @@ const mockSpan = {
 };
 
 const mockBaseTracePosition = {
-  durationMs: 350.372,
-  startTimeMs: 1752490492843,
+  durationUs: 350.372,
+  startTimeUs: 1752490492843000,
   tics: [
     {
       value: 0,
@@ -202,7 +202,7 @@ describe("TraceDetailsSidebar", async () => {
       '[data-test="trace-details-sidebar-header-toolbar-start-time"]',
     );
     expect(startTime.exists()).toBe(true);
-    expect(startTime.text()).toContain("Start Time: 0ms");
+    expect(startTime.text()).toContain("Start Time: 0us");
   });
 
   it("should display span ID", () => {
