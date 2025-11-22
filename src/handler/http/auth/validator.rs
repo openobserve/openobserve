@@ -264,6 +264,37 @@ pub async fn validate_credentials(
         });
     }
 
+    // Check for SAML session token
+    if user_password.starts_with("saml_session_") {
+        match crate::service::session::get(user_id).await {
+            Ok(session_token) => {
+                if session_token.eq(&user_password) {
+                    return Ok(TokenValidationResponse {
+                        is_valid: true,
+                        user_email: user.email,
+                        is_internal_user: !user.is_external,
+                        user_role: Some(user.role),
+                        user_name: user.first_name.to_owned(),
+                        family_name: user.last_name,
+                        given_name: user.first_name,
+                    });
+                }
+            }
+            Err(_) => {
+                // Session not found or expired
+                return Ok(TokenValidationResponse {
+                    is_valid: false,
+                    user_email: "".to_string(),
+                    is_internal_user: false,
+                    user_role: None,
+                    user_name: "".to_string(),
+                    family_name: "".to_string(),
+                    given_name: "".to_string(),
+                });
+            }
+        }
+    }
+
     let in_pass = get_hash(user_password, &user.salt);
     if !user.password.eq(&in_pass)
         && !user

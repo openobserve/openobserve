@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # SAML Identity Provider (for testing)
+  saml-idp:
+    image: kristophjunge/test-saml-idp:1.15
+    container_name: openobserve-saml-idp
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      SIMPLESAMLPHP_SP_ENTITY_ID: "http://localhost:5080/auth/saml/metadata"
+      SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE: "http://localhost:5080/auth/saml/acs"
+      SIMPLESAMLPHP_SP_SINGLE_LOGOUT_SERVICE: "http://localhost:5080/auth/saml/logout"
+    volumes:
+      - ./docker/saml-idp/authsources.php:/var/www/simplesamlphp/config/authsources.php
+    networks:
+      - openobserve-saml-network
+
+  # OpenObserve with SAML enabled
+  openobserve:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: openobserve-with-saml
+    ports:
+      - "5080:5080"
+      - "5081:5081"
+    environment:
+      ZO_ROOT_USER_EMAIL: "root@example.com"
+      ZO_ROOT_USER_PASSWORD: "Complexpass#123"
+      # SAML Configuration
+      ZO_SAML_ENABLED: "true"
+      ZO_SAML_SP_ENTITY_ID: "http://localhost:5080/auth/saml/metadata"
+      ZO_SAML_ACS_URL: "http://localhost:5080/auth/saml/acs"
+      ZO_SAML_IDP_METADATA_XML: |
+        <?xml version="1.0"?>
+        <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" entityID="http://localhost:8080/simplesaml/saml2/idp/metadata.php">
+          <md:IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+            <md:KeyDescriptor use="signing">
+              <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+                <ds:X509Data>
+                  <ds:X509Certificate>MIIDXTCCAkWgAwIBAgIJALmVVuDWu4NYMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwHhcNMTYxMjMxMTQzNDQ3WhcNNDgwNjI1MTQzNDQ3WjBFMQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzUCFozgNb1h1M0jzNRSCjhOBnR+uVbVpaWfXYIR+AhWDdEe5ryY+CgavOg8bfLybyzFdehlYdDRgkedEB/GjG8aJw06l0qF4jDOAw0kEygWCu2mcH7XOxRt+YAH3TVHa/Hu1W3WjzkobqqqLQ8gkKWWM27fOgAZ6GieaJBN6VBSMMcPey3HWLBmc+TYJmv1dbaO2jHhKh8pfKw0W12VM8P1PIO8gv4Phu/uuJYieBWKixBEyy0lHjyixYFCR12xdh4CA47q958ZRGnnDUGFVE1QhgRacJCOZ9bd5t9mr8KLaVBYTCJo5ERE8jymab5dPqe5qKfJsCZiqWglbjUo9twIDAQABo1AwTjAdBgNVHQ4EFgQUxpuwcs/CYQOyui+r1G+3KxBNhxkwHwYDVR0jBBgwFoAUxpuwcs/CYQOyui+r1G+3KxBNhxkwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAAiWUKs/2x/viNCKi3Y6blEuCtAGhzOOZ9EjrvJ8+COH3Rag3tVBWrcBZ3/uhhPq5gy9lqw4OkvEws99/5jFsX1FJ6MKBgqfuy7yh5s1YfM0ANHYczMmYpZeAcQf2CGAaVfwTTfSlzNLsF2lW/ly7yapFzlYSJLGoVE+OHEu8g09yZF6wEDbsMtcpWkT0cAIlcOWdQexYObJC4s37+uaVnS6n0tVzxxkFWbXwpgwO+E9X+W5d3jvNPucYiSfBGUGcyDhb2FdlGu2U+XfZZ3qgPjcHXyLFaQDrLEuRKJuYvs6pS0z0iLGg3vvhM9QNFR3WRU6bHG6oVHQJo1ynC7FwqA==</ds:X509Certificate>
+                </ds:X509Data>
+              </ds:KeyInfo>
+            </md:KeyDescriptor>
+            <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="http://localhost:8080/simplesaml/saml2/idp/SingleLogoutService.php"/>
+            <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</md:NameIDFormat>
+            <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="http://localhost:8080/simplesaml/saml2/idp/SSOService.php"/>
+          </md:IDPSSODescriptor>
+        </md:EntityDescriptor>
+      ZO_SAML_DEFAULT_ORG: "default"
+      ZO_SAML_DEFAULT_ROLE: "admin"
+      ZO_SAML_EMAIL_ATTRIBUTE: "email"
+      ZO_SAML_NAME_ATTRIBUTE: "name"
+      ZO_SAML_DEFAULT_AUTH: "saml"
+      # Other settings
+      ZO_DATA_DIR: "/data"
+      ZO_WEB_URL: "http://localhost:5080"
+    volumes:
+      - ./data:/data
+    networks:
+      - openobserve-saml-network
+    depends_on:
+      - saml-idp
+
+networks:
+  openobserve-saml-network:
+    driver: bridge

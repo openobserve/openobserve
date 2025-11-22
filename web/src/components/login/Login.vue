@@ -114,7 +114,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
 
-        <div v-if="showSSO && showInternalLogin" class="q-py-md text-center">
+        <div v-if="showSAML" class="flex justify-center q-mt-md">
+          <q-btn
+            data-test="saml-login-btn"
+            class="text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            style="width: 400px"
+            @click="loginWithSAML"
+          >
+            <div
+              class="flex items-center justify-center full-width text-center relative"
+            >
+              <img
+                class="absolute"
+                style="width: 30px; left: 16px"
+                :src="getImageURL('images/common/sso.svg')"
+              />
+              <span class="text-center"> Login with AWS SSO (SAML)</span>
+            </div>
+          </q-btn>
+        </div>
+
+        <div v-if="(showSSO || showSAML) && showInternalLogin" class="q-py-md text-center">
           <a
             class="cursor-pointer login-internal-link q-py-md"
             style="text-decoration: underline"
@@ -124,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
+          v-if="(!showSSO && !showSAML) || ((showSSO || showSAML) && loginAsInternalUser && showInternalLogin)"
           class="o2-input login-inputs"
         >
           <q-form ref="loginform"
@@ -242,6 +265,10 @@ export default defineComponent({
       return store.state.zoConfig.sso_enabled && config.isEnterprise === "true";
     });
 
+    const showSAML = computed(() => {
+      return store.state.zoConfig.saml_enabled;
+    });
+
     const showInternalLogin = computed(() => {
       return store.state.zoConfig.native_login_enabled;
     });
@@ -256,6 +283,16 @@ export default defineComponent({
         });
       } catch (error) {
         console.error("Error during redirection:");
+      }
+    };
+
+    const loginWithSAML = async () => {
+      try {
+        const baseUrl = window.location.origin;
+        const samlLoginUrl = `${baseUrl}${config.baseURL || ""}/auth/saml/login`;
+        window.location.href = samlLoginUrl;
+      } catch (error) {
+        console.error("Error during SAML redirection:", error);
       }
     };
 
@@ -454,8 +491,10 @@ export default defineComponent({
       getImageURL,
       loginAsInternalUser,
       showSSO,
+      showSAML,
       showInternalLogin,
       loginWithSSo,
+      loginWithSAML,
       config,
       autoRedirectDexLogin,
     };

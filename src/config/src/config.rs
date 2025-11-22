@@ -646,6 +646,27 @@ pub struct Auth {
     pub ext_auth_salt: String,
     #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
     pub action_server_token: String,
+    // SAML AWS SSO Configuration
+    #[env_config(name = "ZO_SAML_ENABLED", default = false)]
+    pub saml_enabled: bool,
+    #[env_config(name = "ZO_SAML_IDP_METADATA_URL", default = "")]
+    pub saml_idp_metadata_url: String,
+    #[env_config(name = "ZO_SAML_IDP_METADATA_XML", default = "")]
+    pub saml_idp_metadata_xml: String,
+    #[env_config(name = "ZO_SAML_SP_ENTITY_ID", default = "")]
+    pub saml_sp_entity_id: String,
+    #[env_config(name = "ZO_SAML_ACS_URL", default = "")]
+    pub saml_acs_url: String,
+    #[env_config(name = "ZO_SAML_DEFAULT_ORG", default = "default")]
+    pub saml_default_org: String,
+    #[env_config(name = "ZO_SAML_DEFAULT_ROLE", default = "admin")]
+    pub saml_default_role: String,
+    #[env_config(name = "ZO_SAML_EMAIL_ATTRIBUTE", default = "email")]
+    pub saml_email_attribute: String,
+    #[env_config(name = "ZO_SAML_NAME_ATTRIBUTE", default = "name")]
+    pub saml_name_attribute: String,
+    #[env_config(name = "ZO_SAML_DEFAULT_AUTH", default = "basic")]
+    pub saml_default_auth: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
