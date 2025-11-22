@@ -116,9 +116,10 @@ impl super::FileList for SqliteFileList {
             parse_file_key_columns(&dump_file.key).map_err(|e| Error::Message(e.to_string()))?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         let meta = &dump_file.meta;
+        let now_ts = now_micros();
 
-        if let Err(e) = sqlx::query(r#" INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);"#)
+        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);"#)
         .bind(&dump_file.account)
         .bind(org_id)
         .bind(stream_key)
@@ -132,6 +133,8 @@ impl super::FileList for SqliteFileList {
         .bind(meta.compressed_size)
         .bind(meta.index_size)
         .bind(meta.flattened)
+        .bind(now_ts)
+        .bind(now_ts)
         .execute(&mut *tx)
         .await{
             if let Err(e) = tx.rollback().await {
