@@ -157,6 +157,12 @@
             "legend_width": {
               "unit": "px"
             },
+            "tooltip": {
+              "trigger": "axis",
+              "confine": true,
+              "appendToBody": true,
+              "renderMode": "html"
+            },
             "base_map": {
               "type": "osm"
             },

@@ -624,6 +624,12 @@
     "p95": "P95",
     "p99": "P99"
   },
+  "volumeInsights": {
+    "title": "Volume Insights",
+    "analyzeButton": "Volume Analysis",
+    "analyzeTooltip": "Analyze trace volume patterns across dimensions",
+    "rateLabel": "Rate:"
+  },
   "confirmDialog": {
     "cancel": "Cancel",
     "ok": "OK",
