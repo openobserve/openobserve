@@ -23,10 +23,7 @@ use chrono::{Duration, Utc};
 use config::{
     ALL_VALUES_COL_NAME, BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     get_config,
-    meta::{
-        self_reporting::usage::UsageType,
-        stream::{StreamParams, StreamType},
-    },
+    meta::{self_reporting::usage::UsageType, stream::StreamType},
     metrics,
     utils::{
         flatten,
@@ -42,7 +39,7 @@ use crate::{
     service::{
         format_stream_name,
         ingestion::check_ingestion_allowed,
-        pipeline::batch_execution::{ExecutablePipeline, ExecutablePipelineBulkInputs},
+        pipeline::batch_execution::ExecutablePipelineBulkInputs,
         schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
@@ -78,25 +75,108 @@ pub async fn ingest(
         .timestamp_micros();
 
     let log_ingestion_errors = ingestion_log_enabled().await;
+
+    let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
+
+    let org_stream_prefix = format!("{org_id}/{}/", StreamType::Logs);
+
+    // Fast scan to collect unique stream names
+    let mut unique_stream_names = HashSet::new();
+    let mut next_line_is_data = false;
+    let reader = BufReader::new(body.as_ref());
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.is_empty() {
+            continue;
+        }
+
+        let value: json::Value = json::from_slice(line.as_bytes())?;
+
+        if !next_line_is_data {
+            // Parse stream name from bulk operation
+            let ret = super::parse_bulk_index(&value);
+            if ret.is_none() {
+                continue;
+            }
+            let (_, mut stream_name, _) = ret.unwrap();
+
+            if stream_name.is_empty() || stream_name == "_" || stream_name == "/" {
+                continue; // skip invalid
+            }
+
+            if !cfg.common.skip_formatting_stream_name {
+                stream_name = format_stream_name(&stream_name);
+            }
+
+            // Skip blocked streams
+            let key = format!("{org_stream_prefix}{stream_name}");
+            if BLOCKED_STREAMS.contains(&key) {
+                continue;
+            }
+
+            unique_stream_names.insert(stream_name);
+            next_line_is_data = true;
+        } else {
+            next_line_is_data = false;
+        }
+    }
+
+    // Batch fetch metadata concurrently
+    let unique_streams_vec: Vec<String> = unique_stream_names.into_iter().collect();
+    let (
+        stream_executable_pipelines,
+        mut user_defined_schema_map,
+        mut streams_need_original_map,
+        mut streams_need_all_values_map,
+    ) = if !unique_streams_vec.is_empty() {
+        crate::service::ingestion::batch_get_stream_metadata(
+            org_id,
+            &unique_streams_vec,
+            StreamType::Logs,
+        )
+        .await
+    } else {
+        (
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+        )
+    };
+
+    // Also batch fetch flatten levels concurrently
+    let mut flatten_level_cache: HashMap<String, u32> = HashMap::new();
+    if !unique_streams_vec.is_empty() {
+        use futures::future::join_all;
+        let flatten_futures: Vec<_> = unique_streams_vec
+            .iter()
+            .map(|stream_name| {
+                let sn = stream_name.clone();
+                async move {
+                    let level = get_flatten_level(org_id, &sn, StreamType::Logs).await;
+                    (sn, level)
+                }
+            })
+            .collect();
+        let flatten_results = join_all(flatten_futures).await;
+        for (stream_name, level) in flatten_results {
+            flatten_level_cache.insert(stream_name, level);
+        }
+    }
+
+    // Main processing with cached metadata
     let mut action = String::from("");
     let mut stream_name = String::from("");
     let mut doc_id = None;
 
-    let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
-
-    let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
-        HashMap::new();
     let mut stream_pipeline_inputs: HashMap<String, ExecutablePipelineBulkInputs> = HashMap::new();
-
-    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
-    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
-    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
     let mut store_original_when_pipeline_exists = false;
 
     let mut json_data_by_stream = HashMap::new();
     let mut derived_streams = HashSet::new();
     let mut size_by_stream = HashMap::new();
-    let mut next_line_is_data = false;
+    next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
     for line in reader.lines() {
         let line = line?;
@@ -144,7 +224,7 @@ pub async fn ingest(
             }
 
             // skip blocked streams
-            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+            let key = format!("{org_stream_prefix}{stream_name}");
             if BLOCKED_STREAMS.contains(&key) {
                 // print warning only once
                 blocked_stream_warnings.entry(key).or_insert_with(|| {
@@ -154,39 +234,10 @@ pub async fn ingest(
                 continue; // skip
             }
 
-            let mut streams = vec![StreamParams {
-                org_id: org_id.to_owned().into(),
-                stream_type: StreamType::Logs,
-                stream_name: stream_name.to_owned().into(),
-            }];
-
-            // Start retrieve associated pipeline and initialize ExecutablePipeline
-            if !stream_executable_pipelines.contains_key(&stream_name) {
-                let exec_pl_option = crate::service::ingestion::get_stream_executable_pipeline(
-                    org_id,
-                    &stream_name,
-                    &StreamType::Logs,
-                )
-                .await;
-                if let Some(exec_pl) = &exec_pl_option {
-                    let pl_destinations = exec_pl.get_all_destination_streams();
-                    streams.extend(pl_destinations);
-                }
-                stream_executable_pipelines.insert(stream_name.clone(), exec_pl_option);
-            }
-            // End pipeline params construction
-
-            crate::service::ingestion::get_uds_and_original_data_streams(
-                &streams,
-                &mut user_defined_schema_map,
-                &mut streams_need_original_map,
-                &mut streams_need_all_values_map,
-            )
-            .await;
-
             // with pipeline, we need to store original if any of the destinations requires original
             store_original_when_pipeline_exists = stream_executable_pipelines
-                .contains_key(&stream_name)
+                .get(&stream_name)
+                .is_some_and(|pl| pl.is_some())
                 && streams_need_original_map.values().any(|val| *val);
 
             next_line_is_data = true;
@@ -229,8 +280,8 @@ pub async fn ingest(
             } else {
                 let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
                 *_size += estimate_json_bytes(&value);
-                // JSON Flattening - use per-stream flatten level
-                let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+                // JSON Flattening - use cached flatten level from Phase 2
+                let flatten_level = *flatten_level_cache.get(&stream_name).unwrap_or(&0);
                 value = flatten::flatten_with_level(value, flatten_level)?;
 
                 // get json object
