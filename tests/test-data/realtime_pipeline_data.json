@@ -1,0 +1,434 @@
+{
+  "pipeline_id": "7397985627565740032",
+  "version": 0,
+  "enabled": false,
+  "org": "default",
+  "name": "test_pipeline_new",
+  "description": "",
+  "source": {
+    "source_type": "realtime",
+    "org_id": "default",
+    "stream_name": "e2e_automate",
+    "stream_type": "logs"
+  },
+  "nodes": [
+    {
+      "id": "dbe0c764-5955-4e1e-9bc2-bdbf079ec41d",
+      "type": "input",
+      "dimensions": {
+        "width": 215,
+        "height": 65
+      },
+      "computedPosition": {
+        "x": 245,
+        "y": 140,
+        "z": 0
+      },
+      "handleBounds": {
+        "source": [
+          {
+            "id": "output",
+            "type": "source",
+            "nodeId": "dbe0c764-5955-4e1e-9bc2-bdbf079ec41d",
+            "position": "bottom",
+            "x": 99.71878051757812,
+            "y": 55.99998474121094,
+            "width": 16,
+            "height": 16
+          }
+        ],
+        "target": null
+      },
+      "selected": false,
+      "dragging": false,
+      "resizing": false,
+      "initialized": false,
+      "isParent": false,
+      "position": {
+        "x": 245,
+        "y": 140
+      },
+      "data": {
+        "node_type": "stream",
+        "org_id": "default",
+        "stream_name": "e2e_automate",
+        "stream_type": "logs"
+      },
+      "events": {},
+      "io_type": "input"
+    },
+    {
+      "id": "d7f87a90-7cdd-4013-9a34-9fa8dcb4c445",
+      "type": "output",
+      "dimensions": {
+        "width": 224,
+        "height": 65
+      },
+      "computedPosition": {
+        "x": 352.5,
+        "y": 372.5,
+        "z": 0
+      },
+      "handleBounds": {
+        "source": null,
+        "target": [
+          {
+            "id": "input",
+            "type": "target",
+            "nodeId": "d7f87a90-7cdd-4013-9a34-9fa8dcb4c445",
+            "position": "top",
+            "x": 104.21875,
+            "y": -7.000007629394531,
+            "width": 16,
+            "height": 16
+          }
+        ]
+      },
+      "selected": false,
+      "dragging": false,
+      "resizing": false,
+      "initialized": false,
+      "isParent": false,
+      "position": {
+        "x": 352.5,
+        "y": 372.5
+      },
+      "data": {
+        "node_type": "stream",
+        "org_id": "default",
+        "stream_name": "e2e_automate1",
+        "stream_type": "logs"
+      },
+      "events": {},
+      "io_type": "output"
+    },
+    {
+      "id": "dcd5080c-9f69-4386-972a-b4dda2f1716b",
+      "type": "default",
+      "dimensions": {
+        "width": 310,
+        "height": 55
+      },
+      "computedPosition": {
+        "x": 33.75,
+        "y": 252.5,
+        "z": 0
+      },
+      "handleBounds": {
+        "source": [
+          {
+            "id": "output",
+            "type": "source",
+            "nodeId": "dcd5080c-9f69-4386-972a-b4dda2f1716b",
+            "position": "bottom",
+            "x": 146.94534301757812,
+            "y": 45.99998474121094,
+            "width": 16,
+            "height": 16
+          }
+        ],
+        "target": [
+          {
+            "id": "input",
+            "type": "target",
+            "nodeId": "dcd5080c-9f69-4386-972a-b4dda2f1716b",
+            "position": "top",
+            "x": 146.94534301757812,
+            "y": -6.999969482421875,
+            "width": 16,
+            "height": 16
+          }
+        ]
+      },
+      "selected": false,
+      "dragging": false,
+      "resizing": false,
+      "initialized": false,
+      "isParent": false,
+      "position": {
+        "x": 33.75,
+        "y": 252.5
+      },
+      "data": {
+        "node_type": "condition",
+        "conditions": {
+          "and": [
+            {
+              "column": "k8s_event_name",
+              "operator": "not_contains",
+              "value": "testinvalid",
+              "ignore_case": true
+            }
+          ]
+        }
+      },
+      "events": {},
+      "io_type": "default"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edbe0c764-5955-4e1e-9bc2-bdbf079ec41d-dcd5080c-9f69-4386-972a-b4dda2f1716b",
+      "type": "custom",
+      "source": "dbe0c764-5955-4e1e-9bc2-bdbf079ec41d",
+      "target": "dcd5080c-9f69-4386-972a-b4dda2f1716b",
+      "updatable": true,
+      "data": {},
+      "events": {},
+      "label": "",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "width": 20,
+        "height": 20
+      },
+      "style": {
+        "strokeWidth": 2
+      },
+      "animated": true,
+      "sourceNode": {
+        "id": "dbe0c764-5955-4e1e-9bc2-bdbf079ec41d",
+        "type": "input",
+        "dimensions": {
+          "width": 215,
+          "height": 65
+        },
+        "computedPosition": {
+          "x": 245,
+          "y": 140,
+          "z": 0
+        },
+        "handleBounds": {
+          "source": [
+            {
+              "id": "output",
+              "type": "source",
+              "nodeId": "dbe0c764-5955-4e1e-9bc2-bdbf079ec41d",
+              "position": "bottom",
+              "x": 99.71878051757812,
+              "y": 55.99998474121094,
+              "width": 16,
+              "height": 16
+            }
+          ],
+          "target": null
+        },
+        "selected": false,
+        "dragging": false,
+        "resizing": false,
+        "initialized": false,
+        "isParent": false,
+        "position": {
+          "x": 245,
+          "y": 140
+        },
+        "data": {
+          "node_type": "stream",
+          "org_id": "default",
+          "stream_name": "e2e_automate",
+          "stream_type": "logs"
+        },
+        "events": {},
+        "io_type": "input"
+      },
+      "targetNode": {
+        "id": "dcd5080c-9f69-4386-972a-b4dda2f1716b",
+        "type": "default",
+        "dimensions": {
+          "width": 310,
+          "height": 55
+        },
+        "computedPosition": {
+          "x": 33.75,
+          "y": 252.5,
+          "z": 0
+        },
+        "handleBounds": {
+          "source": [
+            {
+              "id": "output",
+              "type": "source",
+              "nodeId": "dcd5080c-9f69-4386-972a-b4dda2f1716b",
+              "position": "bottom",
+              "x": 146.94534301757812,
+              "y": 45.99998474121094,
+              "width": 16,
+              "height": 16
+            }
+          ],
+          "target": [
+            {
+              "id": "input",
+              "type": "target",
+              "nodeId": "dcd5080c-9f69-4386-972a-b4dda2f1716b",
+              "position": "top",
+              "x": 146.94534301757812,
+              "y": -6.999969482421875,
+              "width": 16,
+              "height": 16
+            }
+          ]
+        },
+        "selected": false,
+        "dragging": false,
+        "resizing": false,
+        "initialized": false,
+        "isParent": false,
+        "position": {
+          "x": 33.75,
+          "y": 252.5
+        },
+        "data": {
+          "node_type": "condition",
+          "conditions": {
+            "and": [
+              {
+                "column": "k8s_event_name",
+                "operator": "not_contains",
+                "value": "testinvalid",
+                "ignore_case": true
+              }
+            ]
+          }
+        },
+        "events": {},
+        "io_type": "default"
+      },
+      "sourceX": 352.7187805175781,
+      "sourceY": 211.99998474121094,
+      "targetX": 188.69534301757812,
+      "targetY": 245.50003051757812
+    },
+    {
+      "id": "edcd5080c-9f69-4386-972a-b4dda2f1716b-d7f87a90-7cdd-4013-9a34-9fa8dcb4c445",
+      "type": "custom",
+      "source": "dcd5080c-9f69-4386-972a-b4dda2f1716b",
+      "target": "d7f87a90-7cdd-4013-9a34-9fa8dcb4c445",
+      "updatable": true,
+      "data": {},
+      "events": {},
+      "label": "",
+      "markerEnd": {
+        "type": "arrowclosed",
+        "width": 20,
+        "height": 20
+      },
+      "style": {
+        "strokeWidth": 2
+      },
+      "animated": true,
+      "sourceNode": {
+        "id": "dcd5080c-9f69-4386-972a-b4dda2f1716b",
+        "type": "default",
+        "dimensions": {
+          "width": 310,
+          "height": 55
+        },
+        "computedPosition": {
+          "x": 33.75,
+          "y": 252.5,
+          "z": 0
+        },
+        "handleBounds": {
+          "source": [
+            {
+              "id": "output",
+              "type": "source",
+              "nodeId": "dcd5080c-9f69-4386-972a-b4dda2f1716b",
+              "position": "bottom",
+              "x": 146.94534301757812,
+              "y": 45.99998474121094,
+              "width": 16,
+              "height": 16
+            }
+          ],
+          "target": [
+            {
+              "id": "input",
+              "type": "target",
+              "nodeId": "dcd5080c-9f69-4386-972a-b4dda2f1716b",
+              "position": "top",
+              "x": 146.94534301757812,
+              "y": -6.999969482421875,
+              "width": 16,
+              "height": 16
+            }
+          ]
+        },
+        "selected": false,
+        "dragging": false,
+        "resizing": false,
+        "initialized": false,
+        "isParent": false,
+        "position": {
+          "x": 33.75,
+          "y": 252.5
+        },
+        "data": {
+          "node_type": "condition",
+          "conditions": {
+            "and": [
+              {
+                "column": "k8s_event_name",
+                "operator": "not_contains",
+                "value": "testinvalid",
+                "ignore_case": true
+              }
+            ]
+          }
+        },
+        "events": {},
+        "io_type": "default"
+      },
+      "targetNode": {
+        "id": "d7f87a90-7cdd-4013-9a34-9fa8dcb4c445",
+        "type": "output",
+        "dimensions": {
+          "width": 224,
+          "height": 65
+        },
+        "computedPosition": {
+          "x": 352.5,
+          "y": 372.5,
+          "z": 0
+        },
+        "handleBounds": {
+          "source": null,
+          "target": [
+            {
+              "id": "input",
+              "type": "target",
+              "nodeId": "d7f87a90-7cdd-4013-9a34-9fa8dcb4c445",
+              "position": "top",
+              "x": 104.21875,
+              "y": -7.000007629394531,
+              "width": 16,
+              "height": 16
+            }
+          ]
+        },
+        "selected": false,
+        "dragging": false,
+        "resizing": false,
+        "initialized": false,
+        "isParent": false,
+        "position": {
+          "x": 352.5,
+          "y": 372.5
+        },
+        "data": {
+          "node_type": "stream",
+          "org_id": "default",
+          "stream_name": "e2e_automate1",
+          "stream_type": "logs"
+        },
+        "events": {},
+        "io_type": "output"
+      },
+      "sourceX": 188.69534301757812,
+      "sourceY": 314.49998474121094,
+      "targetX": 464.71875,
+      "targetY": 365.49999237060547
+    }
+  ],
+  "paused_at": null
+}
