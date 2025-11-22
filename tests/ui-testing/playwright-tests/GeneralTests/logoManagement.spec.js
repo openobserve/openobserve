@@ -64,9 +64,14 @@ console.log(`Generated logo name: ${logoName}`);
 
     await logoManagementPage.updateCustomLogoText(logoName); // Updated Unauthorized Access 
 
-    console.log(`Uploading file from path: ${filePath}`);
-    //
+    console.log(`Uploading light mode logo from path: ${filePath}`);
     await logoManagementPage.uploadLogo(filePath);
+
+    await page.waitForTimeout(5000);
+
+    // Upload dark mode logo
+    console.log(`Uploading dark mode logo from path: ${filePath}`);
+    await logoManagementPage.uploadLogoDarkMode(filePath);
 
     await page.waitForTimeout(5000); // Adjust or remove as needed
 });

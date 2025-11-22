@@ -196,11 +196,20 @@ export class SDRPatternsPage {
     // Click the Import JSON File tab to ensure it's selected
     await this.page.locator('[data-test="tab-import_json_file"]').click();
 
-    // Upload file
-    const fileInput = this.page.locator('[data-test="regex-pattern-import-json-file-input"]');
-    await expect(fileInput).toBeVisible();
-    await fileInput.setInputFiles(filePath);
-    testLogger.info('File selected for import');
+    // Upload file - try original locator first, fallback to new locator
+    let fileInput;
+    try {
+      fileInput = this.page.locator('[data-test="regex-pattern-import-json-file-input"]');
+      await expect(fileInput).toBeVisible({ timeout: 5000 });
+      await fileInput.setInputFiles(filePath);
+      testLogger.info('File selected for import (using original locator)');
+    } catch (error) {
+      // Fallback to new locator pattern
+      fileInput = this.page.locator('[data-test="regex-pattern-import-file-input"]');
+      await expect(fileInput).toBeVisible();
+      await fileInput.setInputFiles(filePath);
+      testLogger.info('File selected for import (using fallback locator)');
+    }
 
     // Click import button
     const importJsonBtn = this.page.locator('[data-test="regex-pattern-import-json-btn"]');
