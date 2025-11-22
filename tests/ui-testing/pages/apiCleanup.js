@@ -530,10 +530,19 @@ class APICleanup {
             const functions = await this.fetchFunctions();
             testLogger.info('Fetched functions', { total: functions.length });
 
-            // Filter functions matching pattern: "Pipeline" followed by exactly 3 digits
-            const pattern = /^Pipeline\d{3}$/;
-            const matchingFunctions = functions.filter(f => pattern.test(f.name));
-            testLogger.info('Found functions matching cleanup pattern', { count: matchingFunctions.length });
+            // Filter functions matching patterns:
+            // 1. "Pipeline" followed by exactly 3 digits
+            // 2. "first" followed by exactly 3 digits
+            // 3. "second" followed by exactly 3 digits
+            const patterns = [
+                /^Pipeline\d{3}$/,
+                /^first\d{3}$/,
+                /^second\d{3}$/
+            ];
+            const matchingFunctions = functions.filter(f =>
+                patterns.some(pattern => pattern.test(f.name))
+            );
+            testLogger.info('Found functions matching cleanup patterns', { count: matchingFunctions.length });
 
             if (matchingFunctions.length === 0) {
                 testLogger.info('No functions to clean up');
