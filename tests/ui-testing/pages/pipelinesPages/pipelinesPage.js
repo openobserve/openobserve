@@ -85,7 +85,7 @@ export class PipelinesPage {
         this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
         this.enrichmentTableTab =
           '[data-test="function-enrichment-table-tab"] > .q-tab__content > .q-tab__label';
-        this.addEnrichmentTableButton = page.getByRole('button', { name: 'Add Enrichment Table' });
+        this.addEnrichmentTableButton = page.getByRole('button', { name: 'New enrichment table' });
         this.editButton = page.locator("button").filter({ hasText: "edit" });
         this.remoteDestinationIcon = page.getByRole("img", { name: "Remote Destination" });
         this.nameInput = page.getByLabel("Name *");
@@ -106,7 +106,7 @@ export class PipelinesPage {
         this.kubernetesContainerNameOption = page.getByRole("option", { name: "kubernetes_container_name" });
         this.conditionText = page.getByText('kubernetes_container_name');
         this.pipelineSavedMessage = page.getByText('Pipeline saved successfully');
-        this.addEnrichmentTableText = page.getByRole('button', { name: 'Add Enrichment Table' });
+        this.addEnrichmentTableText = page.getByRole('button', { name: 'New enrichment table' });
         this.deletedSuccessfullyText = page.getByText('deleted successfully');
         this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native");
         this.deleteButtonNth1 = page.locator("button").filter({ hasText: "delete" }).nth(1);
