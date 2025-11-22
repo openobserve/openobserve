@@ -17,10 +17,16 @@ export
         this.deleteLogoButton = page.locator('[data-test="setting_ent_custom_logo_img_delete_btn"]');
         this.confirmDeleteButton = page.locator('[data-test="logs-search-bar-confirm-dialog-ok-btn"]');
         this.fileUploadInput = page.locator('input[data-test="setting_ent_custom_logo_img_file_upload"]');
+        this.saveButtonLight = page.locator('[data-test="settings_ent_logo_custom_light_save_btn"]');
         this.enterpriseFeature = page.locator('#enterpriseFeature');
         this.organizationSearchInput = page.locator('[data-test="organization-search-input"]');
         this.organizationMenuItem = page.locator('[data-test="organization-menu-item-label-item-label"]');
         this.navbarOrganizationsSelect = page.locator('[data-test="navbar-organizations-select"]');
+
+        // Dark mode logo locators
+        this.fileUploadInputDark = page.locator('[data-test="setting_ent_custom_logo_dark_img_file_upload"]');
+        this.saveButtonDark = page.locator('[data-test="settings_ent_logo_custom_dark_save_btn"]');
+        this.deleteLogoButtonDark = page.locator('[data-test="setting_ent_custom_logo_dark_img_delete_btn"]');
     }
 
     async navigateToManagement() {
@@ -114,10 +120,40 @@ export
         await this.page.goto(process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=_meta");
         await this.fileUploadInput.waitFor({ state: 'visible' });
         await this.page.setInputFiles('input[data-test="setting_ent_custom_logo_img_file_upload"]', filePath);
-        // Click the save button after logo upload
-        await this.saveButton.waitFor({ state: 'visible' });
-        await this.saveButton.click({ force: true });
+        // Click the save button after logo upload (light mode)
+        await this.saveButtonLight.waitFor({ state: 'visible' });
+        await this.saveButtonLight.click({ force: true });
         await expect(this.page.getByText("Logo updated successfully")).toBeVisible({
+            timeout: 30000,
+        });
+    }
+
+    async uploadLogoDarkMode(filePath) {
+        // Delete existing dark mode logo if present
+        const isVisible = await this.deleteLogoButtonDark.isVisible();
+        if (isVisible) {
+            await this.deleteLogoButtonDark.waitFor({ state: 'visible' });
+            await this.deleteLogoButtonDark.click({ force: true });
+            await this.confirmDeleteButton.waitFor({ state: 'visible' });
+            await this.confirmDeleteButton.click({ force: true });
+            await expect(this.page.getByText("Dark mode logo deleted")).toBeVisible({
+                timeout: 10000,
+            });
+        }
+
+        // Navigate to the settings page
+        await this.page.goto(process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=_meta");
+
+        // Upload dark mode logo
+        await this.fileUploadInputDark.waitFor({ state: 'visible' });
+        await this.fileUploadInputDark.setInputFiles(filePath);
+
+        // Click the save button for dark mode logo
+        await this.saveButtonDark.waitFor({ state: 'visible' });
+        await this.saveButtonDark.click({ force: true });
+
+        // Verify success message
+        await expect(this.page.getByText("Dark mode logo updated")).toBeVisible({
             timeout: 30000,
         });
     }
