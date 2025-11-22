@@ -14,81 +14,105 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div
-    v-if="variablesData.values?.length > 0"
-    :key="variablesData.isVariablesLoading"
-    class="flex q-mt-xs q-ml-xs"
-  >
-    <div
-      v-for="(item, index) in variablesData.values"
-      :key="item.name + index"
-      :data-test="`dashboard-variable-${item}-selector`"
-    >
-      <div v-if="item.type == 'query_values'">
-        <VariableQueryValueSelector
-          class="q-mr-lg q-mt-xs"
-          v-show="!item.hideOnDashboard"
-          v-model="item.value"
-          :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
-          :loadOptions="loadVariableOptions"
-          @search="onVariableSearch(index, $event)"
-        />
+  <div v-if="variablesData.values?.length > 0">
+    <div :key="variablesData.isVariablesLoading" class="flex q-mt-xs q-ml-xs">
+      <div
+        v-for="(item, index) in variablesData.values"
+        :key="item.name + index"
+        :data-test="`dashboard-variable-${item}-selector`"
+      >
+        <div
+          v-if="item.type == 'query_values' && item._isCurrentLevel !== false"
+        >
+          <VariableQueryValueSelector
+            class="q-mr-lg q-mt-xs"
+            v-show="!item.hideOnDashboard"
+            v-model="item.value"
+            :variableItem="item"
+            @update:model-value="onVariablesValueUpdated(index)"
+            :loadOptions="loadVariableOptions"
+            @search="onVariableSearch(index, $event)"
+          />
+        </div>
+        <div
+          v-else-if="item.type == 'constant' && item._isCurrentLevel !== false"
+        >
+          <q-input
+            v-show="!item.hideOnDashboard"
+            class="q-mr-lg q-mt-xs"
+            style="max-width: 150px !important"
+            v-model="item.value"
+            :label="item.label || item.name"
+            dense
+            readonly
+            data-test="dashboard-variable-constant-selector"
+            @update:model-value="onVariablesValueUpdated(index)"
+            borderless
+            hide-bottom-space
+          ></q-input>
+        </div>
+        <div
+          v-else-if="item.type == 'textbox' && item._isCurrentLevel !== false"
+        >
+          <q-input
+            v-show="!item.hideOnDashboard"
+            class="q-mr-lg q-mt-xs"
+            style="max-width: 150px !important"
+            debounce="1000"
+            v-model="item.value"
+            :label="item.label || item.name"
+            dense
+            data-test="dashboard-variable-textbox-selector"
+            @update:model-value="onVariablesValueUpdated(index)"
+            borderless
+            hide-bottom-space
+          ></q-input>
+        </div>
+        <div
+          v-else-if="item.type == 'custom' && item._isCurrentLevel !== false"
+        >
+          <VariableCustomValueSelector
+            v-show="!item.hideOnDashboard"
+            class="q-mr-lg q-mt-xs"
+            v-model="item.value"
+            :variableItem="item"
+            @update:model-value="onVariablesValueUpdated(index)"
+          />
+        </div>
+        <div
+          v-else-if="
+            item.type == 'dynamic_filters' && item._isCurrentLevel !== false
+          "
+        >
+          <VariableAdHocValueSelector
+            class="q-mr-lg q-mt-xs"
+            v-model="item.value"
+            :variableItem="item"
+          />
+        </div>
       </div>
-      <div v-else-if="item.type == 'constant'">
-        <q-input
-          v-show="!item.hideOnDashboard"
-          class="q-mr-lg q-mt-xs"
-          style="max-width: 150px !important"
-          v-model="item.value"
-          :label="item.label || item.name"
-          dense
-          readonly
-          data-test="dashboard-variable-constant-selector"
-          @update:model-value="onVariablesValueUpdated(index)"
-          borderless
-          hide-bottom-space
-        ></q-input>
-      </div>
-      <div v-else-if="item.type == 'textbox'">
-        <q-input
-          v-show="!item.hideOnDashboard"
-          class="q-mr-lg q-mt-xs"
-          style="max-width: 150px !important"
-          debounce="1000"
-          v-model="item.value"
-          :label="item.label || item.name"
-          dense
-          data-test="dashboard-variable-textbox-selector"
-          @update:model-value="onVariablesValueUpdated(index)"
-          borderless
-          hide-bottom-space
-        ></q-input>
-      </div>
-      <div v-else-if="item.type == 'custom'">
-        <VariableCustomValueSelector
-          v-show="!item.hideOnDashboard"
-          class="q-mr-lg q-mt-xs"
-          v-model="item.value"
-          :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
-        />
-      </div>
-      <div v-else-if="item.type == 'dynamic_filters'">
-        <VariableAdHocValueSelector
-          class="q-mr-lg q-mt-xs"
-          v-model="item.value"
-          :variableItem="item"
-        />
-      </div>
+    </div>
+
+    <!-- Add Variable Button -->
+    <div v-if="showAddVariableButton" class="q-ml-xs q-mt-sm">
+      <q-btn
+        outline
+        no-caps
+        icon="add"
+        label="Add Variable"
+        color="primary"
+        size="md"
+        class="el-border"
+        @click="openAddVariable"
+        data-test="dashboard-add-variable-btn"
+      />
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import { defineComponent, reactive } from "vue";
-import streamService from "../../services/stream";
 import { useStore } from "vuex";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
@@ -111,8 +135,10 @@ export default defineComponent({
     "variablesConfig",
     "initialVariableValues",
     "showDynamicFilters",
+    "lazyLoad", // If true, don't auto-load on mount, wait for explicit trigger
+    "showAddVariableButton", // If true, show the "Add Variable" button
   ],
-  emits: ["variablesData"],
+  emits: ["variablesData", "openAddVariable"],
   components: {
     VariableQueryValueSelector,
     VariableAdHocValueSelector,
@@ -238,11 +264,11 @@ export default defineComponent({
     // currently executing promise
     const currentlyExecutingPromises: any = {};
 
-    // Flag to track initial load
-    // const isInitialLoad = ref(true);
-
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
     const variableFirstResponseProcessed = ref<{ [key: string]: boolean }>({});
+
+    // Flag to prevent cascade loops when processing parent variable changes
+    const isProcessingParentChange = ref(false);
 
     // ------------- Start HTTP2/Streaming Implementation -------------
     const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
@@ -279,7 +305,7 @@ export default defineComponent({
       }
     };
 
-    // onUnmounted want to cancel the values api call for all http2, and streaming
+    // onUnmounted - cancel all active streaming API calls
     onUnmounted(() => {
       // Cancel all active trace IDs for all variables
       Object.keys(traceIdMapper.value).forEach((field) => {
@@ -307,7 +333,7 @@ export default defineComponent({
           payload,
           {
             content: {
-              message: "WebSocket connection terminated unexpectedly",
+              message: "Streaming connection terminated unexpectedly",
               trace_id: payload.traceId,
               code: response.code,
               error_details: response.error_details,
@@ -326,22 +352,6 @@ export default defineComponent({
       variableObject.isVariableLoadingPending = false;
       resetVariableState(variableObject);
       removeTraceId(variableObject.name, request.traceId);
-    };
-
-    const handleSearchReset = (data: any) => {
-      const variableObject = variablesData.values.find(
-        (v: any) => v.query_data?.field === data.queryReq?.fields[0],
-      );
-
-      if (variableObject) {
-        variableObject.isLoading = true;
-        variableFirstResponseProcessed.value[variableObject.name] = false;
-
-        fetchFieldValuesWithWebsocket(
-          variableObject,
-          data.queryReq.query_context,
-        );
-      }
     };
 
     const handleSearchResponse = (
@@ -520,29 +530,6 @@ export default defineComponent({
                 variableObject.isVariablePartialLoaded = true;
               }
             }
-
-            // Check if value actually changed before loading child variables
-            // const hasValueChanged =
-            //   Array.isArray(originalValue) &&
-            //   Array.isArray(variableObject.value)
-            //     ? JSON.stringify(originalValue) !==
-            //       JSON.stringify(variableObject.value)
-            //     : originalValue !== variableObject.value;
-
-            // // Only load child variables if value actually changed
-            // if (hasValueChanged) {
-            //   const childVariables =
-            //     variablesDependencyGraph[variableObject.name]
-            //       ?.childVariables || [];
-            //   if (childVariables.length > 0) {
-            //     const childVariableObjects = variablesData.values.filter(
-            //       (variable: any) => childVariables.includes(variable.name),
-            //     );
-            //     childVariableObjects.forEach((childVariable: any) => {
-            //       loadSingleVariableDataByName(childVariable);
-            //     });
-            //   }
-            // }
           }
         }
       } catch (error) {
@@ -556,19 +543,7 @@ export default defineComponent({
       emitVariablesData();
     };
 
-    const initializeStreamingConnection = (
-      payload: any,
-      variableObject: any,
-    ): any => {
-      // Use HTTP2/streaming for all dashboard variable values
-      fetchQueryDataWithHttpStream(payload, {
-        data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
-        error: (p: any, r: any) => handleSearchError(p, r, variableObject),
-        complete: (p: any, r: any) => handleSearchClose(p, r, variableObject),
-        reset: handleSearchReset,
-      });
-    };
-    const fetchFieldValuesWithWebsocket = (
+    const fetchFieldValuesWithStreaming = (
       variableObject: any,
       queryContext: string,
     ) => {
@@ -580,7 +555,6 @@ export default defineComponent({
       const endTime = props.selectedTimeDate?.end_time?.getTime();
 
       if (!startTime || !endTime) {
-        // console.error("Invalid time range");
         return;
       }
 
@@ -589,7 +563,7 @@ export default defineComponent({
         return;
       }
 
-      // Set loading state before initiating WebSocket
+      // Set loading state before initiating streaming
       variableObject.isLoading = true;
       variableObject.isVariableLoadingPending = true;
 
@@ -618,16 +592,36 @@ export default defineComponent({
       };
       try {
         // Start new streaming connection
-        initializeStreamingConnection(wsPayload, variableObject);
+        fetchQueryDataWithHttpStream(wsPayload, {
+          data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
+          error: (p: any, r: any) => handleSearchError(p, r, variableObject),
+          complete: (p: any, r: any) => handleSearchClose(p, r, variableObject),
+          reset: handleSearchReset,
+        });
         addTraceId(variableObject.name, wsPayload.traceId);
       } catch (error) {
-        console.error("Streaming connection failed:", error);
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;
       }
     };
 
-    // ------------- End WebSocket Implementation -------------
+    const handleSearchReset = (data: any) => {
+      const variableObject = variablesData.values.find(
+        (v: any) => v.query_data?.field === data.queryReq?.fields[0],
+      );
+
+      if (variableObject) {
+        variableObject.isLoading = true;
+        variableFirstResponseProcessed.value[variableObject.name] = false;
+
+        fetchFieldValuesWithStreaming(
+          variableObject,
+          data.queryReq.query_context,
+        );
+      }
+    };
+
+    // ------------- End HTTP2/Streaming Implementation -------------
 
     // reset variables data
     // it will executed once on mount
@@ -644,6 +638,11 @@ export default defineComponent({
       if (!props?.variablesConfig) {
         return;
       }
+
+      variableLog(
+        "init",
+        `Initializing variables: total=${props.variablesConfig.list.length}, variables=${JSON.stringify(props.variablesConfig.list.map((v: any) => ({ name: v.name, _isCurrentLevel: v._isCurrentLevel })))}`,
+      );
 
       // make list of variables using variables config list
       // set initial variables values from props
@@ -765,6 +764,11 @@ export default defineComponent({
       variablesDependencyGraph = buildVariablesDependencyGraph(
         variablesData.values,
       );
+
+      variableLog(
+        "init",
+        `Variables initialized: total=${variablesData.values.length}, currentLevel=${variablesData.values.filter((v: any) => v._isCurrentLevel !== false).length}, parentOnly=${variablesData.values.filter((v: any) => v._isCurrentLevel === false).length}, dependencyGraph=${JSON.stringify(variablesDependencyGraph)}`,
+      );
     };
 
     const rejectAllPromises = () => {
@@ -779,6 +783,9 @@ export default defineComponent({
       });
     };
 
+    // Track if initial load has been done
+    const hasInitialLoadCompleted = ref(false);
+
     onMounted(() => {
       // make list of variables using variables config list
       initializeVariablesData();
@@ -786,11 +793,11 @@ export default defineComponent({
       // reject all promises
       rejectAllPromises();
 
-      // load all variables
-      loadAllVariablesData(true);
-
-      // Set initial load flag to false after first load
-      // isInitialLoad.value = false;
+      // load all variables only if not lazy loading
+      if (!props.lazyLoad) {
+        loadAllVariablesData(true);
+        hasInitialLoadCompleted.value = true;
+      }
     });
 
     onUnmounted(() => {
@@ -803,9 +810,24 @@ export default defineComponent({
 
     watch(
       () => props.variablesConfig,
-      async () => {
-        // Reset initial load flag when config changes
-        // isInitialLoad.value = true;
+      async (newConfig, oldConfig) => {
+        // Skip if this is the first watch trigger after mount (initial load already done)
+        if (!hasInitialLoadCompleted.value && !props.lazyLoad) {
+          return;
+        }
+
+        // Compare configs to see if they actually changed
+        const newConfigStr = JSON.stringify(
+          newConfig?.list?.map((v: any) => v.name) || [],
+        );
+        const oldConfigStr = JSON.stringify(
+          oldConfig?.list?.map((v: any) => v.name) || [],
+        );
+
+        if (newConfigStr === oldConfigStr) {
+          // Config hasn't really changed, skip reload
+          return;
+        }
 
         // make list of variables using variables config list
         initializeVariablesData();
@@ -813,25 +835,13 @@ export default defineComponent({
         // reject all promises
         rejectAllPromises();
         skipAPILoad.value = false;
-        // load all variables
-        loadAllVariablesData(true);
-
-        // Set initial load flag to false after load
-        // isInitialLoad.value = false;
+        // load all variables only if not lazy loading
+        if (!props.lazyLoad) {
+          loadAllVariablesData(true);
+        }
       },
     );
 
-    // you may need to query the data if the variable configs or the data/time changes
-    // watch(
-    //   () => props.selectedTimeDate,
-    //   () => {
-    //     // reject all promises
-    //     rejectAllPromises();
-
-    //     // loadAllVariablesData(false);
-    //     skipAPILoad.value = true;
-    //   },
-    // );
     watch(
       () =>
         JSON.stringify({
@@ -848,14 +858,120 @@ export default defineComponent({
       },
     );
 
+    // Watch for changes in initialVariableValues (from parent) and reload dependent variables
+    watch(
+      () => JSON.stringify(props.initialVariableValues?.value || {}),
+      async (newVal, oldVal) => {
+        if (!oldVal || oldVal === "{}") {
+          return; // Skip initial load
+        }
+        if (newVal === oldVal) return; // No changes
+
+        // Prevent re-entry while we're already processing a parent change
+        if (isProcessingParentChange.value) {
+          return;
+        }
+
+        // Compare old and new values to find what changed
+        const oldValues = oldVal ? JSON.parse(oldVal) : {};
+        const newValues = newVal ? JSON.parse(newVal) : {};
+        const changedVars: string[] = [];
+
+        Object.keys(newValues).forEach((varName) => {
+          if (
+            JSON.stringify(oldValues[varName]) !==
+            JSON.stringify(newValues[varName])
+          ) {
+            changedVars.push(varName);
+          }
+        });
+
+        if (changedVars.length === 0) {
+          return;
+        }
+
+        // Get list of local variable names (only current-level variables)
+        const localVarNames = variablesData.values
+          .filter((v: any) => v._isCurrentLevel === true)
+          .map((v: any) => v.name);
+
+        // Filter out changes that came from our own variables (to prevent self-triggering)
+        const externalChangedVars = changedVars.filter(
+          (varName) => !localVarNames.includes(varName),
+        );
+
+        if (externalChangedVars.length === 0) {
+          return;
+        }
+
+        // IMPORTANT: Update variablesData.values with new parent values BEFORE reloading
+        // This ensures child variables use the NEW parent values when they build queries
+        variablesData.values.forEach((v: any) => {
+          if (newValues[v.name] !== undefined) {
+            v.value = newValues[v.name];
+          }
+        });
+
+        // Also update oldVariablesData for change detection
+        Object.keys(newValues).forEach((varName) => {
+          oldVariablesData[varName] = newValues[varName];
+        });
+
+        // Check which variables depend on changed EXTERNAL parent variables
+        const affectedVariables = variablesData.values.filter((v: any) => {
+          // Only check current-level variables
+          if (v._isCurrentLevel !== true) return false;
+
+          const deps = variablesDependencyGraph[v.name]?.parentVariables || [];
+          return deps.some((dep: string) => externalChangedVars.includes(dep));
+        });
+
+        if (affectedVariables.length === 0) {
+          return;
+        }
+
+        // Set flag to prevent re-entry
+        isProcessingParentChange.value = true;
+
+        try {
+          // Sort variables by dependency order (independent first)
+          const sortedVariables = affectedVariables.sort((a: any, b: any) => {
+            const aDeps =
+              variablesDependencyGraph[a.name]?.parentVariables || [];
+            const bDeps =
+              variablesDependencyGraph[b.name]?.parentVariables || [];
+            // Variables with fewer dependencies load first
+            return aDeps.length - bDeps.length;
+          });
+
+          // Reload affected variables SEQUENTIALLY to prevent multiple simultaneous API calls
+          for (const variable of sortedVariables) {
+            variable.isVariableLoadingPending = true;
+            variable.isVariablePartialLoaded = false;
+            variable.isLoading = true;
+            variable.value = variable.multiSelect ? [] : null;
+            variable.options = [];
+
+            // Wait for this variable to complete before starting next
+            await loadSingleVariableDataByName(variable, false);
+          }
+        } finally {
+          // Always clear the flag when done
+          isProcessingParentChange.value = false;
+        }
+      },
+    );
+
     const emitVariablesData = () => {
-      emit("variablesData", {
+      const dataToEmit = {
         isVariablesLoading: variablesData.isVariablesLoading,
         values: variablesData.values.map((v: any) => ({
           ...v,
           options: undefined, // Don't emit options to prevent unnecessary updates
         })),
-      });
+      };
+
+      emit("variablesData", dataToEmit);
     };
 
     // it is used to change/update initial variables values from outside the component
@@ -933,24 +1049,6 @@ export default defineComponent({
       const isChildVariable =
         variablesDependencyGraph[currentVariable.name]?.parentVariables
           ?.length > 0;
-
-      // Check for URL values first
-      // const urlValue = props.initialVariableValues?.value[currentVariable.name];
-      // if (urlValue) {
-      //   // If URL value exists, use it
-      //   if (currentVariable.multiSelect) {
-      //     currentVariable.value = Array.isArray(urlValue)
-      //       ? urlValue
-      //       : [urlValue];
-      //   } else {
-      //     // For single select, if coming from multiSelect, take first value
-      //     currentVariable.value = Array.isArray(urlValue)
-      //       ? urlValue[0]
-      //       : urlValue;
-      //   }
-      //   currentVariable.isVariableLoadingPending = true;
-      //   return;
-      // }
 
       // Only apply custom values if no URL value exists
       if (
@@ -1073,29 +1171,6 @@ export default defineComponent({
     };
 
     /**
-     * Check if any of the dependent variables are loading
-     * @param {object} variableObject - the variable object
-     * @returns {boolean} - true if any of the dependent variables are loading, false otherwise
-     */
-    const isDependentVariableLoading = (variableObject: any) => {
-      const parentVariables =
-        variablesDependencyGraph[variableObject.name]?.parentVariables || [];
-
-      // If no parent variables, dependencies can't be loading
-      if (parentVariables.length === 0) return false;
-
-      // Check if any of the parent variables are loading or pending
-      return parentVariables.some((parentName: string) => {
-        const parentVariable = variablesData.values.find(
-          (v: any) => v.name === parentName,
-        );
-        return (
-          parentVariable?.isLoading || parentVariable?.isVariableLoadingPending
-        );
-      });
-    };
-
-    /**
      * Resets the state of the given variable.
      * @param {object} variableObject - The variable object to reset.
      */
@@ -1147,7 +1222,6 @@ export default defineComponent({
         const { name } = variableObject;
 
         if (!name || !variableObject) {
-          // console.error("Invalid variable object", variableObject);
           resolve(false);
           return;
         }
@@ -1322,7 +1396,7 @@ export default defineComponent({
       switch (variableObject.type) {
         case "query_values": {
           // for initial loading check if the value is already available,
-          // do not load the values
+          // if yes, just mark as loaded and trigger child loads but don't fetch again
           if (isInitialLoad && !searchText) {
             variableLog(
               variableObject.name,
@@ -1336,13 +1410,21 @@ export default defineComponent({
               (!Array.isArray(variableObject.value) ||
                 variableObject.value.length > 0)
             ) {
-              finalizePartialVariableLoading(
+              // IMPORTANT: Set partial loaded first to allow child variables to load
+              variableObject.isVariablePartialLoaded = true;
+              variableObject.isLoading = false;
+              variableObject.isVariableLoadingPending = false;
+
+              // Emit the data immediately so panels can receive the values
+              emitVariablesData();
+
+              // Then trigger child variable loading
+              await finalizePartialVariableLoading(
                 variableObject,
                 true,
                 isInitialLoad,
               );
-              finalizeVariableLoading(variableObject, true);
-              emitVariablesData();
+
               return true;
             }
           }
@@ -1355,7 +1437,7 @@ export default defineComponent({
 
             // Use HTTP2/streaming for all dashboard variable values
             // We don't need to wait for the response here as it will be handled by the streaming handlers
-            fetchFieldValuesWithWebsocket(variableObject, queryContext);
+            fetchFieldValuesWithStreaming(variableObject, queryContext);
             return true;
           } catch (error) {
             resetVariableState(variableObject);
@@ -1446,139 +1528,6 @@ export default defineComponent({
       return b64EncodeUnicode(queryContext);
     };
 
-    /**
-     * Extract REST API implementation to separate function.
-     * @param variableObject - The variable object containing query data.
-     * @param queryContext - The context for the query as a string.
-     * @returns The response from the stream service containing field values.
-     */
-    const fetchFieldValuesREST = async (
-      variableObject: any,
-      queryContext: string,
-    ) => {
-      const payload = {
-        org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
-        stream_name: variableObject.query_data.stream, // Name of the stream
-        start_time: new Date(
-          props.selectedTimeDate?.start_time?.toISOString(),
-        ).getTime(), // Start time in milliseconds
-        end_time: new Date(
-          props.selectedTimeDate?.end_time?.toISOString(),
-        ).getTime(), // End time in milliseconds
-        fields: [variableObject.query_data.field], // Fields to fetch
-        size: variableObject.query_data.max_record_size || 10, // Maximum number of records
-        type: variableObject.query_data.stream_type, // Type of the stream
-        query_context: queryContext, // Encoded query context
-        no_count: true, // Flag to omit count
-      };
-
-      // Fetch field values from the stream service
-      return await streamService.fieldValues(payload);
-    };
-
-    /**
-     * Updates the options for a variable based on the result of a query to fetch field values.
-     * @param variableObject - The variable object containing query data.
-     * @param hits - The result from the stream service containing field values.
-     */
-    const updateVariableOptions = (variableObject: any, hits: any[]) => {
-      const fieldHit = hits.find(
-        (field: any) => field.field === variableObject.query_data.field,
-      );
-
-      if (fieldHit) {
-        // Extract the values for the specified field from the result
-        const newOptions = fieldHit.values
-          .filter((value: any) => value.zo_sql_key || value.zo_sql_key === "")
-          .map((value: any) => ({
-            // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
-            label:
-              value.zo_sql_key !== "" ? value.zo_sql_key.toString() : "<blank>",
-            // Use the zo_sql_key as the value
-            value: value.zo_sql_key.toString(),
-          }));
-
-        // Efficiently add the selected value to options if not present
-        if (variableObject.multiSelect && Array.isArray(variableObject.value)) {
-          const val = variableObject.value[0];
-          if (
-            val !== undefined &&
-            val !== null &&
-            !newOptions.some((opt) => opt.value === val) &&
-            val !== SELECT_ALL_VALUE
-          ) {
-            newOptions.push({ label: val, value: val });
-          }
-        } else if (
-          !variableObject.multiSelect &&
-          variableObject.value !== null &&
-          variableObject.value !== undefined &&
-          !newOptions.some((opt) => opt.value === variableObject.value) &&
-          variableObject.value !== SELECT_ALL_VALUE
-        ) {
-          newOptions.push({
-            label: variableObject.value,
-            value: variableObject.value,
-          });
-        }
-
-        variableObject.options = newOptions;
-
-        // Set default value
-        if (oldVariablesData[variableObject.name] !== undefined) {
-          const oldValues = Array.isArray(oldVariablesData[variableObject.name])
-            ? oldVariablesData[variableObject.name]
-            : [oldVariablesData[variableObject.name]];
-
-          // Check if this is a child variable
-          const isChildVariable =
-            variablesDependencyGraph[variableObject.name]?.parentVariables
-              ?.length > 0;
-
-          if (isChildVariable) {
-            // For child variables, only keep old values that exist in new options
-            const validOldValues = oldValues.filter((value: string) =>
-              newOptions.some((opt: { value: string }) => opt.value === value),
-            );
-
-            if (validOldValues.length > 0) {
-              // If we have valid old values, use them
-              variableObject.value = variableObject.multiSelect
-                ? validOldValues
-                : validOldValues[0];
-            } else {
-              // If no valid old values, use first option
-              variableObject.value = variableObject.multiSelect
-                ? newOptions.length > 0
-                  ? [newOptions[0].value]
-                  : []
-                : newOptions.length > 0
-                  ? newOptions[0].value
-                  : null;
-            }
-          } else {
-            // For non-child variables, preserve old values as before
-            if (variableObject.type === "custom") {
-              handleCustomVariablesLogic(variableObject, oldValues);
-            } else {
-              handleQueryValuesLogic(variableObject, oldValues);
-            }
-          }
-        } else {
-          // Set default value to the first option if no old values are available
-          variableObject.value = variableObject.multiSelect
-            ? newOptions.length > 0
-              ? [newOptions[0].value]
-              : []
-            : newOptions.length > 0
-              ? newOptions[0].value
-              : null;
-        }
-      } else {
-        // Reset variable state if no field values are available
-        resetVariableState(variableObject);
-      }
-    };
 
     /**
      * Finalizes the variable loading process for a single variable.
@@ -1605,25 +1554,6 @@ export default defineComponent({
           (val: { isLoading: any; isVariableLoadingPending: any }) =>
             val.isLoading || val.isVariableLoadingPending,
         );
-
-        // Don't load child variables on dropdown open events
-        // Load child variables if any
-        // const childVariables =
-        //   variablesDependencyGraph[name]?.childVariables || [];
-        // if (childVariables.length > 0) {
-        //   const childVariableObjects = variablesData.values.filter(
-        //     (variable: any) => childVariables.includes(variable.name),
-        //   );
-
-        //   // Only load children if the parent value actually changed
-        //   if (oldVariablesData[name] !== variableObject.value) {
-        //     await Promise.all(
-        //       childVariableObjects.map((childVariable: any) =>
-        //         loadSingleVariableDataByName(childVariable),
-        //       ),
-        //     );
-        //   }
-        // }
 
         // Emit updated data
         emitVariablesData();
@@ -1655,9 +1585,6 @@ export default defineComponent({
 
         variableObject.isVariablePartialLoaded = success;
 
-        // Update old variables data
-        // oldVariablesData[name] = variableObject.value;
-
         // Don't load child variables on dropdown open events
         // Load child variables if any
         const childVariables =
@@ -1675,14 +1602,27 @@ export default defineComponent({
 
           variableLog(
             variableObject.name,
-            `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
+            `Loading ${childVariableObjects.length} child variables: ${childVariableObjects.map((v: any) => v.name).join(", ")}`,
           );
+          variableLog(
+            variableObject.name,
+            `Old Variables Data: ${JSON.stringify(oldVariablesData)}`,
+          );
+
+          // Load child variables that are at the current level (_isCurrentLevel === true)
           for (const childVariable of childVariableObjects) {
-            await loadSingleVariableDataByName(childVariable, false);
+            // Only load if child is at current level or level not specified
+            if (childVariable._isCurrentLevel !== false) {
+              variableLog(
+                variableObject.name,
+                `Loading child variable: ${childVariable.name}`,
+              );
+              await loadSingleVariableDataByName(childVariable, isInitialLoad);
+            }
           }
         }
       } catch (error) {
-        // console.error(`Error finalizing partial variable loading for ${variableObject.name}:`, error);
+        // Error handling: silently catch errors during partial loading finalization
       }
     };
 
@@ -1736,82 +1676,70 @@ export default defineComponent({
         return;
       }
 
-      // Set loading state for all variables
+      // Set loading state for current-level variables
+      // Variables with _isCurrentLevel === true or undefined should be loaded
       variablesData.values.forEach((variable: any) => {
-        variable.isVariableLoadingPending = true;
+        if (
+          variable._isCurrentLevel === true ||
+          variable._isCurrentLevel === undefined
+        ) {
+          variable.isVariableLoadingPending = true;
+        }
       });
 
-      // Find all independent variables (variables with no dependencies)
+      // Find independent variables to load (current-level with no dependencies)
       const independentVariables = variablesData.values.filter(
-        (variable: any) =>
-          !variablesDependencyGraph[variable.name]?.parentVariables?.length,
+        (variable: any) => {
+          const shouldLoad =
+            variable._isCurrentLevel === true ||
+            variable._isCurrentLevel === undefined;
+          const hasNoDeps =
+            !variablesDependencyGraph[variable.name]?.parentVariables?.length;
+          return shouldLoad && hasNoDeps;
+        },
       );
 
-      // console.groupCollapsed("Loading independent variables:");
-      // console.log(JSON.stringify(independentVariables, null, 2));
-      // console.groupEnd();
-
-      // Find all dependent variables (variables with dependencies)
+      // Find all dependent variables at CURRENT level (variables with dependencies)
       const dependentVariables = variablesData.values.filter(
-        (variable: any) =>
-          variablesDependencyGraph[variable.name]?.parentVariables?.length > 0,
+        (variable: any) => {
+          const shouldLoad =
+            variable._isCurrentLevel === true ||
+            variable._isCurrentLevel === undefined;
+          const hasDeps =
+            variablesDependencyGraph[variable.name]?.parentVariables?.length >
+            0;
+          return shouldLoad && hasDeps;
+        },
+      );
+
+      variableLog(
+        "loadAll",
+        `loadAllVariablesData: isInitialLoad=${isInitialLoad}, totalVariables=${variablesData.values.length}, independent=${JSON.stringify(independentVariables.map((v: any) => v.name))}, dependent=${JSON.stringify(dependentVariables.map((v: any) => ({ name: v.name, parents: variablesDependencyGraph[v.name]?.parentVariables || [] })))}, allVariables=${JSON.stringify(variablesData.values.map((v: any) => ({ name: v.name, _isCurrentLevel: v._isCurrentLevel })))}`,
       );
 
       try {
         // Load all independent variables
+        variableLog(
+          "loadAll",
+          `Loading independent variables: ${JSON.stringify(independentVariables.map((v: any) => v.name))}`,
+        );
         await Promise.all(
           independentVariables.map((variable: any) =>
             loadSingleVariableDataByName(variable, isInitialLoad),
           ),
         );
+        variableLog(
+          "loadAll",
+          "Independent variables loaded, child variables should load automatically",
+        );
       } catch (error) {
+        variableLog("loadAll", `Error loading independent variables: ${error}`);
         await Promise.all(
           independentVariables.map((variable: any) =>
             finalizeVariableLoading(variable, false),
           ),
         );
       }
-
-      // const loadDependentVariables = async () => {
-      //   for (const variable of dependentVariables) {
-      //     // Find all parent variables of the current variable
-      //     const parentVariables =
-      //       variablesDependencyGraph[variable.name].parentVariables;
-      //     // Check if all parent variables are loaded
-      //     const areParentsLoaded = parentVariables.every(
-      //       (parentName: string) => {
-      //         const parentVariable = variablesData.values.find(
-      //           (v: any) => v.name === parentName,
-      //         );
-      //         return (
-      //           parentVariable &&
-      //           !parentVariable.isLoading &&
-      //           !parentVariable.isVariableLoadingPending &&
-      //           parentVariable.value !== null
-      //         );
-      //       },
-      //     );
-
-      //     // If all parent variables are loaded, load the current variable
-      //     if (areParentsLoaded) {
-      //       await loadSingleVariableDataByName(variable);
-      //     }
-      //   }
-      // };
-
-      // // Attempt to load dependent variables up to 3 times
-      // for (let attempt = 0; attempt < 3; attempt++) {
-      //   await loadDependentVariables();
-
-      //   // Check if all variables are loaded
-      //   const allLoaded = variablesData.values.every(
-      //     (variable: any) =>
-      //       !variable.isLoading && !variable.isVariableLoadingPending,
-      //   );
-
-      //   // If all variables are loaded, break the loop
-      //   if (allLoaded) break;
-      // }
 
       isLoading = false;
     };
@@ -1911,6 +1839,17 @@ export default defineComponent({
       // Update the old variables data
       oldVariablesData[currentVariable.name] = currentVariable.value;
 
+      // IMPORTANT: For lazy-loaded variable levels (tab/panel), don't automatically cascade changes
+      // from user interactions. Initial value setting happens through finalizePartialVariableLoading,
+      // not through this function. This function (onVariablesValueUpdated) is ONLY called when user
+      // changes values through the UI. For lazy-loaded variables, we only emit the change for URL sync
+      // and warning display. Child variables will be reloaded when user clicks refresh.
+      if (props.lazyLoad) {
+        // Just emit the change without cascading to child variables
+        emitVariablesData();
+        return;
+      }
+
       // Get all affected variables recursively
       const getAllAffectedVariables = (
         varName: string,
@@ -1975,7 +1914,7 @@ export default defineComponent({
         currentlyExecutingPromises[variableName] = null;
       }
 
-      // 2. Cancel any ongoing WebSocket/Streaming operations
+      // 2. Cancel any ongoing streaming operations
       cancelTraceId(variableName);
 
       // 3. Reset loading states for the variable only if not in search mode
@@ -2008,6 +1947,13 @@ export default defineComponent({
       await loadSingleVariableDataByName(variableItem, false, filterText);
     };
 
+    /**
+     * Opens the Add Variable panel by emitting an event to the parent
+     */
+    const openAddVariable = () => {
+      emit("openAddVariable");
+    };
+
     return {
       props,
       variablesData,
@@ -2016,6 +1962,8 @@ export default defineComponent({
       loadVariableOptions,
       onVariableSearch,
       cancelAllVariableOperations,
+      loadAllVariablesData, // Expose for manual triggering when lazy loading
+      openAddVariable,
     };
   },
 });
