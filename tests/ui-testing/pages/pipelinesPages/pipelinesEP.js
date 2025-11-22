@@ -241,7 +241,40 @@ export class PipelinesEP {
         }
 
         await this.page.locator('[data-test="pipeline-import-destination-stream-type-input"]').click();
-        await this.page.getByRole('option', { name: remoteDestination }).click();
+
+        // Wait for dropdown to open
+        await this.page.waitForTimeout(1000);
+
+        // Wait for dropdown menu to be visible
+        const destinationDropdown = this.page.locator('.q-menu.scroll');
+        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Scroll through the virtual scroll dropdown to find the destination option
+        let destinationOptionVisible = false;
+        let destinationScrollAttempts = 0;
+        const maxDestinationScrollAttempts = 50;
+
+        while (!destinationOptionVisible && destinationScrollAttempts < maxDestinationScrollAttempts) {
+            // Check if option is visible
+            const destinationOption = this.page.getByRole('option', { name: remoteDestination });
+            destinationOptionVisible = await destinationOption.isVisible().catch(() => false);
+
+            if (!destinationOptionVisible) {
+                // Scroll down in the dropdown
+                await destinationDropdown.evaluate(menu => {
+                    menu.scrollTop += 200;
+                });
+                await this.page.waitForTimeout(100);
+                destinationScrollAttempts++;
+            } else {
+                await destinationOption.click();
+                break;
+            }
+        }
+
+        if (!destinationOptionVisible) {
+            throw new Error(`Could not find destination option: ${remoteDestination} after ${maxDestinationScrollAttempts} scroll attempts`);
+        }
 
     }
 

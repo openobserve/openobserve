@@ -44,6 +44,15 @@ export class LoginPage {
     await this.page.waitForLoadState('domcontentloaded');
     await this.page.waitForTimeout(1000);
 
+    // Check if login button is visible, if not click "Login as internal user" first
+    const isLoginButtonVisible = await this.loginButton.isVisible().catch(() => false);
+    if (!isLoginButtonVisible) {
+      if (await this.page.getByText('Login as internal user').isVisible()) {
+        await this.page.getByText('Login as internal user').click();
+        await this.page.waitForTimeout(1000);
+      }
+    }
+
     // Click with retry logic to handle DOM detachment
     for (let i = 0; i < 3; i++) {
       try {
