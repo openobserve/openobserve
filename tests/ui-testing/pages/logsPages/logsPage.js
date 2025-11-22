@@ -2550,6 +2550,116 @@ export class LogsPage {
         return false; // State was already correct
     }
 
+    async enableHistogram() {
+        return await this.ensureHistogramToggleState(true);
+    }
+
+    async disableHistogram() {
+        return await this.ensureHistogramToggleState(false);
+    }
+
+    async clickHistogramToggle() {
+        return await this.page.locator(this.histogramToggle).click();
+    }
+
+    async navigateToLogs() {
+        await this.page.locator(this.logsMenuItem).click();
+        return await this.page.waitForTimeout(1000);
+    }
+
+    async fillStreamFilter(streamName) {
+        return await this.page.locator(this.indexDropDown).fill(streamName);
+    }
+
+    async clickAllFields() {
+        return await this.page.locator('[data-test="logs-all-fields-btn"]').click();
+    }
+
+    async toggleQueryMode() {
+        return await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+    }
+
+    async applyQuery() {
+        return await this.page.locator(this.queryButton).click();
+    }
+
+    async navigateToHome() {
+        return await this.page.locator('[data-test="menu-link-\\/-item"]').click();
+    }
+
+    async toggleStreamSelection(streamName) {
+        return await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).nth(2).click();
+    }
+
+    async clickMonacoEditor() {
+        return await this.page.locator('#fnEditor').locator('.monaco-editor').click();
+    }
+
+    async fillMonacoEditor(text) {
+        return await this.page.locator('#fnEditor').locator('.inputarea').fill(text);
+    }
+
+    async clickTableExpandMenu() {
+        return await this.page.locator('[data-test="table-row-expand-menu"]').first().click({ force: true });
+    }
+
+    async clickDateTimeButton() {
+        return await this.page.locator(this.dateTimeButton).click();
+    }
+
+    async selectRelative6Hours() {
+        return await this.page.locator('[data-test="date-time-relative-6-h-btn"]').click();
+    }
+
+    async clickTimestampColumnMenu() {
+        return await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+    }
+
+    async navigateToStreams() {
+        return await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
+    }
+
+    async navigateToStreamsAlternate() {
+        return await this.page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
+    }
+
+    async searchStream(searchText) {
+        await this.page.getByPlaceholder("Search Stream").click();
+        return await this.page.getByPlaceholder("Search Stream").fill(searchText);
+    }
+
+    async clickExploreButton() {
+        return await this.page.getByRole("button", { name: "Explore" }).first().click({ force: true });
+    }
+
+    async fillIndexFieldSearch(text) {
+        return await this.page.locator('[data-cy="index-field-search-input"]').fill(text);
+    }
+
+    async clickInterestingFieldButton(fieldName) {
+        return await this.page.locator(`[data-test="log-search-index-list-interesting-${fieldName}-field-btn"]`).last().click({ force: true });
+    }
+
+    async toggleSqlMode() {
+        return await this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+    }
+
+    async clickSearchBarRefreshButton() {
+        return await this.page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content').click({ force: true });
+    }
+
+    async clickLogTableColumnSource() {
+        return await this.page.locator('[data-test="log-table-column-0-source"]').click({ force: true });
+    }
+
+    async getCellByName(name) {
+        return await this.page.getByRole('cell', { name });
+    }
+
+    async clickCellByName(name) {
+        return await this.page.getByRole('cell', { name }).click();
+    }
+
     async getQuickModeToggleAttributes() {
         const quickModeToggle = this.page.locator(this.quickModeToggle);
         const ariaPressed = await quickModeToggle.getAttribute('aria-pressed');
