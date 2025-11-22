@@ -907,6 +907,105 @@ class APICleanup {
     }
 
     /**
+     * Fetch all pipeline destinations
+     * @returns {Promise<Array>} Array of pipeline destination objects
+     */
+    async fetchPipelineDestinations() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations?page_num=1&page_size=100000&sort_by=name&desc=false&module=pipeline`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch pipeline destinations', { status: response.status });
+                return [];
+            }
+
+            const destinations = await response.json();
+            return destinations;
+        } catch (error) {
+            testLogger.error('Failed to fetch pipeline destinations', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a pipeline destination
+     * @param {string} name - Name of the destination to delete
+     * @returns {Promise<Object>} Delete result with code and message
+     */
+    async deletePipelineDestination(name) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${name}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+            return { code: response.status, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete pipeline destination', { name, error: error.message });
+            return { code: 500, message: error.message };
+        }
+    }
+
+    /**
+     * Clean up all pipeline destinations matching test patterns
+     * Deletes destinations starting with "destination" followed by 2-3 digits
+     */
+    async cleanupPipelineDestinations() {
+        testLogger.info('Starting pipeline destinations cleanup');
+
+        try {
+            // Fetch all pipeline destinations
+            const destinations = await this.fetchPipelineDestinations();
+            testLogger.info('Fetched pipeline destinations', { total: destinations.length });
+
+            // Filter destinations matching pattern: "destination" followed by 2-3 digits
+            const pattern = /^destination\d{2,3}$/;
+            const matchingDestinations = destinations.filter(d => pattern.test(d.name));
+            testLogger.info('Found pipeline destinations matching cleanup pattern', { count: matchingDestinations.length });
+
+            if (matchingDestinations.length === 0) {
+                testLogger.info('No pipeline destinations to clean up');
+                return;
+            }
+
+            // Delete each destination
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const destination of matchingDestinations) {
+                const result = await this.deletePipelineDestination(destination.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted pipeline destination', { name: destination.name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete pipeline destination', { name: destination.name, result });
+                }
+            }
+
+            testLogger.info('Pipeline destinations cleanup completed', {
+                total: matchingDestinations.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Pipeline destinations cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
      * Fetch all service accounts
      * @returns {Promise<Array>} Array of service account objects
      */
