@@ -16,7 +16,7 @@
 mod o2_tokenizer;
 mod remove_short;
 
-pub use o2_tokenizer::O2Tokenizer;
+pub use o2_tokenizer::{CollectType, O2Tokenizer};
 use tantivy::tokenizer::{SimpleTokenizer, TextAnalyzer, Token};
 
 use crate::{get_config, utils::tantivy::tokenizer::remove_short::RemoveShortFilter};
@@ -25,7 +25,7 @@ pub const O2_TOKENIZER: &str = "o2";
 const MIN_TOKEN_LENGTH: usize = 2;
 const MAX_TOKEN_LENGTH: usize = 64;
 
-pub fn o2_tokenizer_build() -> TextAnalyzer {
+pub fn o2_tokenizer_build(collect_type: CollectType) -> TextAnalyzer {
     let cfg = get_config();
     let min_token_length =
         std::cmp::max(cfg.limit.inverted_index_min_token_length, MIN_TOKEN_LENGTH);
@@ -40,7 +40,7 @@ pub fn o2_tokenizer_build() -> TextAnalyzer {
             .filter(tantivy::tokenizer::LowerCaser)
             .build()
     } else {
-        tantivy::tokenizer::TextAnalyzer::builder(O2Tokenizer::default())
+        tantivy::tokenizer::TextAnalyzer::builder(O2Tokenizer::new(collect_type))
             .filter(RemoveShortFilter::limit(min_token_length))
             .filter(tantivy::tokenizer::RemoveLongFilter::limit(
                 max_token_length,
@@ -50,9 +50,10 @@ pub fn o2_tokenizer_build() -> TextAnalyzer {
     }
 }
 
-pub fn o2_collect_tokens(text: &str) -> Vec<String> {
-    let mut a = o2_tokenizer_build();
+pub fn o2_collect_search_tokens(text: &str) -> Vec<String> {
+    let mut a = o2_tokenizer_build(CollectType::Search);
     let mut token_stream = a.token_stream(text);
+
     let mut tokens: Vec<String> = Vec::new();
     let mut add_token = |token: &Token| {
         tokens.push(token.text.to_lowercase());

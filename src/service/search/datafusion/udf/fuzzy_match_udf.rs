@@ -15,7 +15,7 @@
 
 use std::{iter::zip, sync::Arc};
 
-use config::utils::tantivy::tokenizer::o2_collect_tokens;
+use config::utils::tantivy::tokenizer::o2_collect_search_tokens;
 use datafusion::{
     arrow::{
         array::{ArrayRef, BooleanArray},
@@ -71,7 +71,7 @@ pub fn fuzzy_match_expr_impl() -> ScalarFunctionImplementation {
                     // Here we decide to make our UDF to return null when either haystack or needle
                     // is null.
                     (Some(haystack), Some(needle), Some(dis)) => Some({
-                        let terms = o2_collect_tokens(haystack);
+                        let terms = o2_collect_search_tokens(haystack);
                         terms
                             .iter()
                             .any(|term| levenshtein(term, needle) as i64 <= dis)
