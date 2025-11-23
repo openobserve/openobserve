@@ -628,6 +628,7 @@
     "title": "Volume Insights",
     "analyzeButton": "Volume Analysis",
     "analyzeTooltip": "Analyze trace volume patterns across dimensions",
+    "analyzeTooltipLogs": "Analyze dimension distribution for current time range",
     "rateLabel": "Rate:"
   },
   "confirmDialog": {

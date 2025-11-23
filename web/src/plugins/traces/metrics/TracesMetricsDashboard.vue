@@ -145,6 +145,7 @@ class="tw-mx-1 tw-text-red-500" />
     <TracesAnalysisDashboard
       v-if="showAnalysisDashboard"
       :streamName="streamName"
+      streamType="traces"
       :timeRange="timeRange"
       :durationFilter="analysisDurationFilter"
       :baseFilter="filter"
@@ -157,6 +158,7 @@ class="tw-mx-1 tw-text-red-500" />
     <TracesAnalysisDashboard
       v-if="showVolumeAnalysisDashboard"
       :streamName="streamName"
+      streamType="traces"
       :timeRange="timeRange"
       :rateFilter="analysisRateFilter"
       :baseFilter="filter"
@@ -225,8 +227,10 @@ const error = ref<string | null>(null);
 const dashboardChartsRef = ref<any>(null);
 const currentTimeObj = ref({
   __global: {
-    start_time: new Date(props.timeRange.startTime),
-    end_time: new Date(props.timeRange.endTime),
+    // Convert microseconds to milliseconds before creating Date objects
+    // usePanelDataLoader will convert back to microseconds for the API
+    start_time: new Date(props.timeRange.startTime / 1000),
+    end_time: new Date(props.timeRange.endTime / 1000),
   },
 });
 
@@ -244,8 +248,18 @@ const analysisRateFilter = ref({ start: 0, end: 0 });
 const rangeFiltersVersion = ref(0);
 
 // Stream fields for dimension selector
+// Priority: props > userDefinedSchema > selectedStreamFields
 const streamFields = computed(() => {
-  return props.streamFields || searchObj.data.stream.selectedStreamFields || [];
+  if (props.streamFields) {
+    return props.streamFields;
+  }
+
+  // Prefer user-defined schema if available
+  if (searchObj.data.stream.userDefinedSchema?.length > 0) {
+    return searchObj.data.stream.userDefinedSchema;
+  }
+
+  return searchObj.data.stream.selectedStreamFields || [];
 });
 
 // Use filters from searchObj
@@ -333,8 +347,10 @@ const loadDashboard = async () => {
 
     currentTimeObj.value = {
       __global: {
-        start_time: new Date(props.timeRange.startTime),
-        end_time: new Date(props.timeRange.endTime),
+        // Convert microseconds to milliseconds before creating Date objects
+        // usePanelDataLoader will convert back to microseconds for the API
+        start_time: new Date(props.timeRange.startTime / 1000),
+        end_time: new Date(props.timeRange.endTime / 1000),
       },
     };
     // Convert the dashboard schema and update stream names
