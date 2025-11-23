@@ -216,6 +216,7 @@ const useHttpStreaming = () => {
       if (clear_cache)
         url += `&clear_cache=${clear_cache}`;
       if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
+      if (queryReq.query?.sql.indexOf(' UNION ALL ') && type === "histogram") url += `&is_multi_stream_search=true`;
     } else if (type === "values") {
       const fieldsString = meta?.fields.join(",");
       url = `/_values_stream`;
