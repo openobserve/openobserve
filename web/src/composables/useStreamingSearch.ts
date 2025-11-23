@@ -216,6 +216,13 @@ const useHttpStreaming = () => {
       if (clear_cache)
         url += `&clear_cache=${clear_cache}`;
       if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
+
+      if(type === "histogram") {
+        let is_multi_stream_search = false;
+        if (queryReq.query?.sql.indexOf(' UNION ALL ') !== -1) is_multi_stream_search = true;
+        url += `&is_multi_stream_search=${is_multi_stream_search}`;
+      }
+
     } else if (type === "values") {
       const fieldsString = meta?.fields.join(",");
       url = `/_values_stream`;
