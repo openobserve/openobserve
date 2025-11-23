@@ -227,10 +227,19 @@ export class LogsPage {
     }
 
     async selectIndexAndStreamJoin() {
+        // Select both default and e2e_automate streams for join queries
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
         await this.page.waitForTimeout(3000);
+
+        // Select default stream
         await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
         await this.page.waitForTimeout(1000);
+
+        // Select e2e_automate stream (dropdown stays open after first selection)
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Close dropdown
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
     }
 
@@ -1772,6 +1781,29 @@ export class LogsPage {
 
     async expectPaginationNotVisible() {
         return await expect(this.page.locator(this.pagination)).not.toBeVisible();
+    }
+
+    async expectResultPaginationVisible() {
+        return await expect(this.page.locator(this.resultPagination)).toBeVisible();
+    }
+
+    async clickPaginationPage(pageNumber) {
+        return await this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first().click();
+    }
+
+    async getPaginationPageCount() {
+        const pageButtons = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: /^\d+$/ });
+        return await pageButtons.count();
+    }
+
+    async getPaginationPageClasses(pageNumber) {
+        const pageButton = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first();
+        return await pageButton.getAttribute('class');
+    }
+
+    async isPaginationPageActive(pageNumber) {
+        const classes = await this.getPaginationPageClasses(pageNumber);
+        return classes && (classes.includes('bg-primary') || classes.includes('unelevated'));
     }
 
     async expectSQLPaginationNotVisible() {

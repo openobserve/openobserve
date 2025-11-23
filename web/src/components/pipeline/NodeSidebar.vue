@@ -232,22 +232,22 @@ export default {
   }
 }
 
-.custom-tooltip-nodes {
-  background: rgba(30, 35, 40, 0.95) !important;
-  backdrop-filter: blur(10px);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 11px;
-  max-width: 180px;
-}
+// .custom-tooltip-nodes {
+//   background: rgba(30, 35, 40, 0.95) !important;
+//   backdrop-filter: blur(10px);
+//   border-radius: 6px;
+//   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+//   border: 1px solid rgba(255, 255, 255, 0.1);
+//   font-size: 11px;
+//   max-width: 180px;
+// }
 
 .tooltip-content {
   padding: 6px 10px;
 }
 
 .tooltip-title {
-  color: #ffffff;
+  // color: #ffffff;
   font-weight: 500;
   font-size: 11px;
   margin-bottom: 2px;
@@ -255,7 +255,7 @@ export default {
 }
 
 .tooltip-description {
-  color: rgba(255, 255, 255, 0.75);
+  // color: rgba(255, 255, 255, 0.75);
   font-size: 10px;
   line-height: 1.3;
   text-transform: capitalize;
