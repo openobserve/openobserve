@@ -138,6 +138,7 @@ import {
   type LatencyInsightsConfig,
 } from "@/composables/useLatencyInsightsAnalysis";
 import { useLatencyInsightsDashboard } from "@/composables/useLatencyInsightsDashboard";
+import { selectDimensionsFromData, selectTraceDimensions } from "@/composables/useDimensionSelector";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue")
@@ -163,9 +164,11 @@ interface Props {
   rateFilter?: RateFilter;
   timeRange: TimeRange;
   streamName: string;
+  streamType?: string; // logs or traces
   baseFilter?: string;
   analysisType?: "latency" | "volume"; // New prop to distinguish analysis type
   streamFields?: any[]; // Stream schema fields for smart dimension selection
+  logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -195,68 +198,35 @@ const baselineModeOptions = computed(() => [
 ]);
 
 /**
- * Smart dimension selection based on OpenTelemetry semantic conventions
- * Prioritizes low-cardinality, high-coverage attributes that exist in the schema
+ * Smart dimension selection
+ * - For logs: Uses sample-based analysis with schema metadata
+ * - For traces: Uses OpenTelemetry semantic conventions
  */
 const selectedDimensions = computed(() => {
-  const availableFields = new Set(
-    (props.streamFields || []).map((f: any) => f.name || f)
-  );
+  const streamType = props.streamType || "traces";
+  const schemaFields = (props.streamFields || []).map((f: any) => ({
+    name: f.name || f,
+    type: f.type,
+    isIndexed: f.isIndexed || false,
+    isFTS: f.ftsKey || false,
+    isInteresting: f.isInterestingField || false,
+  }));
 
-  // Priority-ordered list of good dimensions for trace analysis
-  // Excludes high-cardinality fields (user_id, trace_id, span_id, etc.)
-  const prioritizedDimensions = [
-    // Core OTel attributes (always useful, low cardinality)
-    "service_name",        // Primary grouping dimension
-    "span_kind",           // INTERNAL, CLIENT, SERVER, PRODUCER, CONSUMER
-    "span_status",         // OK, ERROR, UNSET
-    "operation_name",      // Operation/endpoint name
-    "span_name",           // Alternative to operation_name
-
-    // HTTP attributes (medium cardinality, HTTP-specific)
-    "http_method",         // GET, POST, PUT, DELETE, etc.
-    "http_status_code",    // 200, 404, 500, etc.
-    "http_route",          // /api/users/{id}, etc.
-    "http_target",         // Request target
-
-    // Database attributes (DB-specific)
-    "db_system",           // postgresql, mysql, mongodb, etc.
-    "db_operation",        // SELECT, INSERT, UPDATE, etc.
-    "db_name",             // Database name
-
-    // Messaging attributes (messaging-specific)
-    "messaging_system",    // kafka, rabbitmq, etc.
-    "messaging_operation", // publish, receive, etc.
-
-    // RPC attributes (RPC-specific)
-    "rpc_system",          // grpc, thrift, etc.
-    "rpc_service",         // Service name
-    "rpc_method",          // Method name
-
-    // Infrastructure
-    "host_name",           // Host identifier
-    "container_name",      // Container name
-    "k8s_pod_name",        // Kubernetes pod
-    "k8s_namespace_name",  // Kubernetes namespace
-  ];
-
-  // Filter to only dimensions that exist in the schema
-  const existingDimensions = prioritizedDimensions.filter((dim) =>
-    availableFields.has(dim)
-  );
-
-  // If schema info not available or no matches, use safe defaults
-  if (existingDimensions.length === 0) {
-    return [
-      "service_name",
-      "span_kind",
-      "span_status",
-      "operation_name",
-    ];
+  // For LOGS: Use sample-based analysis if we have log data
+  if (streamType === "logs" && props.logSamples && props.logSamples.length >= 10) {
+    console.log(`[Analysis] Using sample-based dimension selection for logs (${props.logSamples.length} samples)`);
+    return selectDimensionsFromData(props.logSamples, schemaFields, 8);
   }
 
-  // Return top 8 dimensions to keep dashboard manageable
-  return existingDimensions.slice(0, 8);
+  // For TRACES: Use OTel conventions
+  if (streamType === "traces") {
+    console.log("[Analysis] Using OTel-based dimension selection for traces");
+    return selectTraceDimensions(schemaFields, 8);
+  }
+
+  // Fallback for logs without samples
+  console.log("[Analysis] Using schema-based dimension selection (fallback)");
+  return selectDimensionsFromData([], schemaFields, 8);
 });
 
 const currentOrgIdentifier = computed(() => {
@@ -265,8 +235,10 @@ const currentOrgIdentifier = computed(() => {
 
 const currentTimeObj = computed(() => ({
   __global: {
-    start_time: new Date(baselineTimeRange.value.startTime),
-    end_time: new Date(baselineTimeRange.value.endTime),
+    // Create Date objects from microsecond timestamps
+    // The dashboard loader will convert these to microseconds for the API
+    start_time: new Date(baselineTimeRange.value.startTime / 1000),
+    end_time: new Date(baselineTimeRange.value.endTime / 1000),
   },
 }));
 
@@ -324,7 +296,7 @@ const loadAnalysis = async () => {
 
     const config: LatencyInsightsConfig = {
       streamName: props.streamName,
-      streamType: "traces",
+      streamType: props.streamType || "traces",
       orgIdentifier: currentOrgIdentifier.value,
       selectedTimeRange: props.timeRange,
       baselineTimeRange: baselineTimeRange.value,

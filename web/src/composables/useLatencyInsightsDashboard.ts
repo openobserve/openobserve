@@ -33,7 +33,7 @@ export function useLatencyInsightsDashboard() {
       : "";
     const isVolumeAnalysis = config.analysisType === "volume";
 
-    // Build baseline WHERE clause
+    // Build baseline WHERE clause (time filtering handled by dashboard global time range)
     const baselineWhere = baseFilters ? `WHERE ${baseFilters}` : "";
 
     // Build selected WHERE clause with appropriate filter

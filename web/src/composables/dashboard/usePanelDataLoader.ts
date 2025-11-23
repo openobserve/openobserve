@@ -181,8 +181,9 @@ export const usePanelDataLoader = (
       getCacheKey(),
       { ...toRaw(state) },
       {
-        start_time: selectedTimeObj?.value?.start_time?.getTime(),
-        end_time: selectedTimeObj?.value?.end_time?.getTime(),
+        // Convert to microseconds for consistency with OpenObserve timestamps
+        start_time: selectedTimeObj?.value?.start_time?.getTime() * 1000,
+        end_time: selectedTimeObj?.value?.end_time?.getTime() * 1000,
       },
     );
   };
@@ -828,10 +829,11 @@ export const usePanelDataLoader = (
         timestamps.start_time != "Invalid Date" &&
         timestamps.end_time != "Invalid Date"
       ) {
+        // Convert Date objects to milliseconds then to microseconds (OpenObserve expects microseconds)
         startISOTimestamp = new Date(
           timestamps.start_time.toISOString(),
-        ).getTime();
-        endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
+        ).getTime() * 1000;
+        endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime() * 1000;
       } else {
         return;
       }
