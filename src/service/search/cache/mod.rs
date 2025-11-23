@@ -836,7 +836,6 @@ pub async fn write_results(
     // 1. alignment time range for incomplete records for histogram
     let mut accept_start_time = req_query_start_time;
     let mut accept_end_time = req_query_end_time;
-    let mut need_adjust_end_time = false;
     if is_aggregate
         && let Some(interval) = res.histogram_interval
         && interval > 0
@@ -848,7 +847,6 @@ pub async fn write_results(
         }
         // previous interval of end_time
         if (accept_end_time % interval) != 0 {
-            need_adjust_end_time = true;
             accept_end_time = accept_end_time - (accept_end_time % interval) - interval;
         }
     }
@@ -860,9 +858,12 @@ pub async fn write_results(
     let (data_start_time, data_end_time) =
         extract_timestamp_range(&res.hits, ts_column, is_time_ordered);
     let delay_ts = second_micros(get_config().limit.cache_delay_secs);
-    let mut accept_end_time =
-        std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
-    if data_start_time < accept_start_time || data_end_time > accept_end_time {
+    let accept_end_time = std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
+
+    // Track if we need to recalculate timestamp range after filtering
+    let needs_filtering = data_start_time < accept_start_time || data_end_time > accept_end_time;
+
+    if needs_filtering {
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
                 && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
@@ -884,26 +885,27 @@ pub async fn write_results(
         return;
     }
 
+    // 3.5. Determine final time range for cache filename
+    // If we filtered data, recalculate; otherwise use the original data range
+    let (final_start_time, final_end_time) = if needs_filtering {
+        // Recalculate after filtering - only happens when data was actually filtered
+        extract_timestamp_range(&res.hits, ts_column, is_time_ordered)
+    } else {
+        // No filtering occurred, use the original data range
+        (data_start_time, data_end_time)
+    };
+
     // 4. check if the time range is less than discard_duration
-    if (accept_end_time - accept_start_time) < delay_ts {
+    if (final_end_time - final_start_time) < delay_ts {
         log::info!("[trace_id {trace_id}] Time range is too short for caching, skipping caching");
         return;
     }
 
-    // 5. adjust the cache time range
-    if need_adjust_end_time
-        && is_aggregate
-        && let Some(interval) = res.histogram_interval
-        && interval > 0
-    {
-        accept_end_time += interval * 1000 * 1000;
-    }
-
-    // 6. cache to disk
+    // 5. cache to disk
     let file_name = format!(
         "{}_{}_{}_{}.json",
-        accept_start_time,
-        accept_end_time,
+        final_start_time,
+        final_end_time,
         if is_aggregate { 1 } else { 0 },
         if is_descending { 1 } else { 0 }
     );
@@ -917,8 +919,8 @@ pub async fn write_results(
             &file_name,
             res_cache,
             clear_cache,
-            Some(accept_start_time),
-            Some(accept_end_time),
+            Some(final_start_time),
+            Some(final_end_time),
         )
         .await
         {
@@ -932,8 +934,8 @@ pub async fn write_results(
                         .entry(query_key)
                         .or_insert_with(Vec::new)
                         .push(ResultCacheMeta {
-                            start_time: accept_start_time,
-                            end_time: accept_end_time,
+                            start_time: final_start_time,
+                            end_time: final_end_time,
                             is_aggregate,
                             is_descending,
                         });
