@@ -46,6 +46,7 @@ use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
         alerts::ConditionExt,
+        filters::FilterExt,
         ingestion::{apply_vrl_fn, compile_vrl_function},
         self_reporting::publish_error,
     },
@@ -468,6 +469,7 @@ impl std::fmt::Display for ExecutableNode {
             NodeData::Query(_) => write!(f, "query"),
             NodeData::Function(_) => write!(f, "function"),
             NodeData::Condition(_) => write!(f, "condition"),
+            NodeData::Filter(_) => write!(f, "filter"),
             NodeData::RemoteStream(_) => write!(f, "remote_stream"),
         }
     }
@@ -671,6 +673,58 @@ async fn process_node(
                 }
             }
             log::debug!("[Pipeline]: cond node {node_idx} done processing {count} records");
+        }
+        NodeData::Filter(filter_params) => {
+            log::debug!("[Pipeline]: filter node {node_idx} starts processing");
+            while let Some(pipeline_item) = receiver.recv().await {
+                let PipelineItem {
+                    idx,
+                    mut record,
+                    mut flattened,
+                } = pipeline_item;
+                // value must be flattened before filter params can take effect
+                if !flattened && !record.is_null() && record.is_object() {
+                    record = match flatten::flatten_with_level(
+                        record,
+                        cfg.limit.ingest_flatten_level,
+                    ) {
+                        Ok(flattened) => flattened,
+                        Err(e) => {
+                            let err_msg = format!("FilterNode error with flattening: {e}");
+                            if let Err(send_err) = error_sender
+                                .send((node.id.to_string(), node.node_type(), err_msg, None))
+                                .await
+                            {
+                                log::error!(
+                                    "[Pipeline] {pipeline_name} : FilterNode failed sending errors for collection caused by: {send_err}"
+                                );
+                                break;
+                            }
+                            continue;
+                        }
+                    };
+                    flattened = true;
+                }
+                // only send to children when passing all filter evaluations
+                if filter_params
+                    .filter
+                    .evaluate(record.as_object().unwrap())
+                    .await
+                {
+                    send_to_children(
+                        &mut child_senders,
+                        PipelineItem {
+                            idx,
+                            record,
+                            flattened,
+                        },
+                        "FilterNode",
+                    )
+                    .await;
+                    count += 1;
+                }
+            }
+            log::debug!("[Pipeline]: filter node {node_idx} done processing {count} records");
         }
         NodeData::Function(func_params) => {
             log::debug!("[Pipeline]: func node {node_idx} starts processing");

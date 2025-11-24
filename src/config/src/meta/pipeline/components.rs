@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::meta::{
-    alerts::{ConditionList, QueryCondition, TriggerCondition},
+    alerts::{ConditionList, FilterGroup, QueryCondition, TriggerCondition},
     stream::{RemoteStreamParams, StreamParams, StreamType},
 };
 
@@ -152,6 +152,7 @@ pub enum NodeData {
     Query(DerivedStream),
     Function(FunctionParams),
     Condition(ConditionParams),
+    Filter(FilterParams),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -168,6 +169,11 @@ pub struct FunctionParams {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct ConditionParams {
     pub conditions: ConditionList,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+pub struct FilterParams {
+    pub filter: FilterGroup,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -324,5 +330,83 @@ mod tests {
 
         let or_node_data = json::from_value::<NodeData>(or_payload);
         assert!(or_node_data.is_ok());
+    }
+
+    #[test]
+    fn test_filter_node_serialization() {
+        // Test new Filter node format
+        let payload = json::json!({
+            "node_type": "filter",
+            "filter": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [
+                    {
+                        "filterType": "condition",
+                        "type": "condition",
+                        "column": "status",
+                        "operator": "=",
+                        "value": "error",
+                        "logicalOperator": "AND"
+                    },
+                    {
+                        "filterType": "condition",
+                        "type": "condition",
+                        "column": "level",
+                        "operator": "=",
+                        "value": "critical",
+                        "logicalOperator": "OR"
+                    }
+                ]
+            }
+        });
+
+        let node_data = json::from_value::<NodeData>(payload);
+        assert!(node_data.is_ok());
+
+        // Test with nested groups
+        let nested_payload = json::json!({
+            "node_type": "filter",
+            "filter": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [
+                    {
+                        "filterType": "condition",
+                        "type": "condition",
+                        "column": "status",
+                        "operator": "=",
+                        "value": "error",
+                        "logicalOperator": "AND"
+                    },
+                    {
+                        "filterType": "group",
+                        "logicalOperator": "OR",
+                        "conditions": [
+                            {
+                                "filterType": "condition",
+                                "type": "condition",
+                                "column": "service",
+                                "operator": "=",
+                                "value": "api",
+                                "logicalOperator": "OR"
+                            },
+                            {
+                                "filterType": "condition",
+                                "type": "condition",
+                                "column": "service",
+                                "operator": "=",
+                                "value": "web",
+                                "logicalOperator": "AND"
+                            }
+                        ],
+                        "logicalOperator": "AND"
+                    }
+                ]
+            }
+        });
+
+        let nested_node_data = json::from_value::<NodeData>(nested_payload);
+        assert!(nested_node_data.is_ok());
     }
 }
