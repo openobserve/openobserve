@@ -275,10 +275,10 @@ export const useSearchQuery = () => {
         setChartInterval(req);
       } else {
         if(timestamps.startTime == "Invalid Date") {
-          notificationMsg.value = "The selected start time is not valid. Please choose a different date and time."
+          notificationMsg.value = "The selected start time is  invalid. Please choose a valid time."
         }
         else if(timestamps.endTime == "Invalid Date") {
-          notificationMsg.value = "The selected end time is not valid. Please choose a different date and time."
+          notificationMsg.value = "The selected end time is  invalid. Please choose a valid time."
         }
         else {
           notificationMsg.value = "Invalid date format."
