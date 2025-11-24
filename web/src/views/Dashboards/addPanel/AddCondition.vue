@@ -385,24 +385,26 @@ export default defineComponent({
 }
 
 .condition-logical-operator {
-  width: 55px;
+  width: 60px;
 }
 
 :deep(.condition-logical-operator .q-field__control) {
-  min-height: 23px !important;
-  height: 23px !important;
+  min-height: 26px !important;
+  height: 26px !important;
   padding: 0px 0px 0px 5px !important;
+  vertical-align: middle !important;
+  margin-top: 4px; /* Nudge up slightly to align with buttons */
 }
 
 :deep(.condition-logical-operator .q-field__native) {
-  min-height: 23px !important;
-  height: 23px !important;
+  min-height: 26px !important;
+  height: 26px !important;
   padding: 0px 0px 0px 0px !important;
 }
 
 :deep(.condition-logical-operator .q-field__append) {
-  min-height: 23px !important;
-  height: 23px !important;
+  min-height: 26px !important;
+  height: 26px !important;
   padding: 0px 0px 0px 0px !important;
 }
 

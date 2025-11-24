@@ -223,26 +223,4 @@ export default defineComponent({
   width: 20px;
   margin-right: 5px;
 }
-
-.condition-logical-operator {
-  width: 55px;
-}
-
-:deep(.condition-logical-operator .q-field__control) {
-  min-height: 23px !important;
-  height: 23px !important;
-  padding: 0px 0px 0px 5px !important;
-}
-
-:deep(.condition-logical-operator .q-field__native) {
-  min-height: 23px !important;
-  height: 23px !important;
-  padding: 0px 0px 0px 0px !important;
-}
-
-:deep(.condition-logical-operator .q-field__append) {
-  min-height: 23px !important;
-  height: 23px !important;
-  padding: 0px 0px 0px 0px !important;
-}
 </style>
