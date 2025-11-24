@@ -2,6 +2,12 @@ import { test, expect } from "../baseFixtures.js";
 import PageManager from '../../pages/page-manager.js';
 import { waitUtils } from '../utils/wait-helpers.js';
 
+test.use({
+  contextOptions: {
+    slowMo: 1000
+  }
+});
+
 function reportName() {
     const characters = 'abcdefghijklmnopqrstuvwxyz';
     let TEST_REPORT_NAME = '';

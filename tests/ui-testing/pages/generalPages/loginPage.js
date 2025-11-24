@@ -17,20 +17,32 @@ export class LoginPage {
   }
 
   async loginAsInternalUser() {
+    // Wait for page to stabilize before checking for internal login button
+    await this.page.waitForLoadState('domcontentloaded');
 
-    if (await this.page.getByText('Login as internal user').isVisible()) {
+    const loginAsInternalLink = this.page.getByText('Login as internal user');
 
-       await this.page.getByText('Login as internal user').click();
-       await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/login", {
+    // Wait for the link with a reasonable timeout
+    try {
+      await loginAsInternalLink.waitFor({ state: 'visible', timeout: 10000 });
+      await loginAsInternalLink.click();
+      await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/login", {
         waitUntil: "networkidle",
-        });
-   
+      });
+
+      // Additional wait to ensure login form is fully rendered
+      await this.page.waitForLoadState('domcontentloaded');
+    } catch (error) {
+      // If "Login as internal user" link is not found, form might already be visible
+      console.log('Login as internal user link not found, form may already be visible');
     }
-  
-    
   }
 
   async login() {
+    // Wait for login form elements to be available
+    await this.userIdInput.waitFor({ state: 'visible', timeout: 15000 });
+    await this.passwordInput.waitFor({ state: 'visible', timeout: 15000 });
+
     await this.userIdInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
     await this.passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
 
