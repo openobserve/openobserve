@@ -24,6 +24,7 @@ use datafusion::{
         TableType,
         listing::{ListingTable, ListingTableConfig},
         physical_plan::{FileGroup, FileScanConfig},
+        schema_adapter::DefaultSchemaAdapterFactory,
     },
     execution::cache::cache_manager::FileStatisticsCache,
     logical_expr::TableProviderFilterPushDown,
@@ -53,7 +54,8 @@ impl ListingTableAdapter {
         index_condition: Option<IndexCondition>,
         fst_fields: Vec<String>,
     ) -> Result<Self> {
-        let listing_table = ListingTable::try_new(config)?;
+        let listing_table = ListingTable::try_new(config)?
+            .with_schema_adapter_factory(Arc::new(DefaultSchemaAdapterFactory));
         Ok(Self {
             listing_table,
             trace_id,
