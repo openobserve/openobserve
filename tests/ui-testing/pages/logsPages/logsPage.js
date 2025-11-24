@@ -2614,6 +2614,26 @@ export class LogsPage {
         return await this.page.locator('[data-test="date-time-relative-6-h-btn"]').click();
     }
 
+    async clickAbsoluteTimeTab() {
+        return await this.page.locator('[data-test="date-time-absolute-tab"]').click();
+    }
+
+    async fillStartDate(date) {
+        return await this.page.locator('[data-test="date-time-absolute-start-date"]').fill(date);
+    }
+
+    async fillEndDate(date) {
+        return await this.page.locator('[data-test="date-time-absolute-end-date"]').fill(date);
+    }
+
+    async clickApplyDateRange() {
+        return await this.page.locator('[data-test="date-time-btn-apply"]').click();
+    }
+
+    async searchFieldByName(fieldName) {
+        return await this.page.locator('[data-cy="index-field-search-input"]').fill(fieldName);
+    }
+
     async navigateToStreams() {
         return await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
     }

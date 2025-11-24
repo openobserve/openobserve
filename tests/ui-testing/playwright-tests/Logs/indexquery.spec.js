@@ -228,7 +228,9 @@ test.describe("Compare SQL query execution times", () => {
     }
   });
 
-  test("should validate custom date range picker functionality", async ({ page }) => {
+  test("should validate custom date range picker functionality", {
+    tag: ['@logs', '@datePicker', '@dateRange', '@smoke', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing custom date range picker functionality');
     
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
@@ -237,35 +239,45 @@ test.describe("Compare SQL query execution times", () => {
     // Open date time picker using POM
     await pm.logsPage.clickDateTimeButton();
     
-    // Select absolute time range option
-    await page.locator('[data-test="date-time-absolute-tab"]').click();
+    // Select absolute time range option using POM
+    await pm.logsPage.clickAbsoluteTimeTab();
     await page.waitForTimeout(500);
     
-    // Set custom date range (last 24 hours)
+    // Set custom date range (last 24 hours) using POM methods
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     
-    // Use date picker inputs 
+    // Use POM methods for date inputs
     const startDateInput = page.locator('[data-test="date-time-absolute-start-date"]');
-    const endDateInput = page.locator('[data-test="date-time-absolute-end-date"]');
     
     if (await startDateInput.isVisible()) {
-      await startDateInput.fill(yesterday.toISOString().split('T')[0]);
-      await endDateInput.fill(now.toISOString().split('T')[0]);
+      await pm.logsPage.fillStartDate(yesterday.toISOString().split('T')[0]);
+      await pm.logsPage.fillEndDate(now.toISOString().split('T')[0]);
       
-      // Apply the custom date range
-      await page.locator('[data-test="date-time-btn-apply"]').click();
+      // Apply the custom date range using POM
+      await pm.logsPage.clickApplyDateRange();
       await page.waitForTimeout(1000);
       
-      // Run query with custom date range
-      await pm.logsPage.clickRefreshButton();
+      // Run query with custom date range and assert API response
+      await applyQueryButton(pm);
+      
+      // Verify logs table is visible and contains data
       await expect(page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
+      const logRows = page.locator('[data-test="logs-search-result-logs-table"] tbody tr');
+      await expect(logRows).not.toHaveCount(0);
+      
+      // Verify that date range is actually applied by checking if date picker shows the selected range
+      await pm.logsPage.clickDateTimeButton();
+      const selectedDateRange = page.locator('[data-test="date-time-absolute-start-date"]');
+      await expect(selectedDateRange).toHaveValue(yesterday.toISOString().split('T')[0]);
     }
     
     testLogger.info('Custom date range picker test completed successfully');
   });
 
-  test("should validate field filtering and advanced search functionality", async ({ page }) => {
+  test("should validate field filtering and advanced search functionality", {
+    tag: ['@logs', '@fieldFilter', '@advancedSearch', '@sql', '@regression', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing field filtering and advanced search capabilities');
     
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
@@ -276,9 +288,8 @@ test.describe("Compare SQL query execution times", () => {
     await pm.logsPage.clickQuickModeToggle();
     await pm.logsPage.clickAllFieldsButton();
     
-    // Test field value filtering
-    const fieldFilter = page.locator('[data-cy="index-field-search-input"]');
-    await fieldFilter.fill("level");
+    // Test field value filtering using POM
+    await pm.logsPage.searchFieldByName("level");
     await page.waitForTimeout(1000);
     
     // Look for level field in the field list
@@ -299,23 +310,33 @@ test.describe("Compare SQL query execution times", () => {
     // Advanced query with AND conditions
     const advancedQuery = "SELECT * FROM 'e2e_automate' WHERE level='info' AND job='test' LIMIT 50";
     await pm.logsPage.fillQueryEditor(advancedQuery);
-    await pm.logsPage.clickRefreshButton();
     
-    // Verify advanced search results
+    // Apply query and assert API response
+    await applyQueryButton(pm);
+    
+    // Verify advanced search results are displayed
     await expect(page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
+    const logRows = page.locator('[data-test="logs-search-result-logs-table"] tbody tr');
+    await expect(logRows).not.toHaveCount(0);
+    
+    // Verify that the query was actually applied by checking the query editor contains our query
+    const queryText = await pm.logsPage.getQueryEditorText();
+    await expect(queryText.replace(/\s/g, "")).toContain(advancedQuery.replace(/\s/g, ""));
     
     testLogger.info('Field filtering and advanced search test completed successfully');
   });
 
-  test("should display logs table and basic functionality", async ({ page }) => {
+  test("should display logs table and basic functionality", {
+    tag: ['@logs', '@logsTable', '@basicUI', '@smoke', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing basic logs display and table functionality');
     
     // Navigate to logs page and select stream
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
     await pm.logsPage.selectStream("e2e_automate");
     
-    // Apply query to load logs
-    await pm.logsPage.clickRefreshButton();
+    // Apply query to load logs and assert API response
+    await applyQueryButton(pm);
     
     // Verify logs table is visible
     await expect(page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
@@ -330,6 +351,9 @@ test.describe("Compare SQL query execution times", () => {
     
     // Verify that we can see log data in the table
     await expect(page.locator('[data-test="logs-search-result-logs-table"] tbody')).toContainText(/\w+/);
+    
+    // Verify that the table has expected columns
+    await expect(page.locator('[data-test="logs-search-result-logs-table"] thead')).toBeVisible();
     
     testLogger.info('Basic logs display test completed successfully');
   });
