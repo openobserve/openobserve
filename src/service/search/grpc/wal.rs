@@ -218,7 +218,6 @@ pub async fn search_parquet(
         .file_stat_cache(file_stat_cache.clone())
         .index_condition(index_condition.clone())
         .fst_fields(fst_fields.clone())
-        .need_optimize_partition(true)
         .build(
             session,
             &files,

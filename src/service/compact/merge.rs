@@ -838,7 +838,6 @@ pub async fn merge_files(
 
     let table = match TableBuilder::new()
         .sorted_by_time(true)
-        .need_optimize_partition(is_match_downsampling_rule)
         .build(session, &files, latest_schema.clone())
         .await
     {

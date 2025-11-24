@@ -627,7 +627,6 @@ pub async fn register_table(
     table_name: &str,
     files: &[FileKey],
     sort_key: &[(String, bool)],
-    need_optimize_partition: bool,
 ) -> Result<SessionContext> {
     // only sort by timestamp desc
     let sorted_by_time =
@@ -643,7 +642,6 @@ pub async fn register_table(
     let table = TableBuilder::new()
         .sorted_by_time(sorted_by_time)
         .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
-        .need_optimize_partition(need_optimize_partition)
         .build(session.clone(), files, schema)
         .await?;
     ctx.register_table(table_name, table)?;
@@ -657,7 +655,6 @@ pub struct TableBuilder {
     file_stat_cache: Option<FileStatisticsCache>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
-    need_optimize_partition: bool,
 }
 
 impl TableBuilder {
@@ -667,7 +664,6 @@ impl TableBuilder {
             file_stat_cache: None,
             index_condition: None,
             fst_fields: vec![],
-            need_optimize_partition: false,
         }
     }
 
@@ -688,11 +684,6 @@ impl TableBuilder {
 
     pub fn fst_fields(mut self, fst_fields: Vec<String>) -> Self {
         self.fst_fields = fst_fields;
-        self
-    }
-
-    pub fn need_optimize_partition(mut self, need_optimize_partition: bool) -> Self {
-        self.need_optimize_partition = need_optimize_partition;
         self
     }
 
@@ -1137,18 +1128,15 @@ mod tests {
         assert!(builder.file_stat_cache.is_none());
         assert!(builder.index_condition.is_none());
         assert!(builder.fst_fields.is_empty());
-        assert!(!builder.need_optimize_partition);
     }
 
     #[test]
     fn test_table_builder_with_options() {
         let builder = TableBuilder::new()
             .sorted_by_time(true)
-            .need_optimize_partition(true)
             .fst_fields(vec!["field1".to_string()]);
 
         assert!(builder.sorted_by_time);
-        assert!(builder.need_optimize_partition);
         assert_eq!(builder.fst_fields, vec!["field1".to_string()]);
     }
 
@@ -1272,8 +1260,7 @@ mod tests {
             }];
             let sort_key = vec![(TIMESTAMP_COL_NAME.to_string(), true)];
 
-            let result =
-                register_table(&session, schema, "test_table", &files, &sort_key, false).await;
+            let result = register_table(&session, schema, "test_table", &files, &sort_key).await;
 
             // Should create context successfully
             assert!(result.is_ok());
@@ -1312,9 +1299,7 @@ mod tests {
                 segment_ids: None,
             }];
 
-            let builder = TableBuilder::new()
-                .sorted_by_time(true)
-                .need_optimize_partition(false);
+            let builder = TableBuilder::new().sorted_by_time(true);
 
             let result = builder.build(session, &files, schema).await;
             assert!(result.is_ok());
