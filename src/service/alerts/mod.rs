@@ -21,7 +21,7 @@ use config::{
     TIMESTAMP_COL_NAME, ider,
     meta::{
         alerts::{
-            AggFunction, Condition, ConditionList, Operator, QueryCondition, QueryType,
+            AggFunction, AlertConditionParams, Condition, ConditionList, Operator, QueryCondition, QueryType,
             TriggerCondition, TriggerEvalResults,
         },
         cluster::RoleGroup,
@@ -722,12 +722,56 @@ impl ConditionExt for Condition {
     }
 }
 
+// Trait implementations for AlertConditionParams to support both v1 and v2
+#[async_trait]
+impl ConditionExt for AlertConditionParams {
+    async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+        match self {
+            AlertConditionParams::V1(conditions) => conditions.evaluate(row).await,
+            AlertConditionParams::V2(conditions) => {
+                use crate::service::filters::ConditionGroupExt;
+                conditions.evaluate(row).await
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl ConditionListExt for AlertConditionParams {
+    async fn len(&self) -> u32 {
+        match self {
+            AlertConditionParams::V1(conditions) => conditions.len().await,
+            AlertConditionParams::V2(conditions) => conditions.conditions.len() as u32,
+        }
+    }
+
+    async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error> {
+        match self {
+            AlertConditionParams::V1(conditions) => conditions.to_sql(schema).await,
+            AlertConditionParams::V2(_conditions) => {
+                // V2 format (ConditionGroup) doesn't have to_sql support yet
+                // For now, return an error or implement basic support
+                Err(anyhow::anyhow!(
+                    "SQL generation for v2 condition format not yet supported in alerts"
+                ))
+            }
+        }
+    }
+
+    async fn is_empty(&self) -> bool {
+        match self {
+            AlertConditionParams::V1(conditions) => conditions.is_empty().await,
+            AlertConditionParams::V2(conditions) => conditions.conditions.is_empty(),
+        }
+    }
+}
+
 async fn build_sql(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     query_condition: &QueryCondition,
-    conditions: &ConditionList,
+    conditions: &AlertConditionParams,
 ) -> Result<String, anyhow::Error> {
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let where_sql = if conditions.len().await == 0 {

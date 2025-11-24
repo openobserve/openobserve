@@ -13,38 +13,38 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Filter evaluation module for pipeline conditions
+//! Condition evaluation module for pipeline conditions (v2 format)
 //!
-//! This module provides evaluation logic for the FilterGroup system, which offers
-//! a linear alternative to the tree-based ConditionList for expressing mixed boolean
+//! This module provides evaluation logic for the ConditionGroup system (v2), which offers
+//! a linear alternative to the tree-based ConditionList (v1) for expressing mixed boolean
 //! operations with natural left-to-right ordering.
 
 use async_trait::async_trait;
 use config::{
-    meta::alerts::{FilterGroup, FilterItem, LogicalOperator, Operator},
+    meta::alerts::{ConditionGroup, ConditionItem, LogicalOperator, Operator},
     utils::json::{Map, Value},
 };
 
 #[async_trait]
-pub trait FilterExt: Sync + Send + 'static {
+pub trait ConditionGroupExt: Sync + Send + 'static {
     async fn evaluate(&self, row: &Map<String, Value>) -> bool;
 }
 
 #[async_trait]
-impl FilterExt for FilterGroup {
-    /// Evaluates the filter group against a record
-    /// Returns true if the record passes all filter conditions
+impl ConditionGroupExt for ConditionGroup {
+    /// Evaluates the condition group against a record
+    /// Returns true if the record passes all condition evaluations
     async fn evaluate(&self, row: &Map<String, Value>) -> bool {
-        evaluate_filter_items(&self.conditions, row).await
+        evaluate_condition_items(&self.conditions, row).await
     }
 }
 
 #[async_trait]
-impl FilterExt for FilterItem {
-    /// Evaluates a single filter item against a record
+impl ConditionGroupExt for ConditionItem {
+    /// Evaluates a single condition item against a record
     async fn evaluate(&self, row: &Map<String, Value>) -> bool {
         match self {
-            FilterItem::Condition {
+            ConditionItem::Condition {
                 column,
                 operator,
                 value,
@@ -60,12 +60,14 @@ impl FilterExt for FilterItem {
                 )
                 .await
             }
-            FilterItem::Group { conditions, .. } => evaluate_filter_items(conditions, row).await,
+            ConditionItem::Group { conditions, .. } => {
+                evaluate_condition_items(conditions, row).await
+            }
         }
     }
 }
 
-/// Evaluates a list of filter items with left-to-right logical operator application
+/// Evaluates a list of condition items with left-to-right logical operator application
 ///
 /// Algorithm:
 /// 1. Start with the first item's evaluation result
@@ -78,7 +80,7 @@ impl FilterExt for FilterItem {
 /// - result = eval(A)
 /// - result = result AND eval(B)  // Apply A's operator
 /// - result = result OR eval(C)   // Apply B's operator
-async fn evaluate_filter_items(items: &[FilterItem], row: &Map<String, Value>) -> bool {
+async fn evaluate_condition_items(items: &[ConditionItem], row: &Map<String, Value>) -> bool {
     if items.is_empty() {
         return true;
     }
@@ -221,7 +223,7 @@ mod tests {
             ]
         });
 
-        let filter: FilterGroup = serde_json::from_value(filter_json).unwrap();
+        let filter: ConditionGroup = serde_json::from_value(filter_json).unwrap();
 
         // Both conditions match
         let row = json!({
@@ -264,7 +266,7 @@ mod tests {
             ]
         });
 
-        let filter: FilterGroup = serde_json::from_value(filter_json).unwrap();
+        let filter: ConditionGroup = serde_json::from_value(filter_json).unwrap();
 
         // First condition matches
         let row = json!({
@@ -319,7 +321,7 @@ mod tests {
             ]
         });
 
-        let filter: FilterGroup = serde_json::from_value(filter_json).unwrap();
+        let filter: ConditionGroup = serde_json::from_value(filter_json).unwrap();
 
         // (A AND B) matches
         let row = json!({
@@ -387,7 +389,7 @@ mod tests {
             ]
         });
 
-        let filter: FilterGroup = serde_json::from_value(filter_json).unwrap();
+        let filter: ConditionGroup = serde_json::from_value(filter_json).unwrap();
 
         // A and B match
         let row = json!({
@@ -428,7 +430,7 @@ mod tests {
             ]
         });
 
-        let filter: FilterGroup = serde_json::from_value(filter_json).unwrap();
+        let filter: ConditionGroup = serde_json::from_value(filter_json).unwrap();
 
         let row = json!({
             "count": 15
@@ -458,7 +460,7 @@ mod tests {
             ]
         });
 
-        let filter: FilterGroup = serde_json::from_value(filter_json).unwrap();
+        let filter: ConditionGroup = serde_json::from_value(filter_json).unwrap();
 
         let row = json!({
             "message": "This is an error message"
@@ -489,7 +491,7 @@ mod tests {
             ]
         });
 
-        let filter: FilterGroup = serde_json::from_value(filter_json).unwrap();
+        let filter: ConditionGroup = serde_json::from_value(filter_json).unwrap();
 
         let row = json!({
             "status": "error"
@@ -519,7 +521,7 @@ mod tests {
             ]
         });
 
-        let filter: FilterGroup = serde_json::from_value(filter_json).unwrap();
+        let filter: ConditionGroup = serde_json::from_value(filter_json).unwrap();
 
         let row = json!({
             "status": "error"
@@ -535,7 +537,7 @@ mod tests {
             "conditions": []
         });
 
-        let filter: FilterGroup = serde_json::from_value(filter_json).unwrap();
+        let filter: ConditionGroup = serde_json::from_value(filter_json).unwrap();
 
         let row = json!({
             "status": "error"

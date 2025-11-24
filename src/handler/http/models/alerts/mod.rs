@@ -353,7 +353,11 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
     fn from(value: meta_alerts::QueryCondition) -> Self {
         Self {
             query_type: value.query_type.into(),
-            conditions: value.conditions,
+            // Unwrap AlertConditionParams to ConditionList for API compatibility
+            conditions: value.conditions.and_then(|c| match c {
+                meta_alerts::AlertConditionParams::V1(cond_list) => Some(cond_list),
+                meta_alerts::AlertConditionParams::V2(_) => None, // V2 not supported in API yet
+            }),
             sql: value.sql,
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
@@ -531,7 +535,8 @@ impl From<QueryCondition> for meta_alerts::QueryCondition {
     fn from(value: QueryCondition) -> Self {
         Self {
             query_type: value.query_type.into(),
-            conditions: value.conditions,
+            // Wrap ConditionList in AlertConditionParams::V1
+            conditions: value.conditions.map(meta_alerts::AlertConditionParams::V1),
             sql: value.sql,
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
