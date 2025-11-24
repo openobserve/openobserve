@@ -821,6 +821,11 @@ class APICleanup {
             return true;
         }
 
+        // Pattern 4: sdr_* (SDR test streams)
+        if (streamName.startsWith('sdr_')) {
+            return true;
+        }
+
         // Pattern 4: Random 8-9 char lowercase strings
         // First check if it matches the basic pattern
         if (!/^[a-z]{8,9}$/.test(streamName)) {
@@ -1100,6 +1105,120 @@ class APICleanup {
 
         } catch (error) {
             testLogger.error('Users cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Clean up regex patterns that match test data
+     * Deletes patterns whose names appear in test data files:
+     * - tests/test-data/regex_patterns_import.json
+     * - tests/test-data/sdr_test_data.json
+     */
+    async cleanupRegexPatterns() {
+        testLogger.info('Starting regex patterns cleanup');
+
+        try {
+            // Fetch all regex patterns
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            // Handle 404 or other errors gracefully (feature may not be available in OSS)
+            if (!response.ok) {
+                if (response.status === 404) {
+                    testLogger.info('Regex patterns endpoint not available (OSS edition or feature not enabled)');
+                } else {
+                    testLogger.warn('Failed to fetch regex patterns', { status: response.status });
+                }
+                return;
+            }
+
+            const data = await response.json();
+            const patterns = data.patterns || [];
+            testLogger.info('Fetched regex patterns', { total: patterns.length });
+
+            if (patterns.length === 0) {
+                testLogger.info('No regex patterns found');
+                return;
+            }
+
+            // Load test data pattern names
+            const regexPatternsImport = require('../../test-data/regex_patterns_import.json');
+            const sdrTestData = require('../../test-data/sdr_test_data.json');
+
+            // Collect all pattern names from test data
+            const testPatternNames = new Set();
+
+            // From regex_patterns_import.json
+            regexPatternsImport.forEach(pattern => {
+                testPatternNames.add(pattern.name);
+            });
+
+            // From sdr_test_data.json
+            if (sdrTestData.regexPatterns) {
+                sdrTestData.regexPatterns.forEach(pattern => {
+                    testPatternNames.add(pattern.name);
+                });
+            }
+
+            testLogger.info('Loaded test pattern names', { count: testPatternNames.size });
+
+            // Filter patterns that match test data names
+            const matchingPatterns = patterns.filter(pattern => testPatternNames.has(pattern.name));
+            testLogger.info('Found patterns matching test data', { count: matchingPatterns.length });
+
+            if (matchingPatterns.length === 0) {
+                testLogger.info('No regex patterns to clean up');
+                return;
+            }
+
+            // Delete each matching pattern
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const pattern of matchingPatterns) {
+                try {
+                    const deleteResponse = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${pattern.id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': this.authHeader,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (deleteResponse.ok) {
+                        deletedCount++;
+                        testLogger.debug('Deleted regex pattern', { name: pattern.name, id: pattern.id });
+                    } else {
+                        failedCount++;
+                        testLogger.warn('Failed to delete regex pattern', {
+                            name: pattern.name,
+                            id: pattern.id,
+                            status: deleteResponse.status
+                        });
+                    }
+                } catch (error) {
+                    failedCount++;
+                    testLogger.error('Error deleting regex pattern', {
+                        name: pattern.name,
+                        id: pattern.id,
+                        error: error.message
+                    });
+                }
+            }
+
+            testLogger.info('Regex patterns cleanup completed', {
+                total: matchingPatterns.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Regex patterns cleanup failed', { error: error.message });
         }
     }
 

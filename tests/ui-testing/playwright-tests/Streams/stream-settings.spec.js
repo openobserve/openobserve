@@ -45,6 +45,25 @@ test.describe("Stream Index Type Configuration Tests", () => {
         await pageManager.streamsPage.expectValidationErrorVisible();
     });
 
+    test("should select and delete extended retention period date", {
+        tag: ['@streams', '@extendedRetention', '@dateSelection', '@all']
+    }, async () => {
+        await pageManager.streamsPage.searchStream("e2e_automate");
+        await pageManager.streamsPage.expectStreamExistsExact("e2e_automate");
+        
+        // Navigate to extended retention settings using POM
+        await pageManager.streamsPage.navigateToExtendedRetention();
+        
+        // Select date range for current month using POM
+        const dateRangeText = await pageManager.streamsPage.selectDateRangeForCurrentMonth();
+        
+        // Delete the retention period using POM
+        await pageManager.streamsPage.deleteRetentionPeriod(dateRangeText);
+        
+        // Verify success message using POM
+        await pageManager.streamsPage.expectStreamSettingsUpdatedMessage();
+    });
+
     test.afterAll(async ({ page }) => {
         // Refresh page after all tests complete
         await page.reload();
