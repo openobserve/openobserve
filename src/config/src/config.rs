@@ -2559,6 +2559,19 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
+    // Print MySQL deprecation warning (logger not initialized yet at this stage)
+    if cfg.common.meta_store.starts_with("mysql") {
+        eprintln!("╔════════════════════════════════════════════════════════════════════════════╗");
+        eprintln!(
+            "║                              ⚠️  WARNING  ⚠️                                 ║"
+        );
+        eprintln!("║                                                                            ║");
+        eprintln!("║  MySQL support is DEPRECATED and will be removed in future.                ║");
+        eprintln!("║  Please migrate to PostgreSQL.                                             ║");
+        eprintln!("║                                                                            ║");
+        eprintln!("╚════════════════════════════════════════════════════════════════════════════╝");
+    }
+
     // If the default scrape interval is less than 5s, raise an error
     if cfg.common.default_scrape_interval < 5 {
         return Err(anyhow::anyhow!(
