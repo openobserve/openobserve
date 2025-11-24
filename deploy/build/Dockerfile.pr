@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM public.ecr.aws/debian/debian:trixie-20241016-slim AS runtime
+FROM public.ecr.aws/debian/debian:trixie-slim AS runtime
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libatk1.0-0 libnss3 libglib2.0-0 ca-certificates curl \
     htop iftop nload iptraf ncdu tcpdump sysstat procps lsof net-tools sqlite3 && \
