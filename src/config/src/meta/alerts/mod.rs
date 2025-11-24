@@ -341,7 +341,7 @@ pub struct QueryCondition {
     #[serde(rename = "type")]
     pub query_type: QueryType,
     #[schema(value_type = Option<Object>)]
-    pub conditions: Option<ConditionList>,
+    pub conditions: Option<AlertConditionParams>,
     pub sql: Option<String>,
     pub promql: Option<String>,              // (cpu usage / cpu total)
     pub promql_condition: Option<Condition>, // value >= 80
@@ -634,8 +634,8 @@ impl std::fmt::Display for Operator {
     }
 }
 
-// Filter system for pipeline conditions with linear evaluation
-// This provides an alternative to the tree-based ConditionList for expressing
+// Condition system v2 for pipeline conditions with linear evaluation
+// This provides an alternative to the tree-based ConditionList (v1) for expressing
 // mixed boolean operations with natural left-to-right ordering
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
@@ -647,7 +647,7 @@ pub enum LogicalOperator {
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
 #[serde(tag = "filterType", rename_all = "lowercase")]
-pub enum FilterItem {
+pub enum ConditionItem {
     Condition {
         #[serde(rename = "type")]
         type_field: String, // Always "condition"
@@ -663,18 +663,18 @@ pub enum FilterItem {
     Group {
         #[serde(rename = "logicalOperator")]
         logical_operator: LogicalOperator,
-        conditions: Vec<FilterItem>,
+        conditions: Vec<ConditionItem>,
     },
 }
 
-impl FilterItem {
-    /// Get the logical operator for this filter item
+impl ConditionItem {
+    /// Get the logical operator for this condition item
     pub fn logical_operator(&self) -> &LogicalOperator {
         match self {
-            FilterItem::Condition {
+            ConditionItem::Condition {
                 logical_operator, ..
             } => logical_operator,
-            FilterItem::Group {
+            ConditionItem::Group {
                 logical_operator, ..
             } => logical_operator,
         }
@@ -683,20 +683,20 @@ impl FilterItem {
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct FilterGroup {
+pub struct ConditionGroup {
     pub filter_type: String, // Always "group"
     #[serde(rename = "logicalOperator")]
     pub logical_operator: LogicalOperator,
-    pub conditions: Vec<FilterItem>,
+    pub conditions: Vec<ConditionItem>,
 }
 
-impl FilterGroup {
-    /// Checks if the filter group has conditions
+impl ConditionGroup {
+    /// Checks if the condition group has conditions
     pub fn has_conditions(&self) -> bool {
         self.conditions.len() > 1
     }
 
-    /// Validates the filter group structure
+    /// Validates the condition group structure
     pub fn validate(&self) -> Result<(), String> {
         if self.filter_type != "group" {
             return Err(format!(
@@ -705,9 +705,82 @@ impl FilterGroup {
             ));
         }
         if !self.has_conditions() {
-            return Err("FilterGroup must have at least two conditions".to_string());
+            return Err("ConditionGroup must have at least two conditions".to_string());
         }
         Ok(())
+    }
+}
+
+/// Versioned condition parameters for alerts
+/// Supports both v1 (tree-based ConditionList) and v2 (linear ConditionGroup)
+#[derive(Clone, Debug, PartialEq, ToSchema)]
+pub enum AlertConditionParams {
+    /// v1 format: Tree-based ConditionList (default when no version field)
+    V1(ConditionList),
+    /// v2 format: Linear ConditionGroup (version: 2)
+    V2(ConditionGroup),
+}
+
+impl<'de> Deserialize<'de> for AlertConditionParams {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        use serde_json::Value;
+
+        let value = Value::deserialize(deserializer)?;
+
+        // Get version field, default to 1 if not present
+        let version = value
+            .get("version")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(1);
+
+        match version {
+            1 => {
+                let conditions: ConditionList = serde_json::from_value(value)
+                    .map_err(|e| D::Error::custom(format!("Failed to parse V1 conditions: {}", e)))?;
+                Ok(AlertConditionParams::V1(conditions))
+            }
+            2 => {
+                // Get conditions field
+                let conditions_value = value
+                    .get("conditions")
+                    .ok_or_else(|| D::Error::custom("conditions field missing for v2"))?;
+
+                let conditions: ConditionGroup = serde_json::from_value(conditions_value.clone())
+                    .map_err(|e| D::Error::custom(format!("Failed to parse V2 conditions: {}", e)))?;
+                Ok(AlertConditionParams::V2(conditions))
+            }
+            _ => Err(D::Error::custom(format!(
+                "Unsupported version: {}",
+                version
+            ))),
+        }
+    }
+}
+
+impl Serialize for AlertConditionParams {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        match self {
+            AlertConditionParams::V1(conditions) => {
+                // V1: Serialize directly as ConditionList (no version field)
+                conditions.serialize(serializer)
+            }
+            AlertConditionParams::V2(conditions) => {
+                // V2: Include version field
+                let mut state = serializer.serialize_struct("AlertConditionParams", 2)?;
+                state.serialize_field("version", &2)?;
+                state.serialize_field("conditions", conditions)?;
+                state.end()
+            }
+        }
     }
 }
 
@@ -1468,9 +1541,9 @@ mod test {
     }
 
     #[test]
-    fn test_filter_group_serialization() {
-        // Test simple FilterGroup serialization
-        let filter_json = r#"{
+    fn test_condition_group_serialization() {
+        // Test simple ConditionGroup serialization
+        let condition_json = r#"{
             "filterType": "group",
             "logicalOperator": "AND",
             "conditions": [
@@ -1493,20 +1566,20 @@ mod test {
             ]
         }"#;
 
-        let filter: FilterGroup = serde_json::from_str(filter_json).unwrap();
-        assert_eq!(filter.filter_type, "group");
-        assert_eq!(filter.logical_operator, LogicalOperator::And);
-        assert_eq!(filter.conditions.len(), 2);
+        let condition_group: ConditionGroup = serde_json::from_str(condition_json).unwrap();
+        assert_eq!(condition_group.filter_type, "group");
+        assert_eq!(condition_group.logical_operator, LogicalOperator::And);
+        assert_eq!(condition_group.conditions.len(), 2);
 
         // Test serialization back to JSON
-        let serialized = serde_json::to_value(&filter).unwrap();
+        let serialized = serde_json::to_value(&condition_group).unwrap();
         assert_eq!(serialized["filterType"], "group");
         assert_eq!(serialized["logicalOperator"], "AND");
     }
 
     #[test]
-    fn test_filter_group_with_nested_groups() {
-        let filter_json = r#"{
+    fn test_condition_group_with_nested_groups() {
+        let condition_json = r#"{
             "filterType": "group",
             "logicalOperator": "AND",
             "conditions": [
@@ -1544,11 +1617,11 @@ mod test {
             ]
         }"#;
 
-        let filter: FilterGroup = serde_json::from_str(filter_json).unwrap();
-        assert_eq!(filter.conditions.len(), 2);
+        let condition_group: ConditionGroup = serde_json::from_str(condition_json).unwrap();
+        assert_eq!(condition_group.conditions.len(), 2);
 
         // Check nested group
-        if let FilterItem::Group { conditions, .. } = &filter.conditions[1] {
+        if let ConditionItem::Group { conditions, .. } = &condition_group.conditions[1] {
             assert_eq!(conditions.len(), 2);
         } else {
             panic!("Expected nested group");
@@ -1556,8 +1629,8 @@ mod test {
     }
 
     #[test]
-    fn test_filter_item_logical_operator() {
-        let condition_item = FilterItem::Condition {
+    fn test_condition_item_logical_operator() {
+        let condition_item = ConditionItem::Condition {
             type_field: "condition".to_string(),
             column: "status".to_string(),
             operator: Operator::EqualTo,
@@ -1568,7 +1641,7 @@ mod test {
 
         assert_eq!(*condition_item.logical_operator(), LogicalOperator::And);
 
-        let group_item = FilterItem::Group {
+        let group_item = ConditionItem::Group {
             logical_operator: LogicalOperator::Or,
             conditions: vec![],
         };
@@ -1577,44 +1650,64 @@ mod test {
     }
 
     #[test]
-    fn test_filter_group_validation() {
-        // Valid filter group
-        let filter = FilterGroup {
+    fn test_condition_group_validation() {
+        // Valid condition group (needs at least 2 conditions)
+        let condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
-            conditions: vec![FilterItem::Condition {
-                type_field: "condition".to_string(),
-                column: "status".to_string(),
-                operator: Operator::EqualTo,
-                value: Value::String("error".to_string()),
-                ignore_case: None,
-                logical_operator: LogicalOperator::And,
-            }],
+            conditions: vec![
+                ConditionItem::Condition {
+                    type_field: "condition".to_string(),
+                    column: "status".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("error".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And,
+                },
+                ConditionItem::Condition {
+                    type_field: "condition".to_string(),
+                    column: "level".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("critical".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And,
+                },
+            ],
         };
-        assert!(filter.validate().is_ok());
+        assert!(condition_group.validate().is_ok());
 
         // Invalid filter type
-        let invalid_filter = FilterGroup {
+        let invalid_condition_group = ConditionGroup {
             filter_type: "invalid".to_string(),
             logical_operator: LogicalOperator::And,
-            conditions: vec![FilterItem::Condition {
-                type_field: "condition".to_string(),
-                column: "status".to_string(),
-                operator: Operator::EqualTo,
-                value: Value::String("error".to_string()),
-                ignore_case: None,
-                logical_operator: LogicalOperator::And,
-            }],
+            conditions: vec![
+                ConditionItem::Condition {
+                    type_field: "condition".to_string(),
+                    column: "status".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("error".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And,
+                },
+                ConditionItem::Condition {
+                    type_field: "condition".to_string(),
+                    column: "level".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("critical".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And,
+                },
+            ],
         };
-        assert!(invalid_filter.validate().is_err());
+        assert!(invalid_condition_group.validate().is_err());
 
-        // Empty conditions
-        let empty_filter = FilterGroup {
+        // Empty conditions (should fail - needs at least 2)
+        let empty_condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
             conditions: vec![],
         };
-        assert!(empty_filter.validate().is_err());
+        assert!(empty_condition_group.validate().is_err());
     }
 
     #[test]

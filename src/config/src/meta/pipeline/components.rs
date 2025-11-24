@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::meta::{
-    alerts::{ConditionList, FilterGroup, QueryCondition, TriggerCondition},
+    alerts::{ConditionGroup, ConditionList, QueryCondition, TriggerCondition},
     stream::{RemoteStreamParams, StreamParams, StreamType},
 };
 
@@ -152,7 +152,6 @@ pub enum NodeData {
     Query(DerivedStream),
     Function(FunctionParams),
     Condition(ConditionParams),
-    Filter(FilterParams),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -166,14 +165,75 @@ pub struct FunctionParams {
     pub num_args: u8,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
-pub struct ConditionParams {
-    pub conditions: ConditionList,
+#[derive(Debug, Clone, PartialEq, ToSchema)]
+pub enum ConditionParams {
+    /// v1 format: Tree-based ConditionList (default when no version field)
+    V1 { conditions: ConditionList },
+    /// v2 format: Linear ConditionGroup (version: 2)
+    V2 { conditions: ConditionGroup },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
-pub struct FilterParams {
-    pub filter: FilterGroup,
+// Custom deserializer to handle missing version field (defaults to V1 for backward compatibility)
+impl<'de> Deserialize<'de> for ConditionParams {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        use serde_json::Value;
+
+        let mut value = Value::deserialize(deserializer)?;
+
+        // If version field is missing, default to "1" for backward compatibility
+        if value.get("version").is_none()
+            && let Value::Object(ref mut map) = value {
+                map.insert("version".to_string(), Value::from(1));
+            }
+
+        // Now use the standard internally-tagged deserialization
+        #[derive(Deserialize)]
+        #[serde(tag = "version")]
+        enum ConditionParamsHelper {
+            #[serde(rename = "1")]
+            V1 { conditions: ConditionList },
+            #[serde(rename = "2")]
+            V2 { conditions: ConditionGroup },
+        }
+
+        let helper: ConditionParamsHelper = serde_json::from_value(value)
+            .map_err(|e| D::Error::custom(format!("Failed to parse ConditionParams: {}", e)))?;
+
+        Ok(match helper {
+            ConditionParamsHelper::V1 { conditions } => ConditionParams::V1 { conditions },
+            ConditionParamsHelper::V2 { conditions } => ConditionParams::V2 { conditions },
+        })
+    }
+}
+
+// Custom serializer to omit version field for V1 (backward compatibility)
+impl Serialize for ConditionParams {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        match self {
+            ConditionParams::V1 { conditions } => {
+                // V1: Omit version field for backward compatibility
+                let mut state = serializer.serialize_struct("ConditionParams", 1)?;
+                state.serialize_field("conditions", conditions)?;
+                state.end()
+            }
+            ConditionParams::V2 { conditions } => {
+                // V2: Include version field
+                let mut state = serializer.serialize_struct("ConditionParams", 2)?;
+                state.serialize_field("version", "2")?;
+                state.serialize_field("conditions", conditions)?;
+                state.end()
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -333,11 +393,12 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_node_serialization() {
-        // Test new Filter node format
+    fn test_condition_node_v2_serialization() {
+        // Test v2 condition format with version field
         let payload = json::json!({
-            "node_type": "filter",
-            "filter": {
+            "node_type": "condition",
+            "version": 2,
+            "conditions": {
                 "filterType": "group",
                 "logicalOperator": "AND",
                 "conditions": [
@@ -364,10 +425,19 @@ mod tests {
         let node_data = json::from_value::<NodeData>(payload);
         assert!(node_data.is_ok());
 
+        // Verify it's V2
+        if let Ok(NodeData::Condition(params)) = node_data {
+            assert!(matches!(params, ConditionParams::V2 { .. }));
+        }
+    }
+
+    #[test]
+    fn test_condition_node_v2_nested_groups() {
         // Test with nested groups
         let nested_payload = json::json!({
-            "node_type": "filter",
-            "filter": {
+            "node_type": "condition",
+            "version": 2,
+            "conditions": {
                 "filterType": "group",
                 "logicalOperator": "AND",
                 "conditions": [
