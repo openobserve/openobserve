@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
-FROM public.ecr.aws/docker/library/node:18.20.4-bookworm AS webBuilder
+FROM public.ecr.aws/docker/library/node:24-trixie AS webBuilder
 WORKDIR /web
 COPY ./web /web/
 
 RUN npm install
 RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
-FROM public.ecr.aws/zinclabs/rust:bookworm-sccache AS builder
+FROM public.ecr.aws/zinclabs/rust:trixie-sccache AS builder
 ARG AWS_DEFAULT_REGION
 ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 
@@ -27,8 +27,7 @@ RUN --mount=type=cache,target=/root/.cache/sccache RUSTFLAGS="--cfg tokio_unstab
   && sccache --show-stats
 RUN mv /openobserve/target/x86_64-unknown-linux-gnu/release-profiling/openobserve /openobserve/target/release/openobserve
 
-# FROM gcr.io/distroless/cc as runtime
-FROM public.ecr.aws/debian/debian:bookworm-slim AS runtime
+FROM public.ecr.aws/debian/debian:trixie-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools sqlite3
 RUN update-ca-certificates

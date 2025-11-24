@@ -1,5 +1,4 @@
-# FROM mcr.microsoft.com/devcontainers/base:bookworm
-FROM public.ecr.aws/docker/library/rust:buster
+FROM public.ecr.aws/docker/library/rust:trixie
 
 RUN apt-get update
 RUN apt-get install -y protobuf-compiler
