@@ -29,12 +29,23 @@ pub async fn get_org_usage(
     let (sql, start_time, end_time) =
         org_usage::create_usage_query_sql_and_time_range(org_id, usage_range);
 
-    let query_result = get_usage(sql, start_time, end_time)
+    let mut usage_results = get_usage(sql, start_time, end_time)
         .await
         .map_err(|e| billings::BillingError::PartialUsageResults(e.to_string()))?
         .into_iter()
         .filter_map(|hit| json::from_value::<OrgUsageQueryResult>(hit).ok())
         .collect::<Vec<_>>();
 
-    Ok(query_result)
+    let (data_retention_query, ..) =
+        org_usage::create_data_retention_usage_sql_and_time_range(org_id, usage_range);
+
+    let mut data_retention_results = get_usage(data_retention_query, start_time, end_time)
+        .await
+        .map_err(|e| billings::BillingError::PartialUsageResults(e.to_string()))?
+        .into_iter()
+        .filter_map(|hit| json::from_value::<OrgUsageQueryResult>(hit).ok())
+        .collect::<Vec<_>>();
+
+    usage_results.append(&mut data_retention_results);
+    Ok(usage_results)
 }

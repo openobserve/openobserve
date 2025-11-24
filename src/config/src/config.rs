@@ -1686,6 +1686,8 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_MODE", default = "deleted")]
     // "history" "deleted" "none"
     pub file_list_deleted_mode: String,
+    #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_BATCH_SIZE", default = 1000)]
+    pub file_list_deleted_batch_size: usize,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 0,
@@ -1708,6 +1710,12 @@ pub struct Compact {
     pub pending_jobs_metric_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_GROUP_FILES", default = 10000)]
     pub max_group_files: usize,
+    #[env_config(
+        name = "ZO_COMPACT_RETENTION_ALLOWED_HOURS",
+        default = "",
+        help = "Comma-separated list of hours (0-23) when retention can run. Empty means run at all hours. Example: 5,6,8"
+    )]
+    pub retention_allowed_hours: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]

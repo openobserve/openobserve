@@ -1257,7 +1257,7 @@ class="q-pr-sm q-pt-xs" />
         round
         color="primary"
         @click="isFocused = !isFocused"
-        class="tw-absolute tw-top-[3.1rem] tw-right-[1.2rem] tw-z-50"
+        class="tw-absolute tw-top-[3.3rem] tw-right-[1.2rem] tw-z-50"
       >
       <Maximize size='0.8rem' v-if="!isFocused" />
       <Minimize size="0.8rem" v-else />
@@ -1907,6 +1907,7 @@ export default defineComponent({
       updateUrlQueryParams,
       generateURLQuery,
       isActionsEnabled,
+      checkTimestampAlias,
     } = logsUtils();
     const {
       getSavedViews,
@@ -3965,6 +3966,14 @@ export default defineComponent({
         ) {
           showErrorNotification(
             "Multiple SQL queries are not allowed to visualize",
+          );
+          return;
+        }
+
+        // validate that timestamp column is not used as an alias
+        if (!checkTimestampAlias(logsPageQuery)) {
+          showErrorNotification(
+            `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
           );
           return;
         }

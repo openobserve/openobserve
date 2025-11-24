@@ -162,7 +162,7 @@ describe("ActionScripts", () => {
     it("should display add button", () => {
       const addBtn = wrapper.find('[data-test="action-list-add-btn"]');
       expect(addBtn.exists()).toBe(true);
-      expect(addBtn.text()).toContain("Add");
+      expect(addBtn.text()).toContain("New");
     });
 
     it("should handle search input changes", async () => {
