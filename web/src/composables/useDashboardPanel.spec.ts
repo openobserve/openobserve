@@ -274,7 +274,7 @@ describe("useDashboardPanel", () => {
       const initialLength =
         panel.dashboardPanelData.data.queries[0].fields.x.length;
 
-      panel.removeXAxisItem("timestamp");
+      panel.removeXAxisItemByIndex(0);
 
       expect(
         panel.dashboardPanelData.data.queries[0].fields.x.length,
@@ -286,7 +286,7 @@ describe("useDashboardPanel", () => {
       const initialLength =
         panel.dashboardPanelData.data.queries[0].fields.y.length;
 
-      panel.removeYAxisItem("count");
+      panel.removeYAxisItemByIndex(0);
 
       expect(
         panel.dashboardPanelData.data.queries[0].fields.y.length,
@@ -570,11 +570,11 @@ describe("useDashboardPanel", () => {
 
     it("should handle invalid input gracefully", () => {
       expect(() => {
-        panel.removeXAxisItem("nonexistent");
+        panel.removeXAxisItemByIndex(999); // Non-existent index
       }).not.toThrow();
 
       expect(() => {
-        panel.removeYAxisItem("nonexistent");
+        panel.removeYAxisItemByIndex(999); // Non-existent index
       }).not.toThrow();
     });
 
@@ -1077,9 +1077,9 @@ describe("useDashboardPanel", () => {
       ).toBeGreaterThan(0);
 
       // Remove fields
-      panel.removeXAxisItem("timestamp");
-      panel.removeYAxisItem("count");
-      panel.removeBreakdownItem("level");
+      panel.removeXAxisItemByIndex(0);
+      panel.removeYAxisItemByIndex(0);
+      panel.removeBreakdownItemByIndex(0);
     });
 
     it("should handle query operations", () => {
@@ -1174,12 +1174,12 @@ describe("useDashboardPanel", () => {
       // Verify z-axis field was added
       if (panel.dashboardPanelData.data.queries[0].fields.z.length > 0) {
         expect(
-          panel.dashboardPanelData.data.queries[0].fields.z[0].column,
+          panel.dashboardPanelData.data.queries[0].fields.z[0].args[0].value.field,
         ).toBe("count");
       }
 
       // Remove z-axis field
-      panel.removeZAxisItem("count");
+      panel.removeZAxisItemByIndex(0);
     });
 
     it("should handle different query types and custom queries", () => {
@@ -1593,7 +1593,7 @@ describe("useDashboardPanel", () => {
           panel.dashboardPanelData.data.queries[0].fields.y[0].column ||
           panel.dashboardPanelData.data.queries[0].fields.y[0].name;
         if (fieldName) {
-          panel.removeYAxisItem(fieldName);
+          panel.removeYAxisItemByIndex(0);
           // Just verify the function executed without throwing
           expect(
             panel.dashboardPanelData.data.queries[0].fields.y.length,
@@ -1807,7 +1807,7 @@ describe("useDashboardPanel", () => {
       if (panel.dashboardPanelData.data.queries[0].fields.y.length > 0) {
         const fieldCount =
           panel.dashboardPanelData.data.queries[0].fields.y.length;
-        panel.removeYAxisItem("test_field_count");
+        panel.removeYAxisItemByIndex(0);
         // Field count should remain valid
         expect(
           panel.dashboardPanelData.data.queries[0].fields.y.length,
@@ -2618,7 +2618,7 @@ describe("useDashboardPanel", () => {
         // Should have timestamp field added
         const timestampField =
           panel.dashboardPanelData.data.queries[0].fields.x.find(
-            (field: any) => (field.column || field.name) === "_timestamp",
+            (field: any) => field.args?.[0]?.value?.field === "_timestamp",
           );
         expect(timestampField).toBeDefined();
       } else {
@@ -2648,9 +2648,9 @@ describe("useDashboardPanel", () => {
 
       // Test removing non-existent items
       expect(() => {
-        panel.removeXAxisItem("non_existent_field");
-        panel.removeYAxisItem("non_existent_field");
-        panel.removeBreakdownItem("non_existent_field");
+        panel.removeXAxisItemByIndex(0);
+        panel.removeYAxisItemByIndex(0);
+        panel.removeBreakdownItemByIndex(0);
       }).not.toThrow();
     });
 
@@ -2774,8 +2774,8 @@ describe("useDashboardPanel", () => {
 
         // Test removing fields safely
         expect(() => {
-          panel.removeXAxisItem("safe_test_field");
-          panel.removeYAxisItem("non_existent");
+          panel.removeXAxisItemByIndex(0);
+          panel.removeYAxisItemByIndex(0);
         }).not.toThrow();
       });
 
@@ -3300,7 +3300,7 @@ describe("useDashboardPanel", () => {
               "timestamp";
             const initialXCount =
               panel.dashboardPanelData.data.queries[0].fields.x.length;
-            panel.removeXAxisItem(fieldToRemove);
+            panel.removeXAxisItemByIndex(0);
             expect(
               panel.dashboardPanelData.data.queries[0].fields.x.length,
             ).toBeLessThanOrEqual(initialXCount);
@@ -3313,7 +3313,7 @@ describe("useDashboardPanel", () => {
               "count";
             const initialYCount =
               panel.dashboardPanelData.data.queries[0].fields.y.length;
-            panel.removeYAxisItem(fieldToRemove);
+            panel.removeYAxisItemByIndex(0);
             expect(
               panel.dashboardPanelData.data.queries[0].fields.y.length,
             ).toBeLessThanOrEqual(initialYCount);
@@ -3328,7 +3328,7 @@ describe("useDashboardPanel", () => {
                 .name || "category";
             const initialBreakdownCount =
               panel.dashboardPanelData.data.queries[0].fields.breakdown.length;
-            panel.removeBreakdownItem(fieldToRemove);
+            panel.removeBreakdownItemByIndex(0);
             expect(
               panel.dashboardPanelData.data.queries[0].fields.breakdown.length,
             ).toBeLessThanOrEqual(initialBreakdownCount);
@@ -3727,21 +3727,21 @@ describe("useDashboardPanel", () => {
 
     it("should test removeXAxisItem with field name", () => {
       panel.addXAxisItem({ name: "test_field" });
-      panel.removeXAxisItem("test_field");
+      panel.removeXAxisItemByIndex(0);
       
       expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
     });
 
     it("should test removeYAxisItem functionality", () => {
       panel.addYAxisItem({ name: "metric_field" });
-      panel.removeYAxisItem("metric_field");
+      panel.removeYAxisItemByIndex(0);
       
       expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.y)).toBe(true);
     });
 
     it("should test removeBreakdownItem operation", () => {
       panel.addBreakDownAxisItem({ name: "group_field" });
-      panel.removeBreakdownItem("group_field");
+      panel.removeBreakdownItemByIndex(0);
       
       expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.breakdown)).toBe(true);
     });
@@ -3981,9 +3981,9 @@ describe("useDashboardPanel", () => {
 
     it("should handle error conditions gracefully", () => {
       // Test with invalid field names
-      panel.removeXAxisItem("non_existent_field");
-      panel.removeYAxisItem("non_existent_field");
-      panel.removeBreakdownItem("non_existent_field");
+      panel.removeXAxisItemByIndex(0);
+      panel.removeYAxisItemByIndex(0);
+      panel.removeBreakdownItemByIndex(0);
       
       expect(panel.dashboardPanelData).toBeDefined();
     });
@@ -4358,7 +4358,7 @@ describe("useDashboardPanel", () => {
       panel.addXAxisItem({ name: "field1" });
       panel.addYAxisItem({ name: "field2" });
       panel.addBreakDownAxisItem({ name: "field3" });
-      panel.removeXAxisItem("field1");
+      panel.removeXAxisItemByIndex(0);
       
       expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
     });
@@ -4368,7 +4368,7 @@ describe("useDashboardPanel", () => {
       
       // Perform operations
       panel.addXAxisItem({ name: "test" });
-      panel.removeXAxisItem("test");
+      panel.removeXAxisItemByIndex(0);
       
       // State should be consistent (though not necessarily identical)
       expect(panel.dashboardPanelData).toBeDefined();
@@ -4549,9 +4549,9 @@ describe("useDashboardPanel", () => {
       panel.addFilteredItem({ column: "filter_field", operator: "=", value: "test" });
       
       // Remove all fields
-      panel.removeXAxisItem("x_field");
-      panel.removeYAxisItem("y_field");
-      panel.removeBreakdownItem("breakdown_field");
+      panel.removeXAxisItemByIndex(0);
+      panel.removeYAxisItemByIndex(0);
+      panel.removeBreakdownItemByIndex(0);
       panel.removeFilterItem(0);
       
       expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
@@ -4666,9 +4666,9 @@ describe("useDashboardPanel", () => {
       
       try {
         // Attempt operations that might fail
-        panel.removeXAxisItem("non_existent");
-        panel.removeYAxisItem("non_existent");
-        panel.removeBreakdownItem("non_existent");
+        panel.removeXAxisItemByIndex(0);
+        panel.removeYAxisItemByIndex(0);
+        panel.removeBreakdownItemByIndex(0);
         panel.removeFilterItem(999);
         
         expect(panel.dashboardPanelData).toBeDefined();

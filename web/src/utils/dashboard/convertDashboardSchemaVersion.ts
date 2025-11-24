@@ -54,7 +54,7 @@ const convertPanelSchemaVersion = (data: any) => {
   };
 };
 
-const migrateV5FieldsToV6 = (
+const migrateV7FieldsToV8 = (
   fieldItem: any,
   isCustomQuery: boolean
 ) => {
@@ -334,7 +334,7 @@ export function convertDashboardSchemaVersion(data: any) {
               target,
               value,
             ].forEach((field: any) => {
-              migrateFields(field, queryItem.customQuery, migrateV5FieldsToV6);
+              migrateFields(field, queryItem.customQuery, migrateV7FieldsToV8);
             });
 
             // Migrate the filters

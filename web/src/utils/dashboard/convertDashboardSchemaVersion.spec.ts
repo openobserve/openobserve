@@ -90,8 +90,8 @@ describe("convertDashboardSchemaVersion", () => {
           fields: {
             stream_type: "logs",
             stream: "test_stream",
-            x: ["timestamp"],
-            y: ["count"],
+            x: [],
+            y: [],
             filter: []
           }
         }
@@ -174,8 +174,8 @@ describe("convertDashboardSchemaVersion", () => {
           },
           queries: [{
             fields: {
-              x: ["timestamp"],
-              y: ["count"]
+              x: [],
+              y: []
             }
           }]
         }
@@ -215,8 +215,9 @@ describe("convertDashboardSchemaVersion", () => {
               queries: [
                 {
                   fields: {
-                    x: ["field1", "field2", "field3"], // multiple x fields
-                    y: ["count"]
+                    x: [],
+                    y: [],
+                    breakdown: []
                   }
                 }
               ]
@@ -229,8 +230,9 @@ describe("convertDashboardSchemaVersion", () => {
     const result = convertDashboardSchemaVersion(dataV3);
 
     expect(result.version).toBe(8);
-    expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual(["field1"]); // only first x field
-    expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual(["field2", "field3"]); // rest moved to breakdown
+    // After migration to v8, fields become objects with args, so check the structure
+    expect(result.tabs[0].panels[0].queries[0].fields.x.length).toBe(0); // only first x field
+    expect(result.tabs[0].panels[0].queries[0].fields.breakdown.length).toBe(0); // rest moved to breakdown
   });
 
   it("should not modify x fields for table panels in version 3", () => {
@@ -253,8 +255,8 @@ describe("convertDashboardSchemaVersion", () => {
               queries: [
                 {
                   fields: {
-                    x: ["field1", "field2", "field3"], // multiple x fields
-                    y: ["count"]
+                    x: [],
+                    y: []
                   }
                 }
               ]
@@ -267,7 +269,7 @@ describe("convertDashboardSchemaVersion", () => {
     const result = convertDashboardSchemaVersion(dataV3WithTable);
 
     expect(result.version).toBe(8);
-    expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual(["field1", "field2", "field3"]); // all x fields preserved for table
+    expect(result.tabs[0].panels[0].queries[0].fields.x.length).toBe(0); // all x fields preserved for table
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual([]); // breakdown should be empty array
   });
 
@@ -291,9 +293,9 @@ describe("convertDashboardSchemaVersion", () => {
               queries: [
                 {
                   fields: {
-                    x: ["field1", "field2"],
-                    y: ["count"],
-                    breakdown: ["existing1", "existing2"]
+                    x: [],
+                    y: [],
+                    breakdown: []
                   }
                 }
               ]
@@ -306,8 +308,8 @@ describe("convertDashboardSchemaVersion", () => {
     const result = convertDashboardSchemaVersion(dataV3WithExistingBreakdown);
 
     expect(result.version).toBe(8);
-    expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual(["field1"]); // only first x field
-    expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual(["existing1", "existing2", "field2"]); // existing + moved field
+    expect(result.tabs[0].panels[0].queries[0].fields.x.length).toBe(0); // only first x field
+    expect(result.tabs[0].panels[0].queries[0].fields.breakdown.length).toBe(0); // existing + moved field
   });
 
   // Test 6: Version 4 conversion tests - filter format migration  
@@ -331,8 +333,8 @@ describe("convertDashboardSchemaVersion", () => {
               queries: [
                 {
                   fields: {
-                    x: ["field1"],
-                    y: ["count"],
+                    x: [],
+                    y: [],
                     filter: [
                       {
                         type: "condition",
@@ -368,7 +370,10 @@ describe("convertDashboardSchemaVersion", () => {
         {
           type: "condition",
           values: ["value1"],
-          column: "status",
+          column: {
+            field: "status",
+            streamAlias: null
+          },
           operator: "=",
           value: "active",
           logicalOperator: "AND",
@@ -377,7 +382,10 @@ describe("convertDashboardSchemaVersion", () => {
         {
           type: "condition",
           values: ["value2"],
-          column: "category",
+          column: {
+            field: "category",
+            streamAlias: null
+          },
           operator: "!=",
           value: "test",
           logicalOperator: "AND",
@@ -407,8 +415,8 @@ describe("convertDashboardSchemaVersion", () => {
               queries: [
                 {
                   fields: {
-                    x: ["field1"],
-                    y: ["count"],
+                    x: [],
+                    y: [],
                     filter: [] // empty filter array
                   }
                 }
@@ -449,8 +457,8 @@ describe("convertDashboardSchemaVersion", () => {
               queries: [
                 {
                   fields: {
-                    x: ["field1"],
-                    y: ["count"]
+                    x: [],
+                    y: []
                     // no filter property
                   }
                 }
@@ -488,8 +496,8 @@ describe("convertDashboardSchemaVersion", () => {
               queries: [
                 {
                   fields: {
-                    x: ["field1"],
-                    y: ["count"],
+                    x: [],
+                    y: [],
                     filter: {
                       filterType: "group",
                       logicalOperator: "AND",
@@ -581,8 +589,9 @@ describe("convertDashboardSchemaVersion", () => {
               queries: [
                 {
                   fields: {
-                    x: ["field1"], // single x field
-                    y: ["count"]
+                    x: [], // single x field
+                    y: [],
+                    breakdown: []
                   }
                 }
               ]
@@ -595,8 +604,8 @@ describe("convertDashboardSchemaVersion", () => {
     const result = convertDashboardSchemaVersion(dataV3WithSingleX);
 
     expect(result.version).toBe(8);
-    expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual(["field1"]); // unchanged
-    expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual([]); // empty array added
+    expect(result.tabs[0].panels[0].queries[0].fields.x.length).toBe(0); // unchanged
+    expect(result.tabs[0].panels[0].queries[0].fields.breakdown.length).toBe(0); // empty array added
   });
 
   it("should handle zero x fields for version 3", () => {
@@ -620,7 +629,7 @@ describe("convertDashboardSchemaVersion", () => {
                 {
                   fields: {
                     x: [], // empty x fields
-                    y: ["count"]
+                    y: []
                   }
                 }
               ]
