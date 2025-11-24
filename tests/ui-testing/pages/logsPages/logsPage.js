@@ -2564,4 +2564,70 @@ export class LogsPage {
     async waitForUI(timeout = 500) {
         await this.page.waitForTimeout(timeout);
     }
+
+    // Methods specifically for multistream testing that don't already exist
+    async navigateToHome() {
+        return await this.page.locator('[data-test="menu-link-\\/-item"]').click();
+    }
+
+    async fillStreamFilter(streamName) {
+        return await this.page.locator('[data-test="log-search-index-list-select-stream"]').fill(streamName);
+    }
+
+    async toggleStreamSelection(streamName) {
+        return await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).nth(2).click();
+    }
+
+    async toggleQueryModeEditor() {
+        return await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+    }
+
+    async clickMonacoEditor() {
+        return await this.page.locator('#fnEditor').locator('.monaco-editor').click();
+    }
+
+    async fillMonacoEditor(text) {
+        return await this.page.locator('#fnEditor').locator('.inputarea').fill(text);
+    }
+
+    async getCellByName(name) {
+        return await this.page.getByRole('cell', { name });
+    }
+
+    async clickCellByName(name) {
+        return await this.page.getByRole('cell', { name }).click();
+    }
+
+    async clickTableExpandMenuFirst() {
+        return await this.page.locator('[data-test="table-row-expand-menu"]').first().click({ force: true });
+    }
+
+    async clickTimestampColumnMenu() {
+        return await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+    }
+
+    async clickDateTimeButton() {
+        return await this.page.locator('[data-test="date-time-btn"]').click();
+    }
+
+    async selectRelative6Hours() {
+        return await this.page.locator('[data-test="date-time-relative-6-h-btn"]').click();
+    }
+
+    async navigateToStreams() {
+        return await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
+    }
+
+    async navigateToStreamsAlternate() {
+        return await this.page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
+    }
+
+    async searchStreamByPlaceholder(searchText) {
+        await this.page.getByPlaceholder("Search Stream").click();
+        return await this.page.getByPlaceholder("Search Stream").fill(searchText);
+    }
+
+    async clickFirstExploreButton() {
+        return await this.page.getByRole("button", { name: "Explore" }).first().click({ force: true });
+    }
 } 
