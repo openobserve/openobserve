@@ -22,7 +22,7 @@ use std::{
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
-    DISTINCT_FIELDS, SIZE_IN_MB, get_config,
+    DISTINCT_FIELDS, META_ORG_ID, SIZE_IN_MB, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -591,11 +591,11 @@ async fn write_logs(
 }
 
 async fn ingestion_log_enabled() -> bool {
-    if !get_config().common.ingestion_log_enabled_check {
+    if !get_config().common.ingestion_log_enabled {
         return false;
     }
     // the logging will be enabled through meta only, so hardcoded
-    match get_org_setting("_meta").await {
+    match get_org_setting(META_ORG_ID).await {
         Ok(org_settings) => org_settings.toggle_ingestion_logs,
         Err(_) => false,
     }

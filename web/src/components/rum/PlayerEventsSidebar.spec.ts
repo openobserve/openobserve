@@ -514,12 +514,12 @@ describe("PlayerEventsSidebar Component", () => {
     });
 
     it("should have correct search input width", () => {
-      const searchContainer = wrapper.find('[style*="width: 60%"]');
+      const searchContainer = wrapper.find('.tw-w-\\[60\\%\\]');
       expect(searchContainer.exists()).toBe(true);
     });
 
     it("should have correct selector width", () => {
-      const selectorContainer = wrapper.find('[style*="width: 40%"]');
+      const selectorContainer = wrapper.find('.tw-w-\\[40\\%\\]');
       expect(selectorContainer.exists()).toBe(true);
     });
   });

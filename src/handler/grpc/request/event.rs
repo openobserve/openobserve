@@ -308,7 +308,7 @@ mod tests {
     #[test]
     fn test_filter_deleted_items() {
         // Test filtering deleted items from FileList
-        let items = vec![
+        let items = [
             FileKey {
                 id: 1,
                 key: "test/file1.parquet".to_string(),

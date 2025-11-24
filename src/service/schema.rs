@@ -253,8 +253,7 @@ pub(crate) async fn handle_diff_schema(
 
     // acquire a local_lock to ensure only one thread can update schema
     let cache_key = format!("{org_id}/{stream_type}/{stream_name}");
-    let local_lock = infra::local_lock::lock(&cache_key).await?;
-    let _guard = local_lock.lock().await;
+    let _guard = infra::local_lock::lock(&cache_key).await;
 
     // check if the schema has been updated by another thread
     let read_cache = STREAM_SCHEMAS_LATEST.read().await;
@@ -609,7 +608,7 @@ pub async fn stream_schema_exists(
         conforms: true,
         has_fields: false,
         has_partition_keys: false,
-        has_metadata: false,
+        has_metrics_metadata: false,
     };
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
@@ -633,7 +632,7 @@ pub async fn stream_schema_exists(
         schema_chk.has_partition_keys = true;
     }
     if schema.metadata().contains_key(METADATA_LABEL) {
-        schema_chk.has_metadata = true;
+        schema_chk.has_metrics_metadata = true;
     }
     schema_chk
 }

@@ -308,16 +308,16 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("shows correct status text and icons", () => {
-      expect(wrapper.vm.getStatusText(0)).toBe("Pending");
-      expect(wrapper.vm.getStatusText(1)).toBe("Running");
-      expect(wrapper.vm.getStatusText(2)).toBe("Finished");
-      expect(wrapper.vm.getStatusText(3)).toBe("Cancelled");
-      
+      expect(wrapper.vm.getStatusText(0)).toBe("search_scheduler_job.status_pending");
+      expect(wrapper.vm.getStatusText(1)).toBe("search_scheduler_job.status_running");
+      expect(wrapper.vm.getStatusText(2)).toBe("search_scheduler_job.status_finished");
+      expect(wrapper.vm.getStatusText(3)).toBe("search_scheduler_job.status_cancelled");
+
       expect(wrapper.vm.getStatusIcon(0)).toBe("hourglass_empty");
       expect(wrapper.vm.getStatusIcon(1)).toBe("pause_circle");
       expect(wrapper.vm.getStatusIcon(2)).toBe("check_circle");
       expect(wrapper.vm.getStatusIcon(3)).toBe("cancel");
-      
+
       expect(wrapper.vm.getStatusColor(0)).toBe("orange");
       expect(wrapper.vm.getStatusColor(1)).toBe("blue");
       expect(wrapper.vm.getStatusColor(2)).toBe("green");

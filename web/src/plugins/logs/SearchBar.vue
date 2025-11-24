@@ -1257,7 +1257,7 @@ class="q-pr-sm q-pt-xs" />
         round
         color="primary"
         @click="isFocused = !isFocused"
-        class="tw-absolute tw-top-[3.1rem] tw-right-[1.2rem] tw-z-50"
+        class="tw-absolute tw-top-[3.3rem] tw-right-[1.2rem] tw-z-50"
       >
       <Maximize size='0.8rem' v-if="!isFocused" />
       <Minimize size="0.8rem" v-else />
@@ -1375,19 +1375,17 @@ class="q-pr-sm q-pt-xs" />
           <q-btn
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-secondary-button"
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
             :label="t('confirmDialog.cancel')"
-            color="secondary"
             v-close-popup
           />
           <q-btn
             unelevated
             no-caps
-            class="q-mr-sm text-bold"
+            class="q-mr-sm o2-primary-button"
             data-test="logs-search-bar-confirm-dialog-ok-btn"
             :label="t('search.btnDownload')"
-            color="primary"
             @click="downloadRangeData"
           />
         </q-card-actions>
@@ -1909,6 +1907,7 @@ export default defineComponent({
       updateUrlQueryParams,
       generateURLQuery,
       isActionsEnabled,
+      checkTimestampAlias,
     } = logsUtils();
     const {
       getSavedViews,
@@ -2751,6 +2750,7 @@ export default defineComponent({
         });
       }
 
+      searchObj.meta.showTransformEditor = true;
       searchObj.config.fnSplitterModel = 60;
       fnEditorRef?.value?.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
@@ -3228,10 +3228,11 @@ export default defineComponent({
             });
             setTimeout(async () => {
               try {
+                searchObj.loadingHistogram = false;
                 searchObj.loading = true;
                 searchObj.meta.refreshHistogram = true;
                 // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
-                searchObj.communicationMethod = "streaming";
+                searchObj.communicationMethod = "streaming";                
                 await extractFields();
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
@@ -3411,6 +3412,14 @@ export default defineComponent({
         delete savedSearchObj.data.savedViews;
         delete savedSearchObj.data.transforms;
 
+
+        // Turn off all loaders before saving view
+        savedSearchObj.loading = false;
+        savedSearchObj.loadingHistogram = false;
+        savedSearchObj.loadingCounter = false;
+        savedSearchObj.loadingStream = false;
+        savedSearchObj.loadingSavedView = false;
+        
         savedSearchObj.data.timezone = store.state.timezone;
 
         if (savedSearchObj.data.parsedQuery) {
@@ -3957,6 +3966,14 @@ export default defineComponent({
         ) {
           showErrorNotification(
             "Multiple SQL queries are not allowed to visualize",
+          );
+          return;
+        }
+
+        // validate that timestamp column is not used as an alias
+        if (!checkTimestampAlias(logsPageQuery)) {
+          showErrorNotification(
+            `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
           );
           return;
         }

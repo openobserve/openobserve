@@ -784,7 +784,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     factory
                         .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                        .wrap(middleware::from_fn(middlewares::check_keep_alive))
                         .service(get_metrics)
                         .service(router::http::config)
                         .service(router::http::config_paths)
@@ -800,7 +799,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
                     .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                    .wrap(middleware::from_fn(middlewares::check_keep_alive))
                     .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
@@ -890,7 +888,6 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     factory
                         .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                        .wrap(middleware::from_fn(middlewares::check_keep_alive))
                         .service(get_metrics)
                         .service(router::http::config)
                         .service(router::http::config_paths)
@@ -906,7 +903,6 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
                     .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                    .wrap(middleware::from_fn(middlewares::check_keep_alive))
                     .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)

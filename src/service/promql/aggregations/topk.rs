@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::sort::sort_float;
+use config::{
+    meta::promql::value::{EvalContext, RangeValue, Value},
+    utils::sort::sort_float,
+};
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::{HashMap, HashSet};
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
-
-use crate::service::promql::value::{EvalContext, RangeValue, Value};
 
 /// Aggregates Matrix input for range queries
 /// For each timestamp, selects the top K series by value
@@ -176,8 +177,9 @@ pub(super) fn select_topk_series(
 mod tests {
     use std::sync::Arc;
 
+    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
+
     use super::*;
-    use crate::service::promql::value::{Label, RangeValue, Sample, Value};
 
     #[test]
     fn test_topk_range_function() {

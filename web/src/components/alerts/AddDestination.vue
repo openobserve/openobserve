@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Create Email Template"
             size="sm"
             no-caps
-            color="secondary"
+            class="o2-secondary-button"
             style="border-radius: 4px; font-size: 12px"
             @click="createEmailTemplate"
           />

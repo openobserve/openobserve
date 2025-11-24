@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="report-list-page"
-    class="flex"
+    class="flex q-mt-xs"
   >
     <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
       <div class="card-container tw-mb-[0.625rem]">
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-        <div class="card-container full-width o2-quasar-table o2-row-md o2-quasar-table-header-sticky tw-h-[calc(100vh-124px)]">
+        <div class="card-container full-width o2-quasar-table o2-row-md o2-quasar-table-header-sticky tw-h-[calc(100vh-128px)]">
           <q-table
             data-test="report-list-table"
             ref="reportListTableRef"

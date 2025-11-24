@@ -584,7 +584,7 @@ mod tests {
         use config::meta::cluster::Node;
 
         // Test node sorting logic as used in node_list functions
-        let mut nodes = vec![
+        let mut nodes = [
             Node {
                 id: 3,
                 ..Default::default()

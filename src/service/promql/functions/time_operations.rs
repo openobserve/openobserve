@@ -14,12 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{Datelike, NaiveDate, Timelike};
-use config::utils::time::parse_i64_to_timestamp_micros;
+use config::{
+    meta::promql::value::{LabelsExt, RangeValue, Sample, Value},
+    utils::time::parse_i64_to_timestamp_micros,
+};
 use datafusion::error::{DataFusionError, Result};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use strum::EnumIter;
-
-use crate::service::promql::value::{LabelsExt, RangeValue, Sample, Value};
 
 #[derive(Debug, EnumIter)]
 pub enum TimeOperationType {

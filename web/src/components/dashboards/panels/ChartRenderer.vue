@@ -582,7 +582,10 @@ export default defineComponent({
             theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)");
         options.animation = false;
         try {
-          chart?.setOption(options, { lazyUpdate: true, notMerge: true });
+          // Use notMerge flag from data prop if available, otherwise default to true
+          const notMerge = props.data?.notMerge !== undefined ? props.data.notMerge : true;
+          const lazyUpdate = props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
+          chart?.setOption(options, { lazyUpdate, notMerge });
           chart?.setOption({ animation: true }, { lazyUpdate: true });
         } catch (e: any) {
           emit("error", {

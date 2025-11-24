@@ -48,7 +48,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
   });
 
   describe('Label Display Branch Coverage', () => {
-    it('should show "if" when index is 0 and depth is 0', async () => {
+    it('should show "if" when index is 0', async () => {
       const wrapper = mount(FilterCondition, {
         props: {
           ...defaultProps,
@@ -63,12 +63,12 @@ describe('FilterCondition.vue Branch Coverage', () => {
         },
       });
 
-      // Branch: index == 0 && depth == 0 ? 'if' : computedLabel (line 5)
+      // Branch: index == 0 ? 'if' : computedLabel (line 5)
       const labelElement = wrapper.find('.tw-text-sm');
       expect(labelElement.text().trim()).toBe('if');
     });
 
-    it('should show computed label when index is not 0 or depth is not 0', async () => {
+    it('should show computed label when index is not 0', async () => {
       const wrapper = mount(FilterCondition, {
         props: {
           ...defaultProps,
@@ -84,17 +84,17 @@ describe('FilterCondition.vue Branch Coverage', () => {
         },
       });
 
-      // Branch: computedLabel (when condition is false)
+      // Branch: computedLabel (when index != 0)
       const labelElement = wrapper.find('.tw-text-sm');
       expect(labelElement.text().trim()).toBe('OR');
     });
 
-    it('should show computed label when depth is not 0', async () => {
+    it('should show "if" when index is 0 regardless of depth', async () => {
       const wrapper = mount(FilterCondition, {
         props: {
           ...defaultProps,
           index: 0,
-          depth: 1, // Branch condition: depth != 0
+          depth: 1, // Even with depth != 0, index 0 should show "if"
           label: 'AND',
         },
         global: {
@@ -105,9 +105,9 @@ describe('FilterCondition.vue Branch Coverage', () => {
         },
       });
 
-      // Branch: computedLabel (when condition is false)
+      // Branch: index == 0 shows "if" regardless of depth (updated logic)
       const labelElement = wrapper.find('.tw-text-sm');
-      expect(labelElement.text().trim()).toBe('AND');
+      expect(labelElement.text().trim()).toBe('if');
     });
   });
 

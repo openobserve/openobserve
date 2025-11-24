@@ -15,12 +15,13 @@
 
 use std::{collections::HashSet, sync::Arc};
 
-use config::meta::promql::NAME_LABEL;
+use config::meta::promql::{
+    NAME_LABEL,
+    value::{Label, RangeValue, Value},
+};
 use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-
-use crate::service::promql::value::{Label, RangeValue, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#label_join
 pub(crate) fn label_join(
@@ -73,7 +74,7 @@ mod tests {
 
     #[test]
     fn test_label_join_function() {
-        use crate::service::promql::value::{RangeValue, Sample};
+        use config::meta::promql::value::{RangeValue, Sample};
 
         let eval_ts = 1000;
 

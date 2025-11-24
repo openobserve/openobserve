@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="add-condition-section"
-    class="full-width stream-routing-section"
+    class="stream-routing-section full-width"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md tw-flex tw-items-center tw-justify-between ">
@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :stream-fields="filteredColumns"
               :group="conditionGroup"
               :depth="0"
+              condition-input-width="tw-w-[150px]"
               @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
               @add-group="(updatedGroup) => updateGroup(updatedGroup)"
               @remove-group="(groupId) => removeConditionGroup(groupId)"
@@ -658,8 +659,9 @@ const validateSqlQuery = () => {
   padding-top: 16px;
 }
 .stream-routing-container {
-  width: 720px;
+  min-width: 45vw;
   border-radius: 8px;
+  max-width: 47vw;
   /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
 }
 

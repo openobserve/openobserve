@@ -628,6 +628,10 @@ pub async fn values_http2_stream(
             return http_response;
         }
     };
+    // check default values limit
+    if values_req.size.is_none() {
+        values_req.size = Some(config::get_config().limit.query_values_default_num);
+    }
     let no_count = values_req.no_count;
     let top_k = values_req.size;
 

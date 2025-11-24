@@ -18,16 +18,16 @@ use std::{
     sync::Arc,
 };
 
-use config::meta::promql::NAME_LABEL;
+use config::meta::promql::{
+    NAME_LABEL,
+    value::{Label, LabelsExt, RangeValue, Sample, Value, signature},
+};
 use datafusion::error::{DataFusionError, Result};
 use once_cell::sync::Lazy;
 use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
 use rayon::prelude::*;
 
-use crate::service::promql::{
-    binaries::scalar_binary_operations,
-    value::{Label, LabelsExt, RangeValue, Sample, Value, signature},
-};
+use crate::service::promql::binaries::scalar_binary_operations;
 
 // DROP_METRIC_BIN_OP if the operation is one of these, drop the metric __name__
 pub static DROP_METRIC_BIN_OP: Lazy<HashSet<u8>> = Lazy::new(|| {
@@ -387,8 +387,9 @@ pub fn vector_bin_op(
 mod tests {
     use std::sync::Arc;
 
+    use config::meta::promql::value::{Label, Sample};
+
     use super::*;
-    use crate::service::promql::value::{Label, Sample};
 
     // Helper function to create test data for matrix operations
     fn create_test_matrix_data() -> Vec<RangeValue> {

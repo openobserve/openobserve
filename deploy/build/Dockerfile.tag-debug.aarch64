@@ -1,18 +1,18 @@
 # syntax=docker/dockerfile:1
-FROM public.ecr.aws/docker/library/node:18.20.4-bookworm AS webBuilder
+FROM public.ecr.aws/docker/library/node:24-trixie AS webBuilder
 WORKDIR /web
 COPY ./web /web/
 
 RUN npm install
 RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
-FROM public.ecr.aws/zinclabs/rust:bookworm-sccache AS builder
+FROM public.ecr.aws/zinclabs/rust:trixie-sccache AS builder
 # RUN apt-get update
 # RUN apt-get install -y protobuf-compiler
 # RUN apt-get install -y cmake curl
 
-# RUN rustup toolchain install nightly-2025-07-20
-# RUN rustup default nightly-2025-07-20
+# RUN rustup toolchain install nightly-2025-11-11
+# RUN rustup default nightly-2025-11-11
 # RUN rustup target add aarch64-unknown-linux-gnu
 
 WORKDIR /openobserve
@@ -27,7 +27,7 @@ ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
 RUN cargo build --profile release-prod --features mimalloc --target aarch64-unknown-linux-gnu
 RUN mv /openobserve/target/aarch64-unknown-linux-gnu/release-prod/openobserve /openobserve/target/release/openobserve
 
-FROM public.ecr.aws/debian/debian:bookworm-slim AS runtime
+FROM public.ecr.aws/debian/debian:trixie-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop nload iptraf ncdu tcpdump sysstat procps lsof net-tools sqlite3
 RUN update-ca-certificates

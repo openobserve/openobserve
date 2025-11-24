@@ -256,8 +256,8 @@ describe("AppPerformance.vue", () => {
         expect(vm.tabs[index].value).toBe(expectedTab.value);
         expect(vm.tabs[index].style).toEqual({
           width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
+          padding: "0.5rem 0.75rem",
+          margin: "0 0.25rem",
         });
       });
     });

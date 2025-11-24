@@ -121,11 +121,12 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                 .map(|v| v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8)
                 .is_some()
         })
-        .map(|f| f.to_string())
+        .map(String::from)
         .collect::<HashSet<_>>();
     let index_fields = index_fields
         .iter()
-        .map(|f| f.to_string())
+        .filter(|f| schema_fields.contains_key(f))
+        .map(String::from)
         .collect::<HashSet<_>>();
     let tantivy_fields = fts_fields
         .union(&index_fields)
@@ -146,19 +147,20 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         );
         tantivy_schema_builder.add_text_field(INDEX_FIELD_NAME_FOR_ALL, fts_opts);
     }
+
+    let index_opts = tantivy::schema::TextOptions::default()
+        .set_indexing_options(
+            tantivy::schema::TextFieldIndexing::default()
+                .set_index_option(tantivy::schema::IndexRecordOption::Basic)
+                .set_tokenizer("raw")
+                .set_fieldnorms(false),
+        )
+        .set_fast(None);
     for field in index_fields.iter() {
         if field == TIMESTAMP_COL_NAME {
             continue;
         }
-        let index_opts = tantivy::schema::TextOptions::default()
-            .set_indexing_options(
-                tantivy::schema::TextFieldIndexing::default()
-                    .set_index_option(tantivy::schema::IndexRecordOption::Basic)
-                    .set_tokenizer("raw")
-                    .set_fieldnorms(false),
-            )
-            .set_fast(None);
-        tantivy_schema_builder.add_text_field(field, index_opts);
+        tantivy_schema_builder.add_text_field(field, index_opts.clone());
     }
     // add _timestamp field to tantivy schema
     tantivy_schema_builder.add_i64_field(TIMESTAMP_COL_NAME, tantivy::schema::FAST);
@@ -542,16 +544,7 @@ mod tests {
 
         assert!(result.is_ok());
         let index = result.unwrap();
-        assert!(index.is_some()); // Returns Some because index fields are not filtered by existence
-
-        // Verify the index has the timestamp field and requested fields (even if they don't exist
-        // in data)
-        let index = index.unwrap();
-        let schema = index.schema();
-        assert!(schema.get_field("another_nonexistent_field").is_ok());
-        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
-        // FTS field WILL be present because full_text_search_fields is not empty
-        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(index.is_none());
     }
 
     #[tokio::test]

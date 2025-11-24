@@ -362,6 +362,10 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --q-primary: var(--o2-theme-color);
 
+  --o2-icon-color: #808080;
+
+  --o2-icon-color-dark: #5e5e5e;
+
   // JSON Syntax Highlighting
   --o2-json-key: #{$json-key-light};
   --o2-json-string: #{$json-string-light};
@@ -427,7 +431,7 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --o2-card-bg: #1f2223;
 
-  --o2-header-menu-bg: color-mix(in srgb, var(--o2-theme-color) 90%, white);
+  --o2-header-menu-bg: color-mix(in srgb, #19191e 90%, white);
 
 
   --o2-border-color: rgba(255, 255, 255, 0.40);

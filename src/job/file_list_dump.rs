@@ -29,7 +29,6 @@ use config::{
     meta::stream::{FileKey, FileMeta, StreamType},
     utils::time::hour_micros,
 };
-use hashbrown::HashSet;
 use infra::{
     dist_lock,
     file_list::FileRecord,
@@ -38,8 +37,9 @@ use infra::{
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
+use scc::HashSet;
 use tokio::sync::{
-    Mutex, RwLock,
+    Mutex,
     mpsc::{Receiver, Sender},
 };
 
@@ -98,7 +98,7 @@ static FILE_LIST_DUMP_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
 // currently in queue, because they are not marked as done in the db. In such case, it is possible
 // that files in that time range get dumped before they are compacted. So instead we maintain this
 // and before enqueing, check if the job_id is already waiting in queue or not.
-static ONGOING_JOB_IDS: Lazy<RwLock<HashSet<i64>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+static ONGOING_JOB_IDS: Lazy<HashSet<i64>> = Lazy::new(HashSet::new);
 
 fn get_dump_stream_key(org: &str, stream: &str) -> String {
     format!(
@@ -174,9 +174,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         if let Err(e) = dump(job_id, &org, &stream, offset).await {
                             log::error!("error in dumping files {stream} offset {offset} : {e}");
                         }
-                        let mut ongoing = ONGOING_JOB_IDS.write().await;
-                        ongoing.remove(&job_id);
-                        drop(ongoing);
+                        ONGOING_JOB_IDS.remove_async(&job_id).await;
                     }
                 }
             }
@@ -200,7 +198,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
         let threshold_hour = Utc::now().timestamp_micros()
             - (config.common.file_list_dump_min_hour as i64 * hour_micros(1));
 
-        let ongoing = ONGOING_JOB_IDS.read().await;
         let pending = pending
             .into_iter()
             .filter(|(id, _, _, offset)| {
@@ -209,15 +206,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     return false;
                 }
                 // if we already have that job in queue, we should not re-queue it
-                !ongoing.contains(id)
+                !ONGOING_JOB_IDS.contains_sync(id)
             })
             .collect::<Vec<_>>();
-        // it is important to drop this here, as the worker threads will
-        // also write lock this in order to remove successful jobs
-        // if we don't drop, we can deadlock if the queue gets full, because
-        // worker will block on this lock, queue is full, and we block on queue to have space
-        // but no worker free to remove from queue.
-        drop(ongoing);
+
         for (job_id, org, stream, offset) in pending {
             if let Err(e) = FILE_LIST_DUMP_CHANNEL
                 .sender
@@ -226,9 +218,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             {
                 log::error!("error in sending dump job to worker thread for {job_id} : {e}");
             } else {
-                let mut ongoing = ONGOING_JOB_IDS.write().await;
-                ongoing.insert(job_id);
-                drop(ongoing);
+                let _ = ONGOING_JOB_IDS.insert_async(job_id).await;
             }
         }
     }

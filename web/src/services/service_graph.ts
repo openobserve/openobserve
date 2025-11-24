@@ -18,9 +18,12 @@ import http from "./http";
 const serviceGraphService = {
   /**
    * Get service graph metrics in Prometheus format
+   * @param orgId - Organization ID
+   * @param streamName - Optional stream name to filter metrics
    */
-  getMetrics: (orgId: string) => {
-    return http().get(`/api/${orgId}/traces/service_graph/metrics`);
+  getMetrics: (orgId: string, streamName?: string) => {
+    const params = streamName && streamName !== 'all' ? { stream_name: streamName } : {};
+    return http().get(`/api/${orgId}/traces/service_graph/metrics`, { params });
   },
 
   /**

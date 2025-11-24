@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tag-block row items-center no-wrap q-mr-sm q-mt-sm">
     <div class="q-px-md">{{ tag.key }}</div>
     <q-separator data-test="separator" vertical />
-    <div class="q-px-md tag-bg" style="word-break: break-all">
+    <div class="q-px-md tw-bg-[var(--o2-table-header-bg)] tw-break-all">
       {{ tag.value }}
     </div>
   </div>
@@ -36,7 +36,7 @@ defineProps({
 <style lang="scss" scoped>
 .tag-block {
   border: 1px solid #e0e0e0;
-  border-radius: 4px;
+  border-radius: 0.25rem;
 }
 
 .tag-bg {

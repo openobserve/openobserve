@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="sessions_page">
     <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
       <div class="card-container">
-        <div class="text-right q-py-sm flex align-center justify-between">
+        <div class="text-right tw-p-[0.375rem] flex align-center justify-between">
           <syntax-guide class="q-mr-sm" />
-          <div class="flex align-center justify-end metrics-date-time q-mr-md">
+          <div class="flex align-center justify-end metrics-date-time">
             <date-time
               auto-apply
               :default-type="errorTrackingState.data.datetime?.valueType"
@@ -32,46 +32,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 errorTrackingState.data.datetime.relativeTimePeriod
               "
               data-test="logs-search-bar-date-time-dropdown"
-              class="q-mr-md"
+              class="q-mr-sm"
               @on:date-change="updateDateChange"
             />
             <q-btn
               data-test="metrics-explorer-run-query-button"
               data-cy="metrics-explorer-run-query-button"
               dense
-              flat
               title="Run query"
-              class="q-pa-none search-button"
+              class="q-pa-none !tw-mr-none o2-run-query-button o2-color-primary tw-h-[33px] element-box-shadow"
               @click="runQuery"
             >
               Run query
             </q-btn>
           </div>
         </div>
-        <div
-          style="
-            border-top: 1px solid rgb(219, 219, 219);
-            border-bottom: 1px solid rgb(219, 219, 219);
-          "
-        >
+        <div class="tw-pb-[0.375rem] tw-px-[0.375rem]">
           <query-editor
             editor-id="rum-errors-query-editor"
-            class="monaco-editor"
+            class="monaco-editor tw-border tw-solid tw-border-[var(--o2-border-color)] tw-p-[0.25rem] tw-rounded-[0.375rem] tw-overflow-hidden !tw-h-[4rem]"
             v-model:query="errorTrackingState.data.editorValue"
-            style="height: 40px !important"
             :debounce-time="300"
           />
         </div>
       </div>
     </div>
     <q-splitter
-      class="logs-horizontal-splitter full-height"
+      class="logs-horizontal-splitter !tw-pl-[0.625rem] !tw-h-[calc(100%-131px)]"
       v-model="splitterModel"
       unit="px"
       vertical
     >
       <template #before>
-        <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
+        <div class="card-container tw-p-[0.325rem] tw-h-full">
           <FieldList
             :fields="streamFields"
             :time-stamp="{
@@ -79,7 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               endTime: dateTime.endTime,
             }"
             :stream-name="errorTrackingState.data.stream.errorStream"
-            class="card-container"
             @event-emitted="handleSidebarEvent"
           />
         </div>
@@ -88,24 +80,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-avatar
           color="primary"
           text-color="white"
-          size="20px"
           icon="drag_indicator"
-          style="top: 10px"
+          class="!tw-top-[2rem] tw-w-[0.75rem] !tw-h-[2rem] !tw-text-[2rem] !tw-rounded-[0.325rem]"
         />
       </template>
       <template #after>
-        <div class="tw-pb-[0.625rem] tw-pr-[0.625rem]">
-          <div class="card-container">
+        <div class="tw-pr-[0.625rem] tw-h-full">
+          <div class="card-container tw-h-full">
             <template v-if="isLoading.length">
               <div
-                class="q-pb-lg flex items-center justify-center text-center"
-                style="height: calc(100vh - 300px)"
+                class="q-pb-lg flex items-center justify-center text-center tw-h-[calc(100vh-18.75rem)]"
               >
                 <div>
                   <q-spinner-hourglass
                     color="primary"
-                    size="40px"
-                    style="margin: 0 auto; display: block"
+                    size="2.5rem"
+                    class="tw-mx-auto tw-block"
                   />
                   <div class="text-center full-width">
                     Hold on tight, we're fetching your application errors.
@@ -116,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AppTable
               :columns="columns"
               :rows="errorTrackingState.data.errors"
-              class="app-table-container"
+              class="app-table-container tw-h-full"
               @event-emitted="handleTableEvent"
             >
               <template v-slot:error_details="slotProps">
@@ -487,15 +477,6 @@ function updateUrlQueryParams() {
 </script>
 
 <style scoped lang="scss">
-.sessions_page {
-  .monaco-editor {
-    height: 80px !important;
-  }
-}
-
-.app-table-container {
-  height: calc(100vh - 200px) !important;
-}
 </style>
 <style lang="scss">
 .sessions_page {
@@ -503,7 +484,7 @@ function updateUrlQueryParams() {
   .q-field__native,
   .q-field__input,
   .q-table tbody td {
-    font-size: 12px !important;
+    font-size: 0.75rem !important;
   }
 
   .q-splitter__after {
@@ -516,24 +497,24 @@ function updateUrlQueryParams() {
 
   .index-table :hover::-webkit-scrollbar,
   #tracesSearchGridComponent:hover::-webkit-scrollbar {
-    height: 13px;
-    width: 13px;
+    height: 0.8125rem;
+    width: 0.8125rem;
   }
 
   .index-table ::-webkit-scrollbar-track,
   #tracesSearchGridComponent::-webkit-scrollbar-track {
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 10px;
+    border-radius: 0.625rem;
   }
 
   .index-table ::-webkit-scrollbar-thumb,
   #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 10px;
+    border-radius: 0.625rem;
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
   }
 
   .q-table__top {
-    padding: 0px !important;
+    padding: 0 !important;
   }
 
   .q-table__control {
@@ -541,23 +522,23 @@ function updateUrlQueryParams() {
   }
 
   .q-field__control-container {
-    padding-top: 0px !important;
+    padding-top: 0 !important;
   }
 
   .search-button {
-    width: 96px;
-    line-height: 29px;
+    width: 6rem;
+    line-height: 1.8125rem;
     font-weight: bold;
     text-transform: initial;
-    font-size: 11px;
+    font-size: 0.6875rem;
     color: white;
 
     .q-btn__content {
       background: $secondary;
-      border-radius: 3px 3px 3px 3px;
+      border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
 
       .q-icon {
-        font-size: 15px;
+        font-size: 0.9375rem;
         color: #ffffff;
       }
     }

@@ -1,11 +1,12 @@
 <template>
-  <div class="q-px-md q-pt-md q-pb-md">
-    <div class="text-body1 text-bold">
-      {{ t("settings.logDetails") }}
+  <div>
+    <div class="q-px-md q-pt-md q-pb-md">
+      <div class="text-body1 text-bold">
+        {{ t("settings.logDetails") }}
+      </div>
     </div>
-  </div>
 
-  <div class="q-mx-md q-mb-md">
+    <div class="q-mx-md q-mb-md">
     <div
       data-test="add-role-rolename-input-btn"
       class="trace-id-field-name o2-input q-mb-sm"
@@ -93,11 +94,12 @@
         @click="saveOrgSettings"
       />
     </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import organizations from "@/services/organizations";
 import { useStore } from "vuex";
@@ -146,21 +148,25 @@ const updateFieldName = (fieldName: string) => {
 
 const saveOrgSettings = async () => {
   try {
+    const payload: any = {
+      trace_id_field_name: traceIdFieldName.value,
+      span_id_field_name: spanIdFieldName.value,
+      toggle_ingestion_logs: toggleIngestionLogs.value,
+    };
+
     await organizations.post_organization_settings(
       store.state.selectedOrganization.identifier,
-      {
-        trace_id_field_name: traceIdFieldName.value,
-        span_id_field_name: spanIdFieldName.value,
-        toggle_ingestion_logs: toggleIngestionLogs.value,
-      },
+      payload,
     );
 
-    store.dispatch("setOrganizationSettings", {
+    const updatedSettings: any = {
       ...store.state?.organizationData?.organizationSettings,
       trace_id_field_name: traceIdFieldName.value,
       span_id_field_name: spanIdFieldName.value,
       toggle_ingestion_logs: toggleIngestionLogs.value,
-    });
+    };
+
+    store.dispatch("setOrganizationSettings", updatedSettings);
 
     q.notify({
       message: "Organization settings updated successfully",

@@ -6,6 +6,7 @@ const {
 import PageManager from "../../pages/page-manager";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import { waitForStreamComplete, waitForTableWithData } from "../utils/streaming-helpers.js";
 const testLogger = require('../utils/test-logger.js');
 
 const randomDashboardName =
@@ -81,9 +82,15 @@ test.describe("dashboard UI testcases", () => {
       "kubernetes_container_name",
       "y"
     );
-    // Apply chart and wait for API completion
+
+    // Apply chart and wait for streaming to complete
+    const initialStreamPromise = waitForStreamComplete(page);
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await initialStreamPromise;
     await pm.chartTypeSelector.waitForTableDataLoad();
+
+    // Wait for table to have data before capturing
+    await waitForTableWithData(page);
 
     // Store initial data (before transpose)
     const initialTableData = await captureTableData(page);
@@ -92,32 +99,15 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.selectTranspose();
 
-    // Apply transpose and wait for chart to render
+    // Apply transpose and wait for streaming to complete
+    const transposedStreamPromise = waitForStreamComplete(page);
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await transposedStreamPromise;
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.chartTypeSelector.waitForTableDataLoad();
 
-    // Wait for network to be idle after transpose
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
-      // Continue even if networkidle times out - data might already be loaded
-      testLogger.info('Network idle timeout - continuing anyway');
-    });
-
-    // Wait for the transposed table to be stable and have data
-    await page.waitForFunction(
-      () => {
-        const table = document.querySelector('[data-test="dashboard-panel-table"]');
-        if (!table) return false;
-
-        const rows = table.querySelectorAll('tbody tr');
-        if (rows.length === 0) return false;
-
-        const firstRowCells = rows[0].querySelectorAll('td');
-        // Just check that we have at least one cell - don't be too strict
-        return firstRowCells.length >= 1;
-      },
-      { timeout: 10000, polling: 200 }
-    );
+    // Wait for table to have data before capturing
+    await waitForTableWithData(page);
 
     // Store transposed data after rendering is complete
     const transposedTableData = await captureTableData(page);

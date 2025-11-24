@@ -36,7 +36,6 @@ async function ingestion(page) {
       streamName: streamName,
       logsdata: logsdata
     });
-    console.log('Ingestion response:', response);
     return response;
   } catch (error) {
     console.error('Ingestion failed:', error);
@@ -221,8 +220,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await page.waitForTimeout(500);
     
     // Verify that kubernetes fields are visible
-    const kubernetesFields = page.locator('[data-test*="log-search-expand-kubernetes"]');
-    const fieldCount = await kubernetesFields.count();
+    const fieldCount = await pageManager.logsPage.getKubernetesFieldsCount();
     expect(fieldCount).toBeGreaterThan(0);
     testLogger.info(`Found ${fieldCount} kubernetes fields`);
     
@@ -325,7 +323,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
 
   test("should verify field operations with quick mode toggle", {
     tag: ['@logsTable', '@all', '@logs', '@quickMode']
-  }, async ({ page }) => {
+  }, async () => {
     testLogger.info('Testing field operations with quick mode toggle');
     
     const fieldName = "kubernetes_container_name";

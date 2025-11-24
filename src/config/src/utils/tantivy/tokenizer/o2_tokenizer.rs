@@ -240,4 +240,25 @@ mod tests {
         assert_token(&tokens[4], 4, "Current", 16, 23);
         assert_token(&tokens[5], 5, "Users", 24, 29);
     }
+
+    #[test]
+    fn test_o2_tokenizer_camel_case_short() {
+        let body = "U8iI34Vi";
+        let tokens = token_stream_helper(body);
+        assert_eq!(tokens.len(), 3);
+        assert_token(&tokens[0], 0, "U8i", 0, 3);
+        assert_token(&tokens[1], 1, "I34", 3, 6);
+        assert_token(&tokens[2], 2, "Vi", 6, 8);
+    }
+
+    #[test]
+    fn test_o2_tokenizer_camel_case_ip() {
+        let body = "192.168.1.80";
+        let tokens = token_stream_helper(body);
+        assert_eq!(tokens.len(), 4);
+        assert_token(&tokens[0], 0, "192", 0, 3);
+        assert_token(&tokens[1], 1, "168", 4, 7);
+        assert_token(&tokens[2], 2, "1", 8, 9);
+        assert_token(&tokens[3], 3, "80", 10, 12);
+    }
 }

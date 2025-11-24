@@ -116,7 +116,7 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
     } as any);
 
     wrapper = shallowMount(ImportTemplate, {
-      props: defaultProps,
+      props: JSON.parse(JSON.stringify(defaultProps)),
       global: {
         plugins: [Quasar, mockI18n],
         provide: {
@@ -614,19 +614,25 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
         expect(result).toBe(false);
       });
 
-      it('should handle processing when validation passes but template errors exist', async () => {
+      it('should process template successfully even when prior errors exist', async () => {
         const validObject = {
           name: 'test-template',
           type: 'http',
           body: '{"message": "test"}',
         };
 
-        // Simulate validation passing but having errors in display
-        wrapper.vm.templateErrorsToDisplay = [['Some error']];
+        // Simulate having errors from previous template processing
+        wrapper.vm.templateErrorsToDisplay = [['Some error from previous template']];
+
+        // Mock successful creation
+        const templateService = await import('@/services/alert_templates');
+        vi.mocked(templateService.default.create).mockResolvedValueOnce(true);
 
         const result = await wrapper.vm.processJsonObject(validObject, 1);
 
-        expect(result).toBe(false);
+        // Should succeed because this template's validation passes
+        // regardless of previous templates' errors
+        expect(result).toBe(true);
       });
     });
 

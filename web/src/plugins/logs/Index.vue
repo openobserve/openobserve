@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #before>
                 <div class="relative-position tw-h-full tw-pl-[0.625rem]">
                   <index-list
-                    v-show="searchObj.meta.showFields"
+                    v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     class="card-container"
                     @setInterestingFieldInSQLQuery="
@@ -418,7 +418,6 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
-import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -452,24 +451,26 @@ import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
+import IndexList from "@/plugins/logs/IndexList.vue";
 
 export default defineComponent({
   name: "PageSearch",
   components: {
     SearchBar,
-    SearchSchedulersList,
-    IndexList: defineAsyncComponent(
-      () => import("@/plugins/logs/IndexList.vue"),
-    ),
+    IndexList,
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue"),
     ),
-    ConfirmDialog: defineAsyncComponent(
-      () => import("@/components/ConfirmDialog.vue"),
+    SearchSchedulersList: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchSchedulersList.vue"),
     ),
     SanitizedHtmlRenderer,
-    VisualizeLogsQuery,
-    SearchHistory,
+    VisualizeLogsQuery: defineAsyncComponent(
+      () => import("@/plugins/logs/VisualizeLogsQuery.vue"),
+    ),
+    SearchHistory: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchHistory.vue"),
+    ),
   },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
@@ -651,6 +652,7 @@ export default defineComponent({
       isLimitQuery,
       updateUrlQueryParams,
       addTraceId,
+      checkTimestampAlias,
     } = logsUtils();
     const {
       getHistogramData,
@@ -1234,16 +1236,8 @@ export default defineComponent({
           //   currentQuery.toLowerCase().indexOf("select ") == 0;
           if (!hasSelect) {
             if (currentQuery != "") {
-              currentQuery = currentQuery.split("|");
-              if (currentQuery.length > 1) {
-                selectFields = "," + currentQuery[0].trim();
-                if (currentQuery[1].trim() != "") {
-                  whereClause = "WHERE " + currentQuery[1].trim();
-                }
-              } else if (currentQuery[0].trim() != "") {
-                if (currentQuery[0].trim() != "") {
-                  whereClause = "WHERE " + currentQuery[0].trim();
-                }
+              if (currentQuery.trim() != "") {
+                  whereClause = "WHERE " + currentQuery;
               }
             }
 
@@ -2139,6 +2133,15 @@ export default defineComponent({
         ) {
           showErrorNotification(
             "Multiple SQL queries are not allowed to visualize",
+          );
+          variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+          return null;
+        }
+        
+        // validate that timestamp column is not used as an alias
+        if (!checkTimestampAlias(logsPageQuery)) {
+          showErrorNotification(
+            `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;

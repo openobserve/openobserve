@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 use hashbrown::HashMap;
 use promql_parser::parser::LabelModifier;
@@ -20,18 +21,12 @@ use promql_parser::parser::LabelModifier;
 use crate::service::promql::{
     aggregations::{Accumulate, AggFunc},
     common::std_deviation2,
-    value::{EvalContext, Sample, Value},
 };
 
-/// Aggregates Matrix input for range queries
 pub fn stddev(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
-    let (input_size, timestamps_count) = match &data {
-        Value::Matrix(m) => (m.len(), eval_ctx.timestamps().len()),
-        _ => (0, 0),
-    };
     log::info!(
-        "[trace_id: {}] [PromQL Timing] stddev() started with {input_size} series and {timestamps_count} timestamps",
+        "[trace_id: {}] [PromQL Timing] stddev() started",
         eval_ctx.trace_id,
     );
 
@@ -98,8 +93,9 @@ impl Accumulate for StddevAccumulate {
 mod tests {
     use std::sync::Arc;
 
+    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
+
     use super::*;
-    use crate::service::promql::value::{Label, RangeValue, Sample, Value};
 
     #[test]
     fn test_stddev_range_function() {

@@ -10,7 +10,7 @@ export class CipherKeys {
 
         this.settingsMenu = page.locator('[data-test="menu-link-settings-item"]');
         this.cipherKeyTab = page.locator('[data-test="management-cipher-key-tab"]');
-        this.addCipherKeyButton = page.getByRole('button', { name: 'Add Cipher Key' });
+        this.addCipherKeyButton = page.getByRole('button', { name: 'New cipher key' });
         this.nameInput = page.locator('[data-test="add-cipher-key-name-input"]');
         this.secretInput = page.locator('[data-test="add-cipher-key-openobserve-secret-input"]');
         this.continueButton = page.locator('[data-test="add-report-step1-continue-btn"]');
@@ -42,9 +42,9 @@ export class CipherKeys {
       }
 
       async addCipherKey() {
-        await this.page.waitForSelector('button', { name: 'Add Cipher Key' });
+        await this.page.waitForSelector('button', { name: 'New cipher key' });
         await this.addCipherKeyButton.click();
-       
+
       }
 
       async addCipherKeyName(name) {

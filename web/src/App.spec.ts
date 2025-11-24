@@ -37,7 +37,20 @@ describe('App.vue', () => {
     // Create mock store
     mockDispatch = vi.fn();
     store = createStore({
-      state: {},
+      state: {
+        defaultThemeColors: {
+          light: "#3F7994",
+          dark: "#5B9FBE",
+        },
+        tempThemeColors: {
+          light: null,
+          dark: null,
+        },
+        theme: 'light',
+        organizationData: {
+          organizationSettings: {}
+        }
+      },
       mutations: {},
       actions: {},
       dispatch: mockDispatch

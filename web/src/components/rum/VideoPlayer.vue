@@ -18,14 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="player-container full-height q-pa-sm">
     <div
       v-if="isLoading"
-      class="q-pb-lg flex items-center justify-center text-center full-width"
-      style="height: calc(100vh - 200px)"
+      class="q-pb-lg flex items-center justify-center text-center full-width tw-h-[calc(100vh-12.5rem)]"
     >
       <div>
         <q-spinner-hourglass
           color="primary"
-          size="40px"
-          style="margin: 0 auto; display: block"
+          size="2.5rem"
+          class="tw-mx-auto tw-block"
         />
         <div class="text-center full-width">
           Hold on tight, we're fetching session.
@@ -34,8 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       ref="playerContainerRef"
-      class="flex items-center justify-center"
-      style="height: calc(100vh - 198px)"
+      class="flex items-center justify-center tw-h-[calc(100vh-12.375rem)]"
     >
       <div
         ref="playerRef"
@@ -65,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :style="{
             width: '2px',
             left: playerState.progressWidth - 2 + 'px',
-            bottom: '-5px',
-            height: '15px',
+            bottom: '-0.3125rem',
+            height: '0.9375rem',
             transition: 'all 0.1s linear',
           }"
         />
@@ -80,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             left:
               (event.relativeTime / playerState.totalTime) * playerState.width +
               'px',
-            bottom: '-5px',
-            height: '15px',
+            bottom: '-0.3125rem',
+            height: '0.9375rem',
           }"
           :title="
             event.name.length > 100
@@ -95,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <q-icon
               name="replay_10"
-              size="24px"
-              class="q-mr-sm cursor-pointer"
+              size="1.5rem"
+              class="q-mr-sm cursor-pointer tw-text-[var(--o2-icon-color-dark)] hover:tw-text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('backward')"
             />
             <q-icon
@@ -105,14 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'pause_circle_filled'
                   : 'play_circle_filled'
               "
-              size="32px"
-              class="cursor-pointer"
+              size="2rem"
+              class="cursor-pointer tw-text-[var(--o2-icon-color-dark)] hover:tw-text-[var(--o2-primary-btn-bg)]"
               @click="togglePlay"
             />
             <q-icon
               name="forward_10"
-              size="24px"
-              class="q-ml-sm cursor-pointer"
+              size="1.5rem"
+              class="q-ml-sm cursor-pointer tw-text-[var(--o2-icon-color-dark)] hover:tw-text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('forward')"
             />
           </div>
@@ -573,7 +571,7 @@ defineExpose({
 
 .playback_bar {
   width: 100%;
-  height: 5px;
+  height: 0.3125rem;
   background-color: #ebebeb;
 }
 </style>
@@ -581,14 +579,14 @@ defineExpose({
 <style lang="scss">
 .speed-selector {
   .q-field__control {
-    padding: 0 8px !important;
+    padding: 0 0.5rem !important;
   }
 
   .q-field__marginal,
   .q-field__native,
   .q-field__control {
-    min-height: 30px !important;
-    height: 30px !important;
+    min-height: 1.875rem !important;
+    height: 1.875rem !important;
   }
 }
 </style>

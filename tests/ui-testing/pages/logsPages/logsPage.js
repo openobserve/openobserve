@@ -227,10 +227,19 @@ export class LogsPage {
     }
 
     async selectIndexAndStreamJoin() {
+        // Select both default and e2e_automate streams for join queries
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
         await this.page.waitForTimeout(3000);
+
+        // Select default stream
         await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
         await this.page.waitForTimeout(1000);
+
+        // Select e2e_automate stream (dropdown stays open after first selection)
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Close dropdown
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
     }
 
@@ -1774,6 +1783,29 @@ export class LogsPage {
         return await expect(this.page.locator(this.pagination)).not.toBeVisible();
     }
 
+    async expectResultPaginationVisible() {
+        return await expect(this.page.locator(this.resultPagination)).toBeVisible();
+    }
+
+    async clickPaginationPage(pageNumber) {
+        return await this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first().click();
+    }
+
+    async getPaginationPageCount() {
+        const pageButtons = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: /^\d+$/ });
+        return await pageButtons.count();
+    }
+
+    async getPaginationPageClasses(pageNumber) {
+        const pageButton = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first();
+        return await pageButton.getAttribute('class');
+    }
+
+    async isPaginationPageActive(pageNumber) {
+        const classes = await this.getPaginationPageClasses(pageNumber);
+        return classes && (classes.includes('bg-primary') || classes.includes('unelevated'));
+    }
+
     async expectSQLPaginationNotVisible() {
         return await expect(this.page.locator(this.sqlPagination)).not.toBeVisible();
     }
@@ -2474,6 +2506,11 @@ export class LogsPage {
         return this.page.locator(this.kubernetesFieldsSelector);
     }
 
+    async getKubernetesFieldsCount() {
+        const kubernetesFields = this.page.locator(this.kubernetesFieldsSelector);
+        return await kubernetesFields.count();
+    }
+
     async getSpecificFieldLocator(fieldName) {
         return this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
     }
@@ -2526,5 +2563,71 @@ export class LogsPage {
 
     async waitForUI(timeout = 500) {
         await this.page.waitForTimeout(timeout);
+    }
+
+    // Methods specifically for multistream testing that don't already exist
+    async navigateToHome() {
+        return await this.page.locator('[data-test="menu-link-\\/-item"]').click();
+    }
+
+    async fillStreamFilter(streamName) {
+        return await this.page.locator('[data-test="log-search-index-list-select-stream"]').fill(streamName);
+    }
+
+    async toggleStreamSelection(streamName) {
+        return await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).nth(2).click();
+    }
+
+    async toggleQueryModeEditor() {
+        return await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+    }
+
+    async clickMonacoEditor() {
+        return await this.page.locator('#fnEditor').locator('.monaco-editor').click();
+    }
+
+    async fillMonacoEditor(text) {
+        return await this.page.locator('#fnEditor').locator('.inputarea').fill(text);
+    }
+
+    async getCellByName(name) {
+        return await this.page.getByRole('cell', { name });
+    }
+
+    async clickCellByName(name) {
+        return await this.page.getByRole('cell', { name }).click();
+    }
+
+    async clickTableExpandMenuFirst() {
+        return await this.page.locator('[data-test="table-row-expand-menu"]').first().click({ force: true });
+    }
+
+    async clickTimestampColumnMenu() {
+        return await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+    }
+
+    async clickDateTimeButton() {
+        return await this.page.locator('[data-test="date-time-btn"]').click();
+    }
+
+    async selectRelative6Hours() {
+        return await this.page.locator('[data-test="date-time-relative-6-h-btn"]').click();
+    }
+
+    async navigateToStreams() {
+        return await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
+    }
+
+    async navigateToStreamsAlternate() {
+        return await this.page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
+    }
+
+    async searchStreamByPlaceholder(searchText) {
+        await this.page.getByPlaceholder("Search Stream").click();
+        return await this.page.getByPlaceholder("Search Stream").fill(searchText);
+    }
+
+    async clickFirstExploreButton() {
+        return await this.page.getByRole("button", { name: "Explore" }).first().click({ force: true });
     }
 } 

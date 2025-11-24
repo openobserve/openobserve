@@ -15,28 +15,14 @@
 
 use std::time::Duration;
 
+use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 
-use crate::service::promql::{
-    functions::RangeFunc,
-    value::{EvalContext, Sample, Value},
-};
+use crate::service::promql::functions::RangeFunc;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent_over_time
-/// Enhanced version that processes all timestamps at once for range queries
 pub(crate) fn absent_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] absent_over_time() started",
-        eval_ctx.trace_id
-    );
-    let result = super::eval_range(data, AbsentOverTimeFunc::new(), eval_ctx);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] absent_over_time() execution took: {:?}",
-        eval_ctx.trace_id,
-        start.elapsed()
-    );
-    result
+    super::eval_range(data, AbsentOverTimeFunc::new(), eval_ctx)
 }
 
 pub struct AbsentOverTimeFunc;

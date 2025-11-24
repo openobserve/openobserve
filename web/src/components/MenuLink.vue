@@ -266,7 +266,7 @@ export default defineComponent({
       left: 0;
       right: 0;
       bottom: 0;
-      background: linear-gradient(180deg, var(--o2-menu-gradient-start) 0%, transparent 20%, var(--o2-menu-gradient-end) 100%);
+      background: --o2-menu-gradient-start;
       border-radius: 0 6px 6px 0;
       pointer-events: none;
     }

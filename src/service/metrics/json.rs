@@ -416,7 +416,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             }
 
             // check for schema evolution
-            let _ = check_for_schema(
+            let (_schema_evolution, _infer_schema) = check_for_schema(
                 org_id,
                 &stream_name,
                 StreamType::Metrics,
@@ -425,7 +425,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                 timestamp,
                 false, // is_derived is false for metrics
             )
-            .await;
+            .await?;
 
             // write into buffer
             let schema = stream_schema_map

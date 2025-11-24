@@ -14,15 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::promql::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL},
+    meta::promql::{
+        BUCKET_LABEL, HASH_LABEL, NAME_LABEL,
+        value::{EvalContext, LabelsExt, RangeValue, Sample, Value, signature_without_labels},
+    },
     utils::sort::sort_float,
 };
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
-
-use crate::service::promql::value::{
-    EvalContext, LabelsExt, RangeValue, Sample, Value, signature_without_labels,
-};
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
 #[derive(Debug, Clone, PartialEq)]
@@ -39,28 +38,10 @@ impl Bucket {
 
 /// Enhanced version that processes all timestamps at once for range queries
 pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] histogram_quantile() started with phi={phi}, {} time points",
-        eval_ctx.trace_id,
-        eval_ctx.timestamps().len()
-    );
-
     // Handle input data - convert to matrix format if needed
     let in_matrix = match data {
-        Value::Matrix(m) => {
-            log::info!(
-                "[trace_id: {}] [PromQL Timing] histogram_quantile() processing {} series",
-                eval_ctx.trace_id,
-                m.len()
-            );
-            m
-        }
+        Value::Matrix(m) => m,
         Value::None => {
-            log::info!(
-                "[trace_id: {}] [PromQL Timing] histogram_quantile() received None input",
-                eval_ctx.trace_id
-            );
             return Ok(Value::None);
         }
         _ => {
@@ -134,12 +115,6 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
         }
     }
 
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] histogram_quantile() total execution took: {:?}, produced {} series",
-        eval_ctx.trace_id,
-        start.elapsed(),
-        range_values.len()
-    );
     Ok(Value::Matrix(range_values))
 }
 
