@@ -226,7 +226,6 @@ export default defineComponent({
         { name: 'Workload management (QoS)', values: { opensource: false, enterprise: true, cloud: false } },
         { name: 'Audit trail', values: { opensource: false, enterprise: true, cloud: true } },
         { name: 'Action Scripts', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Cipher keys (HIPAA, PCI compliance)', values: { opensource: false, enterprise: true, cloud: true } },
         { name: 'Sensitive data redaction', values: { opensource: false, enterprise: true, cloud: true } },
         { name: 'Ability to influence roadmap', values: { opensource: false, enterprise: true, cloud: '✅ on enterprise plan' } },
         { name: 'License', values: { opensource: 'AGPL', enterprise: 'Enterprise', cloud: 'Cloud' } },
