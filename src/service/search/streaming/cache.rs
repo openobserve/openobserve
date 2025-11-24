@@ -171,14 +171,17 @@ pub async fn handle_cache_responses_and_deltas(
     let mut curr_res_size = 0; // number of records
 
     let mut remaining_query_range = remaining_query_range as f64; // hours
-    let cache_start_time = cached_resp
-        .first()
-        .map(|c| c.response_start_time)
-        .unwrap_or_default();
-    let cache_end_time = cached_resp
-        .last()
-        .map(|c| c.response_end_time)
-        .unwrap_or_default();
+
+    // Get the actual min/max timestamps regardless of sort order
+    // We need to consider both start and end times from all cached responses
+    // to handle cases where entries might have inverted times or overlapping ranges
+    let mut all_timestamps = Vec::new();
+    for cached in &cached_resp {
+        all_timestamps.push(cached.response_start_time);
+        all_timestamps.push(cached.response_end_time);
+    }
+    let cache_start_time = all_timestamps.iter().min().copied().unwrap_or_default();
+    let cache_end_time = all_timestamps.iter().max().copied().unwrap_or_default();
     let cache_duration = cache_end_time - cache_start_time; // microseconds
     let cached_search_duration = cache_duration + (max_query_range * 3600 * 1_000_000); // microseconds
 
