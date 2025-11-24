@@ -28,7 +28,6 @@ use config::{
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
     catalog::TableProvider,
-    common::Column,
     datasource::{
         file_format::parquet::ParquetFormat,
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
@@ -46,7 +45,7 @@ use datafusion::{
     optimizer::{AnalyzerRule, OptimizerRule},
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::execute_stream,
-    prelude::{Expr, SessionContext},
+    prelude::{SessionContext, col},
 };
 use futures::TryStreamExt;
 use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
@@ -735,13 +734,8 @@ impl TableBuilder {
 
         if self.sorted_by_time {
             // specify sort columns for parquet file
-            listing_options = listing_options.with_file_sort_order(vec![vec![
-                datafusion::logical_expr::SortExpr {
-                    expr: Expr::Column(Column::new_unqualified(TIMESTAMP_COL_NAME.to_string())),
-                    asc: false,
-                    nulls_first: false,
-                },
-            ]]);
+            listing_options = listing_options
+                .with_file_sort_order(vec![vec![col(TIMESTAMP_COL_NAME).sort(false, false)]]);
         }
 
         let schema_key = schema.hash_key();
