@@ -62,7 +62,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
             .collect();
 
         if !allowed_hours.is_empty() && !allowed_hours.contains(&current_hour) {
-            log::debug!(
+            log::info!(
                 "[COMPACTOR] retention skipped: current hour {} is not in allowed hours {:?}",
                 current_hour,
                 allowed_hours
