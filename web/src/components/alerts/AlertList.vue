@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`stream-association-table-${props.row.trace_id}-row`"
                     :props="props"
                     style="cursor: pointer"
-                    @click="triggerExpand(props)"
+                    @click="triggerExpandRow(props)"
                   >
                     <q-td>
                       <q-checkbox
@@ -369,6 +369,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template v-else>
                         {{ props.row[col.field] }}
                       </template>
+                    </q-td>
+                  </q-tr>
+                      <!-- //this is added temporarily so once alert history is implemented this wont be there
+                      //Version - 0.001 -->
+                  <q-tr v-show="expandedRowDetails === props.row.alert_id" :props="props">
+                    <q-td colspan="100%">
+                      <div class="text-left tw-px-2 q-mb-sm expand-content">
+                        <div class="tw-flex tw-items-start tw-justify-start">
+                          <strong
+                            >{{
+                              props.row.type == "sql" ? "SQL Query" : "Conditions"
+                            }}
+                            :
+                            <span
+                              v-if="
+                                props.row.conditions != '' &&
+                                props.row.conditions != '--'
+                              "
+                            >
+                              <q-btn
+                                @click.stop="
+                                  copyToClipboard(
+                                    props.row.conditions,
+                                    'Conditions',
+                                  )
+                                "
+                                size="xs"
+                                dense
+                                flat
+                                icon="content_copy"
+                                class="copy-btn-sql tw-ml-2 tw-py-2 tw-px-2" /></span
+                          ></strong>
+                        </div>
+
+                        <div
+                          data-test="scheduled-pipeline-expanded-sql"
+                          class="scroll-content expanded-sql"
+                        >
+                          <pre style="text-wrap: wrap"
+                            >{{
+                              props.row.conditions != "" &&
+                              props.row.conditions != "--"
+                                ? (props.row.type == 'sql' ? props.row.conditions : props.row.conditions.length != 2  ? `if ${props.row.conditions}` : 'No condition')
+                                : "No condition"
+                            }} </pre
+                          >
+                        </div>
+                      </div>
+                      <div class="text-left tw-px-2 q-mb-sm expand-content">
+                        <div class="tw-flex tw-items-start tw-justify-start">
+                          <strong>Description : <span></span></strong>
+                        </div>
+
+                        <div
+                          data-test="scheduled-pipeline-expanded-sql"
+                          class="scroll-content expanded-sql"
+                        >
+                          <pre style="text-wrap: wrap"
+                            >{{ props.row?.description || "No description" }}  </pre
+                          >
+                        </div>
+                      </div>
                     </q-td>
                   </q-tr>
                 </template>
@@ -886,6 +948,16 @@ export default defineComponent({
     const selectedAlertDetails: Ref<any> = ref(null);
     const expandedAlertHistory: Ref<any[]> = ref([]);
     const isLoadingHistory = ref(false);
+    const expandedRowDetails: Ref<any> = ref("");
+    //this is added temporarily so once alert history is implemented this wont be there
+    //Version - 0.001
+    const triggerExpandRow = (props: any) => {
+      if (expandedRowDetails.value === props.row.alert_id) {
+        expandedRowDetails.value = null;
+      } else {
+        expandedRowDetails.value = props.row.alert_id;
+      }
+    };
 
     const historyTableColumns = [
       {
@@ -947,11 +1019,11 @@ export default defineComponent({
     };
 
     const triggerExpand = (props: any) => {
-      // Open drawer instead of inline expansion
-      selectedAlertDetails.value = props.row;
-      showAlertDetailsDrawer.value = true;
+      // Disabled: Open drawer instead of inline expansion
+      // selectedAlertDetails.value = props.row;
+      // showAlertDetailsDrawer.value = true;
       // Fetch history for this alert
-      fetchAlertHistory(props.row.alert_id);
+      // fetchAlertHistory(props.row.alert_id);
     };
 
     // Handle ESC key and click outside to close drawer
@@ -2469,6 +2541,10 @@ export default defineComponent({
       transformToExpression,
       filterAlertsByQuery,
       bulkToggleAlerts,
+      expandedRowDetails,
+      //this is added temporarily so once alert history is implemented this wont be there
+      //Version - 0.001
+      triggerExpandRow,
     };
   },
 });
