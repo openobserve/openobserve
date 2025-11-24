@@ -531,22 +531,24 @@ fn hide_sensitive_fields(mut value: serde_json::Value) -> serde_json::Value {
             let key_lower = key.to_lowercase();
 
             // Simple rule: contains any of these sensitive keywords
+            // Also hide header values that might contain credentials
             let is_sensitive = key_lower.contains("password")
                 || key_lower.contains("secret")
                 || key_lower.contains("key")
                 || key_lower.contains("auth")
                 || key_lower.contains("token")
-                || key_lower.contains("credential");
+                || key_lower.contains("credential")
+                || (key_lower.contains("header") && key_lower.contains("value"));
 
-            if is_sensitive {
-                if let Some(s) = val.as_str() {
-                    *val = if s.is_empty() {
-                        serde_json::Value::String("[not set]".to_string())
-                    } else {
-                        serde_json::Value::String("[hidden]".to_string())
-                    };
-                }
-            } else if val.is_object() {
+            if is_sensitive && let Some(s) = val.as_str() {
+                *val = if s.is_empty() {
+                    serde_json::Value::String("[not set]".to_string())
+                } else {
+                    serde_json::Value::String("[hidden]".to_string())
+                };
+            }
+
+            if val.is_object() {
                 *val = hide_sensitive_fields(val.clone());
             }
         }
