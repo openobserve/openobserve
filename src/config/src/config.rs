@@ -1564,6 +1564,8 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_MODE", default = "deleted")]
     // "history" "deleted" "none"
     pub file_list_deleted_mode: String,
+    #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_BATCH_SIZE", default = 1000)]
+    pub file_list_deleted_batch_size: usize,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 0,
