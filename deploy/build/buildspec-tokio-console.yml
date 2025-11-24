@@ -25,7 +25,7 @@ phases:
       - docker buildx install
 
       # build openobserve
-      - docker pull public.ecr.aws/zinclabs/rust:bookworm-sccache
+      - docker pull public.ecr.aws/zinclabs/rust:trixie-sccache
       - docker build --build-arg AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION --build-arg AWS_CONTAINER_CREDENTIALS_RELATIVE_URI=$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI -t openobserve:tokio-console-amd64 -f deploy/build/Dockerfile.tokio-console.amd64 .
       - docker tag openobserve:tokio-console-amd64 public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-tokio-console-amd64
       - docker push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-tokio-console-amd64
