@@ -194,8 +194,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tr
                     :data-test="`stream-association-table-${props.row.trace_id}-row`"
                     :props="props"
-                    style="cursor: pointer"
-                    @click="triggerExpand(props)"
                   >
                     <q-td>
                       <q-checkbox
@@ -947,11 +945,11 @@ export default defineComponent({
     };
 
     const triggerExpand = (props: any) => {
-      // Open drawer instead of inline expansion
-      selectedAlertDetails.value = props.row;
-      showAlertDetailsDrawer.value = true;
+      // Disabled: Open drawer instead of inline expansion
+      // selectedAlertDetails.value = props.row;
+      // showAlertDetailsDrawer.value = true;
       // Fetch history for this alert
-      fetchAlertHistory(props.row.alert_id);
+      // fetchAlertHistory(props.row.alert_id);
     };
 
     // Handle ESC key and click outside to close drawer
