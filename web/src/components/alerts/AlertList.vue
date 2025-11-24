@@ -371,6 +371,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </q-td>
                   </q-tr>
+                      <!-- //this is added temporarily so once alert history is implemented this wont be there
+                      //Version - 0.001 -->
                   <q-tr v-show="expandedRowDetails === props.row.alert_id" :props="props">
                     <q-td colspan="100%">
                       <div class="text-left tw-px-2 q-mb-sm expand-content">
@@ -947,7 +949,8 @@ export default defineComponent({
     const expandedAlertHistory: Ref<any[]> = ref([]);
     const isLoadingHistory = ref(false);
     const expandedRowDetails: Ref<any> = ref("");
-
+    //this is added temporarily so once alert history is implemented this wont be there
+    //Version - 0.001
     const triggerExpandRow = (props: any) => {
       if (expandedRowDetails.value === props.row.alert_id) {
         expandedRowDetails.value = null;
@@ -2539,6 +2542,8 @@ export default defineComponent({
       filterAlertsByQuery,
       bulkToggleAlerts,
       expandedRowDetails,
+      //this is added temporarily so once alert history is implemented this wont be there
+      //Version - 0.001
       triggerExpandRow,
     };
   },
