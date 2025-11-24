@@ -1783,6 +1783,29 @@ export class LogsPage {
         return await expect(this.page.locator(this.pagination)).not.toBeVisible();
     }
 
+    async expectResultPaginationVisible() {
+        return await expect(this.page.locator(this.resultPagination)).toBeVisible();
+    }
+
+    async clickPaginationPage(pageNumber) {
+        return await this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first().click();
+    }
+
+    async getPaginationPageCount() {
+        const pageButtons = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: /^\d+$/ });
+        return await pageButtons.count();
+    }
+
+    async getPaginationPageClasses(pageNumber) {
+        const pageButton = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first();
+        return await pageButton.getAttribute('class');
+    }
+
+    async isPaginationPageActive(pageNumber) {
+        const classes = await this.getPaginationPageClasses(pageNumber);
+        return classes && (classes.includes('bg-primary') || classes.includes('unelevated'));
+    }
+
     async expectSQLPaginationNotVisible() {
         return await expect(this.page.locator(this.sqlPagination)).not.toBeVisible();
     }
