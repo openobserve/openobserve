@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="cards-wrapper">
       <div
-        v-for="edition in featureData.editions"
+        v-for="edition in editions"
         :key="edition.id"
         class="edition-card"
         :class="{
@@ -69,40 +69,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Card Header -->
         <div class="card-header">
           <div class="header-content">
-            <div class="edition-name">{{ edition.name }}</div>
+            <div class="edition-info">
+              <div class="edition-name">{{ edition.name }}</div>
+              <div class="edition-description">{{ edition.description }}</div>
+            </div>
             <div v-if="store.state.zoConfig.build_type === edition.id" class="current-plan-badge">
               Your Plan
             </div>
           </div>
         </div>
 
-        <!-- Card Body - Feature List -->
+        <!-- Card Body -->
         <div class="card-body">
+          <!-- Included Features -->
           <div
-            v-for="feature in featureData.features"
-            :key="feature.name"
-            class="feature-item"
+            v-for="(group, index) in edition.includes"
+            :key="index"
+            class="feature-group"
           >
-            <div class="feature-status">
-              <span v-if="feature.values[edition.id] === true" class="status-icon available">
-                <q-icon name="check_circle" size="16px" />
-              </span>
-              <span v-else-if="feature.values[edition.id] === false" class="status-icon unavailable">
-                <q-icon name="cancel" size="16px" />
-              </span>
-              <span v-else class="status-icon text">
-                <q-icon name="info" size="14px" />
-              </span>
+            <div class="group-header">
+              <q-icon name="check_circle" size="16px" class="header-icon" />
+              <span class="group-title">{{ group.title }}</span>
             </div>
-            <div class="feature-content">
-              <div class="feature-name">{{ feature.name }}</div>
-              <div
-                v-if="typeof feature.values[edition.id] === 'string'"
-                class="feature-detail"
+            <ul class="feature-list">
+              <li
+                v-for="(item, itemIndex) in group.items"
+                :key="itemIndex"
+                class="feature-list-item"
               >
-                {{ feature.values[edition.id] }}
-              </div>
-            </div>
+                {{ item }}
+              </li>
+            </ul>
+          </div>
+
+          <!-- Pricing -->
+          <div class="pricing-section">
+            <q-icon
+              :name="edition.pricing.iconName"
+              size="20px"
+              :color="edition.pricing.iconColor"
+              class="pricing-icon"
+            />
+            <span class="pricing-text">{{ edition.pricing.text }}</span>
           </div>
         </div>
       </div>
@@ -114,25 +122,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
 
-interface FeatureValue {
-  opensource: boolean | string;
-  enterprise: boolean | string;
-  cloud: boolean | string;
+interface FeatureGroup {
+  title: string;
+  items: string[];
 }
 
-interface Feature {
-  name: string;
-  values: FeatureValue;
-}
-
-interface Edition {
+interface EditionInfo {
   id: 'opensource' | 'enterprise' | 'cloud';
   name: string;
-}
-
-interface FeatureData {
-  editions: Edition[];
-  features: Feature[];
+  description: string;
+  includes: FeatureGroup[];
+  pricing: {
+    iconName: string;
+    iconColor: string;
+    text: string;
+  };
 }
 
 export default defineComponent({
@@ -140,53 +144,98 @@ export default defineComponent({
   setup() {
     const store = useStore();
 
-    const featureData: FeatureData = {
-      editions: [
-        { id: 'opensource', name: 'Open Source (Self hosted)' },
-        { id: 'enterprise', name: 'Enterprise (Self hosted)' },
-        { id: 'cloud', name: 'Cloud' }
-      ],
-      features: [
-        { name: 'Logs', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Metrics', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Traces', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'RUM', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Alerts', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Dashboards', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Reports', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'VRL functions', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Pipelines', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'High Availability', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Multitenancy (Organizations)', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Dynamic schema and schema evolution', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Advanced multilingual GUI', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Single Sign On', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Role Based Access Control (RBAC)', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Federated search / Super cluster', values: { opensource: false, enterprise: true, cloud: false } },
-        { name: 'Query management', values: { opensource: false, enterprise: true, cloud: false } },
-        { name: 'Workload management (QoS)', values: { opensource: false, enterprise: true, cloud: false } },
-        { name: 'Audit trail', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Action Scripts', values: { opensource: false, enterprise: true, cloud: false } },
-        { name: 'Sensitive data redaction', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Ability to influence roadmap', values: { opensource: false, enterprise: true, cloud: '✅ on enterprise plan' } },
-        { name: 'License', values: { opensource: 'AGPL', enterprise: 'Enterprise', cloud: 'Cloud' } },
-        { name: 'Support', values: { opensource: 'Community', enterprise: 'Enterprise', cloud: 'Cloud' } },
-        { name: 'Cost', values: { opensource: 'Free', enterprise: 'If self hosted, free for up to 200 GB/Day data ingested. Paid thereafter', cloud: '14 day free trial. Paid thereafter' } },
-        { name: 'Pipelines - External destinations', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Extreme performance (100x improvement for many queries)', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Query optimizer', values: { opensource: false, enterprise: true, cloud: true } }
-      ]
-    };
+    const editions: EditionInfo[] = [
+      {
+        id: 'opensource',
+        name: 'Open Source',
+        description: 'Self-hosted',
+        includes: [
+          {
+            title: 'Core Observability',
+            items: ['Logs, Metrics, Traces & RUM', 'Alerts & Dashboards', 'Reports & Pipelines']
+          },
+          {
+            title: 'Platform Features',
+            items: ['High Availability', 'Multitenancy (Organizations)', 'Dynamic schema evolution', 'Advanced multilingual GUI', 'VRL functions']
+          },
+          {
+            title: 'License & Support',
+            items: ['AGPL License', 'Community Support']
+          }
+        ],
+        pricing: {
+          iconName: 'celebration',
+          iconColor: 'var(--o2-primary-btn-bg)',
+          text: 'Free forever'
+        }
+      },
+      {
+        id: 'enterprise',
+        name: 'Enterprise',
+        description: 'Everything in Open Source, plus:',
+        includes: [
+          {
+            title: 'Security & Access',
+            items: ['Single Sign On (SSO)', 'Role Based Access Control (RBAC)', 'Audit trail', 'Sensitive data redaction']
+          },
+          {
+            title: 'Advanced Features',
+            items: ['Federated search / Super cluster', 'Query management', 'Workload management (QoS)', 'Action Scripts', 'Pipelines - External destinations']
+          },
+          {
+            title: 'Performance',
+            items: ['Extreme performance (100x improvement)', 'Query optimizer']
+          },
+          {
+            title: 'Additional Benefits',
+            items: ['Enterprise License', 'Enterprise Support', 'Ability to influence roadmap']
+          }
+        ],
+        pricing: {
+          iconName: 'card_giftcard',
+          iconColor: 'var(--o2-primary-btn-bg)',
+          text: 'Free up to 200 GB/day (~6 TB/month)'
+        }
+      },
+      {
+        id: 'cloud',
+        name: 'Cloud',
+        description: 'Fully managed OpenObserve with comprehensive features:',
+        includes: [
+          {
+            title: 'Core Observability',
+            items: ['Logs, Metrics, Traces & RUM', 'Alerts, Dashboards & Reports', 'Pipelines with external destinations', 'VRL functions']
+          },
+          {
+            title: 'Platform Features',
+            items: ['High Availability', 'Multitenancy (Organizations)', 'Dynamic schema evolution', 'Advanced multilingual GUI']
+          },
+          {
+            title: 'Security & Performance',
+            items: ['SSO & RBAC', 'Audit trail', 'Sensitive data redaction', 'Query optimizer', 'Extreme performance improvements']
+          },
+          {
+            title: 'Cloud Benefits',
+            items: ['Auto-scaling & managed infrastructure', 'Cloud License', 'Cloud Support', 'Ability to influence roadmap (on enterprise plan)']
+          }
+        ],
+        pricing: {
+          iconName: 'payments',
+          iconColor: 'var(--o2-primary-btn-bg)',
+          text: '14-day free trial, pay as you go'
+        }
+      }
+    ];
 
     const currentPlanName = computed(() => {
       const buildType = store.state.zoConfig.build_type;
-      const edition = featureData.editions.find((ed) => ed.id === buildType);
+      const edition = editions.find((ed: EditionInfo) => ed.id === buildType);
       return edition ? edition.name : "";
     });
 
     return {
       store,
-      featureData,
+      editions,
       currentPlanName,
     };
   }
@@ -251,17 +300,13 @@ export default defineComponent({
         margin-top: 0.5rem;
         margin-bottom: 0;
         padding: 0.75rem 1rem;
-        background: linear-gradient(
-          135deg,
-          rgba(76, 175, 80, 0.1),
-          rgba(33, 150, 243, 0.1)
-        );
-        border-left: 3px solid #4caf50;
+        background: color-mix(in srgb, var(--o2-primary-btn-bg) 10%, transparent 90%);
+        border-left: 3px solid var(--o2-primary-btn-bg);
         border-radius: 0.375rem;
 
         strong {
           font-weight: 600;
-          color: #4caf50;
+          color: var(--o2-primary-btn-bg);
         }
       }
     }
@@ -278,10 +323,11 @@ export default defineComponent({
     border: 1px solid rgba(128, 128, 128, 0.2);
     border-radius: 0.5rem;
     overflow: hidden;
-    background: var(--q-card-background, #fff);
+    background: var(--q-card-background);
     transition: all 0.3s ease;
     display: flex;
     flex-direction: column;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
     &:hover {
       transform: translateY(-2px);
@@ -289,11 +335,11 @@ export default defineComponent({
     }
 
     &.is-current-plan {
-      border: 2px solid var(--o2-theme-color);
+      border: 2px solid var(--o2-primary-btn-bg);
       box-shadow: 0 2px 12px rgba(33, 150, 243, 0.15);
 
       .card-header {
-        background: linear-gradient(135deg, var(--o2-theme-color), color-mix(in srgb, var(--o2-theme-color) 80%, #fff 20%));
+        background: linear-gradient(135deg, var(--o2-primary-btn-bg), color-mix(in srgb, var(--o2-primary-btn-bg) 80%, #fff 20%));
         color: white;
       }
     }
@@ -305,92 +351,145 @@ export default defineComponent({
 
       .header-content {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
-        gap: 0.5rem;
+        gap: 0.75rem;
       }
 
-      .edition-name {
-        font-size: 1rem;
-        font-weight: 600;
-        letter-spacing: -0.01em;
+      .edition-info {
         flex: 1;
         min-width: 0;
+
+        .edition-name {
+          font-size: 1.125rem;
+          font-weight: 600;
+          letter-spacing: -0.01em;
+          margin-bottom: 0.25rem;
+        }
+
+        .edition-description {
+          font-size: 0.75rem;
+          opacity: 0.85;
+          line-height: 1.3;
+        }
       }
 
       .current-plan-badge {
         display: inline-flex;
         align-items: center;
-        padding: 0.2rem 0.625rem;
-        background: rgba(255, 255, 255, 0.25);
-        border-radius: 0.75rem;
+        gap: 0.25rem;
+        padding: 0.25rem 0.75rem;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 1rem;
         font-size: 0.6875rem;
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.08em;
         white-space: nowrap;
         flex-shrink: 0;
+        color: var(--o2-primary-btn-bg);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+
+        &::before {
+          content: "★";
+          font-size: 0.75rem;
+          animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.7;
+            transform: scale(1.1);
+          }
+        }
       }
     }
 
     .card-body {
-      padding: 0.75rem 1rem 1rem;
+      padding: 1rem;
       overflow-y: auto;
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
 
-      .feature-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.625rem;
-        padding: 0.5rem 0;
-        border-bottom: 1px solid rgba(128, 128, 128, 0.08);
+      .feature-group {
+        .group-header {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-bottom: 0.5rem;
 
-        &:last-child {
-          border-bottom: none;
-        }
-
-        .feature-status {
-          flex-shrink: 0;
-          margin-top: 0.0625rem;
-
-          .status-icon {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-
-            &.available {
-              color: #4caf50;
-            }
+          .header-icon {
+            color: var(--o2-primary-btn-bg);
 
             &.unavailable {
-              color: #f44336;
+              color: var(--q-negative);
               opacity: 0.5;
             }
+          }
 
-            &.text {
-              color: var(--o2-theme-color);
-            }
+          .group-title {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--q-text-color);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            opacity: 0.9;
           }
         }
 
-        .feature-content {
-          flex: 1;
-          min-width: 0;
+        .feature-list {
+          list-style: none;
+          padding: 0;
+          margin: 0 0 0 1.75rem;
 
-          .feature-name {
+          .feature-list-item {
             font-size: 0.8125rem;
-            font-weight: 500;
+            line-height: 1.6;
             color: var(--q-text-color);
-            line-height: 1.4;
-          }
+            opacity: 0.85;
+            margin-bottom: 0.375rem;
+            position: relative;
+            padding-left: 0.75rem;
 
-          .feature-detail {
-            font-size: 0.6875rem;
-            color: var(--q-text-color);
-            opacity: 0.7;
-            margin-top: 0.2rem;
-            line-height: 1.3;
+            &::before {
+              content: "•";
+              position: absolute;
+              left: 0;
+              color: var(--o2-primary-btn-bg);
+              font-weight: bold;
+            }
+
+            &:last-child {
+              margin-bottom: 0;
+            }
           }
+        }
+      }
+
+      .pricing-section {
+        margin-top: auto;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(128, 128, 128, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+
+        .pricing-icon {
+          flex-shrink: 0;
+        }
+
+        .pricing-text {
+          font-size: 0.8125rem;
+          font-weight: 600;
+          color: var(--q-text-color);
+          line-height: 1.4;
         }
       }
     }
@@ -399,19 +498,47 @@ export default defineComponent({
   // Dark theme adjustments
   :deep(.body--dark) {
     .edition-card {
-      background: rgba(255, 255, 255, 0.03);
-      border-color: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.03) !important;
+      border-color: rgba(255, 255, 255, 0.1) !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
 
       &:hover {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(255, 255, 255, 0.05) !important;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
       }
 
       &.is-current-plan {
-        background: rgba(33, 150, 243, 0.05);
+        background: rgba(33, 150, 243, 0.08) !important;
+        border-color: var(--o2-primary-btn-bg) !important;
+        box-shadow: 0 4px 16px rgba(33, 150, 243, 0.3) !important;
       }
 
-      .feature-item {
-        border-bottom-color: rgba(255, 255, 255, 0.05);
+      .card-header {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)) !important;
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+
+        .edition-description {
+          opacity: 0.75;
+        }
+
+        .current-plan-badge {
+          background: rgba(255, 255, 255, 0.15) !important;
+          color: #fff !important;
+          border-color: rgba(255, 255, 255, 0.25);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        }
+      }
+
+      .feature-list-item {
+        opacity: 0.8;
+
+        &::before {
+          opacity: 0.9;
+        }
+      }
+
+      .pricing-section {
+        border-top-color: rgba(255, 255, 255, 0.08);
       }
     }
   }
