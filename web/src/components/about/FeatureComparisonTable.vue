@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hide-pagination
         flat
         bordered
+        dense
         class="feature-comparison-table o2-quasar-table"
       >
         <template v-slot:body="props">
@@ -167,7 +168,7 @@ export default defineComponent({
         field: 'name',
         align: 'left',
         sortable: false,
-        style: 'width: 35%; min-width: 200px;'
+        style: 'width: 250px; min-width: 200px;'
       },
       {
         name: 'opensource',
@@ -175,7 +176,7 @@ export default defineComponent({
         field: 'opensource',
         align: 'center',
         sortable: false,
-        style: 'width: 21.66%; min-width: 150px;'
+        style: 'width: 150px; max-width: 150px;'
       },
       {
         name: 'enterprise',
@@ -183,7 +184,7 @@ export default defineComponent({
         field: 'enterprise',
         align: 'center',
         sortable: false,
-        style: 'width: 21.66%; min-width: 150px;'
+        style: 'width: 150px; max-width: 150px;'
       },
       {
         name: 'cloud',
@@ -191,7 +192,7 @@ export default defineComponent({
         field: 'cloud',
         align: 'center',
         sortable: false,
-        style: 'width: 21.66%; min-width: 150px;'
+        style: 'width: 150px; max-width: 150px;'
       }
     ];
 
@@ -335,7 +336,9 @@ export default defineComponent({
   }
 
   .feature-comparison-table {
-    width: 100%;
+    width: auto;
+    margin: auto;
+    max-width: 800px;
     
     .feature-name-cell {
       font-weight: 500;
@@ -346,9 +349,11 @@ export default defineComponent({
     .feature-value-cell {
       text-align: center;
       padding: 0.875rem 1rem;
+      word-wrap: break-word;
+      white-space: normal;
 
       .status-icon {
-        font-size: 1.125rem;
+        font-size: 0.9rem;
         display: inline-block;
 
         &.status-available {
@@ -365,6 +370,8 @@ export default defineComponent({
         color: var(--q-text-color);
         display: block;
         padding: 0 0.5rem;
+        word-wrap: break-word;
+        white-space: normal;
       }
 
       &.highlighted-column {
