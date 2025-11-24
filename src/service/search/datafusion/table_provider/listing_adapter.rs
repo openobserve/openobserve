@@ -119,7 +119,9 @@ impl TableProvider for ListingTableAdapter {
             .scan(state, parquet_projection, filters, limit)
             .await?;
 
-        let parquet_exec = handler_tantivy_index(&self.trace_id, parquet_exec);
+        let reverse = !self.listing_table.options().file_sort_order.is_empty()
+            && parquet_exec.properties().output_ordering().is_none();
+        let parquet_exec = handler_tantivy_index(&self.trace_id, parquet_exec, reverse);
 
         // if the index condition can remove filter, we can skip the config
         // feature_query_remove_filter_with_index
@@ -128,17 +130,28 @@ impl TableProvider for ListingTableAdapter {
             .as_ref()
             .map(|v| v.can_remove_filter())
             .unwrap_or(true);
-        if can_remove_filter || get_config().common.feature_query_remove_filter_with_index {
-            apply_filter(
-                self.index_condition.as_ref(),
-                &parquet_exec.schema(),
-                &self.fst_fields,
-                parquet_exec,
-                filter_projection,
-            )
-        } else {
-            Ok(parquet_exec)
+        let plan =
+            if can_remove_filter || get_config().common.feature_query_remove_filter_with_index {
+                apply_filter(
+                    self.index_condition.as_ref(),
+                    &parquet_exec.schema(),
+                    &self.fst_fields,
+                    parquet_exec,
+                    filter_projection,
+                )?
+            } else {
+                parquet_exec
+            };
+
+        if reverse {
+            log::info!(
+                "[trace_id {}] attempted to split file groups by statistics, but there were more file groups than target_partitions: {}; falling back to unordered",
+                self.trace_id,
+                state.config().target_partitions(),
+            );
         }
+
+        Ok(plan)
     }
 
     fn supports_filters_pushdown(
@@ -149,14 +162,30 @@ impl TableProvider for ListingTableAdapter {
     }
 }
 
-fn handler_tantivy_index(trace_id: &str, plan: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
+fn handler_tantivy_index(
+    trace_id: &str,
+    plan: Arc<dyn ExecutionPlan>,
+    reverse: bool,
+) -> Arc<dyn ExecutionPlan> {
     if let Some(data_source_exec) = plan.as_any().downcast_ref::<DataSourceExec>()
         && let Some(config) = data_source_exec
             .data_source()
             .as_any()
             .downcast_ref::<FileScanConfig>()
     {
-        let file_groups = config.file_groups.clone();
+        let mut file_groups = config.file_groups.clone();
+
+        if reverse {
+            let new_file_groups = file_groups
+                .into_iter()
+                .map(|file_group| {
+                    let mut files = file_group.into_inner();
+                    files.reverse();
+                    FileGroup::new(files)
+                })
+                .collect();
+            file_groups = new_file_groups;
+        }
 
         let new_file_groups: Vec<_> = file_groups
             .into_par_iter()
