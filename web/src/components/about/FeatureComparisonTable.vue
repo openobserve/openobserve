@@ -57,82 +57,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="table-wrapper">
-      <q-table
-        :rows="featureData.features"
-        :columns="columns"
-        row-key="name"
-        :pagination="pagination"
-        hide-pagination
-        flat
-        bordered
-        class="feature-comparison-table o2-quasar-table"
+    <div class="cards-wrapper">
+      <div
+        v-for="edition in featureData.editions"
+        :key="edition.id"
+        class="edition-card"
+        :class="{
+          'is-current-plan': store.state.zoConfig.build_type === edition.id
+        }"
       >
-        <template v-slot:body="props">
-          <q-tr :props="props">
-            <q-td key="name" :props="props" class="feature-name-cell">
-              {{ props.row.name }}
-            </q-td>
-            <q-td
-              key="opensource"
-              :props="props"
-              class="feature-value-cell"
-              :class="{
-                'highlighted-column':
-                  store.state.zoConfig.build_type === 'opensource',
-              }"
-            >
-              <span v-if="props.row.values.opensource === true" class="status-icon status-available">
-                ✅
+        <!-- Card Header -->
+        <div class="card-header">
+          <div class="header-content">
+            <div class="edition-name">{{ edition.name }}</div>
+            <div v-if="store.state.zoConfig.build_type === edition.id" class="current-plan-badge">
+              Your Plan
+            </div>
+          </div>
+        </div>
+
+        <!-- Card Body - Feature List -->
+        <div class="card-body">
+          <div
+            v-for="feature in featureData.features"
+            :key="feature.name"
+            class="feature-item"
+          >
+            <div class="feature-status">
+              <span v-if="feature.values[edition.id] === true" class="status-icon available">
+                <q-icon name="check_circle" size="16px" />
               </span>
-              <span v-else-if="props.row.values.opensource === false" class="status-icon status-unavailable">
-                ❌
+              <span v-else-if="feature.values[edition.id] === false" class="status-icon unavailable">
+                <q-icon name="cancel" size="16px" />
               </span>
-              <span v-else class="status-text">
-                {{ props.row.values.opensource }}
+              <span v-else class="status-icon text">
+                <q-icon name="info" size="14px" />
               </span>
-            </q-td>
-            <q-td
-              key="enterprise"
-              :props="props"
-              class="feature-value-cell"
-              :class="{
-                'highlighted-column':
-                  store.state.zoConfig.build_type === 'enterprise',
-              }"
-            >
-              <span v-if="props.row.values.enterprise === true" class="status-icon status-available">
-                ✅
-              </span>
-              <span v-else-if="props.row.values.enterprise === false" class="status-icon status-unavailable">
-                ❌
-              </span>
-              <span v-else class="status-text">
-                {{ props.row.values.enterprise }}
-              </span>
-            </q-td>
-            <q-td key="cloud" :props="props" class="feature-value-cell">
-              <span v-if="props.row.values.cloud === true" class="status-icon status-available">
-                ✅
-              </span>
-              <span v-else-if="props.row.values.cloud === false" class="status-icon status-unavailable">
-                ❌
-              </span>
-              <span v-else class="status-text">
-                {{ props.row.values.cloud }}
-              </span>
-            </q-td>
-          </q-tr>
-        </template>
-      </q-table>
+            </div>
+            <div class="feature-content">
+              <div class="feature-name">{{ feature.name }}</div>
+              <div
+                v-if="typeof feature.values[edition.id] === 'string'"
+                class="feature-detail"
+              >
+                {{ feature.values[edition.id] }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
-import type { QTableColumn } from "quasar";
 
 interface FeatureValue {
   opensource: boolean | string;
@@ -160,45 +140,6 @@ export default defineComponent({
   setup() {
     const store = useStore();
 
-    const columns: QTableColumn[] = [
-      {
-        name: 'name',
-        label: 'Feature',
-        field: 'name',
-        align: 'left',
-        sortable: false,
-        style: 'width: 35%; min-width: 200px;'
-      },
-      {
-        name: 'opensource',
-        label: 'Open Source (Self hosted)',
-        field: 'opensource',
-        align: 'center',
-        sortable: false,
-        style: 'width: 21.66%; min-width: 150px;'
-      },
-      {
-        name: 'enterprise',
-        label: 'Enterprise (Self hosted)',
-        field: 'enterprise',
-        align: 'center',
-        sortable: false,
-        style: 'width: 21.66%; min-width: 150px;'
-      },
-      {
-        name: 'cloud',
-        label: 'Cloud',
-        field: 'cloud',
-        align: 'center',
-        sortable: false,
-        style: 'width: 21.66%; min-width: 150px;'
-      }
-    ];
-
-    const pagination = ref({
-      rowsPerPage: 0 // 0 means show all rows
-    });
-
     const featureData: FeatureData = {
       editions: [
         { id: 'opensource', name: 'Open Source (Self hosted)' },
@@ -225,7 +166,7 @@ export default defineComponent({
         { name: 'Query management', values: { opensource: false, enterprise: true, cloud: false } },
         { name: 'Workload management (QoS)', values: { opensource: false, enterprise: true, cloud: false } },
         { name: 'Audit trail', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Action Scripts', values: { opensource: false, enterprise: true, cloud: true } },
+        { name: 'Action Scripts', values: { opensource: false, enterprise: true, cloud: false } },
         { name: 'Sensitive data redaction', values: { opensource: false, enterprise: true, cloud: true } },
         { name: 'Ability to influence roadmap', values: { opensource: false, enterprise: true, cloud: '✅ on enterprise plan' } },
         { name: 'License', values: { opensource: 'AGPL', enterprise: 'Enterprise', cloud: 'Cloud' } },
@@ -246,8 +187,6 @@ export default defineComponent({
     return {
       store,
       featureData,
-      columns,
-      pagination,
       currentPlanName,
     };
   }
@@ -328,56 +267,130 @@ export default defineComponent({
     }
   }
 
-  .table-wrapper {
-    overflow-x: auto;
-    border-radius: 0.5rem;
+  .cards-wrapper {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
   }
 
-  .feature-comparison-table {
-    width: 100%;
-    
-    .feature-name-cell {
-      font-weight: 500;
-      color: var(--q-text-color);
-      padding: 0.875rem 1rem;
+  .edition-card {
+    border: 1px solid rgba(128, 128, 128, 0.2);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: var(--q-card-background, #fff);
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
     }
 
-    .feature-value-cell {
-      text-align: center;
+    &.is-current-plan {
+      border: 2px solid var(--o2-theme-color);
+      box-shadow: 0 2px 12px rgba(33, 150, 243, 0.15);
+
+      .card-header {
+        background: linear-gradient(135deg, var(--o2-theme-color), color-mix(in srgb, var(--o2-theme-color) 80%, #fff 20%));
+        color: white;
+      }
+    }
+
+    .card-header {
       padding: 0.875rem 1rem;
+      background: linear-gradient(135deg, rgba(128, 128, 128, 0.08), rgba(128, 128, 128, 0.04));
+      border-bottom: 1px solid rgba(128, 128, 128, 0.15);
 
-      .status-icon {
-        font-size: 1.125rem;
-        display: inline-block;
-
-        &.status-available {
-          color: #4caf50;
-        }
-
-        &.status-unavailable {
-          color: #f44336;
-        }
+      .header-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
       }
 
-      .status-text {
-        font-size: 0.875rem;
-        color: var(--q-text-color);
-        display: block;
-        padding: 0 0.5rem;
+      .edition-name {
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        flex: 1;
+        min-width: 0;
       }
 
-      &.highlighted-column {
-        background-color: color-mix(in srgb, var(--o2-theme-color) 15%, var(--o2-theme-mode) 85%);
-        font-weight: 500;
-        position: relative;
+      .current-plan-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.2rem 0.625rem;
+        background: rgba(255, 255, 255, 0.25);
+        border-radius: 0.75rem;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+    }
 
-        &::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 3px;
+    .card-body {
+      padding: 0.75rem 1rem 1rem;
+      overflow-y: auto;
+      flex: 1;
+
+      .feature-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.625rem;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid rgba(128, 128, 128, 0.08);
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        .feature-status {
+          flex-shrink: 0;
+          margin-top: 0.0625rem;
+
+          .status-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            &.available {
+              color: #4caf50;
+            }
+
+            &.unavailable {
+              color: #f44336;
+              opacity: 0.5;
+            }
+
+            &.text {
+              color: var(--o2-theme-color);
+            }
+          }
+        }
+
+        .feature-content {
+          flex: 1;
+          min-width: 0;
+
+          .feature-name {
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--q-text-color);
+            line-height: 1.4;
+          }
+
+          .feature-detail {
+            font-size: 0.6875rem;
+            color: var(--q-text-color);
+            opacity: 0.7;
+            margin-top: 0.2rem;
+            line-height: 1.3;
+          }
         }
       }
     }
@@ -385,34 +398,71 @@ export default defineComponent({
 
   // Dark theme adjustments
   :deep(.body--dark) {
-    .feature-comparison-table tbody tr:nth-child(even) {
+    .edition-card {
       background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(255, 255, 255, 0.1);
 
       &:hover {
-        background: rgba(33, 150, 243, 0.08);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      &.is-current-plan {
+        background: rgba(33, 150, 243, 0.05);
+      }
+
+      .feature-item {
+        border-bottom-color: rgba(255, 255, 255, 0.05);
       }
     }
   }
 
   // Responsive design
+  @media (max-width: 1024px) {
+    .cards-wrapper {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .edition-card {
+      &:hover {
+        transform: none;
+      }
+    }
+  }
+
   @media (max-width: 768px) {
-    padding: 1rem;
+    padding: 0.5rem;
 
-    .feature-comparison-table {
-      font-size: 0.8125rem;
+    .cards-wrapper {
+      gap: 0.75rem;
+    }
 
-      :deep(thead tr th) {
-        padding: 0.75rem 0.5rem;
-        font-size: 0.875rem;
+    .edition-card {
+      .card-header {
+        padding: 1rem;
+
+        .edition-name {
+          font-size: 1rem;
+        }
       }
 
-      .feature-name-cell,
-      .feature-value-cell {
-        padding: 0.625rem 0.5rem;
-      }
+      .card-body {
+        padding: 0.75rem 1rem 1rem;
 
-      .feature-value-cell .status-text {
-        font-size: 0.8125rem;
+        .feature-item {
+          padding: 0.5rem 0;
+          gap: 0.5rem;
+
+          .feature-content {
+            .feature-name {
+              font-size: 0.8125rem;
+            }
+
+            .feature-detail {
+              font-size: 0.6875rem;
+            }
+          }
+        }
       }
     }
   }
