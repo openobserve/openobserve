@@ -60,11 +60,8 @@ use {
 };
 
 use super::{
-    file_type::{FileType, GetExt},
-    planner::extension_planner::OpenobserveQueryPlanner,
-    storage::file_list,
-    table_provider::uniontable::NewUnionTable,
-    udf::transform_udf::get_all_transform,
+    planner::extension_planner::OpenobserveQueryPlanner, storage::file_list,
+    table_provider::uniontable::NewUnionTable, udf::transform_udf::get_all_transform,
 };
 use crate::service::{
     metadata::distinct_values::DISTINCT_STREAM_PREFIX,
@@ -728,7 +725,6 @@ impl TableBuilder {
         // Configure listing options
         let file_format = ParquetFormat::default();
         let mut listing_options = ListingOptions::new(Arc::new(file_format))
-            .with_file_extension(FileType::PARQUET.get_ext())
             .with_target_partitions(target_partitions)
             .with_collect_stat(true); // current is default to true
 
