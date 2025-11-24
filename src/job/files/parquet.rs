@@ -784,9 +784,7 @@ async fn merge_files(
         work_group: None,
         target_partitions: 0,
     };
-    let rules = hashbrown::HashMap::new();
     let table = TableBuilder::new()
-        .rules(rules)
         .sorted_by_time(true)
         .build(session, &new_file_list, schema.clone())
         .await?;

@@ -32,7 +32,7 @@
 
 use std::{any::Any, cmp::Ordering, sync::Arc};
 
-use arrow_schema::{DataType, Field, Schema, SchemaBuilder, SchemaRef, SortOptions};
+use arrow_schema::{Field, Schema, SchemaBuilder, SchemaRef, SortOptions};
 use async_trait::async_trait;
 use config::get_config;
 use datafusion::{
@@ -42,7 +42,10 @@ use datafusion::{
         TableProvider,
         file_format::parquet::ParquetFormat,
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl, PartitionedFile},
-        physical_plan::{FileGroup, FileScanConfig, FileScanConfigBuilder, ParquetSource},
+        physical_plan::{
+            FileGroup, FileScanConfig, FileScanConfigBuilder, FileSource, ParquetSource,
+        },
+        schema_adapter::{DefaultSchemaAdapterFactory, SchemaAdapter},
     },
     error::DataFusionError,
     execution::{
@@ -58,7 +61,6 @@ use futures::{
     future::{self, try_join_all},
     stream,
 };
-use hashbrown::HashMap;
 use helpers::*;
 use object_store::ObjectStore;
 use parquet_reader::NewParquetFileReaderFactory;
@@ -70,10 +72,13 @@ pub mod catalog;
 pub mod empty_table;
 pub mod enrich_table;
 mod helpers;
+#[allow(dead_code)]
+pub mod listing_adapter;
 pub mod memtable;
 mod parquet_reader;
 pub mod uniontable;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct NewListingTable {
     table_paths: Vec<ListingTableUrl>,
@@ -81,9 +86,9 @@ pub(crate) struct NewListingTable {
     file_schema: SchemaRef,
     /// File fields + partition columns
     table_schema: SchemaRef,
-    diff_rules: HashMap<String, DataType>,
     options: ListingOptions,
     collected_statistics: FileStatisticsCache,
+    /// Openobserve use field
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     need_optimize_partition: bool,
@@ -99,9 +104,9 @@ impl NewListingTable {
     /// If the schema is provided then it must be resolved before creating the table
     /// and should contain the fields of the file without the table
     /// partitioning columns.
+    #[allow(dead_code)]
     pub fn try_new(
         config: ListingTableConfig,
-        rules: HashMap<String, DataType>,
         index_condition: Option<IndexCondition>,
         fst_fields: Vec<String>,
         need_optimize_partition: bool,
@@ -124,7 +129,6 @@ impl NewListingTable {
             table_paths: config.table_paths,
             file_schema,
             table_schema: Arc::new(builder.finish()),
-            diff_rules: rules,
             options,
             collected_statistics: Arc::new(DefaultFileStatisticsCache::default()),
             index_condition,
@@ -141,6 +145,7 @@ impl NewListingTable {
     /// multiple times in the same session.
     ///
     /// If `None`, creates a new [`DefaultFileStatisticsCache`] scoped to this query.
+    #[allow(dead_code)]
     pub fn with_cache(mut self, cache: Option<FileStatisticsCache>) -> Self {
         self.collected_statistics =
             cache.unwrap_or(Arc::new(DefaultFileStatisticsCache::default()));
@@ -210,14 +215,26 @@ impl NewListingTable {
 
         let file_group = FileGroup::new(files);
         let file_groups = file_group.split_files(self.options.target_partitions);
-        let (file, stats) = compute_all_files_statistics(
+        let (mut file_groups, mut stats) = compute_all_files_statistics(
             file_groups,
             self.schema(),
             self.options.collect_stat,
             inexact_stats,
         )?;
 
-        Ok((file, stats))
+        let schema_adapter = self.create_schema_adapter();
+        let (schema_mapper, _) = schema_adapter.map_schema(self.file_schema.as_ref())?;
+
+        stats.column_statistics = schema_mapper.map_column_statistics(&stats.column_statistics)?;
+        file_groups.iter_mut().try_for_each(|file_group| {
+            if let Some(stat) = file_group.statistics_mut() {
+                stat.column_statistics =
+                    schema_mapper.map_column_statistics(&stat.column_statistics)?;
+            }
+            Ok::<_, DataFusionError>(())
+        })?;
+
+        Ok((file_groups, stats))
     }
 
     /// Collects statistics for a given partitioned file.
@@ -306,6 +323,27 @@ impl NewListingTable {
         let conf = FileScanConfigBuilder::from(conf).with_source(Arc::new(source));
         Ok(DataSourceExec::from_data_source(conf.build()))
     }
+
+    /// Creates a schema adapter for mapping between file and table schemas
+    ///
+    /// Uses the configured schema adapter factory if available, otherwise falls back
+    /// to the default implementation.
+    fn create_schema_adapter(&self) -> Box<dyn SchemaAdapter> {
+        let table_schema = self.schema();
+        DefaultSchemaAdapterFactory::from_schema(Arc::clone(&table_schema))
+    }
+
+    /// Creates a file source and applies schema adapter factory if available
+    fn create_file_source_with_schema_adapter(&self) -> Result<Arc<dyn FileSource>> {
+        let mut source = self.options.format.file_source();
+        // Apply schema adapter to source if available
+        //
+        // The source will use this SchemaAdapter to adapt data batches as they flow up the plan.
+        // Note: ListingTable also creates a SchemaAdapter in `scan()` but that is only used to
+        // adapt collected statistics.
+        source = source.with_schema_adapter_factory(Arc::new(DefaultSchemaAdapterFactory))?;
+        Ok(source)
+    }
 }
 
 #[async_trait]
@@ -348,10 +386,11 @@ impl TableProvider for NewListingTable {
             .split_file_groups_by_statistics
             .then(|| {
                 output_ordering.first().map(|output_ordering| {
-                    FileScanConfig::split_groups_by_statistics(
+                    FileScanConfig::split_groups_by_statistics_with_target_partitions(
                         &self.table_schema,
                         &partitioned_file_lists,
                         output_ordering,
+                        self.options.target_partitions,
                     )
                 })
             })
@@ -440,6 +479,8 @@ impl TableProvider for NewListingTable {
         let parquet_projection = parquet_projection.as_ref();
         let filter_projection = filter_projection.as_ref();
 
+        let file_source = self.create_file_source_with_schema_adapter()?;
+
         // create the execution plan
         let parquet_exec = self
             .create_physical_plan(
@@ -447,7 +488,7 @@ impl TableProvider for NewListingTable {
                 FileScanConfigBuilder::new(
                     object_store_url,
                     Arc::clone(&self.file_schema),
-                    self.options.format.file_source(),
+                    file_source,
                 )
                 .with_file_groups(partitioned_file_lists)
                 .with_statistics(statistics)
@@ -460,13 +501,6 @@ impl TableProvider for NewListingTable {
             )
             .await?;
 
-        let projection_exec = apply_projection(
-            &self.schema(),
-            &self.diff_rules,
-            parquet_projection,
-            parquet_exec,
-        )?;
-
         // if the index condition can remove filter, we can skip the config
         // feature_query_remove_filter_with_index
         let can_remove_filter = self
@@ -477,13 +511,13 @@ impl TableProvider for NewListingTable {
         if can_remove_filter || get_config().common.feature_query_remove_filter_with_index {
             apply_filter(
                 self.index_condition.as_ref(),
-                &projection_exec.schema(),
+                &parquet_exec.schema(),
                 &self.fst_fields,
-                projection_exec,
+                parquet_exec,
                 filter_projection,
             )
         } else {
-            Ok(projection_exec)
+            Ok(parquet_exec)
         }
     }
 

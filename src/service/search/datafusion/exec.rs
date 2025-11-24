@@ -49,7 +49,6 @@ use datafusion::{
     prelude::{Expr, SessionContext},
 };
 use futures::TryStreamExt;
-use hashbrown::HashMap;
 use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
 #[cfg(feature = "enterprise")]
 use {
@@ -65,11 +64,14 @@ use super::{
     file_type::{FileType, GetExt},
     planner::extension_planner::OpenobserveQueryPlanner,
     storage::file_list,
-    table_provider::{NewListingTable, uniontable::NewUnionTable},
+    table_provider::uniontable::NewUnionTable,
     udf::transform_udf::get_all_transform,
 };
 use crate::service::{
-    metadata::distinct_values::DISTINCT_STREAM_PREFIX, search::index::IndexCondition,
+    metadata::distinct_values::DISTINCT_STREAM_PREFIX,
+    search::{
+        datafusion::table_provider::listing_adapter::ListingTableAdapter, index::IndexCondition,
+    },
 };
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
@@ -628,7 +630,6 @@ pub async fn register_table(
     schema: Arc<Schema>,
     table_name: &str,
     files: &[FileKey],
-    rules: HashMap<String, DataType>,
     sort_key: &[(String, bool)],
     need_optimize_partition: bool,
 ) -> Result<SessionContext> {
@@ -644,7 +645,6 @@ pub async fn register_table(
         .await?;
 
     let table = TableBuilder::new()
-        .rules(rules)
         .sorted_by_time(sorted_by_time)
         .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
         .need_optimize_partition(need_optimize_partition)
@@ -657,7 +657,6 @@ pub async fn register_table(
 
 /// Create a datafusion table from a list of files and a schema
 pub struct TableBuilder {
-    rules: HashMap<String, DataType>,
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
     index_condition: Option<IndexCondition>,
@@ -668,18 +667,12 @@ pub struct TableBuilder {
 impl TableBuilder {
     pub fn new() -> Self {
         Self {
-            rules: HashMap::new(),
             sorted_by_time: false,
             file_stat_cache: None,
             index_condition: None,
             fst_fields: vec![],
             need_optimize_partition: false,
         }
-    }
-
-    pub fn rules(mut self, rules: HashMap<String, DataType>) -> Self {
-        self.rules = rules;
-        self
     }
 
     pub fn sorted_by_time(mut self, sorted_by_time: bool) -> Self {
@@ -796,12 +789,11 @@ impl TableBuilder {
             schema
         };
         config = config.with_schema(schema);
-        let mut table = NewListingTable::try_new(
+        let mut table = ListingTableAdapter::try_new(
             config,
-            self.rules,
+            session.id.clone(),
             self.index_condition,
             self.fst_fields,
-            self.need_optimize_partition,
         )?;
         if self.file_stat_cache.is_some() {
             table = table.with_cache(self.file_stat_cache);
@@ -1151,7 +1143,6 @@ mod tests {
     #[test]
     fn test_table_builder_new() {
         let builder = TableBuilder::new();
-        assert!(builder.rules.is_empty());
         assert!(!builder.sorted_by_time);
         assert!(builder.file_stat_cache.is_none());
         assert!(builder.index_condition.is_none());
@@ -1161,16 +1152,11 @@ mod tests {
 
     #[test]
     fn test_table_builder_with_options() {
-        let mut rules = HashMap::new();
-        rules.insert("field1".to_string(), DataType::Utf8);
-
         let builder = TableBuilder::new()
-            .rules(rules.clone())
             .sorted_by_time(true)
             .need_optimize_partition(true)
             .fst_fields(vec!["field1".to_string()]);
 
-        assert_eq!(builder.rules, rules);
         assert!(builder.sorted_by_time);
         assert!(builder.need_optimize_partition);
         assert_eq!(builder.fst_fields, vec!["field1".to_string()]);
@@ -1294,19 +1280,10 @@ mod tests {
                 id: 1,
                 segment_ids: None,
             }];
-            let rules = HashMap::new();
             let sort_key = vec![(TIMESTAMP_COL_NAME.to_string(), true)];
 
-            let result = register_table(
-                &session,
-                schema,
-                "test_table",
-                &files,
-                rules,
-                &sort_key,
-                false,
-            )
-            .await;
+            let result =
+                register_table(&session, schema, "test_table", &files, &sort_key, false).await;
 
             // Should create context successfully
             assert!(result.is_ok());
